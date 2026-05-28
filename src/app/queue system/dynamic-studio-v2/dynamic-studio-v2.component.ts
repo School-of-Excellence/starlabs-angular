@@ -1,5 +1,6 @@
-import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, inject } from '@angular/core';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, TemplateRef, inject } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { QueueInvitationApprovalComponent } from '../queue-invitation-approval/queue-invitation-approval.component';
 import { AuthguardService } from '../../authguard.service';
@@ -39,6 +40,7 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
     MatIconModule,
     MatSlideToggleModule,
     ReactiveFormsModule,
+    MatDialogModule,
     ViewParticipantAtcComponent,
   ],
   templateUrl: './dynamic-studio-v2.component.html',
@@ -46,6 +48,7 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
 })
 export class DynamicStudioV2Component {
   @ViewChildren('itemElement') itemElements: QueryList<ElementRef>;
+  @ViewChild('formDialogTpl') formDialogTpl!: TemplateRef<any>;
   profileRoles = {}
   profileid = null
   mapProfile = {}
@@ -154,6 +157,48 @@ export class DynamicStudioV2Component {
   // Studio invitation countdown (configurable via classify/studiotimer.timerinseconds)
   invitationTimerSeconds: number = 120
 
+  // Participant's active journey name (from metadata/<profileid>.activejourney → journey/<id>)
+  participantJourneyName: string | null = null
+  private journeyLoadedForProfile: string = ''
+
+  // Total ATC prescribed in the current queue session (validated + pending).
+  // Used to show a "ATC prescribed for this queue" banner at the top of the studio.
+  get atcInThisQueueCount(): number {
+    if (!this.liveAssignment || !this.ongoingQueue) return 0
+    const qid = this.ongoingQueue['docid']
+    let count = 0
+    for (const atc of (this.alphaATCList || [])) {
+      if (atc?.['atcdata']?.['queueid'] === qid) count++
+    }
+    for (const atc of (this.unvalidatedATCList || [])) {
+      if (atc?.['atcdata']?.['queueid'] === qid) count++
+    }
+    return count
+  }
+
+  // Returns the stage name immediately before the current one in the participant's
+  // stage list. Used by the "Send Back" button next to Invite More.
+  get previousStageName(): string | null {
+    if (!this.liveAssignment) return null
+    const variationId = this.liveAssignment['token']?.['variationid']
+    const stageList: string[] = variationId != null
+      ? (this.queueVariation[variationId] ?? [])
+      : (this.ongoingQueue?.['stages'] ?? [])
+    if (!stageList.length) return null
+    const idx = stageList.findIndex(s => s === this.liveAssignment['stagename'])
+    return idx > 0 ? stageList[idx - 1] : null
+  }
+
+  sendBack() {
+    const prev = this.previousStageName
+    if (!prev) {
+      alert('There is no previous stage to send the participant back to.')
+      return
+    }
+    if (!confirm(`Send participant back to the "${prev}" stage?`)) return
+    this.moveStage(prev, false)
+  }
+
   // ATC card expand/collapse state (per ATC id)
   expandedATC: { [atcid: string]: boolean } = {}
   toggleATC(atcid: string) {
@@ -238,13 +283,13 @@ export class DynamicStudioV2Component {
     // 4. Zoom session — the meeting itself (always shown)
     steps.push({ id: 'getstarted', label: 'Zoom Session', icon: 'videocam', color: '#4f46e5' })
 
-    // 5. Prescribe ATC
+    // 5. Prescribe ATC — only when there's an actual prescribe / assign action
+    // for the stage. The shared list widgets (validated/unvalidated/triple)
+    // are kept inside this step as supporting reference but they alone are
+    // not enough to justify the step (they're already in Step 3 "View Submitted ATC").
     if (widgets.includes('addunvalidatedatc') ||
         widgets.includes('addvalidatedatc') ||
-        widgets.includes('assignprocedure') ||
-        widgets.includes('prescribedvalidatedatc') ||
-        widgets.includes('prescribedunvalidatedatc') ||
-        widgets.includes('viewtripleatc')) {
+        widgets.includes('assignprocedure')) {
       steps.push({ id: 'prescribe-atc', label: 'Prescribe ATC', icon: 'add_circle', color: '#ef4444' })
     }
 
@@ -303,6 +348,65 @@ export class DynamicStudioV2Component {
     return idx >= 0 && idx < activeIdx
   }
 
+  // If `mapProfile` doesn't yet have the participant (they were created/added
+  // after the initial profile map load), fetch their profile doc on the fly
+  // so the UI shows their name/avatar without needing a page refresh.
+  private profilesBeingFetched = new Set<string>()
+  async ensureProfileLoaded(profileid: string) {
+    if (!profileid) return
+    if (this.mapProfile?.[profileid]) return
+    if (this.profilesBeingFetched.has(profileid)) return
+    this.profilesBeingFetched.add(profileid)
+    try {
+      const snap = await getDoc(doc(this.firestore, 'profile_data', profileid))
+      if (snap.exists()) {
+        const data: any = snap.data()
+        this.mapProfile = { ...this.mapProfile, [profileid]: data?.name || data?.fullname || 'Participant' }
+        this.mapProfileData = { ...this.mapProfileData, [profileid]: data }
+      }
+    } catch (err) {
+      console.warn('Could not lazy-load participant profile', profileid, err)
+    } finally {
+      this.profilesBeingFetched.delete(profileid)
+    }
+  }
+
+  // Fetch the participant's active journey name (from metadata/<profileid>.activejourney → journey/<id>).
+  // Idempotent per participant id; safe to call repeatedly.
+  async fetchParticipantJourney(profileid: string) {
+    if (!profileid || this.journeyLoadedForProfile === profileid) return
+    this.journeyLoadedForProfile = profileid
+    this.participantJourneyName = null
+    console.log('[Journey] fetching metadata for profile', profileid)
+    try {
+      const metaSnap = await getDoc(doc(this.firestore, 'metadata', profileid))
+      if (!metaSnap.exists()) {
+        console.warn('[Journey] metadata doc does not exist for', profileid)
+        return
+      }
+      const metaData: any = metaSnap.data()
+      console.log('[Journey] metadata doc data:', metaData)
+      const journeyId = metaData?.activejourney
+      if (!journeyId) {
+        console.warn('[Journey] activejourney field is empty on metadata', profileid)
+        return
+      }
+      console.log('[Journey] resolving journey doc', journeyId)
+      const journeySnap = await getDoc(doc(this.firestore, 'journey', journeyId))
+      if (!journeySnap.exists()) {
+        console.warn('[Journey] journey doc not found:', journeyId)
+        // Fall back to showing the ID so something appears
+        this.participantJourneyName = journeyId
+        return
+      }
+      const data: any = journeySnap.data()
+      console.log('[Journey] journey data:', data)
+      this.participantJourneyName = data?.journeyname || data?.name || data?.title || journeyId
+    } catch (err) {
+      console.warn('Could not fetch participant journey', err)
+    }
+  }
+
   // Fetch configurable invitation countdown duration (in seconds) from classify/studiotimer
   async fetchInvitationTimerSeconds() {
     try {
@@ -329,7 +433,8 @@ export class DynamicStudioV2Component {
     public snackBar: MatSnackBar,
     public formbuilder: FormBuilder,
     private ngZone: NgZone,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private sanitizer: DomSanitizer
   ) {
     const overrideProfileId = this.route.snapshot.queryParamMap.get('profileid')
     var loading = this.dialog.open(LoadingProgressComponent, {
@@ -723,9 +828,18 @@ export class DynamicStudioV2Component {
                 ...{token: (this.liveAssignment ?? {})["token"]},
                 ...this.mapStudioLiveAssignment[this.selectedStudio["docid"]]
               }
+              // Fetch the participant's active journey + ensure their profile
+              // is in mapProfile (in case they were created after the initial load).
+              const profId = this.liveAssignment?.['participantid'] || this.liveAssignment?.['token']?.['profile_id']
+              if (profId) {
+                this.ensureProfileLoaded(profId)
+                this.fetchParticipantJourney(profId)
+              }
             }
             else{
               this.liveAssignment = null
+              this.participantJourneyName = null
+              this.journeyLoadedForProfile = ''
             }
           })
         }
@@ -1845,8 +1959,20 @@ export class DynamicStudioV2Component {
   viewform(form){
     const firestoreForms = getFirestore("firestore-forms")
     let path = doc(firestoreForms, "formsByClient", form['docid']).path
-    const url = this.router.createUrlTree(['/formtemplate'],{queryParams: {id: form.formid, type:'form', patchdata:path}})
-    window.open(url.toString(), '_blank')
+    // embed=true tells the app shell to hide its toolbar/sidenav so only the
+    // form renders inside the iframe — no STARLABS chrome.
+    const url = this.router.createUrlTree(['/formtemplate'], {
+      queryParams: { id: form.formid, type: 'form', patchdata: path, embed: 'true' }
+    })
+    const safeUrl: SafeResourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url.toString())
+    this.dialog.open(this.formDialogTpl, {
+      data: { url: safeUrl, formname: form['formname'] || 'Form' },
+      width: '92vw',
+      maxWidth: '1200px',
+      height: '92vh',
+      panelClass: 'form-dialog-panel',
+      autoFocus: false
+    })
   }
   
   addATC(validated, profileid) {

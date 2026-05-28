@@ -43,8 +43,8 @@
       </div>
     </div>
 
-    <!-- Section: Your Studios -->
-    <div class="sec sec--studios" *ngIf="studioList.length > 0">
+    <!-- Section: Your Studios — hidden once we're inside a live assignment -->
+    <div class="sec sec--studios" *ngIf="studioList.length > 0 && liveAssignment == null">
       <div class="sec__head">
         <mat-icon class="sec__head-icon">meeting_room</mat-icon>
         <span class="sec__head-title">Your Studios</span>
@@ -218,18 +218,10 @@
           <div class="pp__id">
             <span class="pp__eyebrow">
               <span class="pp__eyebrow-pulse"></span>
-              Live · {{ liveAssignment["stagename"] }} Stage
+              Live Session
             </span>
             <h2 class="pp__name">{{ mapProfile[liveAssignment["token"]?.profile_id] }}</h2>
             <div class="pp__tags">
-              <span class="pp__tag">
-                <mat-icon>confirmation_number</mat-icon>
-                Token #{{ liveAssignment['token']?.tokennumber || '—' }}
-              </span>
-              <span *ngIf="participantUPVisitLabel" class="pp__tag pp__tag--warm">
-                <mat-icon>celebration</mat-icon>
-                {{ participantUPVisitLabel }} at uP
-              </span>
               <span *ngIf="participantReady" class="pp__tag pp__tag--ready" title="Participant is on the meeting screen and ready to join">
                 <span class="pp__tag-pulse"></span>
                 Ready to join
@@ -237,35 +229,52 @@
             </div>
           </div>
 
-          <button class="pp__btn" (click)="inviteMore(false)">
-            <mat-icon>group_add</mat-icon>
-            <span>Invite More</span>
-          </button>
-        </header>
+          <!-- Single-row session highlights: milestone + product + variation + journey -->
+          <div class="pp__highlights">
+            <div *ngIf="participantUPVisitLabel" class="pp__milestone-hl">
+              <mat-icon>celebration</mat-icon>
+              <div>
+                <span class="pp__milestone-hl__label">Milestone</span>
+                <span class="pp__milestone-hl__value">{{ participantUPVisitLabel }} time at uP</span>
+              </div>
+            </div>
+            <div class="pp__info-chip">
+              <mat-icon>inventory_2</mat-icon>
+              <div>
+                <span class="pp__info-chip__label">Product</span>
+                <span class="pp__info-chip__value" [title]="liveAssignment['token']?.productname">
+                  {{ liveAssignment["token"]?.productname || '—' }}
+                </span>
+              </div>
+            </div>
+            <div *ngIf="liveAssignment['token']?.variationid != null" class="pp__info-chip">
+              <mat-icon>tune</mat-icon>
+              <div>
+                <span class="pp__info-chip__label">Variation</span>
+                <span class="pp__info-chip__value">{{ mapVariationName[liveAssignment['token']?.variationid] }}</span>
+              </div>
+            </div>
+            <div *ngIf="participantJourneyName" class="pp__info-chip">
+              <mat-icon>route</mat-icon>
+              <div>
+                <span class="pp__info-chip__label">Journey</span>
+                <span class="pp__info-chip__value" [title]="participantJourneyName">{{ participantJourneyName }}</span>
+              </div>
+            </div>
+          </div>
 
-        <div class="pp__stats">
-          <div class="pp__stat">
-            <span class="pp__stat-ic"><mat-icon>inventory_2</mat-icon></span>
-            <div class="pp__stat-body">
-              <span class="pp__stat-label">Product</span>
-              <span class="pp__stat-value" [title]="liveAssignment['token']?.productname">{{ liveAssignment["token"]?.productname || '—' }}</span>
-            </div>
+          <div class="pp__actions">
+            <button class="pp__btn" (click)="inviteMore(false)">
+              <mat-icon>group_add</mat-icon>
+              <span>Invite More</span>
+            </button>
+            <button class="pp__btn pp__btn--warn" *ngIf="previousStageName" (click)="sendBack()"
+              [title]="'Send participant back to ' + previousStageName + ' stage'">
+              <mat-icon>undo</mat-icon>
+              <span>Send Back</span>
+            </button>
           </div>
-          <div class="pp__stat" *ngIf="liveAssignment['token']?.variationid != null">
-            <span class="pp__stat-ic"><mat-icon>tune</mat-icon></span>
-            <div class="pp__stat-body">
-              <span class="pp__stat-label">Variation</span>
-              <span class="pp__stat-value">{{ mapVariationName[liveAssignment['token']?.variationid] }}</span>
-            </div>
-          </div>
-          <div class="pp__stat">
-            <span class="pp__stat-ic"><mat-icon>groups</mat-icon></span>
-            <div class="pp__stat-body">
-              <span class="pp__stat-label">Queue</span>
-              <span class="pp__stat-value">{{ ongoingQueue['queuename'] }}</span>
-            </div>
-          </div>
-        </div>
+        </header>
       </section>
 
       <div class="ss-label ss-label--workflow">
@@ -273,6 +282,24 @@
         <span class="ss-label__icon"><mat-icon>timeline</mat-icon></span>
         <span class="ss-label__text">Workflow Progress</span>
         <span class="ss-label__meta">{{ getStepIndex(activeStepId) + 1 }} / {{ visibleSteps.length }}</span>
+      </div>
+
+      <!-- ATC prescribed in this queue banner -->
+      <div class="atc-prescribed-banner" *ngIf="atcInThisQueueCount > 0">
+        <span class="atc-prescribed-banner__icon"><mat-icon>check_circle</mat-icon></span>
+        <div class="atc-prescribed-banner__body">
+          <span class="atc-prescribed-banner__title">
+            {{ atcInThisQueueCount }} ATC prescribed for this queue
+          </span>
+          <span class="atc-prescribed-banner__sub">
+            {{ atcInThisQueueCount === 1 ? 'An ATC has' : atcInThisQueueCount + ' ATCs have' }}
+            been prescribed for {{ mapProfile[liveAssignment["token"]?.profile_id] }} in {{ ongoingQueue['queuename'] }}.
+          </span>
+        </div>
+        <button type="button" class="atc-prescribed-banner__cta" (click)="setActiveStep('view-atc')" *ngIf="getStepIndex('view-atc') >= 0">
+          <mat-icon>visibility</mat-icon>
+          View
+        </button>
       </div>
 
       <!-- Floating "participant is waiting" notice — only when not on Zoom Session step -->
@@ -632,6 +659,22 @@
 
       </div>
 
+      <!-- Form-in-dialog template (used by viewform()) -->
+      <ng-template #formDialogTpl let-data>
+        <div class="form-dlg">
+          <header class="form-dlg__head">
+            <span class="form-dlg__title">
+              <mat-icon>description</mat-icon>
+              {{ data.formname }}
+            </span>
+            <button type="button" class="form-dlg__close" mat-dialog-close>
+              <mat-icon>close</mat-icon>
+            </button>
+          </header>
+          <iframe class="form-dlg__frame" [src]="data.url" allow="clipboard-read; clipboard-write" frameborder="0"></iframe>
+        </div>
+      </ng-template>
+
       <!-- ============================================================
            Reusable widget templates (shared between steps)
            ============================================================ -->
@@ -689,65 +732,56 @@
 
       <!-- Shared ATC Card template (validated + unvalidated use this) -->
       <ng-template #atcCardTpl let-atc let-i="index" let-kind="kind" let-editColl="editColl">
-        <article class="atc-card"
-          [class.atc-card--warn]="kind === 'pending'"
-          [class.atc-card--open]="isATCExpanded(atc.atcid)">
-          <header class="atc-card__head" (click)="toggleATC(atc.atcid)" role="button" tabindex="0">
-            <span class="atc-card__index" [class.atc-card__index--warn]="kind === 'pending'">
-              {{ (i + 1) < 10 ? '0' + (i + 1) : (i + 1) }}
-            </span>
-            <div class="atc-card__head-info">
-              <span class="atc-card__head-row">
-                <mat-icon class="atc-card__head-icon">event</mat-icon>
-                <span class="atc-card__date">{{ atc["atcdata"]["prescription_date"].toDate() | date:'mediumDate' }}</span>
-                <span class="atc-card__queue">
-                  <mat-icon>groups</mat-icon>
-                  {{ mapQueue[atc["atcdata"]["queueid"]] }}
-                </span>
-                <span class="atc-card__status" *ngIf="kind === 'validated'">
-                  <mat-icon>check_circle</mat-icon>
-                  Validated
-                </span>
-                <span class="atc-card__status atc-card__status--warn" *ngIf="kind === 'pending'">
-                  <mat-icon>schedule</mat-icon>
-                  Awaiting validation
-                </span>
-              </span>
-            </div>
-            <button type="button" class="atc-card__edit" (click)="updateATC(atc.atcid, editColl, ''); $event.stopPropagation()">
-              <mat-icon>edit</mat-icon>
-              Edit
-            </button>
-            <mat-icon class="atc-card__chev">{{ isATCExpanded(atc.atcid) ? 'expand_less' : 'expand_more' }}</mat-icon>
+        <article class="vatc" [class.vatc--warn]="kind === 'pending'">
+          <header class="vatc__head">
+            <span class="vatc__num">{{ i + 1 }}.</span>
+            <span class="vatc__date">{{ atc["atcdata"]["prescription_date"].toDate() | date:'medium' }}</span>
+            <span class="vatc__status vatc__status--ok" *ngIf="kind === 'validated'">Validated</span>
+            <span class="vatc__status vatc__status--warn" *ngIf="kind === 'pending'">Awaiting Validation</span>
           </header>
 
-          <!-- Collapsible body -->
-          <div class="atc-card__body" *ngIf="isATCExpanded(atc.atcid)">
-            <!-- Specialists -->
-            <section class="atc-card__section" *ngIf="atc['atcdata']['bigactivity']">
-              <h6 class="atc-card__label">Specialists Assigned</h6>
-              <div class="atc-specs">
-                <div class="atc-spec" *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
-                  <span class="atc-spec__activity">{{ mapActivity[$any(activity.key)] }}</span>
-                  <span class="atc-spec__people">
-                    <span *ngFor="let specialist of $any(activity.value); let isLast = last">{{ mapProfile[specialist] }}{{ isLast ? '' : ', ' }}</span>
-                  </span>
-                </div>
-              </div>
-            </section>
+          <dl class="vatc__list">
+            <div class="vatc__row">
+              <dt>Participant Name:</dt>
+              <dd>
+                {{ mapProfile[liveAssignment["token"]?.profile_id] }}
+              </dd>
+            </div>
+            <div class="vatc__row" *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
+              <dt>{{ mapActivity[$any(activity.key)] }}:</dt>
+              <dd>
+                <span *ngFor="let specialist of $any(activity.value); let isLast = last">{{ mapProfile[specialist] }}{{ isLast ? '' : ', ' }}</span>
+              </dd>
+            </div>
+            <div class="vatc__row" *ngIf="atc['atcdata']['queueid']">
+              <dt>Queue:</dt>
+              <dd>{{ mapQueue[atc["atcdata"]["queueid"]] }}</dd>
+            </div>
+            <div class="vatc__row" *ngIf="atc['atcdata']['directive']">
+              <dt>ATC Directive:</dt>
+              <dd>{{ atc["atcdata"]["directive"] }}</dd>
+            </div>
+          </dl>
 
-            <!-- Directive -->
-            <section class="atc-card__section" *ngIf="atc['atcdata']['directive']">
-              <h6 class="atc-card__label">Directive</h6>
-              <blockquote class="atc-directive">
-                <mat-icon class="atc-directive__quote">format_quote</mat-icon>
-                {{ atc["atcdata"]["directive"] }}
-              </blockquote>
-            </section>
+          <p class="vatc__note" *ngIf="kind === 'validated'">
+            <em>This ATC is directly visible to the Participant.</em>
+          </p>
 
-            <!-- Adjustments & Procedures -->
-            <section class="atc-card__section" *ngIf="atc['transcription']?.length">
-              <h6 class="atc-card__label">Adjustments &amp; Procedures</h6>
+          <div class="vatc__actions">
+            <button type="button" class="vatc__btn" (click)="toggleATC(atc.atcid)">
+              <mat-icon>{{ isATCExpanded(atc.atcid) ? 'visibility_off' : 'visibility' }}</mat-icon>
+              {{ isATCExpanded(atc.atcid) ? 'Hide Details' : 'View Full ATC' }}
+            </button>
+            <button type="button" class="vatc__btn" (click)="updateATC(atc.atcid, editColl, '')">
+              <mat-icon>edit</mat-icon>
+              Edit ATC
+            </button>
+          </div>
+
+          <!-- Expanded full-details panel (Adjustments, Notes) -->
+          <div class="vatc__details" *ngIf="isATCExpanded(atc.atcid)">
+            <div class="vatc__detail-block" *ngIf="atc['transcription']?.length">
+              <h6 class="vatc__detail-label">Adjustments &amp; Procedures</h6>
               <div class="atc-adj-list">
                 <ng-container *ngFor="let adjustment of atc['transcription']; let aIdx = index">
                   <div class="atc-adj" *ngIf="adjustment?.procedure.length != 0">
@@ -764,12 +798,11 @@
                   </div>
                 </ng-container>
               </div>
-            </section>
+            </div>
 
-            <!-- Notes -->
-            <section class="atc-card__section atc-card__notes"
+            <div class="vatc__detail-block"
               *ngIf="mapATCnotes[atc.atcdata['notesid']] || mapATCnotes[atc.atcdata['mentoringid']]">
-              <h6 class="atc-card__label">Notes</h6>
+              <h6 class="vatc__detail-label">Notes</h6>
               <div class="atc-note-grid">
                 <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['notesid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['consultationsummary'])">
                   <span class="atc-note__title"><mat-icon>summarize</mat-icon> Summary</span>
@@ -784,7 +817,7 @@
                   <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'] }}</p>
                 </div>
               </div>
-            </section>
+            </div>
           </div>
         </article>
       </ng-template>

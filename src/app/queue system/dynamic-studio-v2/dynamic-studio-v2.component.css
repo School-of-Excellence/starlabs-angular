@@ -1442,6 +1442,119 @@ mat-form-field {
   color: var(--good);
   font-weight: 700;
 }
+
+/* Single-row session highlights — milestone + product + variation + journey */
+.pp__highlights {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  margin-right: 12px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* Generic info chip used for Product / Variation / Journey */
+.pp__info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid var(--hair-2);
+  border-radius: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 220px;
+  transition: border-color 0.15s ease;
+}
+.pp__info-chip:hover { border-color: var(--accent); }
+.pp__info-chip > mat-icon {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.pp__info-chip > div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.pp__info-chip__label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.pp__info-chip__value {
+  margin-top: 1px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Highlighted uP milestone — same chip shape but warm gradient + animated icon */
+.pp__milestone-hl {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  color: var(--warm);
+  box-shadow: 0 4px 14px rgba(180, 83, 9, 0.18);
+  position: relative;
+  flex-shrink: 0;
+  animation: ppMilestonePop 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes ppMilestonePop {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.pp__milestone-hl mat-icon {
+  font-size: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+  line-height: 20px !important;
+  color: var(--warm);
+  animation: ppMilestoneSpin 6s linear infinite;
+}
+@keyframes ppMilestoneSpin {
+  0%, 92%, 100% { transform: rotate(0deg); }
+  96% { transform: rotate(-15deg); }
+  98% { transform: rotate(15deg); }
+}
+.pp__milestone-hl__label {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #92400e;
+  line-height: 1.15;
+}
+.pp__milestone-hl__value {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #78350f;
+  line-height: 1.2;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .pp__highlights { width: 100%; margin: 6px 0 0; }
+  .pp__milestone-hl,
+  .pp__info-chip { width: 100%; max-width: none; }
+}
 .pp__tag-pulse {
   display: inline-block;
   width: 7px;
@@ -1491,73 +1604,30 @@ mat-form-field {
 }
 .pp__btn mat-icon { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
 
-/* Stats strip */
-.pp__stats {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0;
-  margin: 0 24px 16px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--hair);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.pp__stat {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-right: 1px solid var(--hair);
-  min-width: 0;
-}
-.pp__stat:last-child { border-right: none; }
-.pp__stat-ic {
+.pp__actions {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 7px;
+  gap: 6px;
   flex-shrink: 0;
 }
-.pp__stat-ic mat-icon { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
-.pp__stat-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.2;
+.pp__btn--warn {
+  background: #ffffff;
+  color: var(--warm);
+  border-color: #fbbf24;
 }
-.pp__stat-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+.pp__btn--warn:hover {
+  background: var(--warm);
+  color: #ffffff;
+  border-color: var(--warm);
+  box-shadow: 0 4px 10px rgba(180, 83, 9, 0.18);
 }
-.pp__stat-value {
-  margin-top: 2px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.pp__btn--warn mat-icon { color: inherit; }
 
 @media (max-width: 768px) {
   .pp__hero { padding: 14px 14px 12px; grid-template-columns: auto 1fr; gap: 12px; }
   .pp__avatar { width: 54px; height: 54px; font-size: 22px; }
   .pp__name { font-size: 20px; }
   .pp__btn { grid-column: 1 / -1; justify-content: center; }
-  .pp__stats { margin: 0 14px 14px; grid-template-columns: 1fr; }
-  .pp__stat { border-right: none; border-bottom: 1px solid var(--hair); }
-  .pp__stat:last-child { border-bottom: none; }
 }
 
 /* ---------------- RAIL (clean timeline) ---------------- */
@@ -1804,6 +1874,277 @@ mat-form-field {
   font-size: 12px;
   color: var(--ink-3);
   line-height: 1.4;
+}
+
+/* ============================================================
+   ATC Prescribed banner — shows at top of stepper
+   ============================================================ */
+.atc-prescribed-banner {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, #dcfce7 0%, #f0fdf4 60%, #ffffff 100%);
+  border-top: 1px solid #86efac;
+  border-bottom: 1px solid #86efac;
+  position: relative;
+}
+.atc-prescribed-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--good);
+}
+.atc-prescribed-banner__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--good);
+  color: #ffffff;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.atc-prescribed-banner__icon mat-icon { font-size: 20px; width: 20px; height: 20px; line-height: 20px; }
+.atc-prescribed-banner__body { min-width: 0; display: flex; flex-direction: column; }
+.atc-prescribed-banner__title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.atc-prescribed-banner__sub {
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.4;
+  margin-top: 1px;
+}
+.atc-prescribed-banner__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  background: var(--good);
+  color: #ffffff;
+  border: 1px solid var(--good);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.atc-prescribed-banner__cta:hover { background: #166534; border-color: #166534; }
+.atc-prescribed-banner__cta mat-icon { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
+
+/* ============================================================
+   Form-in-Dialog (iframe view of /formtemplate)
+   ============================================================ */
+.form-dlg {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+}
+.form-dlg__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.form-dlg__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.form-dlg__title mat-icon {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+  color: #4f46e5;
+}
+.form-dlg__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.form-dlg__close:hover { background: #ef4444; color: #ffffff; border-color: #ef4444; }
+.form-dlg__close mat-icon { font-size: 18px; width: 18px; height: 18px; line-height: 18px; }
+.form-dlg__frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+::ng-deep .form-dialog-panel .mat-mdc-dialog-surface {
+  padding: 0 !important;
+  overflow: hidden;
+}
+::ng-deep .form-dialog-panel .mdc-dialog__content,
+::ng-deep .form-dialog-panel .mat-mdc-dialog-content {
+  padding: 0 !important;
+  max-height: none !important;
+}
+
+/* ============================================================
+   View-Prescribe ATC card (vatc) — matches the legacy design
+   ============================================================ */
+.vatc {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  margin: 0;
+}
+.vatc + .vatc { margin-top: 10px; }
+.vatc--warn { border-left: 3px solid var(--warm); }
+
+.vatc__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.vatc__num {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.vatc__date {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.vatc__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.vatc__status--ok {
+  background: #dcfce7;
+  color: var(--good);
+  border: 1px solid #86efac;
+}
+.vatc__status--warn {
+  background: var(--warm-soft);
+  color: var(--warm);
+  border: 1px solid #fbbf24;
+}
+
+.vatc__list {
+  margin: 0 0 10px;
+  padding: 0;
+}
+.vatc__row {
+  display: grid;
+  grid-template-columns: minmax(150px, max-content) 1fr;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.vatc__row dt {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+  font-style: italic;
+}
+.vatc__row dd {
+  margin: 0;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.vatc__note {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.vatc__note em { font-style: italic; font-weight: 500; }
+
+.vatc__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.vatc__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.vatc__btn:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+.vatc__btn mat-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+  line-height: 14px !important;
+}
+
+/* Expanded details */
+.vatc__details {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--hair-2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.vatc__detail-block { display: flex; flex-direction: column; gap: 6px; }
+.vatc__detail-label {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+@media (max-width: 600px) {
+  .vatc__row { grid-template-columns: 1fr; gap: 2px; }
+  .vatc__actions { flex-direction: column; }
+  .vatc__btn { width: 100%; justify-content: center; }
 }
 
 /* ============================================================

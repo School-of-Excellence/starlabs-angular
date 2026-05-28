@@ -72,10 +72,30 @@ export class ZoomClientviewComponent {
   private unloadHandler: ((ev?: any) => void) | null = null;
   private readonly HEARTBEAT_INTERVAL_MS = 10000; // 10 seconds
 
+  // Specialist heartbeat — refreshes `specialistLastSeenAt` so participants
+  // can tell the specialist is still actually in the meeting. Without this,
+  // a stale `specialistJoinedAt` would persist after the specialist leaves /
+  // generates a new link, and the next participant would skip the wait
+  // screen and try to join an empty room.
+  private specialistHeartbeatTimer: any = null;
+  private specialistUnloadHandler: ((ev?: any) => void) | null = null;
+  private readonly SPECIALIST_PRESENCE_FRESHNESS_MS = 30000; // 30s window
+  private readonly SPECIALIST_HEARTBEAT_INTERVAL_MS = 10000; // 10s beat
+
   // Background-tab attention grabbers (used when the gate releases)
   private originalTitle: string = '';
   private titleFlashTimer: any = null;
   private titleVisibilityHandler: (() => void) | null = null;
+  private chimeLoopTimer: any = null;
+  private chimeVisibilityHandler: (() => void) | null = null;
+
+  // Recording-prompt state (host only)
+  private remoteParticipantCount: number = 0;
+  private recordingStatus: 'started' | 'paused' | 'stopped' | 'unknown' = 'unknown';
+  private recordingPromptSnackRef: any = null;
+  private recordingPromptTimer: any = null;
+  private recordingPromptDismissedAt: number = 0;
+  private readonly RECORDING_PROMPT_COOLDOWN_MS = 30000; // re-prompt 30s after dismiss
 
   constructor(
     private route: ActivatedRoute,
@@ -160,6 +180,61 @@ export class ZoomClientviewComponent {
     }
   }
 
+  // Specialist heartbeat — same idea as the participant heartbeat.
+  // Updates `specialistLastSeenAt` every 10s; on tab close clears both
+  // `specialistJoinedAt` and `specialistLastSeenAt` so the next participant
+  // arrival enters the wait screen immediately rather than skipping it
+  // because of a stale flag.
+  private startSpecialistHeartbeat() {
+    if (this.specialistHeartbeatTimer) return;
+    if (!this.profileHost || this.collectiontype !== 'queue' || !this.documentId) return;
+
+    const ref = doc(this.firestore, 'live assignment', this.documentId);
+    const beat = () => {
+      updateDoc(ref, { specialistLastSeenAt: serverTimestamp() })
+        .catch(err => console.warn('Specialist heartbeat failed', err));
+    };
+    beat();
+    this.specialistHeartbeatTimer = setInterval(beat, this.SPECIALIST_HEARTBEAT_INTERVAL_MS);
+
+    this.specialistUnloadHandler = () => {
+      try {
+        updateDoc(ref, {
+          specialistJoinedAt: null,
+          specialistLastSeenAt: null
+        }).catch(() => {});
+      } catch {}
+    };
+    window.addEventListener('pagehide', this.specialistUnloadHandler);
+  }
+
+  private stopSpecialistHeartbeat() {
+    if (this.specialistHeartbeatTimer) {
+      clearInterval(this.specialistHeartbeatTimer);
+      this.specialistHeartbeatTimer = null;
+    }
+    if (this.specialistUnloadHandler) {
+      window.removeEventListener('pagehide', this.specialistUnloadHandler);
+      this.specialistUnloadHandler = null;
+    }
+  }
+
+  // Returns true when the specialist is actually present (joined AND heartbeat fresh).
+  // Falls back to legacy `specialistJoinedAt`-only check if the heartbeat field
+  // isn't present (older deployments).
+  private isSpecialistPresent(data: any): boolean {
+    if (!data?.['specialistJoinedAt']) return false;
+    const hasLastSeenField = data && 'specialistLastSeenAt' in data;
+    const lastSeen = data?.['specialistLastSeenAt'];
+    if (!hasLastSeenField) return true; // legacy fallback — no heartbeat yet
+    if (lastSeen == null) return false; // explicitly cleared on leave
+    const ms = typeof lastSeen?.toMillis === 'function'
+      ? lastSeen.toMillis()
+      : (lastSeen instanceof Date ? lastSeen.getTime() : 0);
+    if (!ms) return false;
+    return (Date.now() - ms) < this.SPECIALIST_PRESENCE_FRESHNESS_MS;
+  }
+
   // -------------------- Attention grabbers --------------------
   // Ask early so the browser shows its native permission prompt while the
   // participant is reading the waiting copy. If they grant, we'll be able
@@ -174,9 +249,43 @@ export class ZoomClientviewComponent {
 
   // Called the instant `specialistJoinedAt` flips. Fires all three signals.
   private alertParticipant() {
-    this.playChime();
+    this.startChimeLoop();
     this.showSystemNotification();
     this.startTitleFlash();
+  }
+
+  // Repeat the chime every 3s while the tab is hidden. Stops the moment
+  // the participant returns to the tab (visibilitychange) or component dies.
+  private startChimeLoop() {
+    if (this.chimeLoopTimer) return;
+    // Always play once immediately.
+    this.playChime();
+    // If the tab is already visible the participant has seen us — no looping.
+    if (!document.hidden) return;
+
+    this.chimeLoopTimer = setInterval(() => {
+      if (document.hidden) {
+        this.playChime();
+      } else {
+        this.stopChimeLoop();
+      }
+    }, 3000);
+
+    this.chimeVisibilityHandler = () => {
+      if (!document.hidden) this.stopChimeLoop();
+    };
+    document.addEventListener('visibilitychange', this.chimeVisibilityHandler);
+  }
+
+  private stopChimeLoop() {
+    if (this.chimeLoopTimer) {
+      clearInterval(this.chimeLoopTimer);
+      this.chimeLoopTimer = null;
+    }
+    if (this.chimeVisibilityHandler) {
+      document.removeEventListener('visibilitychange', this.chimeVisibilityHandler);
+      this.chimeVisibilityHandler = null;
+    }
   }
 
   // Programmatic chime via Web Audio API — two short notes (C5 → E5).
@@ -209,7 +318,7 @@ export class ZoomClientviewComponent {
     try {
       if (!('Notification' in window)) return;
       if (Notification.permission !== 'granted') return;
-      const n = new Notification('Your specialist is ready', {
+      const n = new Notification('Specialist joined call', {
         body: 'Switch back to the meeting tab to join the call.',
         icon: '/favicon.ico',
         tag: 'specialist-ready',
@@ -234,7 +343,7 @@ export class ZoomClientviewComponent {
 
     let on = true;
     this.titleFlashTimer = setInterval(() => {
-      document.title = on ? '🔴 Specialist is ready — Join now!' : this.originalTitle;
+      document.title = on ? '🔴 Specialist joined call — Join now!' : this.originalTitle;
       on = !on;
     }, 1000);
 
@@ -257,6 +366,131 @@ export class ZoomClientviewComponent {
       this.titleVisibilityHandler = null;
     }
   }
+
+  // -------------------- Recording prompt (host-side) --------------------
+  // When 2+ participants are present and recording isn't running, prompt
+  // the host. Re-check on user join/leave and on recording status change.
+  private wireRecordingListeners() {
+    try {
+      const ZM: any = ZoomMtg as any;
+      // Instead of trying to count join/leave events (which include self and
+      // can double-fire on reconnects), poll a snapshot of the attendee list.
+      // Snapshot subtracts self, so it's accurate at all times.
+      ZM.inMeetingServiceListener('onUserJoin', () => this.refreshRemoteCountSnapshot());
+      ZM.inMeetingServiceListener('onUserLeave', () => this.refreshRemoteCountSnapshot());
+      ZM.inMeetingServiceListener('onUserUpdate', () => this.refreshRemoteCountSnapshot());
+      const handleRecordingChange = (data: any) => {
+        const s: string = (data?.recordingStatus || data?.status || '').toLowerCase();
+        let newStatus: 'started' | 'paused' | 'stopped' | 'unknown' = this.recordingStatus;
+        if (s.includes('paus')) newStatus = 'paused';
+        else if (s.includes('stop') || s.includes('end')) newStatus = 'stopped';
+        else if (s.includes('start') || s.includes('record')) newStatus = 'started';
+
+        if (newStatus !== this.recordingStatus) {
+          this.recordingStatus = newStatus;
+          // Status changed → cooldown from a previous dismiss is no longer
+          // relevant. Reset so the new state can prompt immediately.
+          this.recordingPromptDismissedAt = 0;
+        }
+        this.evaluateRecordingPrompt();
+      };
+      ZM.inMeetingServiceListener('onRecordingStatusChange', handleRecordingChange);
+      // Some SDK builds use this older event name
+      ZM.inMeetingServiceListener('onRecordChange', handleRecordingChange);
+    } catch (e) {
+      console.warn('Could not wire Zoom recording listeners', e);
+    }
+
+    // After a short delay, query the current attendees list so we catch
+    // any participants who were already in the call when the host (re)joined.
+    // The user-join listener only fires for NEW joins, so on page refresh
+    // we'd miss the existing remote users without this snapshot.
+    setTimeout(() => this.refreshRemoteCountSnapshot(), 3000);
+
+    // Poll every 10s continuously so the prompt re-appears if the host
+    // dismissed it without starting the recording. Also refreshes the
+    // count snapshot every cycle as a belt-and-braces measure.
+    this.recordingPromptTimer = setInterval(() => {
+      this.refreshRemoteCountSnapshot();
+      this.evaluateRecordingPrompt();
+    }, 10000);
+  }
+
+  // Snapshot the current attendee count (host + remote users) via Zoom SDK.
+  // Best-effort — different SDK builds expose slightly different APIs.
+  private refreshRemoteCountSnapshot() {
+    try {
+      const ZM: any = ZoomMtg as any;
+      if (typeof ZM.getAttendeeslist !== 'function') return;
+      ZM.getAttendeeslist({
+        success: (res: any) => {
+          const list = res?.result?.attendeesList || res?.attendeesList || res?.result || res || [];
+          if (Array.isArray(list)) {
+            // exclude self
+            this.remoteParticipantCount = Math.max(0, list.length - 1);
+            this.evaluateRecordingPrompt();
+          }
+        }
+      });
+    } catch (e) { /* silent */ }
+  }
+
+  private evaluateRecordingPrompt() {
+    // Recording is on → close any open prompt and exit. This handles the
+    // "paused → started" or "stopped → started" transition mid-call.
+    if (this.recordingStatus === 'started') {
+      if (this.recordingPromptSnackRef) {
+        try { this.recordingPromptSnackRef.dismiss(); } catch {}
+        this.recordingPromptSnackRef = null;
+      }
+      this.recordingPromptDismissedAt = 0;
+      return;
+    }
+
+    // `remoteParticipantCount` is already self-excluded (snapshot subtracts 1).
+    // Only prompt when at least one OTHER person is in the room.
+    const otherPresent = this.remoteParticipantCount >= 1;
+    // Only prompt when we KNOW recording is paused or stopped. 'unknown' is
+    // silent (too many false positives when SDK events don't fire).
+    const recordingOff = this.recordingStatus === 'stopped'
+                      || this.recordingStatus === 'paused';
+
+    if (!otherPresent || !recordingOff) return;
+    if (this.recordingPromptSnackRef) return; // already showing
+    // Cooldown: don't re-prompt within 30s of last dismiss (unless status
+    // changed, which clears the cooldown via the listener above).
+    if (this.recordingPromptDismissedAt &&
+        Date.now() - this.recordingPromptDismissedAt < this.RECORDING_PROMPT_COOLDOWN_MS) {
+      return;
+    }
+
+    const msg = this.recordingStatus === 'paused'
+      ? 'Recording is paused. Please resume the recording now.'
+      : 'Recording has stopped. Please start the recording again now.';
+    this.ngZone.run(() => {
+      this.recordingPromptSnackRef = this.snackBar.open(msg, 'Dismiss', {
+        duration: 0,
+        horizontalPosition: 'center',
+        verticalPosition: 'top',
+        panelClass: ['recording-prompt-snack']
+      });
+      this.recordingPromptSnackRef.afterDismissed().subscribe(() => {
+        this.recordingPromptSnackRef = null;
+        this.recordingPromptDismissedAt = Date.now();
+      });
+    });
+  }
+
+  private stopRecordingListeners() {
+    if (this.recordingPromptTimer) {
+      clearInterval(this.recordingPromptTimer);
+      this.recordingPromptTimer = null;
+    }
+    if (this.recordingPromptSnackRef) {
+      try { this.recordingPromptSnackRef.dismiss(); } catch {}
+      this.recordingPromptSnackRef = null;
+    }
+  }
   // -------------------- end attention grabbers --------------------
 
   ngOnDestroy() {
@@ -266,16 +500,19 @@ export class ZoomClientviewComponent {
     this.waitingSub = null;
     this.stopParticipantHeartbeat();
     this.stopTitleFlash();
+    this.stopChimeLoop();
+    this.stopRecordingListeners();
 
-    // Best-effort: if the specialist (host) is leaving the meeting page, clear
-    // the `specialistJoinedAt` flag so a participant who later opens an old
-    // link doesn't think someone is still in the room. Status === 'live' check
-    // prevents wiping the flag if the session has already been marked complete.
+    // Stop the specialist heartbeat and best-effort clear both presence flags
+    // so the next participant arrival lands on the wait screen rather than
+    // skipping it because of a stale `specialistJoinedAt`.
+    this.stopSpecialistHeartbeat();
     if (this.profileHost && this.collectiontype === 'queue' && this.documentId &&
         this.zoomdata?.['status'] === 'live') {
       updateDoc(doc(this.firestore, 'live assignment', this.documentId), {
-        specialistJoinedAt: null
-      }).catch(err => console.warn('Could not clear specialistJoinedAt on leave', err));
+        specialistJoinedAt: null,
+        specialistLastSeenAt: null
+      }).catch(err => console.warn('Could not clear specialist presence on leave', err));
     }
   }
 
@@ -338,8 +575,10 @@ export class ZoomClientviewComponent {
       // closes the tab (heartbeat stops → "Ready to join" disappears).
       this.startParticipantHeartbeat();
 
-      if (!this.zoomdata?.['specialistJoinedAt']) {
+      if (!this.isSpecialistPresent(this.zoomdata)) {
         // Participant arrived before the specialist is in the meeting → wait.
+        // (Either the specialist has never joined, or they joined earlier and
+        // have since left — heartbeat is stale.)
         // Try to surface the participant's name for the waiting copy.
         try {
           const participantId = this.zoomdata?.['participantid'] || this.zoomdata?.['token']?.['profile_id'];
@@ -387,8 +626,10 @@ export class ZoomClientviewComponent {
             });
             return;
           }
-          // Specialist has joined the Zoom call → release the gate
-          if (data['specialistJoinedAt']) {
+          // Specialist is actually present (joined AND heartbeat fresh) →
+          // release the gate. We re-check freshness here so a stale flag
+          // from an earlier session doesn't prematurely release the wait.
+          if (this.isSpecialistPresent(data)) {
             this.waitingSub?.unsubscribe();
             this.waitingSub = null;
             this.zoomdata = data;
@@ -463,17 +704,25 @@ export class ZoomClientviewComponent {
                 console.log("zoom successfully joined");
 
                 // Host has actually entered the Zoom meeting — release any
-                // participant waiting on the studio gate.
+                // participant waiting on the studio gate, and start the
+                // heartbeat so participants can tell when the host leaves.
                 if (this.profileHost && this.collectiontype === 'queue') {
                   updateDoc(doc(this.firestore, 'live assignment', this.documentId), {
-                    specialistJoinedAt: serverTimestamp()
+                    specialistJoinedAt: serverTimestamp(),
+                    specialistLastSeenAt: serverTimestamp()
                   }).catch(err => console.warn('Could not mark specialistJoinedAt', err));
+                  this.startSpecialistHeartbeat();
                 }
 
                 // Participant successfully joined Zoom → stop the heartbeat
                 // (Zoom presence is the source of truth from now on).
                 if (!this.profileHost) {
                   this.stopParticipantHeartbeat();
+                }
+
+                // Host only: wire in-meeting listeners to prompt about recording
+                if (this.profileHost) {
+                  this.wireRecordingListeners();
                 }
 
                 this.snackBar.open(
