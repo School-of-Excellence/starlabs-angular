@@ -61,6 +61,7 @@ export class RouteConfigurationComponent {
   private subscription = new Subject<void>();
   private originalData: RouteItem[] = [];
   private expandedData: RouteItem[] = [];
+  private currentFilter = '';
   isAllExpanded = false;
 
   loggedinProfileRoles = {}
@@ -80,6 +81,15 @@ export class RouteConfigurationComponent {
     //     router.navigateByUrl("/")
     //   }
     })
+    this.dataSource.filterPredicate = (data: RouteItem, filter: string) => {
+      const matches = (item: RouteItem) =>
+        `${item.label || ''} ${item.route || ''}`.toLowerCase().includes(filter);
+      if (matches(data)) return true;
+      if (data.children && data.children.length) {
+        return data.children.some(c => matches(c));
+      }
+      return false;
+    };
     this.loadData();
   }
 
@@ -137,7 +147,8 @@ export class RouteConfigurationComponent {
         item.roles = (item as any).originalRoles || [];
       }
       this.expandedData.push(item);
-      if (item.isExpanded && item.children && item.children.length > 0) {
+      const shouldExpandForFilter = !!this.currentFilter && item.children && item.children.length > 0;
+      if ((item.isExpanded || shouldExpandForFilter) && item.children && item.children.length > 0) {
         item.children.forEach((child, index) => {
           this.expandedData.push({
             ...child,
@@ -232,7 +243,9 @@ export class RouteConfigurationComponent {
 
   applyFilter(event: Event): void {
     const filterValue = (event.target as HTMLInputElement).value;
-    this.dataSource.filter = filterValue.trim().toLowerCase();
+    this.currentFilter = filterValue.trim().toLowerCase();
+    this.buildExpandedData();
+    this.dataSource.filter = this.currentFilter;
 
     if (this.dataSource.paginator) {
       this.dataSource.paginator.firstPage();
