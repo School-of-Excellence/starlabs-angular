@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
-import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc, collectionData } from '@angular/fire/firestore';
 import { PlanActivityComponent } from '../plan-activity/plan-activity.component';
 import { ManageCohertsComponent } from '../manage-coherts/manage-coherts.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -52,6 +52,7 @@ export class CohortManagementComponent {
   private _sheetOpenedAt = 0
   unassignSearch = '';
   filterUnassignParticipants = []
+  progressionSubscription : Subscription;
 
   openMobileSheet(ev: Event): void {
     ev.stopPropagation()
@@ -372,7 +373,9 @@ export class CohortManagementComponent {
   // ════════════════════════════════════════════════════════════════
   // UI helpers
   // ════════════════════════════════════════════════════════════════
-  toggleSidebarCollapse() { this.sidebarCollapsed = !this.sidebarCollapsed }
+  toggleSidebarCollapse() { 
+    this.sidebarCollapsed = !this.sidebarCollapsed 
+  }
 
   toggleParticipantExpanded(cohortId: string, event?: Event) {
     if (event) event.stopPropagation()
@@ -493,7 +496,20 @@ export class CohortManagementComponent {
   activityFilter: 'all' | 'you' | 'system' = 'all'
   statusUpdatedAgo: string = '2 min ago'
 
-  toggleActivitySidenav() { this.activitySidenavCollapsed = !this.activitySidenavCollapsed }
+  toggleActivitySidenav() { 
+    this.activitySidenavCollapsed = !this.activitySidenavCollapsed 
+    if(!this.activitySidenavCollapsed){
+      this.loadProgressionDataLog();
+    } else {
+      this.progressionData = [];
+      this.progressionLoading = true;
+      this.filteredProgressionProfiles = [];
+      if (this.progressionSubscription) {
+        this.progressionSubscription.unsubscribe();
+        this.progressionSubscription = null;
+      }
+    }
+  }
 
   getActivityCount(): number {
     return this.getActivityFeed('lastHour').length + this.getActivityFeed('earlier').length
@@ -1874,6 +1890,7 @@ export class CohortManagementComponent {
     this.totalParticipantsInCohorts = Array.from(new Set(this.totalParticipantsInCohorts))
 
     this.calculateUnassignedParticipants();
+    this.filterProgressData()
 
     return this.filteredCohortsList;
   }
@@ -2435,11 +2452,15 @@ export class CohortManagementComponent {
     if ($event) { $event.preventDefault(); $event.stopPropagation(); }
     if (!cohorts) return;
 
+    const queues = this.searchableQueueList.filter((queue)=>{
+      const eventId = queue['eventid'];
+      console.log(eventId , cohorts['docid'] )
+      return cohorts['eventref']?.id === eventId;
+    })
     const { CohortDetailComponent } = await import('../cohort-detail/cohort-detail.component');
     this.dialog.open(CohortDetailComponent, {
-      width: '92vw',
-      maxWidth: '1280px',
-      maxHeight: '92vh',
+      width: '100vw',
+      height: '100vh',
       panelClass: 'cohort-detail-dialog',
       autoFocus: false,
       data: {
@@ -2456,7 +2477,17 @@ export class CohortManagementComponent {
         bigActivityMap: this.bigActivityMap,
         mapBigAssignment: this.mapBigAssignment,
         mapParticiantsAssignments: this.mapParticiantsAssignments,
-      }
+        searchableQueueList: queues,
+        mapQueueName: this.mapQueueName,
+
+        mapParticipantStudios: this.mapParticipantStudios,
+        mapStudioPairing: this.mapStudioPairing,
+        mapLiveAssignmentByStudio: this.mapLiveAssignmentByStudio,
+        studioPairingList: this.studioPairingList,
+        liveAssignmentList: this.liveAssignmentList,
+        mapLiveParticipants: this.mapLiveParticipants,
+        eventParticipationList: this.eventParticipationList,
+      },
     });
   }
 
@@ -3054,5 +3085,39 @@ export class CohortManagementComponent {
       });
     }
   }
+
+  loadProgressionDataLog(){
+    try {
+      this.progressionLoading = true;
+      const q = query(collection(this.firestore, "big cohorts log"), orderBy("createddate", "desc"));
+      if (this.progressionSubscription) {
+        this.progressionSubscription.unsubscribe();
+      }
+
+      this.progressionSubscription = collectionData(q).subscribe((log)=>{
+        this.progressionData = log;
+        this.filterProgressData()
+        if (this.progressionLoading) {
+          this.progressionLoading = false
+        }
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  filterProgressData(){
+    let data = [...this.progressionData];
+
+    if (this.selectedAcceleratorEvent.length > 0) {
+      data = data.filter((log)=>{
+        const eventId = log['eventref']?.id;
+        return this.selectedAcceleratorEvent.includes(eventId);
+      })
+    }
+    this.filteredProgressionProfiles = data;
+  }
+
+
 }
 
