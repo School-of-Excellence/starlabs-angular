@@ -367,13 +367,17 @@ button {
   white-space: nowrap;
 }
 
-/* Active filters */
+/* Active filters — slimmer row to match standalone */
 .active-filters {
-  padding: 4px 20px 7px;
+  padding: 3px 20px 6px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   flex-wrap: wrap;
+  border-top: 1px dashed #F3F4F6;
+}
+.active-filters .refine-label {
+  margin-right: 2px;
 }
 
 .filter-chip {
@@ -1781,3 +1785,836 @@ button {
   border-radius: 4px;
   transition: width 0.3s ease;
 }
+
+/* ================================================================
+   DESIGN ALIGNMENT — Topbar / Refine / Cards / Drag-drop
+   ================================================================ */
+
+/* ── Topbar search ⌘K kbd hint ────────────────────────────────── */
+.topbar-search .kbd-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9CA3AF;
+  background: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+/* ── Topbar ghost-pill buttons (mat-menu trigger) ─────────────── */
+.topbar-actions .btn-ghost-sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0D0F12;
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.topbar-actions .btn-ghost-sm:hover {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
+}
+.topbar-actions .btn-ghost-sm[aria-expanded="true"] {
+  background: #F5F3FF;
+  border-color: #7C3AED;
+  color: #6D28D9;
+}
+
+/* ── Refine bar tag-btn ───────────────────────────────────────── */
+.refine-row .tag-btn {
+  height: 27px;
+  padding: 0 9px;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  background: white;
+  font-size: 11px;
+  font-weight: 500;
+  color: #0D0F12;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.refine-row .tag-btn:hover { border-color: #D1D5DB; background: #F9FAFB; }
+.refine-row .tag-btn[aria-expanded="true"] {
+  border-color: #7C3AED;
+  background: #F5F3FF;
+}
+.refine-row .tag-btn .tag-label-pill {
+  background: #EDE9FE;
+  color: #6D28D9;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+/* ── Material menu polish (.bc-menu) ──────────────────────────── */
+::ng-deep .bc-menu.mat-mdc-menu-panel {
+  min-width: 220px;
+  max-height: 360px;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.10);
+}
+::ng-deep .bc-menu .mat-mdc-menu-item {
+  font-size: 12px;
+  min-height: 34px;
+  font-family: inherit;
+}
+::ng-deep .bc-menu .mat-mdc-menu-item.active {
+  background: #F5F3FF;
+  color: #6D28D9;
+  font-weight: 600;
+}
+::ng-deep .bc-menu .mat-mdc-menu-item mat-icon,
+::ng-deep .bc-menu .mat-mdc-menu-item .mat-icon {
+  font-size: 17px;
+  width: 17px;
+  height: 17px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ── Bind native select [value] needs styling fix ─────────────── */
+.refine-row .select-wrap select {
+  height: 28px;
+  padding: 0 24px 0 10px;
+  border: 1px solid #E5E7EB;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0D0F12;
+}
+
+/* ── Filter badge (X filters active) ──────────────────────────── */
+.refine-row .filter-badge {
+  background: #F5F3FF;
+  color: #6D28D9;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+  border: 1px solid #DDD6FE;
+}
+
+/* ── Make every refine control share the same height/look ─────── */
+.refine-row > * { height: 28px; }
+.refine-row .select-wrap,
+.refine-row .toggle-label,
+.refine-row .tag-btn,
+.refine-row .filter-badge,
+.refine-row .clear-all {
+  align-self: center;
+}
+.refine-row .toggle-label {
+  height: 28px;
+  display: inline-flex;
+}
+
+/* ── Refine bar gets a slimmer footprint ──────────────────────── */
+.refine-row {
+  padding: 7px 20px;
+  gap: 7px;
+}
+
+/* ── Active filter chips ──────────────────────────────────────── */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 20px;
+  padding: 3px 6px 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1D4ED8;
+  line-height: 1;
+  white-space: nowrap;
+}
+.filter-chip .chip-key {
+  font-size: 9px;
+  font-weight: 800;
+  color: #1E40AF;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.chip-remove {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  color: #1D4ED8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background 0.15s, color 0.15s;
+}
+.chip-remove:hover {
+  background: #DBEAFE;
+  color: #1E3A8A;
+}
+.clear-all-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #DC2626;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.clear-all-btn:hover { background: #FEF2F2; }
+
+/* ── Sidebar collapse / meta icon ─────────────────────────────── */
+.bc-root.sidebar-collapsed .sidebar {
+  width: 28px;
+  cursor: pointer;
+  position: relative;
+}
+.bc-root.sidebar-collapsed .sidebar > * { display: none; }
+.bc-root.sidebar-collapsed .sidebar::before {
+  content: 'UNASSIGNED';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.bc-root.sidebar-collapsed .sidebar:hover::before { color: #6D28D9; }
+.p-meta .meta-ico {
+  font-size: 13px !important;
+  width: 13px !important;
+  height: 13px !important;
+  line-height: 1 !important;
+  vertical-align: middle;
+}
+
+/* ── Grid controls — group-by button ──────────────────────────── */
+.btn-group-by {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  background: white;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6B7280;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-group-by:hover { background: #F9FAFB; border-color: #D1D5DB; }
+.btn-group-by[aria-expanded="true"] {
+  background: #F5F3FF;
+  border-color: #7C3AED;
+  color: #6D28D9;
+}
+
+/* ── Group header color variants ──────────────────────────────── */
+.group-header.studio        { color: #7C3AED; }
+.group-header.readiness     { color: #16A34A; }
+.group-header.foundational  { color: #2563EB; }
+.group-header.scope         { color: #0891B2; }
+.group-header.diagnostics   { color: #D97706; }
+.group-header.consultation  { color: #DB2777; }
+.group-header.educational   { color: #0891B2; }
+.group-header.operational   { color: #475569; }
+
+.group-dot.studio        { background: #7C3AED; }
+.group-dot.readiness     { background: #16A34A; }
+.group-dot.foundational  { background: #2563EB; }
+.group-dot.scope         { background: #0891B2; }
+.group-dot.diagnostics   { background: #D97706; }
+.group-dot.consultation  { background: #DB2777; }
+.group-dot.educational   { background: #0891B2; }
+.group-dot.operational   { background: #475569; }
+
+/* ── Cohort card warn state ───────────────────────────────────── */
+.cohort-card.warn {
+  border-color: #FDE68A !important;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.10);
+}
+.stat-val.warn { color: #D97706 !important; }
+
+/* ── Cohort card drag-over highlight ──────────────────────────── */
+.cohort-card.drag-over {
+  border-color: #7C3AED !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
+  transform: translateY(-2px);
+}
+.cohort-card { cursor: grab; }
+.cohort-card:active { cursor: grabbing; }
+
+/* ── Card tag variants (event/studio/specialist/draft) ────────── */
+.tag.event       { background: #EFF6FF; color: #1D4ED8; }
+.tag.studio      { background: #F5F3FF; color: #7C3AED; }
+.tag.specialist  { background: #F3F4F6; color: #6B7280; }
+.tag.draft       { background: #FFFBEB; color: #D97706; }
+
+/* ── Card-foot text labels (Notify / WhatsApp / Email) ────────── */
+.card-foot .foot-btn {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.card-foot .foot-btn .foot-lbl {
+  margin-left: 2px;
+  font-weight: 500;
+}
+@media (max-width: 1100px) {
+  .card-foot .foot-btn .foot-lbl { display: none; }
+}
+
+/* ── active-dot (live participant indicator) ──────────────────── */
+.cp-row .active-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16A34A;
+  margin-left: auto;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px #DCFCE7;
+}
+
+/* ── cp-more (expand more) ───────────────────────────────────── */
+.cp-more {
+  cursor: pointer;
+  user-select: none;
+  color: #6D28D9;
+  font-weight: 600;
+}
+.cp-more:hover { color: #4C1D95; background: #F5F3FF; }
+
+/* ── Add Activity dashed button ───────────────────────────────── */
+.add-activity-btn {
+  width: 100%;
+  height: 36px;
+  border: 2px dashed #E5E7EB;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9CA3AF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  margin: 6px 8px 8px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.add-activity-btn:hover {
+  border-color: #7C3AED;
+  color: #7C3AED;
+  background: #F5F3FF;
+}
+
+/* ── Floor mode visual treatment ──────────────────────────────── */
+.bc-root.mode-floor {
+  background: #FAFAFB;
+}
+.bc-root.mode-floor .cohort-card {
+  border-style: solid;
+  border-color: #E5E7EB;
+}
+.bc-root.mode-floor .mode-btn .floor-dot { background: #16A34A; }
+
+/* ── Zone option (inside menu) ────────────────────────────────── */
+.zone-option {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.zone-option .zone-name { font-weight: 600; font-size: 12px; color: #0D0F12; }
+.zone-option .zone-sub  { font-size: 10px; color: #9CA3AF; }
+
+/* ════════════════════════════════════════════════════════════════
+   Card v2: handle, open-btn, wider grid, purple stats, tab-action
+   ════════════════════════════════════════════════════════════════ */
+
+/* Wider cards: 3 across at typical desktop (match standalone) */
+.cohort-grid {
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  gap: 16px;
+}
+@media (min-width: 1600px) {
+  .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); }
+}
+@media (max-width: 1200px) {
+  .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+}
+
+/* ── Card-top: clean — name (clickable for edit) + arrow ──────── */
+.card-top {
+  position: relative;
+  align-items: center;
+  padding: 14px 14px 8px;
+  gap: 8px;
+}
+
+.card-top .card-name {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0D0F12;
+  line-height: 1.3;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-top .card-name:hover { color: #6D28D9; }
+
+.card-top .card-open-btn {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  color: #9CA3AF;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, transform 0.15s;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cohort-card:hover .card-open-btn { color: #6D28D9; }
+.card-top .card-open-btn:hover {
+  color: #6D28D9;
+  background: #F5F3FF;
+  transform: translateX(2px);
+}
+
+/* Select-mode overlay checkbox (top-left corner of card) */
+.card-check.select-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #6D28D9;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.card-check.select-overlay mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.cohort-card.select-mode .card-top { padding-left: 40px; }
+.cohort-card.checked { box-shadow: 0 0 0 2px #7C3AED, 0 4px 12px rgba(124,58,237,0.10); }
+
+/* Purple stat values (design) */
+.cohort-card .stat-val {
+  color: #6D28D9;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.cohort-card .stat-val.warn { color: #D97706 !important; }
+.cohort-card .stat-key {
+  font-size: 9px;
+  font-weight: 700;
+  color: #9CA3AF;
+  letter-spacing: 0.6px;
+  margin-top: 4px;
+}
+
+/* In cols-5 layout, CHECKED IN (4th) and LIVE (5th) stats are GREEN */
+.cohort-card .card-stats.cols-5 .stat:nth-child(4) .stat-val,
+.cohort-card .card-stats.cols-5 .stat:nth-child(5) .stat-val {
+  color: #16A34A;
+}
+.cohort-card .card-stats.cols-5 .stat:nth-child(4) .stat-val.warn,
+.cohort-card .card-stats.cols-5 .stat:nth-child(5) .stat-val.warn {
+  color: #D97706 !important;
+}
+
+/* card-tab-action (Select button on right of tabs) */
+.card-tab-action {
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-left: 1px solid #F3F4F6;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9CA3AF;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+}
+.card-tab-action:hover {
+  color: #6D28D9;
+  background: #F5F3FF;
+}
+.card-tab-action.on {
+  color: #6D28D9;
+  background: #F5F3FF;
+  font-weight: 800;
+}
+
+/* Foot — text+icon labels */
+.card-foot .foot-btn.icon-only .foot-lbl,
+.card-foot .foot-btn.icon-only span { display: none; }
+.card-foot .foot-btn { gap: 5px; }
+.card-foot .foot-btn .fa-whatsapp { font-size: 14px; }
+
+/* ════════════════════════════════════════════════════════════════
+   Right Activity Sidenav
+   ════════════════════════════════════════════════════════════════ */
+.activity-sidenav {
+  width: 280px;
+  background: white;
+  border-left: 1px solid #E5E7EB;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.2s;
+}
+.activity-sidenav.collapsed {
+  width: 28px;
+  cursor: pointer;
+  align-items: stretch;
+}
+
+.activity-sidenav-tab {
+  flex: 1;
+  background: linear-gradient(180deg, #F9FAFB 0%, white 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-left: 1px solid #E5E7EB;
+}
+.activity-sidenav-tab .activity-vlabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #9CA3AF;
+  text-transform: uppercase;
+}
+
+.activity-header {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid #F3F4F6;
+}
+.activity-collapse-btn {
+  width: 24px; height: 24px;
+  border: none; background: none;
+  color: #9CA3AF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.activity-collapse-btn:hover { background: #F3F4F6; color: #0D0F12; }
+.activity-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0D0F12;
+}
+.activity-count {
+  background: #F3F4F6;
+  color: #6B7280;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.activity-spacer { flex: 1; }
+
+.activity-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #F3F4F6;
+}
+.activity-tab {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6B7280;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.activity-tab:hover { background: #F3F4F6; }
+.activity-tab.active {
+  background: #F5F3FF;
+  color: #6D28D9;
+  border-color: #DDD6FE;
+}
+
+.activity-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0 8px;
+}
+.activity-list::-webkit-scrollbar { width: 4px; }
+.activity-list::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 2px; }
+
+.activity-section-title {
+  padding: 8px 12px 4px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.activity-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  transition: background 0.1s;
+}
+.activity-entry:hover { background: #FAFAFB; }
+
+.activity-entry .entry-avatar {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.activity-entry .entry-body { flex: 1; min-width: 0; }
+.entry-text {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #0D0F12;
+  word-break: break-word;
+}
+.entry-actor { font-weight: 700; }
+.entry-action { color: #6B7280; margin: 0 2px; }
+.entry-target { font-weight: 600; color: #6D28D9; }
+.entry-meta {
+  font-size: 10px;
+  color: #9CA3AF;
+  margin-top: 2px;
+}
+.entry-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.entry-badge {
+  background: #F3F4F6;
+  color: #6B7280;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.entry-ago {
+  font-size: 9px;
+  color: #9CA3AF;
+}
+
+.activity-view-all {
+  display: block;
+  padding: 10px 12px;
+  border-top: 1px solid #F3F4F6;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6D28D9;
+  text-decoration: none;
+  text-align: left;
+}
+.activity-view-all:hover { background: #F5F3FF; }
+
+.activity-empty {
+  padding: 28px 12px;
+  text-align: center;
+  color: #9CA3AF;
+}
+.activity-empty mat-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  color: #D1D5DB;
+}
+.activity-empty p {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Bottom status bar
+   ════════════════════════════════════════════════════════════════ */
+.bc-root .status-bar {
+  height: 34px;
+  background: white;
+  border-top: 1px solid #E5E7EB;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  font-size: 11px;
+  color: #6B7280;
+}
+.status-bar .status-icon mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #9CA3AF;
+}
+.status-bar .status-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: #9CA3AF;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.status-bar .status-total {
+  font-size: 13px;
+  font-weight: 800;
+  color: #D97706;
+  font-variant-numeric: tabular-nums;
+}
+.status-bar .status-sep { color: #D1D5DB; }
+.status-bar .status-item {
+  font-size: 11px;
+  color: #6B7280;
+}
+.status-bar .status-item b {
+  font-weight: 700;
+  color: #0D0F12;
+  margin-right: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.status-bar .status-spacer { flex: 1; }
+.status-bar .status-updated {
+  font-size: 10px;
+  color: #9CA3AF;
+}
+.status-bar .icon-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+}
+.status-bar .icon-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #9CA3AF;
+}
+.status-bar .icon-btn:hover { background: #F3F4F6; border-radius: 5px; }
+.status-bar .icon-btn:hover mat-icon { color: #0D0F12; }
+
+/* ════════════════════════════════════════════════════════════════
+   Floor mode — stats-only card (per design screenshot)
+   ════════════════════════════════════════════════════════════════ */
+.bc-root.mode-floor {
+  background: #F4F5F7;
+}
+
+/* Floor cards: hide tabs, participants, activities, and foot */
+.bc-root.mode-floor .card-tabs,
+.bc-root.mode-floor .cohort-card-holder,
+.bc-root.mode-floor .card-foot,
+.bc-root.mode-floor .card-people,
+.bc-root.mode-floor .card-activities {
+  display: none !important;
+}
+
+/* Make stats card the body of Floor cards */
+.bc-root.mode-floor .cohort-card {
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.bc-root.mode-floor .cohort-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+
+/* Larger, breathing-room stats in Floor mode */
+.bc-root.mode-floor .card-stats {
+  padding: 14px 14px 8px;
+  border-top: none;
+  gap: 14px;
+}
+.bc-root.mode-floor .stat-val { font-size: 26px; }
+.bc-root.mode-floor .stat-key { font-size: 10px; }
+
+/* The "Tap counts to view details →" link inside Floor card */
+.floor-tap-hint {
+  display: none;
+  padding: 4px 14px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6D28D9;
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  transition: color 0.15s, transform 0.15s;
+}
+.floor-tap-hint:hover { color: #4C1D95; transform: translateX(2px); }
+.bc-root.mode-floor .floor-tap-hint { display: block; }
+
+/* In Floor mode, restore card-context spacing */
+.bc-root.mode-floor .card-tags { padding-top: 0; }
+.bc-root.mode-floor .card-context { padding-bottom: 4px; }
+
+/* Adjust main-content to include activity sidenav width */
+.main-content { position: relative; }

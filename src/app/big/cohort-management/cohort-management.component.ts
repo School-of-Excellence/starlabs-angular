@@ -182,6 +182,9 @@ export class CohortManagementComponent {
       || this.categoryFilter !== 'all'
       || this.typeFilter !== 'all'
       || (this.selectedTags?.length || 0) > 0
+      || this.showTemporaryOnly
+      || this.showExpiredCohorts
+      || !!this.participantSearchQuery
   }
 
   clearAllFilters(): void {
@@ -194,6 +197,394 @@ export class CohortManagementComponent {
     this.clearZoneSelection?.();
     ;(this as any).clearTagSelection?.();
     this.participantSearchQuery = ''
+    if (this.showTemporaryOnly) { this.showTemporaryOnly = false }
+    if (this.showExpiredCohorts) { this.showExpiredCohorts = false }
+    this.onFilter?.()
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // Active filter chips
+  // ════════════════════════════════════════════════════════════════
+  getActiveFilterChips(): Array<{ key: string, value: string, type: string, id?: string }> {
+    const chips: Array<{ key: string, value: string, type: string, id?: string }> = []
+    if (this.typeFilter !== 'all') {
+      const m: any = { general: 'General', event: 'Event' }
+      chips.push({ key: 'TYPE', value: m[this.typeFilter] || this.typeFilter, type: 'type' })
+    }
+    if (this.categoryFilter !== 'all') {
+      const m: any = { studio: 'Studio', readiness: 'Readiness', educational: 'Educational', operational: 'Operational' }
+      chips.push({ key: 'CATEGORY', value: m[this.categoryFilter] || this.categoryFilter, type: 'category' })
+    }
+    if (this.statusFilter !== 'all') {
+      const m: any = { active: 'Active', nonactive: 'Non Active' }
+      chips.push({ key: 'STATUS', value: m[this.statusFilter] || this.statusFilter, type: 'status' })
+    }
+    if (this.selectedMarathon) {
+      const title = this.mapMarathon?.[this.selectedMarathon]?.['title']
+        || this.mapMarathon?.[this.selectedMarathon]?.['name']
+        || this.selectedMarathon
+      chips.push({ key: 'MARATHON', value: title, type: 'marathon' })
+    }
+    (this.selectedAcceleratorEvent || []).forEach((eid: string) => {
+      const name = this.mapAcceleratorEvent?.[eid] || eid
+      chips.push({ key: 'EVENT', value: name, type: 'event', id: eid })
+    });
+    (this.selectedQueueEvent || []).forEach((qid: string) => {
+      const name = this.mapQueueName?.[qid] || qid
+      chips.push({ key: 'QUEUE', value: name, type: 'queue', id: qid })
+    });
+    (this.selectedZoneEvent || []).forEach((zid: string) => {
+      const name = this.mapZoneEvent?.[zid] || zid
+      chips.push({ key: 'ZONE', value: name, type: 'zone', id: zid })
+    });
+    (this.selectedTags || []).forEach((tid: string) => {
+      chips.push({ key: 'TAG', value: this.getTagName(tid), type: 'tag', id: tid })
+    })
+    if (this.showTemporaryOnly) chips.push({ key: 'TEMPORARY', value: 'Only', type: 'temporary' })
+    if (this.showExpiredCohorts) chips.push({ key: 'EXPIRED', value: 'Shown', type: 'expired' })
+    if (this.participantSearchQuery) chips.push({ key: 'SEARCH', value: this.participantSearchQuery, type: 'search' })
+    return chips
+  }
+
+  removeFilterChip(chip: { type: string, id?: string }): void {
+    switch (chip.type) {
+      case 'type': this.setTypeFilter('all'); break
+      case 'category': this.setCategoryFilter('all'); break
+      case 'status': this.setStatusFilter('all'); break
+      case 'marathon': if (this.selectedMarathon) { this.selectedMarathon = null; this.onFilter?.() } break
+      case 'event':
+        this.selectedAcceleratorEvent = (this.selectedAcceleratorEvent || []).filter(id => id !== chip.id)
+        this.toggleEventSelection?.()
+        break
+      case 'queue':
+        this.selectedQueueEvent = (this.selectedQueueEvent || []).filter((id: string) => id !== chip.id)
+        this.toggleQueueSelection?.()
+        break
+      case 'zone':
+        this.selectedZoneEvent = (this.selectedZoneEvent || []).filter(id => id !== chip.id)
+        this.toggleZoneSelection?.()
+        break
+      case 'tag':
+        this.selectedTags = (this.selectedTags || []).filter(id => id !== chip.id)
+        this.toggleTagSelection?.()
+        break
+      case 'temporary': this.showTemporaryOnly = false; this.onFilter?.(); break
+      case 'expired': this.showExpiredCohorts = false; this.onFilter?.(); break
+      case 'search': this.participantSearchQuery = ''; this.onParticipantSearch?.(); break
+    }
+  }
+
+  trackByChip = (_: number, chip: { key: string, value: string, type: string, id?: string }) => `${chip.type}:${chip.id ?? chip.value}`
+
+  getActiveFilterCount(): number { return this.getActiveFilterChips().length }
+
+  // ════════════════════════════════════════════════════════════════
+  // DRAG & DROP (HTML5 native)
+  // ════════════════════════════════════════════════════════════════
+  private dragPayload: { kind: 'participant' | 'cohort', participantId?: string, sourceCohortId?: string | null, cohortId?: string } | null = null
+  hoverDropTargetCohortId: string | null = null
+  sidebarCollapsed: boolean = true
+  participantExpandedCohorts: Set<string> = new Set<string>()
+  modeView: 'plan' | 'floor' = 'plan'
+
+  onParticipantDragStart(event: DragEvent, participantId: string, sourceCohortId: string | null) {
+    if (!event.dataTransfer) return
+    event.stopPropagation()
+    this.dragPayload = { kind: 'participant', participantId, sourceCohortId }
+    event.dataTransfer.effectAllowed = 'move'
+    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
+  }
+
+  onCohortDragStart(event: DragEvent, cohort: any) {
+    if (!event.dataTransfer) return
+    // Only allow drag when starting from the card-handle (set via .card-handle)
+    const tgt = event.target as HTMLElement
+    if (!tgt || !tgt.closest('.card-handle')) {
+      event.preventDefault()
+      return
+    }
+    event.stopPropagation()
+    this.dragPayload = { kind: 'cohort', cohortId: cohort?.['docid'] }
+    event.dataTransfer.effectAllowed = 'move'
+    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
+  }
+
+  onCohortDragOver(event: DragEvent, cohort: any) {
+    if (!this.dragPayload) return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+    this.hoverDropTargetCohortId = cohort?.['docid']
+  }
+
+  onCohortDragLeave(_event: DragEvent, cohort: any) {
+    if (this.hoverDropTargetCohortId === cohort?.['docid']) {
+      this.hoverDropTargetCohortId = null
+    }
+  }
+
+  async onCohortDrop(event: DragEvent, targetCohort: any) {
+    event.preventDefault()
+    event.stopPropagation()
+    const payload = this.dragPayload
+    this.dragPayload = null
+    this.hoverDropTargetCohortId = null
+    if (!payload || !targetCohort) return
+
+    if (payload.kind === 'participant' && payload.participantId) {
+      if (!payload.sourceCohortId) {
+        await this.assignUnassignedToCohort([payload.participantId], targetCohort)
+        return
+      }
+      if (payload.sourceCohortId === targetCohort['docid']) return
+      const sourceCohort = this.cohortsList.find(c => c['docid'] === payload.sourceCohortId)
+      if (sourceCohort) {
+        await this.moveParticipantToCohort(payload.participantId, sourceCohort, targetCohort)
+      }
+      return
+    }
+
+    if (payload.kind === 'cohort' && payload.cohortId && payload.cohortId !== targetCohort['docid']) {
+      this.reorderCohortInList(payload.cohortId, targetCohort['docid'])
+    }
+  }
+
+  onGridDragOver(event: DragEvent) {
+    if (!this.dragPayload || this.dragPayload.kind !== 'cohort') return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  }
+
+  onGridDrop(event: DragEvent) {
+    event.preventDefault()
+    this.dragPayload = null
+    this.hoverDropTargetCohortId = null
+  }
+
+  private reorderCohortInList(sourceId: string, targetId: string) {
+    const fromIdx = this.filteredCohortsList.findIndex(c => c['docid'] === sourceId)
+    const toIdx = this.filteredCohortsList.findIndex(c => c['docid'] === targetId)
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
+    const [moved] = this.filteredCohortsList.splice(fromIdx, 1)
+    this.filteredCohortsList.splice(toIdx, 0, moved)
+    this.applyGrouping?.()
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // UI helpers
+  // ════════════════════════════════════════════════════════════════
+  toggleSidebarCollapse() { this.sidebarCollapsed = !this.sidebarCollapsed }
+
+  toggleParticipantExpanded(cohortId: string, event?: Event) {
+    if (event) event.stopPropagation()
+    if (this.participantExpandedCohorts.has(cohortId)) this.participantExpandedCohorts.delete(cohortId)
+    else this.participantExpandedCohorts.add(cohortId)
+  }
+  isParticipantExpanded(cohortId: string): boolean { return this.participantExpandedCohorts.has(cohortId) }
+
+  getAvatarColorClass(key: string): string {
+    const palette = ['purple', 'blue', 'green', 'amber', 'rose']
+    if (!key) return palette[0]
+    let h = 0
+    for (let i = 0; i < key.length; i++) { h = ((h << 5) - h + key.charCodeAt(i)) | 0 }
+    return palette[Math.abs(h) % palette.length]
+  }
+
+  isParticipantLive(participantId: string): boolean {
+    return !!(this.mapLiveParticipants && this.mapLiveParticipants[participantId])
+  }
+
+  isCohortOverCapacity(cohort: any): boolean {
+    if (!cohort) return false
+    const participants = cohort['participantidlist']?.length || 0
+    const studios = (this.getCohortTotalStudiosCount?.(cohort)) || 0
+    return studios > 0 && participants > studios
+  }
+
+  setModeView(mode: 'plan' | 'floor') { this.modeView = mode }
+
+  getGroupVariantClass(groupKey: string): string {
+    const key = (groupKey || '').toLowerCase()
+    if (key.includes('studio')) return 'studio'
+    if (key.includes('readiness')) return 'readiness'
+    if (key.includes('foundational')) return 'foundational'
+    if (key.includes('scope')) return 'scope'
+    if (key.includes('diagnostic')) return 'diagnostics'
+    if (key.includes('consultation')) return 'consultation'
+    if (key.includes('educational')) return 'educational'
+    if (key.includes('operational')) return 'operational'
+    return 'studio'
+  }
+
+  getGroupByLabel(): string {
+    const m: any = {
+      none: 'No Grouping', category: 'By Category', levels: 'Level Based',
+      studio: 'Studio Based', zone: 'Zone Based', daterange: 'Date Range'
+    }
+    return m[this.groupBy] || 'By Category'
+  }
+
+  getMarathonLabel(): string {
+    if (!this.selectedMarathon) return 'Marathon'
+    return this.mapMarathon?.[this.selectedMarathon]?.['title'] || this.mapMarathon?.[this.selectedMarathon]?.['name'] || 'Marathon'
+  }
+  getEventLabel(): string {
+    const n = (this.selectedAcceleratorEvent || []).length
+    if (n === 0) return 'Event'
+    if (n === 1) return this.mapAcceleratorEvent?.[this.selectedAcceleratorEvent[0]] || 'Event'
+    return `Event · ${n}`
+  }
+  getQueueLabel(): string {
+    const n = (this.selectedQueueEvent || []).length
+    if (n === 0) return 'Queue'
+    if (n === 1) return this.mapQueueName?.[this.selectedQueueEvent[0]] || 'Queue'
+    return `Queue · ${n}`
+  }
+  getZoneLabel(): string {
+    const n = (this.selectedZoneEvent || []).length
+    if (n === 0) return 'Zone'
+    if (n === 1) return this.mapZoneEvent?.[this.selectedZoneEvent[0]] || 'Zone'
+    return `Zone · ${n}`
+  }
+  getTagsLabel(): string {
+    const n = (this.selectedTags || []).length
+    if (n === 0) return 'None'
+    if (n === 1) return this.getTagName(this.selectedTags[0])
+    return `${n} selected`
+  }
+
+  selectSingleMarathon(id: string) {
+    this.selectedMarathon = id
+    this.toggleMarathonSelection?.()
+  }
+
+  toggleEventInSelection(eventId: string) {
+    const idx = (this.selectedAcceleratorEvent || []).indexOf(eventId)
+    if (idx >= 0) this.selectedAcceleratorEvent.splice(idx, 1)
+    else this.selectedAcceleratorEvent.push(eventId)
+    this.toggleEventSelection?.()
+  }
+  toggleQueueInSelection(queueId: string) {
+    const idx = (this.selectedQueueEvent || []).indexOf(queueId)
+    if (idx >= 0) this.selectedQueueEvent.splice(idx, 1)
+    else this.selectedQueueEvent.push(queueId)
+    this.toggleQueueSelection?.()
+  }
+  toggleZoneInSelection(zoneId: string) {
+    const idx = (this.selectedZoneEvent || []).indexOf(zoneId)
+    if (idx >= 0) this.selectedZoneEvent.splice(idx, 1)
+    else this.selectedZoneEvent.push(zoneId)
+    this.toggleZoneSelection?.()
+  }
+  toggleTagInSelection(tagId: string) {
+    const idx = (this.selectedTags || []).indexOf(tagId)
+    if (idx >= 0) this.selectedTags.splice(idx, 1)
+    else this.selectedTags.push(tagId)
+    this.toggleTagSelection?.()
+  }
+  isEventSelected(eventId: string): boolean { return (this.selectedAcceleratorEvent || []).includes(eventId) }
+  isQueueSelected(queueId: string): boolean { return (this.selectedQueueEvent || []).includes(queueId) }
+  isZoneSelected(zoneId: string): boolean { return (this.selectedZoneEvent || []).includes(zoneId) }
+  isTagSelected(tagId: string): boolean { return (this.selectedTags || []).includes(tagId) }
+
+  // ════════════════════════════════════════════════════════════════
+  // Activity sidenav
+  // ════════════════════════════════════════════════════════════════
+  activitySidenavCollapsed: boolean = true
+  activityFilter: 'all' | 'you' | 'system' = 'all'
+  statusUpdatedAgo: string = '2 min ago'
+
+  toggleActivitySidenav() { this.activitySidenavCollapsed = !this.activitySidenavCollapsed }
+
+  getActivityCount(): number {
+    return this.getActivityFeed('lastHour').length + this.getActivityFeed('earlier').length
+  }
+
+  getActivityFeed(bucket: 'lastHour' | 'earlier'): Array<any> {
+    // Build from move logs / live assignments if available; placeholder otherwise.
+    const list: any[] = []
+    // Source: bigInvitationList + cohort logs would be wired in real backend.
+    // Use any in-memory data we already have.
+    const now = Date.now()
+    const hourMs = 60 * 60 * 1000
+    const allEntries: any[] = []
+
+    // Live assignments → "checked in to"
+    ;(this.liveAssignmentList || []).forEach((la: any) => {
+      const t = la?.createddate?.toDate ? la.createddate.toDate().getTime() : (la?.createddate ? new Date(la.createddate).getTime() : now)
+      allEntries.push({
+        ts: t,
+        actor: this.mapProfile?.[la?.participantid] || la?.participantid || 'Someone',
+        action: 'checked in to',
+        target: la?.studioid || la?.queueid || '',
+        meta: la?.cohortname || '',
+        badge: la?.eventcode || '',
+        ago: this.timeAgo(t),
+        type: 'system',
+      })
+    })
+
+    // Cohort moves: scan cohortsList for recent updates
+    ;(this.cohortsList || []).forEach((c: any) => {
+      const t = c?.lastupdated?.toDate ? c.lastupdated.toDate().getTime() : (c?.lastupdated ? new Date(c.lastupdated).getTime() : 0)
+      if (!t) return
+      allEntries.push({
+        ts: t,
+        actor: c['name'] || 'Cohort',
+        action: 'cohort created',
+        target: '',
+        meta: '',
+        badge: '',
+        ago: this.timeAgo(t),
+        type: 'system',
+      })
+    })
+
+    const filtered = allEntries
+      .filter(e => this.activityFilter === 'all' || (this.activityFilter === 'system' && e.type === 'system') || (this.activityFilter === 'you' && e.type === 'you'))
+      .sort((a, b) => b.ts - a.ts)
+
+    return filtered.filter(e => bucket === 'lastHour' ? (now - e.ts) <= hourMs : (now - e.ts) > hourMs).slice(0, 10)
+  }
+
+  private timeAgo(ts: number): string {
+    const diff = Math.max(0, Date.now() - ts)
+    const m = Math.floor(diff / 60000)
+    if (m < 1) return 'just now'
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    const d = Math.floor(h / 24)
+    return `${d}d ago`
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // Status bar
+  // ════════════════════════════════════════════════════════════════
+  getStatusTotal(): number {
+    return (this.cohortsList || []).reduce((sum: number, c: any) => sum + (c?.participantidlist?.length || 0), 0)
+  }
+  getStatusBucket(kind: 'se' | 'diagnostics' | 'consultation' | 'others'): number {
+    let n = 0
+    ;(this.cohortsList || []).forEach((c: any) => {
+      const name = (c?.name || '').toLowerCase()
+      const cat = (c?.cohortCategory || '').toLowerCase()
+      const count = c?.participantidlist?.length || 0
+      if (kind === 'se' && (name.includes('se ') || name.startsWith('se') || cat.includes('scope'))) n += count
+      else if (kind === 'diagnostics' && (name.includes('diagnostic') || cat.includes('diagnostic'))) n += count
+      else if (kind === 'consultation' && (name.includes('consultation') || cat.includes('consultation'))) n += count
+      else if (kind === 'others') {
+        const isSe = name.includes('se ') || name.startsWith('se') || cat.includes('scope')
+        const isDiag = name.includes('diagnostic') || cat.includes('diagnostic')
+        const isCons = name.includes('consultation') || cat.includes('consultation')
+        if (!isSe && !isDiag && !isCons) n += count
+      }
+    })
+    return n
+  }
+  refreshStatus() {
+    this.statusUpdatedAgo = 'just now'
+    this.onFilter?.()
+    setTimeout(() => { this.statusUpdatedAgo = '1 min ago' }, 60000)
   }
 
   onCardClick(event: MouseEvent, cohort: any): void {
@@ -271,7 +662,7 @@ export class CohortManagementComponent {
   taggingDropdownOpen: boolean = false
 
   // Grouping States
-  groupBy: 'none' | 'levels' | 'daterange' = 'none'
+  groupBy: 'none' | 'levels' | 'daterange' | 'category' | 'studio' | 'zone' = 'none'
   showTemporaryOnly: boolean = false
   showExpiredCohorts: boolean = false
 
@@ -1571,6 +1962,80 @@ export class CohortManagementComponent {
       this.groupedCohorts = sortedGroups;
     }
 
+    if (this.groupBy === 'category') {
+      const labelMap: any = {
+        studio: 'STUDIO BASED',
+        readiness: 'READINESS',
+        educational: 'EDUCATIONAL',
+        operational: 'OPERATIONAL',
+      };
+      this.filteredCohortsList.forEach(cohort => {
+        const cat = cohort['cohortCategory'] || 'studio';
+        const label = labelMap[cat] || (cat ? cat.toUpperCase() : 'UNCATEGORIZED');
+        if (!this.groupedCohorts[label]) this.groupedCohorts[label] = [];
+        this.groupedCohorts[label].push(cohort);
+      });
+      const order = ['STUDIO BASED', 'READINESS', 'EDUCATIONAL', 'OPERATIONAL'];
+      const sortedGroups: { [key: string]: any[] } = {};
+      order.forEach(k => { if (this.groupedCohorts[k]) sortedGroups[k] = this.groupedCohorts[k]; });
+      Object.keys(this.groupedCohorts).forEach(k => { if (!sortedGroups[k]) sortedGroups[k] = this.groupedCohorts[k]; });
+      this.groupedCohorts = sortedGroups;
+    }
+
+    if (this.groupBy === 'studio') {
+      this.filteredCohortsList.forEach(cohort => {
+        const activityId = cohort['bigactivity'];
+        const isStudio = cohort['cohortCategory'] === 'studio' || cohort['cohortCategory'] === undefined;
+        const label = isStudio
+          ? ((this.bigActivityMap as any)?.[activityId]?.['activity'] || activityId || 'Not Configured')
+          : 'Non-Studio';
+        if (!this.groupedCohorts[label]) this.groupedCohorts[label] = [];
+        this.groupedCohorts[label].push(cohort);
+      });
+      const keys = Object.keys(this.groupedCohorts).sort((a, b) => {
+        if (a === 'Non-Studio') return 1;
+        if (b === 'Non-Studio') return -1;
+        return a.localeCompare(b);
+      });
+      const sortedGroups: { [key: string]: any[] } = {};
+      keys.forEach(k => sortedGroups[k] = this.groupedCohorts[k]);
+      this.groupedCohorts = sortedGroups;
+    }
+
+    if (this.groupBy === 'zone') {
+      const cohortToZones: { [cohortId: string]: string[] } = {};
+      Object.keys(this.mapZoneData || {}).forEach(zoneId => {
+        const zone: any = this.mapZoneData[zoneId];
+        const zoneName: string = zone?.name || zoneId;
+        const cohortIds: string[] = zone?.cohorts || [];
+        cohortIds.forEach(cid => {
+          if (!cohortToZones[cid]) cohortToZones[cid] = [];
+          cohortToZones[cid].push(zoneName);
+        });
+      });
+      this.filteredCohortsList.forEach(cohort => {
+        const zones = cohortToZones[cohort['docid']] || [];
+        if (zones.length === 0) {
+          const label = 'Unassigned Zone';
+          if (!this.groupedCohorts[label]) this.groupedCohorts[label] = [];
+          this.groupedCohorts[label].push(cohort);
+        } else {
+          zones.forEach(zoneName => {
+            if (!this.groupedCohorts[zoneName]) this.groupedCohorts[zoneName] = [];
+            this.groupedCohorts[zoneName].push(cohort);
+          });
+        }
+      });
+      const keys = Object.keys(this.groupedCohorts).sort((a, b) => {
+        if (a === 'Unassigned Zone') return 1;
+        if (b === 'Unassigned Zone') return -1;
+        return a.localeCompare(b);
+      });
+      const sortedGroups: { [key: string]: any[] } = {};
+      keys.forEach(k => sortedGroups[k] = this.groupedCohorts[k]);
+      this.groupedCohorts = sortedGroups;
+    }
+
     if (this.groupBy === 'daterange') {
       // Sort cohorts by created date based on sortOrder
       const sortedCohorts = [...this.filteredCohortsList].sort((a, b) => {
@@ -1693,7 +2158,7 @@ export class CohortManagementComponent {
     this.onFilter();
   }
 
-  setGroupBy(groupBy: 'none' | 'levels' | 'daterange') {
+  setGroupBy(groupBy: 'none' | 'levels' | 'daterange' | 'category' | 'studio' | 'zone') {
     this.groupBy = groupBy;
     this.applyGrouping();
   }
@@ -1959,6 +2424,40 @@ export class CohortManagementComponent {
 
   onCreateCohort() {
     this.openCohortDialog('new', null);
+  }
+
+  /**
+   * Arrow on card → opens the Cohort Detail screen as a Material dialog.
+   * Reuses all already-loaded maps (mapProfile, bigActivityMap, mapMarathon, etc.)
+   * so auth and Firestore aren't re-fetched.
+   */
+  async openCohortStudio(cohorts: any, $event?: Event) {
+    if ($event) { $event.preventDefault(); $event.stopPropagation(); }
+    if (!cohorts) return;
+
+    const { CohortDetailComponent } = await import('../cohort-detail/cohort-detail.component');
+    this.dialog.open(CohortDetailComponent, {
+      width: '92vw',
+      maxWidth: '1280px',
+      maxHeight: '92vh',
+      panelClass: 'cohort-detail-dialog',
+      autoFocus: false,
+      data: {
+        cohort: cohorts,
+        cohortId: cohorts['docid'],
+        cohortName: cohorts['name'] || '',
+        marathonId: this.selectedMarathon || cohorts['marathonref']?.id || null,
+        eventId: cohorts['eventref']?.id || null,
+        // Pre-loaded maps — passed by reference (no re-fetch)
+        mapProfile: this.mapProfile,
+        mapParticipantMeta: this.mapParticipantMetaData,
+        mapMarathon: this.mapMarathon,
+        mapAcceleratorEvent: this.mapAcceleratorEvent,
+        bigActivityMap: this.bigActivityMap,
+        mapBigAssignment: this.mapBigAssignment,
+        mapParticiantsAssignments: this.mapParticiantsAssignments,
+      }
+    });
   }
 
   openCohortDialog(type: string, cohortDoc: any) {

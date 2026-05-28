@@ -1,0 +1,119 @@
+<div class="cd-root" [class.dialog-mode]="isDialogMode">
+
+  <!-- ── BREADCRUMB BAR ───────────────────────────────────────── -->
+  <div class="cd-breadcrumb">
+    <button class="cd-back-btn" (click)="isDialogMode ? closeDialog() : goBack()" [title]="isDialogMode ? 'Close' : 'Back'">
+      <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"/>
+        <polyline points="12 19 5 12 12 5"/>
+      </svg>
+      B!G Cohorts
+    </button>
+    <span class="cd-bc-sep">/</span>
+    <span class="cd-bc-current">{{cohortName || cohort?.['name'] || '—'}}</span>
+    <span class="cd-spacer"></span>
+    <span class="cd-cat-badge" *ngIf="getCategoryLabel()" [class]="getCategoryClass()">
+      {{getCategoryLabel()}}
+    </span>
+    <button class="cd-close-btn" *ngIf="isDialogMode" (click)="closeDialog()" title="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- ── HEADER (title + owner) ──────────────────────────────── -->
+  <div class="cd-header">
+    <h1 class="cd-title">{{cohortName || cohort?.['name'] || '—'}}</h1>
+    <button class="cd-owner-btn" [matMenuTriggerFor]="ownerMenu" *ngIf="ownerList.length > 0">
+      {{selectedOwner || 'Owner'}}
+      <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m6 9 6 6 6-6"/>
+      </svg>
+    </button>
+    <mat-menu #ownerMenu="matMenu" class="cd-menu">
+      <button mat-menu-item *ngFor="let o of ownerList" (click)="selectedOwner = o">{{o}}</button>
+    </mat-menu>
+  </div>
+
+  <!-- ── STATS ROW ───────────────────────────────────────────── -->
+  <div class="cd-stats">
+    <div class="cd-stat-card">
+      <div class="cd-stat-val">{{peopleCount}}</div>
+      <div class="cd-stat-key">PEOPLE IN COHORT</div>
+    </div>
+    <div class="cd-stat-card">
+      <div class="cd-stat-val">{{studiosPaired}}</div>
+      <div class="cd-stat-key">STUDIOS PAIRED</div>
+    </div>
+    <div class="cd-stat-card">
+      <div class="cd-stat-val">{{qDemand}}</div>
+      <div class="cd-stat-key">Q DEMAND</div>
+    </div>
+    <div class="cd-stat-card">
+      <div class="cd-stat-val">{{eventConfirmed}}</div>
+      <div class="cd-stat-key">EVENT CONFIRMED</div>
+    </div>
+  </div>
+
+  <!-- ── TABS ─────────────────────────────────────────────────── -->
+  <div class="cd-tabs">
+    <button class="cd-tab" [class.active]="contentTab === 'participants'" (click)="setTab('participants')">
+      Participants ({{peopleCount}})
+    </button>
+    <button class="cd-tab" [class.active]="contentTab === 'activities'" (click)="setTab('activities')">
+      Activities ({{activitiesCount}})
+    </button>
+    <button class="cd-tab" [class.active]="contentTab === 'comms'" (click)="setTab('comms')">
+      Comms
+    </button>
+  </div>
+
+  <!-- ── BODY: PARTICIPANTS ───────────────────────────────────── -->
+  <div class="cd-body" *ngIf="contentTab === 'participants'">
+    <div class="cd-participants-grid">
+      <div class="cd-part-card" *ngFor="let p of participantRows">
+        <div class="cd-part-av" [class]="p.avatarClass">{{p.initials}}</div>
+        <div class="cd-part-info">
+          <div class="cd-part-name">{{p.name}}</div>
+          <span class="cd-part-role" [class]="p.roleClass">{{p.roleLabel}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cd-empty" *ngIf="!loading && participantRows.length === 0">
+      <mat-icon>people_outline</mat-icon>
+      <p>No participants in this cohort yet.</p>
+    </div>
+  </div>
+
+  <!-- ── BODY: ACTIVITIES ─────────────────────────────────────── -->
+  <div class="cd-body" *ngIf="contentTab === 'activities'">
+    <div class="cd-activities-list">
+      <div class="cd-activity-row" *ngFor="let a of activities">
+        <mat-icon class="cd-act-ico">assignment</mat-icon>
+        <div class="cd-act-info">
+          <div class="cd-act-title">{{a['title'] || 'Untitled activity'}}</div>
+          <div class="cd-act-meta">{{a['description'] || a['type'] || ''}}</div>
+        </div>
+      </div>
+      <div class="cd-empty" *ngIf="activities.length === 0">
+        <mat-icon>assignment</mat-icon>
+        <p>No activities yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BODY: COMMS ──────────────────────────────────────────── -->
+  <div class="cd-body" *ngIf="contentTab === 'comms'">
+    <div class="cd-empty">
+      <mat-icon>chat_bubble_outline</mat-icon>
+      <p>Communication logs for this cohort will appear here.</p>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="cd-loading" *ngIf="loading">
+    <div class="cd-spinner"></div>
+    <span>Loading cohort…</span>
+  </div>
+
+</div>
