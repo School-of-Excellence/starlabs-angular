@@ -637,6 +637,13 @@
               <span>Email -</span>
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
             </button>
+            <button mat-raised-button class="action-btn-compact oneway-btn"
+              [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
+              (click)="openOneWayWizard()">
+              <mat-icon>campaign</mat-icon>
+              <span>One Way -</span>
+              <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
+            </button>
           </div>
         </span>
 
@@ -1237,6 +1244,10 @@
           <button mat-mini-fab class="comm-fab email-fab" matTooltip="Send Email"
             (click)="sendEmail()">
             <mat-icon>email</mat-icon>
+          </button>
+          <button mat-mini-fab class="comm-fab oneway-fab" matTooltip="One Way Broadcast"
+            (click)="openOneWayWizard()">
+            <mat-icon>campaign</mat-icon>
           </button>
           <span class="comm-count-label">{{ getSelectedParticipantsCount('all') }} selected</span>
         </div>

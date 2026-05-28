@@ -30,6 +30,7 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { environment } from '../../../environments/environment.development';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { OnewayChannelComponent } from '../../OneWayAppCommunication/onewaychannel/oneway-channel/oneway-channel.component';
 import * as XLSX from 'xlsx';
 import { T } from '@angular/cdk/keycodes';
 
@@ -3656,6 +3657,24 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
       }
     })
+  }
+  openOneWayWizard(): void {
+    const selected = this.getActiveParticipantsList()
+      .filter(p => p.selected)
+      .map(p => ({
+        profileid: p.profile_id || p.profileid,
+        name:      this.getProfileName(p.profile_id || p.profileid),
+        email:     this.getParticipantEmail(p.profile_id || p.profileid),
+      }));
+
+    if (selected.length === 0) return;
+
+    this.dialog.open(OnewayChannelComponent, {
+      data:       selected,
+      width:      '860px',
+      maxHeight:  '90vh',
+      panelClass: 'ow-dialog-panel'
+    });
   }
 
   toggleStageRange() {
