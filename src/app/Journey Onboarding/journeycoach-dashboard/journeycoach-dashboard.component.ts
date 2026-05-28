@@ -3921,7 +3921,12 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to navigate screen to mode dashboard 
+  // Function to navigate screen to onboarding pipeline
+  navigateToOnboardingPipeline() {
+    window.open('/onboarding-pipeline', '_blank');
+  }
+
+  // Function to navigate screen to mode dashboard
   navigateToModeDashboard() {
     if (window.location.port.includes('4200')) {
       window.open(`http://localhost:4200/mode-dashboard-new`, '_blank');

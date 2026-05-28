@@ -437,3 +437,30 @@ body {
     padding: 30px 20px;
   }
 }
+.know-more-section {
+  margin: 24px 0;
+  padding: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+.know-more-icons {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.know-more-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.know-more-icon-wrap:hover {
+  transform: scale(1.15);
+}
+.know-more-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
