@@ -5087,7 +5087,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     goToBooking() {
-        this.router.navigate(['/book-appointment']);
+        this.router.navigate(['/bookappointment']);
     }
 
     // ===== Analytics tab =================================================
