@@ -18,6 +18,11 @@ import { EvolutionQuestionsComponent } from './evolution-questions/evolution-que
 import { inject } from '@angular/core';
 import { Router,RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { FormsModule } from '@angular/forms';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSelectModule } from '@angular/material/select';
 @Component({
   selector: 'app-evolution-wishlist-log-screen',
   imports: [CommonModule,
@@ -28,7 +33,12 @@ import { Subscription } from 'rxjs';
     MatSortModule,
     MatButtonModule,
     MatIconModule,
-    MatTableModule,],
+    MatTableModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    MatTooltipModule,
+    MatSelectModule,
+    FormsModule,],
     animations: [
     trigger('detailExpand', [
       state('collapsed', style({ height: '0px', minHeight: '0', visibility: 'hidden' })),
@@ -44,7 +54,7 @@ export class EvolutionWishlistLogScreenComponent {
     mapProfile = {}
     @ViewChild(MatPaginator) paginator: MatPaginator;
     @ViewChild(MatSort) sort: MatSort;
-    displayedColumns: string[] = ["name", "type", "created", "status","contacts","sent","wishlist","reinitiate","delete"];
+    displayedColumns: string[] = ["name", "type", "created", "status","contacts","sent","knowmore","wishlist","reinitiate","delete"];
     dataSource = new MatTableDataSource();
     wishlistlogSubscription: Subscription
     questionsOrder = [];
@@ -53,11 +63,20 @@ export class EvolutionWishlistLogScreenComponent {
     notcompletedCount = 0;
     cancelledCount = 0;
     expandedElement: any = null;
+    activeFilter: string = null;
     totalSharedContacts: number = 0;
     totalCompletedContacts: number = 0;
     received: boolean = false;
     fullAccess:boolean = false;
+    textFilter: string = '';
+    createdFrom: Date = null;
+    createdTo: Date = null;
+    sentFrom: Date = null;
+    sentTo: Date = null;
+    knowMoreFilter: string = '';
+    ecosystemFilter: string = '';
     profilesWithInitiatedStatus: Set<string> = new Set<string>();
+    ecosystemContacts: Set<string> = new Set<string>();
     constructor(
       public guard: AuthguardService,
       public firestore: Firestore,
@@ -77,6 +96,8 @@ export class EvolutionWishlistLogScreenComponent {
           profileSnapshot.forEach(doc => {
             var data = doc.data()
             this.mapProfile[doc.id] = data["name"]
+            if (data["email"]) this.ecosystemContacts.add(data["email"].toLowerCase());
+            if (data["number"]) this.ecosystemContacts.add(String(data["number"]).replace(/\D/g, '').slice(-10));
           })
           const logRef = collection(firestore, 'evolutionwishlistlog') as CollectionReference<any>;
           const logQuery = query(logRef, orderBy('created', 'desc'));
@@ -118,6 +139,23 @@ export class EvolutionWishlistLogScreenComponent {
               this.totalCompletedContacts += data["submittedCount"];
             } else {
               data["submittedCount"] = 0;
+            }
+            if (data["contacts"] && Array.isArray(data["contacts"])) {
+              data["knowMoreClickedCount"] = data["contacts"].filter(
+                c => c.knowmoreclicks && c.knowmoreclicks.length > 0
+              ).length;
+            } else {
+              data["knowMoreClickedCount"] = 0;
+            }
+            if (data["contacts"] && Array.isArray(data["contacts"])) {
+              data["contacts"].forEach(contact => {
+                if (contact.knowmoreclicks) {
+                  contact.knowmoreclicks = contact.knowmoreclicks.map(k => ({
+                    ...k,
+                    clickedAt: k.clickedAt?.toDate ? k.clickedAt.toDate() : k.clickedAt
+                  }));
+                }
+              });
             }
             const existingEntry = mostRecentMap.get(data["profileid"]);
             if (!existingEntry || data["created"] > existingEntry["created"]) {
@@ -180,9 +218,6 @@ export class EvolutionWishlistLogScreenComponent {
       });
   }
 
-  filterData(value){
-    this.dataSource.filter = value
-  }
   cancelInitiated(row: any) {
     this.received = false;
     const confirmDownload = confirm(`Are you sure you want to cancel ${this.mapProfile[row.profileid]}'s wishlist?`);
@@ -316,11 +351,17 @@ export class EvolutionWishlistLogScreenComponent {
       return;
     }
     const csvHeader = [
-      "Participant Name", 
+      "Participant Name",
+      "Wishlist Type",
+      "Created Date",
+      "Sent Date",
+      "Status",
       "Contact Name",
-      "Contact Type", 
-      "Contact Info", 
+      "Contact Type",
+      "Contact Info",
       "Contact Status",
+      "Submitted Date",
+      "Know More Clicked",
     ];
     
     const questionHeaders = this.questionsOrder.map(q => {
@@ -345,14 +386,16 @@ export class EvolutionWishlistLogScreenComponent {
           const submittedDate = contact.submitteddate ? this.formatDate(contact.submitteddate.toDate()) : "";
           const rowData = [
             this.escapeCSV(profileName),
-            // this.escapeCSV(type),
-            // this.escapeCSV(created),
-            // this.escapeCSV(status),
+            this.escapeCSV(row["type"] == 'familyandpeers' ? 'FAMILY AND PEERS' : 'SELF'),
+            this.escapeCSV(row["created"] ? this.formatDate(row["created"]) : ""),
+            this.escapeCSV(row["sent"] ? this.formatDate(row["sent"]) : ""),
+            this.escapeCSV(row["status"] == 'sended' ? 'shared' : row["status"] || ""),
             this.escapeCSV(contactName),
             this.escapeCSV(contactType),
             this.escapeCSV(contactInfo),
             this.escapeCSV(contactStatus),
-            // this.escapeCSV(submittedDate)
+            this.escapeCSV(submittedDate),
+            this.escapeCSV(contact.knowmoreclicks?.length > 0 ? 'Yes' : 'No'),
           ];
           
           if (contact.wishlistquestionmap && contact.status === 'received') {
@@ -372,20 +415,14 @@ export class EvolutionWishlistLogScreenComponent {
           csvData.push(rowData.join(','));
         });
       } else {
-        const rowData = [
-          this.escapeCSV(profileName),
-          // this.escapeCSV(type),
-          // this.escapeCSV(created),
-          // this.escapeCSV(status),
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          ""
-        ];
+      const rowData = [
+        this.escapeCSV(profileName),
+        this.escapeCSV(row["type"] == 'familyandpeers' ? 'FAMILY AND PEERS' : 'SELF'),
+        this.escapeCSV(row["created"] ? this.formatDate(row["created"]) : ""),
+        this.escapeCSV(row["sent"] ? this.formatDate(row["sent"]) : ""),
+        this.escapeCSV((row["mannualcompleted"] ? 'Partially ' : '') + (row["status"] == 'sended' ? 'shared' : row["status"] || "")),
+        "", "", "", "", "",
+      ];
         
         this.questionsOrder.forEach(() => rowData.push(""));
         
@@ -431,14 +468,70 @@ export class EvolutionWishlistLogScreenComponent {
     });
   }
   createQuestion() {
-    var dialogRef = this.dialog.open(EvolutionQuestionsComponent, { 
-      // disableClose: true,
+    this.dialog.open(EvolutionQuestionsComponent, {
       autoFocus: false,
-      width: '90%',
-      height: '85%',
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      panelClass: 'fullscreen-dialog',
     });
-    dialogRef.afterClosed().subscribe(value => {  
-    });
+  }
+  applyStatusFilter(filterType: string) {
+    this.activeFilter = this.activeFilter === filterType ? null : filterType;
+    this.applyFilters();
+  }
+  
+  applyFilters(clear = false) {
+    if (clear) { 
+      this.createdFrom = this.createdTo = this.sentFrom = this.sentTo = null; 
+      this.knowMoreFilter = '';
+      this.ecosystemFilter = '';
+    }
+
+    const statusFilters: Record<string, (d: any) => boolean> = {
+      shared:      d => ['completed','sended'].includes(d.status),
+      completed:   d => d.status === 'completed',
+      pending:     d => d.status === 'sended',
+      notshared:   d => d.status === 'initiated',
+      cancelled:   d => d.status === 'cancelled',
+      sharessent:  d => (d.contacts?.length ?? 0) > 0,
+      received:    d => d.submittedCount > 0,
+      notreceived: d => (d.contacts?.length ?? 0) > d.submittedCount,
+    };
+
+    this.dataSource.filterPredicate = (data: any) => {
+      const statusMatch = this.activeFilter ? (statusFilters[this.activeFilter]?.(data) ?? true) : true;
+      const textMatch = !this.textFilter?.trim() ? true : JSON.stringify(data).toLowerCase().includes(this.textFilter.toLowerCase());
+      const createdMatch = !this.createdFrom && !this.createdTo ? true : (() => {
+        if (!data.created) return false;
+        const d = new Date(data.created);
+        const to = this.createdTo ? new Date(new Date(this.createdTo).setHours(23,59,59,999)) : null;
+        return (!this.createdFrom || d >= this.createdFrom) && (!to || d <= to);
+      })();
+
+      const sentMatch = !this.sentFrom && !this.sentTo ? true : (() => {
+        if (!data.sent) return false;
+        const d = new Date(data.sent);
+        const to = this.sentTo ? new Date(new Date(this.sentTo).setHours(23,59,59,999)) : null;
+        return (!this.sentFrom || d >= this.sentFrom) && (!to || d <= to);
+      })();
+      const knowMoreMatch = !this.knowMoreFilter ? true :
+      this.knowMoreFilter === 'clicked' ? (data.knowMoreClickedCount > 0): (data.knowMoreClickedCount === 0);
+
+      const ecosystemMatch = !this.ecosystemFilter ? true :
+        this.ecosystemFilter === 'yes'? data.contacts?.some(c => this.isInEcosystem(c)): !data.contacts?.some(c => this.isInEcosystem(c));
+
+      return statusMatch && textMatch && createdMatch && sentMatch && knowMoreMatch && ecosystemMatch;
+    };
+
+    this.dataSource.filter = (this.activeFilter || this.textFilter || this.createdFrom || this.createdTo || this.sentFrom || this.sentTo || this.knowMoreFilter || this.ecosystemFilter) ? 'active' : ''; 
+  }
+
+  isInEcosystem(contact: any): boolean {
+    if (!contact?.contact) return false;
+    const val = contact.type === 'gmail' ? contact.contact.toLowerCase() : String(contact.contact).replace(/\D/g, '').slice(-10);
+    return this.ecosystemContacts.has(val);
   }
 }
 

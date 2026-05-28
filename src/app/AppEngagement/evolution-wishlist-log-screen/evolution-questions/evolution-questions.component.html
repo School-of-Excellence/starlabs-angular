@@ -88,7 +88,7 @@
       </div>      
 </div> -->
 <!-- evolution-questions.component.html -->
-<div style="padding: 20px;">
+<!-- <div style="padding: 20px;">
   <form [formGroup]="questionForm" class="flex-container" style="align-items: start;">
     <div class="question-input-container">
       <mat-form-field appearance="outline" style="width: 80%;">
@@ -140,7 +140,7 @@
       <mat-checkbox formControlName="askanswer" class="need-answer-checkbox">
         Need answer for this Audio
       </mat-checkbox>
-    </div>
+    </div> -->
     <!-- <div *ngIf="questionForm.get('type').value === 'radio' || questionForm.get('type').value === 'checkbox'" class="radio-options-container">
       <div formArrayName="options">
         <div *ngFor="let option of options.controls; let i=index" class="option-row">
@@ -157,7 +157,7 @@
         <mat-icon>add</mat-icon> Add Option
       </button>
     </div> -->
-    <div *ngIf="questionForm.get('type').value === 'radio' || questionForm.get('type').value === 'checkbox'" class="radio-options-container">
+    <!-- <div *ngIf="questionForm.get('type').value === 'radio' || questionForm.get('type').value === 'checkbox'" class="radio-options-container">
       <div formArrayName="options">
         <div *ngFor="let option of options.controls; let i=index" class="option-row">
           <mat-form-field appearance="outline">
@@ -241,5 +241,273 @@
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;" cdkDrag></tr>
     </table>
+  </div>
+</div> -->
+<div class="ew-shell">
+  <!-- TOP BAR -->
+  <div class="ew-topbar">
+    <button mat-button (click)="dialogRef.close()" class="ew-back-btn">
+      <mat-icon>arrow_back</mat-icon>
+      Dashboard
+    </button>
+    <h1 class="ew-title">Manage Questions</h1>
+  </div>
+
+  <div class="ew-body">
+    <!-- LEFT PANEL -->
+    <div class="ew-left">
+      <div class="ew-section-header">
+        <span class="ew-section-title">Form Questions</span>
+        <div style="display:flex;gap:8px">
+          <button mat-stroked-button color="primary" (click)="showLinksDialog = true">
+            <mat-icon>add_link</mat-icon> Know More
+          </button>
+          <button mat-flat-button color="primary" (click)="showAddDialog = true">
+            <mat-icon>add</mat-icon> Add Question
+          </button>
+        </div>
+      </div>
+
+      <!-- QUESTION LIST -->
+      <div class="ew-question-list"
+        cdkDropList
+        (cdkDropListDropped)="dropTable($event)">
+        <div class="ew-q-header">
+          <span class="col-sno">S.No</span>
+          <span class="col-question">Question</span>
+          <span class="col-type">Type</span>
+          <span class="col-status">Status</span>
+          <span class="col-actions">Actions</span>
+        </div>
+
+        <div *ngFor="let q of questions; let i = index" class="ew-q-row" cdkDrag>
+          <span class="col-sno drag-handle" cdkDragHandle>
+            <mat-icon style="font-size:16px;color:#aaa">drag_indicator</mat-icon>
+            {{ q.sno }}
+          </span>
+
+          <!-- VIEW MODE -->
+          <ng-container *ngIf="editingQuestion !== q">
+            <span class="col-question">{{ q.question }}</span>
+            <span class="col-type">
+              <span class="type-badge" [ngClass]="q.type">{{ q.type | titlecase }}</span>
+            </span>
+            <span class="col-status">
+              <mat-slide-toggle [checked]="q.enabled" (change)="toggleQuestionStatus(q)" color="primary">
+                {{ q.enabled ? 'Enabled' : 'Disabled' }}
+              </mat-slide-toggle>
+            </span>
+            <span class="col-actions">
+              <button mat-icon-button color="primary" (click)="startEdit(q)" matTooltip="Edit">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="deleteQuestion(q)" matTooltip="Delete">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </span>
+          </ng-container>
+
+          <!-- EDIT MODE -->
+          <ng-container *ngIf="editingQuestion === q" [formGroup]="editForm">
+            <span class="col-question">
+              <mat-form-field appearance="outline" style="width:100%">
+                <input matInput formControlName="question">
+              </mat-form-field>
+              <!-- options editing inline below question field -->
+              <div *ngIf="['radio','checkbox'].includes(editForm.get('type').value)" 
+                  formArrayName="options" class="edit-options-wrap">
+                <div *ngFor="let opt of editOptionsArray.controls; let oi=index" class="ew-option-row">
+                  <mat-form-field appearance="outline" style="width:140px">
+                    <mat-label>Option {{oi+1}}</mat-label>
+                    <input matInput [formControlName]="oi">
+                  </mat-form-field>
+                  <button mat-icon-button color="warn" (click)="editOptionsArray.removeAt(oi)" 
+                    *ngIf="editOptionsArray.length > 1">
+                    <mat-icon style="font-size:16px">close</mat-icon>
+                  </button>
+                </div>
+                <button mat-stroked-button color="primary" type="button" style="font-size:12px;margin-top:4px"
+                  (click)="editOptionsArray.push(fb.control(''))">
+                  <mat-icon>add</mat-icon> Add Option
+                </button>
+              </div>
+            </span>
+            <span class="col-type">
+              <mat-form-field appearance="outline" style="width:100px">
+                <mat-select formControlName="type">
+                  <mat-option value="textarea">Textarea</mat-option>
+                  <mat-option value="input">Input</mat-option>
+                  <mat-option value="email">Email</mat-option>
+                  <mat-option value="radio">Radio</mat-option>
+                  <mat-option value="checkbox">Checkbox</mat-option>
+                  <mat-option value="video">Video</mat-option>
+                  <mat-option value="audio">Audio</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </span>
+            <span class="col-status"></span>
+            <span class="col-actions">
+              <button mat-icon-button color="primary" (click)="saveEdit()" matTooltip="Save">
+                <mat-icon>save</mat-icon>
+              </button>
+              <button mat-icon-button (click)="editingQuestion = null" matTooltip="Cancel">
+                <mat-icon>close</mat-icon>
+              </button>
+            </span>
+          </ng-container>
+        </div>
+      </div>
+      
+
+      <!-- ADD NEW QUESTION -->
+      <div class="ew-dialog-overlay" *ngIf="showAddDialog" (click)="showAddDialog = false">
+        <div class="ew-dialog" (click)="$event.stopPropagation()">
+          <div class="ew-dialog-header">
+            <span>Add New Question</span>
+            <button mat-icon-button (click)="showAddDialog = false"><mat-icon>close</mat-icon></button>
+          </div>
+          <form [formGroup]="questionForm" class="ew-add-form">
+            <mat-form-field appearance="outline" class="ew-add-input">
+              <mat-label>Enter question... use {{'{{'}}participantname{{'}}'}} for dynamic name</mat-label>
+              <textarea matInput formControlName="question" rows="3"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" style="width:100%">
+              <mat-label>Type</mat-label>
+              <mat-select formControlName="type">
+                <mat-option value="textarea">Textarea</mat-option>
+                <mat-option value="input">Input Field</mat-option>
+                <mat-option value="email">Email</mat-option>
+                <mat-option value="radio">Radio Buttons</mat-option>
+                <mat-option value="checkbox">Checkboxes</mat-option>
+                <mat-option value="video">Video</mat-option>
+                <mat-option value="audio">Audio</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <div *ngIf="questionForm.get('type').value === 'radio' || questionForm.get('type').value === 'checkbox'" class="ew-options">
+              <div formArrayName="options">
+                <div *ngFor="let opt of options.controls; let i=index" class="ew-option-row">
+                  <mat-form-field appearance="outline" style="width:100%">
+                    <mat-label>Option {{i+1}}</mat-label>
+                    <input matInput [formControlName]="i">
+                  </mat-form-field>
+                  <button mat-icon-button color="warn" (click)="removeOption(i)" *ngIf="options.length > 1">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <button mat-stroked-button color="primary" (click)="addOption()" type="button"><mat-icon>add</mat-icon> Add Option</button>
+              <mat-checkbox formControlName="needAdditionalInput">Need additional input</mat-checkbox>
+              <mat-form-field *ngIf="questionForm.get('needAdditionalInput').value" appearance="outline" style="width:100%">
+                <mat-label>Additional input label</mat-label>
+                <input matInput formControlName="additionalInputLabel">
+              </mat-form-field>
+            </div>
+            <div *ngIf="questionForm.get('type').value === 'video'" class="ew-url-row">
+              <mat-form-field appearance="outline" style="width:100%"><mat-label>Video URL</mat-label><input matInput formControlName="videoUrl"></mat-form-field>
+              <mat-checkbox formControlName="askanswer">Need answer</mat-checkbox>
+            </div>
+            <div *ngIf="questionForm.get('type').value === 'audio'" class="ew-url-row">
+              <mat-form-field appearance="outline" style="width:100%"><mat-label>Audio URL</mat-label><input matInput formControlName="audioUrl"></mat-form-field>
+              <mat-checkbox formControlName="askanswer">Need answer</mat-checkbox>
+            </div>
+            <div class="ew-dialog-actions">
+              <button mat-stroked-button (click)="showAddDialog = false">Cancel</button>
+              <button mat-flat-button color="primary" [disabled]="questionForm.invalid || disableButton" (click)="addEvolution()">+ Add</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <!-- KNOW MORE LINKS DIALOG -->
+      <div class="ew-dialog-overlay" *ngIf="showLinksDialog" (click)="showLinksDialog = false">
+        <div class="ew-dialog" (click)="$event.stopPropagation()">
+          <div class="ew-dialog-header">
+            <span>Know More Links</span>
+            <button mat-icon-button (click)="showLinksDialog = false"><mat-icon>close</mat-icon></button>
+          </div>
+
+          <div class="ew-links-list">
+            <div *ngFor="let link of knowMoreLinks; let i = index" class="ew-link-row">
+              <div class="ew-link-icon">
+                <img [src]="getFavicon(link.url)" width="28" height="28" style="border-radius:4px">
+              </div>
+              <span class="ew-link-type">{{ link.type | titlecase }}</span>
+              <span class="ew-link-url">{{ link.url }}</span>
+              <mat-slide-toggle [checked]="link.enabled" (change)="manageLink('toggle', i)" color="primary">
+                {{ link.enabled ? 'Enabled' : 'Disabled' }}
+              </mat-slide-toggle>
+              <button mat-icon-button color="warn" (click)="manageLink('remove', i)">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+            <div *ngIf="knowMoreLinks.length === 0" class="ew-no-links">No links added yet</div>
+          </div>
+
+          <div class="ew-add-link-row" style="margin-top:16px">
+            <mat-form-field appearance="outline" style="width:130px">
+              <mat-label>Type</mat-label>
+              <input matInput [(ngModel)]="newLink.type" placeholder="instagram">
+            </mat-form-field>
+            <mat-form-field appearance="outline" style="flex:1">
+              <mat-label>URL</mat-label>
+              <input matInput [(ngModel)]="newLink.url" placeholder="https://...">
+            </mat-form-field>
+            <button mat-flat-button color="primary" (click)="manageLink('add')">
+              <mat-icon>add</mat-icon> Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL — LIVE PREVIEW -->
+    <div class="ew-right">
+      <div class="ew-preview-header">
+        <span class="ew-preview-dot"></span>
+        <span class="ew-preview-title">Live preview</span>
+      </div>
+
+      <div class="ew-preview-body">
+        <ng-container *ngFor="let q of questions">
+          <div *ngIf="q.enabled" class="ew-preview-question">
+            <div class="ew-preview-q-text">{{ q.question.replace('{{participantname}}', 'Participant') }}</div>
+
+            <ng-container [ngSwitch]="q.type">
+              <input *ngSwitchCase="'input'" type="text" class="ew-preview-input" placeholder="Your answer" readonly>
+              <input *ngSwitchCase="'email'" type="email" class="ew-preview-input" placeholder="Your email" readonly>
+              <textarea *ngSwitchCase="'textarea'" class="ew-preview-textarea" placeholder="Your answer" readonly></textarea>
+              <div *ngSwitchCase="'radio'" class="ew-preview-options">
+                <div *ngFor="let opt of q.options" class="ew-preview-radio">
+                  <span class="ew-radio-dot"></span> {{ opt }}
+                </div>
+                <div *ngIf="q.options?.length > 3" class="ew-preview-more">+{{ q.options.length - 3 }} more...</div>
+              </div>
+              <div *ngSwitchCase="'checkbox'" class="ew-preview-options">
+                <div *ngFor="let opt of q.options" class="ew-preview-checkbox">
+                  <span class="ew-checkbox-box"></span> {{ opt }}
+                </div>
+              </div>
+              <div *ngSwitchCase="'video'" class="ew-preview-media">
+                <mat-icon>videocam</mat-icon> Video question
+              </div>
+              <div *ngSwitchCase="'audio'" class="ew-preview-media">
+                <mat-icon>audiotrack</mat-icon> Audio question
+              </div>
+            </ng-container>
+          </div>
+        </ng-container>
+        <!-- KNOW MORE IN PREVIEW -->
+        <div *ngIf="knowMoreLinks.length > 0" class="ew-preview-knowmore">
+          <p style="text-align:center;font-size:11px;font-weight:600;color:#64748b;margin-bottom:8px">Know More</p>
+          <div class="ew-preview-knowmore-icons">
+            <ng-container *ngFor="let link of knowMoreLinks">
+              <div *ngIf="link.enabled" class="ew-preview-knowmore-icon">
+                <img [src]="getFavicon(link.url)" width="32" height="32" style="border-radius:6px">
+                <span style="font-size:10px;color:#64748b">{{ link.type | titlecase }}</span>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

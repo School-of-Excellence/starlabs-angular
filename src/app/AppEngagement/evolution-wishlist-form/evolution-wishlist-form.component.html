@@ -127,6 +127,22 @@
       <p style="font-style: italic;font-weight: 400;text-align: center">
         Thank you for sharing your insights! Your contribution will play an essential role in shaping {{participantname}}’s personal and professional evolution. We appreciate your time and thoughtfulness!    
       </p>
+      <div *ngIf="knowMoreLinks.length > 0" class="know-more-section">
+        <p style="text-align:center;font-weight:600;font-size:14px;margin-bottom:12px">
+          Know More
+        </p>
+        <div class="know-more-icons">
+          <div *ngFor="let link of knowMoreLinks"
+            class="know-more-icon-wrap"
+            (click)="trackAndOpen(link)">
+            <img
+              [src]="getFavicon(link.url)"
+              width="40" height="40"
+              style="border-radius:8px;cursor:pointer">
+            <span class="know-more-label">{{ link.type | titlecase }}</span>
+          </div>
+        </div>
+      </div>
       <div class="button-container">
         <button mat-raised-button color="primary" (click)="onSubmit()" [disabled]="form.invalid || questions.length ===0">
           <mat-icon>send</mat-icon>
