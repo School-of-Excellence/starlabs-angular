@@ -118,6 +118,32 @@
     </div>
   </div>
   <button *ngIf="profileHost && isJoined" class="float" (click)="onClick()">capture</button>
+
+  <!-- Big center overlay shown to the HOST when recording is paused/stopped
+       while another person is in the call. Replaces the older top snackbar
+       so it's impossible to miss. -->
+  <div class="rec-prompt-overlay" *ngIf="recordingPromptVisible" role="alertdialog" aria-live="assertive">
+    <div class="rec-prompt-card">
+      <div class="rec-prompt-card__icon">
+        <mat-icon>fiber_manual_record</mat-icon>
+      </div>
+      <h2 class="rec-prompt-card__title">
+        {{ recordingPromptKind === 'paused' ? 'Recording is paused' : 'Recording is not running' }}
+      </h2>
+      <p class="rec-prompt-card__body">
+        {{ recordingPromptKind === 'paused'
+            ? 'Please resume the recording now — the session is in progress.'
+            : 'Please start the recording now — the session is in progress.' }}
+      </p>
+      <div class="rec-prompt-card__hint">
+        <mat-icon>info</mat-icon>
+        Use the Zoom toolbar at the bottom of your screen to
+        {{ recordingPromptKind === 'paused' ? 'resume' : 'start' }} recording.
+      </div>
+      <button class="rec-prompt-card__btn" (click)="dismissRecordingPrompt()">Dismiss for 30s</button>
+    </div>
+  </div>
+
   <div id="aria-notify-area"></div>
 </body>
 </html>

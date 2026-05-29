@@ -165,3 +165,20 @@ body {
   width: 80vw;
   flex-direction: column;
 }
+/* =============================================================
+   Dynamic Studio V2 — body scroll lock
+   When the studio takes over the viewport with position:fixed,
+   we lock the host page so the user can't accidentally scroll
+   the underlying content (or the Material drawer container,
+   which creates a transform-containing block that the studio's
+   fixed positioning would otherwise inherit).
+   ============================================================= */
+body:has(.dyn-studio-v2-app),
+html:has(.dyn-studio-v2-app) {
+  overflow: hidden !important;
+}
+.mat-drawer-content:has(.dyn-studio-v2-app),
+.mat-drawer-container:has(.dyn-studio-v2-app) {
+  overflow: hidden !important;
+  height: 100vh !important;
+}

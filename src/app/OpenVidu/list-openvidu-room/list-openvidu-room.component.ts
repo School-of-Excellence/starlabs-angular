@@ -61,10 +61,11 @@ export class ListOpenviduRoomComponent {
       var studioID = Array.from(new Set(data.map(e => e["studioid"])))
       console.log("Studio", studioID)
 
-      // Signal "participant is at their studio screen" to the specialist UI on
-      // every active live assignment. The specialist's dynamic-studio-v2 watches
-      // `participantReadyAt` / `participantLastSeenAt` and shows a ready indicator.
-      this.markParticipantPresence(data);
+      // NOTE: We intentionally do NOT write participantReadyAt /
+      // participantLastSeenAt from this page. /participantstudio is only the
+      // invitation list — the participant hasn't actually entered the studio
+      // yet. Presence is written by zoom-clientview the moment they click
+      // "Join Meeting Now" and land on the wait screen.
 
       if(studioID.length != 0){
         var studioCollection = collection(this.firestore, "queue studio pairing")
@@ -282,71 +283,7 @@ export class ListOpenviduRoomComponent {
     return [hours, minutes, seconds];
   }
 
-  // --- Participant presence on the studio screen -----------------------------
-  // Specialist UI in dynamic-studio-v2 watches `participantReadyAt` and
-  // `participantLastSeenAt` on the live assignment doc. We refresh these every
-  // 10s while the participant is on /participantstudio and clear them on tab
-  // close so the specialist can tell the participant is still here.
-  private presenceTrackedAssignmentIds = new Set<string>()
-  private presenceHeartbeatTimer: any = null
-  private presenceUnloadHandler: ((ev?: any) => void) | null = null
-  private readonly PRESENCE_HEARTBEAT_MS = 10000
-
-  private markParticipantPresence(assignments: any[]) {
-    if (!assignments?.length) return
-    // Only update the tracked-ID set — do NOT write here. The subscription
-    // fires whenever ANY field on these docs changes (including our own
-    // heartbeat write), so writing inline would cause an infinite loop:
-    // subscription → write → subscription → write...
-    this.presenceTrackedAssignmentIds = new Set<string>(assignments.map(a => a['docid']))
-
-    // Schedule the heartbeat exactly once. Its periodic writes are the only
-    // path that touches the docs.
-    if (!this.presenceHeartbeatTimer) {
-      // Initial beat (one-shot) so the specialist sees presence immediately
-      this.presenceHeartbeatBeat()
-      this.presenceHeartbeatTimer = setInterval(
-        () => this.presenceHeartbeatBeat(),
-        this.PRESENCE_HEARTBEAT_MS
-      )
-    }
-
-    // Clear flags on tab close so the specialist's "Ready" pill disappears
-    if (!this.presenceUnloadHandler) {
-      this.presenceUnloadHandler = () => {
-        this.presenceTrackedAssignmentIds.forEach(id => {
-          updateDoc(doc(this.firestore, 'live assignment', id), {
-            participantReadyAt: null
-          }).catch(() => {})
-        })
-      }
-      window.addEventListener('pagehide', this.presenceUnloadHandler)
-    }
-  }
-
-  private presenceHeartbeatBeat() {
-    this.presenceTrackedAssignmentIds.forEach(id => {
-      updateDoc(doc(this.firestore, 'live assignment', id), {
-        participantReadyAt: serverTimestamp(),
-        participantLastSeenAt: serverTimestamp()
-      }).catch(err => console.warn('participant studio presence beat failed', id, err))
-    })
-  }
-
   ngOnDestroy() {
-    if (this.presenceHeartbeatTimer) {
-      clearInterval(this.presenceHeartbeatTimer)
-      this.presenceHeartbeatTimer = null
-    }
-    if (this.presenceUnloadHandler) {
-      window.removeEventListener('pagehide', this.presenceUnloadHandler)
-      this.presenceUnloadHandler = null
-    }
-    // Best-effort: clear ready flag on navigate-away too
-    this.presenceTrackedAssignmentIds.forEach(id => {
-      const ref = doc(this.firestore, 'live assignment', id)
-      updateDoc(ref, { participantReadyAt: null }).catch(() => {})
-    })
     this.subscription?.next()
     this.subscription?.complete()
   }

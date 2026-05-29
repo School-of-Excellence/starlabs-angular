@@ -49,6 +49,7 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
 export class DynamicStudioV2Component {
   @ViewChildren('itemElement') itemElements: QueryList<ElementRef>;
   @ViewChild('formDialogTpl') formDialogTpl!: TemplateRef<any>;
+  @ViewChild('checkinConflictTpl') checkinConflictTpl!: TemplateRef<any>;
   profileRoles = {}
   profileid = null
   mapProfile = {}
@@ -86,10 +87,17 @@ export class DynamicStudioV2Component {
   stageTokenList = []
   // Studio Invitation
   invitationCountdown:MatDialogRef<any> = null
-  studioInvitationSubscription: Subscription 
+  studioInvitationSubscription: Subscription
   studioInvitation = null
   studioGroupingInvitationSubscription: Subscription = null
   studioconversationSubscription: Subscription = null
+  // Tokens currently being invited by ANOTHER studio in the same queue.
+  // Keyed by token doc id → { studioName, specialistNames } of the inviting studio.
+  // Used by the waiting-list "Bring To Studio" row to hide the CTA and show
+  // an amber "Already being invited" chip instead.
+  tokenInvitedByOther: { [tokenDocId: string]: { studioName?: string; specialistNames?: string[] } } = {}
+  private otherStudioInvitationSubscription: Subscription = null
+  private otherStudioInvitationHandle = new Subject<void>()
   // Zoom Control
   zoomlinkGenerator = false
   // ATC Property
@@ -153,6 +161,53 @@ export class DynamicStudioV2Component {
   private lastStepSignature: string = ''
   private userNavigated: boolean = false
   private lastAssignmentId: string = ''
+
+  // Sidebar profile collapse state (Milestone/Product/Variation/Journey rows)
+  sidebarProfileOpen: boolean = true
+  toggleSidebarProfile() { this.sidebarProfileOpen = !this.sidebarProfileOpen }
+
+  // True only when the participant is currently in the wait screen (which
+  // is the moment the specialist might want to jump to the meeting button).
+  // Used to gate the topbar "Jump to Meeting" CTA.
+  get participantInWaitingRoom(): boolean {
+    void this.presenceTick
+    const la: any = this.liveAssignment || {}
+    const ready = la['participantReadyAt']
+    const inCall = la['participantInCallAt']
+    const left = la['participantLeftAt']
+    if (!ready || inCall || left) return false
+    const ls = la['participantLastSeenAt']
+    if (!ls) return true // legacy fallback
+    const ms = typeof ls?.toMillis === 'function'
+      ? ls.toMillis()
+      : (ls instanceof Date ? ls.getTime() : 0)
+    if (!ms) return false
+    return (Date.now() - ms) < this.PARTICIPANT_PRESENCE_FRESHNESS_MS
+  }
+
+  // True when the participant is actually live in the Zoom call.
+  get participantHasJoinedCall(): boolean {
+    void this.presenceTick
+    const la: any = this.liveAssignment || {}
+    if (!la['participantInCallAt']) return false
+    if (la['participantLeftAt']) return false
+    const ls = la['participantLastSeenAt']
+    if (!ls) return true
+    const ms = typeof ls?.toMillis === 'function'
+      ? ls.toMillis()
+      : (ls instanceof Date ? ls.getTime() : 0)
+    if (!ms) return false
+    return (Date.now() - ms) < this.PARTICIPANT_PRESENCE_FRESHNESS_MS
+  }
+
+  // True when the current specialist has the mentor role. Used to gate the
+  // Edit ATC button on previous-cycle ATCs (only mentors can edit them).
+  get isMentor(): boolean {
+    return !!this.profileRoles?.['mentor']
+  }
+
+  // Body scroll lock is done purely via CSS (:has() selector in styles.css
+  // targeting .dyn-studio-v2-app) — no JS needed.
 
   // Studio invitation countdown (configurable via classify/studiotimer.timerinseconds)
   invitationTimerSeconds: number = 120
@@ -234,6 +289,98 @@ export class DynamicStudioV2Component {
     return true
   }
   private presenceTimer: any = null
+
+  // Top-bar live status pill — pure derivation from liveAssignment + the
+  // presence ticker. Returns a tone/icon/title/sub that the template binds to.
+  // tones: primary | green | amber | slate. icons are Material icon names.
+  get topBarStatus(): { tone: string; icon: string; title: string; sub: string } {
+    void this.presenceTick // re-run on tick
+    const la: any = this.liveAssignment || {}
+    const readyAt = la['participantReadyAt']
+    const inCallAt = la['participantInCallAt']
+    const leftAt = la['participantLeftAt']
+    const specialistJoinedAt = la['specialistJoinedAt']
+    const lastSeen = la['participantLastSeenAt']
+    const fresh = (ts: any): boolean => {
+      if (!ts) return false
+      const ms = typeof ts?.toMillis === 'function'
+        ? ts.toMillis()
+        : (ts instanceof Date ? ts.getTime() : 0)
+      if (!ms) return false
+      return (Date.now() - ms) < this.PARTICIPANT_PRESENCE_FRESHNESS_MS
+    }
+
+    // session ended — both participant left and call had started
+    if (leftAt && specialistJoinedAt && !fresh(lastSeen)) {
+      return { tone: 'slate', icon: 'check', title: 'Session ended', sub: 'The participant has disconnected' }
+    }
+    // participant left mid-call
+    if (leftAt && specialistJoinedAt) {
+      return { tone: 'amber', icon: 'logout', title: 'Participant left the meeting', sub: 'Connection dropped — waiting for them to rejoin' }
+    }
+    // participant in call (joined live)
+    if (inCallAt && fresh(lastSeen)) {
+      return {
+        tone: 'primary',
+        icon: 'login',
+        title: 'Participant has joined',
+        sub: (this.mapProfile?.[la?.['token']?.profile_id] || 'Participant') + ' is now live in the meeting'
+      }
+    }
+    // participant ready (on meeting screen) — show review hint
+    if (readyAt && fresh(lastSeen)) {
+      return { tone: 'green', icon: 'videocam', title: 'Participant is waiting', sub: 'Take a moment to review the forms and ATC before starting the call.' }
+    }
+    if (readyAt && !lastSeen) {
+      return { tone: 'green', icon: 'videocam', title: 'Participant is waiting', sub: 'Take a moment to review the forms and ATC before starting the call.' }
+    }
+    // default — silent (no scary "no signal" copy)
+    return { tone: 'slate', icon: 'schedule', title: 'Awaiting participant', sub: 'Use this time to review the forms and ATC.' }
+  }
+
+  // ----- Studio-screen presence (writes to live assignment) -----------------
+  // Heartbeat `specialistAtStudioLastSeenAt` every 10s on the currently
+  // selected studio's live assignment so the arena board can tell that the
+  // specialist is actually looking at the studio screen (vs. just having the
+  // record around). One-shot `returnedToStudioAt` is also written the first
+  // time we hit a beat with `specialistJoinedAt` already set on the
+  // assignment (i.e. the specialist came back after a call had started).
+  private studioPresenceTimer: any = null
+  private readonly STUDIO_PRESENCE_HEARTBEAT_MS = 10000
+  private studioReturnStampedFor = new Set<string>()
+
+  private startStudioPresence() {
+    if (this.studioPresenceTimer) return
+    this.beatStudioPresence()
+    this.studioPresenceTimer = setInterval(
+      () => this.beatStudioPresence(),
+      this.STUDIO_PRESENCE_HEARTBEAT_MS
+    )
+  }
+
+  private beatStudioPresence() {
+    const docid: string = this.liveAssignment?.['docid']
+    if (!docid) return
+    const update: any = { specialistAtStudioLastSeenAt: serverTimestamp() }
+    // One-shot: stamp `returnedToStudioAt` the first time we beat against this
+    // assignment AFTER its call has started (specialistJoinedAt set) and we
+    // haven't stamped it already this session.
+    const callStarted = !!this.liveAssignment?.['specialistJoinedAt']
+    const alreadyOnDoc = !!this.liveAssignment?.['returnedToStudioAt']
+    if (callStarted && !alreadyOnDoc && !this.studioReturnStampedFor.has(docid)) {
+      update.returnedToStudioAt = serverTimestamp()
+      this.studioReturnStampedFor.add(docid)
+    }
+    updateDoc(doc(this.firestore, 'live assignment', docid), update)
+      .catch(err => console.warn('Studio presence beat failed', err))
+  }
+
+  private stopStudioPresence() {
+    if (this.studioPresenceTimer) {
+      clearInterval(this.studioPresenceTimer)
+      this.studioPresenceTimer = null
+    }
+  }
 
   // Helper: count specialists across all activities in an ATC
   countSpecialists(atc: any): number {
@@ -533,12 +680,17 @@ export class DynamicStudioV2Component {
       })
     })
     this.enableZoomLinkGenerator()
+    // Start the studio-presence heartbeat. It writes only when there is a
+    // currently selected studio with a live assignment, so an idle / empty
+    // studio screen produces no writes.
+    this.startStudioPresence()
   }
 
   ngOnDestroy(){
    this.subscriptionHandle.complete();
    this.subscriptionHandle.next();
    if (this.presenceTimer) { clearInterval(this.presenceTimer); this.presenceTimer = null }
+   this.stopStudioPresence()
   }
 
   // Trigger periodic change detection so `participantReady` re-evaluates
@@ -573,6 +725,7 @@ export class DynamicStudioV2Component {
     this.tripleATCSubscription?.unsubscribe()
     this.outsideLiveAssignmentSubscription?.unsubscribe()
     this.studioconversationSubscription?.unsubscribe()
+    this.otherStudioInvitationSubscription?.unsubscribe()
 
     this.studioPairingSubscription = null
     this.liveassignmentSubscription = null
@@ -582,6 +735,61 @@ export class DynamicStudioV2Component {
     this.tripleATCSubscription = null
     this.outsideLiveAssignmentSubscription = null
     this.studioconversationSubscription = null
+    this.otherStudioInvitationSubscription = null
+    this.tokenInvitedByOther = {}
+  }
+
+  /**
+   * Subscribe to pending studio invitations for the CURRENT queue that were
+   * sent from a studio OTHER than the one this specialist is in. Populates
+   * `tokenInvitedByOther` (keyed by token doc id) so the waiting-list row can
+   * hide the "Bring To Studio" CTA and show an amber chip instead.
+   *
+   * Re-runs whenever the selected studio changes (we filter by
+   * `studioid !== selectedStudio.docid` in the snapshot).
+   */
+  private subscribeOtherStudioInvitations(){
+    if (!this.ongoingQueue?.['docid']) return
+    // Tear down the previous handle so any in-flight stream stops, then
+    // make a fresh one for the new selected studio.
+    this.otherStudioInvitationHandle.next()
+    this.otherStudioInvitationSubscription?.unsubscribe()
+    this.tokenInvitedByOther = {}
+
+    const queueRef = doc(this.firestore, 'queue generation', this.ongoingQueue['docid'])
+    this.otherStudioInvitationSubscription = collectionData(
+      query(
+        collection(this.firestore, 'studioinvitation'),
+        where('queueref', '==', queueRef),
+        where('status', '==', 'pending'),
+        where('expirydate', '>=', new Date()),
+      ),
+      { idField: 'id' }
+    ).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.otherStudioInvitationHandle)).subscribe(invitations => {
+      const next: { [tokenDocId: string]: { studioName?: string; specialistNames?: string[] } } = {}
+      const selfStudio = this.selectedStudio?.['docid']
+      for (const inv of (invitations || [])) {
+        const invStudio = inv['studioid']
+        if (!invStudio || invStudio === selfStudio) continue
+        const tokenRef: any = inv['tokenref']
+        const tokenDocId = tokenRef?.id
+          ?? (typeof tokenRef?.path === 'string' ? tokenRef.path.split('/').pop() : null)
+        if (!tokenDocId) continue
+        // Skip terminal client responses
+        const clientResp = inv['clientresponse']
+        if (clientResp === 'denied') continue
+        const studio = this.mapStudio?.[invStudio] || {}
+        const studioName = studio?.['studioname'] || studio?.['name'] || 'another studio'
+        const specialistIds: string[] = Array.isArray(inv['specialistpairing'])
+          ? inv['specialistpairing']
+          : (Array.isArray(studio?.['participants']) ? studio['participants'] : [])
+        const specialistNames = specialistIds
+          .map(p => this.mapProfile?.[p])
+          .filter(n => !!n)
+        next[tokenDocId] = { studioName, specialistNames }
+      }
+      this.tokenInvitedByOther = next
+    })
   }
 
   compareFn(c1:any, c2:any): boolean {
@@ -766,6 +974,9 @@ export class DynamicStudioV2Component {
       this.liveStudio = this.studioList.filter(e => e["status"] == "live")
       console.log("Live Studio", this.liveStudio)
       this.isLoadingStudios = false;
+      // Keep the "Already being invited" chip current whenever the studio
+      // list (and therefore mapStudio) changes.
+      this.subscribeOtherStudioInvitations()
       if(this.studioList.length == 0 && !this.isLoadingStudios){
         this.selectedStudio = {}
         this.liveAssignment = null
@@ -949,6 +1160,9 @@ export class DynamicStudioV2Component {
     console.log(this.selectedStudio)
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
     console.log(this.liveAssignment, 'this.liveAssignment');
+    // Switching the active studio changes which invitations count as
+    // "another studio's" — re-derive the chip map.
+    this.subscribeOtherStudioInvitations()
     
     var studioStage = []
     // List Eligible Stages and Token
@@ -1130,14 +1344,91 @@ export class DynamicStudioV2Component {
     }
   }
 
+  /**
+   * Public entry point for the Studio Checkin toggle. Enforces the
+   * one-active-checkin-per-specialist rule: if the user is already checked
+   * into another studio (any queue), prompts a confirmation dialog and
+   * batch-checks-out the others before proceeding with this check-in.
+   * Checkouts (value === false) skip the conflict check entirely.
+   */
   async checkinStudio(value){
+    if (value === true) {
+      const conflicts = await this.findActiveCheckins(this.selectedStudio?.['docid'])
+      if (conflicts.length > 0) {
+        const confirmed = await firstValueFrom(
+          this.dialog.open(this.checkinConflictTpl, {
+            data: {
+              studios: conflicts.map(c => ({
+                docid: c['docid'],
+                name: c['studioname'] || c['name'] || 'Studio'
+              }))
+            },
+            disableClose: true,
+            width: '460px',
+            maxWidth: '92vw',
+            autoFocus: false,
+          }).afterClosed()
+        )
+        if (!confirmed) return
+        // Batch-checkout the conflicting studios atomically before continuing.
+        try {
+          const batch = writeBatch(this.firestore)
+          for (const c of conflicts) {
+            batch.update(doc(this.firestore, 'queue studio pairing', c['docid']), { checkin: false })
+          }
+          await batch.commit()
+          // Log a checkout entry for each, mirroring performCheckin's log shape.
+          for (const c of conflicts) {
+            const logid = doc(collection(this.firestore, 'studio checkin log')).id
+            setDoc(doc(this.firestore, 'studio checkin log', logid), {
+              logparticipant: this.profileid,
+              queueref: c['queueref'],
+              logdate: new Date(),
+              activity: 'checkout',
+              participants: c['participants'] || [],
+              studio: c['docid']
+            })
+          }
+        } catch (err) {
+          console.log('Failed to checkout other studios', err)
+          alert('Could not check out of the other studio. Please try again.')
+          return
+        }
+      }
+    }
+    return this.performCheckin(value)
+  }
+
+  /**
+   * Returns the user's other studios across all queues that currently have
+   * `checkin: true`. Excludes the studio identified by `excludeStudioId`
+   * (typically the one being toggled). Returns empty array on no conflict.
+   */
+  private async findActiveCheckins(excludeStudioId: string | undefined | null): Promise<any[]> {
+    if (!this.profileid) return []
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'queue studio pairing'),
+        where('participants', 'array-contains', this.profileid),
+        where('checkin', '==', true),
+      ))
+      return snap.docs
+        .map(d => d.data())
+        .filter(s => s['docid'] !== excludeStudioId && [null, undefined, false].includes(s['delete']))
+    } catch (err) {
+      console.log('findActiveCheckins error', err)
+      return []
+    }
+  }
+
+  private async performCheckin(value){
     const currentDate = new Date();
-    const currentTime = currentDate.getTime(); 
+    const currentTime = currentDate.getTime();
     const scheduledTimes = (this.selectedStudio["checkinscheduletime"] ?? []).filter(timestamp => {
-      const timestampTime = timestamp.toDate().getTime(); 
+      const timestampTime = timestamp.toDate().getTime();
       console.log(timestampTime);
-      
-      return timestampTime > currentTime; 
+
+      return timestampTime > currentTime;
     });
     console.log(scheduledTimes);
     const dayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
