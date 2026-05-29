@@ -1182,19 +1182,36 @@
                                         </ng-template>
                                       </div>
                                       <!-- SLOT LIST -->
-                                      <div class="bk-slots-grid" (click)="goToBooking()">
+                                      <div class="bk-slots-grid">
                                         <div *ngFor="let slot of selectedSpecialistSlots" class="bk-slot"
-                                          (click)="goToBooking()">
+                                          (click)="goToBooking(slot)">
                                           {{ slot.slotStart?.toDate() | date:'hh:mm a' }}
                                         </div>
                                       </div>
+
+                                      <mat-form-field class="w-25 mt-3" appearance="outline" *ngIf="slotSelected">
+                                        <mat-label>Select Profile</mat-label>
+                                        <mat-select [(ngModel)]="selectedUser"
+                                          (selectionChange)="onProfileSelect(selectedUser)">
+                                          <mat-option>
+                                            <ngx-mat-select-search [(ngModel)]="filteredProfile"
+                                              [placeholderLabel]="'Search'"
+                                              [noEntriesFoundLabel]="'No matching records found'"
+                                              ngDefaultControl></ngx-mat-select-search>
+                                          </mat-option>
+                                          <mat-option *ngFor="let user of returnClient()"
+                                            [value]="user.id">{{user.name}}</mat-option>
+                                        </mat-select>
+                                      </mat-form-field>
                                     </div>
                                   </div>
                                 </td>
                               </tr>
+
                             </table>
                           </td>
                         </tr>
+
                         <tr *ngIf="specialistData.length === 0">
                           <td colspan="6" class="pm-no-data">No specialist data available for the selected range</td>
                         </tr>

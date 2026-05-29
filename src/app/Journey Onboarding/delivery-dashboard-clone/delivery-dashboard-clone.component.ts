@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
-import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, serverTimestamp, arrayUnion, writeBatch, documentId } from '@angular/fire/firestore';
 import { Observable, Subscription, combineLatest } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -530,6 +530,14 @@ export class DeliveryDashboardCloneComponent {
     selectedEISId = null;
     selectedAppointmentTypeId = null;
     selectedView: string = 'booked';
+
+    profileList = [];
+    mapProfile = {};
+    selectedUser: string = null
+    filteredProfile = ""
+    slotSelected = false;
+    selectedSlotData: any;
+    loggedInPID: any;
 
     productData: any = {
         eiStarterPack: {
@@ -1154,9 +1162,7 @@ export class DeliveryDashboardCloneComponent {
                 const sub = collectionData(q, { idField: 'id' })
                     .subscribe({
                         next: async (appointmentsSnap: any[]) => {
-
                             let updatedAppointments = [...appointmentsSnap];
-
                             await Promise.all(
                                 updatedAppointments.map(async (appointment: any) => {
                                     appointment.appointmentTypeName = await this.resolveAppointmentType(appointment);
@@ -1164,17 +1170,16 @@ export class DeliveryDashboardCloneComponent {
                             );
 
                             updatedAppointments = updatedAppointments.map((app: any) => {
-
                                 const matchedProduct = this.allMatchedProductsRaw.find(
                                     (product: any) =>
                                         product.docid === app.participantproductid
                                 );
-
                                 return {
                                     ...matchedProduct,
                                     ...app
                                 };
                             });
+
                             const hasChanges = this.allAppointments !== updatedAppointments;
                             if (hasChanges) {
                                 this.allAppointments = updatedAppointments;
@@ -1677,10 +1682,28 @@ export class DeliveryDashboardCloneComponent {
             endOfTomorrow
         } = this.getTodayAndTomorrowRange();
 
-        const filteredAppointments = this.allAppointments.filter(app =>
-            app.appointmentTypeName === appointmentTypeName &&
-            app.attended === false
-        );
+        // const filteredAppointments = this.allAppointments.filter(app =>
+        //     app.appointmentTypeName === appointmentTypeName &&
+        //     app.attended === false
+        // );
+
+        const filteredAppointments = this.allAppointments
+            .filter(app =>
+                app.appointmentTypeName === appointmentTypeName &&
+                app.attended === false
+            )
+            .map((app: any) => {
+
+                const matchedProduct = this.allMatchedProductsRaw.find(
+                    (product: any) =>
+                        product.docid === app.participantproductid
+                );
+
+                return {
+                    ...matchedProduct,
+                    ...app
+                };
+            });
 
         return {
             all: filteredAppointments,
@@ -1897,7 +1920,6 @@ export class DeliveryDashboardCloneComponent {
         this.availableDates = [];
 
         try {
-            console.log('[Specialist] Step 1: querying products (mode=Priority Mode)...');
             const productsSnap = await runInInjectionContext(this.injector, () =>
                 getDocs(query(
                     collection(this.firestore, 'products'),
@@ -1905,9 +1927,6 @@ export class DeliveryDashboardCloneComponent {
                     where('product', '==', 'Critical Support Diagnostics And Implementation')
                 ))
             );
-
-            console.log(`[Specialist] Step 1 done: ${productsSnap.docs.length} Priority Mode products found`);
-            console.log('[Specialist] Step 2: querying productToDeliverySequence...');
 
             const deliveryPromises = productsSnap.docs.map((productDoc) =>
                 runInInjectionContext(this.injector, () =>
@@ -1945,9 +1964,6 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
 
-            console.log(`[Specialist] Step 2 done: ${activityFetchList.length} activity refs to fetch`);
-            console.log('[Specialist] Step 3: fetching activity docs...');
-
             const activityResults: { productDoc: any; productName: string; activityRef: any; snap: any }[] = [];
             const actBatchSize = 15;
 
@@ -1962,8 +1978,6 @@ export class DeliveryDashboardCloneComponent {
                 );
                 activityResults.push(...batchResults);
             }
-
-            console.log(`[Specialist] Step 3 done: ${activityResults.length} activity docs fetched`);
 
             const seenTypeIds = new Set<string>();
             this.specialistSequences = [];
@@ -1987,7 +2001,6 @@ export class DeliveryDashboardCloneComponent {
                 });
             }
             this.specialistLoading = false;
-            console.log(`[Specialist] Step 4: ${this.specialistSequences.length} unique appointment types → querying AppointmentType-To-Roles & Roles-To-EIS...`);
         } catch (error) {
             console.error('Error loading specialist base data:', error);
             this.specialistLoading = false;
@@ -2004,10 +2017,6 @@ export class DeliveryDashboardCloneComponent {
             )
             : this.specialistSequences;
         const total = filteredSequences.length;
-
-        console.log(
-            `[Specialist] Step 5: fetching availability slots for ${total} sequences sequentially, range: ${this.specialistStartDate?.toDateString()} – ${this.specialistEndDate?.toDateString()}`
-        );
 
         this.specialistLoading = true;
         this.cdr.detectChanges();
@@ -2080,26 +2089,15 @@ export class DeliveryDashboardCloneComponent {
 
                 // progress update
                 if ((i + 1) % 5 === 0 || i === total - 1) {
-
                     this.specialistLoadProgress = `${i + 1} / ${total}`;
-                    console.log(
-                        `[Specialist] Step 5 progress: ${i + 1}/${total}`
-                    );
                     this.cdr.detectChanges();
                 }
             }
 
             this.specialistAllSlots = results;
             this.specialistLoadProgress = '';
-            const totalSlotsFetched =
-                results.reduce((sum, r) => sum + r.slots.length, 0);
-            console.log(
-                `[Specialist] Step 5 done: ${totalSlotsFetched} slots across ${results.length} sequences`
-            );
+            const totalSlotsFetched = results.reduce((sum, r) => sum + r.slots.length, 0);
             this.computeSpecialistDisplayData();
-            console.log(
-                `[Specialist] Done: ${this.specialistData.length} specialists in table`
-            );
         } catch (error) {
             console.error('Error fetching specialist slots:', error);
         } finally {
@@ -3020,19 +3018,6 @@ export class DeliveryDashboardCloneComponent {
                 )
                 : data;
         }
-        // Awaiting
-        // else if (this.selectedStageFilter === 'Awaiting') {
-        //     const data =
-        //         stage.awaiting?.[selectedFilter] ||
-        //         stage.awaiting?.all ||
-        //         [];
-
-        //     this.groupedByStageProfileAll = this.selectedProductId
-        //         ? data.filter(
-        //               (item: any) => item.productId === this.selectedProductId
-        //           )
-        //         : data;
-        // }
     }
 
     get currentGroupedByProfile() {
@@ -5086,8 +5071,182 @@ export class DeliveryDashboardCloneComponent {
         this.selectedStageFilter = '';
     }
 
-    goToBooking() {
-        this.router.navigate(['/bookappointment']);
+    async goToBooking(selectedSlot: any) {
+        this.guard.getProfileMap().then(data => {
+            this.profileList = data.list;
+            this.mapProfile = data.map;
+            this.slotSelected = true;
+        });
+
+        const roles = await this.guard.getRoles();
+        this.loggedInPID = roles.profile_ref.id;
+        this.selectedSlotData = selectedSlot;
+    }
+
+    returnClient() {
+        return this.profileList.filter(e => e.name.toLowerCase().includes(this.filteredProfile.toLowerCase()))
+    }
+
+    async directBookAppointment(appointmentTypeId: string, profileId: string) {
+        const injector = this.injector;
+        try {
+            const selectedSlotData = this.selectedSlotData;
+            await runInInjectionContext(injector, async () => {
+
+                const deliverableCollection = collection(this.firestore, "deliverables");
+                const deliverableQuery = query(
+                    deliverableCollection,
+                    where("profileid", "==", profileId),
+                    where("type", "==", "appointment"),
+                    where("deliveryref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId))
+                );
+
+                const deliverableDocs = await getDocs(deliverableQuery);
+                if (deliverableDocs.empty) {
+                    alert("No matching deliverable found for this appointment type.");
+                    return;
+                }
+
+                const deliverableMap: { [path: string]: any } = {};
+                deliverableDocs.docs.forEach(d => {
+                    deliverableMap[d.ref.path] = d;
+                });
+
+                const deliverySequenceDoc = doc(this.firestore, "participantdeliverysequence/" + profileId);
+                const participantDelivery = await getDoc(deliverySequenceDoc);
+                if (!participantDelivery.exists()) {
+                    alert("No Delivery Sequence Found");
+                    return;
+                }
+
+                const products = participantDelivery.data()["products"];
+                let matchedProduct: any = null;
+                let matchedDelivery: any = null;
+                let deliverablePath: string = null;
+
+                for (const product of products) {
+                    if (!product.delivery) continue;
+                    for (const delivery of product.delivery) {
+                        if (
+                            delivery.type === "appointment" &&
+                            (delivery.status === "ready" || delivery.status == null) &&
+                            deliverableMap[delivery.sequenceref?.path] !== undefined
+                        ) {
+                            matchedProduct = product;
+                            matchedDelivery = delivery;
+                            deliverablePath = delivery.sequenceref.path;
+                            break;
+                        }
+                    }
+                    if (matchedProduct) break;
+                }
+
+                if (!matchedProduct || !matchedDelivery || !deliverablePath) {
+                    alert("No matching delivery sequence entry found.");
+                    return;
+                }
+
+                // Get appointment roles
+                const apptRoleCollection = collection(this.firestore, "AppointmentType-To-Roles");
+                const apptRoleQuery = query(
+                    apptRoleCollection,
+                    where("assigned_appttype_ref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId)),
+                    limit(1)
+                );
+
+                let appointmentRoles: string[] = [];
+                const rolesDocs = await getDocs(apptRoleQuery);
+                rolesDocs.forEach(d => {
+                    (d.data()["required_role"] ?? []).forEach((r: any) => appointmentRoles.push(r.path));
+                });
+
+                if (appointmentRoles.length === 0) {
+                    alert("No roles configured for this appointment type.");
+                    return;
+                }
+
+                const slotStart: Date = selectedSlotData.slotStart;
+                const slotEnd: Date = selectedSlotData.slotEnd;
+                const eisprofile: string = selectedSlotData.eisprofile;
+
+                const docdata: { id: string, index: number }[] = selectedSlotData.docdata ?? [
+                    { id: selectedSlotData.docid, index: selectedSlotData.index ?? 0 }
+                ];
+
+                const hostRole: { [key: string]: any[] } = {};
+                hostRole[appointmentRoles[0]] = [doc(this.firestore, eisprofile)];
+
+                const availabilityDocRef = doc(this.firestore, "availability/" + docdata[0].id);
+                const availabilitySnap = await getDoc(availabilityDocRef);
+                const availabilityData = availabilitySnap.data();
+
+                const requiredRoles = appointmentRoles.map(r => doc(this.firestore, r));
+                const hostRefs = [doc(this.firestore, eisprofile)];
+                const docid = doc(collection(this.firestore, "appointments")).id;
+                const appointmentDocRef = doc(this.firestore, "appointments/" + docid);
+                const appointmentData = {
+                    docid,
+                    starttime: slotStart,
+                    endtime: slotEnd,
+                    appointment: doc(this.firestore, "appointmenttype/" + appointmentTypeId),
+                    appointmentrole: requiredRoles,
+                    bookedby: doc(this.firestore, "profile_data/" + profileId),
+                    hosts: hostRefs,
+                    hostRole,
+                    slotdata: docdata,
+                    attended: false,
+                    cancelled: false,
+                    created: serverTimestamp(),
+                    loggedid: this.loggedInPID,
+                    productid: matchedProduct.productref.id
+                };
+
+                const batch = writeBatch(this.firestore);
+
+                batch.update(availabilityDocRef, availabilityData);
+                batch.set(appointmentDocRef, appointmentData);
+                await batch.commit();
+
+                const updatedProducts = products.map((p: any) => {
+                    if (p.participantproductid !== matchedProduct.participantproductid) return p;
+                    const updatedDelivery = (p.delivery ?? []).map((d: any) => {
+                        if (d.sequenceref?.path === deliverablePath) {
+                            return { ...d, status: "ongoing" };
+                        }
+                        return d;
+                    });
+                    return { ...p, delivery: updatedDelivery };
+                });
+
+                const sequenceDocRef = doc(this.firestore, "participantdeliverysequence/" + profileId);
+                await updateDoc(sequenceDocRef, { products: updatedProducts });
+
+                const deliverableDocRef = doc(this.firestore, deliverablePath);
+                await updateDoc(deliverableDocRef, {
+                    fileref: arrayUnion(doc(this.firestore, appointmentDocRef.path)),
+                    status: "ongoing"
+                });
+
+                const participantProductDocRef = doc(this.firestore, "participantsproduct/" + matchedProduct.participantproductid);
+                await updateDoc(participantProductDocRef, { status: "ongoing" });
+
+                alert("Appointment Booked Successfully!");
+            });
+
+        } catch (err) {
+            console.error("directBookAppointment error:", err);
+            alert("Error booking appointment. Please try again.");
+        }
+    }
+
+    async onProfileSelect(selectedprofile: string) {
+        const confirmed = confirm('Are you sure you want to book this appointment?');
+        if (confirmed) {
+            await this.directBookAppointment(
+                this.selectedAppointmentTypeId,
+                selectedprofile
+            );
+        }
     }
 
     // ===== Analytics tab =================================================
