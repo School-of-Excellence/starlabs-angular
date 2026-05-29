@@ -45,8 +45,8 @@
       <mat-icon>refresh</mat-icon> Re-pair
     </button>
 
-    <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && getCohortStudios().length > 0">
-      <mat-icon>bolt</mat-icon> {{getCohortStudios().length}} Studios Created
+    <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && newStudioPairing.length > 0" (click)="assignRoles()">
+      <mat-icon>bolt</mat-icon> {{newStudioPairing.length}} Studios Created
     </button>
   </div>
 
@@ -136,6 +136,9 @@
       <button class="cd-repair-mini" (click)="onRepairStudios()">
         <mat-icon>refresh</mat-icon> Re-pair
       </button>
+      <button class="cd-repair-mini" (click)="enableStduioCreateMode()">
+        <mat-icon>add</mat-icon> {{studioCreateMode ? 'Back to video' : 'Create Studio'}}
+      </button>
     </div>
 
     <!-- Two-column: canvas + unassigned panel -->
@@ -143,8 +146,65 @@
 
       <!-- Studios canvas -->
       <div class="cd-studios-canvas">
-        <div class="cd-studios-grid">
-          <div class="cd-studio-card"
+
+        <div *ngIf="studioCreateMode">
+          <div>
+            <button (click)="createStudioCombination()">
+              create studio
+            </button>
+            <div class="cd-studios-grid" >
+              <div *ngFor="let studio of newStudioPairing;let i = index" style="background-color: white;padding: 10px;">
+                <button (click)="removePairing(i)">
+                  remove 
+                </button>
+                <div class="cd-role-row" *ngFor="let pid of studio.participants ?? []">
+                  <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
+                  <div class="cd-role-info">
+                    <div class="cd-role-name">{{getNameForId(pid)}}</div>
+                    <!-- <div class="cd-role-sub">{{getStudioParticipantActivity(studio, pid) || 'Participant'}}</div> -->
+                  </div>
+                  <!-- <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button> -->
+                </div>
+                <div *ngIf="(studio.participants ?? []).length === 0">
+                  no participants added yet
+                </div>
+
+                <mat-form-field appearance="outline" style="width: 100%;">
+                  <mat-label>Add Participants</mat-label>
+                  <mat-select [(ngModel)]="studio.participants" multiple>
+                    <mat-option *ngFor="let pid of getUnassignedToStudio()" [value]="pid">
+                      {{ mapProfile[pid] }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="width: 100%;">
+                  <mat-label>ATC Model</mat-label>
+                  <mat-select [(ngModel)]="studio.atcmodel" multiple>
+                    <mat-option *ngFor="let list of productList" [value]="list.atcmodel">
+                      {{ list.atcmodel }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+  
+                <mat-form-field appearance="outline" style="width: 100%;">
+                  <mat-label>Mandatory Activities</mat-label>
+                  <mat-select [(ngModel)]="studio.mandatoryActivity" multiple>
+                    <mat-option *ngFor="let activity of filterActivityfunction()" [value]="activity.docid">
+                      {{ activity.activity }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-checkbox *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']" [(ngModel)]="studio.openViduEnabled">Let this Studio use OpenVidu to make Call.</mat-checkbox>
+              </div>
+
+
+            </div>
+            </div>
+        </div>
+
+
+        <div class="cd-studios-grid" *ngIf="!studioCreateMode">
+          <div class="cd-studio-card" 
             *ngFor="let studio of getFilteredStudios(); let i = index"
             [class.live]="isStudioLive(studio)"
             [class.drag-over]="hoverDropStudioId === (studio?.docid || studio?.id)"
@@ -435,3 +495,74 @@
     </div>
   </div>
 </div>
+
+<ng-template #duplicateStudiosModel let-duplicatedStudios>
+  <div class="tm-modal" *ngIf="duplicatedStudios">
+    <div class="tm-header">
+      <span class="tm-header__title">Duplicated Studios</span>
+      <button class="tm-header__close" (click)="closeDuplicateStuioModel(false)">✕</button>
+    </div>
+    <div *ngFor="let duplictes of duplicatedStudios | keyvalue">
+      <p>{{$any(duplictes).key}}</p>
+      <div class="tm-notice">
+        <mat-icon class="tm-notice__icon">info</mat-icon>
+        <div class="tm-notice__text">
+          <strong>{{ $any(duplictes).value.length }}</strong>
+          duplicated {{ $any(duplictes).value.length === 1 ? 'studio has' : 'studios have' }} already been created with the
+          same participants.
+          Do you want to proceed and create a new studio on top of {{ $any(duplictes).value.length === 1 ? 'this' : 'these'
+          }}?
+        </div>
+      </div>
+      <div class="tm-card-list">
+        <div class="tm-card" *ngFor="let studio of $any(duplictes).value; let i = index">
+          <div class="tm-card__body">
+            <div class="tm-card__top">
+              <span class="tm-sno">#{{ i + 1 }}</span>
+              <div class="tm-card__identity">
+                <div class="tm-card__name">
+                  <ng-container *ngFor="let participant of studio.participants; let last = last">{{
+                    mapProfile[participant] }}<span *ngIf="!last">, </span></ng-container>
+                </div>
+                <div class="tm-card__role">
+                  <ng-container *ngFor="let participant of studio.participants; let last = last">{{
+                    bigActivityMap[studio.participantsactivity[participant]].activity }}<span *ngIf="!last"> ·
+                    </span></ng-container>
+                </div>
+              </div>
+            </div>
+            <div class="tm-card__details">
+              <div class="tm-detail-row">
+                <span class="tm-detail-group__label">ATC</span>
+                <div class="tm-tag-list">
+                  <span class="tm-tag" *ngFor="let atcmodel of studio['atcmodel'] || []">{{ atcmodel }}</span>
+                  <span class="tm-none" *ngIf="!(studio['atcmodel'] || []).length">—</span>
+                </div>
+              </div>
+              <div class="tm-detail-row">
+                <span class="tm-detail-group__label">Mandatory</span>
+                <div class="tm-tag-list">
+                  <span class="tm-tag-activity" *ngFor="let actId of studio['mandatoryactivities'] || []">{{
+                    bigActivityMap[actId].activity }}</span>
+                  <span class="tm-none" *ngIf="!(studio['mandatoryactivities'] || []).length">—</span>
+                </div>
+              </div>
+              <div class="tm-detail-row">
+                <span class="tm-detail-group__label">Stduio</span>
+                <button class="cd-mini-pill" [class.on]="studio.studioin"
+                (click)="toggleStudio(studio); $event.stopPropagation()"
+                [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
+                <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
+              </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tm-footer">
+      <button class="tm-bassignRolestn tm-btn--cancel" (click)="closeDuplicateStuioModel(false)">Cancel</button>
+      <button class="tm-btn tm-btn--proceed" (click)="closeDuplicateStuioModel(true)">Proceed</button>
+    </div>
+  </div>
+</ng-template>

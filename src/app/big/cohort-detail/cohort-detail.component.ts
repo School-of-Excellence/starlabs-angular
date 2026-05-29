@@ -1,4 +1,4 @@
-import { Component, inject, Inject, OnDestroy, Optional } from '@angular/core';
+import { Component, ElementRef, inject, Inject, OnDestroy, Optional, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -11,8 +11,9 @@ import { AuthguardService } from '../../authguard.service';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { Subject, Subscription, takeUntil } from 'rxjs';
-import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc, collectionData, getDoc, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc, collectionData, getDoc, writeBatch, serverTimestamp } from '@angular/fire/firestore';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 
 interface ParticipantRow {
@@ -36,12 +37,15 @@ interface ParticipantRow {
     MatButtonModule,
     MatSelectModule,
     MatFormFieldModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    MatCheckboxModule,
   ],
   templateUrl: './cohort-detail.component.html',
   styleUrl: './cohort-detail.component.css',
 })
-export class CohortDetailComponent  implements OnDestroy {
+export class CohortDetailComponent implements OnDestroy {
+  @ViewChild('duplicateStudiosModel') duplicateStudiosModel : TemplateRef<ElementRef>;
+  loggedinProfileRoles = {}
   cohort: any = null;
   cohortId: string | null = null;
   cohortName: string = '';
@@ -52,18 +56,27 @@ export class CohortDetailComponent  implements OnDestroy {
   searchableQueueList = [];
   private subscription = new Subject<void>();
   products = {};
-  productList = []
+  productList = [];
   queueTokenList = [];
   completedToken = 0;
 
-   editAtcModel = null;
-   editAtcModelData = [];
+  editAtcModel = null;
+  editAtcModelData = [];
 
-   editMandatoryActivities = null;
-   editMandatoryActivitiesData = [];
+  editMandatoryActivities = null;
+  editMandatoryActivitiesData = [];
 
-   queueTokenSubscription : Subscription
+  queueTokenSubscription: Subscription;
 
+  studioCreateMode = false;
+  studioStages = [];
+  selectedStage = '';
+  studioCombinations: any = {};
+  selectCombination = false;
+  selectedCombination = null;
+  newStudioPairing = [];
+  duplicatedStudios: any  | null= {};
+  duplicateModelRef !: MatDialogRef<any>
 
   // Maps (preferably passed in from cohort-management; only loaded if missing)
   mapProfile: { [id: string]: string } = {};
@@ -74,7 +87,7 @@ export class CohortDetailComponent  implements OnDestroy {
   mapBigAssignment: { [id: string]: any } = {};
   mapParticiantsAssignments: { [cohortId: string]: any } = {};
   mapQueueName: any;
-  stageTokenMap = {}
+  stageTokenMap = {};
   filterText = '';
 
   // Studio / live-assignment data (passed in from parent)
@@ -85,9 +98,9 @@ export class CohortDetailComponent  implements OnDestroy {
   liveAssignmentList: any[] = [];
   mapLiveParticipants: { [participantId: string]: boolean } = {};
   eventParticipationList: any[] = [];
-  studioPreAssign = {}
+  studioPreAssign = {};
   stageActivityParse = {};
-  stageStudioMap = {}
+  stageStudioMap = {};
 
   // Derived
   participantRows: ParticipantRow[] = [];
@@ -131,7 +144,6 @@ export class CohortDetailComponent  implements OnDestroy {
   liveassignmentSubscription: Subscription | null = null;
   queuestudioSubscription: Subscription | null = null;
 
-
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -144,15 +156,16 @@ export class CohortDetailComponent  implements OnDestroy {
     @Optional() private dialogRef: MatDialogRef<CohortDetailComponent>,
     @Optional() @Inject(MAT_DIALOG_DATA) private dialogData: any,
   ) {
-
-    getDocs(collection(this.firestore, 'products')).then(snap => {
+    getDocs(collection(this.firestore, 'products')).then((snap) => {
       for (let i = 0; i < snap.docs.length; i++) {
         const element = snap.docs[i].data();
-        this.products[element['id']] = element
+        this.products[element['id']] = element;
       }
+    });
 
-    })
-
+      authguard.getRoles().then(async (roleData) => {
+        this.loggedinProfileRoles = roleData;
+      });
     if (this.dialogData) {
       // Dialog mode — reuse pre-loaded data
       this.isDialogMode = true;
@@ -187,7 +200,6 @@ export class CohortDetailComponent  implements OnDestroy {
       this.searchableQueueList = this.dialogData.searchableQueueList ?? [];
       this.mapQueueName = this.dialogData.mapQueueName ?? {};
 
-
       this.peopleCount = this.cohort?.['participantidlist']?.length || 0;
       this.computeStats();
       this.computeActivitiesFromInjectedMaps();
@@ -216,8 +228,8 @@ export class CohortDetailComponent  implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.subscription.next()
-    this.subscription.complete()
+    this.subscription.next();
+    this.subscription.complete();
   }
 
   /**
@@ -307,8 +319,13 @@ export class CohortDetailComponent  implements OnDestroy {
     return this.studioPairingList.filter((queue) => {
       const queueId = queue['queueref']?.id;
       const bigActivity = this.cohort['bigactivity'];
-      const participantsActivity = Object.values(queue['participantsactivity'] ?? {})
-      return queueId === this.selectedQueue && participantsActivity.includes(bigActivity);
+      const participantsActivity = Object.values(
+        queue['participantsactivity'] ?? {},
+      );
+      return (
+        queueId === this.selectedQueue &&
+        participantsActivity.includes(bigActivity)
+      );
     });
   }
 
@@ -340,7 +357,9 @@ export class CohortDetailComponent  implements OnDestroy {
   getFilteredStudios(): any[] {
     const all = this.getCohortStudios() || [];
     if (this.studioGroupFilter.size === 0) return all;
-    return all.filter((s: any) => this.studioGroupFilter.has(this.getStudioGroupCode(s)));
+    return all.filter((s: any) =>
+      this.studioGroupFilter.has(this.getStudioGroupCode(s)),
+    );
   }
 
   /** All possible group codes (uP! / LYL / B!G) discovered across studios. */
@@ -358,13 +377,15 @@ export class CohortDetailComponent  implements OnDestroy {
     const raw = studio?.studioname || studio?.name || '';
     const m = String(raw).match(/(?:^|[\s\-_#])S?\s*(\d{1,3})/i);
     if (m && m[1]) return `S ${m[1].padStart(2, '0')}`;
-    if (typeof indexFallback === 'number') return `S ${String(indexFallback + 1).padStart(2, '0')}`;
+    if (typeof indexFallback === 'number')
+      return `S ${String(indexFallback + 1).padStart(2, '0')}`;
     return raw || 'Studio';
   }
 
   /** Group code derived from studio name / stage (uP!, LYL, B!G). */
   getStudioGroupCode(studio: any): string {
-    const src = `${studio?.studioname || ''} ${studio?.name || ''} ${studio?.stagename || ''} ${studio?.studioData?.stagename || ''}`.toUpperCase();
+    const src =
+      `${studio?.studioname || ''} ${studio?.name || ''} ${studio?.stagename || ''} ${studio?.studioData?.stagename || ''}`.toUpperCase();
     if (src.includes('UP!') || /\bUP\b/.test(src)) return 'uP!';
     if (src.includes('LYL')) return 'LYL';
     if (src.includes('B!G') || /\bBIG\b/.test(src)) return 'B!G';
@@ -379,7 +400,11 @@ export class CohortDetailComponent  implements OnDestroy {
 
   /** All participant IDs paired into this studio. */
   getStudioParticipantIds(studio: any): string[] {
-    const arr: any[] = studio?.pairing || studio?.specialistpairing || studio?.participants || [];
+    const arr: any[] =
+      studio?.pairing ||
+      studio?.specialistpairing ||
+      studio?.participants ||
+      [];
     return (arr || []).filter((x: any) => !!x);
   }
 
@@ -393,10 +418,10 @@ export class CohortDetailComponent  implements OnDestroy {
 
   /** Split a studio's participants into SPECIALIST / WORKING WITH / MENTOR / SHADOWING buckets. */
   getStudioRoles(studio: any): {
-    specialists: string[],
-    workingWith: string[],
-    mentors: string[],
-    shadowing: string[],
+    specialists: string[];
+    workingWith: string[];
+    mentors: string[];
+    shadowing: string[];
   } {
     const ids = this.getStudioParticipantIds(studio);
     const specialists: string[] = [];
@@ -404,14 +429,24 @@ export class CohortDetailComponent  implements OnDestroy {
     const mentors: string[] = [];
     const shadowing: string[] = [];
     ids.forEach((pid: string) => {
-      const act = (this.getStudioParticipantActivity(studio, pid) || '').toLowerCase();
-      if (act.includes('eis') || act.includes('specialist')) specialists.push(pid);
+      const act = (
+        this.getStudioParticipantActivity(studio, pid) || ''
+      ).toLowerCase();
+      if (act.includes('eis') || act.includes('specialist'))
+        specialists.push(pid);
       else if (act.includes('mentor')) mentors.push(pid);
-      else if (act.includes('shadow') || act.includes('observ')) shadowing.push(pid);
+      else if (act.includes('shadow') || act.includes('observ'))
+        shadowing.push(pid);
       else workingWith.push(pid);
     });
     // Fallback: if no participant matched anything, treat the first as specialist
-    if (specialists.length === 0 && workingWith.length === 0 && mentors.length === 0 && shadowing.length === 0 && ids.length) {
+    if (
+      specialists.length === 0 &&
+      workingWith.length === 0 &&
+      mentors.length === 0 &&
+      shadowing.length === 0 &&
+      ids.length
+    ) {
       specialists.push(ids[0]);
       if (ids.length > 1) workingWith.push(ids[1]);
       if (ids.length > 2) mentors.push(ids[2]);
@@ -422,15 +457,20 @@ export class CohortDetailComponent  implements OnDestroy {
 
   /** Participants in cohort but NOT in any studio (for Unassigned-to-Studio panel). */
   getUnassignedToStudio(): string[] {
-    const cohortParticipants: string[] = this.cohort?.['participantidlist'] || [];
+    const cohortParticipants: string[] =
+      this.cohort?.['participantidlist'] || [];
     const inAnyStudio = new Set<string>();
     (this.getCohortStudios() || []).forEach((s: any) => {
-      this.getStudioParticipantIds(s).forEach(pid => inAnyStudio.add(pid));
+      if (s?.studioin) {
+        this.getStudioParticipantIds(s).forEach((pid) => inAnyStudio.add(pid));
+      }
     });
-    const result = cohortParticipants.filter(pid => !inAnyStudio.has(pid));
+    const result = cohortParticipants.filter((pid) => !inAnyStudio.has(pid));
     const q = (this.studioUnassignedSearch || '').toLowerCase().trim();
     if (!q) return result;
-    return result.filter(pid => (this.mapProfile?.[pid] || pid).toLowerCase().includes(q));
+    return result.filter((pid) =>
+      (this.mapProfile?.[pid] || pid).toLowerCase().includes(q),
+    );
   }
 
   /** Toggle a group-code filter pill (uP!/LYL/B!G). */
@@ -440,13 +480,17 @@ export class CohortDetailComponent  implements OnDestroy {
   }
 
   isStudioGroupSelected(code: string): boolean {
-    return this.studioGroupFilter.size === 0 || this.studioGroupFilter.has(code);
+    return (
+      this.studioGroupFilter.size === 0 || this.studioGroupFilter.has(code)
+    );
   }
 
   /** SESSION LOG done count — best-effort using participantsactivity. */
   getSessionDoneCount(studio: any): number {
     const log = studio?.['sessionlog'] || studio?.['sessions'] || null;
-    if (Array.isArray(log)) return log.filter((s: any) => s?.status === 'done' || s?.done === true).length;
+    if (Array.isArray(log))
+      return log.filter((s: any) => s?.status === 'done' || s?.done === true)
+        .length;
     if (typeof log === 'number') return log;
     return 0;
   }
@@ -467,7 +511,9 @@ export class CohortDetailComponent  implements OnDestroy {
     const palette = ['purple', 'blue', 'green', 'amber', 'rose'];
     if (!pid) return palette[0];
     let h = 0;
-    for (let i = 0; i < pid.length; i++) { h = ((h << 5) - h + pid.charCodeAt(i)) | 0; }
+    for (let i = 0; i < pid.length; i++) {
+      h = ((h << 5) - h + pid.charCodeAt(i)) | 0;
+    }
     return palette[Math.abs(h) % palette.length];
   }
 
@@ -481,22 +527,42 @@ export class CohortDetailComponent  implements OnDestroy {
   // ════════════════════════════════════════════════════════════════
   // Drag & drop — unassigned participant → studio
   // ════════════════════════════════════════════════════════════════
-  private studioDragPayload: { participantId: string, sourceStudioId?: string | null } | null = null;
+  private studioDragPayload: {
+    participantId: string;
+    sourceStudioId?: string | null;
+  } | null = null;
   hoverDropStudioId: string | null = null;
 
   onUnassignedDragStart(event: DragEvent, participantId: string) {
     if (!event.dataTransfer) return;
     this.studioDragPayload = { participantId, sourceStudioId: null };
     event.dataTransfer.effectAllowed = 'move';
-    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.studioDragPayload)); } catch {}
+    try {
+      event.dataTransfer.setData(
+        'text/plain',
+        JSON.stringify(this.studioDragPayload),
+      );
+    } catch {}
   }
 
-  onStudioParticipantDragStart(event: DragEvent, participantId: string, sourceStudio: any) {
+  onStudioParticipantDragStart(
+    event: DragEvent,
+    participantId: string,
+    sourceStudio: any,
+  ) {
     if (!event.dataTransfer) return;
     event.stopPropagation();
-    this.studioDragPayload = { participantId, sourceStudioId: sourceStudio?.docid || sourceStudio?.id };
+    this.studioDragPayload = {
+      participantId,
+      sourceStudioId: sourceStudio?.docid || sourceStudio?.id,
+    };
     event.dataTransfer.effectAllowed = 'move';
-    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.studioDragPayload)); } catch {}
+    try {
+      event.dataTransfer.setData(
+        'text/plain',
+        JSON.stringify(this.studioDragPayload),
+      );
+    } catch {}
   }
 
   onStudioCardDragOver(event: DragEvent, studio: any) {
@@ -522,11 +588,19 @@ export class CohortDetailComponent  implements OnDestroy {
     const targetId = targetStudio?.docid || targetStudio?.id;
     if (!targetId) return;
     if (payload.sourceStudioId === targetId) return;
-    await this.assignParticipantToStudio(payload.participantId, targetStudio, payload.sourceStudioId || null);
+    await this.assignParticipantToStudio(
+      payload.participantId,
+      targetStudio,
+      payload.sourceStudioId || null,
+    );
   }
 
   /** Drop handler: add participant to the target studio (and remove from source if any). */
-  async assignParticipantToStudio(participantId: string, targetStudio: any, sourceStudioId: string | null): Promise<void> {
+  async assignParticipantToStudio(
+    participantId: string,
+    targetStudio: any,
+    sourceStudioId: string | null,
+  ): Promise<void> {
     if (!participantId || !targetStudio) return;
     const targetId = targetStudio?.docid || targetStudio?.id;
     if (!targetId) return;
@@ -541,63 +615,99 @@ export class CohortDetailComponent  implements OnDestroy {
     try {
       // Update target studio in Firestore
       const targetRef = doc(this.firestore, 'studio pairing', targetId);
-      await updateDoc(targetRef, { pairing: arrayUnion(participantId) }).catch(async () => {
-        // fallback collection name
-        const altRef = doc(this.firestore, 'studiopairing', targetId);
-        await updateDoc(altRef, { pairing: arrayUnion(participantId) });
-      });
+      await updateDoc(targetRef, { pairing: arrayUnion(participantId) }).catch(
+        async () => {
+          // fallback collection name
+          const altRef = doc(this.firestore, 'studiopairing', targetId);
+          await updateDoc(altRef, { pairing: arrayUnion(participantId) });
+        },
+      );
 
       // Local mutation — keep the in-memory list in sync (passed by reference from parent)
       targetStudio['pairing'] = targetStudio['pairing'] || [];
-      if (!targetStudio['pairing'].includes(participantId)) targetStudio['pairing'].push(participantId);
+      if (!targetStudio['pairing'].includes(participantId))
+        targetStudio['pairing'].push(participantId);
 
       // Remove from source if cross-studio move
       if (sourceStudioId) {
-        const srcStudio = (this.studioPairingList || []).find((s: any) => (s?.docid || s?.id) === sourceStudioId);
+        const srcStudio = (this.studioPairingList || []).find(
+          (s: any) => (s?.docid || s?.id) === sourceStudioId,
+        );
         if (srcStudio) {
           const srcRef = doc(this.firestore, 'studio pairing', sourceStudioId);
-          await updateDoc(srcRef, { pairing: arrayRemove(participantId) }).catch(async () => {
+          await updateDoc(srcRef, {
+            pairing: arrayRemove(participantId),
+          }).catch(async () => {
             const altRef = doc(this.firestore, 'studiopairing', sourceStudioId);
             await updateDoc(altRef, { pairing: arrayRemove(participantId) });
           });
-          srcStudio['pairing'] = (srcStudio['pairing'] || []).filter((p: string) => p !== participantId);
+          srcStudio['pairing'] = (srcStudio['pairing'] || []).filter(
+            (p: string) => p !== participantId,
+          );
         }
       }
 
       // Refresh the parent map so unassigned-to-studio recomputes
       this.refreshStudioMappings(participantId, targetStudio, sourceStudioId);
 
-      this._snackBar?.open(`Assigned ${this.getNameForId(participantId)} to studio`, 'OK', { duration: 1800 });
+      this._snackBar?.open(
+        `Assigned ${this.getNameForId(participantId)} to studio`,
+        'OK',
+        { duration: 1800 },
+      );
     } catch (err) {
       console.error('Failed to assign participant to studio', err);
-      this._snackBar?.open('Failed to assign. Try again.', 'Dismiss', { duration: 2500 });
+      this._snackBar?.open('Failed to assign. Try again.', 'Dismiss', {
+        duration: 2500,
+      });
     }
   }
 
   /** Remove participant from a studio (× button on a role row). */
-  async removeParticipantFromStudio(participantId: string, studio: any, event?: Event): Promise<void> {
-    if (event) { event.preventDefault(); event.stopPropagation(); }
+  async removeParticipantFromStudio(
+    participantId: string,
+    studio: any,
+    event?: Event,
+  ): Promise<void> {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     if (!participantId || !studio) return;
     const sid = studio?.docid || studio?.id;
     if (!sid) return;
 
     try {
       const sref = doc(this.firestore, 'studio pairing', sid);
-      await updateDoc(sref, { pairing: arrayRemove(participantId) }).catch(async () => {
-        const altRef = doc(this.firestore, 'studiopairing', sid);
-        await updateDoc(altRef, { pairing: arrayRemove(participantId) });
-      });
-      studio['pairing'] = (studio['pairing'] || []).filter((p: string) => p !== participantId);
+      await updateDoc(sref, { pairing: arrayRemove(participantId) }).catch(
+        async () => {
+          const altRef = doc(this.firestore, 'studiopairing', sid);
+          await updateDoc(altRef, { pairing: arrayRemove(participantId) });
+        },
+      );
+      studio['pairing'] = (studio['pairing'] || []).filter(
+        (p: string) => p !== participantId,
+      );
       this.refreshStudioMappings(participantId, null, sid);
-      this._snackBar?.open(`Removed ${this.getNameForId(participantId)}`, 'OK', { duration: 1500 });
+      this._snackBar?.open(
+        `Removed ${this.getNameForId(participantId)}`,
+        'OK',
+        { duration: 1500 },
+      );
     } catch (err) {
       console.error('Failed to remove participant', err);
-      this._snackBar?.open('Failed to remove. Try again.', 'Dismiss', { duration: 2500 });
+      this._snackBar?.open('Failed to remove. Try again.', 'Dismiss', {
+        duration: 2500,
+      });
     }
   }
 
   /** Keep mapParticipantStudios in sync after an assign/move/remove. */
-  private refreshStudioMappings(participantId: string, targetStudio: any | null, sourceStudioId: string | null) {
+  private refreshStudioMappings(
+    participantId: string,
+    targetStudio: any | null,
+    sourceStudioId: string | null,
+  ) {
     if (!this.mapParticipantStudios) this.mapParticipantStudios = {};
     const entry: any[] = this.mapParticipantStudios[participantId] || [];
 
@@ -611,12 +721,15 @@ export class CohortDetailComponent  implements OnDestroy {
       const sid = targetStudio?.docid || targetStudio?.id;
       const already = next.some((e: any) => e?.studioId === sid);
       if (!already) {
-        next = [...next, {
-          studioId: sid,
-          studioData: targetStudio,
-          studioin: !!targetStudio['studioin'],
-          checkin: !!targetStudio['checkin'],
-        }];
+        next = [
+          ...next,
+          {
+            studioId: sid,
+            studioData: targetStudio,
+            studioin: !!targetStudio['studioin'],
+            checkin: !!targetStudio['checkin'],
+          },
+        ];
       }
     }
     this.mapParticipantStudios[participantId] = next;
@@ -807,7 +920,7 @@ export class CohortDetailComponent  implements OnDestroy {
   }
 
   toggleStudio(studio) {
-    // console.log(studio["studioin"],!studio["studioin"]);
+    console.log(studio["studioin"],!studio["studioin"]);
     updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), {
       studioin: !studio['studioin'],
     });
@@ -830,102 +943,133 @@ export class CohortDetailComponent  implements OnDestroy {
   deleteStudio(studio) {
     // console.log(studio['docid']);
     updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), {
-      delete: true
-    })
+      delete: true,
+    });
   }
 
   async loadLiveAssignments() {
-      if (this.liveassignmentSubscription) { this.liveassignmentSubscription.unsubscribe(); }
-      if (this.queuestudioSubscription) { this.queuestudioSubscription.unsubscribe(); }
-      if (this.queueTokenSubscription) { this.queueTokenSubscription.unsubscribe(); }
-  
-      if (!this.selectedQueue) {
-        this.liveAssignmentList = [];
-        this.studioPairingList = [];
-        this.mapLiveParticipants = {};
-        this.mapStudioPairing = {};
-        this.mapParticipantStudios = {};
-        this.mapLiveAssignmentByStudio = {};
-        return;
-      }
-  
-      const queue = this.searchableQueueList.find((q)=>q?.docid === this.selectedQueue);
-      
-      this.stageActivityParse = {};
-      var stageList = queue['stages'] ?? [];
-      for (let i = 0; i < stageList.length; i++) {
-        const stage = stageList[i];
-        const stageProperty = queue['stageproperty'][stage];
-        var compulsoryActivity = Object.values(
-          stageProperty['compulsoryactivity'] ?? {},
-        );
-        for (let j = 0; j < compulsoryActivity.length; j++) {
-          const activitycombination: any = compulsoryActivity[j];
-          const combinationArray = Array.isArray(activitycombination)
-            ? activitycombination
-            : [activitycombination];
-          // var parse = activitycombination.sort((a, b) => a.toString().localeCompare(b.toString())).join(",")
-          var parse = combinationArray
-            .sort((a, b) => a.toString().localeCompare(b.toString()))
-            .join(',');
-          this.stageActivityParse[parse] = this.stageActivityParse[parse] ?? [];
-          this.stageActivityParse[parse].push(stage);
-        }
-      }
+    if (this.liveassignmentSubscription) {
+      this.liveassignmentSubscription.unsubscribe();
+    }
+    if (this.queuestudioSubscription) {
+      this.queuestudioSubscription.unsubscribe();
+    }
+    if (this.queueTokenSubscription) {
+      this.queueTokenSubscription.unsubscribe();
+    }
 
-      this.liveassignmentSubscription = collectionSnapshots(
-        query(
-          collection(this.firestore, "live assignment"),
-          where("status", "==", "live"),
-          where('queueid', 'in', [this.selectedQueue])
-        )
-      ).pipe(takeUntil(this.subscription)).subscribe(snapData => {
-        this.liveAssignmentList = snapData.map(doc => ({ id: doc.id, ...doc.data() }));
-  
+    if (!this.selectedQueue) {
+      this.liveAssignmentList = [];
+      this.studioPairingList = [];
+      this.mapLiveParticipants = {};
+      this.mapStudioPairing = {};
+      this.mapParticipantStudios = {};
+      this.mapLiveAssignmentByStudio = {};
+      return;
+    }
+
+    const queue = this.searchableQueueList.find(
+      (q) => q?.docid === this.selectedQueue,
+    );
+
+    this.stageActivityParse = {};
+    const studioStages = [];
+    var stageList = queue['stages'] ?? [];
+    for (let i = 0; i < stageList.length; i++) {
+      const stage = stageList[i];
+      const stageProperty = queue['stageproperty'][stage];
+      var compulsoryActivity = Object.values(
+        stageProperty['compulsoryactivity'] ?? {},
+      );
+      if (compulsoryActivity.length > 0) {
+        studioStages.push(stage);
+      }
+      for (let j = 0; j < compulsoryActivity.length; j++) {
+        const activitycombination: any = compulsoryActivity[j];
+        const combinationArray = Array.isArray(activitycombination)
+          ? activitycombination
+          : [activitycombination];
+        // var parse = activitycombination.sort((a, b) => a.toString().localeCompare(b.toString())).join(",")
+        var parse = combinationArray
+          .sort((a, b) => a.toString().localeCompare(b.toString()))
+          .join(',');
+        this.stageActivityParse[parse] = this.stageActivityParse[parse] ?? [];
+        this.stageActivityParse[parse].push(stage);
+      }
+    }
+    this.studioStages = studioStages;
+
+    this.liveassignmentSubscription = collectionSnapshots(
+      query(
+        collection(this.firestore, 'live assignment'),
+        where('status', '==', 'live'),
+        where('queueid', 'in', [this.selectedQueue]),
+      ),
+    )
+      .pipe(takeUntil(this.subscription))
+      .subscribe((snapData) => {
+        this.liveAssignmentList = snapData.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
         this.mapLiveAssignmentByStudio = {};
         this.liveAssignmentList.forEach((assignment: any) => {
           if (assignment['studioid']) {
             this.mapLiveAssignmentByStudio[assignment['studioid']] = assignment;
           }
         });
-  
+
         this.updateParticipantStudioMappings();
       });
-  
-      const selectedQueueRef = [this.selectedQueue].map(id => doc(this.firestore, 'queue generation', id));
-  
-      this.queuestudioSubscription = collectionSnapshots(
-        query(
-          collection(this.firestore, 'queue studio pairing'),
-          where("queueref", "in", selectedQueueRef),
-          orderBy("created", "desc")
-        )
-      ).pipe(takeUntil(this.subscription)).subscribe(snapData => {
+
+    const selectedQueueRef = [this.selectedQueue].map((id) =>
+      doc(this.firestore, 'queue generation', id),
+    );
+
+    this.queuestudioSubscription = collectionSnapshots(
+      query(
+        collection(this.firestore, 'queue studio pairing'),
+        where('queueref', 'in', selectedQueueRef),
+        orderBy('created', 'desc'),
+      ),
+    )
+      .pipe(takeUntil(this.subscription))
+      .subscribe((snapData) => {
         var localMap = {};
-        this.studioPairingList = snapData.map(doc => ({ id: doc.id, docid: doc.id, ...doc.data() }));
-  
+        this.studioPairingList = snapData.map((doc) => ({
+          id: doc.id,
+          docid: doc.id,
+          ...doc.data(),
+        }));
+
         this.mapStudioPairing = {};
         this.studioPairingList.forEach((studio: any) => {
           this.mapStudioPairing[studio.docid || studio.id] = studio;
         });
         for (let i = 0; i < this.studioPairingList.length; i++) {
-        const studio = this.studioPairingList[i];
+          const studio = this.studioPairingList[i];
 
-        var studioActivity = Object.values(studio["participantsactivity"]).sort((a, b) => a.toString().localeCompare(b.toString())).join(",");
-        (this.stageActivityParse[studioActivity] ?? []).forEach(stage => {
-          localMap[stage] = localMap[stage] ?? []
-          if (localMap[stage].filter((e: { [key: string]: any }) => e["docid"] == studio["docid"]).length == 0) localMap[stage].push(studio)
-      });
+          var studioActivity = Object.values(studio['participantsactivity'])
+            .sort((a, b) => a.toString().localeCompare(b.toString()))
+            .join(',');
+          (this.stageActivityParse[studioActivity] ?? []).forEach((stage) => {
+            localMap[stage] = localMap[stage] ?? [];
+            if (
+              localMap[stage].filter(
+                (e: { [key: string]: any }) => e['docid'] == studio['docid'],
+              ).length == 0
+            )
+              localMap[stage].push(studio);
+          });
+        }
+        this.stageStudioMap = localMap;
 
-      
-    }
-      this.stageStudioMap = localMap
-  
         this.updateParticipantStudioMappings();
       });
 
-      if(queue !== -1){
-        const arenaEventsSnap = await getDocs(
+    if (queue !== -1) {
+      const arenaEventsSnap = await getDocs(
         query(
           collection(this.firestore, 'arena events'),
           where('docid', 'in', queue['arenaeventidlist'] ?? []),
@@ -946,50 +1090,72 @@ export class CohortDetailComponent  implements OnDestroy {
           seenAtcModels.add(product.atcmodel);
           return true;
         });
-      }
-
-
-       // Queue Token
-    this.queueTokenSubscription = collectionData(query(collection(this.firestore, 'queue_token'), where("queueref", "==", doc(this.firestore, "queue generation", this.selectedQueue)), where("tokenstatus", "==", "Active"), orderBy("logdate", "asc"))).pipe(takeUntil(this.subscription)).subscribe(token => {
-      var lastStage = queue["stages"][queue["stages"].length - 1]
-      this.queueTokenList = token.sort((a, b) => (a["profile_name"] ?? "").localeCompare(b["profile_name"] ?? ""))
-      this.completedToken = this.queueTokenList.filter(e => e["currentstage"] == lastStage).length
-      var localPreAssign = {}
-      // Group token by Stage
-      this.stageTokenMap = this.queueTokenList.reduce(function (r, a) {
-        // Pre Assigned
-        Object.keys(a["preassigned"] ?? {}).forEach(stage => {
-          (a["preassigned"][stage] ?? []).forEach(studio => {
-            localPreAssign[studio] = localPreAssign[studio] ?? []
-            localPreAssign[studio].push(a)
-          })
-        })
-        // Filter Token Status
-        r[a["currentstage"]] = r[a["currentstage"]] || {}
-        r[a["currentstage"]]["waiting"] = r[a["currentstage"]]["waiting"] ?? 0
-        r[a["currentstage"]]["queued"] = r[a["currentstage"]]["queued"] ?? 0
-        r[a["currentstage"]]["instudio"] = r[a["currentstage"]]["instudio"] ?? 0
-        r[a["currentstage"]]["total"] = (r[a["currentstage"]]["total"] ?? 0) + 1
-        r[a["currentstage"]]["tokenlist"] = r[a["currentstage"]]["tokenlist"] ?? []
-        r[a["currentstage"]]["tokenlist"].push(a)
-        if (a["status"] == "ready") {
-          r[a["currentstage"]]["waiting"] += 1
-        }
-        else if (a["status"] == null || a["status"] == "queued" || a["status"] == "invited") {
-          r[a["currentstage"]]["queued"] += 1
-        }
-        else if (a["status"] == "instudio") {
-          r[a["currentstage"]]["instudio"] += 1
-        }
-        return r
-      }, {})
-      this.studioPreAssign = localPreAssign
-      // console.log(this.stageTokenMap)
-      // console.log(this.studioPreAssign)
-    })
     }
 
-    updateParticipantStudioMappings() {
+    // Queue Token
+    this.queueTokenSubscription = collectionData(
+      query(
+        collection(this.firestore, 'queue_token'),
+        where(
+          'queueref',
+          '==',
+          doc(this.firestore, 'queue generation', this.selectedQueue),
+        ),
+        where('tokenstatus', '==', 'Active'),
+        orderBy('logdate', 'asc'),
+      ),
+    )
+      .pipe(takeUntil(this.subscription))
+      .subscribe((token) => {
+        var lastStage = queue['stages'][queue['stages'].length - 1];
+        this.queueTokenList = token.sort((a, b) =>
+          (a['profile_name'] ?? '').localeCompare(b['profile_name'] ?? ''),
+        );
+        this.completedToken = this.queueTokenList.filter(
+          (e) => e['currentstage'] == lastStage,
+        ).length;
+        var localPreAssign = {};
+        // Group token by Stage
+        this.stageTokenMap = this.queueTokenList.reduce(function (r, a) {
+          // Pre Assigned
+          Object.keys(a['preassigned'] ?? {}).forEach((stage) => {
+            (a['preassigned'][stage] ?? []).forEach((studio) => {
+              localPreAssign[studio] = localPreAssign[studio] ?? [];
+              localPreAssign[studio].push(a);
+            });
+          });
+          // Filter Token Status
+          r[a['currentstage']] = r[a['currentstage']] || {};
+          r[a['currentstage']]['waiting'] =
+            r[a['currentstage']]['waiting'] ?? 0;
+          r[a['currentstage']]['queued'] = r[a['currentstage']]['queued'] ?? 0;
+          r[a['currentstage']]['instudio'] =
+            r[a['currentstage']]['instudio'] ?? 0;
+          r[a['currentstage']]['total'] =
+            (r[a['currentstage']]['total'] ?? 0) + 1;
+          r[a['currentstage']]['tokenlist'] =
+            r[a['currentstage']]['tokenlist'] ?? [];
+          r[a['currentstage']]['tokenlist'].push(a);
+          if (a['status'] == 'ready') {
+            r[a['currentstage']]['waiting'] += 1;
+          } else if (
+            a['status'] == null ||
+            a['status'] == 'queued' ||
+            a['status'] == 'invited'
+          ) {
+            r[a['currentstage']]['queued'] += 1;
+          } else if (a['status'] == 'instudio') {
+            r[a['currentstage']]['instudio'] += 1;
+          }
+          return r;
+        }, {});
+        this.studioPreAssign = localPreAssign;
+        // console.log(this.stageTokenMap)
+        // console.log(this.studioPreAssign)
+      });
+  }
+
+  updateParticipantStudioMappings() {
     this.mapLiveParticipants = {};
     this.mapParticipantStudios = {};
 
@@ -1010,7 +1176,7 @@ export class CohortDetailComponent  implements OnDestroy {
           checkin: studio.checkin || false,
           studioin: studio.studioin || false,
           liveAssignment: liveAssignment,
-          studioData: studio
+          studioData: studio,
         });
 
         if (isLive) {
@@ -1022,7 +1188,7 @@ export class CohortDetailComponent  implements OnDestroy {
     this.liveAssignmentList.forEach((assignment: any) => {
       const allParticipants = [
         ...(assignment['pairing'] || []),
-        ...(assignment['bonusactivityparticipant'] || [])
+        ...(assignment['bonusactivityparticipant'] || []),
       ];
 
       allParticipants.forEach((pid: string) => {
@@ -1032,25 +1198,24 @@ export class CohortDetailComponent  implements OnDestroy {
   }
 
   // function to open atc edit form
-  openAtcEditMode(studio : any){
+  openAtcEditMode(studio: any) {
     this.editAtcModel = studio['docid'];
     this.editAtcModelData = studio['atcmodel'] || [];
-
   }
 
-   // function to cancel atc edit
-  cancelAtcEdit(){
+  // function to cancel atc edit
+  cancelAtcEdit() {
     this.editAtcModel = null;
     this.editAtcModelData = [];
   }
-  
-  applyAtcEdit(){
-    updateDoc(doc(this.firestore, "queue studio pairing", this.editAtcModel), {
-      atcmodel : this.editAtcModelData
-    })
+
+  applyAtcEdit() {
+    updateDoc(doc(this.firestore, 'queue studio pairing', this.editAtcModel), {
+      atcmodel: this.editAtcModelData,
+    });
     this.cancelAtcEdit();
   }
-  
+
   openMandatoryEditMode(studio: any) {
     this.editMandatoryActivities = studio['docid'];
     this.editMandatoryActivitiesData = studio['mandatoryactivities'] || [];
@@ -1062,19 +1227,21 @@ export class CohortDetailComponent  implements OnDestroy {
   }
 
   applyMandatoryEdit() {
-    updateDoc(doc(this.firestore, "queue studio pairing", this.editMandatoryActivities), {
-      mandatoryactivities: this.editMandatoryActivitiesData
-    });
+    updateDoc(
+      doc(this.firestore, 'queue studio pairing', this.editMandatoryActivities),
+      {
+        mandatoryactivities: this.editMandatoryActivitiesData,
+      },
+    );
     this.cancelMandatoryEdit();
   }
 
   filterActivityfunction() {
-    const data = Object.values(this.bigActivityMap)
+    const data = Object.values(this.bigActivityMap);
 
-    data.sort((a, b) => a["activity"].localeCompare(b["activity"]));
-    return data
+    data.sort((a, b) => a['activity'].localeCompare(b['activity']));
+    return data;
   }
-
 
   getUniquePreAssignedTokens(studioid: string): any[] {
     if (!this.studioPreAssign[studioid]) {
@@ -1082,70 +1249,266 @@ export class CohortDetailComponent  implements OnDestroy {
     }
 
     // Remove duplicates based on token docid
-    const uniqueTokens = this.studioPreAssign[studioid].filter((token, index, self) =>
-      index === self.findIndex(t => t['docid'] === token['docid'])
+    const uniqueTokens = this.studioPreAssign[studioid].filter(
+      (token, index, self) =>
+        index === self.findIndex((t) => t['docid'] === token['docid']),
     );
 
     return uniqueTokens;
   }
 
-   getStageName(token, studioid): string {
+  getStageName(token, studioid): string {
     if (!token['preassigned']) {
       return 'N/A';
     }
 
-    const stages = Object.keys(token['preassigned'])
-      .filter(stage => {
-        const studios = token['preassigned'][stage];
-        return Array.isArray(studios) && studios.includes(studioid);
-      });
+    const stages = Object.keys(token['preassigned']).filter((stage) => {
+      const studios = token['preassigned'][stage];
+      return Array.isArray(studios) && studios.includes(studioid);
+    });
 
     return stages.length > 0 ? stages.join(', ') : 'N/A';
   }
   updatePreAssigned(studioid, value) {
-      var batch = writeBatch(this.firestore)
-      var selectedToken = value.map(e => e["docid"])
-      // console.log("Selected Token", selectedToken)
-      // console.log("Assigned Token", assignedToken)
-      let stages = Object.keys(this.stageStudioMap).filter(element => {
-        let studioList = this.stageStudioMap[element].filter(e => e['docid'] == studioid);
-        return studioList.length > 0;
+    var batch = writeBatch(this.firestore);
+    var selectedToken = value.map((e) => e['docid']);
+    // console.log("Selected Token", selectedToken)
+    // console.log("Assigned Token", assignedToken)
+    let stages = Object.keys(this.stageStudioMap).filter((element) => {
+      let studioList = this.stageStudioMap[element].filter(
+        (e) => e['docid'] == studioid,
+      );
+      return studioList.length > 0;
+    });
+
+    value.forEach((token) => {
+      token['preassigned'] = token['preassigned'] ?? {};
+      stages.forEach((stage) => {
+        token['preassigned'][stage] = token['preassigned'][stage] ?? [];
+        if (!token['preassigned'][stage].includes(studioid))
+          token['preassigned'][stage].push(studioid);
       });
 
-  
-      value.forEach(token => {
-        token["preassigned"] = token["preassigned"] ?? {}
-        stages.forEach((stage) => {
-          token["preassigned"][stage] = token["preassigned"][stage] ?? []
-          if (!token["preassigned"][stage].includes(studioid)) token["preassigned"][stage].push(studioid)
-        })
-  
-        batch.update(doc(this.firestore, "queue_token", token["docid"]), {
-          preassigned: token["preassigned"]
-        })
-      })
-  
-      stages.forEach((stage) => {
-        var assignedToken = this.queueTokenList.filter(e => (e["preassigned"] ?? {})[stage] != null && (e["preassigned"] ?? {})[stage] != undefined)
-  
-        assignedToken.forEach(token => {
-          if (!selectedToken.includes(token["docid"])) {
-            token["preassigned"] = token["preassigned"] ?? {}
-            token["preassigned"][stage] = token["preassigned"][stage] ?? []
-            var index = token["preassigned"][stage].findIndex(e => e == studioid)
-            if (index != -1) {
-              token["preassigned"][stage].splice(index, 1)
-  
-              batch.update(doc(this.firestore, "queue_token", token["docid"]), {
-                preassigned: token["preassigned"]
-              })
-            }
+      batch.update(doc(this.firestore, 'queue_token', token['docid']), {
+        preassigned: token['preassigned'],
+      });
+    });
+
+    stages.forEach((stage) => {
+      var assignedToken = this.queueTokenList.filter(
+        (e) =>
+          (e['preassigned'] ?? {})[stage] != null &&
+          (e['preassigned'] ?? {})[stage] != undefined,
+      );
+
+      assignedToken.forEach((token) => {
+        if (!selectedToken.includes(token['docid'])) {
+          token['preassigned'] = token['preassigned'] ?? {};
+          token['preassigned'][stage] = token['preassigned'][stage] ?? [];
+          var index = token['preassigned'][stage].findIndex(
+            (e) => e == studioid,
+          );
+          if (index != -1) {
+            token['preassigned'][stage].splice(index, 1);
+
+            batch.update(doc(this.firestore, 'queue_token', token['docid']), {
+              preassigned: token['preassigned'],
+            });
           }
-        })
-      })
-      batch.commit()
-    }
-  filterTokenParticipant() {
-    return this.queueTokenList.filter(e => e["profile_name"].toLowerCase().includes(this.filterText.toLowerCase()))
+        }
+      });
+    });
+    batch.commit();
   }
+  filterTokenParticipant() {
+    return this.queueTokenList.filter((e) =>
+      e['profile_name'].toLowerCase().includes(this.filterText.toLowerCase()),
+    );
+  }
+
+  enableStduioCreateMode() {
+    this.studioCreateMode = !this.studioCreateMode;
+    this.newStudioPairing = [];
+  }
+
+  getStudioCombination() {
+    this.newStudioPairing = [];
+    if (this.selectedStage) {
+      const selectedQueue = this.searchableQueueList.find(
+        (q) => q?.docid === this.selectedQueue,
+      );
+      const stageProperty = selectedQueue['stageproperty'][this.selectedStage];
+      const studioCombination = {};
+      var compulsoryActivity = Object.values(
+        stageProperty['compulsoryactivity'] ?? {},
+      );
+
+      for (let j = 0; j < compulsoryActivity.length; j++) {
+        const activitycombination: any = compulsoryActivity[j];
+        const combinationArray = Array.isArray(activitycombination)
+          ? activitycombination
+          : [activitycombination];
+        // var parse = activitycombination.sort((a, b) => a.toString().localeCompare(b.toString())).join(",")
+        var parse = combinationArray
+          .sort((a, b) => a.toString().localeCompare(b.toString()))
+          .join(',');
+        var comboObject = {};
+        if (combinationArray.length > 0) {
+          combinationArray.forEach((activity) => {
+            comboObject[activity] = (comboObject[activity] ?? 0) + 1;
+          });
+          studioCombination[parse] = comboObject;
+        }
+      }
+      this.studioCombinations = studioCombination;
+    }
+  }
+
+  createStudioCombination(){
+    this.newStudioPairing.push({
+      participants : [],
+      atcmodel : null,
+      mandatoryActivity : null,
+      openViduEnabled : false
+    })
+  }
+
+  removePairing(index){
+    this.newStudioPairing.splice(index , 1)
+  }
+
+  getDuplicatedStudios(studioToCreate) {
+    let duplicates = [];
+    const participantList = studioToCreate.participants ?? [];
+    for (let studio of this.studioPairingList) {
+      const participants = studio['participants'] || [];
+      const activityMap = studio['participantsactivity'] || {};
+      const cohortActivity = this.cohort['bigactivity'];
+      // console.log(cohortActivity , )
+      if (participants.length === participantList.length && Object.values(activityMap).includes(cohortActivity)) {
+        const doesMatch = participantList.every((pid) => {
+          if (participants.includes(pid)) {
+            return true;
+          }
+          return false;
+        });
+        if (doesMatch) {
+          duplicates.push(studio);
+        }
+      }
+    }
+    return duplicates;
+  }
+
+   async assignRoles(){
+    const duplicateStudios = {};
+    const validList = [];
+
+    this.newStudioPairing.forEach((studio)=>{
+      const duplicates = this.getDuplicatedStudios(studio);
+      const studiokey = (studio.participants ?? []).map((pid)=>this.mapProfile[pid]).join('x');
+      if (duplicates.length > 0) {
+        duplicateStudios[studiokey] = duplicates;
+      } else {
+        validList.push(studio)
+      }
+    });
+
+    if (Object.keys(duplicateStudios).length > 0) {
+      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel , {data : duplicateStudios});
+      this.duplicateModelRef.afterClosed().subscribe((data)=>{
+       if (data) {
+          this.newStudioPairing = [...validList];
+          this.createStudios();
+       }
+      })
+    } else{
+        this.createStudios()
+    }
+  }
+
+   closeDuplicateStuioModel(data : boolean = false){
+    if (this.duplicateModelRef) {
+      this.duplicateModelRef.close(data);
+
+    }
+  }
+
+  validateStudios(){
+    const invalidStudios = [];
+    const valid = [];
+
+    this.newStudioPairing.forEach((studio)=>{
+      const participants = studio.participants ?? [];
+      const atcModel = studio.atcmodel ?? [];
+      const mandatoryActivity = studio.mandatoryActivity ?? [];
+      if(participants.length === 0){
+        invalidStudios.push(studio);
+      } else {
+        valid.push(studio);
+      }
+    });
+
+    if(invalidStudios.length > 0){
+      alert('Fill all the studios');
+      this.newStudioPairing = [...invalidStudios , ...valid];
+      return false;
+    }
+
+    return true;
+  }
+
+  async createStudios(){
+    if(this.validateStudios()){
+      try {
+        // 2️⃣ Create batch
+        const batch = writeBatch(this.firestore);
+        const cohortActivity = this.cohort['bigactivity'];
+
+        // const pairingRef = doc(
+        //   collection(this.firestore, 'queue studio pairing'),
+        // );
+
+        this.newStudioPairing.forEach((studio)=>{
+          const pairingRef = doc(
+          collection(this.firestore, 'queue studio pairing'),
+        );
+        const participants = studio.participants ?? [];
+        const atcmodel = studio.atcmodel ?? [];
+        const mandatoryactivities = studio.mandatoryActivity ?? []
+        const participantsactivity = {}
+        
+        participants.forEach((pid)=>{
+          participantsactivity[pid] = cohortActivity;
+        })
+          // 3️⃣ Batch set
+        batch.set(pairingRef, {
+          created: serverTimestamp(),
+          docid: pairingRef.id,
+          participants,
+          participantsactivity,
+          queueref: doc(
+            this.firestore,
+            'queue generation',
+            this.selectedQueue,
+          ),
+          studioin: false,
+          atcmodel,
+          mandatoryactivities: mandatoryactivities,
+          openvidu: studio.openViduEnabled,
+        });
+        })
+
+        // 4️⃣ Commit batch
+        await batch.commit();
+         this.studioCreateMode = false;
+          this.newStudioPairing = [];
+
+
+      } catch (error) {
+        console.error('Error creating studio pairing:', error);
+      }
+    }
+  }
+
 }
