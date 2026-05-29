@@ -16610,3 +16610,35 @@ table.specialist-table tr:hover td {
 .om-icon.av { background: var(--green-bg); color: var(--green); }
 .om-data h4 { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; margin-bottom: 4px; }
 .om-data p { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.confirm-dialog {
+  padding: 10px;
+}
+
+.dialog-header {
+  border-bottom: 1px solid #e5e5e5;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+
+  h4 {
+    margin: 0;
+    font-weight: 600;
+  }
+}
+
+.dialog-body {
+  padding: 10px 0;
+
+  p {
+    margin: 0;
+    font-size: 15px;
+    color: #555;
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 25px;
+}

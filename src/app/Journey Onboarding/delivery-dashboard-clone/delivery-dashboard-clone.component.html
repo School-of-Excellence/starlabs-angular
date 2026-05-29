@@ -527,7 +527,47 @@
                             }}</span>
                         </span>
                       </span>
+                      <button class="btn btn-primary" (click)="initiateProduct(pid)" *ngIf="item['status'] === null || ''">
+                      Initiate
+                    </button>
                     </div>
+                  </div>
+                  <div *ngIf="initiateProductOptions[pid]">
+                    <mat-form-field class="inputfield" appearance="outline">
+                      <mat-label>Minimum Payment</mat-label>
+                      <input matInput type="number" autocomplete="off" [(ngModel)]="minimumPayment"
+                        #minimumPaymentRef="ngModel" required>
+                      <mat-error *ngIf="minimumPaymentRef.invalid && minimumPaymentRef.touched">
+                        Minimum Payment is required
+                      </mat-error>
+                    </mat-form-field>
+                    <!-- Tentative Start -->
+                    <mat-form-field class="inputfield" appearance="outline">
+                      <mat-label>Tentative Start</mat-label>
+                      <input matInput [matDatepicker]="picker" [(ngModel)]="tentativeStartDate"
+                        #tentativeStartRef="ngModel" required autocomplete="off">
+                      <mat-datepicker-toggle matSuffix [for]="picker">
+                      </mat-datepicker-toggle>
+                      <mat-datepicker #picker></mat-datepicker>
+                      <mat-error *ngIf="tentativeStartRef.invalid && tentativeStartRef.touched">
+                        Tentative Start is required
+                      </mat-error>
+                    </mat-form-field>
+                    <!-- Delivery Option -->
+                    <mat-form-field appearance="outline">
+                      <mat-label>Delivery Option</mat-label>
+                      <mat-select [(ngModel)]="selectedDeliveryType" #deliveryTypeRef="ngModel" required>
+                        <mat-option *ngFor="let list of deliveryTypes" [value]="list">
+                          {{ list }}
+                        </mat-option>
+                      </mat-select>
+                      <mat-error *ngIf="deliveryTypeRef.invalid && deliveryTypeRef.touched">
+                        Delivery Option is required
+                      </mat-error>
+                    </mat-form-field>
+                    <button class="btn btn-success h-50 mt-1" (click)="updateParticipantProductStatus(this.participantData[0].docid, this.participantData[0].profileid)">
+                      Confirm Initiate
+                    </button>
                   </div>
                 </div>
               </div>

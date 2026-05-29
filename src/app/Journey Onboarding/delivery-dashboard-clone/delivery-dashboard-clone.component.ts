@@ -539,6 +539,13 @@ export class DeliveryDashboardCloneComponent {
     selectedSlotData: any;
     loggedInPID: any;
 
+    initiateProductOptions: any = {};
+    deliveryTypes: string[] = [];
+    participantData: any;
+    minimumPayment: number | null = null;
+    tentativeStartDate: Date | null = null;
+    selectedDeliveryType: string = '';
+
     productData: any = {
         eiStarterPack: {
             totalEligible: [],
@@ -738,6 +745,8 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async onProductMultiFilterChange() {
+        const selectedProductIds: string[] = this.productFilterControl.value ?? [];
+        console.log("selected product ids", selectedProductIds);
         if (!this.allMatchedProductsRaw || this.allMatchedProductsRaw.length === 0) return;
         // Filter changed → flush memoized getters (visibleCardIds, allProductIdsFromRaw, etc.)
         this.invalidateMemos();
@@ -1704,6 +1713,7 @@ export class DeliveryDashboardCloneComponent {
                     ...app
                 };
             });
+        console.log("filtered appointments", filteredAppointments, this.allAppointments);
 
         return {
             all: filteredAppointments,
@@ -2779,6 +2789,7 @@ export class DeliveryDashboardCloneComponent {
         }
         this.allFunnelModalProfiles = grouped;
         this.groupedByProfileAll = { ...grouped };
+        console.log("groupedProfileAll", this.groupedByProfileAll);
         return this.groupedByProfileAll;
     }
 
@@ -3017,6 +3028,68 @@ export class DeliveryDashboardCloneComponent {
                     (item: any) => item.productId === this.selectedProductId
                 )
                 : data;
+        }
+    }
+
+    async initiateProduct(pid: string) {
+        this.initiateProductOptions[pid] = true;
+
+        if (this.initiateProductOptions) {
+            this.participantData = this.currentGroupedByProfile[pid];
+            const productId = this.participantData[0].productref?.id;
+            await this.getDeliveryTypes(productId);
+        }
+    }
+
+    async getDeliveryTypes(productId: string) {
+        try {
+            const snapshot = await getDocs(
+                collection(this.firestore, 'productToDeliverySequence')
+            );
+            let deliveryType: string[] = [];
+            snapshot.forEach((doc) => {
+                const data: any = doc.data();
+                // Match product
+                if (data.product?.id === productId) {
+                    // Get all delivery types
+                    const types = data.deliveryoptions?.map(
+                        (item: any) => item.deliverytype
+                    ) || [];
+                    this.deliveryTypes.push(...types);
+                }
+                this.deliveryTypes = deliveryType;
+            });
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    async updateParticipantProductStatus(docid: string, profileid: string) {
+        console.log("docid", docid, "profileid", profileid);
+        const participantsProductRef = collection(this.firestore, 'participantsproduct');
+        const q = query(
+            participantsProductRef,
+            where('docid', '==', docid),
+            where('profileid', '==', profileid)
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            const updatePromises = querySnapshot.docs.map((docSnap) =>
+                updateDoc(docSnap.ref, {
+                    status: 'initiated',
+                    minimumpayment: this.minimumPayment,
+                    tentativestart: this.tentativeStartDate,
+                    deliverytype: this.selectedDeliveryType,
+                    statusdate: {
+                        initiated: serverTimestamp()
+                    }
+                })
+            );
+            await Promise.all(updatePromises);
+            this.initiateProductOptions[profileid] = false;
+        } else {
+            console.log('No matching document found');
         }
     }
 
