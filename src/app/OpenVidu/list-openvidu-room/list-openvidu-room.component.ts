@@ -55,11 +55,17 @@ export class ListOpenviduRoomComponent {
     var assignmentCollection = collection(this.firestore, "live assignment")
     var liveQuery = query(assignmentCollection, where("status", "==", "live"), where("participantid", "==", this.loggedinProfileID))
 
-    collectionData(liveQuery).pipe(
+    collectionData(liveQuery, { idField: 'docid' }).pipe(
       takeUntil(this.subscription)
     ).subscribe(data =>{
       var studioID = Array.from(new Set(data.map(e => e["studioid"])))
       console.log("Studio", studioID)
+
+      // NOTE: We intentionally do NOT write participantReadyAt /
+      // participantLastSeenAt from this page. /participantstudio is only the
+      // invitation list — the participant hasn't actually entered the studio
+      // yet. Presence is written by zoom-clientview the moment they click
+      // "Join Meeting Now" and land on the wait screen.
 
       if(studioID.length != 0){
         var studioCollection = collection(this.firestore, "queue studio pairing")
@@ -275,6 +281,11 @@ export class ListOpenviduRoomComponent {
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
     return [hours, minutes, seconds];
+  }
+
+  ngOnDestroy() {
+    this.subscription?.next()
+    this.subscription?.complete()
   }
 
 }

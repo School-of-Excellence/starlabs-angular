@@ -9,6 +9,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
+import { MatButtonModule } from '@angular/material/button';
 import { AuthguardService } from '../../authguard.service';
 
 interface TranscriptionItem {
@@ -35,7 +36,8 @@ interface ProductGroup {
     CommonModule,
     MatProgressBarModule,
     MatIconModule,
-    MatCardModule
+    MatCardModule,
+    MatButtonModule
   ],
   templateUrl: './view-participant-atc.component.html',
   styleUrl: './view-participant-atc.component.css'
@@ -87,6 +89,20 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
   profileMap: Record<string, any> = {};
   procedureMap: Record<string, string> = {};
   mapBigActivity: Record<string, string> = {};
+
+  // Per-ATC expand/collapse state for the "View Full ATC" toggle.
+  expandedATCIds = signal<Set<string>>(new Set<string>());
+
+  toggleATC(atcId: string): void {
+    const next = new Set(this.expandedATCIds());
+    if (next.has(atcId)) next.delete(atcId);
+    else next.add(atcId);
+    this.expandedATCIds.set(next);
+  }
+
+  isATCExpanded(atcId: string): boolean {
+    return this.expandedATCIds().has(atcId);
+  }
 
   ngOnInit(): void {
     if (this.profileid) {
