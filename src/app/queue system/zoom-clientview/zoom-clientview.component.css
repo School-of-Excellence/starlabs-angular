@@ -53,4 +53,318 @@ position: fixed;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+/* ============================================================
+   Specialist-wait screen (participant side, queue/studio flow)
+   ============================================================ */
+.wait-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(ellipse at top, #1e293b 0%, #0f172a 60%, #020617 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #f1f5f9;
+  overflow: hidden;
+}
+.wait-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.18) 0, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(34, 197, 94, 0.12) 0, transparent 40%);
+  pointer-events: none;
+}
+
+.wait-card {
+  position: relative;
+  max-width: 520px;
+  width: 100%;
+  padding: 40px 32px 32px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  text-align: center;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: waitCardIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes waitCardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Pulsing icon */
+.wait-card__pulse {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wait-pulse__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(99, 102, 241, 0.5);
+}
+.wait-pulse__ring--a { animation: waitPulse 2.4s ease-out infinite; }
+.wait-pulse__ring--b { animation: waitPulse 2.4s ease-out 1.2s infinite; }
+@keyframes waitPulse {
+  0% { opacity: 0.8; transform: scale(0.7); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+.wait-pulse__core {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+  z-index: 1;
+}
+.wait-pulse__core mat-icon {
+  font-size: 30px !important;
+  width: 30px !important;
+  height: 30px !important;
+  line-height: 30px !important;
+}
+
+.wait-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.32);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #86efac;
+  margin-bottom: 18px;
+}
+.wait-card__eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  animation: waitDot 1.6s ease-out infinite;
+}
+@keyframes waitDot {
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.65); }
+  100% { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); }
+}
+
+.wait-card__title {
+  margin: 0 0 12px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.018em;
+  line-height: 1.3;
+}
+
+.wait-card__body {
+  margin: 0 0 22px;
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+.wait-card__body strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.wait-card__dots {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.wait-card__dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6366f1;
+  opacity: 0.4;
+  animation: waitBounce 1.4s ease-in-out infinite;
+}
+.wait-card__dots span:nth-child(2) { animation-delay: 0.18s; }
+.wait-card__dots span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes waitBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-8px); opacity: 1; }
+}
+
+.wait-card__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+.wait-card__hint mat-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  line-height: 16px !important;
+  color: #818cf8;
+}
+
+/* Ended / link invalid variant — same shell, calmer treatment */
+.wait-card--ended {
+  /* No special background — neutral end state */
+}
+.wait-card__pulse--static .wait-pulse__ring {
+  display: none;
+}
+.wait-pulse__core--ended {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.4);
+}
+.wait-card__eyebrow--ended {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #cbd5e1;
+}
+.wait-card__eyebrow--ended .wait-card__eyebrow-dot,
+.wait-card__eyebrow--ended::before {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .wait-card { padding: 28px 22px; }
+  .wait-card__title { font-size: 18px; }
+  .wait-card__body { font-size: 13px; }
+}
+
   
+/* =============================================================
+   RECORDING PROMPT — big center overlay (HOST only)
+   Replaces the previous snackbar so paused/stopped state is
+   impossible to miss while a participant is in the call.
+   ============================================================= */
+.rec-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000; /* above the Zoom SDK chrome */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: rec-fade 180ms ease-out;
+}
+@keyframes rec-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.rec-prompt-card {
+  width: min(560px, 92vw);
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 36px 40px 32px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #0f172a;
+  animation: rec-pop 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes rec-pop {
+  from { transform: translateY(12px) scale(0.96); opacity: 0; }
+  to   { transform: translateY(0) scale(1);       opacity: 1; }
+}
+
+.rec-prompt-card__icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6);
+  animation: rec-pulse 1.6s infinite;
+}
+.rec-prompt-card__icon mat-icon {
+  color: #ffffff;
+  font-size: 38px;
+  width: 38px;
+  height: 38px;
+  line-height: 38px;
+}
+@keyframes rec-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0.55); }
+  70%  { box-shadow: 0 0 0 22px rgba(220, 38, 38, 0);   }
+  100% { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0);    }
+}
+
+.rec-prompt-card__title {
+  margin: 0 0 10px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+.rec-prompt-card__body {
+  margin: 0 0 18px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #334155;
+}
+.rec-prompt-card__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  margin-bottom: 22px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #92400e;
+}
+.rec-prompt-card__hint mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  color: #b45309;
+}
+.rec-prompt-card__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 22px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.rec-prompt-card__btn:hover { background: #1e293b; }

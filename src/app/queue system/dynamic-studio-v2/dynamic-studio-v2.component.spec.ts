@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { OnewayTemplatesComponent } from './oneway-templates.component';
+import { DynamicStudioV2Component } from './dynamic-studio-v2.component';
 
-describe('OnewayTemplatesComponent', () => {
-  let component: OnewayTemplatesComponent;
-  let fixture: ComponentFixture<OnewayTemplatesComponent>;
+describe('DynamicStudioV2Component', () => {
+  let component: DynamicStudioV2Component;
+  let fixture: ComponentFixture<DynamicStudioV2Component>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [OnewayTemplatesComponent]
+      imports: [DynamicStudioV2Component]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(OnewayTemplatesComponent);
+    fixture = TestBed.createComponent(DynamicStudioV2Component);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

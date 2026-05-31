@@ -4,21 +4,22 @@
     <p>Loading templates...</p>
 </div>
 
-<div [hidden]="isLoading" class="oneway-template-container">
+<div [hidden]="isLoading" class="channeltemplate-container">
     <!-- Navigation Header -->
     <mat-card class="navigation-header">
         <mat-card-content>
             <div class="nav-buttons">
-                <button mat-raised-button [color]="viewMode === 'list' ? 'primary' : ''" (click)="switchToListView()">
+                <button mat-raised-button [color]="viewMode === 'list' ? 'primary' : ''"
+                    (click)="viewMode='list'; loadTemplates()">
                     <mat-icon>list</mat-icon>
                     View Templates
                 </button>
                 <button mat-raised-button [color]="viewMode === 'create' ? 'primary' : ''"
-                    (click)="switchToCreateView()">
+                    (click)="onReset(); viewMode='create'">
                     <mat-icon>add</mat-icon>
-                    {{ isEditMode ? 'Edit Template' : 'Create Template' }}
+                    Create Template
                 </button>
-                <button mat-button *ngIf="viewMode === 'preview'" (click)="switchToListView()">
+                <button mat-button *ngIf="viewMode === 'preview'" (click)="viewMode='list'">
                     <mat-icon>arrow_back</mat-icon>
                     Back to List
                 </button>
@@ -34,11 +35,11 @@
                 <div class="header-left">
                     <mat-card-title>
                         <mat-icon>campaign</mat-icon>
-                        One Way Templates
+                        Channel Templates
                     </mat-card-title>
                 </div>
                 <mat-chip class="template-count">
-                    <b>{{ getFilteredResultsCount() }}</b> of <b>{{ existingTemplates.length }}</b>
+                    <b>{{ dataSource.filteredData.length }}</b> of <b>{{ existingTemplates.length }}</b>
                 </mat-chip>
             </mat-card-header>
 
@@ -49,46 +50,32 @@
 
                         <mat-form-field appearance="outline">
                             <mat-label>Search templates...</mat-label>
-                            <input matInput [(ngModel)]="searchTerm" (input)="onSearchChange()"
+                            <input matInput [(ngModel)]="searchTerm" (input)="applyFilters()"
                                 placeholder="Search by name, template ID, category">
-                            <mat-icon matPrefix>search</mat-icon>
                             <button matSuffix mat-icon-button *ngIf="searchTerm"
-                                (click)="searchTerm=''; onSearchChange()">
+                                (click)="searchTerm=''; applyFilters()">
                                 <mat-icon>clear</mat-icon>
                             </button>
                         </mat-form-field>
 
                         <mat-form-field appearance="outline">
                             <mat-label>Category</mat-label>
-                            <mat-select [(value)]="selectedCategory" (selectionChange)="onFilterChange()">
+                            <mat-select [(value)]="selectedCategory" (selectionChange)="applyFilters()">
                                 <mat-option value="">All Categories</mat-option>
-                                <mat-option *ngFor="let c of categories" [value]="c">{{ c }}</mat-option>
+                                <mat-option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</mat-option>
                             </mat-select>
                             <mat-icon matSuffix>category</mat-icon>
                         </mat-form-field>
 
                         <mat-form-field appearance="outline">
                             <mat-label>Status</mat-label>
-                            <mat-select [(value)]="selectedStatus" (selectionChange)="onFilterChange()">
+                            <mat-select [(value)]="selectedStatus" (selectionChange)="applyFilters()">
                                 <mat-option value="">All Statuses</mat-option>
                                 <mat-option value="pending">Pending</mat-option>
                                 <mat-option value="approved">Approved</mat-option>
                                 <mat-option value="rework">Rework</mat-option>
                             </mat-select>
                             <mat-icon matSuffix>assignment</mat-icon>
-                        </mat-form-field>
-
-                        <mat-form-field appearance="outline">
-                            <mat-label>Header Type</mat-label>
-                            <mat-select [(value)]="selectedHeaderType" (selectionChange)="onFilterChange()">
-                                <mat-option value="">All Types</mat-option>
-                                <mat-option value="none">None</mat-option>
-                                <mat-option value="text">Text</mat-option>
-                                <mat-option value="image">Image</mat-option>
-                                <mat-option value="video">Video</mat-option>
-                                <mat-option value="document">Document</mat-option>
-                            </mat-select>
-                            <mat-icon matSuffix>view_headline</mat-icon>
                         </mat-form-field>
 
                         <button mat-mini-fab (click)="clearFilters()" matTooltip="Clear Filters">
@@ -98,8 +85,8 @@
 
                     <div class="filter-actions">
                         <span class="filter-info">
-                            <b>({{ getFilteredResultsCount() }})</b>
-                            template{{ getFilteredResultsCount() !== 1 ? 's' : '' }} found
+                            <b>({{ dataSource.filteredData.length }})</b>
+                            template{{ dataSource.filteredData.length !== 1 ? 's' : '' }} found
                         </span>
 
                         <div class="status-pills">
@@ -146,7 +133,7 @@
                             </th>
                             <td mat-cell *matCellDef="let template" class="category-cell">
                                 <mat-chip color="primary" selected class="category-chip">
-                                    {{ template.category }}
+                                    {{ getCategoryName(template.category) }}
                                 </mat-chip>
                             </td>
                         </ng-container>
@@ -213,8 +200,8 @@
                             </th>
                             <td mat-cell *matCellDef="let template" class="actions-cell">
                                 <div class="action-buttons">
-                                    <button mat-icon-button (click)="switchToPreviewView(template)" matTooltip="Preview"
-                                        class="action-btn preview-btn">
+                                    <button mat-icon-button (click)="switchToPreviewView(template)"
+                                        matTooltip="Preview" class="action-btn preview-btn">
                                         <mat-icon>visibility</mat-icon>
                                     </button>
                                     <button mat-icon-button (click)="editTemplate(template)" matTooltip="Edit"
@@ -259,13 +246,14 @@
                     <div class="empty-state" *ngIf="dataSource.filteredData.length === 0 && !isLoading">
                         <mat-icon class="empty-icon">campaign</mat-icon>
                         <h3>No templates found</h3>
-                        <p *ngIf="searchTerm || selectedCategory || selectedStatus || selectedHeaderType">
+                        <p *ngIf="searchTerm || selectedCategory || selectedStatus">
                             Try adjusting your search criteria or filters
                         </p>
-                        <p *ngIf="!searchTerm && !selectedCategory && !selectedStatus && !selectedHeaderType">
-                            Create your first one way template to get started
+                        <p *ngIf="!searchTerm && !selectedCategory && !selectedStatus">
+                            Create your first Channel template to get started
                         </p>
-                        <button mat-raised-button color="primary" (click)="switchToCreateView()"
+                        <button mat-raised-button color="primary"
+                            (click)="onReset(); viewMode='create'"
                             *ngIf="existingTemplates.length === 0">
                             <mat-icon>add</mat-icon>
                             Create First Template
@@ -304,11 +292,7 @@
 
             <div class="manage-list">
                 <div class="manage-item" *ngFor="let item of categories">
-                    <mat-chip color="primary" selected>{{ item }}</mat-chip>
-                    <button mat-icon-button color="warn" matTooltip="Remove" [disabled]="isSaving"
-                        (click)="removeCategory(item)">
-                        <mat-icon>delete</mat-icon>
-                    </button>
+                    <mat-chip color="primary" selected>{{ item.name }}</mat-chip>
                 </div>
                 <div *ngIf="categories.length === 0" class="manage-empty-state">
                     No categories yet.
@@ -317,7 +301,7 @@
         </div>
     </div>
 
-    <!--PREVIEW VIEW (eye icon) -->
+    <!--PREVIEW VIEW -->
     <div *ngIf="viewMode === 'preview' && previewTemplate" class="preview-view-section">
         <mat-card>
             <mat-card-header>
@@ -342,7 +326,7 @@
                 <div class="preview-details">
                     <div class="template-info">
                         <p><strong>Template ID:</strong> <code>{{ previewTemplate.templateid }}</code></p>
-                        <p><strong>Category:</strong> {{ previewTemplate.category }}</p>
+                        <p><strong>Category:</strong> {{ getCategoryName(previewTemplate.category) }}</p>
                         <p><strong>Header Type:</strong> {{ previewTemplate.headertype | titlecase }}</p>
                         <p *ngIf="previewTemplate.headertype !== 'none'">
                             <strong>Header Value:</strong> {{ previewTemplate.headervalue }}
@@ -368,9 +352,7 @@
                 <!-- Phone Preview -->
                 <div class="phone-preview-container">
                     <div class="phone-mockup">
-                        <div class="phone-status">
-                            <div class="phone-notch"></div>
-                        </div>
+                        <div class="phone-status"><div class="phone-notch"></div></div>
                         <div class="phone-header">
                             <div class="phone-avatar">A</div>
                             <div>
@@ -397,8 +379,7 @@
                                     <div class="prev-hdr-text" *ngIf="getPreviewHeaderType() === 'text'">
                                         {{ getPreviewHeader() }}
                                     </div>
-                                    <div class="prev-body" [innerHTML]="getPreviewContent()"></div>
-                                    <!-- FILES — preview view -->
+                                    <div class="prev-body" [innerHTML]="previewHtml"></div>
                                     <div *ngIf="previewTemplate['files']?.length > 0" style="padding: 0 12px 6px;">
                                         <a *ngFor="let file of previewTemplate['files']"
                                             [href]="file.url" target="_blank"
@@ -406,9 +387,7 @@
                                             {{ file.name }}
                                         </a>
                                     </div>
-                                    <div class="prev-footer" *ngIf="getPreviewFooter()">
-                                        {{ getPreviewFooter() }}
-                                    </div>
+                                    <div class="prev-footer" *ngIf="getPreviewFooter()">{{ getPreviewFooter() }}</div>
                                     <div class="prev-buttons" *ngIf="previewTemplate['buttons']?.length > 0">
                                         <div class="prev-btn-item" *ngFor="let btn of previewTemplate['buttons']">
                                             <mat-icon>open_in_new</mat-icon>
@@ -432,7 +411,7 @@
         <mat-card class="form-header">
             <mat-card-header>
                 <mat-card-title>
-                    {{ isEditMode ? 'Edit One Way Template' : 'Create One Way Template' }}
+                    {{ isEditMode ? 'Edit Channel Template' : 'Create Channel Template' }}
                 </mat-card-title>
             </mat-card-header>
 
@@ -444,38 +423,33 @@
                             placeholder="e.g. Onboarding Call Reminder">
                         <mat-icon matSuffix>title</mat-icon>
                         <mat-spinner matSuffix diameter="16" *ngIf="isCheckingName"></mat-spinner>
-                        <mat-error *ngIf="templatename?.hasError('required')">Template name is required</mat-error>
-                        <mat-error *ngIf="templatename?.hasError('pattern')">
+                        <mat-error *ngIf="templateForm.get('templatename')?.hasError('required')">Template name is required</mat-error>
+                        <mat-error *ngIf="templateForm.get('templatename')?.hasError('pattern')">
                             Only letters, numbers, spaces, '.', '-', '_', '&' allowed
                         </mat-error>
-                        <mat-error *ngIf="templatename?.hasError('templateNameExists')">
+                        <mat-error *ngIf="templateForm.get('templatename')?.hasError('templateNameExists')">
                             Template name already exists
                         </mat-error>
-                        <mat-error *ngIf="templatename?.hasError('nameUnchanged')">
+                        <mat-error *ngIf="templateForm.get('templatename')?.hasError('nameUnchanged')">
                             Please change the template name before updating
                         </mat-error>
-                        <mat-hint *ngIf="isEditMode && templatename?.hasError('nameUnchanged')" style="color:var(--warning);">
-                            <mat-icon style="font-size:12px;width:12px;height:12px;vertical-align:middle;">info</mat-icon>
-                            Change the template name to enable update
-                        </mat-hint>
                     </mat-form-field>
 
                     <mat-form-field appearance="outline" class="form-field">
                         <mat-label>Category</mat-label>
                         <mat-select formControlName="category">
                             <mat-option value="">Select Category</mat-option>
-                            <mat-option *ngFor="let c of categories" [value]="c">{{ c }}</mat-option>
+                            <mat-option *ngFor="let c of categories" [value]="c.id">{{ c.name }}</mat-option>
                         </mat-select>
                         <button matSuffix mat-icon-button type="button"
-                            (click)="openManageDialog($event)"
-                            matTooltip="Add or remove categories">
+                            (click)="openManageDialog($event)" matTooltip="Add or remove categories">
                             <mat-icon>add_circle</mat-icon>
                         </button>
-                        <mat-error *ngIf="category?.hasError('required')">Category is required</mat-error>
+                        <mat-error *ngIf="templateForm.get('category')?.hasError('required')">Category is required</mat-error>
                     </mat-form-field>
 
-                    <button mat-fab color="primary" type="button" (click)="onReset(true)" matTooltip="Refresh Form"
-                        aria-label="Refresh">
+                    <button mat-fab color="primary" type="button" (click)="onReset(true)"
+                        matTooltip="Refresh Form" aria-label="Refresh">
                         <mat-icon>refresh</mat-icon>
                     </button>
                 </div>
@@ -486,8 +460,7 @@
         <mat-card class="form-actions">
             <mat-card-actions align="end">
                 <button mat-raised-button color="primary" type="button" (click)="onSubmit(true)"
-                    [disabled]="!templateForm.valid || isCheckingName || isSaving"
-                    [matTooltip]="isEditMode && templatename?.hasError('nameUnchanged') ? 'Change the template name to enable update' : ''">
+                    [disabled]="!templateForm.valid || isCheckingName || isSaving">
                     <mat-icon>send</mat-icon>
                     {{ isEditMode ? 'Update & Submit' : 'Submit for Approval' }}
                 </button>
@@ -604,8 +577,7 @@
                                         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.zip,.txt">
                                     <button type="button" mat-icon-button
                                         (click)="bodyFileInput.click()"
-                                        [disabled]="isUploadingFile"
-                                        matTooltip="Upload file">
+                                        [disabled]="isUploadingFile" matTooltip="Upload file">
                                         <mat-spinner *ngIf="isUploadingFile" diameter="16"></mat-spinner>
                                         <mat-icon *ngIf="!isUploadingFile">attach_file</mat-icon>
                                     </button>
@@ -624,10 +596,11 @@
                                     [placeholder]="'Hi {{name}}, your session is on {{date}} at {{time}}…'">
                                 </ngx-editor>
                             </div>
-                            <mat-error *ngIf="htmlbody?.invalid && htmlbody?.touched" class="editor-error">
-                                <span *ngIf="htmlbody?.errors?.['required']">Message body is required</span>
+                            <mat-error *ngIf="templateForm.get('htmlbody')?.invalid && templateForm.get('htmlbody')?.touched" class="editor-error">
+                                <span *ngIf="templateForm.get('htmlbody')?.errors?.['required']">Message body is required</span>
                             </mat-error>
                         </div>
+
                         <!-- Uploaded Files List -->
                         <div *ngIf="templateFiles.length > 0" class="uploaded-files-section">
                             <div class="uploaded-files-header">
@@ -645,7 +618,8 @@
                                     <a [href]="file.url" target="_blank" mat-icon-button matTooltip="Download">
                                         <mat-icon>download</mat-icon>
                                     </a>
-                                    <button type="button" mat-icon-button color="warn" (click)="removeFile(i)" matTooltip="Remove">
+                                    <button type="button" mat-icon-button color="warn"
+                                        (click)="removeFile(i)" matTooltip="Remove">
                                         <mat-icon>close</mat-icon>
                                     </button>
                                 </div>
@@ -662,7 +636,7 @@
                             <input matInput formControlName="footer" maxlength="60"
                                 placeholder="e.g. Warm Regards, A&H Journey Team">
                             <mat-icon matSuffix>format_align_center</mat-icon>
-                            <mat-hint align="end">{{ footer?.value?.length || 0 }}/60</mat-hint>
+                            <mat-hint align="end">{{ templateForm.get('footer')?.value?.length || 0 }}/60</mat-hint>
                         </mat-form-field>
 
                         <!-- Buttons -->
@@ -696,15 +670,16 @@
                                     <div class="button-row-fields">
                                         <mat-form-field appearance="outline" style="flex:1;">
                                             <mat-label>Button Label</mat-label>
-                                            <input matInput formControlName="label" placeholder="Button label"
-                                                maxlength="50">
+                                            <input matInput formControlName="label"
+                                                placeholder="Button label" maxlength="50">
                                             <mat-hint align="end">{{ btn.get('label')?.value?.length || 0 }}/50</mat-hint>
                                             <mat-error *ngIf="btn.get('label')?.hasError('required')">Required</mat-error>
                                             <mat-error *ngIf="btn.get('label')?.hasError('maxlength')">Max 50 characters</mat-error>
                                         </mat-form-field>
                                         <mat-form-field appearance="outline" style="flex:2;">
                                             <mat-label>URL</mat-label>
-                                            <input matInput formControlName="url" placeholder="https://example.com">
+                                            <input matInput formControlName="url"
+                                                placeholder="https://example.com">
                                             <mat-error *ngIf="btn.get('url')?.hasError('pattern')">Enter a valid URL</mat-error>
                                         </mat-form-field>
                                     </div>
@@ -731,9 +706,7 @@
                     <mat-card-content>
                         <div class="phone-preview-container">
                             <div class="phone-mockup">
-                                <div class="phone-status">
-                                    <div class="phone-notch"></div>
-                                </div>
+                                <div class="phone-status"><div class="phone-notch"></div></div>
                                 <div class="phone-header">
                                     <div class="phone-avatar">A</div>
                                     <div>
@@ -744,19 +717,16 @@
                                 <div class="phone-body">
                                     <div class="prev-msg-wrap">
                                         <div class="prev-bubble">
-                                            <!-- Image header -->
                                             <div class="prev-hdr-img" *ngIf="getPreviewHeaderType() === 'image'">
                                                 <img *ngIf="getPreviewHeader()" [src]="getPreviewHeader()"
                                                     style="width:100%;height:100%;object-fit:cover;" alt="header">
                                                 <mat-icon *ngIf="!getPreviewHeader()">image</mat-icon>
                                             </div>
-                                            <!-- Video header -->
                                             <div class="prev-hdr-img" *ngIf="getPreviewHeaderType() === 'video'">
                                                 <video *ngIf="getPreviewHeader()" [src]="getPreviewHeader()"
                                                     style="width:100%;height:100%;object-fit:cover;" muted playsinline></video>
                                                 <mat-icon *ngIf="!getPreviewHeader()">play_circle</mat-icon>
                                             </div>
-                                            <!-- Document header -->
                                             <div class="prev-hdr-img" *ngIf="getPreviewHeaderType() === 'document'">
                                                 <mat-icon>description</mat-icon>
                                                 <span *ngIf="getPreviewHeader()"
@@ -767,11 +737,10 @@
                                             <div class="prev-hdr-text" *ngIf="getPreviewHeaderType() === 'text'">
                                                 {{ getPreviewHeader() || 'Header text…' }}
                                             </div>
-                                            <div class="prev-body" [innerHTML]="getPreviewContent()"></div>
+                                            <div class="prev-body" [innerHTML]="previewHtml"></div>
                                             <div class="prev-empty" *ngIf="!htmlBodyContent">
                                                 Your message will appear here…
                                             </div>
-                                            <!-- FILES — right panel live preview -->
                                             <div *ngIf="templateFiles.length > 0" style="padding: 0 12px 6px;">
                                                 <a *ngFor="let file of templateFiles"
                                                     [href]="file.url" target="_blank"
