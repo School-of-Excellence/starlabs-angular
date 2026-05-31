@@ -114,6 +114,7 @@ export class ManageCohertsComponent {
 
   supportchatref: DocumentReference | null
 
+  queueList : any = []
 
   constructor(
     private fb: FormBuilder,
@@ -123,6 +124,7 @@ export class ManageCohertsComponent {
     private snackBar: MatSnackBar
   ) {
 
+    this.queueList = this.data?.queueList ?? []
     for (let i = 0; i < this.data.totalParticipants.length; i++) {
       const profile = this.data.totalParticipants[i];
       this.mapProfile[profile.profileid] = profile;
@@ -149,6 +151,7 @@ export class ManageCohertsComponent {
       team: [[]],
       bigactivity: [null],
       description: [''],
+      queueref : [null]
 
     });
 
@@ -181,6 +184,11 @@ export class ManageCohertsComponent {
           createddate: new Date(),
           udpateddate: new Date(),
           marathonref: doc(collection(this.firestore, "big marathon"), this.data.selectedMarathon?.docid),
+          bigactivity : this.data?.bigactivity ?? null,
+          name : this.data?.cohortname ?? '',
+          cohortType : this.data?.cohortType || 'general',
+          eventref : this.data?.selectedEvent || null,
+          queueref : this.data?.selectedQueue ?? null
         });
       }
       if (this.data.type == "edit") {
@@ -211,7 +219,8 @@ export class ManageCohertsComponent {
           mentors: this.data.doc['mentors'] || [],
           team: this.data.doc['team'] || [],
           bigactivity: this.data.doc['bigactivity'] || null,
-          description: this.data.doc['description'] || null
+          description: this.data.doc['description'] || null,
+          queueref : this.data.doc['queueref'] || null
         });
         
         this.selectedTags = this.data.doc['tags'] || [];
@@ -1231,7 +1240,7 @@ export class ManageCohertsComponent {
       if(check){
         // participantidlist already contains all selected participants (including existing ones)
         // The selectedParticipants array includes both dropdown selections and existing participants
-        
+        formValue['queueref'] = ![null , undefined , ''].includes( formValue['queueref']) ? doc(this.firestore , 'queue generation'  , formValue['queueref']) : null;
         // Save cohort document
         await setDoc(doc(this.firestore, "big cohorts", formValue['docid']), formValue, { merge: true });
         

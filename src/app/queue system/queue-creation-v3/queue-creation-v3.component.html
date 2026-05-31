@@ -243,6 +243,20 @@
           </ng-template>
           <form [formGroup]="queueform">
             <div class="content-card">
+              <div class="subform text-center">
+                <h4 class="text-secondary text-center mb-4" style="font-size: 16px;">Map Events to Queue</h4>
+                <mat-form-field appearance="outline" style="width: 350px;padding: 20px;">
+                  <mat-select placeholder="Select Event" formControlName="eventid" multiple>
+                    <!-- <mat-option>
+                      <ngx-mat-select-search [(ngModel)]="filterEvent" placeholderLabel="Search"
+                        noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
+                    </mat-option> -->
+                    <mat-option *ngFor="let event of filterEvents()" [value]="event.docid">
+                      {{event.name}}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
               <div class="subform text-center"  formArrayName="products">
                 <h4 class="text-secondary text-center mb-4" style="font-size: 16px;">Map Event To Products</h4>
                 <div class="text-left" *ngFor="let control of productsArray.controls;let i = index" [formGroupName]="i">
@@ -890,3 +904,83 @@
     </div>
   </div>
 </div>  
+
+
+<ng-template #cohortCreateModel>
+  <div class="tm-modal" *ngIf="cohortCreateModelData">
+    <div class="tm-header">
+      <span class="tm-header__title">Cohorts to create</span>
+      <button class="tm-header__close" (click)="closeCohortModel(false)">✕</button>
+    </div>
+    <div *ngFor="let event of cohortCreateModelData | keyvalue">
+      <p>{{mapEvents[$any(event).key]?.name}}</p>
+      <!-- <div class="tm-notice">
+        <mat-icon class="tm-notice__icon">info</mat-icon>
+        <div class="tm-notice__text">
+          <strong>{{ $any(duplictes).value.length }}</strong>
+          duplicated {{ $any(duplictes).value.length === 1 ? 'studio has' : 'studios have' }} already been created with the
+          same participants.
+          Do you want to proceed and create a new studio on top of {{ $any(duplictes).value.length === 1 ? 'this' : 'these'
+          }}?
+        </div>
+      </div> -->
+      <div class="tm-card-list">
+        <div class="tm-card" *ngFor="let activity of $any(event).value | keyvalue; let i = index">
+          <div class="tm-card__body">
+            <!-- <div class="tm-card__top">
+              <span class="tm-sno">#{{ i + 1 }}</span>
+              <div class="tm-card__identity">
+                <div class="tm-card__name">
+                  <ng-container *ngFor="let participant of studio.participants; let last = last">{{
+                    mapProfile[participant] }}<span *ngIf="!last">, </span></ng-container>
+                </div>
+                <div class="tm-card__role">
+                  <ng-container *ngFor="let participant of studio.participants; let last = last">{{
+                    bigActivityMap[studio.participantsactivity[participant]].activity }}<span *ngIf="!last"> ·
+                    </span></ng-container>
+                </div>
+              </div>
+            </div> -->
+            <div class="tm-card__details">
+              <div class="tm-detail-row">
+                <span class="tm-detail-group__label">Activity</span>
+                <div class="tm-tag-list">
+                  <span class="tm-tag-activity">{{mapBigActivity[$any(activity).key]}}</span>
+                </div>
+              </div>
+              <!-- <div class="tm-detail-row">
+                <span class="tm-detail-group__label">Mandatory</span>
+                <div class="tm-tag-list">
+                  <span class="tm-tag-activity" *ngFor="let actId of studio['mandatoryactivities'] || []">{{
+                    bigActivityMap[actId].activity }}</span>
+                  <span class="tm-none" *ngIf="!(studio['mandatoryactivities'] || []).length">—</span>
+                </div>
+              </div> -->
+              <div class="tm-detail-row">
+                <!-- <span class="tm-detail-group__label">Stduio</span>
+                <button class="cd-mini-pill" [class.on]="studio.studioin"
+                (click)="toggleStudio(studio); $event.stopPropagation()"
+                [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
+                <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
+              </button> -->
+              <button mat-stroked-button (click)="openCohortDialog($any(event).key , $any(activity).key)" [disabled]="$any(activity).value">
+                <span *ngIf="!$any(activity).value">
+                  <mat-icon>add</mat-icon>
+                create cohort
+                </span>
+                <span *ngIf="$any(activity).value">
+                  Done
+                </span>
+              </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tm-footer">
+      <button class="tm-bassignRolestn tm-btn--cancel" (click)="closeCohortModel(false)">Cancel</button>
+      <!-- <button class="tm-btn tm-btn--proceed" (click)="closeCohortModel(true)">{{ textToShowInModel() ?'Done' : 'Procceed without cohort'}}</button> -->
+    </div>
+  </div>
+</ng-template>

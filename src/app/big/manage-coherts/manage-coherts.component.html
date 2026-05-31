@@ -95,6 +95,16 @@
         </div>
       </div>
 
+      <!-- Queue selection -->
+      <div class="form-group">
+        <label class="form-label">Select Queue</label>
+        <mat-select formControlName="queueref" class="form-select">
+          <mat-option *ngFor="let queue of queueList" [value]="queue.docid">
+            {{queue.queuename}}
+          </mat-option>
+        </mat-select>
+      </div>
+
       <!-- Level Selection -->
       <div class="form-group">
         <label class="form-label">Level</label>
