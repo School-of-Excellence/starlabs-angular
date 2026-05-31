@@ -304,7 +304,7 @@ export const routes: Routes = [
 
   {path: 'eventzonemanagement',loadComponent: () => import('./Zone Management/event-zone-management/event-zone-management.component').then(m => m.EventZoneManagementComponent), canActivate: [authGuard] },
 
-  {path: 'onewaytemplates',loadComponent: () => import('./OneWayAppCommunication/onewaytemplates/oneway-templates.component').then(m => m.OnewayTemplatesComponent), canActivate: [authGuard]},
+  {path: 'channel-templates',loadComponent: () => import('./Channel Communication/channeltemplates/channeltemplates.component').then(m => m.ChannelTemplatesComponent),canActivate: [authGuard]},
 
   // ai generated atc view screen
   {path: 'viewaigeneratedatc', loadComponent: () => import('./view-ai-generated-atc/view-ai-generated-atc.component').then(m => m.ViewAiGeneratedAtcComponent), canActivate: [authGuard]},
