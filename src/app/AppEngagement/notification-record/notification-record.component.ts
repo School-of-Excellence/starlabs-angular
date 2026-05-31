@@ -20,9 +20,11 @@ import { CallsRecordComponent } from "../calls-record/calls-record.component";
 import { WatiRecordComponent } from "../wati-record/wati-record.component";
 import { doc } from 'firebase/firestore';
 import { MatTooltip } from "@angular/material/tooltip";
+import { ChannelRecordComponent } from '../channel-record/channel-record.component';
 
 @Component({
   selector: 'app-notification-record',
+  standalone: true,
   imports: [
     CommonModule,
     MatInputModule,
@@ -39,7 +41,8 @@ import { MatTooltip } from "@angular/material/tooltip";
     EmailRecordComponent,
     CallsRecordComponent,
     WatiRecordComponent,
-    MatTooltip
+    MatTooltip,
+    ChannelRecordComponent
 ],
   templateUrl: './notification-record.component.html',
   styleUrl: './notification-record.component.css'

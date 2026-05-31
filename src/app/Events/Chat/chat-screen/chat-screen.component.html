@@ -25,7 +25,7 @@
     <!-- Group Status Tabs -->
     <div class="group-tabs">
       <button class="group-tab" [class.active]="selectedTabIndex === 0" (click)="onTabChange(0)">
-        <mat-icon>chat</mat-icon>
+        <mat-icon>group</mat-icon>
         <span>Active Groups</span>
         <span class="tab-count" *ngIf="filteredActiveChatList.length > 0">{{ filteredActiveChatList.length }}</span>
       </button>
@@ -33,6 +33,14 @@
         <mat-icon>archive</mat-icon>
         <span>Inactive Groups</span>
         <span class="tab-count" *ngIf="filteredInactiveChatList.length > 0">{{ filteredInactiveChatList.length }}</span>
+      </button>
+      <button class="group-tab" [class.active]="selectedTabIndex === 2" (click)="onTabChange(2)">
+        <mat-icon>group</mat-icon>
+        <span>Active Channels</span>
+        <span class="tab-count" *ngIf="activeChannelTotalCount > 0">{{ activeChannelTotalCount }}</span>      </button>
+      <button class="group-tab" [class.active]="selectedTabIndex === 3" (click)="onTabChange(3)">
+        <mat-icon>archive</mat-icon>
+        <span>Inactive Channels</span>
       </button>
     </div>
 
@@ -84,6 +92,13 @@
           </div>
         </div>
       </div>
+      <!-- load more -->
+      <div *ngIf="hasMoreActiveChannels" class="load-more-container">
+        <button mat-stroked-button (click)="loadMoreActiveChannels()" [disabled]="loadingMoreActiveChannels">
+          <mat-spinner *ngIf="loadingMoreActiveChannels" diameter="18" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          {{ loadingMoreActiveChannels ? 'Loading...' : 'Load More Channels' }}
+        </button>
+      </div>
 
       <!-- Empty State - Active -->
       <div *ngIf="filteredActiveChatList.length === 0 && !chatlistloading" class="empty-state">
@@ -132,6 +147,14 @@
         </div>
       </div>
 
+      <!-- Load More Inactive Channels -->
+      <div *ngIf="hasMoreInactiveChannels" class="load-more-container">
+        <button mat-stroked-button (click)="loadMoreInactiveChannels()" [disabled]="loadingMoreInactiveChannels">
+          <mat-spinner *ngIf="loadingMoreInactiveChannels" diameter="18" style="display:inline-block;margin-right:6px;"></mat-spinner>
+          {{ loadingMoreInactiveChannels ? 'Loading...' : 'Load More Channels' }}
+        </button>
+      </div>
+
       <!-- Empty State - Inactive -->
       <div *ngIf="filteredInactiveChatList.length === 0 && !chatlistloading" class="empty-state">
         <mat-icon>{{ searchQuery ? 'search_off' : 'archive' }}</mat-icon>
@@ -139,6 +162,87 @@
         <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">
           Clear Search
         </button>
+      </div>
+    </div>
+
+    <!-- Active Channels List -->
+    <div class="chat-list" *ngIf="!chatlistloading && selectedTabIndex === 2">
+      <div *ngFor="let chat of filteredActiveChannelList; trackBy: trackByMessageId"
+          class="chat-item channel-chat-item"
+          [class.selected]="selectedChat.docid === chat.docid"
+          [class.pinned]="chat.pinned"
+          (click)="selectChat(chat)">
+        <div class="chat-content">
+          <div class="chat-avatar channel-avatar" [matTooltip]="chat.chatname">
+            <img [src]="chat.chatprofile">
+            <div class="channel-badge"><mat-icon>campaign</mat-icon></div>
+            <div *ngIf="chat.hasUnreadMessages" class="unread-indicator">
+              <mat-icon>fiber_manual_record</mat-icon>
+            </div>
+          </div>
+          <div class="chat-info">
+            <div class="chat-header">
+              <h3 class="chat-name">{{ chat.chatname }}</h3>
+              <span class="chat-time">{{ formatChatTime(chat.time) }}</span>
+            </div>
+            <div class="chat-preview">
+              <span class="last-message" [innerHTML]="truncateMessage(chat.message)"></span>
+              <div class="chat-indicators">
+                <span *ngIf="chat.hasUnreadMessages" class="unread-count">{{ chat.pending.length }}</span>
+                <mat-icon *ngIf="chat.pinned" class="pinned-icon">push_pin</mat-icon>
+              </div>
+            </div>
+          </div>
+          <div class="pin-container">
+            <button mat-icon-button class="pin-button" [class.pinned]="chat.pinned"
+                    (click)="togglePinChat($event, chat)"
+                    matTooltip="{{ chat.pinned ? 'Unpin' : 'Pin' }}">
+              <mat-icon>push_pin</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="filteredActiveChannelList.length === 0 && !chatlistloading" class="empty-state">
+        <mat-icon>{{ searchQuery ? 'search_off' : 'campaign' }}</mat-icon>
+        <p>{{ searchQuery ? 'No active channels found' : 'No active channels' }}</p>
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">Clear Search</button>
+      </div>
+    </div>
+
+    <!-- Inactive Channels List -->
+    <div class="chat-list" *ngIf="!chatlistloading && selectedTabIndex === 3">
+      <div *ngFor="let chat of filteredInactiveChannelList; trackBy: trackByMessageId"
+          class="chat-item inactive-chat-item channel-chat-item"
+          [class.selected]="selectedChat.docid === chat.docid"
+          (click)="selectChat(chat)">
+        <div class="chat-content">
+          <div class="chat-avatar inactive channel-avatar" [matTooltip]="chat.chatname">
+            <img [src]="chat.chatprofile">
+            <div class="inactive-overlay"><mat-icon>archive</mat-icon></div>
+          </div>
+          <div class="chat-info">
+            <div class="chat-header">
+              <h3 class="chat-name">{{ chat.chatname }}</h3>
+              <span class="chat-time">{{ formatChatTime(chat.time) }}</span>
+            </div>
+            <div class="chat-preview">
+              <span class="last-message" [innerHTML]="truncateMessage(chat.message)"></span>
+              <span class="inactive-badge">Inactive</span>
+            </div>
+          </div>
+          <div class="pin-container" *ngIf="adminRole || chatAdmin">
+            <button mat-icon-button class="restore-button" (click)="restoreGroup($event, chat)" matTooltip="Restore Channel">
+              <mat-icon>restore</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="filteredInactiveChannelList.length === 0 && !chatlistloading" class="empty-state">
+        <mat-icon>{{ searchQuery ? 'search_off' : 'archive' }}</mat-icon>
+        <p>{{ searchQuery ? 'No inactive channels found' : 'No inactive channels' }}</p>
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">Clear Search</button>
       </div>
     </div>
   </div>
@@ -329,6 +433,15 @@
 
         <!-- Messages List with Date Grouping -->
         <div *ngIf="!messagesLoading" class="messages-list">
+          <!-- Load More Messages (channels only) -->
+        <div *ngIf="isChannelSelected && hasMoreMessages" class="channel-send-bar">
+          <mat-icon class="channel-send-bar-icon">history</mat-icon>
+          <button class="channel-send-cta" (click)="loadMoreChannelMessages()" [disabled]="loadingMoreMessages">
+            <mat-spinner *ngIf="loadingMoreMessages" diameter="16"></mat-spinner>
+            <mat-icon *ngIf="!loadingMoreMessages">expand_less</mat-icon>
+            {{ loadingMoreMessages ? 'Loading...' : 'Load More' }}
+          </button>
+        </div>
           <div *ngFor="let group of groupedMessages; trackBy: trackByGroupDate" class="message-group">
             <!-- Date Separator -->
             <div class="date-separator">
@@ -359,75 +472,144 @@
                     <b>{{mapProfileuid[message.sender_uid]['name']}}</b>
                   </p>
 
-                  <!-- Message Actions Menu - hidden in inactive chats except for copy & receipts -->
-                  <div *ngIf="!selectionMode" class="message-actions">
-                    <button mat-icon-button [matMenuTriggerFor]="messageMenu" class="message-menu-trigger">
-                      <mat-icon>more_vert</mat-icon>
-                    </button>
-                    <mat-menu #messageMenu="matMenu">
-                      <button mat-menu-item (click)="copyMessage(message)">
-                        <mat-icon>content_copy</mat-icon>
-                        <span class="montserratfont">Copy</span>
-                      </button>
-                      <button *ngIf="message.isMyMessage" mat-menu-item (click)="showReadReceiptsModal(message)">
-                        <mat-icon>visibility</mat-icon>
-                        <span class="montserratfont">Read / Un-Read</span>
-                      </button>
-                      <button *ngIf="message.isMyMessage && !isInactiveChatSelected" mat-menu-item
-                        (click)="deleteSingleMessage(message)" class="delete-option">
-                        <mat-icon>delete</mat-icon>
-                        <span class="montserratfont">Delete</span>
-                      </button>
-                      <button mat-menu-item *ngIf="!isInactiveChatSelected"
-                        (click)="enterSelectionMode(); toggleMessageSelection(message)">
-                        <mat-icon>checklist</mat-icon>
-                        <span class="montserratfont">Select</span>
-                      </button>
-                      <button mat-menu-item *ngIf="adminRole && !isInactiveChatSelected" (click)="pinMessage(message)">
-                        <mat-icon>push_pin</mat-icon>
-                        <span class="montserratfont">{{message.pinned ? 'UNPIN' : 'PIN'}}</span>
-                      </button>
-                    </mat-menu>
-                  </div>
+                  <!-- Message Actions Menu -->
+<div *ngIf="!selectionMode" class="message-actions">
+  <button mat-icon-button [matMenuTriggerFor]="messageMenu" class="message-menu-trigger">
+    <mat-icon>more_vert</mat-icon>
+  </button>
+  <mat-menu #messageMenu="matMenu">
+    <button mat-menu-item (click)="copyMessage(message)">
+      <mat-icon>content_copy</mat-icon>
+      <span class="montserratfont">Copy</span>
+    </button>
+    <button *ngIf="message.isMyMessage" mat-menu-item (click)="showReadReceiptsModal(message)">
+      <mat-icon>visibility</mat-icon>
+      <span class="montserratfont">Read / Un-Read</span>
+    </button>
+    <button *ngIf="message.isMyMessage && !isInactiveChatSelected" mat-menu-item
+      (click)="deleteSingleMessage(message)" class="delete-option">
+      <mat-icon>delete</mat-icon>
+      <span class="montserratfont">Delete</span>
+    </button>
+    <button mat-menu-item *ngIf="!isInactiveChatSelected"
+      (click)="enterSelectionMode(); toggleMessageSelection(message)">
+      <mat-icon>checklist</mat-icon>
+      <span class="montserratfont">Select</span>
+    </button>
+    <button mat-menu-item *ngIf="adminRole && !isInactiveChatSelected" (click)="pinMessage(message)">
+      <mat-icon>push_pin</mat-icon>
+      <span class="montserratfont">{{message.pinned ? 'UNPIN' : 'PIN'}}</span>
+    </button>
+  </mat-menu>
+</div>
 
-                  <!-- Message Content -->
-                  <div *ngIf="message.message" class="message-text"
-                    [innerHTML]="message.message | enhancedMessage:mapProfileuid:message.sender_uid:mapProfileuid | linebreaks | link">
-                  </div>
+<!-- Channel: render htmlbody directly -->
+<!-- Channel: full message card -->
+<ng-container *ngIf="isChannelSelected">
 
-                  <!-- Files -->
-                  <div *ngIf="message.files && message.files.length > 0" class="message-files">
-                    <div *ngFor="let file of message.files" class="file-attachment" (click)="openImage(file)">
-                      <div class="file-info">
-                        <mat-icon class="file-icon">{{ getFileIcon(file.filetype) }}</mat-icon>
-                        <div class="file-details">
-                          <span class="file-name">{{ file.filename }}</span>
-                          <span class="file-type">{{ file.filetype }}</span>
-                        </div>
-                      </div>
-                      <button mat-icon-button class="download-btn" matTooltip="Download"
-                        (click)="$event.stopPropagation()">
-                        <mat-icon>download</mat-icon>
-                      </button>
-                    </div>
+  <!-- Header: image or video -->
+  <div class="channel-header-media" *ngIf="message.headertype && message.headervalue">
+    <img *ngIf="message.headertype === 'image'"
+         [src]="message.headervalue"
+         class="channel-header-image"
+         alt="Header image">
+    <video *ngIf="message.headertype === 'video'"
+           [src]="message.headervalue"
+           class="channel-header-video"
+           controls
+           preload="metadata">
+    </video>
+  </div>
 
-                    <!-- Image Previews -->
-                    <div *ngFor="let file of message.files" class="image-preview">
-                      <img *ngIf="file.filetype.startsWith('image/')" [src]="file.fileurl" (click)="openImage(file)"
-                        loading="lazy" class="message-image">
-                    </div>
-                  </div>
+  <!-- HTML Body -->
+  <div *ngIf="message.htmlbody"
+       class="message-text channel-html-body"
+       [innerHTML]="message.htmlbody">
+  </div>
 
-                  <!-- Message Footer -->
-                  <div class="message-footer">
-                    <span class="message-time">{{ formatTime(message.time) }}</span>
-                    <div *ngIf="message.isMyMessage" class="read-status">
-                      <mat-icon [class.read-all]="!hasUnreadUsers(message)"
-                        [class.read-partial]="hasUnreadUsers(message)" matTooltip="{{ getMessageReadStatus(message) }}">
-                        {{ hasUnreadUsers(message) ? 'done' : 'done_all' }}
-                      </mat-icon>
-                    </div>
-                  </div>
+  <!-- Attached Files (PDFs, docs, etc.) -->
+  <div class="channel-files-section" *ngIf="message.files && message.files.length > 0">
+    <div *ngFor="let file of message.files" class="channel-file-card"
+         (click)="openChannelFile(file)">
+      <div class="channel-file-icon-wrap">
+        <mat-icon class="channel-file-icon">{{ getChannelFileIcon(file.url || file.name) }}</mat-icon>
+      </div>
+      <div class="channel-file-info">
+        <span class="channel-file-name">{{ file.name }}</span>
+        <span class="channel-file-type">{{ getChannelFileExt(file.name) }}</span>
+      </div>
+      <mat-icon class="channel-file-open-icon">open_in_new</mat-icon>
+    </div>
+  </div>
+
+  <!-- Links -->
+  <div class="channel-links-section" *ngIf="message.links && message.links.length > 0">
+    <a *ngFor="let link of message.links"
+       [href]="link.url"
+       target="_blank"
+       class="channel-link-chip">
+      <mat-icon class="channel-link-icon">link</mat-icon>
+      <span>{{ link.label || link.url }}</span>
+      <mat-icon class="channel-link-ext">open_in_new</mat-icon>
+    </a>
+  </div>
+
+  <!-- Footer -->
+  <div class="channel-footer-text" *ngIf="message.footer">
+    {{ message.footer }}
+  </div>
+
+</ng-container>
+
+<!-- Group: use existing pipes -->
+<div *ngIf="!isChannelSelected && message.message"
+    class="message-text"
+    [innerHTML]="message.message | enhancedMessage:mapProfileuid:message.sender_uid:mapProfileuid | linebreaks | link">
+</div>
+
+<!-- Files -->
+<div *ngIf="!isChannelSelected && message.files && message.files.length > 0" class="message-files">
+  <div *ngFor="let file of message.files" class="file-attachment" (click)="openImage(file)">
+    <div class="file-info">
+      <mat-icon class="file-icon">{{ getFileIcon(file.filetype) }}</mat-icon>
+      <div class="file-details">
+        <span class="file-name">{{ file.filename }}</span>
+        <span class="file-type">{{ file.filetype }}</span>
+      </div>
+    </div>
+    <button mat-icon-button class="download-btn" matTooltip="Download"
+      (click)="$event.stopPropagation()">
+      <mat-icon>download</mat-icon>
+    </button>
+  </div>
+  <div *ngFor="let file of message.files" class="image-preview">
+    <img *ngIf="file?.filetype?.startsWith('image/')" [src]="file?.fileurl" (click)="openImage(file)"
+      loading="lazy" class="message-image">
+  </div>
+</div>
+
+<!-- Message Footer -->
+<div class="message-footer">
+  <span class="message-time">{{ formatTime(message.time) }}</span>
+  <div *ngIf="message.isMyMessage && !isChannelSelected" class="read-status">
+    <mat-icon [class.read-all]="!hasUnreadUsers(message)"
+      [class.read-partial]="hasUnreadUsers(message)" matTooltip="{{ getMessageReadStatus(message) }}">
+      {{ hasUnreadUsers(message) ? 'done' : 'done_all' }}
+    </mat-icon>
+  </div>
+</div>
+
+<!-- Channel participant count button — only for channel messages -->
+<div *ngIf="isChannelSelected" class="channel-participant-btn-wrap">
+  <button class="channel-participant-btn"
+          (click)="$event.stopPropagation(); openChannelParticipants(message)"
+          [matTooltip]="getReadCount(message) + ' / ' + getTotalParticipantsCount(message) + ' seen'">
+    <mat-icon class="participant-icon">people</mat-icon>
+    <span class="participant-count-label">
+       {{ getTotalParticipantsCount(message) }}
+    </span>
+  </button>
+</div>
                 </div>
               </div>
             </div>
@@ -476,37 +658,40 @@
         </div>
       </div>
 
-      <!-- Message Input - HIDDEN for inactive chats -->
-      <div *ngIf="!isInactiveChatSelected" class="message-input-area" [class.drag-over]="dragOver"
-        (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+      <!-- one-way sent button-->
+      <div *ngIf="isChannelSelected && !isInactiveChatSelected" class="channel-send-bar">
+        <mat-icon class="channel-send-bar-icon">campaign</mat-icon>
+        <span class="channel-send-bar-label">This is a one-way communication channel</span>
+        <button class="channel-send-cta" (click)="openChannelSendDialog()">
+          <mat-icon>send</mat-icon>
+          Send
+        </button>
+      </div>
 
-        <!-- Drag & Drop Overlay -->
+      <div *ngIf="!isChannelSelected && !isInactiveChatSelected" class="message-input-area"
+          [class.drag-over]="dragOver"
+          (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+
         <div *ngIf="dragOver" class="drag-overlay">
           <mat-icon>cloud_upload</mat-icon>
           <p>Drop files here to attach</p>
         </div>
 
-        <div style="position: relative;width: 25vw;">
-          <!-- Mentions popup -->
+        <div style="position: relative; width: 25vw;">
           <div *ngIf="showMentionsList && filteredMembers.length > 0" class="mentions-popup">
             <div *ngFor="let member of filteredMembers" class="mention-user-item" #mentionItem
-              (mousedown)="$event.preventDefault(); selectMention(member)" style="display: flex; align-items: center; padding: 8px 12px; 
-                        cursor: pointer; 
-                        border-radius: 4px; 
-                        transition: background-color 0.15s ease;"
+              (mousedown)="$event.preventDefault(); selectMention(member)"
+              style="display:flex;align-items:center;padding:8px 12px;cursor:pointer;border-radius:4px;transition:background-color 0.15s ease;"
               (mouseenter)="mentionItem.style.backgroundColor='#f8f8f8'"
               (mouseleave)="mentionItem.style.backgroundColor='transparent'">
-
-              <div style="display: flex; flex-direction: row; align-items: center; width: 100%;">
-                <div *ngIf="member.profile" style="margin-right: 12px; flex-shrink: 0;">
-                  <img style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" [src]="member.profile"
-                    [alt]="member.name">
+              <div style="display:flex;flex-direction:row;align-items:center;width:100%;">
+                <div *ngIf="member.profile" style="margin-right:12px;flex-shrink:0;">
+                  <img style="width:32px;height:32px;border-radius:50%;object-fit:cover;"
+                      [src]="member.profile" [alt]="member.name">
                 </div>
-
                 <div class="mention-user-icon" *ngIf="!member.profile">
-                  <mat-icon style="font-size: 18px; width: 18px; height: 18px;">person</mat-icon>
+                  <mat-icon style="font-size:18px;width:18px;height:18px;">person</mat-icon>
                 </div>
-
                 <span class="mention-user-name">{{ member.name }}</span>
               </div>
             </div>
@@ -514,18 +699,14 @@
         </div>
 
         <div class="input-container">
-          <!-- Hidden File Input -->
-          <input #fileInput type="file" multiple style="display: none" (change)="onFileSelected($event)"
+          <input #fileInput type="file" multiple style="display:none" (change)="onFileSelected($event)"
             accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z">
 
-          <!-- Message Input Field -->
           <mat-form-field class="message-input" appearance="outline">
             <textarea matInput #messageInput [(ngModel)]="newMessage" placeholder="Type a message..." rows="4"
-              (input)="onMessageInputChange($event)" (keydown)="onKeyPress($event)">
-                      </textarea>
+              (input)="onMessageInputChange($event)" (keydown)="onKeyPress($event)"></textarea>
           </mat-form-field>
 
-          <!-- Attach Button -->
           <button mat-icon-button [matMenuTriggerFor]="attachMenu" matTooltip="Attach File" class="attach-btn">
             <mat-icon>attach_file</mat-icon>
           </button>
@@ -536,14 +717,19 @@
             </button>
           </mat-menu>
 
-          <!-- Send Button -->
           <button mat-fab color="primary" class="send-button"
-            [disabled]="(!newMessage.trim() && attachedFiles.length === 0) || uploadingFiles" (click)="sendMessage()"
-            matTooltip="Send Message">
+            [disabled]="(!newMessage.trim() && attachedFiles.length === 0) || uploadingFiles"
+            (click)="sendMessage()" matTooltip="Send Message">
             <mat-spinner *ngIf="uploadingFiles" diameter="24"></mat-spinner>
             <mat-icon *ngIf="!uploadingFiles">send</mat-icon>
           </button>
         </div>
+      </div>
+
+      <!-- message diable for inactive channel-->
+      <div *ngIf="isInactiveChatSelected" class="inactive-footer">
+        <mat-icon>lock</mat-icon>
+        <span>Messaging is disabled for inactive groups</span>
       </div>
 
       <!-- Read-only footer for inactive chats -->
@@ -603,4 +789,223 @@
       </div>
     </div>
   </div>
+  <!-- participant side panel -->
+  <div *ngIf="showChannelParticipants && isChannelSelected"
+    class="channel-participants-panel"
+    (click)="$event.stopPropagation()">
+
+  <div class="participants-panel-header">
+    <div class="participants-panel-title">
+      <mat-icon>people</mat-icon>
+      <span>Participants</span>
+      <span class="participants-total-badge">{{ getTotalParticipantsCount(selectedMessageForParticipants) }}</span>
+    </div>
+    <button mat-icon-button (click)="closeChannelParticipants()" matTooltip="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="pp-tab-strip" *ngIf="selectedMessageForParticipants">
+    <button class="pp-tab" [class.pp-tab-active]="participantTab === 'sent'"
+            (click)="participantTab = 'sent'">
+      <mat-icon class="pp-tab-icon sent-icon">check_circle</mat-icon>
+      <span>Sent</span>
+      <span class="pp-tab-badge pp-badge-seen">
+        {{ getChannelSentMessages(selectedMessageForParticipants).length }}
+      </span>
+    </button>
+    <button class="pp-tab" [class.pp-tab-active]="participantTab === 'seen'"
+            (click)="participantTab = 'seen'">
+      <mat-icon class="pp-tab-icon seen-icon">check_circle</mat-icon>
+      <span>Seen</span>
+      <span class="pp-tab-badge pp-badge-seen">
+        {{ getChannelReadByUsers(selectedMessageForParticipants).length }}
+      </span>
+    </button>
+    <button class="pp-tab" [class.pp-tab-active]="participantTab === 'unseen'"
+            (click)="participantTab = 'unseen'">
+      <mat-icon class="pp-tab-icon unseen-icon">cancel</mat-icon>
+      <span>Not Seen</span>
+      <span class="pp-tab-badge pp-badge-unseen">
+        {{ getChannelPendingUsers(selectedMessageForParticipants).length }}
+      </span>
+    </button>
+  </div>
+
+  <div class="participants-panel-body" *ngIf="selectedMessageForParticipants">
+    <!-- SENT LIST -->
+     <ng-container *ngIf="participantTab === 'sent'">
+      <div *ngFor="let profile of getChannelSentMessages(selectedMessageForParticipants)"
+           class="participant-card seen-card">
+        <div class="participant-card-info">
+          <span class="participant-card-name">{{ profile?.name || 'Unknown' }}</span>
+          <span class="participant-card-email">{{ profile?.email || '—' }}</span>
+        </div>
+        <mat-icon class="participant-status-icon seen-status">check_circle</mat-icon>
+      </div>
+      <div *ngIf="getChannelSentMessages(selectedMessageForParticipants).length === 0"
+           class="participants-empty">
+        <mat-icon>visibility_off</mat-icon>
+        <p>No one has seen this yet</p>
+      </div>
+    </ng-container>
+    <!-- SEEN LIST -->
+    <ng-container *ngIf="participantTab === 'seen'">
+      <div *ngFor="let profile of getChannelReadByUsers(selectedMessageForParticipants)"
+           class="participant-card seen-card">
+        <div class="participant-card-info">
+          <span class="participant-card-name">{{ profile?.name || 'Unknown' }}</span>
+          <span class="participant-card-email">{{ profile?.email || '—' }}</span>
+        </div>
+        <mat-icon class="participant-status-icon seen-status">check_circle</mat-icon>
+      </div>
+      <div *ngIf="getChannelReadByUsers(selectedMessageForParticipants).length === 0"
+           class="participants-empty">
+        <mat-icon>visibility_off</mat-icon>
+        <p>No one has seen this yet</p>
+      </div>
+    </ng-container>
+
+    <!-- UNSEEN LIST -->
+    <ng-container *ngIf="participantTab === 'unseen'">
+      <div *ngFor="let profile of getChannelPendingUsers(selectedMessageForParticipants)"
+           class="participant-card unseen-card">
+        <div class="participant-card-info">
+          <span class="participant-card-name">{{ profile?.name || 'Unknown' }}</span>
+          <span class="participant-card-email">{{ profile?.email || '—' }}</span>
+        </div>
+        <mat-icon class="participant-status-icon unseen-status">cancel</mat-icon>
+      </div>
+      <div *ngIf="getChannelPendingUsers(selectedMessageForParticipants).length === 0"
+           class="participants-empty">
+        <mat-icon>done_all</mat-icon>
+        <p>Everyone has seen this</p>
+      </div>
+    </ng-container>
+
+  </div>
+</div>
+
+<!-- dialog box -->
+<div *ngIf="showChannelSendDialog" class="csd-overlay" (click)="closeChannelSendDialog()">
+  <div class="csd-modal" (click)="$event.stopPropagation()">
+
+    <div class="csd-header">
+      <div class="csd-header-title">
+        <mat-icon>campaign</mat-icon>
+        <span>Send One-Way Communication</span>
+      </div>
+      <button mat-icon-button (click)="closeChannelSendDialog()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="csd-toolbar">
+      <button class="csd-import-btn" (click)="handleChannelImportClick()">
+        <mat-icon>upload_file</mat-icon>
+        Import
+      </button>
+      <input #channelImportInput type="file" style="display:none"
+            accept=".xls,.xlsx" (change)="onChannelImportChange($event)">
+    </div>
+
+    <!-- EXACT same as reference page - no extra attributes -->
+   <div class="csd-dropdown-wrap" (click)="$event.stopPropagation()">
+  <div class="csd-custom-select">
+
+    <!-- Trigger -->
+    <div class="csd-trigger" (click)="csdOpen ? closeCsd() : openCsd()">
+      <span class="csd-trigger-label">{{ getParticipantTriggerText() }}</span>
+      <mat-icon>{{ csdOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </div>
+
+    <!-- Panel — lives inside dialog DOM, no CDK portal -->
+    <div class="csd-panel" *ngIf="csdOpen">
+
+      <div class="csd-search-row">
+        <mat-icon>search</mat-icon>
+        <input class="csd-search-input"
+               type="text"
+               placeholder="Search participants..."
+               [(ngModel)]="csdQuery"
+               (ngModelChange)="filterCsdOptions()"
+               (click)="$event.stopPropagation()">
+        <button class="csd-clear-x" *ngIf="csdQuery"
+                (click)="csdQuery=''; filterCsdOptions(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="csd-options">
+        <div class="csd-option"
+             *ngFor="let p of csdOptions"
+             [class.csd-checked]="selectedChannelParticipantIds.has(p.profileDocId)"
+             (click)="toggleChannelParticipant(p); $event.stopPropagation()">
+          <mat-icon class="csd-chk-icon">
+            {{ selectedChannelParticipantIds.has(p.profileDocId) ? 'check_box' : 'check_box_outline_blank' }}
+          </mat-icon>
+          <span>{{ p.name }}</span>
+        </div>
+        <div class="csd-no-results" *ngIf="csdOptions.length === 0">
+          No participant found
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+    <div class="csd-list-header" *ngIf="selectedParticipantsModel.length > 0">
+      <span class="csd-selected-count">
+        {{ selectedParticipantsModel.length }} participant(s) selected
+      </span>
+      <button mat-button class="csd-clear-btn" (click)="clearSelectedParticipants()">
+        Clear all
+      </button>
+    </div>
+
+    <div *ngIf="selectedChannelParticipantsList.length > 0" class="csd-selected-section">
+      <div class="csd-selected-title">
+        <mat-icon>checklist</mat-icon>
+        Selected Participants ({{ selectedChannelParticipantsList.length }})
+      </div>
+      <div class="csd-selected-table-wrap">
+        <table class="csd-selected-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of selectedChannelParticipantsList; let i = index">
+              <td class="csd-num">{{ i + 1 }}</td>
+              <td>{{ p.name }}</td>
+              <td class="csd-email">{{ p.email || '—' }}</td>
+              <td>
+                <button mat-icon-button class="csd-remove-btn"
+                        (click)="toggleChannelParticipant(p)"
+                        matTooltip="Remove">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="csd-footer">
+      <button class="csd-cancel-btn" (click)="closeChannelSendDialog()">Cancel</button>
+      <button class="csd-proceed-btn"
+              [disabled]="selectedChannelParticipantsList.length === 0"
+              (click)="proceedChannelCommunication()">
+        <mat-icon>send</mat-icon>
+        Proceed ({{ selectedChannelParticipantsList.length }})
+      </button>
+    </div>
+  </div>
+</div>
 </div>
