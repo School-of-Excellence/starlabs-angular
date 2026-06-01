@@ -392,8 +392,8 @@ export class CohortManagementComponent {
     return palette[Math.abs(h) % palette.length]
   }
 
-  isParticipantLive(participantId: string): boolean {
-    return !!(this.mapLiveParticipants && this.mapLiveParticipants[participantId])
+  isParticipantLive(queueId : string , participantId: string): boolean {
+    return !!(this.mapLiveParticipants && this.mapLiveParticipants[queueId] && this.mapLiveParticipants[queueId][participantId])
   }
 
   isCohortOverCapacity(cohort: any): boolean {
@@ -694,7 +694,7 @@ export class CohortManagementComponent {
 
   // Live Assignment data for participant status
   liveAssignmentList: any[] = []
-  mapLiveParticipants: { [key: string]: boolean } = {}
+  mapLiveParticipants: { [key: string]: {[key: string]:boolean } } = {}
 
   // Queue
   queueSearchQuery: string = ''
@@ -1109,7 +1109,10 @@ export class CohortManagementComponent {
       const participants = studio.participants || [];
       const liveAssignment = this.mapLiveAssignmentByStudio[studioId];
       const isLive = !!liveAssignment;
+      const queueId = studio['queueref']?.id;
 
+      if([null , undefined , ''].includes(queueId)) return
+      this.mapLiveParticipants[queueId] = this.mapLiveParticipants[queueId] ?? {};
       participants.forEach((participantId: string) => {
         if (!this.mapParticipantStudios[participantId]) {
           this.mapParticipantStudios[participantId] = [];
@@ -1125,7 +1128,8 @@ export class CohortManagementComponent {
         });
 
         if (isLive) {
-          this.mapLiveParticipants[participantId] = true;
+          this.mapLiveParticipants[queueId][participantId] = true;
+          // this.mapLiveParticipants[participantId] = true;
         }
       });
     });
@@ -1135,19 +1139,22 @@ export class CohortManagementComponent {
         ...(assignment['pairing'] || []),
         ...(assignment['bonusactivityparticipant'] || [])
       ];
-
+      const queueId = assignment['queueid'];
       allParticipants.forEach((pid: string) => {
-        this.mapLiveParticipants[pid] = true;
+        this.mapLiveParticipants[queueId][pid] = true;
       });
     });
   }
 
-  isParticipantInStudio(participantId: string): boolean {
-    return this.mapLiveParticipants[participantId] === true;
+  isParticipantInStudio(queueId : string , participantId: string): boolean {
+    if(this.mapLiveParticipants[queueId]){
+      return this.mapLiveParticipants[queueId][participantId] === true;
+    }
+    return false;
   }
 
-  getParticipantStatus(participantId: string): string {
-    return this.isParticipantInStudio(participantId) ? 'Live' : 'Idle';
+  getParticipantStatus(queueId : string , participantId: string): string {
+    return this.isParticipantInStudio(queueId, participantId) ? 'Live' : 'Idle';
   }
 
   getParticipantLiveStudioCount(participantId: string): number {
@@ -1192,12 +1199,14 @@ export class CohortManagementComponent {
 
   getIdleCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
-    return participants.filter((pid: string) => !this.isParticipantInStudio(pid)).length;
+    const queueId = cohort['queueref']?.id;
+    return participants.filter((pid: string) => !this.isParticipantInStudio(queueId , pid)).length;
   }
 
   getInStudioCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
-    return participants.filter((pid: string) => this.isParticipantInStudio(pid)).length;
+    const queueId = cohort['queueref']?.id;
+    return participants.filter((pid: string) => this.isParticipantInStudio(queueId , pid)).length;
   }
 
   getCohortStudioStats(cohort: any): {
@@ -2448,17 +2457,17 @@ export class CohortManagementComponent {
    * Reuses all already-loaded maps (mapProfile, bigActivityMap, mapMarathon, etc.)
    * so auth and Firestore aren't re-fetched.
    */
-  async openCohortStudio(cohorts: any, $event?: Event) {
+  async openCohortStudio(cohorts: any, $event?: Event , viewType ?: string) {
     if ($event) { $event.preventDefault(); $event.stopPropagation(); }
     if (!cohorts) return;
 
     const queues = this.searchableQueueList.filter((queue)=>{
       const eventId = queue['eventid'];
       console.log(eventId , cohorts['docid'] )
-      return cohorts['eventref']?.id === eventId;
+      return eventId?.includes(cohorts['eventref']?.id);
     })
     const { CohortDetailComponent } = await import('../cohort-detail/cohort-detail.component');
-    this.dialog.open(CohortDetailComponent, {
+    const dialogRef = this.dialog.open(CohortDetailComponent, {
       width: '100vw',
       maxWidth: '100vw',
       height: '100vh',
@@ -2467,6 +2476,7 @@ export class CohortManagementComponent {
       hasBackdrop: false,
       autoFocus: false,
       data: {
+        viewType : viewType,
         cohort: cohorts,
         cohortId: cohorts['docid'],
         cohortName: cohorts['name'] || '',
@@ -2492,6 +2502,20 @@ export class CohortManagementComponent {
         eventParticipationList: this.eventParticipationList,
       },
     });
+
+    dialogRef.afterClosed().subscribe((result)=>{
+      if (result) {
+        getDocs(collection(this.firestore, "big cohorts")).then(snap => {
+          this.cohortsList = snap.docs.map(e => {
+            let element: any = e.data()
+            element['contentview'] = 'participants'
+            return element
+          })
+          this.toRunFilterFunctions()
+        })
+      }
+    })
+
   }
 
   openCohortDialog(type: string, cohortDoc: any) {
@@ -2668,6 +2692,7 @@ export class CohortManagementComponent {
 
     this.filteredCohortsList.forEach(cohort => {
       const participants = cohort['participantidlist'] || [];
+      const queueId = cohort['queueref']?.id;
 
       if (participants.length === 0) {
         exportData.push({
@@ -2704,7 +2729,7 @@ export class CohortManagementComponent {
             'Marathon': index === 0 ? this.mapMarathon[cohort['marathonref']?.id]?.['title'] || '' : '',
             'Total Participants': index === 0 ? participants.length : '',
             'Participant Name': this.mapProfile[participantId] || participantId,
-            'Participant Status': this.isParticipantInStudio(participantId) ? 'In Studio' : 'Idle',
+            'Participant Status': this.isParticipantInStudio(queueId , participantId) ? 'In Studio' : 'Idle',
             'Studios In': studioInList.length,
             'Checked In': checkedInCount,
             'Live Assignments': liveAssignmentStats.live,
@@ -2754,6 +2779,11 @@ export class CohortManagementComponent {
       }
     });
 
+    const totalParticipantsWithStudio = Object.values(this.mapLiveParticipants).map(Object.keys);
+    const nonDuplicates = new Set()
+    totalParticipantsWithStudio.forEach((id)=>{
+      nonDuplicates.add(id)
+    })
     const summaryData = [
       { 'Metric': 'Total Cohorts', 'Value': this.filteredCohortsList.length },
       { 'Metric': 'Total Participants', 'Value': this.totalParticipantsInCohorts.length },
@@ -2765,7 +2795,7 @@ export class CohortManagementComponent {
       { 'Metric': 'Event Cohorts', 'Value': this.filteredCohortsList.filter(c => c['eventref']).length },
       { 'Metric': 'General Cohorts', 'Value': this.filteredCohortsList.filter(c => !c['eventref']).length },
       { 'Metric': 'Temporary Cohorts', 'Value': this.filteredCohortsList.filter(c => c['isTemporary']).length },
-      { 'Metric': 'Participants In Studio', 'Value': Object.keys(this.mapLiveParticipants).length },
+      { 'Metric': 'Participants In Studio', 'Value': nonDuplicates.size },
       { 'Metric': 'Export Date', 'Value': new Date().toLocaleString() }
     ];
 

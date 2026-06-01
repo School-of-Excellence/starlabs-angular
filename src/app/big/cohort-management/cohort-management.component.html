@@ -15,7 +15,7 @@
     <div class="topbar-brand">
       <div class="brand-logo">C</div>
       <div class="brand-text">
-        <div class="brand-sub">COHORT OPS</div>
+        <div class="brand-sub">COHORT</div>
         <div class="brand-name">Management</div>
       </div>
     </div>
@@ -329,14 +329,14 @@
             (dragover)="onCohortDragOver($event, cohorts)"
             (dragleave)="onCohortDragLeave($event, cohorts)"
             (drop)="onCohortDrop($event, cohorts)"
-            (click)="onCardClick($event, cohorts)"
+            (click)="openCohortStudio(cohorts, $event , 'participants');"
             *ngFor="let cohorts of groupedCohorts[groupKey]">
             <div class="card-top">
               <span class="card-check select-overlay" *ngIf="selectMode" (click)="toggleCohortSelected(cohorts['docid']); $event.stopPropagation()" title="Select cohort">
                 <mat-icon>{{isCohortSelected(cohorts['docid']) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
               </span>
               <span class="card-name" (click)="onEditCohort(cohorts); $event.stopPropagation()" title="Click to edit cohort">{{cohorts['name']}}</span>
-              <button class="card-open-btn" (click)="openCohortStudio(cohorts, $event)" title="Open studio view">
+              <button class="card-open-btn" title="Open studio view">
                 <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12"/>
                   <polyline points="12 5 19 12 12 19"/>
@@ -372,7 +372,7 @@
             </div>
             <div class="card-stats"
               [class]="(modeView === 'floor' || selectedQueueEvent.length > 0) && cohorts['cohortCategory'] == 'studio' ? 'cols-5' : 'cols-2'">
-              <div class="stat">
+              <div class="stat" (click)="openCohortStudio(cohorts, $event , 'participants');">
                 <div class="stat-val">
                   <span *ngIf="!participantSearchQuery" class="stat-val">{{cohorts['participantidlist']?.length
                     || 0}}</span>
@@ -382,12 +382,12 @@
                 </div>
                 <div class="stat-key">PARTICIPANTS</div>
               </div>
-              <div class="stat">
+              <div class="stat" (click)="openCohortStudio(cohorts, $event , 'activities');">
                 <div class="stat-val">{{getActivitiesCount(cohorts['docid'])}}</div>
                 <div class="stat-key">ACTIVITIES</div>
               </div>
               <ng-container *ngIf="(modeView === 'floor' || selectedQueueEvent.length > 0) && cohorts['cohortCategory'] == 'studio'">
-                <div class="stat">
+                <div class="stat" (click)="openCohortStudio(cohorts, $event , 'studios');">
                   <div class="stat-val" [class.warn]="(cohorts['participantidlist']?.length || 0) > getCohortTotalStudiosCount(cohorts)">
                     {{cohorts['participantidlist']?.length || 0}}/{{getCohortTotalStudiosCount(cohorts)}}
                   </div>
@@ -492,7 +492,7 @@
                       {{getAvatar(mapProfile[participant] || participant) | uppercase}}
                     </div>
                     <span class="cp-name">{{mapProfile[participant] || participant}}</span>
-                    <span class="active-dot" *ngIf="isParticipantLive(participant)"></span>
+                    <span class="active-dot" *ngIf="isParticipantLive(cohorts['queueref']?.id,participant)"></span>
                   </div>
                   <div class="cp-more"
                     *ngIf="getFilteredParticipants(cohorts['participantidlist']).length > 5"
@@ -721,7 +721,7 @@
   </div><!-- /main-content -->
 
   <!-- ─── BOTTOM STATUS BAR ─── -->
-  <div class="status-bar" *ngIf="!loading">
+  <!-- <div class="status-bar" *ngIf="!loading">
     <span class="status-icon"><mat-icon>group</mat-icon></span>
     <span class="status-label">QUEUE DEMAND</span>
     <span class="status-total">{{getStatusTotal()}} total</span>
@@ -733,7 +733,7 @@
     <span class="status-spacer"></span>
     <span class="status-updated">updated {{statusUpdatedAgo}}</span>
     <button class="icon-btn" (click)="refreshStatus()" title="Refresh"><mat-icon>refresh</mat-icon></button>
-  </div>
+  </div> -->
 
   <div class="selectbar" *ngIf="selectMode">
     <div class="sb-main-row">

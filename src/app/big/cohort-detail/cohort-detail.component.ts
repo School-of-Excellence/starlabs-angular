@@ -14,7 +14,13 @@ import { Subject, Subscription, takeUntil } from 'rxjs';
 import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc, collectionData, getDoc, writeBatch, serverTimestamp } from '@angular/fire/firestore';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-
+import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
+import { environment } from '../../../environments/environment.development';
+import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
+import { Storage,ref,uploadBytes,getDownloadURL } from '@angular/fire/storage';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 interface ParticipantRow {
   id: string;
@@ -44,8 +50,9 @@ interface ParticipantRow {
   styleUrl: './cohort-detail.component.css',
 })
 export class CohortDetailComponent implements OnDestroy {
-  @ViewChild('duplicateStudiosModel') duplicateStudiosModel : TemplateRef<ElementRef>;
-  loggedinProfileRoles = {}
+  @ViewChild('duplicateStudiosModel')
+  duplicateStudiosModel: TemplateRef<ElementRef>;
+  loggedinProfileRoles = {};
   cohort: any = null;
   cohortId: string | null = null;
   cohortName: string = '';
@@ -75,8 +82,10 @@ export class CohortDetailComponent implements OnDestroy {
   selectCombination = false;
   selectedCombination = null;
   newStudioPairing = [];
-  duplicatedStudios: any  | null= {};
-  duplicateModelRef !: MatDialogRef<any>
+  duplicatedStudios: any | null = {};
+  duplicateModelRef!: MatDialogRef<any>;
+  selectMode = false;
+  selectedParticipantIds = new Set();
 
   // Maps (preferably passed in from cohort-management; only loaded if missing)
   mapProfile: { [id: string]: string } = {};
@@ -96,7 +105,7 @@ export class CohortDetailComponent implements OnDestroy {
   mapLiveAssignmentByStudio: { [studioId: string]: any } = {};
   studioPairingList: any[] = [];
   liveAssignmentList: any[] = [];
-  mapLiveParticipants: { [participantId: string]: boolean } = {};
+  mapLiveParticipants: { [key: string]: { [key: string]: boolean } } = {};
   eventParticipationList: any[] = [];
   studioPreAssign = {};
   stageActivityParse = {};
@@ -104,9 +113,13 @@ export class CohortDetailComponent implements OnDestroy {
 
   // Derived
   participantRows: ParticipantRow[] = [];
-  contentTab: 'studios' | 'participants' | 'activities' | 'comms' = 'studios';
+  contentTab: 'studios' | 'participants' | 'activities' | 'comms' =
+    'participants';
   ownerList: string[] = [];
   selectedOwner: string = '';
+  mentorsList = [];
+  selectedMentors = [];
+  isCohortUpdates : boolean = false;
 
   // Studios tab UI state
   studioGroupFilter: Set<string> = new Set<string>(); // selected group codes (uP! / LYL / B!G). Empty = all.
@@ -153,9 +166,12 @@ export class CohortDetailComponent implements OnDestroy {
     private router: Router,
     private dialog: MatDialog,
     private _snackBar: MatSnackBar,
+    private storage : Storage,
+    private http : HttpClient,
     @Optional() private dialogRef: MatDialogRef<CohortDetailComponent>,
     @Optional() @Inject(MAT_DIALOG_DATA) private dialogData: any,
   ) {
+    
     getDocs(collection(this.firestore, 'products')).then((snap) => {
       for (let i = 0; i < snap.docs.length; i++) {
         const element = snap.docs[i].data();
@@ -163,9 +179,9 @@ export class CohortDetailComponent implements OnDestroy {
       }
     });
 
-      authguard.getRoles().then(async (roleData) => {
-        this.loggedinProfileRoles = roleData;
-      });
+    authguard.getRoles().then(async (roleData) => {
+      this.loggedinProfileRoles = roleData;
+    });
     if (this.dialogData) {
       // Dialog mode — reuse pre-loaded data
       this.isDialogMode = true;
@@ -188,7 +204,7 @@ export class CohortDetailComponent implements OnDestroy {
       this.mapParticiantsAssignments =
         this.dialogData.mapParticiantsAssignments || {};
 
-      // this.mapParticipantStudios = this.dialogData.mapParticipantStudios || {};
+      this.mapParticipantStudios = this.dialogData.mapParticipantStudios || {};
       // this.mapStudioPairing = this.dialogData.mapStudioPairing || {};
       // this.mapLiveAssignmentByStudio =
       //   this.dialogData.mapLiveAssignmentByStudio || {};
@@ -199,12 +215,17 @@ export class CohortDetailComponent implements OnDestroy {
         this.dialogData.eventParticipationList || [];
       this.searchableQueueList = this.dialogData.searchableQueueList ?? [];
       this.mapQueueName = this.dialogData.mapQueueName ?? {};
-
+      this.selectedQueue = this.dialogData.cohort['queueref']?.id ?? null;
+      this.contentTab = this.dialogData.viewType ?? 'participants'
+      console.log('queueid', this.dialogData.cohort['queueref']?.id);
       this.peopleCount = this.cohort?.['participantidlist']?.length || 0;
+      this.selectedMentors = this.cohort?.['mentors'] ?? [];
       this.computeStats();
       this.computeActivitiesFromInjectedMaps();
       this.computeOwners();
       this.rebuildParticipantRows();
+      if(this.selectedQueue)  this.loadLiveAssignments();
+      this.loadMentors();
       return;
     }
 
@@ -238,6 +259,7 @@ export class CohortDetailComponent implements OnDestroy {
   computeStats() {
     const participants: string[] = this.cohort?.['participantidlist'] || [];
     this.peopleCount = participants.length;
+    // const queueId = this.cohort;
 
     let studiosTotal = 0;
     let studiosPaired = 0;
@@ -250,7 +272,7 @@ export class CohortDetailComponent implements OnDestroy {
       checkedIn += studios.filter((s: any) => s?.checkin === true).length;
     });
     live = participants.filter(
-      (pid) => !!this.mapLiveParticipants?.[pid],
+      (pid) => !!this.mapLiveParticipants?.[this.selectedQueue]?.[pid],
     ).length;
 
     this.studiosPaired =
@@ -345,8 +367,12 @@ export class CohortDetailComponent implements OnDestroy {
     return studios.some((s: any) => s?.studioin === true);
   }
 
-  isParticipantLive(participantId: string): boolean {
-    return !!this.mapLiveParticipants?.[participantId];
+  isParticipantLive(queueId: string, participantId: string): boolean {
+    return !!(
+      this.mapLiveParticipants &&
+      this.mapLiveParticipants[queueId] &&
+      this.mapLiveParticipants[queueId][participantId]
+    );
   }
 
   // ════════════════════════════════════════════════════════════════
@@ -764,7 +790,7 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   closeDialog(result?: any) {
-    if (this.dialogRef) this.dialogRef.close(result);
+    if (this.dialogRef) this.dialogRef.close(this.isCohortUpdates);
   }
 
   async loadCohort() {
@@ -892,6 +918,8 @@ export class CohortDetailComponent implements OnDestroy {
 
   setTab(tab: 'studios' | 'participants' | 'activities' | 'comms') {
     this.contentTab = tab;
+    this.selectMode = false;
+    this.selectedParticipantIds = new Set()
   }
 
   goBack() {
@@ -920,7 +948,7 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   toggleStudio(studio) {
-    console.log(studio["studioin"],!studio["studioin"]);
+    console.log(studio['studioin'], !studio['studioin']);
     updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), {
       studioin: !studio['studioin'],
     });
@@ -1164,7 +1192,10 @@ export class CohortDetailComponent implements OnDestroy {
       const participants = studio.participants || [];
       const liveAssignment = this.mapLiveAssignmentByStudio[studioId];
       const isLive = !!liveAssignment;
+      const queueId = studio['queueref']?.id;
 
+      if([null , undefined , ''].includes(queueId)) return
+      this.mapLiveParticipants[queueId] = this.mapLiveParticipants[queueId] ?? {};
       participants.forEach((participantId: string) => {
         if (!this.mapParticipantStudios[participantId]) {
           this.mapParticipantStudios[participantId] = [];
@@ -1180,7 +1211,8 @@ export class CohortDetailComponent implements OnDestroy {
         });
 
         if (isLive) {
-          this.mapLiveParticipants[participantId] = true;
+          this.mapLiveParticipants[queueId][participantId] = true;
+          // this.mapLiveParticipants[participantId] = true;
         }
       });
     });
@@ -1190,9 +1222,10 @@ export class CohortDetailComponent implements OnDestroy {
         ...(assignment['pairing'] || []),
         ...(assignment['bonusactivityparticipant'] || []),
       ];
-
+      const queueId = assignment['queueid'];
       allParticipants.forEach((pid: string) => {
-        this.mapLiveParticipants[pid] = true;
+        if(!this.mapLiveParticipants[queueId]) return 
+        this.mapLiveParticipants[queueId][pid] = true;
       });
     });
   }
@@ -1364,17 +1397,17 @@ export class CohortDetailComponent implements OnDestroy {
     }
   }
 
-  createStudioCombination(){
+  createStudioCombination() {
     this.newStudioPairing.push({
-      participants : [],
-      atcmodel : null,
-      mandatoryActivity : null,
-      openViduEnabled : false
-    })
+      participants: [],
+      atcmodel: null,
+      mandatoryActivity: null,
+      openViduEnabled: false,
+    });
   }
 
-  removePairing(index){
-    this.newStudioPairing.splice(index , 1)
+  removePairing(index) {
+    this.newStudioPairing.splice(index, 1);
   }
 
   getDuplicatedStudios(studioToCreate) {
@@ -1385,7 +1418,10 @@ export class CohortDetailComponent implements OnDestroy {
       const activityMap = studio['participantsactivity'] || {};
       const cohortActivity = this.cohort['bigactivity'];
       // console.log(cohortActivity , )
-      if (participants.length === participantList.length && Object.values(activityMap).includes(cohortActivity)) {
+      if (
+        participants.length === participantList.length &&
+        Object.values(activityMap).includes(cohortActivity)
+      ) {
         const doesMatch = participantList.every((pid) => {
           if (participants.includes(pid)) {
             return true;
@@ -1400,66 +1436,69 @@ export class CohortDetailComponent implements OnDestroy {
     return duplicates;
   }
 
-   async assignRoles(){
+  async assignRoles() {
     const duplicateStudios = {};
     const validList = [];
 
-    this.newStudioPairing.forEach((studio)=>{
+    this.newStudioPairing.forEach((studio) => {
       const duplicates = this.getDuplicatedStudios(studio);
-      const studiokey = (studio.participants ?? []).map((pid)=>this.mapProfile[pid]).join('x');
+      const studiokey = (studio.participants ?? [])
+        .map((pid) => this.mapProfile[pid])
+        .join('x');
       if (duplicates.length > 0) {
         duplicateStudios[studiokey] = duplicates;
       } else {
-        validList.push(studio)
+        validList.push(studio);
       }
     });
 
     if (Object.keys(duplicateStudios).length > 0) {
-      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel , {data : duplicateStudios});
-      this.duplicateModelRef.afterClosed().subscribe((data)=>{
-       if (data) {
+      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel, {
+        data: duplicateStudios,
+      });
+      this.duplicateModelRef.afterClosed().subscribe((data) => {
+        if (data) {
           this.newStudioPairing = [...validList];
           this.createStudios();
-       }
-      })
-    } else{
-        this.createStudios()
+        }
+      });
+    } else {
+      this.createStudios();
     }
   }
 
-   closeDuplicateStuioModel(data : boolean = false){
+  closeDuplicateStuioModel(data: boolean = false) {
     if (this.duplicateModelRef) {
       this.duplicateModelRef.close(data);
-
     }
   }
 
-  validateStudios(){
+  validateStudios() {
     const invalidStudios = [];
     const valid = [];
 
-    this.newStudioPairing.forEach((studio)=>{
+    this.newStudioPairing.forEach((studio) => {
       const participants = studio.participants ?? [];
       const atcModel = studio.atcmodel ?? [];
       const mandatoryActivity = studio.mandatoryActivity ?? [];
-      if(participants.length === 0){
+      if (participants.length === 0) {
         invalidStudios.push(studio);
       } else {
         valid.push(studio);
       }
     });
 
-    if(invalidStudios.length > 0){
+    if (invalidStudios.length > 0) {
       alert('Fill all the studios');
-      this.newStudioPairing = [...invalidStudios , ...valid];
+      this.newStudioPairing = [...invalidStudios, ...valid];
       return false;
     }
 
     return true;
   }
 
-  async createStudios(){
-    if(this.validateStudios()){
+  async createStudios() {
+    if (this.validateStudios()) {
       try {
         // 2️⃣ Create batch
         const batch = writeBatch(this.firestore);
@@ -1469,46 +1508,304 @@ export class CohortDetailComponent implements OnDestroy {
         //   collection(this.firestore, 'queue studio pairing'),
         // );
 
-        this.newStudioPairing.forEach((studio)=>{
+        this.newStudioPairing.forEach((studio) => {
           const pairingRef = doc(
-          collection(this.firestore, 'queue studio pairing'),
-        );
-        const participants = studio.participants ?? [];
-        const atcmodel = studio.atcmodel ?? [];
-        const mandatoryactivities = studio.mandatoryActivity ?? []
-        const participantsactivity = {}
-        
-        participants.forEach((pid)=>{
-          participantsactivity[pid] = cohortActivity;
-        })
+            collection(this.firestore, 'queue studio pairing'),
+          );
+          const participants = studio.participants ?? [];
+          const atcmodel = studio.atcmodel ?? [];
+          const mandatoryactivities = studio.mandatoryActivity ?? [];
+          const participantsactivity = {};
+
+          participants.forEach((pid) => {
+            participantsactivity[pid] = cohortActivity;
+          });
           // 3️⃣ Batch set
-        batch.set(pairingRef, {
-          created: serverTimestamp(),
-          docid: pairingRef.id,
-          participants,
-          participantsactivity,
-          queueref: doc(
-            this.firestore,
-            'queue generation',
-            this.selectedQueue,
-          ),
-          studioin: false,
-          atcmodel,
-          mandatoryactivities: mandatoryactivities,
-          openvidu: studio.openViduEnabled,
+          batch.set(pairingRef, {
+            created: serverTimestamp(),
+            docid: pairingRef.id,
+            participants,
+            participantsactivity,
+            queueref: doc(
+              this.firestore,
+              'queue generation',
+              this.selectedQueue,
+            ),
+            studioin: false,
+            atcmodel,
+            mandatoryactivities: mandatoryactivities,
+            openvidu: studio.openViduEnabled,
+          });
         });
-        })
 
         // 4️⃣ Commit batch
         await batch.commit();
-         this.studioCreateMode = false;
-          this.newStudioPairing = [];
-
-
+        this.studioCreateMode = false;
+        this.newStudioPairing = [];
       } catch (error) {
         console.error('Error creating studio pairing:', error);
       }
     }
   }
 
+  showQueueSelection() {
+    const isStudioCohort = this.cohort['cohortCategory'] === 'studio';
+    const isShadowCohort =
+      this.bigActivityMap[this.cohort['bigactivity'] ?? '']?.shadow;
+    console.log(
+      isStudioCohort,
+      this.bigActivityMap[this.cohort['bigactivity'] ?? '']?.shadow,
+    );
+    return (
+      isStudioCohort && isShadowCohort === false && !this.cohort['queueref']?.id
+    );
+  }
+
+  toggleSelectMode(){
+    this.selectMode = !this.selectMode;
+    if(!this.selectMode) this.selectedParticipantIds = new Set();
+  }
+
+  toggleParticipantSelection(profileid){
+    if(this.selectedParticipantIds.has(profileid)){
+      this.selectedParticipantIds.delete(profileid);
+    }else{
+      this.selectedParticipantIds.add(profileid);
+    }
+  }
+
+  selectAllParticipants(){
+    const participants = this.cohort['participantidlist'] ?? [];
+    participants.forEach((profileid)=>{
+      this.selectedParticipantIds.add(profileid);
+    })
+  }
+
+   private cohortForSelected(cohort: any): any {
+    const ids = Array.from(this.selectedParticipantIds)
+    return { ...cohort, participantidlist: ids, mentors: [] }
+  }
+  sendSelectedNotification(cohort: any): void {
+    if (this.selectedParticipantIds.size === 0) return
+    ;(this as any).sendCohortNotification?.(this.cohortForSelected(cohort))
+  }
+  sendSelectedEmail(cohort: any): void {
+    if (this.selectedParticipantIds.size === 0) return
+    ;(this as any).sendCohortEmail?.(this.cohortForSelected(cohort))
+  }
+  sendSelectedWhatsapp(cohort: any): void {
+    if (this.selectedParticipantIds.size === 0) return
+    ;(this as any).sendCohortWhatsapp?.(this.cohortForSelected(cohort))
+  }
+  sendSelectedRecommendPlayist(cohort: any): void {
+    if (this.selectedParticipantIds.size === 0) return
+    ;(this as any).sendCohortRecommendedPlaylist?.(this.cohortForSelected(cohort))
+  }
+
+  sendCohortNotification(cohorts){    
+    let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
+    const selectedParticipants = selected.map((e)=>this.mapParticipantMeta[e])
+    let dialogRef = this.dialog.open(AhNotificationComponent,{
+      width : "60vw",
+      maxHeight: "90vh",
+      disableClose:true,
+      autoFocus: false,
+    })
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      console.log(result,'send app notificationssss');
+      if(result != null && result != undefined){
+        var userID = [];
+        var profileID = [];
+        console.log(selectedParticipants,"selectedParticipants");
+        for (let i = 0; i < selectedParticipants.length; i++) {
+          const selected = selectedParticipants[i];
+          if(selected["firebaseuserref"] != null){
+            profileID.push(selected["profileid"])
+          }
+        }
+
+        var notificationimage = null
+        if(result["notificationimage"] != null){
+          const filepath = "Notification Images/" + new Date().toISOString() + result["notificationimage"].name;
+          try {
+            const storageRef = ref(this.storage,filepath)
+            const uploadResult = await uploadBytes(storageRef,result["notificationimage"])
+            notificationimage = await getDownloadURL(uploadResult.ref)
+          } catch (error) {
+            console.log("file upload error",error);
+          }
+        }
+        console.log(profileID,"profileIDprofileIDprofileIDprofileID");
+        this.authguard.saveNotificationRecord({
+          title: result["title"],
+          message: result["message"],
+          subtitle: result["subtitle"] ?? null,
+          notificationtype: "ahupdate",
+          notificationimage: notificationimage,
+          sticky: result["sticky"],
+          logged: true, 
+          landingpage: result["landingpage"],
+          profileid: profileID,
+        }).then(()=>{
+          console.log( notificationimage)
+          alert("A&H Update sent to App user " + profileID.length.toString())
+        })
+      }
+    })
+  };
+
+  sendCohortEmail(cohorts){
+    let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
+    const selectedParticipants = selected.map((e)=>this.mapParticipantMeta[e])
+    console.log(selectedParticipants);
+    
+    let dialogRef = this.dialog.open(EmailInputComponent,{
+      data : selectedParticipants,
+      minWidth : "600px",
+      disableClose:true
+    });
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if(result != null && result != undefined){
+        console.log(result);
+        
+        const docRef = doc(collection(this.firestore,"email archive"),result['docid']);
+        if(result['status'] == 'queued' || result['status'] == 'send'){
+          await setDoc(docRef,result,{merge:true}).then(() => {
+            this.authguard.openSnackBar(result['status'] == 'queued' ? 'Successfully Added to Queue' : "Email Sent Successfully", "OK",600);
+          }).catch(err => {
+            console.log(err);
+            this.authguard.openSnackBar("Error Sending Email", "OK",600);
+          });
+        }else if (result['status'] == 'validated'){
+          let url:string;
+          if(environment.firebase.projectId == 'starlabs-test'){
+            url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
+          }else if (environment.firebase.projectId == 'fir-sample-aae4a'){
+            url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail"
+          }
+          console.log("EMAIL :", url);
+          let data = result;
+          data['archiveid'] = result['docid'];
+          this.http.post(url, JSON.stringify(data),{
+            responseType: 'text',
+            headers: new HttpHeaders().set('Content-Type', 'application/json'),
+          }).subscribe({
+            next: (response) => {
+              console.log('response', response);
+            },
+            error: (err) => {
+              console.log(err);
+              console.log("Error: " + err);
+            }
+          });
+        }
+
+      }
+    })
+  };
+
+  sendCohortWhatsapp(cohorts){
+    let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
+    const selectedParticipants = selected.map((e)=>this.mapParticipantMeta[e])
+    
+    let dialogRef = this.dialog.open(WatiInputComponent,{
+      data : selectedParticipants,
+      width : "70vw",
+      height : "80vh",
+      disableClose:true
+    });
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if(result != null && result != undefined){
+        if(result == 'success') {
+          this.authguard.openSnackBar("Wati Message Sent Successfully", "OK",600);
+          if(result['status'] == 'sendtoparticipants'){
+            let url:string;
+
+            if(environment.firebase.projectId == 'starlabs-test'){
+              url = "https://us-central1-starlabs-test.cloudfunctions.net/sendWhatsAppBroadcast";
+            }else if (environment.firebase.projectId == 'fir-sample-aae4a'){
+              url = ""
+            } 
+
+            const docRef = doc(collection(this.firestore , 'wati archive'), result['archiveid']);
+            await updateDoc(docRef, {
+              templatestatus: "created",
+              templatevalidated: true,
+            }).then(() => {
+              console.log("Wati Archive Document Created");
+            }).catch((error) => {
+              console.log("Error Creating Wati Archive");
+            });
+
+            const response = await this.http.post(url, { archiveid: result['archiveid'] }).toPromise();
+            console.log("Response : ",response)
+
+          }
+        } else if(result == 'failed') {
+          this.authguard.openSnackBar("Sending Wati Message Failed", "OK",600);
+        }
+      }
+    });
+  };
+
+  sendCohortRecommendedPlaylist(cohorts){
+    let selected = cohorts['mentors'] != null && cohorts['mentors'].length > 0 ? [...cohorts['mentors'], ...cohorts['participantidlist']] : cohorts['participantidlist'];
+    const selectedParticipants = selected.map((e)=>this.mapParticipantMeta[e]);
+
+    let dialogRef = this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent, {
+      data: {
+        participantlist: selectedParticipants,
+        // personalised : personalised
+      },
+      minWidth: "500px",
+      disableClose: true
+    })
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
+      if (result != null && result != undefined) {
+        let docid = doc(collection(this.firestore, "buffermix archive")).id
+        result['docid'] = docid
+        setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
+          console.log("buffer document created");
+        }).catch(err => {
+          console.log(err);
+        })
+      }
+    });
+  }
+
+  async loadMentors(){
+    try{
+      const rolesQuery = query(collection(this.firestore, "users_roles"),where("mentor", "==", true));
+      const rolesSnap = await getDocs(rolesQuery);
+
+      const mentorProfileIds: string[] = [];
+      rolesSnap.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data['profile_ref'] && data['mentor'] == true) {
+          // Extract profile ID from DocumentReference
+          const profileId = typeof data['profile_ref'] === 'string' 
+            ? data['profile_ref'] 
+            : data['profile_ref'].id;
+          if (profileId) {
+            mentorProfileIds.push(profileId);
+          }
+        }
+      });
+      this.mentorsList = mentorProfileIds;
+    } catch (error){
+      console.error('Error loading mentors:', error);
+  }
+  }
+
+  toggleMentors(){
+    const cohortId = this.cohort['docid'] ?? null;
+    if(cohortId){
+      if(!this.isCohortUpdates) this.isCohortUpdates = true
+      const docRef = doc(this.firestore , 'big cohorts' , cohortId);
+      updateDoc(docRef, {
+        mentors : this.selectedMentors
+      });
+    }
+  }
 }
