@@ -13,12 +13,11 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EiflixBannerComponent } from '../eiflix-banner/eiflix-banner.component';
 import { WorkshopDialogComponent } from '../workshop-dialog/workshop-dialog.component';
-import { NewusersComponent } from '../newusers/newusers.component';
+
 
 
 @Component({
@@ -144,23 +143,6 @@ export class WorkshopsComponent implements OnInit {
       panelClass: 'eiflix-banner-dialog'
     });
   }
-
-  async openNewUserDialog() {
-    this.dialog.open(NewusersComponent, {
-      data: { mapProfile: this.mapProfileNew, mapProfileold: this.mapProfile },
-      width: '100vw', 
-      height: '100vh', 
-      maxWidth: '100vw', 
-      maxHeight: '100vh',
-      autoFocus: false, 
-      panelClass: 'new-users-dialog'
-    });
-  }
-
-  ngOnDestroy() {
-  this.dialog.closeAll();
-}
-  
 
   openRefferalcodeDialog() {
     const dialogRef = this.dialog.open(WorkshopDialogComponent, {
