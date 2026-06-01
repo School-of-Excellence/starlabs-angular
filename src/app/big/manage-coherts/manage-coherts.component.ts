@@ -145,7 +145,7 @@ export class ManageCohertsComponent {
       startDate: [null],
       endDate: [null],
       level: [],
-      enableGroupChat: [true],
+      enableGroupChat: [false],
       tags: [[]],
       mentors: [[]],
       team: [[]],

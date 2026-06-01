@@ -23,13 +23,29 @@
   <!-- HEADER -->
   <div class="cd-header">
     <h1 class="cd-title">{{cohortName || cohort?.['name'] || '—'}}</h1>
+  
+    <div *ngIf="showQueueSelection()">
+      <mat-form-field appearance="outline" class="cd-queue-select">
+        <mat-label>Select Queue</mat-label>
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="loadLiveAssignments()">
+          <mat-option *ngFor="let option of searchableQueueList" [value]="option.docid">{{option.queuename || option.name
+            ||
+            option.id}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
 
-    <mat-form-field appearance="outline" class="cd-queue-select">
-      <mat-label>Select Queue</mat-label>
-      <mat-select [(ngModel)]="selectedQueue" (selectionChange)="loadLiveAssignments()">
-        <mat-option *ngFor="let option of searchableQueueList" [value]="option.docid">{{option.queuename || option.name || option.id}}</mat-option>
-      </mat-select>
-    </mat-form-field>
+    <div>
+      <mat-form-field appearance="outline" class="cd-queue-select">
+        <mat-label>Select Mentors</mat-label>
+        <mat-select [(ngModel)]="selectedMentors" (selectionChange)="toggleMentors()" multiple>
+          <mat-option *ngFor="let mentorId of mentorsList" [value]="mentorId">{{mapProfile[mentorId]}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div>
+        <span *ngFor="let mentorId of selectedMentors">{{mapProfile[mentorId]}} /</span>
+      </div>
+    </div>
 
     <button class="cd-owner-btn" [matMenuTriggerFor]="ownerMenu" *ngIf="ownerList.length > 0">
       {{selectedOwner || 'Owner'}}
@@ -84,12 +100,21 @@
     <button class="cd-tab" [class.active]="contentTab === 'comms'" (click)="setTab('comms')">
       Comms
     </button>
+    <div (click)="toggleSelectMode()" *ngIf="contentTab === 'participants';">
+      {{selectMode ? 'Cancel' : 'Select'}}
+    </div>
   </div>
 
   <!-- BODY: PARTICIPANTS -->
   <div class="cd-body" *ngIf="contentTab === 'participants'">
     <div class="cd-participants-grid">
-      <div class="cd-part-card" *ngFor="let p of participantRows">
+      <div class="cd-part-card row" *ngFor="let p of participantRows" 
+      [class.checked]="selectMode && selectedParticipantIds.has(p.id)"
+      (click)="selectMode && toggleParticipantSelection(p.id)"
+      >
+        <span class="p-check" *ngIf="selectMode">
+          <mat-icon>check</mat-icon>
+        </span>
         <div class="cd-part-av" [class]="p.avatarClass">{{p.initials}}</div>
         <div class="cd-part-info">
           <div class="cd-part-name">{{p.name}}</div>
@@ -126,6 +151,7 @@
     <!-- Sub-toolbar: filter pills + Re-pair -->
     <div class="cd-studios-toolbar">
       <span class="cd-studios-rule">STUDIOS CANVAS · RULE: 1 EIS PER STUDIO</span>
+      <span class="cd-studios-rule">Seleted Queue : {{mapQueueName[selectedQueue]}}</span>
       <span class="cd-studio-pill"
         *ngFor="let code of getStudioGroupCodes()"
         [class.active]="isStudioGroupSelected(code)"
@@ -262,7 +288,7 @@
                   <div class="cd-role-name">{{getNameForId(pid)}}</div>
                   <div class="cd-role-sub">{{getStudioParticipantActivity(studio, pid) || 'Participant'}}</div>
                 </div>
-                <span class="cd-role-livedot" *ngIf="isParticipantLive(pid)" title="Live"></span>
+                <span class="cd-role-livedot" *ngIf="isParticipantLive(cohort[cohort['queueref']?.id],pid)" title="Live"></span>
                 <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
               </div>
             </ng-container>
@@ -566,3 +592,38 @@
     </div>
   </div>
 </ng-template>
+
+<div class="selectbar" *ngIf="selectMode">
+    <div class="sb-main-row">
+      <span class="selectbar-count"><b>{{selectedParticipantIds.size}}</b>  selected</span>
+      <span class="sb-divider"></span>
+      <button class="sb-btn ghost" (click)="selectAllParticipants()" title="Select / clear all">
+        <mat-icon>select_all</mat-icon> All
+      </button>
+      <ng-container *ngIf="selectedParticipantIds.size > 0">
+        <button class="sb-btn ghost" (click)="sendSelectedNotification(this.cohort)" title="Notify selected cohorts">
+          <mat-icon>notifications</mat-icon>
+        </button>
+        <button class="sb-btn ghost" (click)="sendSelectedEmail(this.cohort)" title="Email selected cohorts">
+          <mat-icon>email</mat-icon>
+        </button>
+        <button class="sb-btn ghost wa" (click)="sendSelectedWhatsapp(this.cohort)" title="WhatsApp selected cohorts">
+          <i class="fa-brands fa-whatsapp"></i>
+        </button>
+      </ng-container>
+      <button class="sb-btn ghost" (click)="toggleSelectMode()" title="Exit select mode">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <ng-container *ngIf="selectedParticipantIds.size > 0">
+      <div class="sb-action-row">
+        <button class="sb-btn primary" (click)="sendSelectedRecommendPlayist(this.cohort)"
+          title="recommend playlist selected cohorts">
+          <mat-icon>music_note</mat-icon> Recommend Playlist
+        </button>
+        <!-- <button class="sb-btn primary" (click)="exportSelectedCohorts()">
+          <mat-icon>download</mat-icon> Export ({{selectedCohortIds.size}})
+        </button> -->
+      </div>
+    </ng-container>
+  </div>
