@@ -39,21 +39,51 @@
         </mat-error> -->
       </mat-form-field>
       <br>
-      <mat-form-field class="countrycode" appearance="outline">
-        <mat-label>Code</mat-label>
-        <input matInput type="tel" formControlName="countrycode">
-        <mat-error *ngIf="profileForm.get('countrycode').hasError('required')">
-          <strong>required</strong>
-        </mat-error>
-      </mat-form-field>
+      <div class="country-dropdown-wrapper">
+        <div class="country-selected" (click)="toggleCountryDropdown()">
+          <span>{{ selectedCountry?.iso }} {{ selectedCountry?.code }}</span>
+          <mat-icon>arrow_drop_down</mat-icon>
+        </div>
+        <div class="country-panel" *ngIf="countryDropdownOpen">
+          <input
+            class="country-search"
+            placeholder="Search country..."
+            [(ngModel)]="countrySearchText"
+            [ngModelOptions]="{standalone: true}"
+            (click)="$event.stopPropagation()"
+            autofocus
+          />
+          <div class="country-list">
+            <div
+              class="country-option"
+              *ngFor="let country of filteredCountries"
+              (click)="selectCountry(country)"
+              [class.active]="country.code === profileForm.get('countrycode').value"
+            >
+              <span class="flag">{{ country.flag }}</span>
+              <span class="dial">{{ country.code }}</span>
+              <span class="cname">{{ country.name }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <mat-form-field class="numberinputfields" appearance="outline">
         <mat-label>Mobile Number</mat-label>
-        <input matInput type="text" formControlName="number">
+        <input
+          matInput
+          type="tel"
+          inputmode="numeric"
+          formControlName="number"
+          [maxlength]="phoneMaxLength"
+          [placeholder]="phoneMaxLength + ' digits'"
+          (input)="onPhoneInput($event)"
+        />
+        <mat-hint>{{ phoneHint }}</mat-hint>
         <mat-error *ngIf="profileForm.get('number').hasError('required')">
           Number <strong>required</strong>
         </mat-error>
         <mat-error *ngIf="profileForm.get('number').hasError('pattern')">
-          <strong>Invalid</strong> Format
+          Must be exactly {{ phoneMaxLength }} digits for {{ selectedCountry?.name }}
         </mat-error>
       </mat-form-field>
       <br>

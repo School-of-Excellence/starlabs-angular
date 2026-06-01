@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit ,HostListener } from '@angular/core';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { doc, Firestore, serverTimestamp, setDoc, writeBatch } from '@angular/fire/firestore';
-import { FormGroup, Validators, FormBuilder, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
+import { FormGroup, Validators, FormBuilder, FormsModule, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -13,7 +13,9 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-
+import { MatSelectModule } from '@angular/material/select';
+import { MatIconModule } from '@angular/material/icon';
+import { CountryPhoneService, CountryPhone } from '../../Service/country-phone service/country-phone.service';
 
 @Component({
   selector: 'app-updateprofile',
@@ -26,7 +28,10 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
     MatInputModule,
     MatDatepickerModule,
     MatNativeDateModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    FormsModule,
+    MatSelectModule,
+    MatIconModule,
   ],
   templateUrl: './updateprofile.component.html',
   styleUrl: './updateprofile.component.css'
@@ -39,6 +44,56 @@ export class UpdateprofileComponent {
   profileForm: FormGroup
   emailLocked: boolean = false;
   originalProfile: any;
+  countries: CountryPhone[];
+  selectedCountry: CountryPhone;
+  phoneMaxLength: number = 10;
+  countrySearchText: string = '';
+  countryDropdownOpen: boolean = false;
+
+  get filteredCountries(): CountryPhone[] {
+    const q = this.countrySearchText.toLowerCase();
+    if (!q) return this.countries;
+    return this.countries.filter(c =>
+      c.name.toLowerCase().includes(q) || c.code.includes(q) || c.iso.toLowerCase().includes(q)
+    );
+  }
+
+  get phoneHint(): string {
+    if (!this.selectedCountry) return '';
+    return `${this.selectedCountry.digits} digits required (${this.selectedCountry.name})`;
+  }
+
+  onPhoneInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    let val = input.value.replace(/\D/g, '').slice(0, this.phoneMaxLength);
+    this.profileForm.get('number')!.setValue(val, { emitEvent: false });
+    input.value = val;
+  }
+
+  private _syncCountry(code: string): void {
+    const found = this.countryPhoneService.getByCode(code);
+    this.selectedCountry = found ?? { name: 'Unknown', code, iso: '', digits: 10, flag: '' };
+    this.phoneMaxLength = this.selectedCountry.digits;
+  }
+
+  toggleCountryDropdown(): void {
+    this.countryDropdownOpen = !this.countryDropdownOpen;
+    if (this.countryDropdownOpen) this.countrySearchText = '';
+  }
+
+  selectCountry(country: CountryPhone): void {
+    this.profileForm.get('countrycode')!.setValue(country.code);
+    this.countryDropdownOpen = false;
+    this.countrySearchText = '';
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.country-dropdown-wrapper')) {
+      this.countryDropdownOpen = false;
+    }
+  }
 
   noWhitespaceValidator(control: AbstractControl): ValidationErrors | null {
     if (control.value != null && control.value.trim().length === 0) {
@@ -47,7 +102,7 @@ export class UpdateprofileComponent {
     return null;
   }
 
-  constructor(public auth: AngularFireAuth,public formbuilder: FormBuilder, public firestore : Firestore, public dialogRef : MatDialogRef<any>, @Inject(MAT_DIALOG_DATA) public dialogData : any, public http: HttpClient,private snackBar: MatSnackBar) {
+  constructor(public auth: AngularFireAuth, public formbuilder: FormBuilder, public countryPhoneService: CountryPhoneService, public firestore : Firestore, public dialogRef : MatDialogRef<any>, @Inject(MAT_DIALOG_DATA) public dialogData : any, public http: HttpClient, private snackBar: MatSnackBar) {
 
     this.profileForm =  this.formbuilder.group({
       // name: [, {validators: [Validators.required], updateOn: 'change'}],
@@ -63,6 +118,22 @@ export class UpdateprofileComponent {
       testuser:[false,{}],
     })
     this.originalProfile = dialogData.profile;
+    this.countries = countryPhoneService.countries;
+    this._syncCountry('+91');
+
+    let isFirstLoad = true;
+    this.profileForm.get('countrycode')!.valueChanges.subscribe(code => {
+      this._syncCountry(code);
+      if (!isFirstLoad) {
+        this.profileForm.get('number')!.setValue(null);
+      }
+      isFirstLoad = false;
+      this.profileForm.get('number')!.setValidators([
+        Validators.required,
+        Validators.pattern(this.countryPhoneService.getPatternForCode(code))
+      ]);
+      this.profileForm.get('number')!.updateValueAndValidity();
+    });
     console.log(dialogData)
     this.existingProfile = dialogData.existingprofile
     this.newprofile = dialogData.profile == null
@@ -82,6 +153,13 @@ export class UpdateprofileComponent {
         enableahcrm: data.enableahcrm ?? false,
         testuser: data.testuser ?? false
       })
+      const code = data.countrycode ?? '+91';
+      this._syncCountry(code);
+      this.profileForm.get('number')!.setValidators([
+        Validators.required,
+        Validators.pattern(this.countryPhoneService.getPatternForCode(code))
+      ]);
+      this.profileForm.get('number')!.updateValueAndValidity();
     }
     if (this.dialogData.profile?.user_ref) {
       this.emailLocked = true;
