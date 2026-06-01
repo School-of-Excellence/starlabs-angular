@@ -88,11 +88,16 @@
   </div>
 
   <div class="filtered-info">
-    <span class="filtered-count">Showing {{ reportATC.length }} ATC{{ reportATC.length === 1 ? '' : 's' }}</span>
-    <span class="filtered-by" *ngIf="getActiveFilters().length > 0">
-      &nbsp;|&nbsp; Filtered by: {{ getActiveFilters().join('  •  ') }}
-    </span>
-    <span class="filtered-by no-filter" *ngIf="getActiveFilters().length === 0">&nbsp;|&nbsp; No filters applied</span>
+    <div class="filtered-text">
+      <span class="filtered-count">Showing {{ reportATC.length }} ATC{{ reportATC.length === 1 ? '' : 's' }}</span>
+      <span class="filtered-by" *ngIf="getActiveFilters().length > 0">
+        &nbsp;|&nbsp; Filtered by: {{ getActiveFilters().join('  •  ') }}
+      </span>
+      <span class="filtered-by no-filter" *ngIf="getActiveFilters().length === 0">&nbsp;|&nbsp; No filters applied</span>
+    </div>
+    <button mat-flat-button class="exportbtn" (click)="exportToExcel()" [disabled]="reportATC.length === 0">
+      <mat-icon>download</mat-icon> Export to Excel
+    </button>
   </div>
 
   <div class="summary-bar">

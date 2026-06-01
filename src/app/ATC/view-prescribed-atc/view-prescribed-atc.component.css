@@ -48,6 +48,22 @@
   font-size: 14px;
   color: rgb(3, 48, 63);
   line-height: 1.5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filtered-info .filtered-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filtered-info .exportbtn {
+  flex: 0 0 auto;
+  background-color: rgb(3, 48, 63);
+  color: white;
 }
 
 .filtered-info .filtered-count {

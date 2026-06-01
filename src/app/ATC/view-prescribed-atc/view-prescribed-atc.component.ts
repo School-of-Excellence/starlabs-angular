@@ -19,6 +19,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatListModule } from '@angular/material/list';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'app-view-prescribed-atc',
@@ -606,6 +607,91 @@ export class ViewPrescribedATCComponent {
     }
 
     return filters;
+  }
+
+  // Export the currently filtered ATC list (one row per ATC) to Excel.
+  exportToExcel() {
+    if (!this.reportATC || this.reportATC.length === 0) {
+      alert("No ATC records to export");
+      return;
+    }
+
+    const nameOf = (id: any) => (id != null ? (this.profileMap[id]?.name || id) : '');
+
+    // Collect the distinct bigactivity role columns (ATC Mentor, Diagnostics solo, etc.)
+    // present across the filtered ATCs.
+    const activityKeys: string[] = [];
+    this.reportATC.forEach((snapshot: any) => {
+      const ba = snapshot.data()['bigactivity'];
+      if (ba) {
+        Object.keys(ba).forEach(k => {
+          if (!activityKeys.includes(k)) activityKeys.push(k);
+        });
+      }
+    });
+    const activityLabels = activityKeys.map(k => this.mapBigActivity[k] || k);
+
+    const headers = [
+      "ATC ID", "Participant",
+      ...activityLabels,
+      "Author(s)", "Observer(s)",
+      "Prescription Date", "Product", "Status",
+      "Total Adjustments", "Adj. Pending", "Adj. Completed",
+      "Total Change Work", "CW Pending", "CW Completed"
+    ];
+
+    const worksheetData: any[][] = [headers];
+
+    this.reportATC.forEach((snapshot: any) => {
+      const data = snapshot.data();
+      const ba = data['bigactivity'] || {};
+
+      const activityValues = activityKeys.map(k =>
+        (ba[k] || []).map((id: any) => nameOf(id)).filter((n: string) => n).join(', ')
+      );
+
+      const authors = (data['author'] || [])
+        .map((ref: any) => nameOf(ref?.id)).filter((n: string) => n).join(', ');
+      const observers = (data['observer'] || [])
+        .map((ref: any) => nameOf(ref?.id)).filter((n: string) => n).join(', ');
+      const prescriptionDate = data['prescription_date']?.toDate
+        ? this.datepipe.transform(data['prescription_date'].toDate(), 'mediumDate')
+        : '';
+      const status = data['status'] === 'atc given' ? 'Unvalidated' : 'Validated';
+
+      worksheetData.push([
+        data['atcid'] || snapshot.id,
+        nameOf(data['profileid']),
+        ...activityValues,
+        authors,
+        observers,
+        prescriptionDate,
+        data['product'] || 'No Product Mentioned',
+        status,
+        data['totaladjustment'] || 0,
+        data['totaladjustmentpending'] || 0,
+        data['totaladjustmentcompleted'] || 0,
+        data['totalprocedure'] || 0,
+        data['totalprocedurepending'] || 0,
+        data['totalprocedurecompleted'] || 0
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+    const maxWidths: number[] = [];
+    worksheetData.forEach(row => {
+      row.forEach((cell, colIndex) => {
+        const cellLength = cell != null ? String(cell).length : 10;
+        maxWidths[colIndex] = Math.max(maxWidths[colIndex] || 10, cellLength);
+      });
+    });
+    ws['!cols'] = maxWidths.map(width => ({ wch: Math.min(width + 2, 50) }));
+
+    XLSX.utils.book_append_sheet(wb, ws, "Prescribed ATC");
+    const fileName = `Prescribed_ATC_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   }
 
   private resetToFirstPage() {
