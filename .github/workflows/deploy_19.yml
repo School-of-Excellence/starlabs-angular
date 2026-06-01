@@ -24,6 +24,8 @@ jobs:
           FIREBASE_PROD_CONFIG: ${{ secrets.FIREBASE_PROD_CONFIG }}
           WATSON_TEST_CONFIG: ${{ secrets.WATSON_TEST_CONFIG }}
           WATSON_PROD_CONFIG: ${{ secrets.WATSON_PROD_CONFIG }}
+          SALESCRM_TEST_CONFIG: ${{ secrets.SALESCRM_TEST_CONFIG }}
+          SALESCRM_PROD_CONFIG: ${{ secrets.SALESCRM_PROD_CONFIG }}
           PICOVOICE_ACCESS_KEY: ${{ secrets.PICOVOICE_ACCESS_KEY }}
         run: |
           mkdir -p src/environments
@@ -35,6 +37,7 @@ jobs:
             production: true,
             firebase: $FIREBASE_TEST_CONFIG,
             watson: $WATSON_TEST_CONFIG,
+            salescrm: $SALESCRM_TEST_CONFIG,
             df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
@@ -45,6 +48,7 @@ jobs:
             production: true,
             firebase: $FIREBASE_TEST_CONFIG,
             watson: $WATSON_TEST_CONFIG,
+            salescrm: $SALESCRM_TEST_CONFIG,
             df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
@@ -63,6 +67,7 @@ jobs:
             production: true,
             firebase: $FIREBASE_PROD_CONFIG,
             watson: $WATSON_PROD_CONFIG,
+            salescrm: $SALESCRM_PROD_CONFIG,
             df3CdnUrl: 'https://breakthroughs.app/assets/df3',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
@@ -73,6 +78,7 @@ jobs:
             production: true,
             firebase: $FIREBASE_PROD_CONFIG,
             watson: $WATSON_PROD_CONFIG,
+            salescrm: $SALESCRM_PROD_CONFIG,
             df3CdnUrl: 'https://breakthroughs.app/assets/df3',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };

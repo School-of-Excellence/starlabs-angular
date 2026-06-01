@@ -1,58 +1,139 @@
-<h2 mat-dialog-title class="dialog-title">
-  <span>{{ data?.type === 'edit' ? 'Edit Pipeline' : 'Add Pipeline' }}</span>
-  <button mat-icon-button (click)="dialogRef.close()">
-    <mat-icon>close</mat-icon>
-  </button>
-</h2>
+<div class="aps-shell">
 
-<mat-dialog-content class="dialog-content">
-  <form [formGroup]="pipelineform" class="pipeline-form">
-
-    <!-- Row 1: Name + Description -->
-    <div class="form-row">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Pipeline Name</mat-label>
-        <input matInput placeholder="Enter Pipeline Name" formControlName="pipelinename">
-        <mat-error *ngIf="pipelineform.get('pipelinename')?.hasError('required')">
-          Pipeline Name is required
-        </mat-error>
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Pipeline Description</mat-label>
-        <textarea matInput placeholder="Enter Pipeline Description" formControlName="description" rows="3"></textarea>
-      </mat-form-field>
+  <!-- HEADER -->
+  <div mat-dialog-title class="aps-header">
+    <div class="aps-header-main">
+      <span class="aps-header-tag">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+        Pipeline
+      </span>
+      <h2 class="aps-title">{{ data?.type === 'edit' ? 'Edit Pipeline' : 'Add Pipeline' }}</h2>
     </div>
+    <button type="button" class="aps-close" (click)="dialogRef.close()" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
 
-    <!-- Row 2: Columns + Presale Owner + Stages + Visible To -->
-    <div class="form-row">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Table Columns</mat-label>
-        <mat-select formControlName="columns" multiple>
-          <mat-option *ngFor="let col of leadslist" [value]="col">{{ col }}</mat-option>
-        </mat-select>
-      </mat-form-field>
+  <!-- CONTENT -->
+  <mat-dialog-content class="aps-content">
+    <form [formGroup]="pipelineform" class="aps-form">
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Assignable Pre-Sale Owner</mat-label>
-        <mat-select formControlName="presaleowner" multiple>
-          <mat-option *ngFor="let owner of ownerlist" [value]="owner.owner_id">{{ owner.owner }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <!-- Stages Section -->
-      <div class="stages-section">
-        <div class="stages-header">
-          <label class="stages-label">Pipeline Stages</label>
+      <!-- BASIC INFORMATION -->
+      <section class="aps-section">
+        <div class="aps-section-head">
+          <span class="aps-section-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="8" y1="13" x2="14" y2="13"/>
+              <line x1="8" y1="17" x2="12" y2="17"/>
+            </svg>
+          </span>
+          <h3 class="aps-section-title">Basic Information</h3>
         </div>
 
-        <div class="available-stages">
-          <label class="sub-label">Available Stages (Click to select):</label>
+        <div class="aps-section-body">
+          <div class="aps-grid aps-grid-2">
+
+            <mat-form-field appearance="outline" class="aps-field">
+              <mat-label>Pipeline name</mat-label>
+              <input matInput formControlName="pipelinename">
+              <mat-error *ngIf="pipelineform.get('pipelinename')?.hasError('required')">Required</mat-error>
+            </mat-form-field>
+
+            <div class="aps-category">
+              <div class="aps-category-row" *ngIf="hidecategory">
+                <mat-form-field appearance="outline" class="aps-field aps-category-field">
+                  <mat-label>Category</mat-label>
+                  <mat-select formControlName="category">
+                    <mat-option *ngFor="let cat of categoriesList" [value]="cat">{{ cat }}</mat-option>
+                  </mat-select>
+                  <mat-error *ngIf="pipelineform.get('category')?.hasError('required')">Required</mat-error>
+                </mat-form-field>
+                <button type="button" class="aps-icon-btn"
+                        (click)="hidecategory = !hidecategory"
+                        matTooltip="Manage categories" aria-label="Manage categories">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+              </div>
+
+              <div class="aps-cat-editor" *ngIf="!hidecategory">
+                <span class="aps-mini-label">Manage categories</span>
+                <div class="aps-chip-input">
+                  <span class="aps-chip" *ngFor="let item of categoriesList; let i = index"
+                        [class.aps-chip--locked]="isOriginalCategory(item)">
+                    <span class="aps-chip-text">{{ item }}</span>
+                    <button *ngIf="!isOriginalCategory(item)"
+                            type="button" class="aps-chip-x"
+                            (click)="removeCategory(i)" aria-label="Remove">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           stroke-width="2.6" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                  </span>
+                  <input #catIn
+                         class="aps-chip-input-text"
+                         placeholder="Type a category and press Enter…"
+                         (keydown)="addCategoryFromInput($event)"
+                         (blur)="addCategoryOnBlur(catIn)">
+                  <span class="aps-kbd" aria-hidden="true">⏎</span>
+                </div>
+                <div class="aps-cat-hint">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  Press <kbd>Enter</kbd> after each category to add it as a chip
+                </div>
+                <div class="aps-cat-actions">
+                  <button type="button" class="aps-ghost-btn aps-ghost-btn--sm"
+                          (click)="hidecategory = !hidecategory">Cancel</button>
+                  <button type="button" class="aps-primary-btn aps-primary-btn--sm"
+                          (click)="saveCategory(catIn)">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <mat-form-field appearance="outline" class="aps-field aps-field-full">
+            <mat-label>Description</mat-label>
+            <textarea matInput rows="2" formControlName="description"></textarea>
+          </mat-form-field>
+        </div>
+      </section>
+
+      <!-- PIPELINE STAGES -->
+      <section class="aps-section">
+        <div class="aps-section-head">
+          <span class="aps-section-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="5" cy="12" r="2"/>
+              <circle cx="12" cy="12" r="2"/>
+              <circle cx="19" cy="12" r="2"/>
+              <line x1="7" y1="12" x2="10" y2="12"/>
+              <line x1="14" y1="12" x2="17" y2="12"/>
+            </svg>
+          </span>
+          <h3 class="aps-section-title">Pipeline Stages</h3>
+          <span class="aps-counter" *ngIf="selectedStageIds.length > 0">
+            {{ selectedStageIds.length }} selected
+          </span>
+        </div>
+
+        <div class="aps-section-body">
           <mat-chip-listbox
             [(ngModel)]="selectedStageIds"
             [ngModelOptions]="{standalone: true}"
             (ngModelChange)="onStageSelectionChange($event)"
-            multiple>
+            multiple
+            class="aps-stage-listbox">
             <mat-chip-option
               *ngFor="let stage of dealStagesList"
               [value]="stage.id"
@@ -60,116 +141,196 @@
               {{ stage.stageName }}
             </mat-chip-option>
           </mat-chip-listbox>
-        </div>
 
-        <div class="selected-stages" *ngIf="selectedStageIds.length > 0">
-          <label class="sub-label">Selected Stages (Drag to reorder):</label>
-          <div class="selected-chips-container" cdkDropList (cdkDropListDropped)="dropStage($event)">
-            <mat-chip
-              *ngFor="let stageId of selectedStageIds"
-              cdkDrag
-              class="selected-chip">
-              <mat-icon class="drag-handle" cdkDragHandle>drag_indicator</mat-icon>
-              {{ getStageNameById(stageId) }}
-              <mat-icon matChipRemove (click)="removeStageFromSelection(stageId)">cancel</mat-icon>
-            </mat-chip>
-          </div>
-        </div>
-
-        <div class="error-text" *ngIf="!pipelineform.controls['stages'].valid && selectedStageIds.length === 0">
-          Pipeline Stages are Required
-        </div>
-      </div>
-
-      <mat-form-field appearance="outline" class="full-width" *ngIf="isDeveloper">
-        <mat-label>Pipeline Visible To</mat-label>
-        <mat-select formControlName="pipeline_visibleto" multiple>
-          <mat-option *ngFor="let owner of ownerlist" [value]="owner.owner_id">{{ owner.owner }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-    </div>
-
-    <!-- Row 3: Category + Settings -->
-    <div class="form-row">
-
-      <!-- Category Section -->
-      <div class="category-section">
-        <div *ngIf="hidecategory" class="category-select">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Pipeline Category</mat-label>
-            <mat-select formControlName="category">
-              <mat-option *ngFor="let cat of categoriesList" [value]="cat">{{ cat }}</mat-option>
-            </mat-select>
-            <mat-error *ngIf="pipelineform.get('category')?.hasError('required')">
-              Category is required
-            </mat-error>
-          </mat-form-field>
-          <button mat-icon-button type="button" color="primary" (click)="hidecategory = !hidecategory">
-            <mat-icon>add</mat-icon>
-          </button>
-        </div>
-
-        <div *ngIf="!hidecategory" class="category-create">
-          <label class="field-label">Create Categories</label>
-          <div class="chip-input-wrapper">
-            <div class="chips-container">
-              <span class="chip" *ngFor="let item of categoriesList; let i = index">
-                {{ item }}
-                <mat-icon class="chip-close" (click)="removeCategory(i)">close</mat-icon>
-              </span>
-              <input
-                class="stage-input"
-                placeholder="Add category and hit Enter..."
-                (keydown)="addCategoryFromInput($event)">
+          <div class="aps-stage-flow" *ngIf="selectedStageIds.length > 0">
+            <span class="aps-mini-label">
+              Flow order
+              <span class="aps-mini-hint">— drag to reorder</span>
+            </span>
+            <div class="aps-flow-track" cdkDropList
+                 cdkDropListOrientation="horizontal"
+                 (cdkDropListDropped)="dropStage($event)">
+              <div *ngFor="let stageId of selectedStageIds; let i = index"
+                   cdkDrag class="aps-flow-chip">
+                <span class="aps-flow-step">{{ i + 1 }}</span>
+                <span class="aps-flow-name">{{ getStageNameById(stageId) }}</span>
+                <button type="button" class="aps-flow-x"
+                        (click)="removeStageFromSelection(stageId)"
+                        aria-label="Remove stage">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+                <span class="aps-flow-arrow" *ngIf="i < selectedStageIds.length - 1" aria-hidden="true">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M13 5l7 7-7 7"/>
+                  </svg>
+                </span>
+              </div>
             </div>
           </div>
-          <div class="category-buttons">
-            <button mat-button type="button" (click)="hidecategory = !hidecategory">Back</button>
-            <button mat-button color="primary" type="button" (click)="saveCategory()">Save</button>
+
+          <p class="aps-error"
+             *ngIf="!pipelineform.controls['stages'].valid && selectedStageIds.length === 0">
+            At least one stage is required
+          </p>
+        </div>
+      </section>
+
+      <!-- ACCESS & VISIBILITY -->
+      <section class="aps-section">
+        <div class="aps-section-head">
+          <span class="aps-section-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </span>
+          <h3 class="aps-section-title">Access & Visibility</h3>
+        </div>
+
+        <div class="aps-section-body">
+          <div class="aps-grid aps-grid-2">
+            <mat-form-field appearance="outline" class="aps-field">
+              <mat-label>Table columns</mat-label>
+              <mat-select formControlName="columns" multiple>
+                <mat-option *ngFor="let col of leadslist" [value]="col">{{ col }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="aps-field">
+              <mat-label>Pre-sale owners</mat-label>
+              <mat-select formControlName="presaleowner" multiple>
+                <mat-option *ngFor="let owner of ownerlist" [value]="owner.owner_id || owner.id">
+                  {{ owner.owner || owner.owner_fullname || owner.email }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
           </div>
+
+          <mat-form-field appearance="outline" class="aps-field aps-field-full">
+            <mat-label>Pipeline visible to</mat-label>
+            <mat-select formControlName="pipeline_visibleto" multiple>
+              <mat-option *ngFor="let owner of ownerlist" [value]="owner.owner_id || owner.id">
+                {{ owner.owner || owner.owner_fullname || owner.email }}
+              </mat-option>
+            </mat-select>
+            <mat-hint>You're added by default; pick others to share with.</mat-hint>
+          </mat-form-field>
         </div>
-      </div>
+      </section>
 
-      <!-- Settings Section -->
-      <div class="settings-section">
-        <div class="setting-row" *ngIf="isDeveloper">
-          <span class="setting-label">Hidden Pipeline</span>
-          <mat-checkbox formControlName="hidden">
-            <span class="setting-status">{{ pipelineform.controls['hidden'].value ? 'Yes' : 'No' }}</span>
-          </mat-checkbox>
+      <!-- SETTINGS -->
+      <section class="aps-section">
+        <div class="aps-section-head">
+          <span class="aps-section-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </span>
+          <h3 class="aps-section-title">Settings</h3>
         </div>
 
-        <div class="setting-row">
-          <span class="setting-label">Dynamic Leads</span>
-          <mat-checkbox formControlName="pipelinedynamic">
-            <span class="setting-status">{{ pipelineform.controls['pipelinedynamic'].value ? 'Enabled' : 'Disabled' }}</span>
-          </mat-checkbox>
+        <div class="aps-section-body">
+
+          <!-- Journey Experience Spotlight -->
+          <div class="aps-spotlight"
+               [class.aps-spotlight--on]="pipelineform.controls['journeyexperience'].value">
+            <div class="aps-spotlight-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2l2.39 7.36H22l-6.18 4.49L18.21 21 12 16.51 5.79 21l2.39-7.15L2 9.36h7.61z"/>
+              </svg>
+            </div>
+            <div class="aps-spotlight-meta">
+              <span class="aps-spotlight-pill">Starlabs</span>
+              <span class="aps-spotlight-label">Journey Experience Pipeline</span>
+            </div>
+            <div class="aps-spotlight-toggle">
+              <span class="aps-toggle-state">
+                {{ pipelineform.controls['journeyexperience'].value ? 'On' : 'Off' }}
+              </span>
+              <mat-slide-toggle formControlName="journeyexperience"
+                                class="aps-toggle aps-toggle--spotlight">
+              </mat-slide-toggle>
+            </div>
+          </div>
+
+          <!-- Other settings -->
+          <div class="aps-setting-list">
+            <div class="aps-setting" *ngIf="isDeveloper">
+              <span class="aps-setting-icon">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </span>
+              <span class="aps-setting-label">Hidden pipeline</span>
+              <mat-checkbox formControlName="hidden" class="aps-cb"></mat-checkbox>
+            </div>
+
+            <div class="aps-setting">
+              <span class="aps-setting-icon">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              </span>
+              <span class="aps-setting-label">Dynamic leads</span>
+              <mat-checkbox formControlName="pipelinedynamic" class="aps-cb"></mat-checkbox>
+            </div>
+
+            <div class="aps-setting">
+              <span class="aps-setting-icon">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="16 3 21 3 21 8"/>
+                  <line x1="4" y1="20" x2="21" y2="3"/>
+                  <polyline points="21 16 21 21 16 21"/>
+                  <line x1="15" y1="15" x2="21" y2="21"/>
+                  <line x1="4" y1="4" x2="9" y2="9"/>
+                </svg>
+              </span>
+              <span class="aps-setting-label">Assign leads · round robin</span>
+              <mat-checkbox formControlName="assignleads" class="aps-cb"></mat-checkbox>
+            </div>
+
+            <div class="aps-setting aps-setting--publish">
+              <span class="aps-setting-icon">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+                  <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+                  <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+                  <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+                </svg>
+              </span>
+              <span class="aps-setting-label">Publish pipeline</span>
+              <div class="aps-publish-toggle">
+                <span class="aps-toggle-state"
+                      [class.aps-toggle-state--live]="pipelineform.controls['delete'].value">
+                  {{ pipelineform.controls['delete'].value ? 'Live' : 'Draft' }}
+                </span>
+                <mat-slide-toggle formControlName="delete" class="aps-toggle"></mat-slide-toggle>
+              </div>
+            </div>
+          </div>
+
         </div>
+      </section>
+    </form>
+  </mat-dialog-content>
 
-        <div class="setting-row">
-          <span class="setting-label">Assign Leads (Round Robin)</span>
-          <mat-checkbox formControlName="assignleads">
-            <span class="setting-status">{{ pipelineform.controls['assignleads'].value ? 'Enabled' : 'Disabled' }}</span>
-          </mat-checkbox>
-        </div>
-
-        <div class="setting-row">
-          <span class="setting-label">Publish Pipeline</span>
-          <mat-slide-toggle formControlName="delete">
-            {{ pipelineform.controls['delete'].value ? 'YES' : 'NO' }}
-          </mat-slide-toggle>
-        </div>
-      </div>
-
-    </div>
-  </form>
-</mat-dialog-content>
-
-<mat-dialog-actions class="dialog-actions">
-  <button mat-stroked-button color="warn" (click)="dialogRef.close()">Close</button>
-  <button mat-stroked-button color="primary"
-    [disabled]="!pipelineform.valid"
-    (click)="save(pipelineform.value)">
-    Save Pipeline
-  </button>
-</mat-dialog-actions>
+  <!-- FOOTER -->
+  <mat-dialog-actions class="aps-footer">
+    <button type="button" class="aps-ghost-btn" (click)="dialogRef.close()">Cancel</button>
+    <button type="button" class="aps-primary-btn"
+            (click)="save(pipelineform.value)">
+      {{ data?.type === 'edit' ? 'Save changes' : 'Create pipeline' }}
+    </button>
+  </mat-dialog-actions>
+</div>

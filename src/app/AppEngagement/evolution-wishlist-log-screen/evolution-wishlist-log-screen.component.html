@@ -1,64 +1,96 @@
 <div class="mainscreen">
     <div class="header">
-      <div class="row">
-        <div class="col-sm"></div>
-        <div class="col-sm">
-          <h5 class="heading">Evolution Wishlist Log</h5>
-        </div>
-        <div class="col-sm"></div>
+      <h5 class="heading">Evolution Wishlist Log</h5>
+      <div style="display:flex;gap:8px">
+        <button mat-raised-button color="primary" (click)="createQuestion()">Create Question</button>
+        <button mat-raised-button color="primary" [disabled]="!fullAccess" (click)="export()">Export</button>
       </div>
     </div>
     <div class="body mat-elevation-z2">
       <div class="actionbox">
-        <div class="actionitem">
+        <div class="actionitem" style="flex-wrap:wrap;gap:8px;justify-content:flex-start">
           <mat-form-field appearance="outline">
             <mat-label>Filter Table</mat-label>
-            <input matInput (keyup)="filterData(input.value)" #input autocomplete="off">
-          </mat-form-field>&nbsp;&nbsp;
-          <button mat-raised-button color="primary" (click)="createQuestion()">
-            Create Question
-          </button>&nbsp;&nbsp;
-          <button mat-raised-button color="primary" [disabled]="!fullAccess" (click)="export()">
-            Export
-          </button>
+            <input matInput (keyup)="textFilter = input.value; applyFilters()" #input autocomplete="off">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="date-range-field">
+            <mat-label>Created range</mat-label>
+            <mat-date-range-input [rangePicker]="createdPicker">
+              <input matStartDate [(ngModel)]="createdFrom" placeholder="Start date" (dateChange)="applyFilters()">
+              <input matEndDate [(ngModel)]="createdTo" placeholder="End date" (dateChange)="applyFilters()">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matIconSuffix [for]="createdPicker"></mat-datepicker-toggle>
+            <mat-date-range-picker #createdPicker></mat-date-range-picker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="date-range-field">
+            <mat-label>Sent range</mat-label>
+            <mat-date-range-input [rangePicker]="sentPicker">
+              <input matStartDate [(ngModel)]="sentFrom" placeholder="Start date" (dateChange)="applyFilters()">
+              <input matEndDate [(ngModel)]="sentTo" placeholder="End date" (dateChange)="applyFilters()">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matIconSuffix [for]="sentPicker"></mat-datepicker-toggle>
+            <mat-date-range-picker #sentPicker></mat-date-range-picker>
+          </mat-form-field>
+
+          <!-- Know More filter -->
+          <mat-form-field appearance="outline" style="width:160px">
+            <mat-label>Know More</mat-label>
+            <mat-select [(ngModel)]="knowMoreFilter" (ngModelChange)="applyFilters()">
+              <mat-option value="">All</mat-option>
+              <mat-option value="clicked">Clicked</mat-option>
+              <mat-option value="notclicked">Not Clicked</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <!-- Ecosystem filter -->
+          <mat-form-field appearance="outline" style="width:160px">
+            <mat-label>Ecosystem</mat-label>
+            <mat-select [(ngModel)]="ecosystemFilter" (ngModelChange)="applyFilters()">
+              <mat-option value="">All</mat-option>
+              <mat-option value="yes">In Ecosystem</mat-option>
+              <mat-option value="no">Not in Ecosystem</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <button mat-stroked-button color="warn" (click)="applyFilters(true)">Clear</button>
         </div>
       </div>
       <br>
       <div class="count-container">
         <h5 class="count-heading">
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('initiated')" [class.active-card]="activeFilter === 'initiated'">
             <span class="count-number initiated-total">{{ initiatedCount + completedCount + notcompletedCount + cancelledCount }}</span>
             <span class="count-label">Initiated</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('shared')" [class.active-card]="activeFilter === 'shared'">
             <span class="count-number shared">{{ completedCount + notcompletedCount }}</span>
             <span class="count-label">Shared</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('completed')" [class.active-card]="activeFilter === 'completed'">
             <span class="count-number completed">{{ completedCount }}</span>
             <span class="count-label">Completed</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('pending')" [class.active-card]="activeFilter === 'pending'">
             <span class="count-number pending">{{ notcompletedCount }}</span>
             <span class="count-label">Pending</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('notshared')" [class.active-card]="activeFilter === 'notshared'">
             <span class="count-number initiated">{{ initiatedCount }}</span>
             <span class="count-label">Not shared</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('sharessent')" [class.active-card]="activeFilter === 'sharessent'">
             <span class="count-number sharessent">{{ totalSharedContacts }}</span>
             <span class="count-label">Shares Sent</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('received')" [class.active-card]="activeFilter === 'received'">
             <span class="count-number responsesreceived">{{ totalCompletedContacts }}</span>
             <span class="count-label">Responses Received</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('notreceived')" [class.active-card]="activeFilter === 'notreceived'">
             <span class="count-number initiated">{{ totalSharedContacts - totalCompletedContacts }}</span>
             <span class="count-label">Responses Not Received</span>
           </div>
-          <div class="count-item">
+          <div class="count-item" (click)="applyStatusFilter('cancelled')" [class.active-card]="activeFilter === 'cancelled'">
             <span class="count-number cancelled">{{ cancelledCount }}</span>
             <span class="count-label">Cancelled</span>
           </div>
@@ -99,76 +131,85 @@
             </span>
           </td>
         </ng-container>
-        <ng-container  matColumnDef="contacts">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Contacts</th>
-            <td mat-cell *matCellDef="let row">
-                <!-- {{row["contacts"]}} -->
-                <div *ngFor="let contact of row.contacts">
-                  <b>{{ contact.name }}</b>&nbsp;&nbsp;&nbsp;
-                  <mat-icon *ngIf="contact.type == 'gmail'" style="font-size: 16px;">email</mat-icon>
-                  <mat-icon *ngIf="contact.type == 'number'" style="font-size: 16px;">perm_phone_msg</mat-icon>{{ contact.contact }}
-                  <!-- ({{ contact.type }}) -->
-              </div>
-            </td>
+        <ng-container matColumnDef="contacts">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Contacts</th>
+          <td mat-cell *matCellDef="let row">
+          <div class="contact-chips">
+            <span *ngFor="let contact of row.contacts"
+              class="contact-chip"
+              [matTooltip]="isInEcosystem(contact) ? 'In Ecosystem' : ''"
+              [ngClass]="{
+                'chip-received': contact.status === 'received',
+                'chip-cancelled': contact.status === 'cancelled',
+                'chip-pending': contact.status !== 'received' && contact.status !== 'cancelled',
+                'chip-ecosystem': isInEcosystem(contact)
+              }">
+              {{ contact.name }}
+              <span *ngIf="isInEcosystem(contact)" class="ecosystem-badge">★</span>
+            </span>
+          </div>
+          </td>
         </ng-container>
         <ng-container  matColumnDef="sent">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Sent</th>
             <td mat-cell *matCellDef="let row">{{row["sent"] | date: 'MMMM d, y, h:mm a'}}</td>
         </ng-container>
+        <ng-container matColumnDef="knowmore">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Know More</th>
+          <td mat-cell *matCellDef="let row">
+            <span *ngIf="row.contacts?.length > 0" class="knowmore-badge">
+               {{ row.knowMoreClickedCount }}/{{ row.contacts.length }}
+            </span>
+            <span *ngIf="!row.contacts?.length">—</span>
+          </td>
+        </ng-container>
         <ng-container matColumnDef="wishlist">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Wishlist</th>
-          <td mat-cell *matCellDef="let row" class="wishlist-column">
-            <div *ngFor="let contact of row.contacts; let i = index">
-              <div *ngIf="contact.status === 'received'">
-                <div>
-                  {{ i + 1 }}. 
-                  <!-- {{ contact.name }}  -->
-                  <b>{{ contact.name }}</b>&nbsp;
-                  <mat-icon *ngIf="contact.type == 'gmail'" style="font-size: 16px;">email</mat-icon>
-                  <mat-icon *ngIf="contact.type == 'number'" style="font-size: 16px;">perm_phone_msg</mat-icon>
-                  <!-- ({{ contact.type }}) -->
-                </div>
-              </div>
-            </div>
-            <button mat-raised-button color="accent" style="margin-bottom: 20px;margin-top: 10px;" [disabled]="!fullAccess" (click)="expandedElement = expandedElement === row ? null : row">
+          <th mat-header-cell *matHeaderCellDef>Details</th>
+          <td mat-cell *matCellDef="let row">
+            <button mat-raised-button color="accent" 
+              [disabled]="!fullAccess"
+              (click)="expandedElement = expandedElement === row ? null : row">
               {{ expandedElement === row ? 'Collapse' : 'Expand' }}
             </button>
           </td>
         </ng-container>
         <ng-container matColumnDef="expandedDetail">
-          <td mat-cell *matCellDef="let element" [attr.colspan]="8">
+          <td mat-cell *matCellDef="let element" [attr.colspan]="displayedColumns.length">
             <div class="expandedbox" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
-              <h2 class="responses-heading">Wishlist Responses</h2>
               
-              <div class="forms-container">
-                <ng-container *ngFor="let contact of element.contacts; let contactIndex = index">
-                  <div *ngIf="contact.status === 'received' && contact.wishlistquestionmap" class="form-container">
-                    <div class="form-header">
-                      <p style="font-style: italic; font-weight: 400; text-align: center; margin-bottom: 25px;">
-                        Responses from <b>{{ contact.name }}</b> submitted on {{ contact['submitteddate'].toDate() | date: 'MMMM d, y, h:mm a' }}
-                      </p>
-                    </div>
-                    
-                    <ng-container *ngFor="let orderedQuestion of questionsOrder; let i = index">
-                      <div *ngIf="contact.wishlistquestionmap && contact.wishlistquestionmap[orderedQuestion.id]" class="question-container">
-                        <label class="question-label">
-                          <strong>{{ i + 1 }}. {{ questionsMap[orderedQuestion.id]?.replace('{{participantname}}', mapProfile[element.profileid]) }}</strong>
-                        </label>
-                        
-                        <div class="answer-display">
-                          <p>{{ contact.wishlistquestionmap[orderedQuestion.id] }}</p>
-                          <p *ngIf="contact[orderedQuestion.id + 'Additional']" class="additional-response">
-                            <strong>Additional information:</strong> {{ contact[orderedQuestion.id + 'Additional'] }}
-                          </p>
-                        </div>
-                      </div>
-                    </ng-container>
-                    <p style="font-style: italic; font-weight: 400; text-align: center; margin-top: 25px;">
-                      These responses will be utilized for designing {{ mapProfile[element.profileid] }}'s next cycle of Personal Evolution.
-                    </p>
-                  </div>
-                </ng-container>
+              <div class="expand-summary">
+                <span>{{ element.submittedCount }} of {{ element.contacts?.length }} submitted</span>
+                <span>{{ element.knowMoreClickedCount }} of {{ element.contacts?.length }} clicked Know More</span>
               </div>
+
+              <table class="detail-table">
+                <thead>
+                  <tr>
+                    <th>Contact</th>
+                    <th>Submission</th>
+                    <th>Submitted at</th>
+                    <th>Know More</th>
+                    <th>Clicked at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let contact of element.contacts">
+                    <td>{{ contact.name }}</td>
+                    <td>
+                      <span class="status-badge"
+                        [ngClass]="contact.status === 'received' ? 'badge-received' : contact.status === 'cancelled' ? 'badge-cancelled' : 'badge-pending'">
+                        {{ contact.status === 'received' ? 'Received' : contact.status === 'cancelled' ? 'Cancelled' : 'Pending' }}
+                      </span>
+                    </td>
+                    <td>{{ contact.submitteddate ? (contact.submitteddate.toDate() | date: 'MMM d, y, h:mm a') : '—' }}</td>
+                    <td>
+                      <span *ngIf="contact.knowmoreclicks?.length > 0" class="knowmore-clicked">✓ Clicked</span>
+                      <span *ngIf="!contact.knowmoreclicks?.length">—</span>
+                    </td>
+                    <td>{{ contact.knowmoreclicks?.[0]?.clickedAt ? (contact.knowmoreclicks[0].clickedAt | date: 'MMM d, y, h:mm a') : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </td>
         </ng-container>

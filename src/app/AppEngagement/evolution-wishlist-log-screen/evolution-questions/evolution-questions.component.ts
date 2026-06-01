@@ -1,12 +1,12 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule,FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { MatOptionModule } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
-import { Firestore,where, collection, getDocs, query, doc, updateDoc,setDoc, orderBy, CollectionReference,writeBatch, collectionData } from '@angular/fire/firestore';
+import { Firestore,where, collection, getDocs, query, doc, updateDoc,setDoc, orderBy, CollectionReference,writeBatch, collectionData,deleteDoc,getDoc } from '@angular/fire/firestore';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSort, MatSortModule} from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
@@ -26,7 +26,7 @@ import { AngularFireStorage } from '@angular/fire/compat/storage';
   imports:[CommonModule,MatFormFieldModule,MatIconModule,MatButtonModule,
     MatSlideToggleModule,DragDropModule, MatInputModule,MatSortModule,
     MatTableModule,ReactiveFormsModule,  MatSelectModule, MatOptionModule,
-    MatPaginatorModule,],
+    MatPaginatorModule,CommonModule, FormsModule, MatFormFieldModule,],
   templateUrl: './evolution-questions.component.html',
   styleUrls: ['./evolution-questions.component.css']
 })
@@ -39,10 +39,17 @@ export class EvolutionQuestionsComponent implements OnInit {
   disableButton: boolean = false;
   disableQuestion: boolean = true;
   sno: number = 0; 
+  editingQuestion: any = null;
+  editForm: FormGroup;
+  editOptionsArray: FormArray = null;
+  showAddDialog: boolean = false;
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
   displayedColumns: string[] = ["sno", "question", "type", "options", "disable"];
   dataSource = new MatTableDataSource();
+  knowMoreLinks: any[] = [];
+  newLink = { type: '', url: '', enabled: true };
+  showLinksDialog: boolean = false;
   dropTable(event: CdkDragDrop<any[]>) {
     moveItemInArray(this.questions, event.previousIndex, event.currentIndex);
     this.updateSerialNumbers();
@@ -68,12 +75,16 @@ export class EvolutionQuestionsComponent implements OnInit {
     private storage: AngularFireStorage,
     public dialog: MatDialog,
     public dialogRef: MatDialogRef<EvolutionQuestionsComponent>,
-    private fb: FormBuilder
+    public fb: FormBuilder
   ) { 
     this.initForm();
   }
   ngOnInit(): void {
     this.getAllQuestionsAndSerialNumber();
+    const docRef = doc(this.firestore, 'evolutionwishlistquestions', 'knowmorelinks');
+    getDoc(docRef).then(snap => {
+      this.knowMoreLinks = snap.exists() ? snap.data()['links'] || [] : [];
+    });
   }
 
   initForm() {
@@ -135,10 +146,10 @@ export class EvolutionQuestionsComponent implements OnInit {
     const q = query(questionsRef, orderBy("sno", "asc"));
     getDocs(q).then(snapshot => {
         if (!snapshot.empty) {
-          const data = snapshot.docs.map(doc => ({
-            docid: doc.id,
-            ...doc.data() as any
-          }));
+        const data = snapshot.docs.map(doc => ({
+          docid: doc.id,
+          ...doc.data() as any
+        })).filter(q => !q.deleted);
           const lastSno = Math.max(...data.map(q => q.sno), 0);
           this.sno = lastSno + 1;
           if (this.questionForm) {
@@ -172,14 +183,13 @@ export class EvolutionQuestionsComponent implements OnInit {
   }
   toggleQuestionStatus(element: any) {
     const questionRef = doc(this.firestore, "evolutionwishlistquestions", element.docid);
-    updateDoc(questionRef, {
-        enabled: !element.enabled
-        }).then(() => {
-        console.log('Question status updated');
-        }).catch((error) => {
-        console.error('Error updating question status', error);
-        });
-    }
+    const newStatus = !element.enabled;
+    updateDoc(questionRef, { enabled: newStatus }).then(() => {
+      element.enabled = newStatus; 
+    }).catch((error) => {
+      console.error('Error updating question status', error);
+    });
+  }
   addEvolution() {
     if (this.questionForm.invalid) {
       alert('Please fill all required fields');
@@ -223,11 +233,12 @@ export class EvolutionQuestionsComponent implements OnInit {
           videoUrl: '',
           audioUrl: '',
           askanswer: false,
-          needAdditionalInput: false, // Reset the checkbox
-          additionalInputLabel: '' // Reset the additional input label  
+          needAdditionalInput: false, 
+          additionalInputLabel: ''  
         });
         this.options.clear();
         this.getAllQuestionsAndSerialNumber();
+        this.showAddDialog = false; 
         this.disableQuestion = false;
       })
       .catch((error) => {
@@ -235,6 +246,63 @@ export class EvolutionQuestionsComponent implements OnInit {
         this.disableButton = false;
       });
     }
+    deleteQuestion(element: any) {
+      if (confirm('Are you sure you want to delete this question?')) {
+        const questionRef = doc(this.firestore, "evolutionwishlistquestions", element.docid);
+        updateDoc(questionRef, { deleted: true, enabled: false }).then(() => {
+          this.questions = this.questions.filter(q => q.docid !== element.docid);
+        });
+      }
+    }
+    startEdit(question: any) {
+      this.editingQuestion = question;
+      this.editForm = this.fb.group({
+        question: [question.question, Validators.required],
+        type: [question.type],
+        options: this.fb.array(
+          (question.options || []).map(opt => this.fb.control(opt, Validators.required))
+        ),
+      });
+      this.editOptionsArray = this.editForm.get('options') as FormArray;
+    }
+
+    saveEdit() {
+      if (this.editForm.invalid) return;
+      const updateData: any = {
+        question: this.editForm.value.question,
+        type: this.editForm.value.type,
+      };
+      if (['radio','checkbox'].includes(this.editForm.value.type)) {
+        updateData.options = this.editForm.value.options;
+      }
+      const questionRef = doc(this.firestore, "evolutionwishlistquestions", this.editingQuestion.docid);
+      updateDoc(questionRef, updateData).then(() => {
+        this.editingQuestion.question = updateData.question;
+        this.editingQuestion.type = updateData.type;
+        if (updateData.options) this.editingQuestion.options = updateData.options;
+        this.editingQuestion = null;
+      });
+    }
+    getFavicon(url: string) {
+      return `https://www.google.com/s2/favicons?domain=${url}&sz=64`;
+    }
+
+    manageLink(action: 'add' | 'remove' | 'toggle', index?: number) {
+      if (action === 'add') {
+        if (!this.newLink.type || !this.newLink.url) { alert('Please enter type and url'); return; }
+        this.knowMoreLinks.push({ ...this.newLink });
+        this.newLink = { type: '', url: '', enabled: true };
+      } else if (action === 'remove') {
+        if (!confirm('Are you sure you want to delete this link?')) return;
+        this.knowMoreLinks.splice(index, 1);
+      }
+      else if (action === 'toggle') {
+        this.knowMoreLinks[index].enabled = !this.knowMoreLinks[index].enabled;
+      }
+      const docRef = doc(this.firestore, 'evolutionwishlistquestions', 'knowmorelinks');
+      setDoc(docRef, { links: this.knowMoreLinks });
+    }
+    
   }
   // getAllQuestionsAndSerialNumber() {
   //   this.firestore.collection("evolutionwishlistquestions",ref => ref.orderBy("sno", "asc"))
