@@ -653,12 +653,20 @@ scrollLogTop(): void {
 
       // Update filtered list
     this.filteredParticipantLists = [...this.participantLists];
+    this.sortListsLiveFirst();
     console.log('Participant lists loaded:', this.participantLists.length);
   } catch (error) {
     console.error('Error loading participant lists:', error);
     throw error;
   }
 }
+
+  private sortListsLiveFirst(): void {
+    const sort = (arr: ParticipantList[]) =>
+      [...arr].sort((a, b) => (b.live ? 1 : 0) - (a.live ? 1 : 0));
+    this.participantLists = sort(this.participantLists);
+    this.filteredParticipantLists = sort(this.filteredParticipantLists);
+  }
 
   async computeLiveSegmentConflicts(): Promise<void> {
   this.globalConflictMap.clear();
@@ -836,6 +844,7 @@ scrollLogTop(): void {
       return list.profileids.some(profileId => matchedProfileIds.has(profileId));
     });
 
+    this.sortListsLiveFirst();
     console.log(`Filter applied: ${this.matchedProfiles.length} profiles matched, ${this.filteredParticipantLists.length} lists found`);
   }
 
@@ -981,6 +990,8 @@ scrollLogTop(): void {
 
       const filtered = this.filteredParticipantLists.find(l => l.docid === list.docid);
       if (filtered) filtered.live = newLiveValue;
+
+      this.sortListsLiveFirst();
 
       if (this.selectedList?.docid === list.docid) {
         this.selectedList.live = newLiveValue;

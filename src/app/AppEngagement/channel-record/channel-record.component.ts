@@ -188,7 +188,8 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
     try {
       const q = query(
         collection(this.firestore, 'supportchat'),
-        where('type', '==', 'channel')
+        where('type', '==', 'channel'),
+        where('isdelete', '==', false)
       );
       const snap = await getDocs(q);
       this.channelMap = {};
