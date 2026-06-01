@@ -169,9 +169,8 @@
                   </div>
                 </div>
 
-                <!-- Token + status (middle) -->
+                <!-- Status only (token number is internal — not surfaced) -->
                 <div class="wait-token__meta">
-                  <span class="wait-token__token">#{{ token.tokennumber }}</span>
                   <span class="wait-token__status"
                         [class.is-ready]="token.status == 'ready'">
                     {{ token.status }}
@@ -221,17 +220,17 @@
       <div class="ds-side-profile">
         <div class="ds-side-id">
           <div class="ds-avatar"
-            (click)="(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile) && (expandedImage = (mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile))">
-            <img *ngIf="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
-              [src]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
-              [alt]="mapProfile[liveAssignment['token']?.profile_id]">
-            <span *ngIf="!(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile)">
-              {{ (mapProfile[liveAssignment["token"]?.profile_id] || '?').charAt(0) | uppercase }}
+            (click)="(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile) && (expandedImage = (mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile))">
+            <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+              [src]="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+              [alt]="mapProfile[participantProfileId]">
+            <span *ngIf="!(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile)">
+              {{ (mapProfile[participantProfileId] || '?').charAt(0) | uppercase }}
             </span>
             <span class="ds-online" *ngIf="participantReady"></span>
           </div>
           <div style="min-width:0; flex:1;">
-            <div class="ds-side-name">{{ mapProfile[liveAssignment["token"]?.profile_id] }}</div>
+            <div class="ds-side-name">{{ mapProfile[participantProfileId] || '—' }}</div>
           </div>
           <button type="button" class="ds-collapse" [class.open]="sidebarProfileOpen"
             (click)="toggleSidebarProfile()"
@@ -246,7 +245,7 @@
           <div class="ds-meta-row" *ngIf="participantUPVisitLabel">
             <span class="ds-meta-ic"><mat-icon class="ic">emoji_events</mat-icon></span>
             <span class="ds-chip-label">Milestone</span>
-            <span class="ds-chip-val">{{ participantUPVisitLabel }} time at uP</span>
+            <span class="ds-chip-val">{{ participantUPVisitLabel }} at uP!</span>
           </div>
           <div class="ds-meta-row">
             <span class="ds-meta-ic"><mat-icon class="ic">inventory_2</mat-icon></span>
@@ -278,10 +277,6 @@
 
       <!-- Stepper -->
       <div class="ds-stepscroll">
-        <div class="ds-steps-label">
-          <span>Workflow Progress</span>
-          <span class="ds-progress-count">{{ getStepIndex(activeStepId) + 1 }} / {{ visibleSteps.length }}</span>
-        </div>
         <nav class="ds-steplist">
           <button
             *ngFor="let step of visibleSteps; let i = index; let last = last"
@@ -320,6 +315,21 @@
           <div class="ds-waiting-title">{{ topBarStatus.title }}</div>
           <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
         </div>
+
+        <!-- ATC count for the current queue — quick summary chip shown in
+             the topbar so the specialist sees it across all steps. Click
+             jumps to the View Submitted ATC step. -->
+        <div class="ds-waiting-chips">
+          <button type="button" class="ds-chip ds-chip--atc"
+                  *ngIf="atcInThisQueueCount > 0 && getStepIndex('view-atc') >= 0"
+                  (click)="setActiveStep('view-atc')"
+                  [matTooltip]="'View prescribed ATC for this queue'">
+            <mat-icon class="ic">check_circle</mat-icon>
+            <b>{{ atcInThisQueueCount }}</b>
+            ATC given for this queue
+          </button>
+        </div>
+
         <!-- Jump to Meeting is only shown while the participant is in the
              waiting room — i.e. they're on the meeting screen ready to join
              the call but the specialist hasn't started it yet. -->
@@ -351,50 +361,17 @@
             </div>
           </div>
 
-          <!-- ATC prescribed in this queue banner (visible across steps) -->
-          <div class="atc-banner" *ngIf="atcInThisQueueCount > 0">
-            <span class="atc-banner__icon"><mat-icon class="ic">check_circle</mat-icon></span>
-            <div>
-              <div class="atc-banner__title">{{ atcInThisQueueCount }} ATC prescribed for this queue</div>
-              <div class="atc-banner__sub">
-                {{ atcInThisQueueCount === 1 ? 'An ATC has' : atcInThisQueueCount + ' ATCs have' }}
-                been prescribed for {{ mapProfile[liveAssignment["token"]?.profile_id] }} in {{ ongoingQueue['queuename'] }}.
-              </div>
-            </div>
-            <button type="button" class="btn btn-soft btn-sm atc-banner__cta" (click)="setActiveStep('view-atc')" *ngIf="getStepIndex('view-atc') >= 0">
-              <mat-icon class="ic">visibility</mat-icon>
-              View
-            </button>
-          </div>
+          <!-- (ATC prescribed banner + Submitted Forms info banner moved into
+               the topbar status pill as compact chips — saves vertical space.) -->
 
           <!-- ========================= STEP 1: Submitted Forms ========================= -->
           <ng-container *ngIf="activeStepId === 'current-forms'">
-            <div class="info-banner">
-              <mat-icon class="ic">info</mat-icon>
-              <p>
-                <b>{{ participantForm.length }}</b> form{{ participantForm.length === 1 ? '' : 's' }}
-                submitted by <b>{{ mapProfile[liveAssignment['token']?.profile_id] }}</b>.
-                Open any form to review the participant's responses in a new tab.
-              </p>
-            </div>
             <div class="card">
-              <div class="form-row" *ngFor="let form of participantForm; let i = index">
+              <div class="form-row form-row--compact" *ngFor="let form of participantForm; let i = index">
                 <div class="form-row__main">
+                  <span class="form-row__num">{{ i + 1 }}.</span>
                   <div class="form-row__icon"><mat-icon class="ic">description</mat-icon></div>
-                  <div>
-                    <div class="form-row__kicker">Form {{ i + 1 }}</div>
-                    <div class="form-row__name">{{ form['formname'] }}</div>
-                    <div class="form-row__chips">
-                      <span class="pill pill-slate">
-                        <mat-icon class="ic">people</mat-icon>
-                        {{ mapQueue[form['queueid']] }}
-                      </span>
-                      <span class="pill pill-green">
-                        <mat-icon class="ic">check</mat-icon>
-                        Submitted
-                      </span>
-                    </div>
-                  </div>
+                  <span class="form-row__name">{{ form['formname'] }}</span>
                 </div>
                 <button type="button" class="btn btn-primary" (click)="viewform(form)">
                   Open Form
@@ -411,7 +388,10 @@
             <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')">
               <div class="card-pad">
                 <h3 class="section-title">Previous ATC History</h3>
-                <app-view-participant-atc [profileid]="liveAssignment['participantid']"></app-view-participant-atc>
+                <app-view-participant-atc
+                  [profileid]="liveAssignment['participantid']"
+                  [excludeQueueId]="ongoingQueue['docid']">
+                </app-view-participant-atc>
               </div>
             </div>
 
@@ -440,7 +420,7 @@
                   <div class="ll-item" *ngFor="let letter of loveLetterList; let i = index">
                     <div class="ll-item__head">
                       <span>{{ i + 1 }}.</span>
-                      <span class="ll-item__name">{{ mapProfile[letter.profileid] || mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+                      <span class="ll-item__name">{{ mapProfile[letter.profileid] || mapProfile[participantProfileId] }}</span>
                       <span class="ll-item__date">
                         {{ (letter.created?.toDate ? letter.created.toDate() : letter.created) | date:'medium' }}
                       </span>
@@ -456,27 +436,29 @@
 
           <!-- ========================= STEP 3: View Submitted ATC ========================= -->
           <ng-container *ngIf="activeStepId === 'view-atc'">
-            <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedvalidatedatc')" [ngTemplateOutlet]="tplValidatedATC"></ng-container>
-            <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedunvalidatedatc')" [ngTemplateOutlet]="tplUnvalidatedATC"></ng-container>
-            <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('assignedatc')" [ngTemplateOutlet]="tplAssignedATC"></ng-container>
-            <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('viewtripleatc')" [ngTemplateOutlet]="tplTripleATC"></ng-container>
+            <div class="step-compact">
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedvalidatedatc')" [ngTemplateOutlet]="tplValidatedATC"></ng-container>
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedunvalidatedatc')" [ngTemplateOutlet]="tplUnvalidatedATC"></ng-container>
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('assignedatc')" [ngTemplateOutlet]="tplAssignedATC"></ng-container>
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('viewtripleatc')" [ngTemplateOutlet]="tplTripleATC"></ng-container>
+            </div>
           </ng-container>
 
           <!-- ========================= STEP 4: Zoom Session ========================= -->
           <ng-container *ngIf="activeStepId === 'getstarted'">
             <div class="zoom-intro">
               <div class="zoom-intro__avatar">
-                <img *ngIf="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
-                  [src]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
-                  [alt]="mapProfile[liveAssignment['token']?.profile_id]">
-                <span *ngIf="!(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile)">
-                  {{ (mapProfile[liveAssignment["token"]?.profile_id] || '?').charAt(0) | uppercase }}
+                <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+                  [src]="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+                  [alt]="mapProfile[participantProfileId]">
+                <span *ngIf="!(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile)">
+                  {{ (mapProfile[participantProfileId] || '?').charAt(0) | uppercase }}
                 </span>
               </div>
               <div>
                 <div class="zoom-intro__title">
-                  <ng-container *ngIf="participantReady">{{ mapProfile[liveAssignment["token"]?.profile_id] }} is ready &amp; waiting</ng-container>
-                  <ng-container *ngIf="!participantReady">Ready to meet {{ mapProfile[liveAssignment["token"]?.profile_id] }}</ng-container>
+                  <ng-container *ngIf="participantReady">{{ mapProfile[participantProfileId] }} is ready &amp; waiting</ng-container>
+                  <ng-container *ngIf="!participantReady">Ready to meet {{ mapProfile[participantProfileId] }}</ng-container>
                 </div>
                 <div class="zoom-intro__sub">
                   <ng-container *ngIf="participantReady">
@@ -515,7 +497,8 @@
                 <div class="choice-desc">
                   Start the call when you're ready. The participant has already been invited.
                 </div>
-                <div class="zoom-status" *ngIf="liveAssignment['zoomdata']?.start_url">
+                <!-- Inline status: ready / pending / broken -->
+                <div class="zoom-status" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
                   <mat-icon class="ic">check_circle</mat-icon>
                   Zoom link ready
                 </div>
@@ -523,26 +506,40 @@
                   <mat-icon class="ic">hourglass_top</mat-icon>
                   Generating Zoom link...
                 </div>
+                <div class="zoom-status zoom-status--broken" *ngIf="isZoomLinkBroken && liveAssignment['zoomdata']">
+                  <mat-icon class="ic">warning</mat-icon>
+                  This Zoom link is broken — please generate a new one below.
+                </div>
                 <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
                         (click)="navigateMeeting(liveAssignment)"
-                        [disabled]="liveAssignment['zoomdata'] === undefined">
+                        [disabled]="liveAssignment['zoomdata'] === undefined || isZoomLinkBroken">
                   <mat-icon class="ic">play_arrow</mat-icon>
                   <span class="start-meeting-btn__label">Start Meeting</span>
                 </button>
               </div>
 
-              <!-- Generate New Link (placed at the BOTTOM as a separate row) -->
+              <!-- Generate New Link (placed at the BOTTOM as a separate row).
+                   Shown whenever the link is broken (regardless of the 10s
+                   throttle) OR when zoomlinkGenerator has unlocked normally. -->
               <div class="choice choice--secondary"
-                   *ngIf="liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
+                   *ngIf="(isZoomLinkBroken || (liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator)) && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
                 <div class="choice-secondary__head">
                   <div class="choice-ic slate"><mat-icon class="ic">refresh</mat-icon></div>
                   <div class="choice-secondary__text">
                     <div class="choice-title">Generate a new link</div>
                     <div class="choice-desc">
-                      If the existing link is broken, expired, or unreachable, create a fresh one. The new link is sent to the participant automatically.
+                      <ng-container *ngIf="isZoomLinkBroken">
+                        The current link is broken. Create a fresh one — the new link is sent to the participant automatically.
+                      </ng-container>
+                      <ng-container *ngIf="!isZoomLinkBroken">
+                        If the existing link is broken, expired, or unreachable, create a fresh one. The new link is sent to the participant automatically.
+                      </ng-container>
                     </div>
                   </div>
-                  <button type="button" class="btn btn-ghost btn-lg" (click)="regenerateZoomLink()">
+                  <button type="button" class="btn btn-lg"
+                          [class.btn-ghost]="!isZoomLinkBroken"
+                          [class.btn-primary]="isZoomLinkBroken"
+                          (click)="regenerateZoomLink()">
                     <mat-icon class="ic">refresh</mat-icon>
                     Generate New Link
                   </button>
@@ -570,13 +567,13 @@
                 <div style="display:flex;gap:14px;flex-wrap:wrap;">
                   <button type="button" class="btn btn-primary btn-lg"
                     *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc')"
-                    (click)="addATC(true, liveAssignment['token']?.profile_id)">
+                    (click)="addATC(true, participantProfileId)">
                     <mat-icon class="ic">check</mat-icon>
                     Prescribe ATC — No Validation
                   </button>
                   <button type="button" class="btn btn-ghost btn-lg"
                     *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')"
-                    (click)="addATC(false, liveAssignment['token']?.profile_id)">
+                    (click)="addATC(false, participantProfileId)">
                     <mat-icon class="ic">verified</mat-icon>
                     Prescribe ATC — Requires Validation
                   </button>
@@ -730,19 +727,65 @@
       </footer>
     </main>
 
-    <!-- Form-in-dialog template (used by viewform()) -->
-    <ng-template #formDialogTpl let-data>
+    <!-- Form-in-dialog template (used by viewform()).
+         Renders the submitted form INLINE — markup mirrors the overlay in
+         view-participants-form.component.html (individual mode). Bound to
+         the component's `formViewerState` writable holder. -->
+    <ng-template #formDialogTpl>
       <div class="form-dlg">
         <header class="form-dlg__head">
           <span class="form-dlg__title">
             <mat-icon class="ic">description</mat-icon>
-            {{ data.formname }}
+            {{ formViewerState.title }}
           </span>
           <button type="button" class="form-dlg__close" mat-dialog-close>
             <mat-icon class="ic">close</mat-icon>
           </button>
         </header>
-        <iframe class="form-dlg__frame" [src]="data.url" allow="clipboard-read; clipboard-write" frameborder="0"></iframe>
+        <div class="overlay-content">
+          <div *ngIf="formViewerState.loading" class="loading-spinner">
+            <div class="ds-form-spinner" aria-label="Loading"></div>
+          </div>
+
+          <ng-container *ngIf="!formViewerState.loading && formViewerState.data">
+            <div class="form-view">
+              <div class="form-banner"></div>
+              <div class="form-participant">{{ formViewerState.data.participantName }}</div>
+              <div class="form-title">{{ formViewerState.data.formTitle }}</div>
+              <div class="form-description" *ngIf="formViewerState.data.formDescription">{{ formViewerState.data.formDescription }}</div>
+              <div class="form-meta">
+                Queue: {{ formViewerState.data.queue }} | Workshop: {{ formViewerState.data.workshop }} | Submitted: {{ formViewerState.data.date }}
+              </div>
+              <hr class="form-divider">
+              <div *ngFor="let field of formViewerState.data.fields" class="form-field-item">
+                <div *ngIf="field.type === 'label'" class="form-section-label">
+                  <div class="section-title">{{ field.fieldname }}</div>
+                  <div class="section-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+                </div>
+                <div *ngIf="field.type === 'field'" class="form-question">
+                  <div class="question-title">
+                    {{ field.number }}. {{ field.fieldname }}
+                    <span class="required-star" *ngIf="field.required">*</span>
+                  </div>
+                  <div class="question-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+                  <div class="question-value" [class.empty-value]="field.isEmpty">
+                    <ng-container *ngIf="field.fieldType === 'array'; else plainValue">
+                      <div *ngFor="let line of field.value.split('\n')" class="array-sub-item">
+                        <ng-container *ngIf="line.includes(':'); else noColon">
+                          <span class="sub-item-label">{{ line.split(':')[0] }}:</span>
+                          <div class="sub-item-answer">{{ line.split(':').slice(1).join(':') }}</div>
+                        </ng-container>
+                        <ng-template #noColon>{{ line }}</ng-template>
+                      </div>
+                    </ng-container>
+                    <ng-template #plainValue>{{ field.value }}</ng-template>
+                  </div>
+                  <div class="question-notes" *ngIf="field.fieldnotes">Note: {{ field.fieldnotes }}</div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </div>
       </div>
     </ng-template>
 
@@ -815,7 +858,7 @@
 
         <div class="field-grid">
           <span class="field-label">Participant Name</span>
-          <span class="field-val">{{ mapProfile[liveAssignment["token"]?.profile_id] }}</span>
+          <span class="field-val">{{ mapProfile[participantProfileId] }}</span>
           <ng-container *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
             <span class="field-label">{{ mapActivity[$any(activity.key)] }}</span>
             <span class="field-val">
@@ -1020,7 +1063,21 @@
         <ul class="checkin-conflict__studios">
           <li *ngFor="let s of data.studios">
             <mat-icon class="ic">meeting_room</mat-icon>
-            <span>{{ s.name }}</span>
+            <div class="checkin-conflict__studio-info">
+              <div class="checkin-conflict__queue">
+                {{ s.queueName || 'Unknown queue' }}
+                <span class="checkin-conflict__live-dot" *ngIf="s.isLive" title="Live session in progress"></span>
+              </div>
+              <div class="checkin-conflict__stage" *ngIf="s.stageName">
+                <mat-icon class="ic ic-sm">arrow_forward</mat-icon>
+                <span>{{ s.stageName }}</span>
+                <span class="checkin-conflict__live-tag" *ngIf="s.isLive">LIVE</span>
+              </div>
+              <div class="checkin-conflict__stage checkin-conflict__stage--muted" *ngIf="!s.stageName">
+                <span>Idle · no active stage</span>
+              </div>
+              <div class="checkin-conflict__studio-name">{{ s.name }}</div>
+            </div>
           </li>
         </ul>
       </div>

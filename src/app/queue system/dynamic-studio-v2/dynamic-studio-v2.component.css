@@ -363,7 +363,7 @@
 }
 .ds-app .ds-meta-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 8px 13px;
 }
@@ -388,6 +388,8 @@
   text-transform: uppercase;
   color: var(--ink-3);
   white-space: nowrap;
+  flex-shrink: 0;
+  padding-top: 2px;
 }
 .ds-app .ds-chip-val {
   margin-left: auto;
@@ -395,11 +397,13 @@
   font-size: 13.5px;
   font-weight: 700;
   color: var(--ink);
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 60%;
+  line-height: 1.3;
+  /* Allow long values (product names, journey names, etc.) to wrap to
+     multiple lines instead of being clipped with an ellipsis. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .ds-app .ds-side-actions {
@@ -413,7 +417,7 @@
 .ds-app .ds-stepscroll {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 16px 26px;
+  padding: 12px 16px 22px;
 }
 .ds-app .ds-steps-label {
   font-size: 11px;
@@ -1145,6 +1149,40 @@
 }
 .ds-app .form-row__chips { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* Compact single-row variant — number + small icon + form name + CTA,
+   no kicker / no chips / no extra rows. Saves vertical space. */
+.ds-app .form-row--compact {
+  padding: clamp(10px, 0.6vw + 4px, 14px) clamp(14px, 0.8vw + 6px, 18px);
+}
+.ds-app .form-row--compact .form-row__main { gap: 10px; }
+.ds-app .form-row--compact .form-row__num {
+  font-size: clamp(14px, 0.4vw + 9px, 16px);
+  font-weight: 800;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+}
+.ds-app .form-row--compact .form-row__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.ds-app .form-row--compact .form-row__icon .ic {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+.ds-app .form-row--compact .form-row__name {
+  font-size: clamp(14px, 0.4vw + 9px, 16px);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ============================================================== LOVE LETTERS */
 .ds-app .ll-list { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
 .ds-app .ll-item {
@@ -1360,6 +1398,146 @@
   min-height: 0;
   border: 0;
   background: #fff;
+}
+
+/* ============================================================== INLINE FORM VIEWER
+   Ported from view-participants-form.component.css. The MatDialog template
+   renders OUTSIDE .ds-app via the CDK overlay, so we scope under the dialog's
+   panelClass with ::ng-deep instead of .ds-app. */
+::ng-deep .form-dialog-panel .overlay-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+::ng-deep .form-dialog-panel .loading-spinner {
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+}
+::ng-deep .form-dialog-panel .ds-form-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: ds-form-spinner-rot 0.9s linear infinite;
+}
+@keyframes ds-form-spinner-rot {
+  to { transform: rotate(360deg); }
+}
+::ng-deep .form-dialog-panel .form-view {
+  padding-bottom: 24px;
+}
+::ng-deep .form-dialog-panel .form-banner {
+  height: 6px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  margin-bottom: 16px;
+}
+::ng-deep .form-dialog-panel .form-participant {
+  font-size: 14px;
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 4px;
+}
+::ng-deep .form-dialog-panel .form-title {
+  font-size: 22px;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 8px;
+}
+::ng-deep .form-dialog-panel .form-description {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+::ng-deep .form-dialog-panel .form-meta {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 12px;
+}
+::ng-deep .form-dialog-panel .form-divider {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 12px 0 20px;
+}
+::ng-deep .form-dialog-panel .form-field-item {
+  margin-bottom: 20px;
+}
+::ng-deep .form-dialog-panel .form-section-label {
+  margin: 24px 0 12px;
+}
+::ng-deep .form-dialog-panel .section-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #000;
+}
+::ng-deep .form-dialog-panel .section-description {
+  font-size: 12px;
+  color: #777;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+::ng-deep .form-dialog-panel .form-question {
+  padding-left: 4px;
+}
+::ng-deep .form-dialog-panel .question-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 4px;
+}
+::ng-deep .form-dialog-panel .required-star {
+  color: #e53935;
+}
+::ng-deep .form-dialog-panel .question-description {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+::ng-deep .form-dialog-panel .question-value {
+  font-size: 13px;
+  color: #000;
+  background: #f5f5f5;
+  padding: 10px 12px;
+  border-radius: 6px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+::ng-deep .form-dialog-panel .question-value.empty-value {
+  color: #aaa;
+  font-style: italic;
+}
+::ng-deep .form-dialog-panel .question-notes {
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
+  margin-top: 6px;
+  padding-left: 4px;
+}
+::ng-deep .form-dialog-panel .array-sub-item {
+  padding: 6px 10px;
+  margin: 4px 0;
+  background-color: #f5f5f5;
+  border-left: 3px solid #667eea;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+::ng-deep .form-dialog-panel .sub-item-label {
+  font-weight: 600;
+  color: #000;
+  font-size: 13px;
+}
+::ng-deep .form-dialog-panel .sub-item-answer {
+  color: #444;
+  font-size: 13px;
+  margin-top: 2px;
+  padding-left: 8px;
+  line-height: 1.5;
 }
 
 /* ============================================================== LIGHTBOX
@@ -1753,6 +1931,15 @@
   color: var(--amber);
 }
 .ds-app .zoom-status--pending .ic { color: var(--amber-bright); }
+.ds-app .zoom-status--broken {
+  background: #FDE8E8;
+  border-color: #F5C2C2;
+  color: var(--red);
+  align-self: stretch;
+  padding: 9px 14px;
+  border-radius: var(--r-sm);
+}
+.ds-app .zoom-status--broken .ic { color: var(--red); }
 
 /* Generate New Link card (secondary, sits at the bottom of the step) */
 .ds-app .choice--secondary {
@@ -1833,14 +2020,47 @@
    Tighter spacing for the Prescribe ATC + Previous ATC step containers so
    they use vertical space better on shorter screens. Only applies inside
    the `.step-compact` wrapper. */
-.ds-app .step-compact .card { margin-top: clamp(12px, 0.8vw + 4px, 16px); }
+.ds-app .step-compact .card { margin-top: clamp(10px, 0.5vw + 4px, 13px); }
 .ds-app .step-compact .card:first-child { margin-top: 0; }
-.ds-app .step-compact .card + .card { margin-top: clamp(12px, 0.8vw + 4px, 16px); }
-.ds-app .step-compact .card-head { padding: clamp(10px, 0.6vw + 4px, 14px) clamp(14px, 0.8vw + 6px, 18px); }
-.ds-app .step-compact .card-pad { padding: clamp(14px, 0.8vw + 6px, 18px) clamp(16px, 1vw + 8px, 20px); }
-.ds-app .step-compact .atc-card { padding: clamp(14px, 0.9vw + 6px, 18px) clamp(16px, 1vw + 8px, 20px); }
-.ds-app .step-compact .field-grid { gap: clamp(7px, 0.4vw + 4px, 10px) clamp(18px, 1.4vw + 10px, 24px); }
-.ds-app .step-compact .section-title { margin-bottom: 10px; }
+.ds-app .step-compact .card + .card { margin-top: clamp(10px, 0.5vw + 4px, 13px); }
+.ds-app .step-compact .card-head { padding: clamp(8px, 0.4vw + 4px, 11px) clamp(12px, 0.6vw + 6px, 16px); }
+.ds-app .step-compact .card-pad { padding: clamp(10px, 0.5vw + 4px, 14px) clamp(13px, 0.7vw + 6px, 17px); }
+.ds-app .step-compact .atc-card { padding: clamp(10px, 0.5vw + 6px, 14px) clamp(13px, 0.7vw + 6px, 17px) !important; }
+.ds-app .step-compact .atc-card .atc-card__head { margin-bottom: clamp(8px, 0.4vw + 4px, 12px) !important; }
+.ds-app .step-compact .field-grid { gap: clamp(5px, 0.3vw + 3px, 8px) clamp(14px, 1vw + 8px, 20px); }
+.ds-app .step-compact .field-label, .ds-app .step-compact .field-val {
+  font-size: clamp(12.5px, 0.3vw + 9px, 13.5px);
+  line-height: 1.35;
+}
+.ds-app .step-compact .section-title { margin-bottom: 8px; font-size: 12px; }
+.ds-app .step-compact .empty { padding: 18px 12px; }
+.ds-app .step-compact .empty-ic { width: 40px; height: 40px; margin-bottom: 8px; }
+.ds-app .step-compact .empty-text { font-size: 13px; }
+.ds-app .step-compact .count-badge { font-size: 11.5px; min-width: 20px; height: 20px; }
+
+/* Compact pass for the previous-cycle ATC component when rendered inside
+   .step-compact. Uses ::ng-deep to pierce View Encapsulation since
+   app-view-participant-atc is a standalone component with its own styles. */
+.ds-app .step-compact ::ng-deep app-view-participant-atc .atc-card {
+  padding: clamp(10px, 0.5vw + 6px, 14px) clamp(13px, 0.7vw + 6px, 17px) !important;
+  margin-bottom: clamp(8px, 0.4vw + 4px, 11px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .atc-card__head {
+  margin-bottom: clamp(8px, 0.4vw + 4px, 11px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .field-grid {
+  gap: clamp(5px, 0.3vw + 3px, 8px) clamp(14px, 1vw + 8px, 20px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .product-group {
+  margin-bottom: clamp(10px, 0.5vw + 4px, 14px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .product-header {
+  padding: clamp(7px, 0.4vw + 4px, 10px) clamp(11px, 0.5vw + 6px, 14px) !important;
+  margin-bottom: clamp(7px, 0.4vw + 4px, 10px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .product-header h2 {
+  font-size: 13.5px !important;
+}
 
 /* ============================================================== CHECKIN CONFLICT DIALOG
    Rendered by MatDialog OUTSIDE .ds-app, so no ds-app scoping. */
@@ -1888,21 +2108,86 @@
 }
 .checkin-conflict__studios li {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
   background: #FCF3E0;
   border: 1px solid #F1DDA8;
   color: #B45309;
-  padding: 8px 12px;
-  border-radius: 9px;
+  padding: 10px 14px;
+  border-radius: 10px;
   font-size: 13.5px;
   font-weight: 700;
 }
-.checkin-conflict__studios li .ic {
-  font-size: 16px;
-  width: 16px;
-  height: 16px;
-  line-height: 16px;
+.checkin-conflict__studios li > .ic {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  color: #B45309;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.checkin-conflict__studio-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.checkin-conflict__queue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #1A2332;
+  letter-spacing: -.01em;
+}
+.checkin-conflict__live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #DC2626;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  animation: conflictDot 1.4s ease-out infinite;
+}
+@keyframes conflictDot {
+  0%   { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0); }
+}
+.checkin-conflict__stage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #92400E;
+}
+.checkin-conflict__stage .ic {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  line-height: 13px;
+  color: #B45309;
+}
+.checkin-conflict__stage--muted { color: #8A93A3; font-weight: 600; }
+.checkin-conflict__live-tag {
+  margin-left: 4px;
+  padding: 1px 7px;
+  background: #DC2626;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+.checkin-conflict__studio-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #8A93A3;
+  letter-spacing: .02em;
+  margin-top: 1px;
 }
 .checkin-conflict__foot {
   display: flex;
@@ -1932,3 +2217,82 @@
   border-color: #143F49;
 }
 .checkin-conflict__btn--primary:hover { background: #143F49; }
+
+/* ============================================================== TOPBAR SUMMARY CHIPS
+   Forms count + ATC prescribed count, shown inline inside the Awaiting-
+   participant status pill. Replaces the old info-banner + atc-banner that
+   were taking a full row each in the main panel. */
+.ds-app .ds-waiting-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.ds-app .ds-waiting-cta { margin-left: 8px; }
+/* When the CTA is present, push it after the chips */
+.ds-app .ds-waiting-chips + .ds-waiting-cta { margin-left: 0; }
+
+.ds-app .ds-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: clamp(11.5px, 0.3vw + 9px, 13px);
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: background .2s var(--ease), border-color .2s var(--ease), transform .2s var(--ease);
+}
+.ds-app .ds-chip:hover {
+  background: var(--surface-2);
+  border-color: var(--ink-3);
+  transform: translateY(-1px);
+}
+.ds-app .ds-chip b {
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ds-app .ds-chip .ic {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+}
+.ds-app .ds-chip--forms {
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
+  color: var(--primary-ink);
+}
+.ds-app .ds-chip--forms b { color: var(--primary-ink); }
+.ds-app .ds-chip--forms .ic { color: var(--primary); }
+.ds-app .ds-chip--forms:hover {
+  background: #D6E6E8;
+  border-color: var(--primary);
+}
+.ds-app .ds-chip--atc {
+  background: var(--green-soft);
+  border-color: var(--green-line);
+  color: var(--green);
+}
+.ds-app .ds-chip--atc b { color: var(--green); }
+.ds-app .ds-chip--atc .ic { color: var(--green-bright); }
+.ds-app .ds-chip--atc:hover {
+  background: #D2EBD9;
+  border-color: var(--green-bright);
+}
+
+/* Tighten on narrow viewports — hide the trailing label, keep just the
+   icon + count so the topbar doesn't wrap. */
+@media (max-width: 1180px) {
+  .ds-app .ds-chip { padding: 4px 9px; }
+}
+@media (max-width: 900px) {
+  .ds-app .ds-waiting-chips { display: none; }
+}
