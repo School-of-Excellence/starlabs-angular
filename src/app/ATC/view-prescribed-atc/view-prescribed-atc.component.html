@@ -19,7 +19,7 @@
 
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>ATC Model</mat-label>
-        <mat-select [(ngModel)]="selectedProducts" (selectionChange)="onPrescriberSelect()" multiple [disabled]="selectedQueue != null">
+        <mat-select [(ngModel)]="selectedProducts" (selectionChange)="onPrescriberSelect()" multiple>
           <mat-option *ngFor="let atcmodel of atcModelList" [value]="atcmodel.atcmodel">
             {{atcmodel.atcmodel}}
           </mat-option>
@@ -38,7 +38,7 @@
 
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Filter by Queue</mat-label>
-        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()" multiple>
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -68,8 +68,31 @@
         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-date-range-picker #picker></mat-date-range-picker>
       </mat-form-field>
+
+      <mat-form-field class="filteritem" appearance="outline">
+        <mat-label>ATC Count Operator</mat-label>
+        <mat-select [(ngModel)]="atcCountOperator" (selectionChange)="onCountFilterChange()">
+          <mat-option [value]="null">None</mat-option>
+          <mat-option value="lt">Less than (&lt;)</mat-option>
+          <mat-option value="gt">Greater than (&gt;)</mat-option>
+          <mat-option value="eq">Equals (=)</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field class="filteritem" appearance="outline">
+        <mat-label>ATC Count (per participant)</mat-label>
+        <input matInput type="number" min="0" [(ngModel)]="atcCountValue" (ngModelChange)="onCountFilterChange()" [disabled]="atcCountOperator == null" placeholder="Count value">
+      </mat-form-field>
     </div>
-    <button class="clearbtn" *ngIf="(selectedPrescribers.length > 0 && superRoles) || selectedParticipants.length > 0 || selectedProducts.length > 0 || selectedQueue != null || selectedMentors.length > 0 || (this.startDate != null && this.endDate != null)" mat-stroked-button (click)="resetFilter()">Clear Filter</button>
+    <button class="clearbtn" *ngIf="(selectedPrescribers.length > 0 && superRoles) || selectedParticipants.length > 0 || selectedProducts.length > 0 || selectedQueue.length > 0 || selectedMentors.length > 0 || (this.startDate != null && this.endDate != null) || atcCountOperator != null || atcCountValue != null" mat-stroked-button (click)="resetFilter()">Clear Filter</button>
+  </div>
+
+  <div class="filtered-info">
+    <span class="filtered-count">Showing {{ reportATC.length }} ATC{{ reportATC.length === 1 ? '' : 's' }}</span>
+    <span class="filtered-by" *ngIf="getActiveFilters().length > 0">
+      &nbsp;|&nbsp; Filtered by: {{ getActiveFilters().join('  •  ') }}
+    </span>
+    <span class="filtered-by no-filter" *ngIf="getActiveFilters().length === 0">&nbsp;|&nbsp; No filters applied</span>
   </div>
 
   <div class="summary-bar">

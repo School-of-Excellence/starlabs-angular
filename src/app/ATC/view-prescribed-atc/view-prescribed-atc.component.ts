@@ -63,10 +63,14 @@ export class ViewPrescribedATCComponent {
   // Filters
   filterText = "";
 
-  selectedQueue: string = null;
+  selectedQueue: any[] = [];
   selectedActivity: string = null;
 
   validationFilter: string | null = null;
+
+  // ATC count per participant filter
+  atcCountOperator: 'lt' | 'gt' | 'eq' | null = null;
+  atcCountValue: number | null = null;
 
   // List data
   prescriberList: Array<any> = [];
@@ -412,7 +416,7 @@ export class ViewPrescribedATCComponent {
     // if (this.selectedProduct != null) {
     //   queryList.push(where("product", "==", this.selectedProduct))
     // }
-    if (this.selectedParticipants.length == 0 && this.selectedPrescribers.length == 0 && this.selectedProducts.length == 0 && this.selectedQueue == null && this.selectedMentors.length == 0) {
+    if (this.selectedParticipants.length == 0 && this.selectedPrescribers.length == 0 && this.selectedProducts.length == 0 && this.selectedQueue.length == 0 && this.selectedMentors.length == 0) {
       queryList.push(limit(400))
     }
 
@@ -424,7 +428,7 @@ export class ViewPrescribedATCComponent {
       orderBy("prescription_date", "desc")
     ];
 
-    if (this.selectedParticipants.length == 0 && this.selectedPrescribers.length == 0 && this.selectedProducts.length == 0 && this.selectedQueue == null && this.selectedMentors.length == 0) {
+    if (this.selectedParticipants.length == 0 && this.selectedPrescribers.length == 0 && this.selectedProducts.length == 0 && this.selectedQueue.length == 0 && this.selectedMentors.length == 0) {
       toValidateQueryList.push(limit(400))
     }
 
@@ -470,17 +474,17 @@ export class ViewPrescribedATCComponent {
         this.sourceReportATC = Array.from(existingReport.values());
         this.applyValidationFilter();
 
-        const unvalidated = this.reportATC.filter((doc: any) => doc.data()['status'] === 'atc given').length;
-        const validated = this.reportATC.filter((doc: any) => doc.data()['status'] !== 'atc given').length;
-        const total = this.reportATC.length;
+        const unvalidated = this.sourceReportATC.filter((doc: any) => doc.data()['status'] === 'atc given').length;
+        const validated = this.sourceReportATC.filter((doc: any) => doc.data()['status'] !== 'atc given').length;
+        const total = this.sourceReportATC.length;
 
-        const totalAdjustment = this.reportATC.reduce((sum, doc: any) => sum + (doc.data()['totaladjustment'] || 0), 0);
-        const totalAdjustmentPending = this.reportATC.reduce((sum, doc: any) => sum + (doc.data()['totaladjustmentpending'] || 0), 0);
-        const totalAdjustmentCompleted = this.reportATC.reduce((sum, doc: any) => sum + (doc.data()['totaladjustmentcompleted'] || 0), 0);
+        const totalAdjustment = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totaladjustment'] || 0), 0);
+        const totalAdjustmentPending = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totaladjustmentpending'] || 0), 0);
+        const totalAdjustmentCompleted = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totaladjustmentcompleted'] || 0), 0);
 
-        const totalProcedure = this.reportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedure'] || 0), 0);
-        const totalProcedurePending = this.reportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedurepending'] || 0), 0);
-        const totalProcedureCompleted = this.reportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedurecompleted'] || 0), 0);
+        const totalProcedure = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedure'] || 0), 0);
+        const totalProcedurePending = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedurepending'] || 0), 0);
+        const totalProcedureCompleted = this.sourceReportATC.reduce((sum, doc: any) => sum + (doc.data()['totalprocedurecompleted'] || 0), 0);
 
         this.reportSummary = {
           total,
@@ -509,20 +513,106 @@ export class ViewPrescribedATCComponent {
   filterByValidation(type: string | null) {
     this.validationFilter = type;
     this.applyValidationFilter();
+    this.resetToFirstPage();
+  }
+
+  onCountFilterChange() {
+    this.applyValidationFilter();
+    this.resetToFirstPage();
   }
 
   applyValidationFilter() {
+    let base: QueryDocumentSnapshot<any>[];
     if (this.validationFilter === 'validated') {
-      this.reportATC = this.sourceReportATC.filter(
+      base = this.sourceReportATC.filter(
         (doc: any) => doc.data()['status'] !== 'atc given'
       );
     } else if (this.validationFilter === 'unvalidated') {
-      this.reportATC = this.sourceReportATC.filter(
+      base = this.sourceReportATC.filter(
         (doc: any) => doc.data()['status'] === 'atc given'
       );
     } else {
-      this.reportATC = this.sourceReportATC;
+      base = this.sourceReportATC;
     }
+    this.reportATC = this.applyCountFilter(base);
+  }
+
+  // Keep only ATCs whose participant's ATC count (within the current set)
+  // satisfies the selected operator/value.
+  applyCountFilter(list: QueryDocumentSnapshot<any>[]): QueryDocumentSnapshot<any>[] {
+    if (this.atcCountOperator == null || this.atcCountValue == null || this.atcCountValue < 0) {
+      return list;
+    }
+    const countByParticipant: Record<string, number> = {};
+    list.forEach((doc: any) => {
+      const pid = doc.data()['profileid'];
+      countByParticipant[pid] = (countByParticipant[pid] || 0) + 1;
+    });
+    return list.filter((doc: any) => {
+      const count = countByParticipant[doc.data()['profileid']] || 0;
+      switch (this.atcCountOperator) {
+        case 'lt': return count < this.atcCountValue;
+        case 'gt': return count > this.atcCountValue;
+        case 'eq': return count === this.atcCountValue;
+        default: return true;
+      }
+    });
+  }
+
+  // Human-readable list of every filter currently shaping the result set.
+  getActiveFilters(): string[] {
+    const filters: string[] = [];
+
+    if (this.selectedPrescribers.length > 0) {
+      const names = this.selectedPrescribers.map(p => {
+        const match = this.prescriberList.find(a => a.authorpath === p);
+        return match ? match.authorname : p.split('/').pop();
+      });
+      filters.push(`Author: ${names.join(', ')}`);
+    }
+
+    if (this.selectedProducts.length > 0) {
+      filters.push(`ATC Model: ${this.selectedProducts.join(', ')}`);
+    }
+
+    if (this.selectedParticipants.length > 0) {
+      const names = this.selectedParticipants.map(pid => {
+        const match = this.participantList.find(p => p.profileid === pid);
+        return match ? match.name : pid;
+      });
+      filters.push(`Participant: ${names.join(', ')}`);
+    }
+
+    if (this.selectedQueue.length > 0) {
+      filters.push(`Queue: ${this.selectedQueue.map(q => q['queuename']).join(', ')}`);
+    }
+
+    if (this.selectedMentors.length > 0) {
+      const names = this.selectedMentors.map(m => this.profileMap[m]?.name || m);
+      filters.push(`Mentor: ${names.join(', ')}`);
+    }
+
+    if (this.startDate && this.endDate) {
+      filters.push(`Date: ${this.datepipe.transform(this.startDate, 'mediumDate')} - ${this.datepipe.transform(this.endDate, 'mediumDate')}`);
+    }
+
+    if (this.validationFilter) {
+      filters.push(`Validation: ${this.validationFilter === 'validated' ? 'Validated' : 'Unvalidated'}`);
+    }
+
+    if (this.atcCountOperator != null && this.atcCountValue != null) {
+      const opText = this.atcCountOperator === 'lt' ? '<' : this.atcCountOperator === 'gt' ? '>' : '=';
+      filters.push(`ATC count per participant ${opText} ${this.atcCountValue}`);
+    }
+
+    return filters;
+  }
+
+  private resetToFirstPage() {
+    this.clearPreviousPage(this.pageIndex);
+    this.pageIndex = 0;
+    this.paginator?.firstPage();
+    this.checkATCversion();
   }
 
   // Filter Participant list
@@ -563,10 +653,12 @@ export class ViewPrescribedATCComponent {
       this.selectedPrescribers = [];
     }
     this.selectedProducts = [];
-    this.selectedQueue = null;
+    this.selectedQueue = [];
     this.selectedMentors = [];
     this.startDate = null;
     this.endDate = null;
+    this.atcCountOperator = null;
+    this.atcCountValue = null;
 
     // Reload with original query
     this.setupATCQueries();
@@ -584,45 +676,56 @@ export class ViewPrescribedATCComponent {
       this.selectedPrescribers = [];
     }
     this.selectedProducts = [];
-    this.startDate = this.selectedQueue['queuestartdate']?.toDate();
-    this.endDate = this.selectedQueue['queueenddate']?.toDate();
 
-    const queueName = this.selectedQueue['queuename'].trim();
-    const eventsRef = collection(this.firestoreDefault, 'arena events');
-    const eventsQuery = query(
-      eventsRef,
-      where('eventname', '==', queueName),
-      where('delete', '==', false)
-    );
+    if (!this.selectedQueue || this.selectedQueue.length === 0) {
+      this.startDate = null;
+      this.endDate = null;
+      this.setupATCQueries();
+      return;
+    }
 
-    const eventsSnapshot = await getDocs(eventsQuery);
+    // Aggregate the widest date range across all selected queues
+    const startTimes = this.selectedQueue
+      .map(q => q['queuestartdate']?.toDate()?.getTime())
+      .filter(t => t != null);
+    const endTimes = this.selectedQueue
+      .map(q => q['queueenddate']?.toDate()?.getTime())
+      .filter(t => t != null);
+    this.startDate = startTimes.length ? new Date(Math.min(...startTimes)) : null;
+    this.endDate = endTimes.length ? new Date(Math.max(...endTimes)) : null;
 
-    // Extract all productref IDs from matching docs
-    const productIds: string[] = [];
-    eventsSnapshot.forEach(doc => {
-      const productRef: DocumentReference = doc.data()['productref'];
-      if (productRef) {
-        const id = typeof productRef === 'string' ? productRef : productRef.id;
-        if (id && !productIds.includes(id)) {
-          productIds.push(id);
+    // Collect the union of ATC models across all selected queues
+    const atcModels: string[] = [];
+    for (const queue of this.selectedQueue) {
+      const queueName = queue['queuename'].trim();
+      const eventsRef = collection(this.firestoreDefault, 'arena events');
+      const eventsQuery = query(
+        eventsRef,
+        where('eventname', '==', queueName),
+        where('delete', '==', false)
+      );
+
+      const eventsSnapshot = await getDocs(eventsQuery);
+
+      const productIds: string[] = [];
+      eventsSnapshot.forEach(doc => {
+        const productRef: DocumentReference = doc.data()['productref'];
+        if (productRef) {
+          const id = typeof productRef === 'string' ? productRef : productRef.id;
+          if (id && !productIds.includes(id)) {
+            productIds.push(id);
+          }
         }
-      }
-    });
+      });
 
-    // Look up each product ID in mapProducts and extract atcmodel
-    if (productIds.length > 0) {
-      const atcModels: string[] = [];
       productIds.forEach(id => {
-        console.log("id", id);
         const product = this.mapProducts[id];
-        console.log("product", product);
-
         if (product?.atcmodel && !atcModels.includes(product.atcmodel)) {
           atcModels.push(product.atcmodel);
         }
       });
-      this.selectedProducts = atcModels;
     }
+    this.selectedProducts = atcModels;
 
     this.setupATCQueries();
   }
