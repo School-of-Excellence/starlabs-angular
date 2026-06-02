@@ -321,6 +321,28 @@
             </div>
             <div class="ow-phone-body">
               <div class="ow-bubble">
+                <!-- Video header -->
+                <div class="ow-bubble-header-video" *ngIf="selectedTemplate?.headertype === 'video' && selectedTemplate?.headervalue">
+                  <video [src]="selectedTemplate.headervalue"
+                    style="width:100%;border-radius:8px 8px 0 0;object-fit:cover;max-height:160px;"
+                    muted playsinline controls></video>
+                </div>
+                <!-- Image header -->
+                <div class="ow-bubble-header-img" *ngIf="selectedTemplate?.headertype === 'image' && selectedTemplate?.headervalue">
+                  <img [src]="selectedTemplate.headervalue"
+                    style="width:100%;border-radius:8px 8px 0 0;object-fit:cover;max-height:160px;">
+                </div>
+                <!-- Document header -->
+                <div class="ow-bubble-header-doc" *ngIf="selectedTemplate?.headertype === 'document' && selectedTemplate?.headervalue"
+                  style="padding:10px;display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:8px 8px 0 0;">
+                  <mat-icon>description</mat-icon>
+                  <span style="font-size:11px;">Document attached</span>
+                </div>
+                <!-- Text header -->
+                <div class="ow-bubble-header-text" *ngIf="selectedTemplate?.headertype === 'text' && selectedTemplate?.headervalue"
+                  style="padding:10px 12px 0;font-weight:bold;font-size:14px;">
+                  {{ selectedTemplate.headervalue }}
+                </div>
                 <div class="ow-bubble-body" [innerHTML]="previewHtml"></div>
                 <div class="ow-bubble-footer" *ngIf="selectedTemplate?.footer">
                   {{ selectedTemplate.footer }}

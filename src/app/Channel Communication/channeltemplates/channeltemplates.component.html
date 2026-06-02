@@ -370,7 +370,7 @@
                                     </div>
                                     <div class="prev-hdr-img" *ngIf="getPreviewHeaderType() === 'video'">
                                         <video *ngIf="getPreviewHeader()" [src]="getPreviewHeader()"
-                                            style="width:100%;height:100%;object-fit:cover;" muted playsinline></video>
+                                            style="width:100%;height:100%;object-fit:cover;" muted playsinline controls></video>
                                         <mat-icon *ngIf="!getPreviewHeader()">play_circle</mat-icon>
                                     </div>
                                     <div class="prev-hdr-img" *ngIf="getPreviewHeaderType() === 'document'">
@@ -724,7 +724,7 @@
                                             </div>
                                             <div class="prev-hdr-img" *ngIf="getPreviewHeaderType() === 'video'">
                                                 <video *ngIf="getPreviewHeader()" [src]="getPreviewHeader()"
-                                                    style="width:100%;height:100%;object-fit:cover;" muted playsinline></video>
+                                                    style="width:100%;height:100%;object-fit:cover;" muted playsinline controls></video>
                                                 <mat-icon *ngIf="!getPreviewHeader()">play_circle</mat-icon>
                                             </div>
                                             <div class="prev-hdr-img" *ngIf="getPreviewHeaderType() === 'document'">
