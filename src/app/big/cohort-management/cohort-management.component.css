@@ -761,8 +761,9 @@ button {
 }
 
 .cohort-card-holder{
-  height: 250px;
+  height: 265px;
   overflow-y: auto;
+  padding-bottom: 35px;
 }
 
 /* Card header */
@@ -2618,3 +2619,81 @@ button {
 
 /* Adjust main-content to include activity sidenav width */
 .main-content { position: relative; }
+
+/* move button */
+.p-move-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #5b6cff, #9a5cff);
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 28px;
+  font-family: inherit;
+  box-shadow: 0 3px 10px rgba(91, 108, 255, .35);
+  transition: all .12s;
+}
+
+.p-move-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(91, 108, 255, .45)
+}
+
+.p-move-btn mat-icon {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  line-height: 15px
+}
+
+/* ==================== MOVE MENU ==================== */
+.move-participant-menu {
+  min-width: 260px
+}
+
+.move-menu-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line-2)
+}
+
+.move-menu-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin: 8px 10px;
+  min-height: 34px;
+}
+
+.move-menu-search input {
+  background: none;
+  border: none;
+  outline: none;
+  flex: 1;
+  font-size: 12px;
+  font-family: inherit
+}
+
+.move-menu-search mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  color: var(--text-mute)
+}
+
+.move-menu-list {
+  max-height: 260px;
+  overflow: auto
+}

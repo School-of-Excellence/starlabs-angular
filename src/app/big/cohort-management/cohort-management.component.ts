@@ -284,7 +284,7 @@ export class CohortManagementComponent {
   // ════════════════════════════════════════════════════════════════
   private dragPayload: { kind: 'participant' | 'cohort', participantId?: string, sourceCohortId?: string | null, cohortId?: string } | null = null
   hoverDropTargetCohortId: string | null = null
-  sidebarCollapsed: boolean = true
+  sidebarCollapsed: boolean = false
   participantExpandedCohorts: Set<string> = new Set<string>()
   modeView: 'plan' | 'floor' = 'plan'
 
@@ -347,6 +347,18 @@ export class CohortManagementComponent {
     if (payload.kind === 'cohort' && payload.cohortId && payload.cohortId !== targetCohort['docid']) {
       this.reorderCohortInList(payload.cohortId, targetCohort['docid'])
     }
+  }
+
+  async checkForActiveParticipantStuidosInCohort(cohort : any , participantId : string){
+    // console.log(cohortId)
+    // const cohort = this.cohortsList.find((cohort)=>cohort['docid']===cohortId);
+    const queueId = cohort['queueref'];
+    if(queueId){
+      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'==',queueId) , where('studioin' , '==' , true) , where('participants' , 'array-contains' , participantId))
+      const studios = await getDocs(q);
+      return !studios.empty
+    }
+    return false
   }
 
   onGridDragOver(event: DragEvent) {
@@ -1141,6 +1153,7 @@ export class CohortManagementComponent {
       ];
       const queueId = assignment['queueid'];
       allParticipants.forEach((pid: string) => {
+        if(!this.mapLiveParticipants[queueId]) return
         this.mapLiveParticipants[queueId][pid] = true;
       });
     });
@@ -1596,9 +1609,11 @@ export class CohortManagementComponent {
   moveMenuFilteredCohorts: any[] = [];
   isMovingParticipant: boolean = false;
 
-  filterMoveMenuCohorts(sourceCohortId: string) {
+  filterMoveMenuCohorts(cohort: string) {
+    const cohortId = cohort['docid'];
+    const eventId = cohort['eventref']?.id;
     const query = this.moveMenuSearchQuery.toLowerCase().trim();
-    let cohorts = this.filteredCohortsList.filter(c => c.docid !== sourceCohortId);
+    let cohorts = this.filteredCohortsList.filter(c => c.docid !== cohortId && c['eventref']?.id === eventId);
 
     if (query) {
       cohorts = cohorts.filter(c => c.name?.toLowerCase().includes(query));
@@ -1607,17 +1622,22 @@ export class CohortManagementComponent {
     this.moveMenuFilteredCohorts = cohorts;
   }
 
-  onMoveMenuOpen(sourceCohortId: string) {
+  onMoveMenuOpen(cohort: any) {
     this.moveMenuSearchQuery = '';
-    this.filterMoveMenuCohorts(sourceCohortId);
+    this.filterMoveMenuCohorts(cohort);
   }
 
-  onMoveMenuSearch(event: Event, sourceCohortId: string) {
+  onMoveMenuSearch(event: Event, cohort: any) {
     event.stopPropagation();
-    this.filterMoveMenuCohorts(sourceCohortId);
+    this.filterMoveMenuCohorts(cohort);
   }
-
+  
   async moveParticipantToCohort(participantId: string, sourceCohort: any, targetCohort: any) {
+    const hasActiveStudio = await this.checkForActiveParticipantStuidosInCohort(sourceCohort  , participantId)
+      if(hasActiveStudio){
+        alert('There are active stuido for the selected participant please disbale it before moving to another cohorts');
+        return
+      }
     if (this.isMovingParticipant) return;
 
     this.isMovingParticipant = true;

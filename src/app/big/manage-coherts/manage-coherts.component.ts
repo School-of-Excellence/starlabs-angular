@@ -892,6 +892,7 @@ export class ManageCohertsComponent {
   // Fetch participants from 'event participation request' when event is selected
   async onChangeEvent() {
     const eventRef = this.cohortsForm.get("eventref")?.value;
+    console.log('selected event : ' , eventRef.id)
     
     // DON'T reset participants when event changes - keep the selection
     // this.selectedParticipants = [];
@@ -904,12 +905,21 @@ export class ManageCohertsComponent {
       
       try {
         const participationQuery = query(collection(this.firestore, "event participation request"),where("eventref", "==", eventRef),where("status", "in", ['attended','approved']));
+        const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef));
+        const assignedParticipantIds = new Set<string>(); 
         
-        const participationSnap = await getDocs(participationQuery);
-        
+        const [participationSnap , cohortsSnap] = await Promise.all([getDocs(participationQuery) , getDocs(cohortQuery)]);
+        cohortsSnap.docs.forEach((cohortDoc)=>{
+          const cohort = cohortDoc.data();
+          // console.log(cohort['participantidlist'])
+          (cohort['participantidlist'] || []).forEach((id: string) => {
+          assignedParticipantIds.add(id);
+        });
+          
+        })
         this.bigInvitationParticipants = participationSnap.docs.map(docSnap => {
           const data: any = docSnap.data();
-          if(data['profileid'] != null){
+          if(data['profileid'] != null && !assignedParticipantIds.has(data['profileid'])){
             return {
               id: docSnap.id,
               name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',

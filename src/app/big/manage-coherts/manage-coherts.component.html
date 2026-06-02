@@ -79,18 +79,18 @@
         </mat-select>
         
         <!-- Approved Participants Count Display -->
-        <div class="invitation-info" *ngIf="bigInvitationCount > 0 || loadingInvitations">
+        <div class="invitation-info" *ngIf=" ![null , undefined , ''].includes(cohortsForm.controls['eventref']?.value) || loadingInvitations">
           <div class="invitation-loading" *ngIf="loadingInvitations">
             <mat-icon class="spin">sync</mat-icon>
-            <span>Fetching approved participants...</span>
+            <span>Fetching unassigned participants...</span>
           </div>
           <div class="invitation-count" *ngIf="!loadingInvitations && bigInvitationCount > 0">
             <mat-icon class="success-icon">check_circle</mat-icon>
-            <span><strong>{{bigInvitationCount}}</strong> approved participant(s) found for this event</span>
+            <span><strong>{{bigInvitationCount}}</strong> unassigned participant(s) found for this event</span>
           </div>
           <div class="invitation-count warning" *ngIf="!loadingInvitations && bigInvitationCount === 0 && cohortsForm.get('eventref')?.value">
             <mat-icon class="warning-icon">warning</mat-icon>
-            <span>No approved participants found for this event</span>
+            <span>No unassigned participants found for this event</span>
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@
       <!-- Queue selection -->
       <div class="form-group">
         <label class="form-label">Select Queue</label>
-        <mat-select formControlName="queueref" class="form-select">
+        <mat-select formControlName="queueref" class="form-select" placeholder="Choose an queue">
           <mat-option *ngFor="let queue of queueList" [value]="queue.docid">
             {{queue.queuename}}
           </mat-option>
