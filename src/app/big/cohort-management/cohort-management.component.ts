@@ -353,10 +353,11 @@ export class CohortManagementComponent {
     // console.log(cohortId)
     // const cohort = this.cohortsList.find((cohort)=>cohort['docid']===cohortId);
     const queueId = cohort['queueref'];
+    const activity = cohort['bigactivity'] ?? '';
     if(queueId){
-      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'==',queueId) , where('studioin' , '==' , true) , where('participants' , 'array-contains' , participantId))
-      const studios = await getDocs(q);
-      return !studios.empty
+      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'==',queueId) , where('studioin' , '==' , true) , where('participants' , 'array-contains' , participantId));
+      const studios = await getDocs(q); 
+      return studios.docs.filter((st)=>Object.values(st.data()['participantsactivity'] ?? {}).includes(activity)).length > 0;
     }
     return false
   }
@@ -1633,7 +1634,7 @@ export class CohortManagementComponent {
   }
   
   async moveParticipantToCohort(participantId: string, sourceCohort: any, targetCohort: any) {
-    const hasActiveStudio = await this.checkForActiveParticipantStuidosInCohort(sourceCohort  , participantId)
+    const hasActiveStudio = await this.checkForActiveParticipantStuidosInCohort(sourceCohort  , participantId);
       if(hasActiveStudio){
         alert('There are active stuido for the selected participant please disbale it before moving to another cohorts');
         return

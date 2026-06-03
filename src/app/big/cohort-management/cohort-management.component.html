@@ -717,7 +717,7 @@
               <div style="display:flex;gap:8px;align-items:center">
                 <mat-icon [style.color]="getStatusColor(log['status'])">{{getStatusIcon(log['status'])}}</mat-icon>
                 <strong [style.color]="getStatusColor(log['status'])">{{log['status'] | titlecase}}</strong>
-                <span style="color:#8a93a3" *ngIf="log['profileid']"> {{mapProfile[log['profileid']] || 'Unknown'}}</span>
+                <span style="color:#8a93a3"> {{mapProfile[log['profileid']] || mapProfile[log['participantid']] ||'Unknown'}}</span>
                 <span style="color:#8a93a3">· {{formatTimelineDate(log['createddate'])}}</span>
               </div>
               <div style="margin-top:4px">
