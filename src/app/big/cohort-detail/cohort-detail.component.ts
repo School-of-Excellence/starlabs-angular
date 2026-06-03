@@ -1457,13 +1457,13 @@ export class CohortDetailComponent implements OnDestroy {
     });
 
     if (Object.keys(duplicateStudios).length > 0) {
-      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel, {
-        data: duplicateStudios,
-      });
+      this.duplicatedStudios = duplicateStudios;
+      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel);
       this.duplicateModelRef.afterClosed().subscribe((data) => {
         if (data) {
           this.newStudioPairing = [...validList];
           this.createStudios();
+          this.duplicatedStudios = null;
         }
       });
     } else {
@@ -1471,6 +1471,10 @@ export class CohortDetailComponent implements OnDestroy {
     }
   }
 
+  toggleStudioInModel(studio){
+    this.toggleStudio(studio);
+    studio['studioin'] = !studio['studioin'];
+  }
   closeDuplicateStuioModel(data: boolean = false) {
     if (this.duplicateModelRef) {
       this.duplicateModelRef.close(data);

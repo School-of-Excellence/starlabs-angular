@@ -2256,7 +2256,9 @@ export class CohortManagementComponent {
     })
   }
 
-  onEditAssignment(cohorts: any, assignment: any) {
+  onEditAssignment(cohorts: any, assignment: any , event : Event) {
+    event.stopPropagation();
+    console.log('parameters : ',cohorts , assignment)
     console.log(this.cohortsList.map((e)=> e?.marathonref?.id || null));
     console.log(this.selectedMarathon);
     let dialogref = this.dialog.open(PlanActivityComponent, {
@@ -2268,8 +2270,9 @@ export class CohortManagementComponent {
         mapProfile: this.mapProfile,
       },
       disableClose: true,
-      width: '95vw',
-      height: '90vh',
+      maxWidth: '100vw',
+      width: '100vw',
+      height: '100vh',
       panelClass: 'full-width-dialog',
     })
     dialogref.afterClosed().subscribe((result) => {
@@ -2526,13 +2529,15 @@ export class CohortManagementComponent {
 
     dialogRef.afterClosed().subscribe((result)=>{
       if (result) {
+        this.loading = true;
         getDocs(collection(this.firestore, "big cohorts")).then(snap => {
           this.cohortsList = snap.docs.map(e => {
             let element: any = e.data()
             element['contentview'] = 'participants'
             return element
           })
-          this.toRunFilterFunctions()
+          this.toRunFilterFunctions();
+          this.loading = false;
         })
       }
     })
@@ -2561,13 +2566,15 @@ export class CohortManagementComponent {
 
     dialogRef.afterClosed().subscribe((result) => {
       if (result) {
+        this.loading = true;
         getDocs(collection(this.firestore, "big cohorts")).then(snap => {
           this.cohortsList = snap.docs.map(e => {
             let element: any = e.data()
             element['contentview'] = 'activities'
             return element
           })
-          this.toRunFilterFunctions()
+          this.toRunFilterFunctions();
+          this.loading = false;
         })
       }
     });

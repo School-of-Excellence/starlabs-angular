@@ -545,7 +545,7 @@
                     <span>Assignment deleted</span>
                   </div>
 
-                  <div class="activity-row" *ngIf="mapBigAssignment[$any(assignment.key)]">
+                  <div class="activity-row" *ngIf="mapBigAssignment[$any(assignment.key)]" (click)="onEditAssignment(cohorts , mapBigAssignment[$any(assignment.key)],$event);$event.stopPropagation();">
                     <div class="ac-icon"><mat-icon>assignment</mat-icon></div>
                     <div class="act-info">
                       <div class="act-title">{{mapBigAssignment[$any(assignment.key)]?.['title'] || 'Untitled'}}</div>
@@ -738,7 +738,7 @@
             <p>No recent activity</p>
           </div>
         </div>
-        <a class="activity-view-all" href="javascript:void(0)" (click)="$event.preventDefault()">View full activity log →</a>
+        <!-- <a class="activity-view-all" href="javascript:void(0)" (click)="$event.preventDefault()">View full activity log →</a> -->
       </ng-container>
     </div>
 
