@@ -218,8 +218,21 @@
             <mat-form-field appearance="outline" class="ow-full">
               <mat-label>Participant metadata field</mat-label>
               <mat-select [(ngModel)]="param.metadataField">
-                <mat-option *ngFor="let f of metadataFields" [value]="f">{{ f }}</mat-option>
-              </mat-select>
+              <mat-option>   
+                <ngx-mat-select-search
+                  [(ngModel)]="param['metadataSearch']"
+                  [ngModelOptions]="{standalone: true}"
+                  placeholderLabel="Search fields..."
+                  noEntriesFoundLabel="No fields found"
+                  ngDefaultControl>
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option
+                *ngFor="let f of getFilteredMetadataFields(param['metadataSearch'] || '')"
+                [value]="f">
+                {{ f }}
+              </mat-option>
+            </mat-select>
               <mat-icon matSuffix>person</mat-icon>
             </mat-form-field>
           </div>
