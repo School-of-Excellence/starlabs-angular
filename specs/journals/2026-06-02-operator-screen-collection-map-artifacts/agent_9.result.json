@@ -1,0 +1,399 @@
+[
+  {
+    "route": "journeysupport/:pid",
+    "file": "src/app/Journey Onboarding/journeyplan/journeyplan.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 92},
+      {"c": "products", "line": 103},
+      {"c": "package", "line": 116},
+      {"c": "solar voice playlist", "line": 120},
+      {"c": "series", "line": 124},
+      {"c": "content_urls", "line": 128},
+      {"c": "workshopconfiguration", "line": 135},
+      {"c": "participantplanning", "line": 193},
+      {"c": "participantsproduct", "line": 419},
+      {"c": "participantsproduct", "line": 520},
+      {"c": "profile_data", "line": 552},
+      {"c": "participantdeliverysequence", "line": 601},
+      {"c": "participantsproduct", "line": 724},
+      {"c": "profile_data", "line": 743}
+    ],
+    "writes": [
+      {"c": "participantplanning", "line": 345},
+      {"c": "participantplanning", "line": 347},
+      {"c": "participantsproduct", "line": 499},
+      {"c": "participant metadata", "line": 539},
+      {"c": "participantsproduct", "line": 688},
+      {"c": "participantdeliverysequence", "line": 691},
+      {"c": "participantsproduct", "line": 760}
+    ],
+    "services": ["AuthguardService.updateDeliverySequence (line 502)", "AuthguardService.initializeWatson (line 551)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Mixed modular + AngularFire compat (this.firestore.collection) APIs. writeBatch at 305 writes/deletes participantplanning; writeBatch at 482 updates participantsproduct. Also reads separate watsonDatabase (different Firebase app) collections 'Participants' (557) and 'Payment Schedule' (575) - not main Firestore."
+  },
+  {
+    "route": "salesleads",
+    "file": "src/app/Journey Onboarding/saleslead/saleslead.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "salesleads", "line": 95},
+      {"c": "package", "line": 114},
+      {"c": "products", "line": 121},
+      {"c": "journey", "line": 129},
+      {"c": "participantjourneyproduct", "line": 574}
+    ],
+    "writes": [
+      {"c": "salesleads", "line": 627},
+      {"c": "salesleads", "line": 1777},
+      {"c": "salesleads", "line": 1813},
+      {"c": "salesleads", "line": 1868}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Large blocks (lines ~667-1706) are commented out (old upgrade/downgrade/watson logic touching participantjourneyproduct, journeyproductpurchase, profile_data, users_roles, ParticipantPurchases etc.) - NOT counted as active. Active reads salesleads via collectionData query built at 95-96."
+  },
+  {
+    "route": "onboardingremarks",
+    "file": "src/app/Journey Onboarding/onboarding-remark/onboarding-remark.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "users_roles", "line": 79},
+      {"c": "salesleads", "line": 93}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only screen; salesleads read by doc id derived from participantjourneyproduct salesleadsref."
+  },
+  {
+    "route": "opportunities",
+    "file": "src/app/Journey Onboarding/journeycoach-opportunities/journeycoach-opportunities.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "users_roles", "line": 106},
+      {"c": "participantjourneyproduct", "line": 132}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only; filters journeycoach users_roles and onboarded participantjourneyproduct."
+  },
+  {
+    "route": "JourneycoachDashboard-new",
+    "file": "src/app/Journey Onboarding/journeycoach-duplicate/journeycoach-duplicate.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "users_roles", "line": 660},
+      {"c": "appointments", "line": 672},
+      {"c": "journey", "line": 701},
+      {"c": "queue generation", "line": 881},
+      {"c": "salesleads", "line": 1436},
+      {"c": "salesleads", "line": 1616},
+      {"c": "salesleads", "line": 1638},
+      {"c": "participant metadata", "line": 1732},
+      {"c": "participantjourneyproduct", "line": 2047},
+      {"c": "salesleads", "line": 2084},
+      {"c": "participantjourneyproduct", "line": 2107},
+      {"c": "participantjourneyproduct", "line": 2196},
+      {"c": "participantsproduct", "line": 2464},
+      {"c": "modes", "line": 2494},
+      {"c": "atc_alpha", "line": 3970},
+      {"c": "atc_to_validate", "line": 3975},
+      {"c": "atc_alpha", "line": 3999},
+      {"c": "atc_to_validate", "line": 4005},
+      {"c": "ask AH", "line": 4370},
+      {"c": "love letter", "line": 4376},
+      {"c": "accelerated evolution level", "line": 4448},
+      {"c": "interim crossover", "line": 4450},
+      {"c": "participant metadata", "line": 4924},
+      {"c": "participant tags", "line": 4981}
+    ],
+    "writes": [
+      {"c": "participantjourneyproduct", "line": 2767},
+      {"c": "salesleads", "line": 2768},
+      {"c": "appointments", "line": 2773},
+      {"c": "appointments", "line": 2992},
+      {"c": "participant metadata", "line": 3929},
+      {"c": "participant tag logs", "line": 4940},
+      {"c": "participant tag logs", "line": 4963}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc_alpha", "atc_to_validate"],
+    "notes": "Largest screen (~5000 lines). READS ATC collections atc_alpha and atc_to_validate (lines 3970-4022) - FLAGGED, off-limits per CLAUDE.md. writeBatch at 4956 writes participant tag logs (setDoc 4963). cancelRef/downgradeRef (1616/1638) are salesleads doc reads."
+  },
+  {
+    "route": "productinitiated-dashboard",
+    "file": "src/app/Journey Onboarding/product-initiation-dashboard/product-initiation-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "users_roles", "line": 194},
+      {"c": "journey", "line": 204},
+      {"c": "products", "line": 212},
+      {"c": "participantsproduct", "line": 895},
+      {"c": "participantjourneyproduct", "line": 1064},
+      {"c": "participantsproduct", "line": 1076},
+      {"c": "participant metadata", "line": 1118},
+      {"c": "participantjourneyproduct", "line": 1199},
+      {"c": "participantjourneyproduct", "line": 1215},
+      {"c": "participantjourneyproduct", "line": 1270},
+      {"c": "participantsproduct", "line": 1291},
+      {"c": "participantsproduct", "line": 1336},
+      {"c": "participantjourneyproduct", "line": 1352},
+      {"c": "participantsproduct", "line": 1381},
+      {"c": "participantjourneyproduct", "line": 1423}
+    ],
+    "writes": [
+      {"c": "participant metadata", "line": 768}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Dashboard, mostly reads via collectionData subscriptions; single updateDoc to participant metadata at 768."
+  },
+  {
+    "route": "delivery-dashboard",
+    "file": "src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "users_roles", "line": 472},
+      {"c": "journey", "line": 475},
+      {"c": "products", "line": 478},
+      {"c": "package", "line": 484},
+      {"c": "appointmenttype", "line": 522},
+      {"c": "formsByClient", "line": 946},
+      {"c": "participantsproduct", "line": 1152},
+      {"c": "products", "line": 1233},
+      {"c": "productToDeliverySequence", "line": 1241},
+      {"c": "AppointmentType-To-Roles", "line": 1321},
+      {"c": "Roles-To-EIS", "line": 1340},
+      {"c": "availability", "line": 1402},
+      {"c": "participant metadata", "line": 2118},
+      {"c": "appointments", "line": 2183},
+      {"c": "participantsproduct", "line": 2418},
+      {"c": "participantjourneyproduct", "line": 2473},
+      {"c": "participantsproduct", "line": 2502}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only dashboard (collectionData subscriptions + getDocs). getDoc(item.activityRef) at 1281 is a dynamic DocumentReference (collection not resolvable from literal)."
+  },
+  {
+    "route": "overall-dashboard",
+    "file": "src/app/Journey Onboarding/overall-dashboard/overall-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 504},
+      {"c": "salesleads", "line": 746},
+      {"c": "adsinvestment", "line": 846},
+      {"c": "adsinvestment", "line": 876},
+      {"c": "journey", "line": 895},
+      {"c": "appointments", "line": 912},
+      {"c": "FCM_token", "line": 921},
+      {"c": "participantsproduct", "line": 929},
+      {"c": "workshopconfiguration", "line": 935},
+      {"c": "workshop participant enrolled", "line": 939},
+      {"c": "expenseplanning", "line": 1139},
+      {"c": "expenseplanning", "line": 1141}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only analytics dashboard via collectionData subscriptions + getDocs."
+  },
+  {
+    "route": "sales-report",
+    "file": "src/app/Journey Onboarding/sales-dashboard-clone/sales-dashboard-clone.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "journey", "line": 566},
+      {"c": "salesleads", "line": 1705},
+      {"c": "salesleads", "line": 1798},
+      {"c": "salesleads", "line": 3562},
+      {"c": "salesleads", "line": 3578},
+      {"c": "salesleads", "line": 4545},
+      {"c": "salesleads", "line": 4648}
+    ],
+    "writes": [
+      {"c": "participant metadata", "line": 3376}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Sales reporting dashboard; salesleads read via onSnapshot (1705/1798) and getDocs. cancelRef/downgradeRef (3562/3578/4648) are salesleads doc reads. Single updateDoc to participant metadata at 3376."
+  },
+  {
+    "route": "ecosystem",
+    "file": "src/app/Journey Onboarding/eco-system-new/eco-system-new.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participantdashboard", "line": 570},
+      {"c": "accelerated evolution level", "line": 643},
+      {"c": "interim crossover", "line": 653},
+      {"c": "aggregate_participant_timeline", "line": 778},
+      {"c": "atc_alpha", "line": 851},
+      {"c": "event collection", "line": 1141},
+      {"c": "event participation request", "line": 1186}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc_alpha"],
+    "notes": "Read-only. READS atc_alpha (line 851) - FLAGGED, off-limits per CLAUDE.md. Route appears twice in chunk (lines 10 & 11) pointing at same component."
+  },
+  {
+    "route": "ecosystem",
+    "file": "src/app/Journey Onboarding/eco-system-new/eco-system-new.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participantdashboard", "line": 570},
+      {"c": "accelerated evolution level", "line": 643},
+      {"c": "interim crossover", "line": 653},
+      {"c": "aggregate_participant_timeline", "line": 778},
+      {"c": "atc_alpha", "line": 851},
+      {"c": "event collection", "line": 1141},
+      {"c": "event participation request", "line": 1186}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc_alpha"],
+    "notes": "Duplicate route row (same eco-system-new.component.ts as previous entry). READS atc_alpha (851) - FLAGGED off-limits."
+  },
+  {
+    "route": "customersupportdashboard",
+    "file": "src/app/Customer Support/customer-support-dashboard/customer-support-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "chat config", "line": 215},
+      {"c": "users_roles", "line": 234},
+      {"c": "clientissue", "line": 251},
+      {"c": "clientissue", "line": 339},
+      {"c": "clientissue", "line": 482}
+    ],
+    "writes": [
+      {"c": "clientissue", "line": 759},
+      {"c": "clientissue", "line": 780}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Support ticket dashboard. updateDoc targets (759/780) are clientissue docs (defined lines 758/779)."
+  },
+  {
+    "route": "customersupportdashboard/ticket/:ticketid/:ticketno",
+    "file": "src/app/Customer Support/customer-chat-screen/customer-chat-screen.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "users_roles", "line": 222},
+      {"c": "chat config", "line": 303},
+      {"c": "users_roles", "line": 309},
+      {"c": "participantjourneyproduct", "line": 486},
+      {"c": "clientissue/{id}/messages", "line": 503},
+      {"c": "profile_data", "line": 575},
+      {"c": "new_user_data", "line": 579},
+      {"c": "clientissue", "line": 596},
+      {"c": "profile_data", "line": 769},
+      {"c": "new_user_data", "line": 772},
+      {"c": "clientissue/{id}/messages", "line": 1357}
+    ],
+    "writes": [
+      {"c": "clientissue", "line": 625},
+      {"c": "clientissue", "line": 649},
+      {"c": "profile_data", "line": 794},
+      {"c": "profile_data", "line": 813},
+      {"c": "profile_data", "line": 829},
+      {"c": "clientissue/{id}/messages", "line": 864},
+      {"c": "clientissue", "line": 1021},
+      {"c": "clientissue", "line": 1066},
+      {"c": "clientissue/{id}/messages", "line": 1137},
+      {"c": "clientissue", "line": 1145},
+      {"c": "clientissue/{id}/messages", "line": 1155},
+      {"c": "clientissue", "line": 1222},
+      {"c": "clientissue/{id}/messages", "line": 1231},
+      {"c": "clientissue/{id}/messages", "line": 1331},
+      {"c": "clientissue", "line": 1340},
+      {"c": "clientissue/{id}/messages", "line": 1364}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Live chat screen. Chat messages live in clientissue/{id}/messages subcollection (chatSubCollection = doc(clientissueDoc,'messages',docid)). doc(collection(firestore,'messages')).id at 1118/1201 only generates a random id - NO top-level 'messages' write. writeBatch at 1154 & 1230 set the messages subcollection. profile lookups fall back profile_data -> new_user_data. updateDoc at 794/813/829 = profile_data (profileRef may also point new_user_data at 771 dynamically)."
+  },
+  {
+    "route": "customer-support-tickets",
+    "file": "src/app/Customer Support/customer-ticket-new/customer-ticket-new.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "clientissue", "line": 233},
+      {"c": "chat config", "line": 301}
+    ],
+    "writes": [
+      {"c": "clientissue", "line": 1079},
+      {"c": "clientissue", "line": 1091}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "clientissue subscribed via collectionData (233). updateDoc targets (1079/1091) are clientissue docs (ticketRef defined 1078/1090)."
+  },
+  {
+    "route": "customertickets",
+    "file": "src/app/Customer Support/customertickets/customertickets.component.ts",
+    "exists": true,
+    "reads": [],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Presentational/chart component. No Firestore access; empty constructor() (line 217). Receives data via @Input('tickets') (line 112); renders ApexCharts. Parent supplies ticket data."
+  },
+  {
+    "route": "quiz",
+    "file": "src/app/quiz/quizscreen.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "quiz", "line": 72}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads quiz collection via collectionData subscription (72-73)."
+  },
+  {
+    "route": "viewquiz",
+    "file": "src/app/quiz/viewquizcohort/viewquizcohort.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "quiz", "line": 194},
+      {"c": "quizbyclients", "line": 231},
+      {"c": "big cohorts", "line": 291},
+      {"c": "event collection", "line": 310}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only; getDocs over quiz, quizbyclients, big cohorts, event collection."
+  },
+  {
+    "route": "devtestmic",
+    "file": "src/app/Test Component/dev-test-mic/dev-test-mic.component.ts",
+    "exists": true,
+    "reads": [],
+    "writes": [],
+    "services": ["DeepFilter3Service (line 4/115)", "KoalaFilterService (line 5/116)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Audio mic/noise-suppression test harness. Zero Firestore references. Uses DeepFilter3Service and KoalaFilterService (PicoVoice Koala) for audio filtering only."
+  }
+]

@@ -1,0 +1,30 @@
+{
+  "//": "Composite indexes the Tier-A happy paths need in the emulator. Discovered via read-only probes (e.g. appointments attended+starttime hit FAILED_PRECONDITION). EMULATOR/test use; production indexes are managed separately.",
+  "indexes": [
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "attended", "order": "ASCENDING" },
+        { "fieldPath": "starttime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue stage log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profile_id", "order": "ASCENDING" },
+        { "fieldPath": "createdon", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "participantjourneyproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileid", "order": "ASCENDING" },
+        { "fieldPath": "subscriptionstart", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

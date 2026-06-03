@@ -1,0 +1,13 @@
+{
+  "//": "EMULATOR-ONLY config. Kept SEPARATE from firebase.json on purpose: the deploy workflow (.github/workflows/deploy_19.yml) runs a bare `firebase deploy`, so a `firestore` block in firebase.json would push rules/indexes to PRODUCTION (fir-sample-aae4a) — forbidden (prod must stay untouched). Run with: firebase emulators:start --config firebase.emulator.json",
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "ui": { "enabled": true, "port": 4001 },
+    "singleProjectMode": true
+  }
+}

@@ -49,3 +49,4 @@ src/environments
 src/firebase-messaging-sw.js
 
 .claude
+graphify-out/

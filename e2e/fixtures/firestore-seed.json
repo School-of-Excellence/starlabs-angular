@@ -1,0 +1,140 @@
+{
+  "_README": "SYNTHETIC Tier-A seed for the Firebase EMULATOR ONLY. No production data, no PII, no ATC collections. Markers: {\"_ts\":\"<iso>\"} -> Timestamp, {\"_ref\":\"col/id\"} -> DocumentReference. Loaded by seed-emulator.js (refuses to run unless FIRESTORE_EMULATOR_HOST is set). Shapes mirror the documented config (CONFIGURATION.md / DATA-MODEL.md); ids/names are fake. Goal: enough config that a queue actually runs and each Tier-A subsystem has a happy path.",
+
+  "users_roles": {
+    "role-admin":       { "admin": true, "developer": true, "ah": true, "ahmember": true, "eis": true, "capacityplanner": true, "participant": false },
+    "role-participant": { "participant": true, "admin": false, "developer": false }
+  },
+
+  "user_data": {
+    "uid-admin":       { "name": "Test Admin", "email": "admin@example.test", "number": "+10000000001" },
+    "uid-participant": { "name": "Test Participant", "email": "participant@example.test", "number": "+10000000002" }
+  },
+
+  "profile_data": {
+    "prof-admin":       { "profileid": "prof-admin", "name": "Test Admin", "email": "admin@example.test", "enable": true, "participantmode": "operator", "created": {"_ts":"2026-01-01T00:00:00Z"}, "number": "+10000000001", "role_ref": {"_ref":"users_roles/role-admin"}, "user_ref": {"_ref":"user_data/uid-admin"} },
+    "prof-participant": { "profileid": "prof-participant", "name": "Test Participant", "email": "participant@example.test", "enable": true, "participantmode": "participant", "created": {"_ts":"2026-02-01T00:00:00Z"}, "number": "+10000000002", "role_ref": {"_ref":"users_roles/role-participant"}, "user_ref": {"_ref":"user_data/uid-participant"} }
+  },
+
+  "dashboard": {
+    "nav-home":  { "label": "Dashboard", "route": "/EISDashboard", "icon": "home", "showInSidenav": true, "order": 1, "roles": [], "profileid": [], "children": [] },
+    "nav-queue": { "label": "Queue System", "icon": "queue", "showInSidenav": true, "order": 13, "roles": [], "profileid": [], "children": [
+      { "label": "Queue List", "route": "/queuelist", "showInSidenav": true, "roles": ["admin","capacityplanner"], "profileid": [] },
+      { "label": "Queue Web", "route": "/queue-web", "showInSidenav": true, "roles": ["admin","participant"], "profileid": [] }
+    ] },
+    "nav-sched": { "label": "Scheduling", "icon": "event", "showInSidenav": true, "order": 12, "roles": [], "profileid": [], "children": [
+      { "label": "Book Appointment", "route": "/bookappointment", "showInSidenav": true, "roles": ["admin","eis"], "profileid": [] }
+    ] },
+    "nav-content": { "label": "Content", "icon": "movie", "showInSidenav": true, "order": 6, "roles": [], "profileid": [], "children": [
+      { "label": "Series Dashboard", "route": "/seriesdashboard", "showInSidenav": true, "roles": ["admin"], "profileid": [] }
+    ] },
+    "nav-dev": { "label": "Developer Settings", "route": "/routeconfiguration", "icon": "settings", "showInSidenav": false, "order": 99, "roles": ["admin"], "profileid": [], "children": [] }
+  },
+
+  "queue generation": {
+    "queue-test-1": {
+      "queuename": "TEST Diagnostics & Consultation",
+      "stages": ["Yet to Start", "Diagnostics", "In Diagnostics", "Ready for Changework", "In changework", "Ready for Review", "In Review", "Completed"],
+      "stageproperty": {
+        "Diagnostics":     { "selfmovable": true, "nextstage": "In Diagnostics", "compulsoryactivity": {}, "calltoaction": "Start Diagnostics" },
+        "In Diagnostics":  { "selfmovable": false, "nextstage": "Ready for Changework", "compulsoryactivity": { "diag": "Diagnostics" } },
+        "In changework":   { "selfmovable": false, "nextstage": "Ready for Review", "compulsoryactivity": { "cw": "Changework" } },
+        "In Review":       { "selfmovable": false, "nextstage": "Completed", "compulsoryactivity": {} }
+      },
+      "queuevariation": ["var-test-1"],
+      "queueadmin": ["prof-admin"],
+      "queuementor": ["prof-admin"],
+      "queuetargetcapacity": 10,
+      "totalcapacity": 20,
+      "venue": "ONLINE",
+      "enablezoommeetingsdk": false,
+      "zoomlinkrequired": false,
+      "queuestartdate": {"_ts":"2026-06-01T00:00:00Z"},
+      "queueenddate": {"_ts":"2026-12-31T00:00:00Z"},
+      "created": {"_ts":"2026-05-01T00:00:00Z"},
+      "modified": {"_ts":"2026-06-02T00:00:00Z"}
+    }
+  },
+
+  "queue variation": {
+    "var-test-1": { "variationname": "Old Participant", "queueref": {"_ref":"queue generation/queue-test-1"}, "stages": ["Yet to Start", "Diagnostics", "In Diagnostics", "Ready for Review", "In Review", "Completed"] }
+  },
+
+  "queue_token": {
+    "token-test-1": { "docid": "token-test-1", "profile_id": "prof-participant", "profile_name": "Test Participant", "queueref": {"_ref":"queue generation/queue-test-1"}, "queuename": "TEST Diagnostics & Consultation", "productref": {"_ref":"products/prod-test-1"}, "productname": "TEST Priority Product", "tokennumber": 1, "tokenstatus": "active", "stagestatus": "Approved", "currentstage": "Yet to Start", "previousstage": "Yet to Start", "variationid": null, "people_involved": [], "createdon": {"_ts":"2026-06-01T09:00:00Z"}, "logdate": {"_ts":"2026-06-01T09:00:00Z"} }
+  },
+
+  "modes": {
+    "mode-priority":     { "mode": "Priority", "sequence": 1, "info": "1:1 appointment series" },
+    "mode-event":        { "mode": "Event", "sequence": 2, "info": "group" },
+    "mode-installation": { "mode": "Installation Event", "sequence": 3, "info": "live workshop" },
+    "mode-big":          { "mode": "Big", "sequence": 4, "info": "cohort/marathon" },
+    "mode-investment":   { "mode": "Investment", "sequence": 5, "info": "investment" }
+  },
+
+  "journey": {
+    "journey-test-1": { "journey": "TEST Wellness Journey", "originalfee": 1000, "type": "core", "journeyupgrades": [], "addonproducts": [], "extras": [], "sequence": 1 }
+  },
+  "products": {
+    "prod-test-1": { "id": "prod-test-1", "product": "TEST Priority Product", "mode": "Priority", "modeflow": ["Diagnostics","Implementation","Review"], "deliveryplanning": "sequence", "performancedays": 30, "extendedperformancedays": 45, "integrationdays": 7, "atcmodel": "none", "unlimited": false, "originalfee": 1000 }
+  },
+  "package": { "pkg-test-1": { "package": "TEST Package" } },
+  "journey-to-product": { "j2p-test-1": { "journey": {"_ref":"journey/journey-test-1"}, "product": [{"_ref":"products/prod-test-1"}], "journeyrequiredjourneycoach": false } },
+
+  "participantjourneyproduct": {
+    "pjp-test-1": { "profileid": "prof-participant", "journeystatus": "ongoing", "journeyref": {"_ref":"journey/journey-test-1"}, "productref": [{"_ref":"products/prod-test-1"}], "subscriptionstart": {"_ts":"2026-02-01T00:00:00Z"}, "subscriptionend": {"_ts":"2026-08-01T00:00:00Z"}, "onboarded": true, "purchasedate": {"_ts":"2026-02-01T00:00:00Z"} }
+  },
+  "participantsproduct": {
+    "pp-test-1": { "profileid": "prof-participant", "productref": {"_ref":"products/prod-test-1"}, "packageref": {"_ref":"package/pkg-test-1"}, "deliverymode": "Priority", "mode": "Priority", "sequenceorder": 1, "minimumpayment": 100, "unlimited": false, "status": "ongoing", "subscriptionstart": {"_ts":"2026-02-01T00:00:00Z"}, "subscriptionend": {"_ts":"2026-08-01T00:00:00Z"} }
+  },
+  "salesleads": {
+    "lead-test-1": { "docid": "lead-test-1", "name": "Test Lead", "firstname": "Test", "lastname": "Lead", "email": "lead@example.test", "phonenumber": "+10000000003", "status": "Approved", "journeytype": "new", "journey": "TEST Wellness Journey", "profileid": "prof-participant", "totalpurchasevalue": 1000, "initialpayment": 100, "installmentamount": 100, "journeytenure": 6, "date": {"_ts":"2026-01-15T00:00:00Z"}, "purchasedate": {"_ts":"2026-02-01T00:00:00Z"}, "addons": [], "bonus": [], "edited": false } },
+
+  "productToDeliverySequence": {
+    "pds-test-1": { "product": {"_ref":"products/prod-test-1"}, "deliveryoptions": [ { "deliverytype": "standard", "deliverysequence": [ { "activity": {"_ref":"appointmenttype/appt-diag"} }, { "activity": {"_ref":"appointmenttype/appt-impl"} }, { "activity": {"_ref":"appointmenttype/appt-review"} } ] } ] }
+  },
+  "appointmenttype": {
+    "appt-diag":   { "id": "appt-diag", "appointmenttype": "TEST Diagnostics", "duration": 60, "ischangeworkrequired": false, "groupappointment": false },
+    "appt-impl":   { "id": "appt-impl", "appointmenttype": "TEST Implementation", "duration": 45, "ischangeworkrequired": true, "groupappointment": false },
+    "appt-review": { "id": "appt-review", "appointmenttype": "TEST Review", "duration": 30, "ischangeworkrequired": false, "groupappointment": false }
+  },
+  "AppointmentType-To-Roles": {
+    "a2r-diag": { "id": "a2r-diag", "assigned_appttype_ref": {"_ref":"appointmenttype/appt-diag"}, "assigned_appttype": "TEST Diagnostics", "required_role": [{"_ref":"Roles-To-EIS/r2e-diag"}], "additional_role": [], "assigned_role": [] }
+  },
+  "Roles-To-EIS": {
+    "r2e-diag": { "id": "r2e-diag", "assigned_role_ref": {"_ref":"eisroles/eis-diag"}, "assigned_role": "TEST Diagnostics Specialist", "assigned_eis": [{"_ref":"profile_data/prof-admin"}] }
+  },
+  "eisroles": {
+    "eis-diag": { "id": "eis-diag", "role": "TEST Diagnostics Specialist", "experiencestage": "Diagnostics", "experiencelevel": "Lead" }
+  },
+  "availability": {
+    "avail-test-1": { "id": "avail-test-1", "profileref": {"_ref":"profile_data/prof-admin"}, "appointments": [{"_ref":"appointmenttype/appt-diag"}], "starttime": {"_ts":"2026-06-10T09:00:00Z"}, "endtime": {"_ts":"2026-06-10T17:00:00Z"}, "appt-diag": [ { "slotstart": {"_ts":"2026-06-10T09:00:00Z"}, "slotend": {"_ts":"2026-06-10T10:00:00Z"}, "booked": false, "available": true } ] }
+  },
+  "appointments": {
+    "appt-booked-1": { "starttime": {"_ts":"2026-06-10T09:00:00Z"}, "endtime": {"_ts":"2026-06-10T10:00:00Z"}, "appointment": {"_ref":"appointmenttype/appt-diag"}, "hosts": [{"_ref":"profile_data/prof-admin"}], "hostRole": {}, "appointmentrole": [], "slotdata": [], "cancelled": false, "attended": true, "bookedby": {"_ref":"profile_data/prof-admin"}, "participantproductid": "pp-test-1", "productid": "prod-test-1", "totalminutes": 60, "created": {"_ts":"2026-06-02T00:00:00Z"} }
+  },
+  "deliverables": {
+    "delv-test-1": { "type": "appointment", "deliveryref": {"_ref":"appointmenttype/appt-diag"}, "profileid": "prof-participant", "participantproductid": "pp-test-1", "status": "ongoing", "fileref": [] }
+  },
+  "participantdeliverysequence": {
+    "prof-participant": { "profileid": "prof-participant", "products": [ { "productref": {"_ref":"products/prod-test-1"}, "delivery": [ { "appointmenttype": "TEST Diagnostics", "status": "ongoing" } ] } ] }
+  },
+
+  "tier": { "tier-test-1": { "id": "tier-test-1", "tier": "TEST Tier 1", "order": 1, "date": {"_ts":"2026-01-01T00:00:00Z"} } },
+  "tier access config": { "tac-test-1": { "docid": "tac-test-1", "tieraccessby": "product", "tierid": "tier-test-1", "biglevel": [], "biglevelid": [], "productaccess": { "journey-test-1": [ { "productid": "prod-test-1", "count": 1 } ] } } },
+  "series": { "series-test-1": { "id": "series-test-1", "seriesName": "TEST Series", "description": "test", "imageUrl": "", "order": 1, "sequence": [{"_ref":"episodes/ep-test-1"}], "tier": [{"_ref":"tier/tier-test-1"}], "date": {"_ts":"2026-03-01T00:00:00Z"} } },
+  "episodes": { "ep-test-1": { "id": "ep-test-1", "title": "TEST Episode", "description": "test", "videoUrl": "https://example.test/v.m3u8", "date": {"_ts":"2026-03-01T00:00:00Z"}, "series": [{"_ref":"series/series-test-1"}] } },
+  "solar voice playlist": { "svp-test-1": { "id": "svp-test-1", "name": "TEST Playlist", "description": "test", "sequence": [{"_ref":"solar voice audios/sva-test-1"}], "private": false, "date": {"_ts":"2026-03-01T00:00:00Z"} } },
+  "solar voice audios": { "sva-test-1": { "id": "sva-test-1", "name": "TEST Audio", "url": "https://example.test/a.mp3", "description": "test", "size": "1MB", "sizeBytes": 1000000, "duration": 120, "date": {"_ts":"2026-03-01T00:00:00Z"} } },
+  "content analytics": {
+    "ca-test-sv": { "profileid": "prof-participant", "videoname": "TEST Audio", "videoid": "sva-test-1", "from": "playlist", "lastwatchedtime": "120", "totaltimespend": 120, "totalruntime": 120, "type": "solarvoice", "playlistid": "svp-test-1", "logdate": {"_ts":"2026-06-01T10:00:00Z"} },
+    "ca-test-ef": { "profileid": "prof-participant", "videoname": "TEST Episode", "videoid": "ep-test-1", "from": "series", "lastwatchedtime": "300", "totaltimespend": 300, "totalruntime": 600, "type": "eiflixcontent", "logdate": {"_ts":"2026-06-01T11:00:00Z"} }
+  },
+
+  "arenaspace": {
+    "space-test-1": { "docid": "space-test-1", "spaceid": "space-test-1", "mentor": ["prof-admin"], "pivottype": "diagnostics", "eventref": {"_ref":"event collection/event-test-1"}, "participantslist": ["prof-participant"], "cohortsid": [], "validated": true, "delete": false, "date": {"_ts":"2026-06-01T00:00:00Z"}, "createddate": {"_ts":"2026-05-01T00:00:00Z"} }
+  },
+  "event collection": {
+    "event-test-1": { "name": "TEST Event", "event_id": "event-test-1", "venue": "ONLINE", "address": "", "start_date": {"_ts":"2026-06-15T00:00:00Z"}, "end_date": {"_ts":"2026-06-15T12:00:00Z"}, "hosts": ["prof-admin"] }
+  }
+}

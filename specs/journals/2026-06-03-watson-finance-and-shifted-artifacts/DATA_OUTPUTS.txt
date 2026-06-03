@@ -1,0 +1,132 @@
+==== watson_explore.js — Watson collections + purchase/payment shapes ====
+PROJECT: watsonproduction-becde
+
+=== ROOT COLLECTIONS ===
+  Batchmail  (count=403)
+  Invoice  (count=16292)
+  Invoices  (count=29)
+  Journey  (count=8899)
+  Notes  (count=4)
+  ParticipantPayments  (count=24190)
+  ParticipantPurchases  (count=5462)
+  ParticipantPurchases_history  (count=470)
+  Participants  (count=3496)
+  Payment Schedule  (count=45842)
+  Token  (count=264)
+  accountsconfig  (count=1)
+  addproduct  (count=104)
+  addroutingpath  (count=37)
+  addteamnames  (count=8)
+  addteamroles  (count=5)
+  adjusted schedule  (count=481)
+  aggregatedisciplinedashboard  (count=12)
+  axisenach  (count=400)
+  backup payment_schedule  (count=309309)
+  billingverification  (count=37)
+  cancelledemailinvoices  (count=54)
+  cancelledinvoices  (count=271)
+  classify  (count=2)
+  computedpaymentschedule  (count=45743)
+  configurations  (count=1)
+  credentials  (count=1)
+  dashboard tags  (count=1)
+  defaults  (count=16)
+  emaillist  (count=123)
+  emi pause  (count=1542)
+  emihealth_growthtracker  (count=38)
+  esteemed schedule  (count=4)
+  event  (count=7)
+  form  (count=168)
+  growth_tracker  (count=21)
+  icicienach  (count=4713)
+  journey-count  (count=11)
+  last months payment management records  (count=774)
+  mail  (count=13)
+  message services  (count=1663)
+  month1stMFD  (count=898)
+  monthlyfinancedashboard  (count=1603)
+  monthlyinvoiceid  (count=23)
+  nach  (count=4983)
+  nongstratiocounters  (count=14)
+  onboarding  (count=1)
+  participantlog  (count=26269)
+  payment_schedule  (count=746)
+  payment_schedule backup  (count=121)
+  paymentdisciplinedashboard  (count=3495)
+  paymentscheduleupdates  (count=5290)
+  product  (count=5)
+  product-to-journey  (count=18)
+  salecompletiondashboard  (count=117)
+  saleinitiation  (count=118)
+  salesleads  (count=4332)
+  tickets  (count=7788)
+  users  (count=53)
+  usersrole  (count=3)
+  watsondata  (count=24)
+  zoho-sign-templates  (count=1)
+  zoho_archive  (count=22)
+  zoho_events  (count=48)
+  zoho_template_configs  (count=2)
+
+=== PURCHASE/PAYMENT COLLECTION SHAPES ===
+
+## Participants
+   [00tRDiOJ4xP6k3gC3MlA] {firstname:str(9), paymentcommitment:str(4), pp_frequency:str(7), countrycode:str(3), firstpurchasedate:str(10), billingname:str(11), billingnumber:str(10), profileid:str(20), id:str(20), email:str(26), pp_status:str(3), pp_installmentstartmonth:str(7), tdsenabled:boolean, archive:boolean, lastname:str(1), participantid:str(20), phone:str(10), billingemail:str(26), name:str(11), paymentscheduleupdated:boolean, debitplan:str(9), pp_installmentamount:number, paymentcommitmentupdateddate:ts, nachrecieved:boolean, billingaddress:str(0), gstno:str(0), pp_method:str(13), lastpaymentdate:ts, pp_lastpayment:str(10), pp_installmentspaid:number}
+   [014h8eqrRoFpU6rSGeUr] {recentpurchase:str(24), pp_installmentstartmonth:str(7), firstname:str(7), pp_frequency:str(7), firstpurchasedate:str(10), lastname:str(9), phone:str(10), lastpaymentdate:ts, recentpurchasedate:str(10), pp_balance:number, name:str(17), pp_installmentamount:number, pp_paymentday:number, pp_totalpaid:number, id:str(20), email:str(27), pp_totalpurchasevalue:number, checkvariable:number, pp_lastpayment:str(10), pp_installmentspaid:number, pp_installmentsdue:number, overdue:number, financestatus:str(6), totalemipaid:number, totalemidue:number, pp_status:str(10), nachreceived:boolean, profileid:str(20), archive:boolean, pp_method:str(6)}
+
+## ParticipantPurchases
+   [00YDotA8U3I1XZrhv4Ew] {product:str(11), gross:number, fee:number, initialpayment:number, gst:number, participantid:str(20), purchasedate:str(10), id:str(20), purchasedate_ts:ts, paymentplan:str(6), balance:number}
+   [00ebMs8fzMSEjsTQgeoS] {installmentstartmonth:str(7), originalfee:number, product:str(24), gross:number, fee:number, initialpayment:number, gst:number, participantid:str(20), purchasedate_ts:ts, purchasedate:str(10), paymentday:number, salesperson:str(5), packagedesignid:str(20), id:str(20), installmentamount:number, status:str(18), socialcommit:str(14), balance:number, paymentplan:null}
+
+## ParticipantPayments
+   [0083Pht3RGOjacc9tJKf] {date:str(10), participantid:str(20), paymentdate:ts, fee:number, gst:number, receipt:number, fluid:boolean, id:str(20), invoiceid:number, email:str(23)}
+   [008HhVqDhCX6DZNmFkhL] {date:str(10), updateddate:ts, receipt:number, fee:number, gst:number, participantid:str(20), id:str(20), paymentdate:ts, paymentid:str(41), notes:str(0), addedby:str(28), invoiceid:number, p_type:str(8), scheduleamount:number, paymentsource:str(13)}
+
+## Payment Schedule
+   [001vY6Nv55iKiFysT8ro] {year:number, day:number, amount:number, docid:str(20), participantid:str(20), date:ts, computed:number, month:number, paymentstatus:str(8), receipt:number, bulkschedule:number, emischedule:number}
+   [004SwyUBjGUjPHMbqSgg] {participantid:str(20), year:number, docid:str(20), paymentstatus:str(8), receipt:number, amount:number, month:number, date:ts, day:number, actualamountreceived:number, status:str(14), bulkschedule:number, emischedule:number}
+
+DONE
+
+==== watson_purchase_probe.js — purchase model (purchasetype/status) + 'shifted' hits ====
+
+## ParticipantPurchases
+   [00YDotA8U3I1XZrhv4Ew] {product:str(11), gross:number, fee:number, initialpayment:number, gst:number, participantid:str(20), purchasedate:str(10), id:str(20), purchasedate_ts:ts, paymentplan:str(6), balance:number}
+   [00ebMs8fzMSEjsTQgeoS] {installmentstartmonth:str(7), originalfee:number, product:str(24), gross:number, fee:number, initialpayment:number, gst:number, participantid:str(20), purchasedate_ts:ts, purchasedate:str(10), paymentday:number, salesperson:str(5), packagedesignid:str(20), id:str(20), installmentamount:number, status:str(18), socialcommit:str(14), balance:number, paymentplan:null}
+
+## ParticipantPurchases_history
+   [086N2Td1Q67AybI9LRJe] {originalfee:number, salesperson:str(9), carryover:boolean, balance:number, gst:number, fee:number, installmentamount:number, cancelled:boolean, amendnotes:str(147), participantid:str(20), purchasestatus:str(6), purchasedate_ts:ts, purchasedate:str(10), purchasetype:str(7), gross:number, installmentstartmonth:str(7), product:str(10), paymentid:str(1), initialpayment:number, status:str(3), installmentsData:array[1], paymentday:number, id:str(20), lastupdate:ts}
+   [08tF1B8puVPZlqRlKrkT] {originalfee:number, installmentstartmonth:str(7), product:str(10), gross:number, fee:number, initialpayment:number, gst:number, purchasedate_ts:ts, participantid:str(20), paymentday:number, purchasedate:str(10), salesperson:str(6), installmentsData:array[1], paymentid:str(1), purchasestatus:str(6), purchasetype:str(7), cancelled:boolean, carryover:boolean, id:str(20), lastupdate:ts, installmentamount:number, status:str(8)}
+
+## Journey
+   [0041iNYBnxscS5Wll1At] {date:str(10), people_involved:array[1], multiplelink:array[0], type:str(11), participantid:str(20), sequence:number, quicknotes:str(1), location:str(1), id:str(20)}
+   [00tLFf2Wf5clciXbawVy] {date:str(10), people_involved:array[1], tokenid:str(20), type:str(11), participantid:str(20), sequence:str(3), tokennumber:number, modifiedtime:ts, location:str(6), quicknotes:str(2), id:str(20)}
+
+## addproduct
+   [0Krs5uGKZ1LN5mnS0865] {originalpurchaseamount:str(6), id:str(20), product:str(18)}
+   [0c2DuImNzwremPpSCvnw] {product:str(15), originalpurchaseamount:str(6), id:str(20)}
+
+=== status-like field VALUES (sample 900) + any "shift*" value ===
+
+# ParticipantPurchases (n=900)
+  status-like: status=due:407  purchasetype=journey:355  purchasestatus=active:233  status=Active PaymentPlan:104  purchasestatus=upgrade:82  purchasestatus=cancelled:70  status=Fully Paid:41  purchasestatus=addons:36  purchasetype=addons:22  purchasetype=product:20  purchasestatus=downgrade:18  status=missed:9  customerstatus=regular:7  status=overdue:4  status=emi paid:3
+  shift* hits: 2 73oSwzrzVc93bR8IsknE: salenotes="Journey shift" | 8hKUTwnTDn6YmnAVid2J: salenotes="Journey Shifted from uP! to LYL
+
+Will be clearing minimum payment of 2L to start W!SH by next week."
+
+# ParticipantPurchases_history (n=470)
+  status-like: status=due:384  purchasetype=journey:357  purchasestatus=active:334  status=Active PaymentPlan:39  purchasestatus=upgrade:26  purchasestatus=addons:21  purchasetype=addons:15  purchasetype=product:6  status=overdue:5  status=missed:3  customerstatus=regular:3  status=Fully Paid:3  status=emi paid:2  status=no due:1  purchasestatus=downgrade:1
+  shift* hits: 2 LA2BKQJuBPQZ46QsD5e0: salenotes="EMI to start from August 5th
+
+Please shift her journey from uP! to B!G (purchase price includes uP! payment made so far)
+
+" | wi1xLP6h9AV3HHHNyXmy: salenotes="Note to Finance & Onboarding Team-
+1) She has already completed payment for uP!, create new ENACH and get her to fill it today itself.
+2) One year uP! continuity as bonus.
+3) Some frame shifts will make her sign up for B!G-she already wants to do it but current family situation is not allowing her to see the journey happening immediately."
+
+# Journey (n=900)
+  status-like: type=uP! Life Report:114  type=Video Log:97  type=EIS Diagnostics:78  type=Change work:75  type=Evolution Mapping Activity:66  type=Consultation:62  type=Review:55  type=ATC Assessment:47  type=Listing of Adjustments:41  type=Self ATC:25  type=EIS Apprenticeship:22  type=A&H Review - Change Work:21  type=CTD Consultation:16  type=Video Interview:13  type=Shadowing A&H:11
+  shift* hits: 0 
+
+DONE

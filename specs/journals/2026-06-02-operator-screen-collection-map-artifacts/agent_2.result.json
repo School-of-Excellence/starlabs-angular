@@ -1,0 +1,296 @@
+[
+  {
+    "route": "playlistads",
+    "file": "src/app/content/playlist-ads/playlist-ads.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "content_urls", "line": 47},
+      {"c": "adsplaylist", "line": 55}
+    ],
+    "writes": [],
+    "services": ["getRoles"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "content_urls via getDocs (build title map); adsplaylist via collectionSnapshots subscribe. Read-only here; edits open UpdatePlaylistadsComponent dialog."
+  },
+  {
+    "route": "healthstories",
+    "file": "src/app/content/health-stories/health-stories.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "health stories", "line": 43}
+    ],
+    "writes": [],
+    "services": ["getRoles"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "'health stories' (with space) via collectionSnapshots subscribe. Edits open UpdateHealthstoryComponent dialog."
+  },
+  {
+    "route": "ads",
+    "file": "src/app/content/click-ads/click-ads.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "ads", "line": 139}
+    ],
+    "writes": [],
+    "services": ["getRoles"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "'ads' via collectionSnapshots subscribe. Line 41 commented out. Edits open UpdateAdsComponent dialog."
+  },
+  {
+    "route": "videodashboard",
+    "file": "src/app/content/episodes-dashboard/episodes-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "episodes", "line": 136},
+      {"c": "atc taxonomy", "line": 145}
+    ],
+    "writes": [
+      {"c": "episodes", "line": 595}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc taxonomy"],
+    "notes": "episodes read via query(orderBy date desc). 'atc taxonomy' is reference-only/safe per CLAUDE.md. Line 346 doc(collection 'episodes').id is ID generation only. Write: setDoc(doc episodes/{id}, ...,{merge:true}) at 595."
+  },
+  {
+    "route": "contentanalytics",
+    "file": "src/app/content/content-analytics/content-analytics.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "journey", "line": 132},
+      {"c": "series", "line": 337},
+      {"c": "tier", "line": 354},
+      {"c": "participant content analytics", "line": 395},
+      {"c": "content analytics", "line": 812},
+      {"c": "solar voice playlist", "line": 894}
+    ],
+    "writes": [
+      {"c": "content analytics", "line": 985}
+    ],
+    "services": ["getParticipantMetaMap", "getProfileMapNewUser"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "journey/series/tier/'participant content analytics' via getDocs. 'content analytics' via onSnapshot(query logdate range). 'solar voice playlist' via getDocs. Write: deleteDoc(doc 'content analytics', docid) at 985. Lines 918-984 commented-out duplicates."
+  },
+  {
+    "route": "content-analytics-dashboard",
+    "file": "src/app/content/content-analytics-dashboard/content-analytics-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "content analytics", "line": 780},
+      {"c": "participant metadata", "line": 1006},
+      {"c": "recommended mix playlist", "line": 1018}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "'content analytics' via onSnapshot(query). 'participant metadata' via getDocs. 'recommended mix playlist' via collectionData(query). Read-only. Many .set/.delete hits are Map/Set ops, not Firestore; lines 544-751 commented-out."
+  },
+  {
+    "route": "accessscreen",
+    "file": "src/app/content/access-screen/access-screen.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "tier", "line": 67},
+      {"c": "series", "line": 108},
+      {"c": "user", "line": 149}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "tier collection (67) + getDoc on tier doc (124); series via collection (108); user via collectionSnapshots (149). Read-only in this component."
+  },
+  {
+    "route": "seriesdashboard",
+    "file": "src/app/content/series-dashboard/series-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "series", "line": 53}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "'series' via collectionSnapshots subscribe. Read-only; add/edit handled in child components."
+  },
+  {
+    "route": "addseries",
+    "file": "src/app/content/series-dashboard/add-series/add-series.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "episodes", "line": 88},
+      {"c": "category", "line": 96},
+      {"c": "series", "line": 103},
+      {"c": "tier", "line": 111}
+    ],
+    "writes": [
+      {"c": "series", "line": 255},
+      {"c": "episodes", "line": 257}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads episodes(query orderBy date)/category/series/tier via getDocs. writeBatch (211): batch.set new 'series' doc (255); batch.update each episode doc (256-259) to arrayUnion the new series ref into episode.series. Line 214 doc(collection 'series').id = ID gen."
+  },
+  {
+    "route": "editseries",
+    "file": "src/app/content/series-dashboard/edit-series/edit-series.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "episodes", "line": 93},
+      {"c": "series", "line": 102},
+      {"c": "category", "line": 140}
+    ],
+    "writes": [
+      {"c": "series", "line": 467}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads episodes(query orderBy date)/series/category via getDocs. Write: submitToFirestore(seriesDocRef,data) -> updateDoc on 'series' doc (467; seriesDocRef defined line 376). Old AngularFire batch/episode-update code at 312-355 is commented out."
+  },
+  {
+    "route": "category-dashboard",
+    "file": "src/app/content/category-dashboard/category-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "category", "line": 39},
+      {"c": "series", "line": 95}
+    ],
+    "writes": [
+      {"c": "series", "line": 106}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "category + series read via collectionData. Write: updateDoc(doc series/{id},{order}) at 106 to persist drag-reorder."
+  },
+  {
+    "route": "viewparticipantstieraccess",
+    "file": "src/app/content/eiflix_tier/viewparticipant-tier-access/viewparticipant-tier-access.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "tier", "line": 53},
+      {"c": "participant metadata", "line": 69},
+      {"c": "series", "line": 94},
+      {"c": "tier access config", "line": 144},
+      {"c": "journey", "line": 151},
+      {"c": "products", "line": 159},
+      {"c": "biglevel", "line": 167}
+    ],
+    "writes": [
+      {"c": "tier access config", "line": 277}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "tier/journey/products/biglevel via getDocs; 'participant metadata' via collectionSnapshots(query orderBy name); series via collection (94)+getDoc tier doc (109); 'tier access config' collection (144). Write: deleteDoc(doc 'tier access config', docid) at 277. profile_data read commented out (61)."
+  },
+  {
+    "route": "tieraccessconfig",
+    "file": "src/app/content/tier-access-config/view-tier-access/view-tier-access.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "tier access config", "line": 44},
+      {"c": "tier", "line": 50},
+      {"c": "journey", "line": 57},
+      {"c": "products", "line": 64},
+      {"c": "biglevel", "line": 71}
+    ],
+    "writes": [
+      {"c": "tier access config", "line": 120}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "'tier access config' collection (44); tier/journey/products/biglevel via getDocs. Write: deleteDoc(doc 'tier access config', docid) at 120."
+  },
+  {
+    "route": "contentupload",
+    "file": "src/app/content/content-upload/content-upload.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "user_data", "line": 70},
+      {"c": "profile_data", "line": 71},
+      {"c": "content_urls", "line": 77},
+      {"c": "atc taxonomy", "line": 92}
+    ],
+    "writes": [
+      {"c": "content_urls", "line": 168}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc taxonomy"],
+    "notes": "user_data doc ref (70) used to query profile_data by user_ref (getDocs 73); content_urls via query orderBy added (77). 'atc taxonomy' reference-only/safe per CLAUDE.md. Write: deleteDoc(doc content_urls/{docid}) at 168."
+  },
+  {
+    "route": "createarenavideoasktemplate",
+    "file": "src/app/content/arena-video-ask-input/arena-video-ask-input.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 66},
+      {"c": "arenavideoask", "line": 75}
+    ],
+    "writes": [
+      {"c": "arenavideoask", "line": 163},
+      {"c": "arenavideoask", "line": 198},
+      {"c": "arenavideoask", "line": 210},
+      {"c": "arenavideoask", "line": 226}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "'event collection' via getDocs; 'arenavideoask' via collectionSnapshots subscribe. Writes: setDoc new arenavideoask (163); updateDoc arenavideoask (198); writeBatch batch.update arenavideoask active:false (210); deleteDoc arenavideoask (226). Line 148 doc(collection 'content_urls').id = ID gen; line 154 references 'event collection' doc."
+  },
+  {
+    "route": "offtime",
+    "file": "src/app/Offtime/offtime-list/offtime-list.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "offtime", "line": 75}
+    ],
+    "writes": [
+      {"c": "offtime", "line": 116}
+    ],
+    "services": ["generateSpecialistSlot"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "offtime via collectionData(query profileid==loggedinPID, date>=now). Write: writeBatch (113) batch.delete(doc offtime/{docid}) at 116. After delete, calls guard.generateSpecialistSlot(profileid) (118)."
+  },
+  {
+    "route": "approveofftime",
+    "file": "src/app/Offtime/approve-offtime/approve-offtime.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "offtime", "line": 89},
+      {"c": "profile_data", "line": 107}
+    ],
+    "writes": [
+      {"c": "offtime", "line": 162},
+      {"c": "offtime", "line": 197}
+    ],
+    "services": ["generateSpecialistSlot"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "offtime via collectionData(query date>=now); profile_data via getDocs(query profileid in list) at 107. Writes: updateDoc(doc offtime/{docid}) approve (162) and reject/other (197). Calls guard.generateSpecialistSlot(profileid) (153)."
+  },
+  {
+    "route": "participanttouchpoint",
+    "file": "src/app/participant-touchpoint/participant-touchpoint.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "classify", "line": 62},
+      {"c": "participant touchpoint", "line": 88}
+    ],
+    "writes": [],
+    "services": ["getProfileMap"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "getDoc(doc '/classify/touchpoint') reads classify doc (62); 'participant touchpoint' via collectionData(query touchpointdate range, orderBy asc) at 88. Uses 'afs' Firestore instance. Read-only."
+  }
+]
