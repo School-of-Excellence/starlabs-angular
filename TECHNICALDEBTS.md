@@ -1,6 +1,8 @@
 # TECHNICALDEBTS.md — StarLabs
 
 > Narrative tech-debt register from the 2026-06-02 discovery. Evidence-linked. Not a status tracker (no live bug DB installed yet — that's part of the deferred velocity substrate).
+>
+> ⚠️ **STALE-BRANCH RISK (2026-06-04):** line numbers in TD entries were captured on `main` (2026-04-17); repo now on `production` (308 commits ahead). **Re-verify the Angular `file:line` refs before acting** — esp. TD-006 (`authguard.service.ts:186,188`), TD-010 (unguarded routes), TD-012/013 (config), TD-015 (`journeyplan.component.ts:557`). The *findings* still hold; only the line anchors may have moved. **Unaffected:** TD-016/017/018/019 (CF repo on `development`) and all data-driven debts. (Stream B; `ORIENTATION.md` Open-threads #4.)
 
 ### TD-001 · Heavy component duplication (Clone / Clone-2 / Duplicate / old)
 **7 of the top-10 graph hubs** are clone/duplicate variants: `BigCohortClone(2)`, `DynamicQueueManagerClone`, `SalesDashboardClone`, `DeliveryDashboardClone`, `JourneycoachDuplicate`, `QueuePlanningClone`. Inflates surface area, splits logic, and pollutes any test effort. **Dedup before writing tests — don't test dead clones.** Evidence: `graphify-out/GRAPH_REPORT.md`.

@@ -1,5 +1,6 @@
 # Operator Screen → Collection Map (100% code-evidence)
 
+> ⚠️ **STALE-BRANCH RISK (2026-06-04):** extracted from `main` (2026-04-17); repo now on `production` (308 commits ahead). **Screen list + `file:line` evidence may be stale** (~8 new component dirs on `production`). The screen→collection *mapping* is largely intact, but **re-verify specific `file:line` refs against `production` before relying.** (Stream B; `ORIENTATION.md` Open-threads #4.)
 > Generated 2026-06-02 by 11 parallel extraction agents over the **194 routed operator screens** (ATC screens excluded). Evidence = Firestore calls in each route's component (file:line). Used to validate Tier-A reliability: *a collection is operator-used only if a real screen reads/writes it.* Raw: `~/Downloads/svstats/chunks/agent_*.result.json`.
 
 **Coverage:** 194 screens · 219 distinct collections referenced · 130 screens write.

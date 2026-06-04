@@ -22,6 +22,8 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 
 **StarLabs backend = Cloud Functions repo `starlabs-cloud-function/`** (a separate git repo nested in this folder; work on the **`development`** branch). `functions/components/*.js` = the real backend (participantmode, participantproduct, participantmetadata, queuesystem, big-*, watson-updates, salescrm-updates, …). This is where the **mode engine** lives (TD-016 resolved). The old `firebasefunctions/` is a partial/legacy deployment — ignore for mode/delivery logic.
 
+**Branches (important):** Angular work is on **`docs/system-documentation-prod`** — cut from `origin/production` (today's live code). **Do NOT use `main`** — it is 308 commits / 234 files stale (frozen 2026-04-17). The CF backend repo is on **`development`**.
+
 ## The read-only data harness
 `~/Downloads/svstats/` — Node + `firebase-admin`. Pattern: `cd ~/Downloads/svstats && node <probe>.js`. The query scripts for each investigation are **copied into the repo** under `specs/journals/<date>-<topic>-artifacts/` with a `DATA_OUTPUTS.txt` of the captured data. (`firebase-admin` already installed there.)
 
@@ -31,7 +33,7 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 - **`specs/` auto-docs** (AI-derived, *unreviewed* — reference only): `DATA-MODEL.md`, `CONFIGURATION.md` (config→behavior + config-authoring screens), `operator-screens.md` (every screen→collection, ATC-exclusion set), `data-reliability.md` (Tier A/B/C trust), `JOURNEY-LIFECYCLE`/`SCHEDULING-DELIVERY`/`QUEUE-AND-BIG`/`LIVE-STUDIOS`/`CONTENT-ENGAGEMENT`/`AUTH-ROLES`.
 - **Root:** `DESIGN.md` (architecture WHY), `DOCS.md` (212-route code reference), `DECISIONS.md` (D-001…D-009), `TECHNICALDEBTS.md` (TD-001…TD-016).
 - **`specs/journals/`** = the WHY/narrative per investigation (10 journals; each pairs with a `-artifacts/` data dir). **`tier-a-proposal.csv`** = the trusted-collection set awaiting engineer validation.
-- **`graphify-out/`** (gitignored) = knowledge graph; `wiki/index.md` to navigate.
+- **`graphify-out/`** (gitignored) = knowledge graph; `wiki/index.md` to navigate. **Rebuilt 2026-06-04 over `production` + the CF backend** — 18,337 nodes, 1,104 wiki articles, 40 labelled communities (incl. `CF Backend — Delivery & Data`, `CF Backend — Notifications/FCM`). Hub nodes: `AuthguardService` (289 edges), the dashboard clones, `DynamicQueueManager`. **Scope:** all code (AST) + 961 code/doc files (semantic). **Excluded:** the 249 `src/assets` images (all decorative UI/journey-track **icons — no diagrams**) and the 398 empty spec stubs. Our own architecture/journey/mode diagrams are **ASCII inside the `.md` docs**, so they ARE in the graph.
 
 ## Concept-group validation status
 | # | Group | Status |
@@ -47,6 +49,7 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 1. ~~Mode engine off-disk~~ — **RESOLVED 2026-06-04 (TD-016, fully closed).** The engine is **`starlabs-cloud-function/functions/components/participantmode.js`** (the StarLabs Cloud Functions repo — a separate git repo nested here; develop on the **`development`** branch). Fully mapped in `validated/02 §7`. The `participant metadata.participantmode` denorm path is also resolved (§7d): it's a CQRS projection rebuilt by `participantmetadata.js`.
 2. **Tier-A lock pending** — engineers validate `specs/tier-a-proposal.csv` → then mark `data-reliability.md` LOCKED → only then build CI fixtures.
 3. **Hardcoded secrets** (FCM server keys, Zoom SDK key) in client source — TD-006 (a spawned task exists).
+4. **⚠️ Doc citations vs `production` — RE-VERIFY before relying (stream B, pending).** The docs were authored against `main` (frozen 2026-04-17); the repo migrated to `production` on 2026-06-04 (**308 commits / 234 files ahead**). So **Angular `file:line` citations + screen/route counts may be stale** in: `DOCS.md` (212-route ref), `operator-screens.md`, `TECHNICALDEBTS.md` (TD-006 `authguard.service:186/188`, TD-010, TD-012/013, TD-015 `journeyplan:557`), `route_inventory.csv`, `CONFIGURATION.md`. **Branch-independent / still trustworthy:** all data-driven facts (production Firestore), the reliability tiers, and **CF-repo citations on `development`** (incl. the mode engine `validated/02 §7`). Routes only drifted +2 (387→389) and +8 component dirs, so structure holds — it's individual line numbers that need a re-anchor pass.
 
 ## Immediate next actions
 - Resume **#3 Queue Manager** (validate-from-data) — the next concept group. (Head start: `CONFIGURATION.md §1` queue config model + `queuesystem.js` in the CF repo.)
