@@ -13,8 +13,8 @@
     </mat-toolbar>
 
     <div>
-      <mat-form-field appearance="outline" style="width: 350px;padding: 20px;">
-        <mat-select placeholder="Select Event" [(ngModel)]="selectedEvent" (selectionChange)="eventSelected()">
+      <mat-form-field appearance="outline" style="width: 350px;padding: 20px 20px 5px;">
+        <mat-select placeholder="Select Event" [(ngModel)]="selectedEventsList" (selectionChange)="eventSelected()" multiple>
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterEvent" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
           </mat-option>
@@ -23,6 +23,11 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
+      <div class="event-chips-container">
+        <div *ngFor="let event of selectedEventsList" (click)="onEventClick(event)" [class.active]="selectedEvent === event">
+          {{mapEvent[event].name}}
+        </div>
+      </div>
     </div>
   
     <div *ngIf="selectedEvent != null" class="main-content-container">

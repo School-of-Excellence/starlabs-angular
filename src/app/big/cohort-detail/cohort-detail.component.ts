@@ -127,6 +127,7 @@ export class CohortDetailComponent implements OnDestroy {
   studioUnassignedSearch: string = '';
   /** docids of expanded studio cards (the chevron toggles entry presence). */
   studioExpanded: Set<string> = new Set<string>();
+  dragPayload = null;
 
   toggleStudioExpanded(studio: any, event?: Event) {
     if (event) event.stopPropagation();
@@ -493,7 +494,8 @@ export class CohortDetailComponent implements OnDestroy {
         this.getStudioParticipantIds(s).forEach((pid) => inAnyStudio.add(pid));
       }
     });
-    const result = cohortParticipants.filter((pid) => !inAnyStudio.has(pid));
+    const newStudioPairingPID = this.newStudioPairing.map((studio)=>studio['participants'] ?? []).flatMap((studio)=>studio)
+    const result = cohortParticipants.filter((pid) => !inAnyStudio.has(pid) && !newStudioPairingPID.includes(pid));
     const q = (this.studioUnassignedSearch || '').toLowerCase().trim();
     if (!q) return result;
     return result.filter((pid) =>
@@ -1829,5 +1831,80 @@ export class CohortDetailComponent implements OnDestroy {
     const studioParticipants = pid ?? [];
     const cohortParticipants = this.cohort['participantidlist'] ?? [];
     return studioParticipants.every((pid)=>cohortParticipants.includes(pid))
+  }
+
+  onStduioParticipantDrag(event: DragEvent , participantId : string , studioIndex : number){
+    if (!event.dataTransfer) return
+    event.stopPropagation()
+    this.dragPayload = { kind: 'studio', studioIndex , participantId  }
+    event.dataTransfer.effectAllowed = 'move'
+    console.log('drag success ')
+    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
+  }
+
+  onParticipantDragStart(event: DragEvent , participantId : string) {
+    if (!event.dataTransfer) return
+    event.stopPropagation()
+    this.dragPayload = { kind: 'participant', participantId  }
+    event.dataTransfer.effectAllowed = 'move'
+    console.log('drag success ')
+    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
+  }
+
+  onStudioDragOver(event: DragEvent) {
+    if (!this.dragPayload) return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  }
+
+  async onStudioDrop(event: DragEvent, studioIndex: any) {
+    console.log('on drpo')
+    event.preventDefault()
+    event.stopPropagation()
+    const payload = this.dragPayload
+    this.dragPayload = null
+    console.log(payload)
+    console.log('inside of studio')
+    if (!payload || [null , undefined , ''].includes(studioIndex)) return
+    console.log('inside of studio' , 1)
+    if (payload.kind === 'participant' && payload.participantId) {
+      console.log('inside of studio' , 2)
+      this.newStudioPairing = this.newStudioPairing.map((studio , index)=>{
+      if (
+        index === studioIndex &&
+        !(studio['participants'] ?? []).includes(payload.participantId)
+      ) {
+        studio['participants'] = [
+          ...studio['participants'],
+          payload.participantId,
+        ];
+      }
+
+      return {...studio}
+      });
+
+      console.log(this.newStudioPairing)
+    } else if(payload.kind === 'studio' && payload.participantId && ![null , undefined , ''].includes(payload.studioIndex)){
+      this.newStudioPairing = this.newStudioPairing.map((studio , index)=>{
+      if (
+        index === studioIndex &&
+        !(studio['participants'] ?? []).includes(payload.participantId)
+      ) {
+        studio['participants'] = [
+          ...studio['participants'],
+          payload.participantId,
+        ];
+      }
+
+      if (
+        index === payload.studioIndex &&
+        (studio['participants'] ?? []).includes(payload.participantId)
+      ) {
+        studio['participants'] = (studio['participants'] ?? []).filter((pid)=>pid !== payload.participantId);
+      }
+
+      return {...studio}
+      });
+    }
   }
 }

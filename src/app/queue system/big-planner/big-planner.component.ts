@@ -92,7 +92,9 @@ export class BigPlannerComponent {
   editMandatoryActivitiesData: string[] = [];
   atcModel: Array<any> = [];
   duplicatedStudios: Array<any>  | null= [];
-  duplicateModelRef !: MatDialogRef<any>
+  duplicateModelRef !: MatDialogRef<any>;
+  selectedEventsList = [];
+  mapEvent = {};
 
   // big Activity Property
   bigActivitySubcription: Subscription
@@ -223,30 +225,30 @@ export class BigPlannerComponent {
           if (this.selectedQueue != null) this.onQueueSelect();
           if (this.selectedQueue != null) {
 
-            this.selectedEvent = this.selectedQueue['eventid'];
+            this.selectedEventsList = this.selectedQueue['eventid'];
 
-            const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
-            collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
-              let list = [];
-              let participantsList = new Set<string>();
-              console.log('cohorts found :', cohort.length);
+            // const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
+            // collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
+            //   let list = [];
+            //   let participantsList = new Set<string>();
+            //   console.log('cohorts found :', cohort.length);
 
-              if (cohort.length > 0) {
-                for (let i = 0; i < cohort.length; i++) {
-                  const cohortData = cohort[i];
-                  list.push(cohortData);
-                  if (Array.isArray(cohortData['participantidlist'])) {
-                    cohortData['participantidlist'].forEach((p) => participantsList.add(p));
-                  }
-                }
-                this.eventCohorts = list;
-                this.cohortparticipantsList = Array.from(participantsList.values())
-                  .sort((a, b) => (this.mapProfile[a] || '').localeCompare(this.mapProfile[b] || '', undefined, { sensitivity: 'base' }));
-              } else {
-                this.guard.openSnackBar('No Cohorts found', 'OK', 600);
-              }
-              console.log('totalParticipants', participantsList.size);
-            });
+            //   if (cohort.length > 0) {
+            //     for (let i = 0; i < cohort.length; i++) {
+            //       const cohortData = cohort[i];
+            //       list.push(cohortData);
+            //       if (Array.isArray(cohortData['participantidlist'])) {
+            //         cohortData['participantidlist'].forEach((p) => participantsList.add(p));
+            //       }
+            //     }
+            //     this.eventCohorts = list;
+            //     this.cohortparticipantsList = Array.from(participantsList.values())
+            //       .sort((a, b) => (this.mapProfile[a] || '').localeCompare(this.mapProfile[b] || '', undefined, { sensitivity: 'base' }));
+            //   } else {
+            //     this.guard.openSnackBar('No Cohorts found', 'OK', 600);
+            //   }
+            //   console.log('totalParticipants', participantsList.size);
+            // });
           };
         })
         loading.close()
@@ -270,7 +272,8 @@ export class BigPlannerComponent {
       for (let i = 0; i < event.docs.length; i++) {
         const element = event.docs[i].data();
         element['docid'] = event.docs[i].id;
-        this.eventList.push(element)
+        this.eventList.push(element);
+        this.mapEvent[element['docid']] = element;
       }
     });
 
@@ -293,15 +296,9 @@ export class BigPlannerComponent {
 
   }
 
-  async eventSelected() {
-    const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
-    await updateDoc(queueRef, {
-      eventid: this.selectedEvent
-    }).then(() => {
-      console.log('Event Updated In Queue');
-      this.guard.openSnackBar('Event Updated in Queue', 'OK', 600);
-
-      const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
+  onEventClick(eventId : string){
+    this.selectedEvent = eventId;
+    const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
       collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
         let list = [];
         let participantsList = [];
@@ -320,12 +317,43 @@ export class BigPlannerComponent {
           this.guard.openSnackBar('No Cohorts found', 'OK', 600);
         }
       });
+  }
+
+  async eventSelected() {
+    const queueRef = doc(this.firestore, 'queue generation', this.selectedQueue['docid']);
+    await updateDoc(queueRef, {
+      eventid: this.selectedEventsList
+    }).then(() => {
+      console.log('Event Updated In Queue');
+      this.guard.openSnackBar('Event Updated in Queue', 'OK', 600);
+
+      // const eventRef = doc(this.firestore, 'event collection', this.selectedEvent);
+      // collectionData(query(collection(this.firestore, 'big cohorts'), where('eventref', '==', eventRef), where('status', '==', 'active'))).subscribe((cohort) => {
+      //   let list = [];
+      //   let participantsList = [];
+      //   if (cohort.length > 0) {
+      //     for (let i = 0; i < cohort.length; i++) {
+      //       const cohortData = cohort[i];
+      //       list.push(cohortData);
+      //       if (Array.isArray(cohortData['participantidlist'])) {
+      //         participantsList.push(...cohortData['participantidlist']);
+      //       }
+      //     }
+      //     this.eventCohorts = list;
+      //     this.cohortparticipantsList = participantsList
+      //       .sort((a, b) => (this.mapProfile[a] || '').localeCompare(this.mapProfile[b] || '', undefined, { sensitivity: 'base' }));
+      //   } else {
+      //     this.guard.openSnackBar('No Cohorts found', 'OK', 600);
+      //   }
+      // });
 
     }).catch((error) => {
       console.log('Error While Updating Event', error, 'ok');
       this.guard.openSnackBar('Error While Updating Event', 'OK', 600);
     });
   }
+
+  
 
   filterEvents() {
     return this.eventList.filter(e => e["name"].toLowerCase().includes(this.filterEvent.toLowerCase()))

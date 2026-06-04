@@ -46,6 +46,7 @@
         <span class="cd-mentor-chip" *ngFor="let mentorId of selectedMentors">
           <span class="cd-mentor-chip-av" [class]="getAvatarColorClass(mentorId)">{{getInitialsForId(mentorId)}}</span>
           {{mapProfile[mentorId]}}
+          <!-- <span><mat-icon style="font-size:medium;">cancel</mat-icon></span> -->
         </span>
       </div>
     </div>
@@ -191,28 +192,26 @@
       <!-- Studios canvas -->
       <div class="cd-studios-canvas">
 
-        <div *ngIf="studioCreateMode">
+        <div *ngIf="studioCreateMode" class="studio-create-section">
           <div>
-            <button (click)="createStudioCombination()">
-              create studio
+            <button (click)="createStudioCombination()" style="text-align:center">
+              Add studio
             </button>
-            <div class="cd-studios-grid" >
-              <div *ngFor="let studio of newStudioPairing;let i = index" style="background-color: white;padding: 10px;">
+            <div class="cd-studios-grid">
+              <div *ngFor="let studio of newStudioPairing; let i = index" (drop)="onStudioDrop($event , i)" (dragover)="onStudioDragOver($event)">
                 <button (click)="removePairing(i)">
-                  remove 
+                  <mat-icon>cancel</mat-icon>
                 </button>
-                <div class="cd-role-row" *ngFor="let pid of studio.participants ?? []">
+                <div class="cd-role-row" *ngFor="let pid of studio.participants ?? []" (dragstart)="onStduioParticipantDrag($event , pid , i)" draggable="true">
                   <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
                   <div class="cd-role-info">
                     <div class="cd-role-name">{{getNameForId(pid)}}</div>
-                    <!-- <div class="cd-role-sub">{{getStudioParticipantActivity(studio, pid) || 'Participant'}}</div> -->
                   </div>
-                  <!-- <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button> -->
                 </div>
                 <div *ngIf="(studio.participants ?? []).length === 0">
                   no participants added yet
                 </div>
-
+        
                 <mat-form-field appearance="outline" style="width: 100%;">
                   <mat-label>Add Participants</mat-label>
                   <mat-select [(ngModel)]="studio.participants" multiple>
@@ -221,6 +220,7 @@
                     </mat-option>
                   </mat-select>
                 </mat-form-field>
+        
                 <mat-form-field appearance="outline" style="width: 100%;">
                   <mat-label>ATC Model</mat-label>
                   <mat-select [(ngModel)]="studio.atcmodel" multiple>
@@ -229,7 +229,7 @@
                     </mat-option>
                   </mat-select>
                 </mat-form-field>
-  
+        
                 <mat-form-field appearance="outline" style="width: 100%;">
                   <mat-label>Mandatory Activities</mat-label>
                   <mat-select [(ngModel)]="studio.mandatoryActivity" multiple>
@@ -238,12 +238,14 @@
                     </mat-option>
                   </mat-select>
                 </mat-form-field>
-                <mat-checkbox *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']" [(ngModel)]="studio.openViduEnabled">Let this Studio use OpenVidu to make Call.</mat-checkbox>
+        
+                <mat-checkbox *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']"
+                  [(ngModel)]="studio.openViduEnabled">
+                  Let this Studio use OpenVidu to make Call.
+                </mat-checkbox>
               </div>
-
-
             </div>
-            </div>
+          </div>
         </div>
 
 
@@ -431,6 +433,7 @@
           <p>No studios match the current filter.</p>
         </div>
       </div>
+      
 
       <!-- Unassigned-to-Studio sidebar -->
       <aside class="cd-unassigned-panel">
@@ -446,7 +449,7 @@
         </div>
         <div class="cd-unassigned-list" *ngIf="getUnassignedToStudio().length > 0">
           <div class="cd-mini-row" *ngFor="let pid of getUnassignedToStudio()"
-            draggable="true" (dragstart)="onUnassignedDragStart($event, pid)">
+            draggable="true" (dragstart)="onParticipantDragStart($event, pid)">
             <svg class="cd-drag-grip" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="8" cy="6" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="8" cy="18" r="1"/>
               <circle cx="16" cy="6" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="16" cy="18" r="1"/>

@@ -2325,7 +2325,7 @@ button {
    Right Activity Sidenav
    ════════════════════════════════════════════════════════════════ */
 .activity-sidenav {
-  width: 280px;
+  width: 340px;
   background: white;
   border-left: 1px solid #E5E7EB;
   display: flex;

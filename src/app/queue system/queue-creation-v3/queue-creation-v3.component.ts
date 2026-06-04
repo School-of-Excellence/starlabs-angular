@@ -930,7 +930,7 @@ addNextStage(mainIndex: number) {
           stages: value.stages,
           packageeligibility: value.packageeligibility,
           queuewelcomemessage,
-          eventid : value.eventid,
+          eventid : value.eventid ?? [],
           // isahrequired : value.isahrequired,
           // ahperson : value.ahperson,
           // ischangeworkreq: value.ischangeworkreq,
