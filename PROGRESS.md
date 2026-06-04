@@ -14,7 +14,8 @@ _Last updated: 2026-06-04_ · **New session? Read `specs/ORIENTATION.md` first.*
 - **Config-authoring screens** mapped into `CONFIGURATION.md`. **`specs/ORIENTATION.md`** created (read-first map) + `CLAUDE.md` wired to it. All probe scripts + their captured data copied into `specs/journals/…-artifacts/`.
 
 ## Pending
-- **#2 Product Modes — DONE (end-to-end mapped 2026-06-04).** Engine = `participantmode.js §7`; denorm/projection = `participantmetadata.js §7d` (CQRS, ~11 `*_to_pmd` triggers). No residual. → ready to move to #3.
-- **#3 Queue Manager** — next concept group (head start: `CONFIGURATION.md §1` queue config model).
+- **#2 Product Modes — DONE (end-to-end mapped 2026-06-04).** Engine = `participantmode.js §7`; denorm/projection = `participantmetadata.js §7d` (CQRS, ~11 `*_to_pmd` triggers). No residual.
+- **Stream B (citation re-anchoring) — DONE 2026-06-04.** TDs/key cites re-verified vs `production`: **TD-010 now mostly fixed** (5 of 6 routes guarded; only `devtestmic` left), TD-006 keys still live, TD-015 `:557→:584`, TD-016-hist `:814→:815`. **Residual:** ~7 new `production` screens not yet in `operator-screens.md`.
+- **#3 Queue Manager** — ⏳ **NEXT** (head start: `CONFIGURATION.md §1` queue config model + `queuesystem.js` in the CF repo, now in the graph).
 - **Engineers validate `tier-a-proposal.csv`** → mark `data-reliability.md` LOCKED → build CI fixtures.
-- Resolve **FCM/Zoom hardcoded-key** security task (TD-006); consider **Clone/Duplicate dedup** (TD-001) before tests.
+- Resolve **FCM/Zoom hardcoded-key** security task (TD-006, still live on `production`); consider **Clone/Duplicate dedup** (TD-001) before tests.

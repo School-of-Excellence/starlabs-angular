@@ -1,6 +1,6 @@
 # 01 · Journey & Products — OPERATOR-VALIDATED
 
-> ⚠️ **Branch note (2026-06-04):** validated against `main`-era code; repo since migrated to `production`. Facts here are **data-driven (production Firestore/Watson) → branch-independent and still valid**; re-verify any Angular `file:line` ref against `production` before relying (stream B; see `ORIENTATION.md` Open-threads #4).
+> ✅ **Branch-checked (2026-06-04, stream B):** facts here are **data-driven (production Firestore/Watson) → branch-independent and current**. This doc carries no Angular `file:line` cites, so nothing needed re-anchoring after the `production` migration.
 > **Status: VALIDATED with operator, 2026-06-03.** This supersedes the auto-derived `specs/JOURNEY-LIFECYCLE.md` for this topic. Cross-project facts involve **Watson** (`watsonproduction-becde`), the separate finance/billing project added 2026-06-03.
 > Evidence (in-repo, git-tracked): query scripts + captured live data in `specs/journals/2026-06-03-watson-finance-and-shifted-artifacts/` (`shifted_correlation2.js`, `watson_purchase_probe.js`, `watsonid_check.js`/`_check2.js`, `journey_taxonomy.js` + `DATA_OUTPUTS.txt`); the 10 windowed timelines in `specs/evidence/journey_evidence_final.json`. Journal: `specs/journals/2026-06-03-watson-finance-and-shifted.md`.
 
