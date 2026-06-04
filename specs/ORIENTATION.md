@@ -1,6 +1,6 @@
 # ORIENTATION — read this FIRST (new-session map)
 
-> One-screen map of where everything is and what's true. Read this → `CLAUDE.md` (constraints) → then the specific `specs/validated/` doc or journal you need. Updated 2026-06-03.
+> One-screen map of where everything is and what's true. Read this → `CLAUDE.md` (constraints) → then the specific `specs/validated/` doc or journal you need. Updated 2026-06-04.
 
 ## What this project is
 **StarLabs / "Breakthroughs"** — an Angular 19 + Firebase coaching/customer-journey platform. People **buy a journey** → get **onboarded** → move through **delivery** (appointments / events / cohort) → consume **content** → **progress** to further journeys. We are **documenting the system, validating concept-group by concept-group with the operator.**
@@ -20,12 +20,14 @@
 | `salesleadcrm` / `salescrm-test-19` | **Sales CRM** — lead → purchase approval (`breakthroughapprovedleads`) | (off-disk) |
 Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); explicit `watsonpurchaseid`/`watsonparticipantid` on `journeyproductpurchase`/`salesleads`. `profileid ≠ Watson participantid`.
 
+**StarLabs backend = Cloud Functions repo `starlabs-cloud-function/`** (a separate git repo nested in this folder; work on the **`development`** branch). `functions/components/*.js` = the real backend (participantmode, participantproduct, participantmetadata, queuesystem, big-*, watson-updates, salescrm-updates, …). This is where the **mode engine** lives (TD-016 resolved). The old `firebasefunctions/` is a partial/legacy deployment — ignore for mode/delivery logic.
+
 ## The read-only data harness
 `~/Downloads/svstats/` — Node + `firebase-admin`. Pattern: `cd ~/Downloads/svstats && node <probe>.js`. The query scripts for each investigation are **copied into the repo** under `specs/journals/<date>-<topic>-artifacts/` with a `DATA_OUTPUTS.txt` of the captured data. (`firebase-admin` already installed there.)
 
 ## Documentation map (what to read for what)
 - **`specs/validated/`** = the **authoritative, operator-validated** truth (supersedes the auto-docs per topic). `README.md` is the validation-sequence index.
-  - `01-journey-and-products.md` ✅ validated · `02-product-modes.md` ◐ **INTERIM** (engine off-disk — see below).
+  - `01-journey-and-products.md` ✅ validated · `02-product-modes.md` ✅ **engine fully mapped** (§7 = the 3-function mode engine; §7d = the `participantmetadata.js` projection layer — end-to-end).
 - **`specs/` auto-docs** (AI-derived, *unreviewed* — reference only): `DATA-MODEL.md`, `CONFIGURATION.md` (config→behavior + config-authoring screens), `operator-screens.md` (every screen→collection, ATC-exclusion set), `data-reliability.md` (Tier A/B/C trust), `JOURNEY-LIFECYCLE`/`SCHEDULING-DELIVERY`/`QUEUE-AND-BIG`/`LIVE-STUDIOS`/`CONTENT-ENGAGEMENT`/`AUTH-ROLES`.
 - **Root:** `DESIGN.md` (architecture WHY), `DOCS.md` (212-route code reference), `DECISIONS.md` (D-001…D-009), `TECHNICALDEBTS.md` (TD-001…TD-016).
 - **`specs/journals/`** = the WHY/narrative per investigation (10 journals; each pairs with a `-artifacts/` data dir). **`tier-a-proposal.csv`** = the trusted-collection set awaiting engineer validation.
@@ -35,20 +37,19 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 | # | Group | Status |
 |---|---|---|
 | 1 | Journey & Products | ✅ validated → `validated/01` |
-| 2 | Product Modes | ◐ **interim** → `validated/02` (transition engine off-disk — blocked) |
+| 2 | Product Modes | ✅ **fully mapped** → `validated/02` §7 (`participantmode.js` engine) + §7d (`participantmetadata.js` projection) |
 | 3 | Queue Manager | ⏳ next (head start: `CONFIGURATION.md §1` queue config model) |
 | 4 | Dynamic Studio | ⏳ pending |
 | 5 | Appointment System | ⏳ pending |
 | 6 | Events, Arena & Calendar | ⏳ pending |
 
 ## 🔴 Open threads / blockers
-1. **Mode engine is OFF-DISK (TD-016).** The code that writes `participant mode checklist` (27,496 docs) + `participant metadata.participantmode` — the AEL/delivery-driven participant-mode engine — is in **no local repo** (verified exhaustively). **Ask the developer:** *"Where is the code that creates `participant mode checklist` docs and sets `participant metadata.participantmode`? Another Cloud Functions deployment on `fir-sample-aae4a`, or a pointer in current code?"* Then finish `validated/02` §7.
+1. ~~Mode engine off-disk~~ — **RESOLVED 2026-06-04 (TD-016, fully closed).** The engine is **`starlabs-cloud-function/functions/components/participantmode.js`** (the StarLabs Cloud Functions repo — a separate git repo nested here; develop on the **`development`** branch). Fully mapped in `validated/02 §7`. The `participant metadata.participantmode` denorm path is also resolved (§7d): it's a CQRS projection rebuilt by `participantmetadata.js`.
 2. **Tier-A lock pending** — engineers validate `specs/tier-a-proposal.csv` → then mark `data-reliability.md` LOCKED → only then build CI fixtures.
 3. **Hardcoded secrets** (FCM server keys, Zoom SDK key) in client source — TD-006 (a spawned task exists).
 
 ## Immediate next actions
-- Resume **#3 Queue Manager** (validate-from-data), OR
-- If the developer answers (1), finish `validated/02` mode-engine section first.
+- Resume **#3 Queue Manager** (validate-from-data) — the next concept group. (Head start: `CONFIGURATION.md §1` queue config model + `queuesystem.js` in the CF repo.)
 
 ## Gotchas (this repo specifically)
 - **Folder names have spaces** ("Journey Onboarding", "queue system"…) → `grep --include=*.ts` and unquoted `xargs` BREAK. Use `find … -print0 | xargs -0 grep`.

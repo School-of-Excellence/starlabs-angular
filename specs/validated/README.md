@@ -13,8 +13,8 @@ As each concept group is validated, its `specs/validated/NN-*.md` becomes canoni
 
 ## Concept groups (validation sequence)
 1. **Journey & Products** — `01-journey-and-products.md` ✅ validated 2026-06-03
-2. **Product Modes** — `02-product-modes.md` ◐ **INTERIM** validated 2026-06-03 (everything observable is validated; the participant-mode transition **engine is off-disk** — pending the developer pointer, TD-016)
-3. Queue Manager — _pending_
+2. **Product Modes** — `02-product-modes.md` ✅ **validated 2026-06-04, end-to-end** (the transition **engine** is mapped: `participantmode.js` §7 + the `participantmetadata.js` projection §7d, in the `starlabs-cloud-function/` repo on `development`; TD-016 closed)
+3. Queue Manager — ⏳ _next_
 4. Dynamic Studio — _pending_
 5. Appointment System — _pending_
 6. Events, Arena & Calendar — _pending_
