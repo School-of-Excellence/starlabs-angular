@@ -244,8 +244,7 @@
         <div class="ds-side-meta" *ngIf="sidebarProfileOpen">
           <div class="ds-meta-row" *ngIf="participantUPVisitLabel">
             <span class="ds-meta-ic"><mat-icon class="ic">emoji_events</mat-icon></span>
-            <span class="ds-chip-label">Milestone</span>
-            <span class="ds-chip-val">{{ participantUPVisitLabel }} at uP!</span>
+            <span class="ds-chip-val ds-chip-val--lead">{{ participantUPVisitLabel }} at uP!</span>
           </div>
           <div class="ds-meta-row">
             <span class="ds-meta-ic"><mat-icon class="ic">inventory_2</mat-icon></span>
@@ -314,6 +313,17 @@
         <div class="ds-waiting-body">
           <div class="ds-waiting-title">{{ topBarStatus.title }}</div>
           <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
+        </div>
+
+        <!-- Stage notes configured in queue-creation. Each targets a selected
+             stage and only shows when the participant's variation includes
+             that stage. -->
+        <div class="ds-stagenotes">
+          <div class="ds-stagenote" *ngFor="let sn of currentStageNotes"
+               [matTooltip]="sn.stage + ': ' + sn.note">
+            <mat-icon class="ic">sticky_note_2</mat-icon>
+            <span class="ds-stagenote__text">{{ sn.note }}</span>
+          </div>
         </div>
 
         <!-- ATC count for the current queue — quick summary chip shown in
@@ -431,6 +441,39 @@
                 </div>
               </div>
             </div>
+
+            <!-- Evolution Wishlist -->
+            <div class="card"
+                 [class.card--empty]="evolutionWishlist.length === 0"
+                 *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('evolutionwishlist')">
+              <div class="card-head tint-slate">
+                <div class="card-head-title">
+                  <mat-icon class="ic">auto_awesome</mat-icon>
+                  Evolution Wishlist
+                  <span class="count-badge" *ngIf="evolutionWishlist.length > 0">{{ evolutionWishlist.length }}</span>
+                  <span class="card-head-empty" *ngIf="evolutionWishlist.length === 0 && !evolutionWishlistLoading">— No data available</span>
+                  <span class="card-head-empty" *ngIf="evolutionWishlist.length === 0 && evolutionWishlistLoading">— Loading…</span>
+                </div>
+              </div>
+              <div class="card-pad" *ngIf="evolutionWishlist.length > 0">
+                <div class="ewl-list">
+                  <div class="ewl-item" *ngFor="let entry of evolutionWishlist; let i = index">
+                    <div class="ewl-item__head">
+                      <span class="ewl-item__num">{{ i + 1 }}.</span>
+                      <span class="ewl-item__type">{{ formatEvolutionWishlistType(entry.type) }}</span>
+                      <span class="ewl-item__status">{{ formatEvolutionWishlistStatus(entry) }}</span>
+                      <span class="ewl-item__date">
+                        {{ (entry.created?.toDate ? entry.created.toDate() : entry.created) | date:'mediumDate' }}
+                      </span>
+                    </div>
+                    <div class="ewl-item__contacts" *ngIf="evolutionWishlistContactsLabel(entry) as contactsLabel">
+                      <mat-icon class="ic">group</mat-icon>
+                      {{ contactsLabel }} contacts
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             </div>
           </ng-container>
 
@@ -524,7 +567,6 @@
               <div class="choice choice--secondary"
                    *ngIf="(isZoomLinkBroken || (liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator)) && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
                 <div class="choice-secondary__head">
-                  <div class="choice-ic slate"><mat-icon class="ic">refresh</mat-icon></div>
                   <div class="choice-secondary__text">
                     <div class="choice-title">Generate a new link</div>
                     <div class="choice-desc">
@@ -551,6 +593,25 @@
           <!-- ========================= STEP 5: Prescribe ATC ========================= -->
           <ng-container *ngIf="activeStepId === 'prescribe-atc'">
             <div class="step-compact">
+            <!-- Highlight: ATC already submitted for THIS queue/activity -->
+            <div class="card" *ngIf="atcInThisQueueCount > 0">
+              <div class="card-head tint-green">
+                <div class="card-head-title">
+                  <mat-icon class="ic">task_alt</mat-icon>
+                  ATC has been submitted for this activity
+                  <span class="count-badge count-green">{{ atcInThisQueueCount }}</span>
+                </div>
+              </div>
+              <div class="card-pad">
+                <ng-container *ngFor="let atc of currentQueueValidatedATCList; let i = index">
+                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'validated', editColl: 'alpha' }"></ng-container>
+                </ng-container>
+                <ng-container *ngFor="let atc of currentQueueUnvalidatedATCList; let i = index">
+                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: currentQueueValidatedATCList.length + i, kind: 'pending', editColl: 'validation' }"></ng-container>
+                </ng-container>
+              </div>
+            </div>
+
             <!-- Prescribe new ATC -->
             <div class="card"
               *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc') || ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')">
@@ -793,22 +854,19 @@
          Reusable widget templates (shared between Steps 3 & 5)
          ===================================================================== -->
     <ng-template #tplValidatedATC>
-      <div class="card">
+      <div class="card" [class.card--empty]="alphaATCList.length == 0">
         <div class="card-head tint-green">
           <div class="card-head-title">
             <mat-icon class="ic">verified</mat-icon>
             Validated ATC
-            <span class="count-badge count-green">{{ alphaATCList.length }}</span>
+            <span class="count-badge count-green" *ngIf="alphaATCList.length > 0">{{ alphaATCList.length }}</span>
+            <span class="card-head-empty" *ngIf="alphaATCList.length == 0">— No data available</span>
           </div>
           <button type="button" class="btn-icon" (click)="previewATC('alpha')" title="Refresh">
             <mat-icon class="ic">refresh</mat-icon>
           </button>
         </div>
-        <div class="card-pad">
-          <div class="empty" *ngIf="alphaATCList.length == 0">
-            <div class="empty-ic"><mat-icon class="ic">inventory_2</mat-icon></div>
-            <div class="empty-text">No validated ATC found for this participant.</div>
-          </div>
+        <div class="card-pad" *ngIf="alphaATCList.length > 0">
           <ng-container *ngFor="let atc of alphaATCList; let i = index">
             <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'validated', editColl: 'alpha' }"></ng-container>
           </ng-container>
@@ -817,22 +875,19 @@
     </ng-template>
 
     <ng-template #tplUnvalidatedATC>
-      <div class="card">
+      <div class="card" [class.card--empty]="unvalidatedATCList.length == 0">
         <div class="card-head tint-amber">
           <div class="card-head-title">
             <mat-icon class="ic">assignment</mat-icon>
             Unvalidated ATC
-            <span class="count-badge count-amber">{{ unvalidatedATCList.length }}</span>
+            <span class="count-badge count-amber" *ngIf="unvalidatedATCList.length > 0">{{ unvalidatedATCList.length }}</span>
+            <span class="card-head-empty" *ngIf="unvalidatedATCList.length == 0">— No data available</span>
           </div>
           <button type="button" class="btn-icon" (click)="previewATC('validation')" title="Refresh">
             <mat-icon class="ic">refresh</mat-icon>
           </button>
         </div>
-        <div class="card-pad">
-          <div class="empty" *ngIf="unvalidatedATCList.length == 0">
-            <div class="empty-ic"><mat-icon class="ic">inbox</mat-icon></div>
-            <div class="empty-text">No ATC pending validation.</div>
-          </div>
+        <div class="card-pad" *ngIf="unvalidatedATCList.length > 0">
           <ng-container *ngFor="let atc of unvalidatedATCList; let i = index">
             <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'pending', editColl: 'validation' }"></ng-container>
           </ng-container>
@@ -881,74 +936,159 @@
         </div>
 
         <div class="atc-card__actions">
-          <button type="button" class="btn btn-soft btn-sm" (click)="toggleATC(atc.atcid)">
-            <mat-icon class="ic">{{ isATCExpanded(atc.atcid) ? 'visibility_off' : 'visibility' }}</mat-icon>
-            {{ isATCExpanded(atc.atcid) ? 'Hide Details' : 'View Full ATC' }}
+          <button type="button" class="btn btn-soft btn-sm" (click)="viewATCInDialog(atc, kind)">
+            <mat-icon class="ic">visibility</mat-icon>
+            View Full ATC
           </button>
           <button type="button" class="btn btn-soft btn-sm" *ngIf="isMentor"
                   (click)="updateATC(atc.atcid, editColl, '')">
             <mat-icon class="ic">edit</mat-icon>
             Edit ATC
           </button>
+          <!-- Non-mentors can't edit a submitted ATC — explain why. -->
+          <span class="atc-card__mentor-note" *ngIf="!isMentor">
+            <mat-icon class="ic">lock</mat-icon>
+            Only the Mentor can edit this ATC.
+          </span>
         </div>
 
-        <!-- Expanded details -->
+        <!-- Inline expanded details (kept available via toggleATC for compatibility;
+             "View Full ATC" now opens the overlay instead) -->
         <div class="atc-card__details" *ngIf="isATCExpanded(atc.atcid)">
-          <div *ngIf="atc['transcription']?.length">
-            <h6 class="atc-card__detail-label">Adjustments &amp; Procedures</h6>
-            <div class="atc-adj-list">
-              <ng-container *ngFor="let adjustment of atc['transcription']; let aIdx = index">
-                <div class="atc-adj" *ngIf="adjustment?.procedure.length != 0">
-                  <div class="atc-adj__head">
-                    <span class="atc-adj__index">A{{ aIdx + 1 }}</span>
-                    <span class="atc-adj__text">{{ adjustment?.adjustment }}</span>
-                  </div>
-                  <ul class="atc-proc-list">
-                    <li *ngFor="let procedure of adjustment?.procedure">
-                      <mat-icon class="ic">chevron_right</mat-icon>
-                      <span>{{ mapProcedure[procedure?.procedureid] }}</span>
-                    </li>
-                  </ul>
-                </div>
-              </ng-container>
-            </div>
-          </div>
+          <ng-container *ngTemplateOutlet="atcDetailTpl; context: { $implicit: atc }"></ng-container>
+        </div>
+      </div>
+    </ng-template>
 
-          <div *ngIf="mapATCnotes[atc.atcdata['notesid']] || mapATCnotes[atc.atcdata['mentoringid']]" style="margin-top:16px;">
-            <h6 class="atc-card__detail-label">Notes</h6>
-            <div class="atc-note-grid">
-              <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['notesid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['consultationsummary'])">
-                <span class="atc-note__title"><mat-icon class="ic">summarize</mat-icon> Summary</span>
-                <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['notesid']]['consultationsummary'] }}</p>
+    <!-- =====================================================================
+         Shared ATC detail body — Adjustments & Procedures + Notes.
+         Rendered both inline (atcCardTpl) and inside the overlay (atcDialogTpl)
+         so the two stay visually identical. Mirrors the expanded card in
+         view-participant-atc (adjustment header + procedure rows with status).
+         ===================================================================== -->
+    <ng-template #atcDetailTpl let-atc>
+      <div *ngIf="atc['transcription']?.length" class="transcription-section">
+        <div class="section-title">Adjustments &amp; Procedures</div>
+        <div class="atc-adj-list">
+          <ng-container *ngFor="let adjustment of atc['transcription']; let aIdx = index">
+            <div class="adjustment-block" *ngIf="adjustment?.procedure.length != 0">
+              <div class="adjustment-header">
+                <span class="adj-number">{{ aIdx + 1 }}.</span>
+                <span class="adj-name">Adjustment: {{ adjustment?.adjustment }}</span>
               </div>
-              <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['notesid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['notes'])">
-                <span class="atc-note__title"><mat-icon class="ic">sticky_note_2</mat-icon> Notes</span>
-                <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['notesid']]['notes'] }}</p>
-              </div>
-              <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['mentoringid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'])">
-                <span class="atc-note__title"><mat-icon class="ic">school</mat-icon> Mentoring Note</span>
-                <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'] }}</p>
+              <div class="procedures-container">
+                <div class="procedures-title">Procedures:</div>
+                <div class="procedure-block" *ngFor="let procedure of adjustment?.procedure; let pIdx = index">
+                  <div class="procedure-row">
+                    <span class="proc-number">{{ pIdx + 1 }}.</span>
+                    <span class="proc-name">{{ mapProcedure[procedure?.procedureid] }}</span>
+                    <mat-icon class="status-icon" [class.completed]="procedure?.status === 'completed'" [class.pending]="procedure?.status !== 'completed'">
+                      {{ procedure?.status === 'completed' ? 'check_circle' : 'radio_button_unchecked' }}
+                    </mat-icon>
+                  </div>
+                </div>
               </div>
             </div>
+          </ng-container>
+        </div>
+      </div>
+      <div *ngIf="!atc['transcription']?.length" class="no-transcription">
+        No adjustments recorded
+      </div>
+
+      <div *ngIf="mapATCnotes[atc.atcdata['notesid']] || mapATCnotes[atc.atcdata['mentoringid']]" style="margin-top:16px;">
+        <h6 class="atc-card__detail-label">Notes</h6>
+        <div class="atc-note-grid">
+          <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['notesid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['consultationsummary'])">
+            <span class="atc-note__title"><mat-icon class="ic">summarize</mat-icon> Summary</span>
+            <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['notesid']]['consultationsummary'] }}</p>
+          </div>
+          <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['notesid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['notes'])">
+            <span class="atc-note__title"><mat-icon class="ic">sticky_note_2</mat-icon> Notes</span>
+            <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['notesid']]['notes'] }}</p>
+          </div>
+          <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['mentoringid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'])">
+            <span class="atc-note__title"><mat-icon class="ic">school</mat-icon> Mentoring Note</span>
+            <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'] }}</p>
           </div>
         </div>
       </div>
     </ng-template>
 
+    <!-- =====================================================================
+         Full ATC overlay (MatDialog) — mirrors formDialogTpl. Opened by
+         viewATCInDialog(); bound to the component's `atcViewerState` holder.
+         ===================================================================== -->
+    <ng-template #atcDialogTpl>
+      <div class="form-dlg">
+        <header class="form-dlg__head">
+          <span class="form-dlg__title">
+            <mat-icon class="ic">fact_check</mat-icon>
+            {{ atcViewerState.title }}
+          </span>
+          <button type="button" class="form-dlg__close" mat-dialog-close>
+            <mat-icon class="ic">close</mat-icon>
+          </button>
+        </header>
+        <div class="overlay-content">
+          <ng-container *ngIf="atcViewerState.data as atc">
+            <div class="atc-card atc-card--dialog">
+              <div class="atc-card__head">
+                <span class="atc-card__date">{{ atc["atcdata"]["prescription_date"].toDate() | date:'medium' }}</span>
+                <span class="pill pill-green" *ngIf="atcViewerState.kind === 'validated'">
+                  <mat-icon class="ic">verified</mat-icon>
+                  Validated
+                </span>
+                <span class="pill pill-amber" *ngIf="atcViewerState.kind === 'pending'">
+                  <mat-icon class="ic">schedule</mat-icon>
+                  Awaiting Validation
+                </span>
+              </div>
+
+              <div class="field-grid">
+                <span class="field-label">Participant Name</span>
+                <span class="field-val">{{ mapProfile[participantProfileId] }}</span>
+                <ng-container *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
+                  <span class="field-label">{{ mapActivity[$any(activity.key)] }}</span>
+                  <span class="field-val">
+                    <span *ngFor="let specialist of $any(activity.value); let isLast = last">{{ mapProfile[specialist] }}{{ isLast ? '' : ', ' }}</span>
+                  </span>
+                </ng-container>
+                <ng-container *ngIf="atc['atcdata']['queueid']">
+                  <span class="field-label">Queue</span>
+                  <span class="field-val">{{ mapQueue[atc["atcdata"]["queueid"]] }}</span>
+                </ng-container>
+                <ng-container *ngIf="atc['atcdata']['directive']">
+                  <span class="field-label">ATC Directive</span>
+                  <span class="field-val">{{ atc["atcdata"]["directive"] }}</span>
+                </ng-container>
+              </div>
+
+              <div class="atc-card__note" *ngIf="atcViewerState.kind === 'validated'">
+                <mat-icon class="ic">visibility</mat-icon>
+                This ATC is directly visible to the Participant.
+              </div>
+
+              <div class="atc-card__details atc-card__details--dialog">
+                <ng-container *ngTemplateOutlet="atcDetailTpl; context: { $implicit: atc }"></ng-container>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </ng-template>
+
     <ng-template #tplAssignedATC>
-      <div class="card">
+      <div class="card" [class.card--empty]="cwATClist.length == 0">
         <div class="card-head tint-slate">
           <div class="card-head-title">
             <mat-icon class="ic">assignment_turned_in</mat-icon>
             ATC Assigned to Them
-            <span class="count-badge count-slate">{{ cwATClist.length }}</span>
+            <span class="count-badge count-slate" *ngIf="cwATClist.length > 0">{{ cwATClist.length }}</span>
+            <span class="card-head-empty" *ngIf="cwATClist.length == 0">— No data available</span>
           </div>
         </div>
-        <div class="card-pad">
-          <div class="empty" *ngIf="cwATClist.length == 0">
-            <div class="empty-ic"><mat-icon class="ic">checklist</mat-icon></div>
-            <div class="empty-text">No mandatory procedures assigned.</div>
-          </div>
+        <div class="card-pad" *ngIf="cwATClist.length > 0">
           <div class="atc-assigned" *ngIf="cwATClist.length > 0">
             <div class="atc-assigned__card" *ngFor="let atc of cwATClist; let a = index">
               <div class="atc-assigned__head" (click)="toggleATC('cw-' + a)">
@@ -1011,19 +1151,16 @@
     </ng-template>
 
     <ng-template #tplTripleATC>
-      <div class="card">
+      <div class="card" [class.card--empty]="tripleATCList.length == 0">
         <div class="card-head tint-slate">
           <div class="card-head-title">
             <mat-icon class="ic">show_chart</mat-icon>
             Triple ATC
-            <span class="count-badge count-slate">{{ tripleATCList.length }}</span>
+            <span class="count-badge count-slate" *ngIf="tripleATCList.length > 0">{{ tripleATCList.length }}</span>
+            <span class="card-head-empty" *ngIf="tripleATCList.length == 0">— No data available</span>
           </div>
         </div>
-        <div class="card-pad">
-          <div class="empty" *ngIf="tripleATCList.length == 0">
-            <div class="empty-ic"><mat-icon class="ic">inbox</mat-icon></div>
-            <div class="empty-text">No Triple ATC submitted for validation.</div>
-          </div>
+        <div class="card-pad" *ngIf="tripleATCList.length > 0">
           <div class="triple-atc-grid" *ngIf="tripleATCList.length > 0">
             <button
               *ngFor="let atc of tripleATCList; let i = index"

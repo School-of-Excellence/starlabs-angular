@@ -23,6 +23,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { StageIncompleteConfirmationComponent } from '../stage-incomplete-confirmation/stage-incomplete-confirmation.component';
 import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view-participant-atc.component';
@@ -38,6 +39,7 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
     FormsModule,
     MatButtonModule,
     MatIconModule,
+    MatTooltipModule,
     MatSlideToggleModule,
     ReactiveFormsModule,
     MatDialogModule,
@@ -49,6 +51,7 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
 export class DynamicStudioV2Component {
   @ViewChildren('itemElement') itemElements: QueryList<ElementRef>;
   @ViewChild('formDialogTpl') formDialogTpl!: TemplateRef<any>;
+  @ViewChild('atcDialogTpl') atcDialogTpl!: TemplateRef<any>;
   @ViewChild('checkinConflictTpl') checkinConflictTpl!: TemplateRef<any>;
   profileRoles = {}
   profileid = null
@@ -111,6 +114,10 @@ export class DynamicStudioV2Component {
   loveLetterList: any[] = []
   loveLetterLoading: boolean = false
   loveLetterLoadedFor: string | null = null
+  // Evolution Wishlist
+  evolutionWishlist: any[] = []
+  evolutionWishlistLoaded: string = ''
+  evolutionWishlistLoading: boolean = false
   // UP Attendance
   readonly upProductIds = ['N0MhGQnxP9S8TdavuRJR', '0ayiNALL1HDVvCXDHcZ4', 'Rq9cu2Z3FSuILXdwYtca']
   participantUPVisitLabel: string | null = null
@@ -231,9 +238,84 @@ export class DynamicStudioV2Component {
     } else {
       this.participantAEL = {}
     }
+    // Evolution Wishlist
+    if (studioWidget.includes('evolutionwishlist')) {
+      this.loadEvolutionWishlist(this.participantProfileId)
+    } else {
+      this.evolutionWishlist = []
+    }
     // Forms (needs token.queueref for cross-queue history; falls back to
     // a single-queue lookup if the token isn't hydrated yet).
     this.loadParticipantForms()
+  }
+
+  /**
+   * Fetches the participant's Evolution Wishlist log entries from the
+   * `evolutionwishlistlog` collection, sorted newest-first. Guarded by
+   * `evolutionWishlistLoaded` (profileid) to avoid re-fetching for the same
+   * participant. Each entry keeps its raw fields — the template formats them.
+   */
+  async loadEvolutionWishlist(profileid: string) {
+    if (!profileid) {
+      this.evolutionWishlist = []
+      return
+    }
+    if (this.evolutionWishlistLoaded === profileid) {
+      return
+    }
+    this.evolutionWishlistLoading = true
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'evolutionwishlistlog'),
+        where('profileid', '==', profileid),
+      ))
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      list.sort((a: any, b: any) => {
+        const am = typeof a?.['created']?.toMillis === 'function' ? a['created'].toMillis() : 0
+        const bm = typeof b?.['created']?.toMillis === 'function' ? b['created'].toMillis() : 0
+        return bm - am
+      })
+      this.evolutionWishlist = list
+      this.evolutionWishlistLoaded = profileid
+    } catch (error) {
+      console.error('Error fetching evolution wishlist:', error)
+      this.evolutionWishlist = []
+    } finally {
+      this.evolutionWishlistLoading = false
+    }
+  }
+
+  /** Formats an Evolution Wishlist `type` for display. */
+  formatEvolutionWishlistType(type: string): string {
+    if (type === 'familyandpeers') return 'Family & Peers'
+    if (type === 'self') return 'Self'
+    return type || '-'
+  }
+
+  /**
+   * Formats an Evolution Wishlist `status` for display. 'sended' renders as
+   * 'Shared'; the 'Partially ' prefix is applied when `mannualcompleted` is
+   * truthy on the entry.
+   */
+  formatEvolutionWishlistStatus(entry: any): string {
+    let status: string = entry?.['status'] || '-'
+    if (status === 'sended') status = 'Shared'
+    if (entry?.['mannualcompleted']) status = 'Partially ' + status
+    return status
+  }
+
+  /**
+   * Returns the contacts count string `submitted/total` when the entry has a
+   * contacts array; otherwise null (hide the chip). The submitted count is
+   * computed from the contacts array directly (matching the Evolution
+   * Wishlist Log screen, which counts `contact.submitted === true`) so it's
+   * accurate even when the doc doesn't carry a stored `submittedCount`.
+   */
+  evolutionWishlistContactsLabel(entry: any): string | null {
+    const contacts = entry?.['contacts']
+    if (!Array.isArray(contacts) || contacts.length === 0) return null
+    const submitted = contacts.filter((c: any) => c?.submitted === true).length
+    return `${submitted}/${contacts.length}`
   }
 
   /**
@@ -368,6 +450,22 @@ export class DynamicStudioV2Component {
     return count
   }
 
+  // Validated ATCs prescribed specifically for the current queue session.
+  // Used by the green "ATC has been submitted for this activity" highlight at
+  // the top of the Prescribe ATC step.
+  get currentQueueValidatedATCList(): any[] {
+    const qid = this.ongoingQueue?.['docid']
+    if (!qid) return []
+    return (this.alphaATCList || []).filter(atc => atc?.['atcdata']?.['queueid'] === qid)
+  }
+
+  // Pending/unvalidated ATCs prescribed for the current queue session.
+  get currentQueueUnvalidatedATCList(): any[] {
+    const qid = this.ongoingQueue?.['docid']
+    if (!qid) return []
+    return (this.unvalidatedATCList || []).filter(atc => atc?.['atcdata']?.['queueid'] === qid)
+  }
+
   // Returns the stage name immediately before the current one in the participant's
   // stage list. Used by the "Send Back" button next to Invite More.
   get previousStageName(): string | null {
@@ -379,6 +477,54 @@ export class DynamicStudioV2Component {
     if (!stageList.length) return null
     const idx = stageList.findIndex(s => s === this.liveAssignment['stagename'])
     return idx > 0 ? stageList[idx - 1] : null
+  }
+
+  /**
+   * Stage notes to display in the topbar. Configured in queue-creation under
+   * the CURRENT stage as a map { [targetStage]: note } — where targetStage
+   * need not be the current stage. Each note is shown ONLY when the
+   * participant's variation includes that target stage.
+   *
+   * Variation→stage list resolution mirrors `previousStageName`: when the
+   * token carries a `variationid` we use `queueVariation[variationid]`; if
+   * that map has no entry we are conservative and show nothing. When there's
+   * no variationid we fall back to the queue's full stage list.
+   */
+  get currentStageNotes(): { stage: string; note: string }[] {
+    if (!this.liveAssignment || !this.ongoingQueue) return []
+    const stagename = this.liveAssignment['stagename']
+    if (!stagename) return []
+    const raw = this.ongoingQueue?.['stageproperty']?.[stagename]?.['stagenote']
+    if (raw == null) return []
+
+    // Normalize both shapes into [{ stage, note }]:
+    //  - new ARRAY format: [{ stage, note }]
+    //  - legacy MAP format: { [stage]: note }
+    const entries: { stage: string; note: any }[] = Array.isArray(raw)
+      ? raw.map((r: any) => ({ stage: r?.['stage'], note: r?.['note'] }))
+      : (typeof raw === 'object'
+          ? Object.keys(raw).map(k => ({ stage: k, note: raw[k] }))
+          : [])
+
+    // Resolve the participant's variation stage list.
+    const variationId = this.liveAssignment['token']?.['variationid']
+    let stageList: string[]
+    if (variationId != null) {
+      if (!(variationId in this.queueVariation)) return [] // conservative
+      stageList = this.queueVariation[variationId] ?? []
+    } else {
+      stageList = this.ongoingQueue?.['stages'] ?? []
+    }
+
+    const out: { stage: string; note: string }[] = []
+    for (const e of entries) {
+      if (!e.stage) continue
+      if (e.note == null || String(e.note).trim().length === 0) continue
+      if (stageList.includes(e.stage)) {
+        out.push({ stage: e.stage, note: String(e.note) })
+      }
+    }
+    return out
   }
 
   sendBack() {
@@ -552,7 +698,7 @@ export class DynamicStudioV2Component {
     }
 
     // 2. ATC & Love Letter - Previous uP! cycle(s)
-    if (widgets.includes('previousatc') || widgets.includes('loveletters')) {
+    if (widgets.includes('previousatc') || widgets.includes('loveletters') || widgets.includes('evolutionwishlist')) {
       steps.push({ id: 'prev-history', label: 'Previous ATC & Love Letters', icon: 'history', color: '#84cc16' })
     }
 
@@ -1623,9 +1769,19 @@ export class DynamicStudioV2Component {
         where('participants', 'array-contains', this.profileid),
         where('checkin', '==', true),
       ))
+      // Only consider studios that belong to the specialist's currently LIVE
+      // / ongoing queues. A studio in a queue that has ended shouldn't count
+      // as an active check-in conflict.
+      const liveQueueIds = new Set(
+        (this.ongoingQueueList || []).map((q: any) => q['docid'])
+      )
       const studios = snap.docs
         .map(d => d.data())
-        .filter(s => s['docid'] !== excludeStudioId && [null, undefined, false].includes(s['delete']))
+        .filter(s =>
+          s['docid'] !== excludeStudioId &&
+          [null, undefined, false].includes(s['delete']) &&
+          (liveQueueIds.size === 0 || liveQueueIds.has(s['queueref']?.id))
+        )
 
       // Enrich each conflicting studio with queue name + current stage name
       // (best-effort — falls back to "Studio" / "—" if lookups fail).
@@ -2598,6 +2754,34 @@ export class DynamicStudioV2Component {
       console.error('Error loading form overlay:', err)
       this.formViewerState = { ...this.formViewerState, loading: false }
     }
+  }
+
+  // ==========================================
+  // Full-ATC overlay viewer state (used by atcDialogTpl).
+  // Mirrors formViewerState so "View Full ATC" opens the ATC in a MatDialog
+  // overlay (same UX as the form viewer) instead of expanding inline.
+  // ==========================================
+  atcViewerState: { loading: boolean; data: any; title: string; kind: string } = {
+    loading: false,
+    data: null,
+    title: '',
+    kind: ''
+  }
+
+  viewATCInDialog(atc: any, kind: string = '') {
+    this.atcViewerState = {
+      loading: false,
+      data: atc,
+      title: 'Full ATC',
+      kind: kind || ''
+    }
+    this.dialog.open(this.atcDialogTpl, {
+      width: '92vw',
+      maxWidth: '1000px',
+      height: '92vh',
+      panelClass: 'form-dialog-panel',
+      autoFocus: false
+    })
   }
 
   // ==========================================
