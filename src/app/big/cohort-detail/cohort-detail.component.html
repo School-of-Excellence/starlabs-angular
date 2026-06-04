@@ -35,15 +35,18 @@
       </mat-form-field>
     </div>
 
-    <div>
+    <div class="cd-mentor-block">
       <mat-form-field appearance="outline" class="cd-queue-select">
         <mat-label>Select Mentors</mat-label>
         <mat-select [(ngModel)]="selectedMentors" (selectionChange)="toggleMentors()" multiple>
           <mat-option *ngFor="let mentorId of mentorsList" [value]="mentorId">{{mapProfile[mentorId]}}</mat-option>
         </mat-select>
       </mat-form-field>
-      <div>
-        <span *ngFor="let mentorId of selectedMentors">{{mapProfile[mentorId]}} /</span>
+      <div class="cd-mentor-chips" *ngIf="selectedMentors.length">
+        <span class="cd-mentor-chip" *ngFor="let mentorId of selectedMentors">
+          <span class="cd-mentor-chip-av" [class]="getAvatarColorClass(mentorId)">{{getInitialsForId(mentorId)}}</span>
+          {{mapProfile[mentorId]}}
+        </span>
       </div>
     </div>
 
@@ -104,9 +107,10 @@
     <!-- <button class="cd-tab" [class.active]="contentTab === 'comms'" (click)="setTab('comms')">
       Comms
     </button> -->
-    <div (click)="toggleSelectMode()" *ngIf="contentTab === 'participants';">
+    <button class="cd-select-toggle" [class.on]="selectMode" (click)="toggleSelectMode()" *ngIf="contentTab === 'participants'">
+      <mat-icon>{{selectMode ? 'close' : 'check_box_outline_blank'}}</mat-icon>
       {{selectMode ? 'Cancel' : 'Select'}}
-    </div>
+    </button>
   </div>
 
   <!-- BODY: PARTICIPANTS -->
@@ -172,8 +176,8 @@
        <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && newStudioPairing.length > 0" (click)="assignRoles()">
       <mat-icon>bolt</mat-icon> {{newStudioPairing.length}} Studios Created
     </button>
-      <div>
-        Show Disabled Stduio
+      <div class="cd-toggle-wrap">
+        <span class="cd-toggle-lbl">Show Disabled Stduio</span>
         <label class="mw-toggle">
           <input type="checkbox" [(ngModel)]="showDisabledStudio"/>
           <span class="slider"></span>
@@ -246,11 +250,14 @@
         <div class="cd-studios-grid" *ngIf="!studioCreateMode">
           <ng-container *ngFor="let studio of getFilteredStudios(); let i = index">
 
-          <div class="cd-studio-card" 
+          <div class="cd-studio-card"
             [class.live]="isStudioLive(studio)"
             [class.drag-over]="hoverDropStudioId === (studio?.docid || studio?.id)"
             [class.warn]="studio['studioin'] && studio['sort'] === 0"
             *ngIf="(showDisabledStudio || studio['studioin'])"
+            (dragover)="onStudioCardDragOver($event, studio)"
+            (dragleave)="onStudioCardDragLeave($event, studio)"
+            (drop)="onStudioCardDrop($event, studio)"
             >
 
             <!-- Card header -->
@@ -282,6 +289,8 @@
             <ng-container *ngIf="getStudioRoles(studio).specialists.length">
               <div class="cd-role-label">SPECIALIST</div>
               <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).specialists"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''"
                 draggable="true" (dragstart)="onStudioParticipantDragStart($event, pid, studio)">
                 <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
                 <div class="cd-role-info">
@@ -296,7 +305,9 @@
             <!-- WORKING WITH -->
             <ng-container *ngIf="getStudioRoles(studio).workingWith.length">
               <div class="cd-role-label">Participants</div>
-              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).workingWith">
+              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).workingWith"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''">
                 <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
                 <div class="cd-role-info">
                   <div class="cd-role-name">{{getNameForId(pid)}}</div>
@@ -311,6 +322,8 @@
             <ng-container *ngIf="getStudioRoles(studio).mentors.length">
               <div class="cd-role-label">MENTOR</div>
               <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).mentors"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''"
                 draggable="true" (dragstart)="onStudioParticipantDragStart($event, pid, studio)">
                 <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
                 <div class="cd-role-info">
@@ -326,6 +339,8 @@
             <ng-container *ngIf="getStudioRoles(studio).shadowing.length">
               <div class="cd-role-label">SHADOWING ({{getStudioRoles(studio).shadowing.length}})</div>
               <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).shadowing"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''"
                 draggable="true" (dragstart)="onStudioParticipantDragStart($event, pid, studio)">
                 <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
                 <div class="cd-role-info">

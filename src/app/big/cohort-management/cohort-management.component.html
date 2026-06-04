@@ -447,6 +447,7 @@
               <button class="card-tab-action" [class.on]="isParticipantSelectActive(cohorts['docid'])"
                 *ngIf="cohorts['contentview'] === 'participants' && cohorts['participantidlist']?.length > 0"
                 (click)="toggleParticipantSelectMode(cohorts['docid']); $event.stopPropagation()">
+                <mat-icon class="cta-check">{{isParticipantSelectActive(cohorts['docid']) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
                 {{isParticipantSelectActive(cohorts['docid']) ? 'Cancel' : 'Select'}}
               </button>
 
@@ -712,24 +713,26 @@
             </div>
           </div> -->
 
-          <div *ngFor="let log of filteredProgressionProfiles" style="padding:8px 10px;border-left:3px solid;margin-left:14px;font-size:12px"
-              [style.border-color]="getStatusColor(log['status'])">
-              <div style="display:flex;gap:8px;align-items:center">
-                <mat-icon [style.color]="getStatusColor(log['status'])">{{getStatusIcon(log['status'])}}</mat-icon>
-                <strong [style.color]="getStatusColor(log['status'])">{{log['status'] | titlecase}}</strong>
-                <span style="color:#8a93a3"> {{mapProfile[log['profileid']] || mapProfile[log['participantid']] ||'Unknown'}}</span>
-                <span style="color:#8a93a3">· {{formatTimelineDate(log['createddate'])}}</span>
+          <div class="act-log-item" *ngFor="let log of filteredProgressionProfiles"
+              [style.border-left-color]="getStatusColor(log['status'])">
+              <div class="act-log-head">
+                <mat-icon class="act-log-ico" [style.color]="getStatusColor(log['status'])">{{getStatusIcon(log['status'])}}</mat-icon>
+                <strong class="act-log-status" [style.color]="getStatusColor(log['status'])">{{log['status'] | titlecase}}</strong>
+                <span class="act-log-time">{{formatTimelineDate(log['createddate'])}}</span>
               </div>
-              <div style="margin-top:4px">
+              <div class="act-log-name">{{mapProfile[log['profileid']] || mapProfile[log['participantid']] ||'Unknown'}}</div>
+              <div class="act-log-detail">
                 <ng-container *ngIf="log['status'] === 'moved'">
-                  {{log['fromcohortname'] || 'Unknown'}} → {{log['tocohortname'] || 'Unknown'}}
+                  {{log['fromcohortname'] || 'Unknown'}} <mat-icon class="act-log-arrow">east</mat-icon> {{log['tocohortname'] || 'Unknown'}}
                 </ng-container>
                 <ng-container *ngIf="log['status'] !== 'moved'">
                   {{log['tocohortname'] || log['cohortname'] || 'Unknown cohort'}}
                 </ng-container>
-                <span *ngIf="log['level']" style="color:#8a93a3"> · {{getLevelLabel(log['level'])}}</span>
-                <span *ngIf="log['cohortCategory']" style="color:#8a93a3"> · {{log['cohortCategory'] | titlecase}}</span>
-                <span *ngIf="log['addedby']" style="color:#8a93a3"> · By {{mapProfile[log['addedby']] || 'System'}}</span>
+              </div>
+              <div class="act-log-meta" *ngIf="log['level'] || log['cohortCategory'] || log['addedby']">
+                <span class="act-log-tag" *ngIf="log['level']">{{getLevelLabel(log['level'])}}</span>
+                <span class="act-log-tag" *ngIf="log['cohortCategory']">{{log['cohortCategory'] | titlecase}}</span>
+                <span class="act-log-by" *ngIf="log['addedby']">By {{mapProfile[log['addedby']] || 'System'}}</span>
               </div>
           </div>
           <div *ngIf="progressionLoading">Loading....</div>

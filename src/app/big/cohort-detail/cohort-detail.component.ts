@@ -534,6 +534,12 @@ export class CohortDetailComponent implements OnDestroy {
     return this.mapProfile?.[pid] || pid;
   }
 
+  /** True when a single participant id belongs to the current cohort's roster. */
+  isPidInCohort(pid: string): boolean {
+    const roster: string[] = this.cohort?.['participantidlist'] || [];
+    return roster.includes(pid);
+  }
+
   /** Avatar colour class via deterministic hash. */
   getAvatarColorClass(pid: string): string {
     const palette = ['purple', 'blue', 'green', 'amber', 'rose'];

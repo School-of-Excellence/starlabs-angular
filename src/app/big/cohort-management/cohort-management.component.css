@@ -749,6 +749,7 @@ button {
   overflow: hidden;
   transition: box-shadow 0.15s, transform 0.15s;
   position: relative;
+  container: cohortcard / inline-size;
 }
 
 .cohort-card:hover {
@@ -2084,17 +2085,25 @@ button {
 .tag.specialist  { background: #F3F4F6; color: #6B7280; }
 .tag.draft       { background: #FFFBEB; color: #D97706; }
 
-/* ── Card-foot text labels (Notify / WhatsApp / Email) ────────── */
+/* ── Card-foot text labels (Notify / WhatsApp / Email) ──────────
+   The footer must never clip the "+ Activity" button. Each card is only
+   ~440px wide regardless of viewport, so label visibility is driven by the
+   CARD's width (container query), not the viewport. Default = icon-only so
+   the Activity button always fits; labels return when the card is wide. */
 .card-foot .foot-btn {
   padding: 5px 8px;
   font-size: 11px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 .card-foot .foot-btn .foot-lbl {
   margin-left: 2px;
   font-weight: 500;
+  display: none;
 }
-@media (max-width: 1100px) {
-  .card-foot .foot-btn .foot-lbl { display: none; }
+.card-foot .btn-activity { flex-shrink: 0; }
+@container cohortcard (min-width: 540px) {
+  .card-foot .foot-btn .foot-lbl { display: inline; }
 }
 
 /* ── active-dot (live participant indicator) ──────────────────── */
@@ -2266,13 +2275,19 @@ button {
   color: #D97706 !important;
 }
 
-/* card-tab-action (Select button on right of tabs) */
+/* card-tab-action (Select toggle on right of tabs — checkbox style, NOT a tab) */
 .card-tab-action {
   margin-left: auto;
-  padding: 6px 12px;
-  border: 1px solid transparent;
-  border-left: 1px solid #F3F4F6;
-  background: transparent;
+  align-self: center;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #E5E7EB;
+  border-radius: 7px;
+  background: white;
   font-size: 10px;
   font-weight: 700;
   color: #9CA3AF;
@@ -2280,15 +2295,23 @@ button {
   text-transform: uppercase;
   cursor: pointer;
   font-family: inherit;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.card-tab-action .cta-check {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  line-height: 15px;
 }
 .card-tab-action:hover {
   color: #6D28D9;
   background: #F5F3FF;
+  border-color: #C4B5FD;
 }
 .card-tab-action.on {
   color: #6D28D9;
   background: #F5F3FF;
+  border-color: #C4B5FD;
   font-weight: 800;
 }
 
@@ -2696,4 +2719,136 @@ button {
 .move-menu-list {
   max-height: 260px;
   overflow: auto
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Activity log sidebar — redesigned entries (item 5)
+   ════════════════════════════════════════════════════════════════ */
+.act-log-item {
+  margin: 8px 12px;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border: 1px solid #F3F4F6;
+  border-left: 3px solid #D1D5DB;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.act-log-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.act-log-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.act-log-ico {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+.act-log-status {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+.act-log-time {
+  margin-left: auto;
+  font-size: 9px;
+  color: #9CA3AF;
+  white-space: nowrap;
+}
+.act-log-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0D0F12;
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.act-log-detail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #6B7280;
+  margin-top: 2px;
+}
+.act-log-arrow {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  line-height: 13px;
+  color: #9CA3AF;
+}
+.act-log-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.act-log-tag {
+  font-size: 9px;
+  font-weight: 700;
+  color: #6B7280;
+  background: #F3F4F6;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.act-log-by {
+  font-size: 9px;
+  color: #9CA3AF;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Cohort card — selection mode polish (item 7)
+   ════════════════════════════════════════════════════════════════ */
+.dashboard-wrapper.select-mode .cohort-card {
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s, background 0.15s;
+}
+.dashboard-wrapper.select-mode .cohort-card:hover {
+  border-color: #C4B5FD;
+}
+.cohort-card.checked {
+  border-color: #7C3AED;
+  background: #FAF5FF;
+}
+.cohort-card.select-mode .card-check.select-overlay {
+  border: 1.5px solid #E5E7EB;
+}
+.cohort-card.checked .card-check.select-overlay {
+  background: #7C3AED;
+  color: #FFFFFF;
+  border-color: #7C3AED;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Responsiveness pass (item 1)
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 1200px) {
+  .activity-sidenav { width: 240px; }
+}
+@media (max-width: 1024px) {
+  .activity-sidenav:not(.collapsed) { width: 220px; }
+  .topbar { flex-wrap: wrap; height: auto; row-gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+  .topbar-search { order: 3; flex-basis: 100%; }
+}
+@media (max-width: 860px) {
+  .main-content { flex-direction: column; }
+  .sidebar { width: 100% !important; max-height: 220px; border-right: none; border-bottom: 1px solid #E5E7EB; }
+  .activity-sidenav:not(.collapsed) { width: 100%; max-height: 280px; border-left: none; border-top: 1px solid #E5E7EB; }
+  .activity-sidenav.collapsed { width: 100%; height: 28px; }
+  .activity-sidenav-tab { writing-mode: initial; }
+  .activity-sidenav-tab .activity-vlabel { writing-mode: initial; transform: none; }
+  .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .refine-row { flex-wrap: wrap; row-gap: 8px; }
+}
+@media (max-width: 560px) {
+  .topbar-actions { flex-wrap: wrap; row-gap: 6px; }
+  .cohort-grid { grid-template-columns: 1fr; }
+  .card-tab-action { margin-right: 4px; }
+  .selectbar { left: 8px; right: 8px; transform: none; bottom: 12px; flex-wrap: wrap; }
 }
