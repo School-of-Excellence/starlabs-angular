@@ -120,6 +120,7 @@ export class CohortDetailComponent implements OnDestroy {
   mentorsList = [];
   selectedMentors = [];
   isCohortUpdates : boolean = false;
+  showDisabledStudio = false;
 
   // Studios tab UI state
   studioGroupFilter: Set<string> = new Set<string>(); // selected group codes (uP! / LYL / B!G). Empty = all.
@@ -382,10 +383,11 @@ export class CohortDetailComponent implements OnDestroy {
   /** Filtered list of studios (applies group filter pills). */
   getFilteredStudios(): any[] {
     const all = this.getCohortStudios() || [];
-    if (this.studioGroupFilter.size === 0) return all;
-    return all.filter((s: any) =>
-      this.studioGroupFilter.has(this.getStudioGroupCode(s)),
-    );
+    const studios = [...all].map((st)=>{
+      st['sort'] = this.isParticipantInCohort(st['participants'] ?? []) ? 1 : 0;
+      return st
+    });
+    return studios;
   }
 
   /** All possible group codes (uP! / LYL / B!G) discovered across studios. */
@@ -986,7 +988,10 @@ export class CohortDetailComponent implements OnDestroy {
       this.queueTokenSubscription.unsubscribe();
     }
 
-    if (!this.selectedQueue) {
+    const queue = this.searchableQueueList.find(
+      (q) => q?.docid === this.selectedQueue,
+    );
+    if (!this.selectedQueue || queue == -1) {
       this.liveAssignmentList = [];
       this.studioPairingList = [];
       this.mapLiveParticipants = {};
@@ -995,10 +1000,6 @@ export class CohortDetailComponent implements OnDestroy {
       this.mapLiveAssignmentByStudio = {};
       return;
     }
-
-    const queue = this.searchableQueueList.find(
-      (q) => q?.docid === this.selectedQueue,
-    );
 
     this.stageActivityParse = {};
     const studioStages = [];
@@ -1362,6 +1363,9 @@ export class CohortDetailComponent implements OnDestroy {
   enableStduioCreateMode() {
     this.studioCreateMode = !this.studioCreateMode;
     this.newStudioPairing = [];
+    if(this.studioCreateMode){
+      this.createStudioCombination()
+    }
   }
 
   getStudioCombination() {
@@ -1453,13 +1457,13 @@ export class CohortDetailComponent implements OnDestroy {
     });
 
     if (Object.keys(duplicateStudios).length > 0) {
-      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel, {
-        data: duplicateStudios,
-      });
+      this.duplicatedStudios = duplicateStudios;
+      this.duplicateModelRef = this.dialog.open(this.duplicateStudiosModel);
       this.duplicateModelRef.afterClosed().subscribe((data) => {
         if (data) {
           this.newStudioPairing = [...validList];
           this.createStudios();
+          this.duplicatedStudios = null;
         }
       });
     } else {
@@ -1467,6 +1471,10 @@ export class CohortDetailComponent implements OnDestroy {
     }
   }
 
+  toggleStudioInModel(studio){
+    this.toggleStudio(studio);
+    studio['studioin'] = !studio['studioin'];
+  }
   closeDuplicateStuioModel(data: boolean = false) {
     if (this.duplicateModelRef) {
       this.duplicateModelRef.close(data);
@@ -1552,12 +1560,14 @@ export class CohortDetailComponent implements OnDestroy {
     const isStudioCohort = this.cohort['cohortCategory'] === 'studio';
     const isShadowCohort =
       this.bigActivityMap[this.cohort['bigactivity'] ?? '']?.shadow;
-    console.log(
-      isStudioCohort,
-      this.bigActivityMap[this.cohort['bigactivity'] ?? '']?.shadow,
-    );
+    // console.log(
+    //   'msg from showQueueSelection',
+    //   isStudioCohort,
+    //   this.bigActivityMap[this.cohort['bigactivity'] ?? '']?.shadow,
+    //   this.searchableQueueList
+    // );
     return (
-      isStudioCohort && isShadowCohort === false && !this.cohort['queueref']?.id
+      isStudioCohort && isShadowCohort === false && !this.cohort['queueref']?.id && this.searchableQueueList.length > 0
     );
   }
 
@@ -1807,5 +1817,11 @@ export class CohortDetailComponent implements OnDestroy {
         mentors : this.selectedMentors
       });
     }
+  }
+
+  isParticipantInCohort(pid){
+    const studioParticipants = pid ?? [];
+    const cohortParticipants = this.cohort['participantidlist'] ?? [];
+    return studioParticipants.every((pid)=>cohortParticipants.includes(pid))
   }
 }

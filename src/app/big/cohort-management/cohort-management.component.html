@@ -92,8 +92,8 @@
         </button>
       </mat-menu>
 
-      <button class="icon-btn" title="Settings" (click)="$event.preventDefault()"><mat-icon>settings</mat-icon></button>
-      <button class="icon-btn" title="Notifications" (click)="toggleActivitySidenav()"><mat-icon>notifications_none</mat-icon></button>
+      <!-- <button class="icon-btn" title="Settings" (click)="$event.preventDefault()"><mat-icon>settings</mat-icon></button>
+      <button class="icon-btn" title="Notifications" (click)="toggleActivitySidenav()"><mat-icon>notifications_none</mat-icon></button> -->
 
       <button class="btn-create" (click)="onCreateCohort()">
         <svg class="ico sm" viewBox="0 0 24 24" stroke-width="2.5">
@@ -210,7 +210,7 @@
     <div class="sidebar" (click)="sidebarCollapsed && toggleSidebarCollapse(); $event.stopPropagation()">
       <div class="sidebar-header">
         <span class="sidebar-title">Unassigned</span>
-        <span class="unassigned-badge">{{this.filterUnassignParticipants.length}}</span>
+        <span class="unassigned-badge" *ngIf="selectedAcceleratorEvent.length > 0">{{this.filterUnassignParticipants.length}}</span>
         <button class="icon-btn sidebar-collapse" title="Collapse" (click)="toggleSidebarCollapse(); $event.stopPropagation()">
           <svg class="ico sm" viewBox="0 0 24 24">
             <path [attr.d]="sidebarCollapsed ? 'm9 18 6-6-6-6' : 'm15 18-6-6 6-6'" />
@@ -418,9 +418,9 @@
             </div>
 
             <!-- Floor-mode footer link -->
-            <a class="floor-tap-hint" *ngIf="modeView === 'floor'" (click)="onEditCohort(cohorts); $event.stopPropagation()">
+            <span class="floor-tap-hint" *ngIf="modeView === 'floor'">
               Tap counts to view details →
-            </a>
+            </span>
 
             <div class="card-tabs">
               <button class="card-tab" [class.active]="cohorts['contentview'] === 'participants'"
@@ -449,6 +449,30 @@
                 (click)="toggleParticipantSelectMode(cohorts['docid']); $event.stopPropagation()">
                 {{isParticipantSelectActive(cohorts['docid']) ? 'Cancel' : 'Select'}}
               </button>
+
+              <button class="p-move-btn" *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0"
+                [matMenuTriggerFor]="moveMultiMenuOut" (menuOpened)="onMoveMenuOpen(cohorts)"
+                (click)="$event.stopPropagation()">
+                <mat-icon>swap_horiz</mat-icon> Move
+              </button>
+
+              <mat-menu #moveMultiMenuOut="matMenu" class="move-participant-menu">
+                <div class="move-menu-header" (click)="$event.stopPropagation()">
+                  <span class="move-menu-title">Move {{selectedParticipantIds.size}} to Cohort</span>
+                </div>
+                <div class="move-menu-search" (click)="$event.stopPropagation()">
+                  <mat-icon>search</mat-icon>
+                  <input type="text" placeholder="Search cohorts…" [(ngModel)]="moveMenuSearchQuery"
+                    (input)="onMoveMenuSearch($event, cohorts)" (click)="$event.stopPropagation()">
+                </div>
+                <div class="move-menu-list">
+                  <button mat-menu-item *ngFor="let targetCohort of moveMenuFilteredCohorts"
+                    (click)="moveSelectedParticipantsTo(cohorts, targetCohort)" [disabled]="isMovingParticipant">
+                    <span>{{targetCohort.name}}</span>
+                    <small style="opacity:.6;margin-left:6px">{{targetCohort.participantidlist?.length || 0}} ppl</small>
+                  </button>
+                </div>
+              </mat-menu>
             </div>
             <div class="cohort-card-holder">
               <div class="card-people" *ngIf="cohorts['contentview'] === 'participants'">
@@ -521,7 +545,7 @@
                     <span>Assignment deleted</span>
                   </div>
 
-                  <div class="activity-row" *ngIf="mapBigAssignment[$any(assignment.key)]">
+                  <div class="activity-row" *ngIf="mapBigAssignment[$any(assignment.key)]" (click)="onEditAssignment(cohorts , mapBigAssignment[$any(assignment.key)],$event);$event.stopPropagation();">
                     <div class="ac-icon"><mat-icon>assignment</mat-icon></div>
                     <div class="act-info">
                       <div class="act-title">{{mapBigAssignment[$any(assignment.key)]?.['title'] || 'Untitled'}}</div>
@@ -693,7 +717,7 @@
               <div style="display:flex;gap:8px;align-items:center">
                 <mat-icon [style.color]="getStatusColor(log['status'])">{{getStatusIcon(log['status'])}}</mat-icon>
                 <strong [style.color]="getStatusColor(log['status'])">{{log['status'] | titlecase}}</strong>
-                <span style="color:#8a93a3" *ngIf="log['profileid']"> {{mapProfile[log['profileid']] || 'Unknown'}}</span>
+                <span style="color:#8a93a3"> {{mapProfile[log['profileid']] || mapProfile[log['participantid']] ||'Unknown'}}</span>
                 <span style="color:#8a93a3">· {{formatTimelineDate(log['createddate'])}}</span>
               </div>
               <div style="margin-top:4px">
@@ -714,7 +738,7 @@
             <p>No recent activity</p>
           </div>
         </div>
-        <a class="activity-view-all" href="javascript:void(0)" (click)="$event.preventDefault()">View full activity log →</a>
+        <!-- <a class="activity-view-all" href="javascript:void(0)" (click)="$event.preventDefault()">View full activity log →</a> -->
       </ng-container>
     </div>
 

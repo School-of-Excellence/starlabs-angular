@@ -57,13 +57,13 @@
       <button mat-menu-item *ngFor="let o of ownerList" (click)="selectedOwner = o">{{o}}</button>
     </mat-menu>
 
-    <button class="cd-repair-btn" (click)="onRepairStudios()" *ngIf="contentTab === 'studios' && selectedQueue" title="Re-pair studios">
+    <!-- <button class="cd-repair-btn" (click)="onRepairStudios()" *ngIf="contentTab === 'studios' && selectedQueue" title="Re-pair studios">
       <mat-icon>refresh</mat-icon> Re-pair
-    </button>
+    </button> -->
 
-    <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && newStudioPairing.length > 0" (click)="assignRoles()">
+    <!-- <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && newStudioPairing.length > 0" (click)="assignRoles()">
       <mat-icon>bolt</mat-icon> {{newStudioPairing.length}} Studios Created
-    </button>
+    </button> -->
   </div>
 
   <!-- STATS ROW -->
@@ -72,14 +72,18 @@
       <div class="cd-stat-val">{{peopleCount}}</div>
       <div class="cd-stat-key">PEOPLE IN COHORT</div>
     </div>
+    <div class="cd-stat-card">
+      <div class="cd-stat-val" style="font-size: 23px;">{{mapQueueName[this.selectedQueue] ?? '—'}}</div>
+      <div class="cd-stat-key">Queue</div>
+    </div>
     <div class="cd-stat-card" >
       <div class="cd-stat-val">{{getCohortStudios().length || '—'}}</div>
       <div class="cd-stat-key">STUDIOS PAIRED</div>
     </div>
-    <div class="cd-stat-card">
+    <!-- <div class="cd-stat-card">
       <div class="cd-stat-val">{{qDemand}}</div>
       <div class="cd-stat-key">Q DEMAND</div>
-    </div>
+    </div> -->
     <!-- <div class="cd-stat-card">
       <div class="cd-stat-val">{{eventConfirmed}}</div>
       <div class="cd-stat-key">EVENT CONFIRMED</div>
@@ -97,9 +101,9 @@
     <button class="cd-tab" [class.active]="contentTab === 'activities'" (click)="setTab('activities')">
       Activities ({{activitiesCount}})
     </button>
-    <button class="cd-tab" [class.active]="contentTab === 'comms'" (click)="setTab('comms')">
+    <!-- <button class="cd-tab" [class.active]="contentTab === 'comms'" (click)="setTab('comms')">
       Comms
-    </button>
+    </button> -->
     <div (click)="toggleSelectMode()" *ngIf="contentTab === 'participants';">
       {{selectMode ? 'Cancel' : 'Select'}}
     </div>
@@ -118,7 +122,7 @@
         <div class="cd-part-av" [class]="p.avatarClass">{{p.initials}}</div>
         <div class="cd-part-info">
           <div class="cd-part-name">{{p.name}}</div>
-          <span class="cd-part-role" [class]="p.roleClass">{{p.roleLabel}}</span>
+          <!-- <span class="cd-part-role" [class]="p.roleClass">{{p.roleLabel}}</span> -->
         </div>
       </div>
     </div>
@@ -150,7 +154,7 @@
 
     <!-- Sub-toolbar: filter pills + Re-pair -->
     <div class="cd-studios-toolbar">
-      <span class="cd-studios-rule">STUDIOS CANVAS · RULE: 1 EIS PER STUDIO</span>
+      <!-- <span class="cd-studios-rule">STUDIOS CANVAS · RULE: 1 EIS PER STUDIO</span> -->
       <span class="cd-studios-rule">Seleted Queue : {{mapQueueName[selectedQueue]}}</span>
       <span class="cd-studio-pill"
         *ngFor="let code of getStudioGroupCodes()"
@@ -159,12 +163,22 @@
         {{code}}
       </span>
       <span class="cd-spacer"></span>
-      <button class="cd-repair-mini" (click)="onRepairStudios()">
+      <!-- <button class="cd-repair-mini" (click)="onRepairStudios()">
         <mat-icon>refresh</mat-icon> Re-pair
-      </button>
+      </button> -->
       <button class="cd-repair-mini" (click)="enableStduioCreateMode()">
         <mat-icon>add</mat-icon> {{studioCreateMode ? 'Back to video' : 'Create Studio'}}
       </button>
+       <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && newStudioPairing.length > 0" (click)="assignRoles()">
+      <mat-icon>bolt</mat-icon> {{newStudioPairing.length}} Studios Created
+    </button>
+      <div>
+        Show Disabled Stduio
+        <label class="mw-toggle">
+          <input type="checkbox" [(ngModel)]="showDisabledStudio"/>
+          <span class="slider"></span>
+        </label>
+      </div>
     </div>
 
     <!-- Two-column: canvas + unassigned panel -->
@@ -230,13 +244,14 @@
 
 
         <div class="cd-studios-grid" *ngIf="!studioCreateMode">
+          <ng-container *ngFor="let studio of getFilteredStudios(); let i = index">
+
           <div class="cd-studio-card" 
-            *ngFor="let studio of getFilteredStudios(); let i = index"
             [class.live]="isStudioLive(studio)"
             [class.drag-over]="hoverDropStudioId === (studio?.docid || studio?.id)"
-            (dragover)="onStudioCardDragOver($event, studio)"
-            (dragleave)="onStudioCardDragLeave($event, studio)"
-            (drop)="onStudioCardDrop($event, studio)">
+            [class.warn]="studio['studioin'] && studio['sort'] === 0"
+            *ngIf="(showDisabledStudio || studio['studioin'])"
+            >
 
             <!-- Card header -->
             <div class="cd-studio-head">
@@ -280,16 +295,15 @@
 
             <!-- WORKING WITH -->
             <ng-container *ngIf="getStudioRoles(studio).workingWith.length">
-              <div class="cd-role-label">WORKING WITH</div>
-              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).workingWith"
-                draggable="true" (dragstart)="onStudioParticipantDragStart($event, pid, studio)">
+              <div class="cd-role-label">Participants</div>
+              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).workingWith">
                 <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
                 <div class="cd-role-info">
                   <div class="cd-role-name">{{getNameForId(pid)}}</div>
                   <div class="cd-role-sub">{{getStudioParticipantActivity(studio, pid) || 'Participant'}}</div>
                 </div>
                 <span class="cd-role-livedot" *ngIf="isParticipantLive(cohort[cohort['queueref']?.id],pid)" title="Live"></span>
-                <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
+                <!-- <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button> -->
               </div>
             </ng-container>
 
@@ -324,11 +338,11 @@
 
             <!-- SESSION LOG -->
             <div class="cd-session-log">
-              <span class="cd-session-lbl">SESSION LOG</span>
+              <span class="cd-session-lbl">Expand to edit</span>
               <span class="cd-session-count" *ngIf="getSessionDoneCount(studio) > 0">{{getSessionDoneCount(studio)}} done</span>
               <span class="cd-session-count muted" *ngIf="getSessionDoneCount(studio) === 0">0 done</span>
               <span class="cd-spacer"></span>
-              <button class="cd-session-toggle" (click)="toggleStudioExpanded(studio, $event)" [class.open]="isStudioExpanded(studio)" title="Show more">
+              <button class="cd-session-toggle" (click)="toggleStudioExpanded(studio, $event);$event.stopPropagation()" [class.open]="isStudioExpanded(studio)" title="Show more">
                 <mat-icon>expand_more</mat-icon>
               </button>
             </div>
@@ -394,6 +408,7 @@
 
             </div>
           </div>
+          </ng-container>
         </div>
 
         <div class="cd-empty" *ngIf="getFilteredStudios().length === 0">
@@ -522,7 +537,7 @@
   </div>
 </div>
 
-<ng-template #duplicateStudiosModel let-duplicatedStudios>
+<ng-template #duplicateStudiosModel>
   <div class="tm-modal" *ngIf="duplicatedStudios">
     <div class="tm-header">
       <span class="tm-header__title">Duplicated Studios</span>
@@ -576,7 +591,7 @@
               <div class="tm-detail-row">
                 <span class="tm-detail-group__label">Stduio</span>
                 <button class="cd-mini-pill" [class.on]="studio.studioin"
-                (click)="toggleStudio(studio); $event.stopPropagation()"
+                (click)="toggleStudioInModel(studio); $event.stopPropagation()"
                 [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
                 <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
               </button>
