@@ -50,3 +50,8 @@ src/firebase-messaging-sw.js
 
 .claude
 graphify-out/
+
+# Nested sibling repos (their own git repos — not part of starlabs-angular)
+Watson-Angular/
+starlabs-cloud-function/
+watson-cloud-functions/
