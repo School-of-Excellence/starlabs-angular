@@ -724,7 +724,7 @@
                   <div class="profile-header">
                     <span class="participant-index">{{ i + 1 }}</span>
                     <a class="participant-name" [href]="'/participantdeliverysequence/' + app.bookedby?.id">
-                     {{ mapMetaData[app.bookedby?.id]?.['name'] || app.bookedby?.id }}
+                      {{ mapMetaData[app.bookedby?.id]?.['name'] || app.bookedby?.id }}
                     </a>
                   </div>
                   <div class="profile-products">
@@ -1169,6 +1169,7 @@
                       </div>
 
                       <!-- Merged seat map: available (green) / booked merged (blue) / busy (grey) -->
+                      <!-- Merged seat map: available (green) / booked merged (blue) / busy (grey) -->
                       <div class="seat-map" *ngIf="mergedSeatSlots?.length; else noSeatsTpl">
                         <button type="button" *ngFor="let slot of mergedSeatSlots" class="seat-chip"
                           [class.seat-avail]="slot.available && !slot.booked" [class.seat-booked]="slot.booked"
@@ -1176,6 +1177,7 @@
                           [class.seat-selected]="slotSelected && selectedSlotData === slot"
                           [disabled]="slot.booked || (!slot.available && !slot.booked)" (click)="goToBooking(slot)"
                           [title]="(slot.booked || !slot.available) ? ((getSlotBookingInfo(slot)?.name || 'Booked') + (getSlotBookingInfo(slot)?.type ? (' · ' + getSlotBookingInfo(slot)?.type) : '')) : 'Available'">
+
                           <!-- Merged booked slot: show time range -->
                           <ng-container *ngIf="slot._merged; else singleSlotTpl">
                             <span class="seat-time">
@@ -1190,9 +1192,19 @@
 
                           <!-- Single slot (available, busy, or single booked) -->
                           <ng-template #singleSlotTpl>
-                            <span class="seat-time">{{ slot.slotStart?.toDate() | date:'hh:mm a' }}</span>
+                            <span class="seat-time">
+                              {{ slot.slotStart?.toDate() | date:'hh:mm a' }}
+                              <ng-container *ngIf="slot._mergedEnd">
+                                – {{ slot._mergedEnd?.toDate() | date:'hh:mm a' }}
+                              </ng-container>
+                            </span>
                             <ng-container *ngIf="slot.booked">
-                              <span class="seat-who">{{ getSlotBookingInfo(slot)?.name || 'Booked' }}</span>
+                              <span class="seat-time" *ngIf="getSlotBookingInfo(slot)?.type">
+                                {{ getSlotBookingInfo(slot)?.type }}
+                              </span>
+                              <span class="seat-who">
+                                {{ getSlotBookingInfo(slot)?.name || 'Booked' }}
+                              </span>
                             </ng-container>
                             <ng-container *ngIf="!slot.available && !slot.booked">
                               <span class="seat-who seat-busy-type">
@@ -1206,6 +1218,9 @@
 
                         </button>
                       </div>
+                      <ng-template #noSeatsTpl>
+                        <div class="seat-empty">No slots for this day</div>
+                      </ng-template>
                       <ng-template #noSeatsTpl>
                         <div class="seat-empty">No slots for this day</div>
                       </ng-template>

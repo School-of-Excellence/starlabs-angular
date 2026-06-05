@@ -1932,7 +1932,7 @@ export class DeliveryDashboardCloneComponent {
             })}`;
     }
 
-    async loadSpecialistBaseData(retryCount = 0) {
+    async loadSpecialistBaseData() {
         this.specialistLoading = true;
         this.cdr.detectChanges();
         this.specialistAllSlots = [];
@@ -2360,13 +2360,7 @@ export class DeliveryDashboardCloneComponent {
     private getBookedParticipantId(appointment: any): string | null {
         return (
             appointment?.bookedby?.id ||
-            appointment?.bookedby?.path?.split('/')?.pop() ||
-            (typeof appointment?.bookedby === 'string'
-                ? appointment.bookedby.split('/').pop()
-                : null) ||
-            appointment?.profileid ||
-            appointment?.participantproductid ||
-            null
+            appointment?.bookedby?.path?.split('/')?.pop() || null
         );
     }
 
@@ -2432,9 +2426,9 @@ export class DeliveryDashboardCloneComponent {
     get selectedDayBookedCount(): number {
         return (this.selectedSpecialistSlots || []).filter((s: any) => s.booked).length;
     }
-    get selectedDayUnavailableCount(): number {
-        return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
-    }
+    // get selectedDayUnavailableCount(): number {
+    //     return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
+    // }
 
     // Find the appointment occupying a slot's time for this specialist — works for
     // both "booked" slots (this appointment type) and "unavailable" slots (the
@@ -2461,57 +2455,90 @@ export class DeliveryDashboardCloneComponent {
     }
 
     // Merges consecutive booked slots for the same participant into one card.
+    private getAppointmentTypeId(appointment: any): string | null {
+        return (
+            appointment?.appointment?.id ||
+            appointment?.appointment?.path?.split('/')?.pop() ||
+            null
+        );
+    }
+
     private computeMergedSeatSlots(): any[] {
         const slots = [...(this.selectedSpecialistSlots || [])];
         const result: any[] = [];
 
-        // Use same overlap logic as getSlotBookingInfo to find the appointment for a slot
         const findAppointmentForSlot = (s: any) => {
             const start: Date | null = s?.slotStart?.toDate?.() ?? null;
             const end: Date | null = s?.slotEnd?.toDate?.() ?? null;
+
             if (!start) return null;
 
             return (this.specialistBookedAll || []).find((a: any) => {
                 const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
                 const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
+
                 if (!aStart) return false;
-                if (aEnd && end) return aStart < end && aEnd > start;
-                return Math.floor(aStart.getTime() / 60000) === Math.floor(start.getTime() / 60000);
+                if (aEnd && end) {
+                    return aStart < end && aEnd > start;
+                }
+                return (
+                    Math.floor(aStart.getTime() / 60000) ===
+                    Math.floor(start.getTime() / 60000)
+                );
             });
         };
 
-        // Pre-cache participant ID using overlap logic
         const participantIds: (string | null)[] = slots.map((s: any) => {
-            if (s.available && !s.booked) return null; // available, skip
+            if (s.available && !s.booked) return null;
             const match = findAppointmentForSlot(s);
             return this.getBookedParticipantId(match);
+        });
+
+        const appointmentTypeIds: (string | null)[] = slots.map((s: any) => {
+            if (s.available && !s.booked) return null;
+            const match = findAppointmentForSlot(s);
+            return this.getAppointmentTypeId(match);
         });
 
         const isOccupied = (s: any) => s.booked || (!s.available && !s.booked);
 
         let i = 0;
+
         while (i < slots.length) {
             const slot = slots[i];
 
             if (!isOccupied(slot)) {
-                result.push({ ...slot, _merged: false });
+                result.push({
+                    ...slot,
+                    _merged: false,
+                    _mergedEnd: slot.slotEnd
+                });
+
                 i++;
                 continue;
             }
 
             const participantId = participantIds[i];
+            const appointmentTypeId = appointmentTypeIds[i];
 
             if (!participantId) {
-                result.push({ ...slot, _merged: false });
+                result.push({
+                    ...slot,
+                    _merged: false,
+                    _mergedEnd: slot.slotEnd
+                });
+
                 i++;
                 continue;
             }
 
             let j = i + 1;
+
             while (
                 j < slots.length &&
                 isOccupied(slots[j]) &&
-                participantIds[j] === participantId
+                participantIds[j] === participantId &&
+                appointmentTypeIds[j] === appointmentTypeId
             ) {
                 j++;
             }
@@ -2520,18 +2547,23 @@ export class DeliveryDashboardCloneComponent {
                 result.push({
                     ...slot,
                     _merged: true,
-                    _mergedEnd: slots[j - 1]?.slotEnd ?? slots[j - 1]?.slotStart,
-                    _mergeCount: j - i,
+                    _mergedEnd:
+                        slots[j - 1]?.slotEnd ??
+                        slots[j - 1]?.slotStart,
+                    _mergeCount: j - i
                 });
             } else {
-                result.push({ ...slot, _merged: false });
+                result.push({
+                    ...slot,
+                    _merged: false,
+                    _mergedEnd: slot.slotEnd
+                });
             }
-
             i = j;
         }
         return result;
     }
-
+    
     // Resolve the participant a booking belongs to. Real appointment docs store
     // the client in `bookedby` (a profile_data ref → has `.id`/`.path`); our
     // optimistic local appointments use `profileid`. Handle both + a name map.
