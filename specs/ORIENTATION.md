@@ -29,7 +29,7 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 
 ## Documentation map (what to read for what)
 - **`specs/validated/`** = the **authoritative, operator-validated** truth (supersedes the auto-docs per topic). `README.md` is the validation-sequence index.
-  - `01-journey-and-products.md` ✅ validated · `02-product-modes.md` ✅ **engine fully mapped** (§7 = the 3-function mode engine; §7d = the `participantmetadata.js` projection layer — end-to-end).
+  - `01-journey-and-products.md` ✅ validated · `02-product-modes.md` ✅ **engine fully mapped** (§7 = the 3-function mode engine; §7d = the `participantmetadata.js` projection layer — end-to-end) · `03-queue-manager.md` ✅ **validated** (session-series → ATC; two transition types: operator `nextstage` + self-move; variation = journey×cycle; + flow-visualizer spec in `specs/queue-flow-visualizer/`, diagrams in `specs/diagrams/queue-*`).
 - **`specs/` auto-docs** (AI-derived, *unreviewed* — reference only): `DATA-MODEL.md`, `CONFIGURATION.md` (config→behavior + config-authoring screens), `operator-screens.md` (every screen→collection, ATC-exclusion set), `data-reliability.md` (Tier A/B/C trust), `JOURNEY-LIFECYCLE`/`SCHEDULING-DELIVERY`/`QUEUE-AND-BIG`/`LIVE-STUDIOS`/`CONTENT-ENGAGEMENT`/`AUTH-ROLES`.
 - **Root:** `DESIGN.md` (architecture WHY), `DOCS.md` (212-route code reference), `DECISIONS.md` (D-001…D-009), `TECHNICALDEBTS.md` (TD-001…TD-016).
 - **`specs/journals/`** = the WHY/narrative per investigation (10 journals; each pairs with a `-artifacts/` data dir). **`tier-a-proposal.csv`** = the trusted-collection set awaiting engineer validation.
@@ -40,8 +40,8 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 |---|---|---|
 | 1 | Journey & Products | ✅ validated → `validated/01` |
 | 2 | Product Modes | ✅ **fully mapped** → `validated/02` §7 (`participantmode.js` engine) + §7d (`participantmetadata.js` projection) |
-| 3 | Queue Manager | ⏳ next (head start: `CONFIGURATION.md §1` queue config model) |
-| 4 | Dynamic Studio | ⏳ pending |
+| 3 | Queue Manager | ✅ **validated** → `validated/03` (+ `specs/queue-flow-visualizer/`) |
+| 4 | Dynamic Studio | ⏳ **next** (boundary = `live assignment` creation; the studio runtime — `arena participant` stageroles, OpenVidu/Zoom rooms, where ATC widgets get clicked) |
 | 5 | Appointment System | ⏳ pending |
 | 6 | Events, Arena & Calendar | ⏳ pending |
 
@@ -52,7 +52,16 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 4. ✅ **Doc citations re-anchored to `production` (stream B — done 2026-06-04, one residual).** Re-verified: TD-006 (`authguard.service.ts:186,188` **unchanged — keys still live**), **TD-010 5 of 6 routes now GUARDED** on `production` (only `devtestmic` `app.routes.ts:322` remains), TD-015 (`journeyplan:557→:584`), TD-016-history (`userprofile:814→:815`); `app.routes.ts` = 389 paths (+2 vs `main`). Data-driven facts + CF-repo (`development`) cites were always branch-independent. **Residual:** ~7 new `production` screens (`OneWayAppCommunication`, `onboarding-pipeline`, `web-studio-invitation`, `add-delivery-activities`, `workshop-dialog`, `upload-episode-dialog`, `exceptionalrouting`) not yet in `operator-screens.md` — fold in when that map is next touched.
 
 ## Immediate next actions
-- Resume **#3 Queue Manager** (validate-from-data) — the next concept group. (Head start: `CONFIGURATION.md §1` queue config model + `queuesystem.js` in the CF repo.)
+- Resume **#4 Dynamic Studio** (validate-from-data) — the studio runtime (boundary from #3 = `live assignment` creation). Head start: `arena participant`, `live assignment`, `studioZoomLink`/`openVidu.js` in the CF repo, `src/app/queue system/` studio components.
+- (Parallel, optional) port the **queue flow-visualizer** into `queue-creation-v3` — spec ready at `specs/queue-flow-visualizer/BRIEF.md`.
+
+## ⚙️ Multi-machine / branch setup (READ if you just cloned this on a new machine)
+This folder is **one git repo** with **separate git repos nested inside it** (all gitignored — they do NOT travel with this repo):
+- **`starlabs-angular`** (this repo): work continues on branch **`docs/concept-groups-wip`** (off `production`). The graph (`graphify-out/`) and the nested repos are gitignored — regenerate / re-clone them.
+- **`starlabs-cloud-function/`** = the StarLabs backend, **its own repo** (`github.com/School-of-Excellence/starlabs-cloud-function`). On a fresh machine you must **clone it into this exact nested path and `git checkout development`** — it will NOT be here otherwise, and `validated/02`/`03` cite it.
+- **`Watson-Angular/`, `watson-cloud-functions/`** = separate repos (finance/Watson); clone only if needed.
+- **`graphify-out/`** (gitignored, ~26MB) = the knowledge graph — not committed; rebuild with `/graphify .` (+ the CF repo) if you want it.
+- The **read-only probe harness** lives outside the repo (`~/Downloads/svstats/` + the production service-account JSON) — copy it + the SA file to the new machine to re-run probes. Key queue probes are also archived in `specs/journals/2026-06-05-queue-manager-artifacts/`.
 
 ## Gotchas (this repo specifically)
 - **Folder names have spaces** ("Journey Onboarding", "queue system"…) → `grep --include=*.ts` and unquoted `xargs` BREAK. Use `find … -print0 | xargs -0 grep`.
