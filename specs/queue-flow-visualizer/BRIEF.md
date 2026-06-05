@@ -2,7 +2,9 @@
 
 > **Goal:** give queue designers a **live flow diagram inside the `queue-creation-v3` config screen** so they can *see* the queue they're building instead of holding it in their head — and immediately catch where the config diverges from the intended flow. This is a self-contained feature; it also doubles as the basis for **config-validity assertions in the e2e/CI suite** (same graph-derivation logic).
 >
-> **Read first:** `specs/validated/03-queue-manager.md` (when it lands) and `specs/queue-flow-visualizer/prototype.html` — the working, framework-free prototype this brief asks you to port.
+> **Read first:** `specs/validated/03-queue-manager.md` and `specs/queue-flow-visualizer/prototype.html` — the working, framework-free prototype this brief asks you to port.
+>
+> **Two phases of this feature:** this brief = the **read-only viewer** (mirror the config as a graph). The **editable** evolution — refactoring the config screen into a GUI/graph *builder* — is `specs/queue-flow-visualizer/GUI-REFACTOR-BRIEF.md`. The viewer is the low-risk first step; the editor builds on the same `build()` + data contract.
 
 ---
 
