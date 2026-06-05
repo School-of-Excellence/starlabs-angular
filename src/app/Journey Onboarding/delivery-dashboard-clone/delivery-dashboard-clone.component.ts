@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
-import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, serverTimestamp, arrayUnion, writeBatch, documentId } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, serverTimestamp, arrayUnion, writeBatch, getFirestore, documentId } from '@angular/fire/firestore';
 import { Observable, Subscription, combineLatest } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -153,6 +153,7 @@ interface UtilizationRow {
 export class DeliveryDashboardCloneComponent {
     @ViewChild('tabGroup') tabGroup: any;
     filterForm: FormGroup;
+    firestoreForms = getFirestore('firestore-forms');
 
     // Outer mat-tab-group selectedIndex (Overview=0, Analytics=1, Participants=2)
     outerTabIndex: number = 0;
@@ -555,6 +556,7 @@ export class DeliveryDashboardCloneComponent {
     minimumPayment: number | null = null;
     tentativeStartDate: Date | null = null;
     selectedDeliveryType: string = '';
+    mergedSeatSlots: any[] = [];
 
     productData: any = {
         eiStarterPack: {
@@ -756,7 +758,6 @@ export class DeliveryDashboardCloneComponent {
 
     async onProductMultiFilterChange() {
         const selectedProductIds: string[] = this.productFilterControl.value ?? [];
-        console.log("selected product ids", selectedProductIds);
         if (!this.allMatchedProductsRaw || this.allMatchedProductsRaw.length === 0) return;
         // Filter changed → flush memoized getters (visibleCardIds, allProductIdsFromRaw, etc.)
         this.invalidateMemos();
@@ -774,6 +775,7 @@ export class DeliveryDashboardCloneComponent {
             this.clearStats();
         }
         // applyDateFilter rebuilds gated data and (when label is set) re-runs selectProduct
+        this.currentSelectedLabels = this.productFilterControl.value as string[] || [];
         await this.applyDateFilter();
     }
 
@@ -1080,6 +1082,9 @@ export class DeliveryDashboardCloneComponent {
             this.groupedPurchased = groupedPurchased;
             this.groupedNotEligible = groupedNotEligible;
             this.funnelData = funnelData;
+
+            this.currentSelectedLabels = this.productFilterControl.value as string[] || [];
+            this.populateActionableCohorts(this.currentSelectedLabels);
         } catch (err) {
             console.log("error apply date filter", err);
         }
@@ -1092,7 +1097,7 @@ export class DeliveryDashboardCloneComponent {
         // Repopulate the actionable cohorts (Participants tab) from the
         // freshly gated participantsproduct data. Stage-based, not appointment-
         // based — so it works even when the appointments read is denied.
-        this.populateActionableCohorts();
+        this.populateActionableCohorts(this.productFilterControl.value as string[]);
     }
 
     getConversionRate(cardId: string): number {
@@ -1220,11 +1225,6 @@ export class DeliveryDashboardCloneComponent {
                             resolve();
                         },
                         error: (err) => {
-                            // Defensive degrade: a Firestore permission denial on
-                            // the 'appointments' collection means the user's role
-                            // can't read appointment-level detail. Keep the page
-                            // alive — Stages columns are sourced from
-                            // participantsproduct + funnelData and continue to work.
                             const denied = err?.code === 'permission-denied' ||
                                 /permission|insufficient/i.test(err?.message || '');
                             if (denied) {
@@ -1557,7 +1557,7 @@ export class DeliveryDashboardCloneComponent {
                 .slice(i, i + 10)
                 .map(item => item.docid);
             const q = query(
-                collection(this.firestore, 'formsByClient'),
+                collection(this.firestoreForms, 'formsByClient'),
                 where('participantproductid', 'in', chunk)
             );
             const obs$ = runInInjectionContext(this.injector, () =>
@@ -1708,29 +1708,13 @@ export class DeliveryDashboardCloneComponent {
             endOfTomorrow
         } = this.getTodayAndTomorrowRange();
 
-        // const filteredAppointments = this.allAppointments.filter(app =>
-        //     app.appointmentTypeName === appointmentTypeName &&
-        //     app.attended === false
-        // );
-
         const filteredAppointments = this.allAppointments
             .filter(app =>
                 app.appointmentTypeName === appointmentTypeName &&
                 app.attended === false
-            )
-            .map((app: any) => {
-
-                const matchedProduct = this.allMatchedProductsRaw.find(
-                    (product: any) =>
-                        product.docid === app.participantproductid
-                );
-
-                return {
-                    ...matchedProduct,
-                    ...app
-                };
-            });
-        console.log("filtered appointments", filteredAppointments, this.allAppointments);
+            );
+        // no need to map/find matchedProduct again
+        // profileid is already merged in filterAppointmentsByType
 
         return {
             all: filteredAppointments,
@@ -1774,7 +1758,7 @@ export class DeliveryDashboardCloneComponent {
                 5: this.productData.eiStarterPack.preprocess || [],
                 6: this.productData.eiStarterPack.diagnostics || [],
                 7: this.productData.eiStarterPack.implementation || [],
-                8: this.productData.eiStarterPack.report || [],
+                8: this.productData.eiStarterPack.reports || [],
                 9: this.productData.eiStarterPack.celebrationCall || []
             };
         }
@@ -2368,6 +2352,8 @@ export class DeliveryDashboardCloneComponent {
             (appointment: any) =>
                 appointment?.appointment?.id === this.selectedAppointmentTypeId
         );
+
+        this.mergedSeatSlots = this.computeMergedSeatSlots();
     }
 
     // Extract the booked participant id from an appointment's stored reference.
@@ -2421,11 +2407,22 @@ export class DeliveryDashboardCloneComponent {
 
     onDateSelect(date: any) {
         this.selectedDate = date.fullDate.toDateString();
-        // Merged view: keep both booked and available slots, sorted by time.
-        this.selectedSpecialistSlots = this.getSlotsForDate(this.selectedDate)
+
+        const raw = this.getSlotsForDate(this.selectedDate)
             .sort((a: any, b: any) =>
                 (a.slotStart?.toDate?.()?.getTime() || 0) - (b.slotStart?.toDate?.()?.getTime() || 0)
             );
+
+        // Deduplicate: same time + same booked/available state = duplicate
+        const seen = new Set<string>();
+        this.selectedSpecialistSlots = raw.filter((slot: any) => {
+            const key = `${slot.slotStart?.toDate?.()?.getTime()}_${slot.booked}_${slot.available}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+
+        this.mergedSeatSlots = this.computeMergedSeatSlots();
     }
 
     // Slot counts for the currently selected day (drive the seat-map summary).
@@ -2461,6 +2458,78 @@ export class DeliveryDashboardCloneComponent {
             name: this.resolveBookedParticipantName(match),
             type: this.resolveAppointmentType(match) || '',
         };
+    }
+
+    // Merges consecutive booked slots for the same participant into one card.
+    private computeMergedSeatSlots(): any[] {
+        const slots = [...(this.selectedSpecialistSlots || [])];
+        const result: any[] = [];
+
+        // Use same overlap logic as getSlotBookingInfo to find the appointment for a slot
+        const findAppointmentForSlot = (s: any) => {
+            const start: Date | null = s?.slotStart?.toDate?.() ?? null;
+            const end: Date | null = s?.slotEnd?.toDate?.() ?? null;
+            if (!start) return null;
+
+            return (this.specialistBookedAll || []).find((a: any) => {
+                const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
+                const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
+                if (!aStart) return false;
+                if (aEnd && end) return aStart < end && aEnd > start;
+                return Math.floor(aStart.getTime() / 60000) === Math.floor(start.getTime() / 60000);
+            });
+        };
+
+        // Pre-cache participant ID using overlap logic
+        const participantIds: (string | null)[] = slots.map((s: any) => {
+            if (s.available && !s.booked) return null; // available, skip
+            const match = findAppointmentForSlot(s);
+            return this.getBookedParticipantId(match);
+        });
+
+        const isOccupied = (s: any) => s.booked || (!s.available && !s.booked);
+
+        let i = 0;
+        while (i < slots.length) {
+            const slot = slots[i];
+
+            if (!isOccupied(slot)) {
+                result.push({ ...slot, _merged: false });
+                i++;
+                continue;
+            }
+
+            const participantId = participantIds[i];
+
+            if (!participantId) {
+                result.push({ ...slot, _merged: false });
+                i++;
+                continue;
+            }
+
+            let j = i + 1;
+            while (
+                j < slots.length &&
+                isOccupied(slots[j]) &&
+                participantIds[j] === participantId
+            ) {
+                j++;
+            }
+
+            if (j > i + 1) {
+                result.push({
+                    ...slot,
+                    _merged: true,
+                    _mergedEnd: slots[j - 1]?.slotEnd ?? slots[j - 1]?.slotStart,
+                    _mergeCount: j - i,
+                });
+            } else {
+                result.push({ ...slot, _merged: false });
+            }
+
+            i = j;
+        }
+        return result;
     }
 
     // Resolve the participant a booking belongs to. Real appointment docs store
@@ -2654,6 +2723,7 @@ export class DeliveryDashboardCloneComponent {
                 break;
         }
         if (this.tabGroup) this.tabGroup.selectedIndex = this.currentTabIndex;
+        this.populateActionableCohorts(this.currentSelectedLabels);
         // Re-trigger paginated data for the newly active sub-tab
         try { this.filterTableData?.(); } catch { /* ignore if not ready */ }
     }
@@ -2922,7 +2992,6 @@ export class DeliveryDashboardCloneComponent {
         }
         this.allFunnelModalProfiles = grouped;
         this.groupedByProfileAll = { ...grouped };
-        console.log("groupedProfileAll", this.groupedByProfileAll);
         return this.groupedByProfileAll;
     }
 
@@ -3228,8 +3297,6 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async updateParticipantProductStatus(docid: string, profileid: string) {
-        console.log("docid", docid, "profileid", profileid);
-
         // Guard: Minimum Payment and Delivery Option are mandatory (matches the
         // participant-purchase initiate flow).
         const missing: string[] = [];
@@ -3548,7 +3615,6 @@ export class DeliveryDashboardCloneComponent {
         await this.fetchDFUProductData();
     }
 
-
     applyProductFilter() {
         const productKeywordsMap: any = {
             "WISH": ["WiSH"],
@@ -3750,7 +3816,7 @@ export class DeliveryDashboardCloneComponent {
     getAppointmentStatus(stage: string, appointment: any) {
         const { attended } = appointment;
 
-        if (stage === 'Pre-Process' || stage === 'Post-Process Form' || stage === 'Post Session Check-in') return 'Submitted';
+        if (stage === 'Pre-Process' || stage === 'Post-Process Form' || stage === 'EI Starter Pack Post Session Check-in') return 'Submitted';
         else if (attended) return 'Completed';
         else if (!attended) return 'Scheduled';
         else return 'Cancelled';
@@ -3760,7 +3826,6 @@ export class DeliveryDashboardCloneComponent {
         this.searchText = event.target.value;
         this.updateFilteredCards();
     }
-
 
     async loadModes() {
         const now = new Date();
@@ -4113,7 +4178,6 @@ export class DeliveryDashboardCloneComponent {
         );
 
         this.monthyear = `${this.selectedMonth.getFullYear()}-${String(this.selectedMonth.getMonth() + 1).padStart(2, '0')}`;
-
         this.fetchData();
     }
 
@@ -4243,6 +4307,11 @@ export class DeliveryDashboardCloneComponent {
         if (this.currentPage > this.totalPages && this.totalPages > 0) {
             this.currentPage = this.totalPages;
         }
+
+        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+        const endIndex = startIndex + this.itemsPerPage;
+        this.paginatedData = allData.slice(startIndex, endIndex);
+        this.cdr.detectChanges();
     }
 
     updatePaginatedData(): void {
@@ -4345,15 +4414,20 @@ export class DeliveryDashboardCloneComponent {
     }
 
     refreshFilter(): void {
-        this.filterForm.reset({
+        // save product selection before reset
+        const savedProductLabels = this.productFilterControl.value as string[] || [];
+        // reset only search and journey, NOT product
+        this.filterForm.patchValue({
             search: '',
             journey: [],
-            product: []
         });
         this.searchText = '';
         this.filteredData = [];
         this.currentPage = 1;
-        this.updatePaginatedData();
+
+        // restore product selection
+        this.currentSelectedLabels = savedProductLabels;
+        this.populateActionableCohorts(this.currentSelectedLabels);
     }
 
     updatePaginatedDataWithSearch(): void {
@@ -4698,11 +4772,23 @@ export class DeliveryDashboardCloneComponent {
         this.calculatePagination();
     }
 
+    private currentSelectedLabels: string[] = [];
+
     onTabChange(event: any) {
         this.currentTabIndex = event.index;
         this.currentPage = 1;
         this.itemsPerPage = 10;
-        this.refreshFilter();
+
+        // save product selection before reset
+        const savedProductLabels = this.productFilterControl.value as string[] || [];
+
+        // reset only search and journey, NOT product
+        this.filterForm.patchValue({
+            search: '',
+            journey: [],
+        });
+        this.searchText = '';
+        this.filteredData = [];
 
         if (!this.isFilterButtonClick) {
             this.activeFilter = 'none';
@@ -4731,7 +4817,10 @@ export class DeliveryDashboardCloneComponent {
         }
 
         this.isFilterButtonClick = false;
-        this.updatePaginatedData();
+
+        // use saved labels to ensure product filter is preserved
+        this.currentSelectedLabels = savedProductLabels;
+        this.populateActionableCohorts(this.currentSelectedLabels);
     }
 
     onBulkInitiateClick() {
@@ -6153,7 +6242,7 @@ export class DeliveryDashboardCloneComponent {
         return Math.max(0, Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000)));
     }
 
-    populateActionableCohorts(): void {
+    populateActionableCohorts(selectedLabels: string[] = []): void {
         const awaiting: any[] = [];
         const idle: any[] = [];
         const stuck: any[] = [];
@@ -6161,7 +6250,14 @@ export class DeliveryDashboardCloneComponent {
         const rejected = new Set(['rejected', 'cancelled', 'inactive']);
 
         for (const item of this.allMatchedProductsRaw || []) {
-            if (!this.itemPassesProductFilter(item)) continue;
+
+            // replace itemPassesProductFilter with direct label check
+            if (selectedLabels.length > 0) {
+                const pid = item?.productref?.id;
+                if (!pid) continue;
+                const label = this.cardLabelForProductId(pid);
+                if (!label || !selectedLabels.includes(label)) continue;
+            }
 
             const profileId = item?.profileid;
             if (!profileId) continue;
@@ -6193,8 +6289,6 @@ export class DeliveryDashboardCloneComponent {
             const daysSinceInitiated = this.daysSinceTs(initiated);
             const daysSinceActivity = this.daysSinceTs(lastActivity);
 
-            // --- Awaiting Initiation -------------------------------------
-            // Payment cleared (eligible), and status is null/empty (not yet initiated)
             if (!status && isEligible) {
                 awaiting.push({
                     profileid: profileId,
@@ -6208,8 +6302,6 @@ export class DeliveryDashboardCloneComponent {
                 continue;
             }
 
-            // --- Initiated · Not Consuming -------------------------------
-            // status='initiated' and idle > IDLE_DAYS
             if (status === 'initiated' && daysSinceInitiated >= this.IDLE_DAYS) {
                 idle.push({
                     profileid: profileId,
@@ -6220,8 +6312,6 @@ export class DeliveryDashboardCloneComponent {
                 });
             }
 
-            // --- Stuck Cases ----------------------------------------------
-            // In any active stage (initiated/ongoing) and no movement > STUCK_DAYS
             if ((status === 'initiated' || status === 'ongoing') && daysSinceActivity >= this.STUCK_DAYS) {
                 const days = daysSinceActivity;
                 const escalation = days > 30 ? 'HIGH' : days > 21 ? 'MEDIUM' : 'LOW';
@@ -6249,10 +6339,7 @@ export class DeliveryDashboardCloneComponent {
         this.originalData['stuckCases'].data = stuck;
         this.originalData['stuckCases'].count = stuck.length;
 
-        // Pagination depends on these arrays; recalc if a table is currently mounted.
-        if (typeof this.calculatePagination === 'function') {
-            this.calculatePagination();
-            this.updatePaginatedData?.();
-        }
+        this.currentPage = 1;
+        this.calculatePagination();
     }
 }
