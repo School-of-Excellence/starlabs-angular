@@ -486,7 +486,7 @@
                 </div>
 
                 <div class="empty-state"
-                  *ngIf="cohorts['participantidlist']?.length > 0 && getFilteredParticipants(cohorts['participantidlist']).length === 0 && participantSearchQuery"
+                  *ngIf="cohorts['participantidlist']?.length > 0 && getFilteredParticipants(cohorts).length === 0 && participantSearchQuery"
                   style="padding:28px 10px">
                   <mat-icon>search_off</mat-icon>
                   <p>No participants match "{{participantSearchQuery}}"</p>
@@ -495,8 +495,8 @@
                 <div>
                   <div class="cp-row row"
                     *ngFor="let participant of (isParticipantExpanded(cohorts['docid'])
-                      ? getFilteredParticipants(cohorts['participantidlist'])
-                      : getFilteredParticipants(cohorts['participantidlist']).slice(0,5))"
+                      ? getFilteredParticipants(cohorts).slice(0,5)
+                      : getFilteredParticipants(cohorts).slice(0,5))"
                     [class.selectable]="isParticipantSelectActive(cohorts['docid'])"
                     [class.checked]="isParticipantSelectActive(cohorts['docid']) && isParticipantChecked(participant)"
                     (click)="isParticipantSelectActive(cohorts['docid']) && toggleParticipantChecked(participant, $event)"
@@ -520,11 +520,11 @@
                     <span class="active-dot" *ngIf="isParticipantLive(cohorts['queueref']?.id,participant)"></span>
                   </div>
                   <div class="cp-more"
-                    *ngIf="getFilteredParticipants(cohorts['participantidlist']).length > 5"
+                    *ngIf="getFilteredParticipants(cohorts).length > 5"
                     (click)="toggleParticipantExpanded(cohorts['docid'], $event)">
                     {{ isParticipantExpanded(cohorts['docid'])
                         ? 'Show less'
-                        : '+' + (getFilteredParticipants(cohorts['participantidlist']).length - 5) + ' more' }}
+                        : '+' + (getFilteredParticipants(cohorts).length - 5) + ' more' }}
                   </div>
                 </div>
               </div>

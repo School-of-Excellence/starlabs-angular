@@ -2390,17 +2390,24 @@ export class CohortManagementComponent {
     }
   }
 
-  getFilteredParticipants(participantList: string[]): string[] {
+  getFilteredParticipants(cohort : any): string[] {
+    const participantList = cohort['participantidlist'] ?? [];
+    const cohortName = (cohort['name'] || '').toLowerCase();
+    const eventName = this.mapAcceleratorEvent[cohort['eventref']?.id]?.toLowerCase() || '';
     if (!participantList || participantList.length === 0) return [];
     if (!this.participantSearchQuery || !this.participantSearchQuery.trim()) {
       return participantList;
     }
     
     const query = this.participantSearchQuery.toLowerCase().trim();
-    return participantList.filter(participantId => {
-      const name = (this.mapProfile[participantId] || participantId).toLowerCase();
+    const filteredParticipants = participantList.filter(participantId => {
+      const name = (this.mapProfile[participantId] || participantId).toLowerCase().trim();
       return name.includes(query);
     });
+    if(filteredParticipants.length === 0 && (cohortName.includes(query) || eventName.includes(query))){
+      return participantList;
+    }
+    return filteredParticipants;
   }
 
   clearCohortSearch() {
