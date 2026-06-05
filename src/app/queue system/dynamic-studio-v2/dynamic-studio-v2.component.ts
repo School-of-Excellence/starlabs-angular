@@ -173,6 +173,16 @@ export class DynamicStudioV2Component {
   sidebarProfileOpen: boolean = true
   toggleSidebarProfile() { this.sidebarProfileOpen = !this.sidebarProfileOpen }
 
+  // Per-stage-note expand state (clamp to 2 lines, "Show more" when longer).
+  expandedStageNotes = new Set<string>()
+  toggleStageNote(key: string) {
+    if (this.expandedStageNotes.has(key)) this.expandedStageNotes.delete(key)
+    else this.expandedStageNotes.add(key)
+  }
+  isStageNoteExpanded(key: string): boolean {
+    return this.expandedStageNotes.has(key)
+  }
+
   /**
    * The participant's profile ID for the current live assignment. Prefers
    * the queue_token's `profile_id` (set when the specialist invited them
@@ -2575,8 +2585,8 @@ export class DynamicStudioV2Component {
     Object.keys(this.liveAssignment["bonusactivity"] ?? {}).forEach(profileid =>{
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]] = additionalActivities[this.liveAssignment["bonusactivity"][profileid]] ?? []
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]].push(profileid)
-    }) 
-    console.log(additionalActivities)   
+    })
+    console.log(additionalActivities)
     var inviteParticipant = this.dialog.open(AssignQueueStudioComponent, {
       data: {
         title: reviewSpecialist ? "Assign Other Specialist if attended in this Studio" : "Update Additional Specialist and Activity in the Studio",
@@ -2593,35 +2603,40 @@ export class DynamicStudioV2Component {
     try {
       const result = await inviteParticipant.afterClosed().toPromise();
       if(result != null){
-        console.log(result)
         if(Object.keys(result).length != 0){
           // Update Bonus Activity
           var mergeActivity = reviewSpecialist ? (result["bonusactivity"] ?? {}) : {...(this.liveAssignment["bonusactivity"] ?? {}), ...result["bonusactivity"]}
-          console.log(mergeActivity)
           var additionalSpecialist = Object.keys(mergeActivity)
-          
+
           await updateDoc(doc(this.firestore, "live assignment", this.liveAssignment["docid"]), {
             bonusactivity: additionalSpecialist.length != 0 ? mergeActivity : null,
             bonusactivityparticipant: additionalSpecialist.length != 0 ? additionalSpecialist : null
           });
-  
+
           // Update People Involved
           var peopleInvolved = Object.keys(mergeActivity)
           var mergePeopleInvolved = Array.from(new Set(peopleInvolved.concat(this.liveAssignment["pairing"] ?? []) as string[]))
-          console.log(mergePeopleInvolved)
-          
+
           await updateDoc(doc(this.firestore, "queue_token", this.liveAssignment["token"]["docid"]), {
             people_involved: mergePeopleInvolved
           });
+          this.snackBar.open('Specialist(s) added to the studio.', 'OK',
+            { duration: 3000, horizontalPosition: 'center', verticalPosition: 'top' })
+        } else {
+          // Dialog closed with no specialist rows added — tell the user how.
+          this.snackBar.open('No specialist was added. Click "Add Other Specialists", fill it, then Assign.', 'OK',
+            { duration: 5000, horizontalPosition: 'center', verticalPosition: 'top' })
         }
         invited = true
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in inviteMore:', error);
+      this.snackBar.open('Invite failed: ' + (error?.message || error), 'Dismiss',
+        { duration: 7000, horizontalPosition: 'center', verticalPosition: 'top' });
     }
     return invited
   }
-  
+
   async regenerateZoomLink(){
     var url:string
     if(environment.firebase.projectId == "starlabs-test"){
@@ -3394,8 +3409,9 @@ export class DynamicStudioV2Component {
     console.log("Checking AEL.....")
     this.participantAEL = {}
 
+    // AEL needs liveAssignment.token to know which queue(s) to search.
     if(!this.liveAssignment["token"]) return;
-    
+
     try {
       const level = await getDocs(collection(this.firestore, "accelerated evolution level"));
       this.aelLevelList = level.docs.map(e => e.data())

@@ -315,17 +315,6 @@
           <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
         </div>
 
-        <!-- Stage notes configured in queue-creation. Each targets a selected
-             stage and only shows when the participant's variation includes
-             that stage. -->
-        <div class="ds-stagenotes">
-          <div class="ds-stagenote" *ngFor="let sn of currentStageNotes"
-               [matTooltip]="sn.stage + ': ' + sn.note">
-            <mat-icon class="ic">sticky_note_2</mat-icon>
-            <span class="ds-stagenote__text">{{ sn.note }}</span>
-          </div>
-        </div>
-
         <!-- ATC count for the current queue — quick summary chip shown in
              the topbar so the specialist sees it across all steps. Click
              jumps to the View Submitted ATC step. -->
@@ -354,6 +343,26 @@
 
     <!-- ============================ MAIN ============================ -->
     <main class="ds-main">
+
+      <!-- Stage notes — full-width banner directly below the topbar (so the
+           complete text is visible and never overlaps). Each note targets a
+           selected stage and only shows when the participant's variation
+           includes that stage. -->
+      <div class="ds-stagenote-bar" *ngIf="currentStageNotes.length">
+        <div class="ds-stagenote" *ngFor="let sn of currentStageNotes">
+          <mat-icon class="ic">sticky_note_2</mat-icon>
+          <div class="ds-stagenote__main">
+            <span class="ds-stagenote__text"
+                  [class.is-clamped]="!isStageNoteExpanded(sn.stage)">{{ sn.note }}</span>
+            <button type="button" class="ds-stagenote__more"
+                    *ngIf="(sn.note?.length || 0) > 140"
+                    (click)="toggleStageNote(sn.stage)">
+              {{ isStageNoteExpanded(sn.stage) ? 'Show less' : 'Show more' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="ds-main-scroll">
         <div class="ds-main-inner">
 
