@@ -3,7 +3,7 @@
     <div>
         <mat-form-field class="w-100" appearance="outline">
             <mat-label>Select Queue</mat-label>
-            <mat-select (selectionChange)="onQueueSelect($event.value)">
+            <mat-select (selectionChange)="onQueueSelect($event.value)" data-testid="arena-queue-select">
                 <mat-option>
                     <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                 </mat-option>
@@ -25,7 +25,7 @@
         </mat-list>
     </div> -->
     <div class="zoom-section">
-        <span class="count-badge">{{ zoomNotInUseEmails.length }} Available</span>
+        <span class="count-badge" data-testid="arena-zoom-available-count">{{ zoomNotInUseEmails.length }} Available</span>
         
         <mat-chip-set class="email-chips">
             <mat-chip *ngFor="let email of zoomNotInUseEmails">
@@ -37,8 +37,9 @@
 </div>
 
 <div class="arena-participants-container">
-  <mat-card *ngFor="let item of arenaparticipant; let i = index" 
+  <mat-card *ngFor="let item of arenaparticipant; let i = index"
             class="participant-card"
+            data-testid="arena-participant-card" [attr.data-participant-id]="item['participantid']"
             [ngClass]="{
               'stage-mismatch': mapParticipantToToken[item['participantid']]?.['currentstage'] !== item['stagename'],
               'zoom-in-use': item['zoomdata'] && mapZoomAccount[item['zoomdata']['host_email']]?.['inuse'],
@@ -108,7 +109,7 @@
         
         <!-- Actions -->
         <div class="actions" *ngIf="developer">
-          <button mat-raised-button color="warn" (click)="closeStudio(item)">
+          <button mat-raised-button color="warn" (click)="closeStudio(item)" data-testid="arena-close-studio-btn">
             <mat-icon>close</mat-icon>
             Close Studio
           </button>
@@ -131,7 +132,7 @@
   </mat-card>
   
   <!-- Empty State -->
-  <div *ngIf="!arenaparticipant?.length" class="empty-state">
+  <div *ngIf="!arenaparticipant?.length" class="empty-state" data-testid="arena-empty-state">
     <mat-icon>people_outline</mat-icon>
     <p>No participants in arena</p>
   </div>

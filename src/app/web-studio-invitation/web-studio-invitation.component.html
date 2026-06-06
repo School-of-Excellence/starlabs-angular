@@ -1,5 +1,5 @@
 <!-- Studio Invitation Full-Screen Overlay -->
-<div class="inv-overlay" *ngIf="studioInvitation && !invitationAccepted">
+<div class="inv-overlay" *ngIf="studioInvitation && !invitationAccepted" data-testid="web-inv-overlay">
   <div class="inv-content">
 
     <h1 class="inv-heading">
@@ -50,11 +50,11 @@
   </div>
 
   <div class="inv-actions">
-    <button class="inv-btn inv-btn--accept" (click)="acceptInvitation()">
+    <button class="inv-btn inv-btn--accept" (click)="acceptInvitation()" data-testid="web-inv-accept-btn">
       → {{ joinLaterConfirm ? 'Join Now' : 'Accept Invitation & Join' }}
     </button>
     <button class="inv-btn inv-btn--later"
-      (click)="joinLaterConfirm ? confirmJoinLater() : onJoinLater()">
+      (click)="joinLaterConfirm ? confirmJoinLater() : onJoinLater()" data-testid="web-inv-later-btn">
       {{ joinLaterConfirm ? 'Confirm Join Later' : "I'll join later" }}
     </button>
   </div>
@@ -86,7 +86,7 @@
       </ul>
     </div>
 
-    <button class="inv-success-btn" (click)="_closeInvitation()">Got it, Thanks!</button>
+    <button class="inv-success-btn" (click)="_closeInvitation()" data-testid="web-inv-success-btn">Got it, Thanks!</button>
 
   </div>
 </div>

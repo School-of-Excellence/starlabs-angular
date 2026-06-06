@@ -16,7 +16,7 @@
 </div>
 
 <!-- Preview - Not Joined the meeting -->
-<div *ngIf="!room() && !loading && meetingRoomStatus == null" class="prejoin-container">
+<div *ngIf="!room() && !loading && meetingRoomStatus == null" class="prejoin-container" data-testid="joinroom-prejoin">
   
   <div class="title">{{roomDetail.title}}</div>
   
@@ -65,10 +65,10 @@
 
   <!-- Buttons -->
   <div class="buttons">
-    <button class="btn-enable" (click)="prepareParticipant()" [disabled]="isRequesting">
+    <button class="btn-enable" (click)="prepareParticipant()" [disabled]="isRequesting" data-testid="joinroom-enable-btn">
       Enable Access
     </button>
-    <button class="btn-join" (click)="joinCall()" [disabled]="cameraStatus !== 'granted' || micStatus !== 'granted'">
+    <button class="btn-join" (click)="joinCall()" [disabled]="cameraStatus !== 'granted' || micStatus !== 'granted'" data-testid="joinroom-join-btn">
       Join Call
     </button>
   </div>
@@ -86,7 +86,7 @@
 </div>
 
 <!-- Connected to the Meeting -->
-<div #meetingContainer *ngIf="room() && meetingRoomStatus == 'connected'" class="zoom-container">
+<div #meetingContainer *ngIf="room() && meetingRoomStatus == 'connected'" class="zoom-container" data-testid="joinroom-connected">
   
 
   <!-- Zoom-style Header -->

@@ -1,0 +1,22 @@
+const { chromium } = require('@playwright/test');
+const BASE = 'http://localhost:4200';
+(async () => {
+  const b = await chromium.launch(); const page = await b.newPage();
+  const failed = [], errors = [];
+  page.on('requestfailed', r => failed.push(`${r.failure()?.errorText} ${r.url().slice(0, 140)}`));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 240)); });
+  page.on('pageerror', e => errors.push('PAGEERROR ' + (e.message || e).slice(0, 240)));
+  await page.goto(BASE);
+  await page.locator('input[type="email"]').first().fill('admin+run1@example.com');
+  await page.locator('input[type="password"]').first().fill('Test!1234');
+  await page.getByRole('button', { name: /login/i }).click();
+  await page.waitForURL(u => !u.pathname.includes('/login'), { timeout: 30000 });
+  await page.goto(BASE + '/dynamicqueuemanager', { waitUntil: 'domcontentloaded' });
+  await page.getByText('TEST 30-stage L3rqCr', { exact: false }).first().click();
+  await page.waitForTimeout(12000);
+  console.log('=== failed requests (' + failed.length + ') ===');
+  [...new Set(failed)].slice(0, 20).forEach(f => console.log('  ' + f));
+  console.log('=== console/page errors (' + errors.length + ') ===');
+  [...new Set(errors)].slice(0, 20).forEach(e => console.log('  ' + e));
+  await b.close(); process.exit(0);
+})();

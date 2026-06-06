@@ -1,12 +1,22 @@
 {
-  "//": "EMULATOR-ONLY config. Kept SEPARATE from firebase.json on purpose: the deploy workflow (.github/workflows/deploy_19.yml) runs a bare `firebase deploy`, so a `firestore` block in firebase.json would push rules/indexes to PRODUCTION (fir-sample-aae4a) — forbidden (prod must stay untouched). Run with: firebase emulators:start --config firebase.emulator.json",
+  "//": "EMULATOR-ONLY config (firestore + auth + FUNCTIONS). Kept SEPARATE from firebase.json on purpose: the deploy workflow (.github/workflows/deploy_19.yml) runs a bare `firebase deploy`, so a firestore/functions block in firebase.json would push to PRODUCTION (fir-sample-aae4a) — forbidden. Boot with: e2e/scripts/deploy-cf-emulator.sh  (which sets functions/package.json main -> index.emulator.js for the run, materializes functions/.secret.local, then runs `firebase emulators:start --project demo-slabs-queue --config firebase.emulator.json`).",
+  "//databases": "The Firestore emulator serves the DEFAULT db AND any named db (e.g. firestore-forms) on demand — named DBs are created on first access, no per-db block needed here. The named `firestore-atc` DB is intentionally never touched (index.emulator.js excludes the ATC functions). rules/indexes below apply to the default db.",
+  "//functions": "source points at the nested CF repo (branch test/queue-e2e-deploy). NO `predeploy` loopDetector here — loopDetector.js runs against functions/index.js which `require`s the ATC module (getFirestore('firestore-atc') at module-eval); the emulator must load functions/index.emulator.js instead (the deploy script repoints package.json main). codebase id matches the cloud deploy for parity.",
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "functions": [
+    {
+      "source": "starlabs-cloud-function/functions",
+      "codebase": "default",
+      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log", "*.local"]
+    }
+  ],
   "emulators": {
     "auth": { "port": 9099 },
     "firestore": { "port": 8080 },
+    "functions": { "port": 5001 },
     "ui": { "enabled": true, "port": 4001 },
     "singleProjectMode": true
   }

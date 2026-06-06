@@ -1,0 +1,21 @@
+{
+  "name": "starlabs-queue-e2e",
+  "private": true,
+  "description": "Queue Manager full-complexity test environment (Playwright + model-based oracle), targets a dedicated disposable Firebase project.",
+  "scripts": {
+    "plan": "node fixtures/seed-test-project.js --plan",
+    "seed": "node fixtures/seed-test-project.js --seed",
+    "teardown": "node fixtures/seed-test-project.js --teardown",
+    "test": "playwright test",
+
+    "emu:up": "bash scripts/deploy-cf-emulator.sh",
+    "emu:seed": "FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIREBASE_PROJECT=demo-slabs-queue node fixtures/seed-emulator.js --seed",
+    "emu:seed:min": "FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIREBASE_PROJECT=demo-slabs-queue node fixtures/seed-emulator.js --legacy",
+    "test:emu": "TARGET=emulator playwright test --config=playwright.queue.emulator.config.ts",
+    "test:cloud": "TARGET=cloud playwright test --config=playwright.queue.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "firebase-admin": "^13.4.0"
+  }
+}

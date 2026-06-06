@@ -30,9 +30,9 @@
 
     <div class="marathon-container">
       <div *ngFor="let marathon of this.bigMarathonList">
-        <button class="marathon" [ngClass]="{'selected': selectedMarathon['marathonref']?.id === marathon.marathonref.id}" (click)="fetchMarathonData(marathon)">
+        <button class="marathon" data-testid="pab-marathon-btn" [attr.data-marathon-id]="marathon['docid']" [ngClass]="{'selected': selectedMarathon['marathonref']?.id === marathon.marathonref.id}" (click)="fetchMarathonData(marathon)">
           <b>{{marathon['title']}}</b>
-          <span *ngIf="marathonMap[marathon['docid']] ? marathonMap[marathon['docid']]['pending'] > 0 : false" class="pending"><b>{{marathonMap[marathon['docid']]['pending']}}</b></span>
+          <span *ngIf="marathonMap[marathon['docid']] ? marathonMap[marathon['docid']]['pending'] > 0 : false" class="pending" data-testid="pab-marathon-pending"><b>{{marathonMap[marathon['docid']]['pending']}}</b></span>
         </button>
       </div>
     </div>
@@ -44,12 +44,13 @@
 
             <button class="filter-btn"
               *ngFor="let status of  ['myactivities', 'review', 'rework', 'missed', 'completed']"
+              data-testid="pab-status-btn" [attr.data-status]="status"
               [ngClass]="{'active': selectedStatus === status}"
               (click)="applyStatusFilter(status)">
               {{status === 'myactivities' ? 'My Activities' : (status | titlecase)}}
               <span *ngIf="this.mapParticipantAssignments[this.selectedMarathon['marathonref'].id][status] &&
                 this.mapParticipantAssignments[this.selectedMarathon['marathonref'].id][status].length > 0"
-                class="status-count"
+                class="status-count" data-testid="pab-status-count"
               >
                 {{this.mapParticipantAssignments[this.selectedMarathon['marathonref'].id][status].length}}
               </span>
@@ -82,9 +83,9 @@
           <p>No activities found</p>
         </div>
       </div>
-      <div class="activity-card" *ngFor="let activity of dataSource.data">
+      <div class="activity-card" data-testid="pab-card" [attr.data-assignment-id]="activity.docid" *ngFor="let activity of dataSource.data">
         <div class="card-header">
-          <div class="type-badge" [ngClass]="{
+          <div class="type-badge" data-testid="pab-type-badge" [ngClass]="{
             'type-zoom': activity.assignmenttype === 'Zoom Call',
             'type-manual': activity.assignmenttype === 'Manual Assignment',
             'type-triple': activity.assignmenttype === 'Triple ATC',
@@ -94,7 +95,7 @@
           }">
             {{activity.assignmenttype}}
           </div>
-          <div class="status-indicator" [ngClass]="{
+          <div class="status-indicator" data-testid="pab-status-badge" [ngClass]="{
             'status-ongoing': isActivityOngoing(activity),
             'status-upcoming': !isActivityOngoing(activity) && selectedStatus === 'myactivities',
             'status-completed': selectedStatus === 'completed',
@@ -232,7 +233,7 @@
         </div> -->
         <div class="card-footer" *ngIf="shouldShowButton(activity)">
           <div class="d-flex align-items-center" style="flex-direction: column; align-items: flex-start;">
-            <button class="action-btn"
+            <button class="action-btn" data-testid="pab-perform-action"
               [disabled]="isButtonDisabled(activity)"
               (click)="!isButtonDisabled(activity) && performAction(activity, checkActivityStart(activity))">
               <i *ngIf="!isButtonDisabled(activity)" class="fas fa-external-link-alt"></i>

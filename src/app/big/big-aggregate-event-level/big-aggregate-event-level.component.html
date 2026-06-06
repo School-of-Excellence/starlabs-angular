@@ -40,7 +40,7 @@
         </mat-hint>
     </mat-form-field>
 
-    <button mat-stroked-button class="submitbtn" type="submit" 
+    <button mat-stroked-button class="submitbtn" type="submit" data-testid="ael-submit"
       [disabled]="loading || aggregateForm.invalid || crossmatch || configurationcheck">
         {{loading ? 'Updating....' : 'Update participant level'}}
     </button>
@@ -80,7 +80,7 @@
     <span *ngFor="let model of atcModelLevelup | keyvalue;">
       <label class="h5">{{model.key}}</label> : <label class="h5">{{model.value}}</label>,&nbsp;
     </span>
-    <label class="h5">Total ATC Model Count</label> : <label class="h5">{{dataSource.filteredData.length}}</label>
+    <label class="h5">Total ATC Model Count</label> : <label class="h5" data-testid="ael-total-count">{{dataSource.filteredData.length}}</label>
   </div>
 
 

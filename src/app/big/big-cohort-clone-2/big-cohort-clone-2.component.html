@@ -39,7 +39,7 @@
         <button class="btn btn-success" (click)="openProgressionReport()">
           <mat-icon>timeline</mat-icon> Progression
         </button>
-        <button class="btn btn-primary" (click)="onCreateCohort()">
+        <button class="btn btn-primary" (click)="onCreateCohort()" data-testid="cohorts-create">
           <mat-icon>add</mat-icon> Create
         </button>
       </div>
@@ -239,6 +239,7 @@
   <!-- ==================== COHORT CARD TEMPLATE ==================== -->
   <ng-template #cohortCard let-cohorts>
     <article class="card"
+      data-testid="cohort-card" [attr.data-cohort-id]="cohorts['docid']"
       [class.select-mode]="selectMode"
       [class.checked]="isCohortSelected(cohorts['docid'])"
       (click)="onCardClick($event, cohorts)">

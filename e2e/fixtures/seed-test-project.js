@@ -1,0 +1,786 @@
+#!/usr/bin/env node
+/**
+ * seed-test-project.js — stand up the sample queue + fake users/data on `starlabs-test`.
+ *
+ * Adapted from seed-emulator.js, but targets the REAL `starlabs-test` Firebase project
+ * (full complexity: deployed cloud functions, named DBs, real FCM) — NEVER the emulator,
+ * NEVER production. Seeds the exact L3rqCr config (30 stages, 9 variations) from
+ * `sample-queue-config.json`, ~50 fake participants distributed across the 9 variations
+ * mirroring the real journey×cycle mix (see path-generator.js), plus operators/specialists.
+ *
+ * PRODUCTION-SAFE BY CONSTRUCTION:
+ *   - HARD-ABORTS if the resolved project id is production (`fir-sample-aae4a`).
+ *   - Only ever targets `starlabs-test` (override with TEST_PROJECT, prod ids still blocked).
+ *   - ATC collections are denylisted (defence in depth) — never seeded.
+ *   - Every doc + Auth user is tagged with a `testrunid` for clean teardown.
+ *
+ * Auth (no service-account file needs to be hand-supplied):
+ *   - Application Default Credentials — run `gcloud auth application-default login` once, OR
+ *   - GOOGLE_APPLICATION_CREDENTIALS=/path/to/starlabs-test-sa.json
+ *
+ * Usage:
+ *   node e2e/fixtures/seed-test-project.js --plan            # dry-run: guards + plan, NO creds needed
+ *   node e2e/fixtures/seed-test-project.js --seed            # create users + data (needs creds)
+ *   node e2e/fixtures/seed-test-project.js --teardown <id>   # delete everything tagged testrunid
+ */
+'use strict';
+const path = require('path');
+const { oracle } = require('../lib/flow-model');
+const { generatePlan } = require('../lib/path-generator');
+const { TEST_PROJECT_ID, assertWritable } = require('../lib/test-project');
+const { buildDoc } = require('../lib/fake-data');
+
+// ---------------------------------------------------------------------------
+// SAFETY GUARD FIRST (before any Firebase dependency) — refuse cleanly anywhere.
+// Allowlist: only the dedicated, disposable test project is writable.
+// ---------------------------------------------------------------------------
+const TEST_PROJECT = TEST_PROJECT_ID;
+const assertNotProduction = assertWritable;
+
+// ATC denylist (the prompt excludes ATC entirely) — never create these collections.
+const ATC_DENY = [/\batc\b/i, /atc_/i, /triple ?atc/i, /queue_atc_generation/i, /atc_alpha/i];
+const isATC = name => ATC_DENY.some(re => re.test(name));
+function assertNoATC(collection) {
+  if (isATC(collection)) {
+    console.error(`🛑 ABORT: attempted to write ATC collection "${collection}" — denied.`);
+    process.exit(3);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Config + plan (pure — no creds)
+// ---------------------------------------------------------------------------
+const cfg = require('./sample-queue-config.json');
+const QUEUE_ID = process.env.QUEUE_ID || 'L3rqCrqDBsshd7HM5YRn'; // the real L3rqCr docid
+// SECOND queue: same config, but the test operator (admin) is NOT in its `queueadmin`.
+// OP-02b asserts the operator's queue dropdown shows queue 1 and is ABSENT of this one
+// (the `queueadmin` not-array / visibility bug, PLAN risk #7). Filtered by `queueadmin
+// array-contains profileid` (dynamic-queue-manager-clone.ts:1546) + index §C.
+const QUEUE_ID_2 = process.env.QUEUE_ID_2 || 'Z9negVis0OP02bQUEUE2'; // operator-excluded queue
+const TOTAL_PARTICIPANTS = Number(process.env.TOTAL_PARTICIPANTS || 50);
+
+// The named-DB id for the two forms collections (delivery forms / formsByClient). The app
+// reaches them via getFirestore("firestore-forms") (dynamic-studio.component.ts:758,1652);
+// firebase.test.json provisions this database for the test project (schemas.md §0.6).
+const FORMS_DB = 'firestore-forms';
+
+// Reference-data doc ids the seeded refs point at. These docs are seeded into the EMULATOR by
+// firestore-seed.json; on the CLOUD test project they may not exist, but the app only DEREFS
+// the ones it actually reads (a missing ref still stores fine — Firestore refs are just paths).
+// Keep these ids in sync with firestore-seed.json so emulator runs resolve the refs (coordinated
+// with the emulator seeder, task #13). The `_ph` ids are harmless placeholders never dereferenced.
+const REF_IDS = {
+  'products': 'prod-test-1',
+  'package': 'pkg-test-1',
+  'event collection': 'event-test-1',
+  'solar voice playlist': 'svp-test-1',
+  'journey': 'journey-test-1',
+  'eiflix workshop': 'eiflix-ws-ph',          // placeholder — app never derefs in test
+  'journeyproductpurchase': 'jpp-ph',
+  'salesleads': 'lead-test-1',
+  'deliverables': 'delv-test-1',
+};
+
+function newTestRunId() {
+  const d = new Date();
+  const stamp = d.toISOString().replace(/[-:T]/g, '').slice(0, 14);
+  return `tr_${stamp}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Build the fake STAFF roster (operators/admins, specialists, BIG providers) for a run.
+ * Each carries a profileid for the auth chain (user_data -> profile_data -> users_roles).
+ * Exported so the per-variation seed builders (fixtures/variation-seeds/*) seed the SAME
+ * staff with the SAME email convention `actors.ts` logs in with — never duplicate this list.
+ * @param {string} testrunid
+ * @returns {{operators:object[], specialists:object[], bigProviders:object[], staff:object[]}}
+ */
+function makeStaff(testrunid) {
+  const mk = (kind, i, roles) => ({
+    uid: `${testrunid}_${kind}_${i}`,
+    profileid: `${testrunid}_pf_${kind}_${i}`,
+    email: `${kind}${i}+${testrunid}@example.com`,
+    role: kind,
+    roles, // users_roles booleans to set true
+  });
+  const operators = [
+    { ...mk('admin', 0, ['admin']), email: `admin+${testrunid}@example.com` },
+    { ...mk('mentor', 0, ['admin', 'eventcoordinator']), email: `mentor+${testrunid}@example.com` },
+  ];
+  const specialists = Array.from({ length: 10 }, (_, i) => mk('specialist', i, ['admin', 'changeagent']));
+  const bigProviders = Array.from({ length: 4 }, (_, i) => mk('big', i, ['admin', 'eventcoordinator']));
+  const staff = [...operators, ...specialists, ...bigProviders];
+  return { operators, specialists, bigProviders, staff };
+}
+
+/** Build the full seed plan: oracle verdict + per-variation paths + participant roster. */
+function planSeed(testrunid) {
+  const verdict = oracle(cfg);
+  const plan = generatePlan(cfg, TOTAL_PARTICIPANTS);
+
+  const { operators, specialists, bigProviders, staff } = makeStaff(testrunid);
+
+  const participants = [];
+  let n = 0;
+  for (const v of plan.variations) {
+    for (let k = 0; k < v.participants; k++) {
+      const idx = n++;
+      participants.push({
+        uid: `${testrunid}_p_${idx}`,
+        profileid: `${testrunid}_profile_${idx}`,
+        email: `participant${idx}+${testrunid}@example.com`,
+        variationid: v.id,
+        variationname: v.variationname,
+        firststage: v.backbone[0] || cfg.stages[0],
+      });
+    }
+  }
+  return { verdict, plan, operators, specialists, bigProviders, staff, participants };
+}
+
+// Routes the e2e drives in the real Angular app, each needs a `dashboard` route-config doc
+// granting access (by role and by the staff profileids). cleanUrl = '/' + path.
+const DRIVEN_ROUTES = [
+  { route: '/dynamicqueuemanager', label: 'Queue Manager' },
+  { route: '/queuebigplanner', label: 'Queue BIG Planner' },
+  { route: '/dynamicstudio', label: 'Dynamic Studio' },
+  { route: '/arenastudioactivity', label: 'Arena Studio Activity' },
+  { route: '/big-dashboard', label: 'BIG Dashboard' },
+  { route: '/particiant_assignment_board', label: 'Participant Assignment Board' },
+  { route: '/bigcohorts', label: 'BIG Cohorts' },
+  { route: '/EISDashboard', label: 'EIS Dashboard' },
+  // Every other screen a spec navigates to. The authGuard matches by the FIRST path segment only
+  // ('/' + state.url.split('?')[0].split('/')[1], auth.guard.ts:35), so dynamic routes like /joinroom/:id
+  // are granted by their base '/joinroom', and the queue-creation-v3 authoring STEPPER is a dialog within
+  // /queuelist (no own route). Without a `dashboard` doc per screen the guard shows "No roles or profiles
+  // configured for screen: X" and redirects to root — this was the root cause of OP-02 and most BIG cases.
+  { route: '/queuelist', label: 'Queue List' },
+  { route: '/manualassignment', label: 'Manual Assignment' },
+  { route: '/formbasedsubmission', label: 'Form Based Submission' },
+  { route: '/validateParticipantAssignments', label: 'Validate Participant Assignments' },
+  { route: '/bigactivity', label: 'BIG Activity' },
+  { route: '/biglevel', label: 'BIG Level' },
+  { route: '/modellevelconfig', label: 'ATC Model Level Config' },
+  { route: '/arena_space', label: 'Arena Space' },
+  { route: '/big_aggregate', label: 'BIG Aggregate' },
+  { route: '/bigaggregateeventlevel', label: 'BIG Aggregate Event Level' },
+  { route: '/bigactivitymonitor', label: 'BIG Activity Monitor' },
+  { route: '/bigactivitylog', label: 'BIG Activity Log' },
+  { route: '/bigProfile', label: 'BIG Profile' },
+  { route: '/zoommeeting_bigparticipants', label: 'Zoom Meeting (BIG)' },
+  { route: '/joinroom', label: 'Join Room (OpenVidu)' },
+  { route: '/web-studio-invitation', label: 'Web Studio Invitation' },
+];
+
+// ---------------------------------------------------------------------------
+// --plan : print guards + plan, NO credentials required
+// ---------------------------------------------------------------------------
+function runPlan() {
+  console.log('── seed plan (dry-run, no writes) ──────────────────────────────');
+  console.log(`target project : ${TEST_PROJECT}`);
+  assertNotProduction(TEST_PROJECT);
+  console.log('prod guard     : ✓ passed (not production)');
+
+  const testrunid = process.env.TESTRUNID || newTestRunId();
+  const { verdict, plan, operators, specialists, participants } = planSeed(testrunid);
+
+  console.log(`testrunid      : ${testrunid}`);
+  console.log(`queue          : ${QUEUE_ID}  (${cfg.stages.length} stages, ${cfg.queuevariation.length} variations)`);
+  console.log('\nstatic oracle  :', verdict.ok ? '✓ clean' : '⚠ issues (matches validated spec §8):');
+  verdict.issues.forEach(i => console.log('   •', i));
+  console.log('\nusers          :', `${operators.length} operators, ${specialists.length} specialists, ${participants.length} participants`);
+  console.log('coverage       :', `${plan.summary.coveredEdges}/${plan.summary.totalEdges} edges, ${plan.summary.totalPaths} paths`);
+  console.log('\ndistribution (mirrors production journey×cycle mix):');
+  plan.variations.forEach(v => console.log(
+    `   ${String(v.participants).padStart(2)}p · ${v.variationname.padEnd(22)} edges ${v.covered}/${v.edgeCount}`,
+  ));
+
+  // Collections the --seed pass writes (the full no-scopecut feature surface). Grouped by DB.
+  const studioCohort = Math.min(3, participants.length);
+  console.log('\ncollections    : (default DB)');
+  console.log('   queue generation×2 (queue 1 + operator-excluded queue 2 for OP-02b)');
+  console.log(`   queue variation×${cfg.queuevariation.length + 1}, queue_token×${participants.length}, queue planning×${cfg.queuevariation.length}`);
+  console.log('   profile_data, participantjourneyproduct, participantsproduct (per participant)');
+  console.log(`   participant mode checklist×${participants.length}, participantvideoask×${participants.length}`);
+  console.log(`   queue studio pairing×1, studioinvitation×${studioCohort}, live assignment×${studioCohort}, arena participant×${studioCohort}`);
+  console.log('   modes×5, journey×1, arenavideoask×1');
+  console.log('   user_data, users_roles, dashboard (staff auth chain + route grants)');
+  console.log('                 (firestore-forms named DB)');
+  console.log('   delivery forms×1, formsByClient×2  (SS-07 positive lower-bound, forms half)');
+  console.log('   NOTE: NO ATC collections — firestore-atc is off-limits & not provisioned (SS-07 ATC reads 0 by design).');
+
+  console.log('\nnext: `--seed` (needs ADC or GOOGLE_APPLICATION_CREDENTIALS for', TEST_PROJECT + ')');
+  console.log('────────────────────────────────────────────────────────────────');
+}
+
+// ---------------------------------------------------------------------------
+// Lazy Firebase Admin init (only when actually writing)
+// ---------------------------------------------------------------------------
+function initAdmin() {
+  assertNotProduction(TEST_PROJECT);
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) {
+    // Uses ADC or GOOGLE_APPLICATION_CREDENTIALS; projectId pins the target explicitly.
+    admin.initializeApp({ projectId: TEST_PROJECT });
+  }
+  const resolved = admin.app().options.projectId || TEST_PROJECT;
+  assertNotProduction(resolved); // belt-and-suspenders after init
+  return admin;
+}
+
+const TAG = testrunid => ({ testrunid, _testdata: true });
+
+/** Stable doc-id for the queue-generation doc of a run (the variation builders share this). */
+const queueGenDocId = testrunid => `${testrunid}_${QUEUE_ID}`;
+/** Stable doc-id for the SECOND (operator-excluded) queue's generation doc. */
+const queueGenDocId2 = testrunid => `${testrunid}_${QUEUE_ID_2}`;
+/** Stable doc-id for a queue_token, keyed by participant profileid. */
+const tokenDocId = (testrunid, profileid) => `${testrunid}_tok_${profileid}`;
+
+/**
+ * The firestore-forms named-DB handle. Memoized per process. Uses the MODULAR
+ * `getFirestore(app, databaseId)` (firebase-admin/firestore, ≥11.x) — the namespaced
+ * `admin.firestore()` does NOT take a databaseId, so a named DB is only reachable via the
+ * modular accessor. App reaches the same DB via getFirestore("firestore-forms") in-app (§0.6).
+ */
+let _formsDb = null;
+function getFormsDb(admin) {
+  if (!_formsDb) {
+    const { getFirestore } = require('firebase-admin/firestore');
+    _formsDb = getFirestore(admin.app(), FORMS_DB);
+  }
+  return _formsDb;
+}
+
+/**
+ * Build the generator `ctx` the fake-data.buildDoc factory consumes. Wires the §0 invariant
+ * helpers: queueref-as-ref (default DB), queueref-as-ref (firestore-forms DB), token refs in
+ * both DBs, and `refFor` → reference-data ids (REF_IDS). The seeder spreads collection-specific
+ * fields (docid, profileid, …) onto the returned object before calling buildDoc.
+ * @param {object} admin firebase-admin
+ * @param {object} db    admin.firestore() (default DB)
+ * @param {string} testrunid
+ * @param {string} [queueDocId] the queue this doc is scoped to (defaults to queue 1)
+ */
+function makeCtx(admin, db, testrunid, queueDocId) {
+  const T = admin.firestore.Timestamp;
+  const qid = queueDocId || queueGenDocId(testrunid);
+  const formsDb = getFormsDb(admin);
+  return {
+    testrunid,
+    queueDocId: qid,
+    now: () => T.now(),
+    future: () => T.fromMillis(Date.now() + 30 * 86400e3),
+    past: () => T.fromMillis(Date.now() - 7 * 86400e3),
+    geopoint: () => new admin.firestore.GeoPoint(0, 0),
+    // queueref §0.2 — a DocumentReference into `queue generation` (default DB).
+    queueGenRef: (q) => db.collection('queue generation').doc(q || qid),
+    // formsByClient.queueref is a ref created with the firestore-forms handle (named-DB caveat).
+    queueGenRefForms: (q) => formsDb.collection('queue generation').doc(q || qid),
+    tokenRef: (tok) => db.collection('queue_token').doc(tok),
+    tokenRefForms: (tok) => formsDb.collection('queue_token').doc(tok),
+    // out-of-scope reference collections → seeded ids (REF_IDS) or a harmless placeholder.
+    refFor: (col) => db.collection(col).doc(REF_IDS[col] || `${col.replace(/\W+/g, '_')}_ph`),
+  };
+}
+
+/**
+ * Seed the STAFF auth chain (Auth user + user_data + profile_data + users_roles) and the
+ * `dashboard` route-config so staff can log in and pass the route guard. Idempotent.
+ * Reused verbatim by the per-variation seed builders so their specs can `loginAs` the SAME
+ * operator/specialist/BIG emails `actors.ts` expects. Participants get only an Auth user here
+ * (their profile_data/token are written per-token by `seedParticipantToken`).
+ * @param {object} db   admin.firestore()
+ * @param {object} auth admin.auth()
+ * @param {string} testrunid
+ * @param {{staff:object[], operators:object[], participants?:object[]}} roster
+ */
+async function seedAuthChain(db, auth, testrunid, roster) {
+  const { staff, participants = [] } = roster;
+
+  // Auth users for everyone (staff + any participants), all @example.com, tagged.
+  for (const u of [...staff, ...participants]) {
+    await auth.createUser({ uid: u.uid, email: u.email, password: 'Test!1234', displayName: u.email })
+      .catch(async e => { if (e.code === 'auth/uid-already-exists') return; throw e; });
+    await auth.setCustomUserClaims(u.uid, { testrunid, role: u.role || 'participant' });
+  }
+
+  // AUTH CHAIN for STAFF: user_data/{uid} <- profile_data.user_ref ; profile_data.role_ref -> users_roles/{id}
+  // (login needs profile_data by email + non-null number + valid role_ref; guard needs roles/profileid)
+  for (const s of staff) {
+    const roleId = `${testrunid}_role_${s.uid}`;
+    const userDataRef = db.collection('user_data').doc(s.uid);
+    const profileRef = db.collection('profile_data').doc(s.profileid);
+    const roleRef = db.collection('users_roles').doc(roleId);
+    await userDataRef.set({ name: s.email, email: s.email, number: '9999900000', ...TAG(testrunid) });
+    const roleFlags = {}; (s.roles || ['admin']).forEach(r => { roleFlags[r] = true; });
+    await roleRef.set({ id: roleId, name: s.email, participant: false, profile_ref: profileRef, ...roleFlags, ...TAG(testrunid) });
+    await profileRef.set({
+      profileid: s.profileid, email: s.email.toLowerCase(), name: s.email,
+      number: '9999900000', countrycode: '+91',
+      user_ref: userDataRef, role_ref: roleRef, ...TAG(testrunid),
+    });
+  }
+
+  // dashboard route-config: grant every driven route to the staff roles + profileids.
+  const staffProfileIds = staff.map(s => s.profileid);
+  const allRoles = [...new Set(staff.flatMap(s => s.roles || ['admin']))];
+  for (const r of DRIVEN_ROUTES) {
+    await db.collection('dashboard').doc(`${testrunid}_dash_${r.route.replace(/\W+/g, '_')}`).set({
+      route: r.route, label: r.label, roles: allRoles, profileid: staffProfileIds,
+      showInSidenav: true, order: 0, children: [], ...TAG(testrunid),
+    });
+  }
+}
+
+/**
+ * Seed `queue generation` + the requested `queue variation` docs (exact L3rqCr config from
+ * sample-queue-config.json). Two-pass so the queue's `queuevariation` ref-array resolves.
+ * Reused by the per-variation builders, which pass only the ONE variation id they exercise
+ * (the board fetches a token's variation by `getDoc(doc('queue variation', token.variationid))`,
+ * so only that variation's doc must exist for the spec under test). Idempotent.
+ * @param {object} db admin.firestore()
+ * @param {object} admin firebase-admin (for Timestamp)
+ * @param {string} testrunid
+ * @param {object} operators makeStaff().operators (for queueadmin/queuementor profileids)
+ * @param {{variationIds?:string[]}} [opts] subset of variation ids to seed (default: all 9)
+ * @returns {{queueGenRef:object, varRefs:object[]}}
+ */
+async function seedQueueAndVariations(db, admin, testrunid, operators, opts = {}) {
+  const T = admin.firestore.Timestamp;
+  const ts = () => T.now();
+  const past = T.fromMillis(Date.now() - 7 * 86400e3);   // queue already started
+  const future = T.fromMillis(Date.now() + 30 * 86400e3); // registration/end open
+
+  const wanted = opts.variationIds
+    ? cfg.queuevariation.filter(v => opts.variationIds.includes(v.id))
+    : cfg.queuevariation;
+
+  const queueGenRef = db.collection('queue generation').doc(queueGenDocId(testrunid));
+  const varRefs = [];
+  for (const v of wanted) {
+    const vref = db.collection('queue variation').doc(`${testrunid}_${v.id}`);
+    // board queries `queue variation` by queueref (dynamic-queue-manager-clone.ts:1814)
+    // every app doc stores its own id as `docid` (app-wide convention) — required by the board
+    await vref.set({ docid: vref.id, variationname: v.variationname, stages: v.stages, atcmodel: null, queueref: queueGenRef, ...TAG(testrunid) });
+    varRefs.push(vref);
+  }
+  await queueGenRef.set({
+    docid: queueGenDocId(testrunid),
+    queuename: `TEST ${cfg.stages.length}-stage L3rqCr`,
+    // queueadmin/queuementor hold PROFILEIDs, NOT auth uids: the board filters non-admins by
+    // `this.profileid = roles.profile_ref.id` (:1531) via `array-contains` (:1546), and the prod
+    // creation form stores `profile.id == profile_ref.id` into both fields (queue-creation-v3 html:62/44).
+    queueadmin: operators.filter(o => o.role === 'admin').map(o => o.profileid),
+    queuementor: operators.filter(o => o.role === 'mentor').map(o => o.profileid),
+    stages: cfg.stages,
+    stageproperty: cfg.stageproperty,
+    queuevariation: varRefs,
+    zoomlinkrequired: true,
+    iscommunicationsdisabled: true, // externals stubbed — no real comms in test
+    queuestartdate: past, queueenddate: future, lastregistrationdate: future,
+    created: ts(), modified: ts(),
+    ...TAG(testrunid),
+  });
+  return { queueGenRef, varRefs };
+}
+
+/**
+ * Seed ONE participant's preconditions at a given stage: profile_data + participantjourneyproduct
+ * + participantsproduct + queue_token. The token is the heart of the board (currentstage bucketing).
+ * This is a PRECONDITION write only — specs assert the value the APP/CF computes after a move,
+ * never this seeded value (anti-circularity). Idempotent (overwrites by deterministic doc ids).
+ * @param {object} db admin.firestore()
+ * @param {object} admin firebase-admin (for Timestamp)
+ * @param {string} testrunid
+ * @param {object} p {profileid, email, variationid, stage, queueposition}
+ * @param {object} queueRef the `queue generation` DocumentReference (queueref §0.2)
+ * @returns {string} the queue_token doc id
+ */
+async function seedParticipantToken(db, admin, testrunid, p, queueRef) {
+  const ts = () => admin.firestore.Timestamp.now();
+  await db.collection('profile_data').doc(p.profileid).set({
+    docid: p.profileid, profileid: p.profileid, email: p.email, name: p.email,
+    number: '9999900000', countrycode: '+91', ...TAG(testrunid),
+  });
+  await db.collection('participantjourneyproduct').doc(`${testrunid}_pjp_${p.profileid}`).set({
+    profileid: p.profileid, journeyref: null, purchasedate: ts(), ...TAG(testrunid),
+  });
+  await db.collection('participantsproduct').doc(`${testrunid}_pp_${p.profileid}`).set({
+    profileid: p.profileid, mode: null, ...TAG(testrunid),
+  });
+  const id = tokenDocId(testrunid, p.profileid);
+  // queue_token = participant state; seeded at `p.stage` (the variation's first stage). The CF/app
+  // advances it; the spec reads the resulting currentstage/stage-log — never this seeded value.
+  await db.collection('queue_token').doc(id).set({
+    docid: id,
+    profile_id: p.profileid, profile_name: p.email, queueref: queueRef, variationid: p.variationid,
+    currentstage: p.stage, previousstage: null, status: 'queued', stagestatus: 'Yet to Start',
+    tokenstatus: 'Active', tokennumber: p.queueposition, delete: false, // board counts tokenstatus==='Active' & !delete
+    queueposition: p.queueposition, people_involved: [],
+    liveassignmentid: null, manuallymoved: false,
+    createdon: ts(), logdate: ts(), updatedAt: ts(), ...TAG(testrunid),
+  });
+  return id;
+}
+
+// ---------------------------------------------------------------------------
+// Feature-collection seeders (the no-scopecut expansion). Each builds its body via
+// fake-data.buildDoc(collection, ctx) so the field SHAPE is owned in ONE place (lib/fake-data.js)
+// and the emulator seeder mirrors it exactly (coordination, task #13). All idempotent: written
+// at deterministic doc ids and tagged with testrunid/_testdata for teardown.
+// ---------------------------------------------------------------------------
+
+/**
+ * Reference data with NO per-participant dependency: `journey`, `modes`, `arenavideoask`,
+ * `delivery forms` (named DB). Seeded once per run, tagged for teardown. `delivery forms`
+ * templates are referenced by `formsByClient.formid` (the SS-07 forms fixture) and by stage
+ * `actionresource` refs; `modes` drives the ordered mode list; `arenavideoask` is the Video-Ask
+ * question template (orderBy('title')). Returns the ids other seeders reference.
+ * @returns {{deliveryFormId:string, arenaVideoAskId:string}}
+ */
+async function seedReferenceData(db, admin, testrunid) {
+  const ctx = makeCtx(admin, db, testrunid);
+  const formsDb = getFormsDb(admin);
+
+  // modes — the 5 production modes, ordered (sequence REQUIRED for orderBy).
+  const MODES = ['Priority', 'Event Mode', 'Installation Event', 'Big', 'Investment'];
+  for (let i = 0; i < MODES.length; i++) {
+    const docid = `${testrunid}_mode_${i}`;
+    await db.collection('modes').doc(docid).set(buildDoc('modes', { ...ctx, docid, mode: MODES[i], sequence: i + 1 }));
+  }
+
+  // journey — one catalog entry (uses `id`, not `docid`); participantjourneyproduct.journeyref → here.
+  const journeyId = `${testrunid}_journey_0`;
+  await db.collection('journey').doc(journeyId).set(buildDoc('journey', {
+    ...ctx, id: journeyId, journey: 'TEST Journey', sequence: 1, originalfee: 1000,
+  }));
+
+  // arenavideoask — one Video-Ask question template (the "Video Ask" stage actionresource).
+  const arenaVideoAskId = `${testrunid}_ava_0`;
+  await db.collection('arenavideoask').doc(arenaVideoAskId).set(buildDoc('arenavideoask', {
+    ...ctx, docid: arenaVideoAskId, title: `TEST Video Ask ${testrunid}`,
+  }));
+
+  // delivery forms — one FORM TEMPLATE in the named DB. Referenced by formsByClient.formid.
+  const deliveryFormId = `${testrunid}_form_0`;
+  await formsDb.collection('delivery forms').doc(deliveryFormId).set(buildDoc('delivery forms', {
+    ...ctx, docid: deliveryFormId, formname: `TEST Delivery Form ${testrunid}`,
+  }));
+
+  return { deliveryFormId, arenaVideoAskId };
+}
+
+/**
+ * Per-participant feature docs: `participant mode checklist`, `participantvideoask`, and a
+ * minimal `queue planning` row for the participant's variation. Preconditions only.
+ * @param {object} p {profileid, variationid}
+ * @param {{arenaVideoAskId:string}} ref ids from seedReferenceData
+ */
+async function seedParticipantFeatureDocs(db, admin, testrunid, p, ref) {
+  const ctx = makeCtx(admin, db, testrunid);
+
+  const checklistId = `${testrunid}_pmc_${p.profileid}`;
+  await db.collection('participant mode checklist').doc(checklistId).set(buildDoc('participant mode checklist', {
+    ...ctx, docid: checklistId, profileid: p.profileid, mode: 'Event Mode',
+  }));
+
+  const videoAskId = `${testrunid}_pva_${p.profileid}`;
+  await db.collection('participantvideoask').doc(videoAskId).set(buildDoc('participantvideoask', {
+    ...ctx, docid: videoAskId, profileid: p.profileid, videoaskid: ref.arenaVideoAskId,
+  }));
+}
+
+/**
+ * One `queue planning` row per variation under test (slot/segment plan). Most variations don't
+ * need it (only stages with planned slots read it), so we seed it minimally per variation id so
+ * the doc exists if a spec dereferences a `queueplanid`. Idempotent by variation id.
+ * @param {string[]} variationIds
+ */
+async function seedQueuePlanning(db, admin, testrunid, variationIds) {
+  const ctx = makeCtx(admin, db, testrunid);
+  for (const variationId of variationIds) {
+    const docid = `${testrunid}_plan_${variationId}`;
+    await db.collection('queue planning').doc(docid).set(buildDoc('queue planning', {
+      ...ctx, docid, variationId,
+    }));
+  }
+}
+
+/**
+ * Studio/arena flow PRECONDITIONS for a small set of participants (the studio specs drive a few
+ * tokens into a room — they don't need all 50). Seeds: `queue studio pairing` (the room, surfaced
+ * on the board with studioin+checkin true), `studioinvitation` (a pending invite, future expiry),
+ * `live assignment` (a live session record, queueid as STRING), `arena participant` (enrolment).
+ * These stand in for state the app/CF would otherwise create; specs assert the app-computed
+ * end-state (token↔live-assignment↔pairing triangle, SS-06), never these seeded values directly.
+ * @param {object[]} cohort up to N participants {profileid, variationid}
+ */
+async function seedStudioFlowPreconditions(db, admin, testrunid, cohort, opts = {}) {
+  const ctx = makeCtx(admin, db, testrunid);
+  const studioId = `${testrunid}_studio_0`;
+  const stagename = 'Diagnostics'; // the studio engine stage (enablezoom; flow-config §V1 row 9)
+  const profileids = cohort.map(p => p.profileid);
+  // The dynamic-studio screen surfaces a pairing only when the LOGGED-IN SPECIALIST'S profileid is in
+  // `participants` (where('participants','array-contains',specialist.profileid), dynamic-studio.ts:314) AND
+  // its `queueref` is an ongoing queue (where('queueref','in',...), :315). So the room must include the
+  // specialist(s) the studio specs log in as — not only the cohort — and carry the run1 queue ref.
+  const { specialistProfileids = [], queueDocId } = opts;
+  const roomMembers = [...new Set([...specialistProfileids, ...profileids])];
+
+  // one room holding the specialist(s) + the cohort, scoped to the run1 queue
+  const pairingId = `${testrunid}_pair_0`;
+  await db.collection('queue studio pairing').doc(pairingId).set(buildDoc('queue studio pairing', {
+    ...ctx, docid: pairingId, queueDocId, participants: roomMembers, studioin: true, checkin: true,
+  }));
+
+  // per-participant: a pending invitation + a live-assignment + arena enrolment
+  for (const p of cohort) {
+    const tok = tokenDocId(testrunid, p.profileid);
+
+    const invId = `${testrunid}_inv_${p.profileid}`;
+    await db.collection('studioinvitation').doc(invId).set(buildDoc('studioinvitation', {
+      ...ctx, docid: invId, studioId, tokenDocId: tok, profileid: p.profileid,
+      stage: stagename, invitedstudio: [studioId], specialistpairing: [],
+    }));
+
+    const laId = `${testrunid}_la_${p.profileid}`;
+    await db.collection('live assignment').doc(laId).set(buildDoc('live assignment', {
+      ...ctx, docid: laId, studioId, stagename, participantid: p.profileid,
+      status: 'live', pairing: profileids,
+    }));
+
+    const apId = `${testrunid}_arena_${p.profileid}`;
+    await db.collection('arena participant').doc(apId).set(buildDoc('arena participant', {
+      ...ctx, docid: apId, profileid: p.profileid,
+    }));
+  }
+  return { studioId };
+}
+
+/**
+ * SS-07 POSITIVE LOWER-BOUND fixture (forms half). Seeds a KNOWN non-zero count of submitted
+ * forms (`formsByClient`, named DB firestore-forms) for one participant, so the studio "Forms
+ * submitted by the Participant" widget shows that EXACT non-zero number. This catches the
+ * secondary-DB-empty failure mode (if the firestore-forms handle fails to init, the widget reads
+ * 0 and a parity-with-also-empty-read still passes — PLAN P1 #7 / studio.md SS-07 anti-circularity).
+ *
+ * ATC NOTE (hard constraint): the SS-07 ATC widgets (triple-ATC, alpha/validation ATC) read the
+ * `firestore-atc` database — which is OFF-LIMITS (CLAUDE.md) and is NOT provisioned for the test
+ * project (firebase.test.json has only `(default)` + `firestore-forms`). We therefore seed NO ATC
+ * docs. The ATC widgets will read 0 in test by design; SS-07's positive lower-bound is asserted on
+ * the FORMS count (the in-scope cross-DB widget). See IMPL_SCHEMA "SS-07 / ATC" for the contract.
+ *
+ * @param {object} p the participant whose token the forms attach to {profileid}
+ * @param {string} deliveryFormId the `delivery forms` template id (from seedReferenceData)
+ * @param {number} [count=2] how many submitted forms to seed (the asserted lower bound)
+ * @returns {{profileid:string, formCount:number}}
+ */
+async function seedFormsFixture(db, admin, testrunid, p, deliveryFormId, count = 2) {
+  const formsDb = getFormsDb(admin);
+  const ctx = makeCtx(admin, db, testrunid);
+  const tok = tokenDocId(testrunid, p.profileid);
+  const stagename = 'Diagnostics';
+  for (let i = 0; i < count; i++) {
+    const docid = `${testrunid}_fbc_${p.profileid}_${i}`;
+    await formsDb.collection('formsByClient').doc(docid).set(buildDoc('formsByClient', {
+      ...ctx, docid, formid: deliveryFormId, profileid: p.profileid,
+      stagename, tokenDocId: tok,
+    }));
+  }
+  return { profileid: p.profileid, formCount: count };
+}
+
+/**
+ * SECOND queue for OP-02b (negative visibility). Same config, but `queueadmin` does NOT include
+ * any test operator's profileid — it lists a DIFFERENT (decoy) admin profileid. `queueadmin` is a
+ * proper ARRAY (§A; the board filters `array-contains profileid`, :1546). The non-admin operator's
+ * dropdown must show queue 1 and be ABSENT of this queue. Reuses seedQueueAndVariations' write shape
+ * but pins a distinct docid + queueadmin so both queues coexist for the same run. Idempotent.
+ * @returns {{queueGenRef2:object, decoyAdminProfileId:string}}
+ */
+async function seedSecondQueue(db, admin, testrunid) {
+  const T = admin.firestore.Timestamp;
+  const ts = () => T.now();
+  const past = T.fromMillis(Date.now() - 7 * 86400e3);
+  const future = T.fromMillis(Date.now() + 30 * 86400e3);
+  const decoyAdminProfileId = `${testrunid}_pf_admin_DECOY`; // a profileid NO seeded operator has — excludes the test op
+
+  const queueGenRef2 = db.collection('queue generation').doc(queueGenDocId2(testrunid));
+  // seed the LYL-FC variation for queue 2 so it is a valid (selectable-by-its-own-admin) queue.
+  const v = cfg.queuevariation[0];
+  const vref = db.collection('queue variation').doc(`${testrunid}_q2_${v.id}`);
+  await vref.set({ docid: vref.id, variationname: v.variationname, stages: v.stages, atcmodel: null, queueref: queueGenRef2, ...TAG(testrunid) });
+  await queueGenRef2.set({
+    docid: queueGenDocId2(testrunid),
+    queuename: `TEST Q2 (operator-excluded) ${testrunid}`,
+    queueadmin: [decoyAdminProfileId],   // ARRAY, but WITHOUT any test operator's profileid (the negative case)
+    queuementor: [decoyAdminProfileId],
+    stages: cfg.stages,
+    stageproperty: cfg.stageproperty,
+    queuevariation: [vref],
+    zoomlinkrequired: true,
+    iscommunicationsdisabled: true,
+    queuestartdate: past, queueenddate: future, lastregistrationdate: future,
+    created: ts(), modified: ts(),
+    ...TAG(testrunid),
+  });
+  return { queueGenRef2, decoyAdminProfileId };
+}
+
+async function runSeed() {
+  const testrunid = process.env.TESTRUNID || newTestRunId();
+  const admin = initAdmin();
+  const db = admin.firestore();
+  const auth = admin.auth();
+  const { verdict, plan, operators, specialists, bigProviders, staff, participants } = planSeed(testrunid);
+
+  console.log(`🌱 seeding ${TEST_PROJECT}  testrunid=${testrunid}`);
+  if (!verdict.ok) console.log('   (note: config has known oracle issues — see validated spec §8):', verdict.issues.join('; '));
+
+  // 1. Auth + chain + dashboard route-config (staff log in; participants get Auth users).
+  await seedAuthChain(db, auth, testrunid, { staff, operators, participants });
+  console.log(`   ✓ ${staff.length + participants.length} auth users + auth chain for ${staff.length} staff + ${DRIVEN_ROUTES.length} dashboard routes`);
+
+  // 2. The sample queue: `queue generation` + all 9 `queue variation` docs (exact L3rqCr config).
+  const { queueGenRef, varRefs } = await seedQueueAndVariations(db, admin, testrunid, operators);
+  console.log(`   ✓ queue generation + ${varRefs.length} queue variation docs`);
+
+  // 2b. SECOND queue — operator NOT in queueadmin (OP-02b negative visibility).
+  await seedSecondQueue(db, admin, testrunid);
+  console.log('   ✓ second queue (operator-excluded, for OP-02b)');
+
+  // 3. Reference data (no per-participant dep): modes, journey, arenavideoask, delivery forms (named DB).
+  const ref = await seedReferenceData(db, admin, testrunid);
+  console.log('   ✓ reference data (modes, journey, arenavideoask, delivery forms)');
+
+  // 3b. queue planning — one row per variation (slot/segment plan; minimal).
+  await seedQueuePlanning(db, admin, testrunid, cfg.queuevariation.map(v => v.id));
+  console.log(`   ✓ queue planning (${cfg.queuevariation.length} variation rows)`);
+
+  // 4. Per-participant: token + journey/product, then feature docs (mode checklist, videoask).
+  let pos = 0;
+  for (const p of participants) {
+    await seedParticipantToken(db, admin, testrunid,
+      { profileid: p.profileid, email: p.email, variationid: p.variationid, stage: p.firststage, queueposition: ++pos },
+      queueGenRef);
+    await seedParticipantFeatureDocs(db, admin, testrunid, p, ref);
+  }
+  console.log(`   ✓ ${participants.length} participants (token + mode checklist + participantvideoask)`);
+
+  // 5. Studio/arena flow preconditions for a small cohort (studio specs drive a few tokens).
+  const studioCohort = participants.slice(0, Math.min(3, participants.length));
+  if (studioCohort.length) {
+    await seedStudioFlowPreconditions(db, admin, testrunid, studioCohort, {
+      specialistProfileids: [0, 1, 2].map((i) => `${testrunid}_pf_specialist_${i}`),
+      queueDocId: queueGenRef.id,
+    });
+    console.log(`   ✓ studio preconditions (pairing[+specialists] + invitation + live assignment + arena) for ${studioCohort.length}`);
+  }
+
+  // 6. SS-07 positive lower-bound: KNOWN non-zero forms count (named DB) for the first participant.
+  if (studioCohort.length) {
+    const { profileid, formCount } = await seedFormsFixture(db, admin, testrunid, studioCohort[0], ref.deliveryFormId, 2);
+    console.log(`   ✓ SS-07 forms fixture: ${formCount} formsByClient docs for ${profileid} (firestore-forms)`);
+    console.log('     (ATC widgets read firestore-atc which is OFF-LIMITS + not provisioned in test — 0 by design)');
+  }
+
+  console.log(`\n✅ seed complete. testrunid=${testrunid}`);
+  console.log(`   teardown: node ${path.relative(process.cwd(), __filename)} --teardown ${testrunid}`);
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
+// --teardown <testrunid> : delete everything tagged with that run id
+// ---------------------------------------------------------------------------
+// Default-DB collections written by this seeder (+ `queue stage log` written by the CF /
+// participant-sim, also testrunid-tagged). Every entry is testrunid-filtered on teardown.
+const SEEDED_COLLECTIONS = [
+  'queue generation', 'queue variation', 'queue_token', 'queue stage log',
+  'queue planning', 'queue studio pairing', 'studioinvitation',
+  'live assignment', 'arena participant',
+  'profile_data', 'participantjourneyproduct', 'participantsproduct',
+  'participant mode checklist', 'participantvideoask',
+  'arenavideoask', 'modes', 'journey',
+  'user_data', 'users_roles', 'dashboard',
+];
+// Named-DB (firestore-forms) collections — torn down via the firestore-forms handle.
+const SEEDED_COLLECTIONS_FORMS = ['delivery forms', 'formsByClient'];
+
+/** Delete all testrunid-tagged docs in `cols` of `database`, in batches. Returns the count. */
+async function teardownCollections(database, cols, testrunid) {
+  let docs = 0;
+  for (const col of cols) {
+    assertNoATC(col);
+    const snap = await database.collection(col).where('testrunid', '==', testrunid).get();
+    // chunk deletes at 450 (< Firestore's 500/commit cap) for the larger collections.
+    for (let i = 0; i < snap.docs.length; i += 450) {
+      const batch = database.batch();
+      snap.docs.slice(i, i + 450).forEach(d => { batch.delete(d.ref); docs++; });
+      await batch.commit();
+    }
+  }
+  return docs;
+}
+
+async function runTeardown(testrunid) {
+  if (!testrunid) { console.error('teardown requires a testrunid argument'); process.exit(1); }
+  const admin = initAdmin();
+  const db = admin.firestore();
+  const auth = admin.auth();
+  console.log(`🗑️  tearing down testrunid=${testrunid} on ${TEST_PROJECT}`);
+
+  let docs = await teardownCollections(db, SEEDED_COLLECTIONS, testrunid);
+  docs += await teardownCollections(getFormsDb(admin), SEEDED_COLLECTIONS_FORMS, testrunid);
+
+  // Auth users: iterate and delete those whose custom claim matches.
+  let users = 0;
+  let pageToken;
+  do {
+    const list = await auth.listUsers(1000, pageToken);
+    const victims = list.users.filter(u => u.customClaims && u.customClaims.testrunid === testrunid);
+    if (victims.length) { await auth.deleteUsers(victims.map(u => u.uid)); users += victims.length; }
+    pageToken = list.pageToken;
+  } while (pageToken);
+
+  console.log(`   ✓ deleted ${docs} docs, ${users} auth users`);
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------------------
+// Exports — the per-variation seed builders (fixtures/variation-seeds/*) reuse these
+// helpers so they NEVER duplicate the auth-chain / queue / token write logic.
+// ---------------------------------------------------------------------------
+module.exports = {
+  // config + ids
+  cfg, QUEUE_ID, QUEUE_ID_2, FORMS_DB, REF_IDS, DRIVEN_ROUTES, TAG, newTestRunId,
+  queueGenDocId, queueGenDocId2, tokenDocId,
+  // firebase init (allowlist-guarded — only ever the dedicated test project) + named-DB handle
+  initAdmin, getFormsDb, makeCtx,
+  // roster + plan
+  makeStaff, planSeed,
+  // seed primitives — auth/queue/token
+  seedAuthChain, seedQueueAndVariations, seedParticipantToken,
+  // seed primitives — feature collections (no-scopecut expansion)
+  seedReferenceData, seedParticipantFeatureDocs, seedQueuePlanning,
+  seedStudioFlowPreconditions, seedFormsFixture, seedSecondQueue,
+  // teardown helpers
+  teardownCollections, SEEDED_COLLECTIONS, SEEDED_COLLECTIONS_FORMS,
+};
+
+// ---------------------------------------------------------------------------
+// CLI — only when run directly (`node seed-test-project.js …`), never on require().
+// ---------------------------------------------------------------------------
+if (require.main === module) {
+  const [, , mode, arg] = process.argv;
+  (async () => {
+    switch (mode) {
+      case '--plan': return runPlan();
+      case '--seed': return runSeed();
+      case '--teardown': return runTeardown(arg);
+      default:
+        console.log('usage: seed-test-project.js --plan | --seed | --teardown <testrunid>');
+        process.exit(1);
+    }
+  })().catch(e => { console.error('FAILED:', e.message || e); process.exit(1); });
+}

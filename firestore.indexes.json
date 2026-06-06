@@ -2,6 +2,31 @@
   "//": "Composite indexes the Tier-A happy paths need in the emulator. Discovered via read-only probes (e.g. appointments attended+starttime hit FAILED_PRECONDITION). EMULATOR/test use; production indexes are managed separately.",
   "indexes": [
     {
+      "collectionGroup": "queue_token",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "FCM_token",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "device_os", "order": "ASCENDING" },
+        { "fieldPath": "profile_ref", "order": "ASCENDING" },
+        { "fieldPath": "last_modified", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue generation",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueadmin", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "queuename", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "appointments",
       "queryScope": "COLLECTION",
       "fields": [

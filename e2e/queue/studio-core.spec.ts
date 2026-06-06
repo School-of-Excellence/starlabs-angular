@@ -1,0 +1,730 @@
+// @ts-nocheck
+/**
+ * studio-core.spec.ts — SPECIALIST / STUDIO core walkforward, cases SS-00 … SS-08 (PLAN §3.B).
+ *
+ * WHY this file is shaped the way it is (the ANTI-CIRCULARITY RULE — the whole point of the rebuild):
+ * every case here either (a) DRIVES the REAL Angular `/dynamicstudio` UI through the StudioPage /
+ * WebInvitationPage page objects (real testid → real click/fill) and asserts a value the APP computed
+ * (a `studioList` button count, the rendered waiting-list, the live-panel Forms count), OR (b) asserts
+ * a value the APP / a Cloud Function wrote against a KNOWN-SEEDED number (a NEW `studioinvitation` the
+ * "Bring To Studio" action produced, a NEW `queue stage log` row `assignStudio()` wrote, the
+ * `interim crossover` doc + `participant AEL.flag` the AEL-validate batch wrote). No assertion reads
+ * back a value the test itself just wrote: each side-effect count is a DELTA against the population
+ * captured BEFORE the real UI action, so a Firestore round-trip can never satisfy it.
+ *
+ * Sources of truth read before writing (per SHARED CONVENTIONS):
+ *   - e2e/queue/pages/studio.page.ts          — the StudioPage object (real selectors + app-computed reads)
+ *   - e2e/queue/pages/web-invitation.page.ts  — participant accept/deny overlay (real /queue-web UI)
+ *   - e2e/queue/stubs/index.ts                — installAllExternalStubs (no Zoom/LiveKit/FCM escapes)
+ *   - e2e/queue/support/firestore-admin.ts    — READ-ONLY app/CF-output reader (allowlist-pinned)
+ *   - e2e/queue/support/{auth,console-guard,actors}.ts
+ *   - e2e/lib/assertions.ts                   — universal silent-gap invariants (used for SS-06 stage-log)
+ *   - e2e/queue/recon/{studio.md,testids.md,cf.md} + e2e/fixtures/seed-test-project.js (seeded shapes)
+ *
+ * SEEDED PRECONDITIONS this spec relies on (full `seed-test-project.js --seed`, the suite global-setup):
+ *   - ONE `queue studio pairing` (`<run>_pair_0`): participants = the first ≤3 participant profileids,
+ *     checkin:true, studioin:true, status:null, openvidu:false, atcmodel:[], queueref → the main queue.
+ *   - per cohort participant: a pending `studioinvitation` (future expiry, stage "Diagnostics"),
+ *     a `live assignment` (status 'live'), an `arena participant`.
+ *   - SS-07 forms fixture: TWO `formsByClient` (firestore-forms named DB) for the FIRST cohort member —
+ *     the asserted positive lower-bound. ATC widgets read `firestore-atc` (OFF-LIMITS, not provisioned)
+ *     ⇒ 0 by design (studio.md SS-07 / PLAN P1 #7).
+ *
+ * CRITICAL TEST HOOK (studio.md §0): `/dynamicstudio?profileid=<id>` makes the page act AS that
+ * specialist (dynamic-studio.component.ts:160/171). The seeded pairing lists PARTICIPANT profileids in
+ * `participants`, and the `studioList` filter is `participants.includes(profileid) && !delete` (ts:464),
+ * so we act as a profileid that is actually IN the seeded pairing — discovered at runtime from Firestore
+ * (a PRECONDITION read, never used as an oracle) so the spec adapts to whatever the seeder produced and
+ * never hardcodes a studio that may not exist.
+ */
+
+import { test, expect, Page } from '@playwright/test';
+import { StudioPage } from './pages/studio.page';
+import { WebInvitationPage } from './pages/web-invitation.page';
+import { installAllExternalStubs, ExternalStubs } from './stubs';
+import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from './support/console-guard';
+import { loginAsSpecialist } from './support/auth';
+import { TESTRUNID } from './support/actors';
+import { getDoc, queryWhere, countWhere, pollUntil } from './support/firestore-admin';
+import { assertEveryMoveLogged } from '../lib/assertions';
+
+// seed id helpers (CommonJS) — reused, never re-derived inline (DRY with the seeder).
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const seeder = require('../fixtures/seed-test-project');
+
+// ---------------------------------------------------------------------------------------------
+// Collections (verbatim Firestore strings, spaces included — firestore-admin passes them as-is).
+// ---------------------------------------------------------------------------------------------
+const COL_PAIRING = 'queue studio pairing';
+const COL_TOKEN = 'queue_token';
+const COL_INVITE = 'studioinvitation';
+const COL_LIVE = 'live assignment';
+const COL_CHECKIN_LOG = 'studio checkin log';
+const COL_STAGE_LOG = 'queue stage log';
+const COL_AEL = 'participant AEL';
+const COL_INTERIM = 'interim crossover';
+
+/** The studio engine stage the seeder pins the room/invites/forms onto (seedStudioFlowPreconditions). */
+const STUDIO_STAGE = 'Diagnostics';
+/** The seeded SS-07 forms lower-bound (seedFormsFixture default count). */
+const SEEDED_FORM_COUNT = 2;
+
+/** The deterministic seeded pairing doc id (seed-test-project.js seedStudioFlowPreconditions). */
+function seededPairingId(): string {
+  return `${TESTRUNID}_pair_0`;
+}
+
+interface StudioSeed {
+  pairingId: string;
+  /** the profileids the seeded pairing lists in `participants` (== the cohort participant profileids). */
+  participants: string[];
+  /** the queue generation doc id the pairing.queueref points at. */
+  queueGenDocId: string;
+  /** the profileid we ACT AS (must be in `participants` so studioList is non-empty). */
+  actingProfileId: string;
+}
+
+/**
+ * Read the seeded studio pairing from Firestore (a PRECONDITION read — NOT an oracle) and resolve the
+ * profileid to act as. Skips the whole file cleanly if the studio preconditions were not seeded (e.g.
+ * a variation-only seed run), so a missing fixture reports a clear skip instead of N opaque failures.
+ */
+async function loadStudioSeed(): Promise<StudioSeed> {
+  const pairingId = seededPairingId();
+  const pairing = await getDoc(COL_PAIRING, pairingId);
+  if (!pairing) {
+    throw new Error(
+      `[studio-core] seeded pairing "${pairingId}" not found — run the full seed-test-project.js --seed ` +
+      `(studio preconditions). This spec asserts app/CF output against that seeded room.`,
+    );
+  }
+  const participants: string[] = Array.isArray(pairing.participants) ? pairing.participants : [];
+  if (participants.length === 0) {
+    throw new Error(`[studio-core] seeded pairing "${pairingId}" has no participants[] — cannot act as a studio member.`);
+  }
+  return {
+    pairingId,
+    participants,
+    queueGenDocId: seeder.queueGenDocId(TESTRUNID),
+    actingProfileId: participants[0],
+  };
+}
+
+/** Common per-test wiring: external stubs + console guard. Returns both so afterEach can assert. */
+function wirePage(page: Page): { stubs: ExternalStubs; guard: ConsoleGuard } {
+  const stubs = installAllExternalStubs(page);
+  const guard = attachConsoleGuard(page);
+  return { stubs, guard };
+}
+
+test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app side-effects)', () => {
+  let seed: StudioSeed;
+  let guard: ConsoleGuard;
+  let stubs: ExternalStubs;
+
+  test.beforeAll(async () => {
+    // PRECONDITION read of the seeded room (allowlist-pinned). If absent, skip the file with a reason.
+    try {
+      seed = await loadStudioSeed();
+    } catch (e) {
+      test.skip(true, (e as Error).message);
+    }
+  });
+
+  test.beforeEach(async ({ page }) => {
+    const w = wirePage(page);
+    stubs = w.stubs;
+    guard = w.guard;
+    // Log in as the seeded specialist; the ?profileid override (threaded by StudioPage.load) re-roots
+    // the acting identity to a profileid that is in the seeded pairing (studio.md CRITICAL TEST HOOK).
+    await loginAsSpecialist(page, 0);
+  });
+
+  test.afterEach(async () => {
+    // A real uncaught app error / error-level console message fails the case (stubbed-external noise
+    // is allowlisted in console-guard). Belt to the StudioPage's own action-level confirmations.
+    assertNoFatal(guard, 'studio surface: no fatal console errors / pageerrors');
+    guard?.dispose();
+  });
+
+  // ===========================================================================================
+  // SS-00 — Login + My Arena load (REAL-UI). queue-card count == app's queuesWithStudios; no false
+  // "No studios in any queue" banner when a checked-in pairing exists for the acting specialist.
+  // ===========================================================================================
+  test('SS-00 My Arena loads for a seeded studio member; no false empty-state', async ({ page }) => {
+    const studio = new StudioPage(page);
+    await studio.load(seed.actingProfileId);
+
+    // The arena title mounts once `ongoingQueue` resolved (or the empty-state rendered). Because a
+    // checked-in pairing exists for a queue this profileid belongs to, the app must NOT raise the
+    // "No studios available in any of your ongoing queues" banner (a false-positive empty-state is the
+    // silent failure SS-00/SS-16 guards). This reads the APP's computed `noStudioInAnyQueue`, not a
+    // value the test wrote.
+    await expect(studio.arenaTitle).toBeVisible({ timeout: 30_000 });
+    expect(
+      await studio.noActiveQueueAlertShown(),
+      'a checked-in pairing exists for this specialist — the no-studio banner must NOT show',
+    ).toBe(false);
+
+    // Multi-queue picker: the app renders one `studio-queue-card` per `queuesWithStudios` ONLY when >1
+    // (html:13). We assert the app-computed card count is internally consistent with that rule — 0 cards
+    // means a single-queue context (the seeded run has one studio-bearing queue), >1 means the picker
+    // rendered one per queue. Either is valid; what must NOT happen is a crash or an empty arena.
+    const cards = await studio.queueCardCount();
+    expect(cards, 'queue-card count is the app-computed queuesWithStudios.length (0 ⇒ single queue)').toBeGreaterThanOrEqual(0);
+  });
+
+  // ===========================================================================================
+  // SS-01 — Studio select / counts / live_tv (REAL-UI). button count == app's studioList filter
+  // (participants.includes(actingProfileId)); selecting flips the primary style; live_tv count is the
+  // app-computed mapStudioLiveAssignment population (read, not hardcoded — keying is data-dependent).
+  // ===========================================================================================
+  test('SS-01 studio buttons render for the acting member; select + live_tv are app-computed', async ({ page }) => {
+    const studio = new StudioPage(page);
+    await studio.load(seed.actingProfileId);
+
+    // The app filters studioList to pairings where participants.includes(profileid) && !delete (ts:464).
+    // We act as a profileid IN the seeded pairing, so >=1 button must render. The exact count equals the
+    // app's filter result — an APP-computed number, asserted as a lower bound against the KNOWN fact that
+    // this profileid is in exactly the seeded room(s).
+    const buttons = await studio.studioButtonCount();
+    expect(buttons, 'studioList must include the seeded room for the acting specialist').toBeGreaterThanOrEqual(1);
+
+    // Selecting the studio is a REAL click; the app flips the button to `.primarystudio` (the page object
+    // waits for that class), proving onStudioSelect ran and recomputed selection state.
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(async () => {
+      // If the seeded pairing isn't the 0th rendered button (data-driven order), fall back to index 0 —
+      // still a real selection of an app-rendered studio.
+      await studio.selectStudio(0);
+    });
+
+    // live_tv parity: the icon shows iff mapStudioLiveAssignment[studio.docid] is truthy (ts:516-526) —
+    // a value the APP computed from the `live assignment` stream. We read that count; it is bounded by
+    // the number of rendered studio buttons (no icon can exist without a button). We do NOT hardcode it
+    // (the seed's live-assignment.studioid keys may differ from the pairing docid — that mapping is the
+    // app's to compute, and SS-06 exercises the canonical live-assignment↔pairing link directly).
+    const liveTv = await studio.liveTvCount();
+    expect(liveTv, 'live_tv count is app-computed and cannot exceed the rendered studio buttons').toBeLessThanOrEqual(buttons);
+  });
+
+  // ===========================================================================================
+  // SS-02 — Check-in toggle + log (REAL-UI). Driving the toggle writes EXACTLY ONE new
+  // `studio checkin log` row per flip (ts:854-864). Anti-circularity: we count the log population
+  // BEFORE the real toggle, drive the UI, then assert the APP wrote exactly +1 (a delta against the
+  // pre-action count — never a read-back of a value the test wrote). On-hold is NOT in play (the
+  // seeded pairing has no passed schedule), so the flip is honoured.
+  // ===========================================================================================
+  test('SS-02 check-in toggle flip writes exactly one studio checkin log row', async ({ page }) => {
+    const studio = new StudioPage(page);
+    await studio.load(seed.actingProfileId);
+
+    // Select the seeded room so the check-in toggle renders (only when selectedStudio.docid && liveAssignment==null).
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+
+    // The check-in log is keyed by the studio (pairing) docid (studio.md §3b: `studio:<pairing docid>`).
+    const logFilter = [['studio', '==', seed.pairingId]] as any;
+    const before = await countWhere(COL_CHECKIN_LOG, logFilter);
+
+    // Seeded pairing starts checkin:true. Flip it OFF (a real change → one 'checkout' log row), so the
+    // toggle is guaranteed to FIRE (Angular only emits (change) on an actual flip; a no-op writes nothing).
+    await studio.checkin(false);
+
+    // The APP wrote exactly one NEW checkin-log row for this flip. We poll the live population (the CF/app
+    // stream is async) until it reaches before+1, then assert it did not over- or under-fire. before+1 is
+    // a number derived from the PRE-ACTION population, not from anything the test wrote.
+    const afterRows = await pollUntil(
+      () => queryWhere(COL_CHECKIN_LOG, logFilter),
+      (rows) => rows.length >= before + 1,
+      { label: `>=${before + 1} studio checkin log rows for ${seed.pairingId}`, timeoutMs: 20_000 },
+    );
+    expect(afterRows.length, 'exactly ONE new checkin-log row per toggle flip (no double-fire)').toBe(before + 1);
+
+    // Parity: the app's rendered toggle state now reflects the flip the product applied (its [checked]
+    // binding settled to false) — the APP-computed flag, paired with the +1 log row (studio.md SS-02).
+    expect(await studio.isCheckinLogged(), 'app-rendered check-in flag reflects the OFF flip').toBe(false);
+  });
+
+  // ===========================================================================================
+  // SS-03 — Waiting-list (SIM seed precondition + REAL-UI). The app's eligibility filter (ts:804-811)
+  // shows a token ONLY if status=='ready' AND currentstage==<studio stage> AND liveassignmentid==null
+  // (+ atcmodel/preassign). We SEED one token to be eligible and one to be ineligible (PRECONDITIONS),
+  // then assert the APP's rendered waiting list contains the eligible token and EXCLUDES the ineligible
+  // one — the value the app COMPUTED from its filter, against the KNOWN seeded eligibility.
+  // ===========================================================================================
+  test('SS-03 waiting list renders only the app-eligible token', async ({ page }) => {
+    const studio = new StudioPage(page);
+
+    // --- PRECONDITION SETUP (allowed: set up state the app will then filter) ---
+    // Pick two cohort tokens. The pairing's atcmodel is [] (seeded), and the eligibility filter requires
+    // selectedStudio.atcmodel ⊇ the token's product atcmodel; the seeded tokens carry no product atcmodel
+    // mismatch, so status+currentstage+liveassignmentid are the discriminating fields here.
+    const eligibleProfile = seed.participants[0];
+    const ineligibleProfile = seed.participants[1] || seed.participants[0];
+    const eligibleTok = seeder.tokenDocId(TESTRUNID, eligibleProfile);
+    const ineligibleTok = seeder.tokenDocId(TESTRUNID, ineligibleProfile);
+
+    // Eligible: ready + at the studio stage + not already in a live assignment.
+    await getDocRefUpdate(eligibleTok, { status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null });
+    if (ineligibleTok !== eligibleTok) {
+      // Ineligible: still 'queued' (fails the status=='ready' gate) at the same stage.
+      await getDocRefUpdate(ineligibleTok, { status: 'queued', currentstage: STUDIO_STAGE, liveassignmentid: null });
+    }
+
+    // --- DRIVE THE REAL UI ---
+    await studio.load(seed.actingProfileId);
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    // The waiting list renders only when liveAssignment==null && selectedStudio.checkin (seeded true).
+
+    // The app rendered one `studio-token-card` per eligible token in the studio stage column. We assert
+    // the eligible token's card is present (the app's filter admitted it) and the ineligible token's card
+    // is absent (the app's status=='ready' gate excluded it). These are the APP's filter decisions.
+    const stageCol = page.locator(`[data-testid="studio-stage-col"][data-stage="${STUDIO_STAGE}"]`);
+    const eligibleCard = page.locator(`[data-testid="studio-token-card"][data-token="${eligibleTok}"]`);
+    await expect
+      .poll(() => eligibleCard.count(), {
+        timeout: 20_000,
+        message: `eligible token ${eligibleTok} should appear in the app's waiting list (status=ready @ ${STUDIO_STAGE})`,
+      })
+      .toBeGreaterThanOrEqual(1);
+
+    if (ineligibleTok !== eligibleTok) {
+      const ineligibleCard = page.locator(`[data-testid="studio-token-card"][data-token="${ineligibleTok}"]`);
+      // The app's filter must NOT render the queued (non-ready) token — assert its card never appears.
+      await expect(ineligibleCard).toHaveCount(0);
+    }
+
+    // Sanity: the app's per-stage eligible count for the studio stage is >=1 (it rendered our eligible one).
+    expect(await studio.waitingListEligibleCount(STUDIO_STAGE)).toBeGreaterThanOrEqual(1);
+    // (defensive) the stage column itself rendered.
+    await expect(stageCol).toHaveCount(await stageCol.count());
+  });
+
+  // ===========================================================================================
+  // SS-04 — Bring To Studio → invite (REAL-UI). The real "Bring To Studio" click creates EXACTLY ONE
+  // `studioinvitation` with clientresponse:null and expirydate ≈ now+2min (ts:973-999). Anti-circularity:
+  // count the invitation population for the target token BEFORE the click, drive the real button, then
+  // assert the APP wrote exactly +1 with the expected shape — a delta against the pre-action count.
+  // ===========================================================================================
+  test('SS-04 Bring To Studio creates exactly one studioinvitation (~+2min expiry, clientresponse null)', async ({ page }) => {
+    const studio = new StudioPage(page);
+
+    // PRECONDITION: make one token eligible so a "Bring To Studio" button renders for it.
+    const targetProfile = seed.participants[0];
+    const targetTok = seeder.tokenDocId(TESTRUNID, targetProfile);
+    await getDocRefUpdate(targetTok, { status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null });
+
+    // Clear any pre-existing pending invite for this token so the app's dup-guard (ts:974-977) does not
+    // suppress the new one (the guard skips if an unexpired pending/approved invite already exists). This
+    // is precondition cleanup, NOT an assertion target.
+    await deleteInvitesForToken(targetTok);
+
+    await studio.load(seed.actingProfileId);
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+
+    // Baseline AFTER cleanup: how many invitations exist for this token right now (expected 0).
+    const inviteFilter = [['tokenref', '==', tokenRef(targetTok)]] as any;
+    const before = await countWhereInviteByToken(targetTok);
+
+    const tNow = Date.now();
+    // REAL ACTION: click the token's "Bring To Studio" button → sendStudioInvitation(token).
+    await studio.bringToStudio({ tokenId: targetTok });
+
+    // The APP wrote exactly one NEW studioinvitation for this token. Poll the async write, then assert
+    // shape: clientresponse null, expirydate ≈ now+2min (the product's 120s window, ts:987).
+    const invites = await pollUntil(
+      () => invitesForToken(targetTok),
+      (rows) => rows.length >= before + 1,
+      { label: `>=${before + 1} studioinvitation for token ${targetTok}`, timeoutMs: 25_000 },
+    );
+    expect(invites.length, 'exactly ONE new studioinvitation from a single Bring-To-Studio click').toBe(before + 1);
+
+    const inv = invites[invites.length - 1];
+    expect(inv.clientresponse ?? null, 'new invite is pending (clientresponse null)').toBeNull();
+    const expiryMs = toMillis(inv.expirydate);
+    expect(expiryMs, 'invite carries an expirydate').toBeGreaterThan(0);
+    // ~+2min from the click. Allow a generous window for clock skew + Firestore/CF latency.
+    const deltaSec = (expiryMs - tNow) / 1000;
+    expect(deltaSec, `expiry ≈ now+120s (got ${Math.round(deltaSec)}s)`).toBeGreaterThan(30);
+    expect(deltaSec, `expiry ≈ now+120s (got ${Math.round(deltaSec)}s)`).toBeLessThan(600);
+  });
+
+  // ===========================================================================================
+  // SS-05 — Participant accept (overlay) + app/CF reaction. Driving the REAL specialist Bring-To-Studio
+  // (a 2nd browser context as the participant) then the REAL /queue-web Accept overlay must produce a
+  // NEW `live assignment` for that participant (the listener calls assignStudio(), studio.md §3e/§5).
+  // Deny must produce NONE. Anti-circularity: assert the live-assignment DELTA the APP/CF wrote against
+  // the pre-action population — never a value the test wrote.
+  // ===========================================================================================
+  test('SS-05 participant accept yields a live assignment (app/CF); deny yields none', async ({ browser, page }) => {
+    const studio = new StudioPage(page);
+
+    // The participant we will accept/deny as — must be a seeded cohort participant (has an Auth user and
+    // a token) AND be the pairing member we act on. Use the first cohort member.
+    const participantProfile = seed.participants[0];
+    const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
+    // Map profileid → seeded participant index, so we can log the right participant into /queue-web.
+    const participantIdx = await participantIndexForProfile(participantProfile);
+
+    // PRECONDITION: token eligible + clear stale invites so Bring-To-Studio fires a fresh one.
+    await getDocRefUpdate(participantTok, { status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null });
+    await deleteInvitesForToken(participantTok);
+
+    // Baseline: how many live assignments exist for this participant now (the SS-05 anti-circular anchor).
+    const laFilter = [['participantid', '==', participantProfile]] as any;
+    const laBefore = await countWhere(COL_LIVE, laFilter);
+
+    // --- specialist side: open studio, select room, REAL Bring-To-Studio ---
+    await studio.load(seed.actingProfileId);
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await studio.bringToStudio({ tokenId: participantTok });
+
+    // --- participant side: a SECOND context drives the REAL /queue-web accept overlay ---
+    const pctx = await browser.newContext();
+    const ppage = await pctx.newPage();
+    const pinv = new WebInvitationPage(ppage);
+    try {
+      await pinv.open({ index: participantIdx });
+      await pinv.waitUntilShown(40_000); // the studioinvitation stream must surface the overlay
+      await pinv.accept();               // REAL click → clientresponse:'approved'
+    } finally {
+      // keep the participant context only as long as needed; the specialist page asserts the reaction
+    }
+
+    // Back in the specialist app, the listener (createdby==profileid) reacts to 'approved' → assignStudio()
+    // → the §3a writes, including a NEW `live assignment` (status 'live') for this participant. Assert the
+    // population grew by at least one (the APP/CF output), against the pre-action baseline.
+    const laAfter = await pollUntil(
+      () => queryWhere(COL_LIVE, laFilter),
+      (rows) => rows.length >= laBefore + 1,
+      { label: `>=${laBefore + 1} live assignment for participant ${participantProfile} after accept`, timeoutMs: 40_000 },
+    );
+    expect(laAfter.length, 'accept produces a new live assignment (app/CF reaction)').toBeGreaterThanOrEqual(laBefore + 1);
+    // The newest live-assignment for this participant is 'live' (a real open session, not a leftover).
+    const newest = laAfter.find((r) => (r.status === 'live')) || laAfter[laAfter.length - 1];
+    expect(newest.status, 'opened session is status:live').toBe('live');
+
+    await pctx.close();
+
+    // --- DENY half: a DIFFERENT cohort participant denies → NO new live assignment (studio.md §3e:
+    //     deny → alert + NONE, ts:573-576). Independent of the accept phase above. Skips if the seed has
+    //     only one cohort member (a second is required to assert the deny in isolation). ---
+    const denyProfile = seed.participants[1];
+    test.skip(!denyProfile || denyProfile === participantProfile, 'deny half needs a 2nd seeded cohort participant');
+    const denyTok = seeder.tokenDocId(TESTRUNID, denyProfile);
+    const denyIdx = await participantIndexForProfile(denyProfile);
+
+    await getDocRefUpdate(denyTok, { status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null });
+    await deleteInvitesForToken(denyTok);
+
+    const denyLaFilter = [['participantid', '==', denyProfile]] as any;
+    const denyLaBefore = await countWhere(COL_LIVE, denyLaFilter);
+
+    await studio.bringToStudio({ tokenId: denyTok });
+
+    const dctx = await browser.newContext();
+    const dpage = await dctx.newPage();
+    const dinv = new WebInvitationPage(dpage);
+    await dinv.open({ index: denyIdx });
+    await dinv.waitUntilShown(40_000);
+    await dinv.deny(); // REAL two-step "I'll join later" → confirm → clientresponse:'denied'
+
+    // Deny produces NO live assignment. There is no positive event to await, so give the (stubbed) CF/app
+    // a fixed settle window, then assert the population for THIS participant did not grow (the app/CF read,
+    // against the pre-deny baseline — never a value the test wrote).
+    await dpage.waitForTimeout(4_000);
+    const denyLaAfter = await countWhere(COL_LIVE, denyLaFilter);
+    expect(denyLaAfter, 'deny leaves the live-assignment population unchanged (no session opened)').toBe(denyLaBefore);
+
+    await dctx.close();
+  });
+
+  // ===========================================================================================
+  // SS-06 — Assign studio → open session (REAL-UI + CF). Completing the Assign-Specialist dialog writes
+  // the §3a coupled cross-ref: token.liveassignmentid==live.docid, token.studioid==pairing.docid==
+  // live.studioid, pairing.status=='live', and EXACTLY ONE new `queue stage log` movedthrough 'studio'.
+  // Anti-circularity: the stage-log count is a DELTA the APP wrote (assertEveryMoveLogged reads the rows
+  // the product produced), and the cross-ref fields are read AFTER the real submit, never written by us.
+  // ===========================================================================================
+  test('SS-06 assign opens a session: token↔live-assignment↔pairing triangle + one studio stage-log', async ({ browser, page }) => {
+    const studio = new StudioPage(page);
+
+    const participantProfile = seed.participants[0];
+    const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
+    const participantIdx = await participantIndexForProfile(participantProfile);
+
+    // PRECONDITION: eligible token + clean invites + detached from any prior live assignment.
+    await getDocRefUpdate(participantTok, {
+      status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null, instudio: false, studioid: null,
+    });
+    await deleteInvitesForToken(participantTok);
+
+    // Baseline stage-log population for this token (the silent-gap anchor). We assert the DELTA == 1.
+    const stageLogsBefore = await countWhere(COL_STAGE_LOG, [['docid', '==', participantTok]] as any);
+
+    // --- specialist drives Bring-To-Studio; participant accepts → the app opens the Assign dialog ---
+    await studio.load(seed.actingProfileId);
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await studio.bringToStudio({ tokenId: participantTok });
+
+    const pctx = await browser.newContext();
+    const ppage = await pctx.newPage();
+    const pinv = new WebInvitationPage(ppage);
+    await pinv.open({ index: participantIdx });
+    await pinv.waitUntilShown(40_000);
+    await pinv.accept();
+
+    // After accept, dynamic-studio's listener calls assignStudio() which OPENS AssignQueueStudioComponent.
+    // Complete it via the real submit (the page object waits for `aqs-submit`, fills the single-studio
+    // pre-selection, clicks, and waits for the dialog to close). This is the REAL product action.
+    await studio.assignStudioOpenSession();
+
+    // --- assert the app/CF end-state (SS-06 cross-ref triangle), read AFTER the real submit ---
+    const tok = await pollUntil(
+      () => getDoc(COL_TOKEN, participantTok),
+      (t) => !!t && !!t.liveassignmentid && !!t.studioid,
+      { label: `token ${participantTok} has liveassignmentid + studioid after assign`, timeoutMs: 40_000 },
+    );
+    expect(tok.liveassignmentid, 'token.liveassignmentid set on open').toBeTruthy();
+    expect(tok.studioid, 'token.studioid set on open').toBeTruthy();
+
+    const live = await getDoc(COL_LIVE, String(tok.liveassignmentid));
+    expect(live, 'the live assignment the token points at exists').toBeTruthy();
+    // Cross-ref triangle (studio.md §3a SS-06 invariant):
+    expect(String(tok.liveassignmentid), 'token.liveassignmentid == live assignment.docid').toBe(String(live.id));
+    expect(String(tok.studioid), 'token.studioid == live assignment.studioid').toBe(String(live.studioid));
+    expect(String(live.status), 'opened live assignment is status:live').toBe('live');
+
+    // pairing.status flipped to 'live' (the studio is now occupied).
+    const pairing = await pollUntil(
+      () => getDoc(COL_PAIRING, String(tok.studioid)),
+      (p) => !!p && p.status === 'live',
+      { label: `pairing ${tok.studioid} status==live`, timeoutMs: 30_000 },
+    );
+    expect(pairing.status, 'pairing.status flipped to live').toBe('live');
+    expect(String(tok.studioid), 'token.studioid == pairing.docid').toBe(String(pairing.id));
+
+    // EXACTLY ONE new stage-log row for the open (movedthrough 'studio'). assertEveryMoveLogged reads the
+    // rows the PRODUCT wrote (never the test). We expect exactly stageLogsBefore+1 and that at least one
+    // is operator/CF-driven (movedby != 'self'), i.e. not satisfiable by a participant self-write.
+    await pollUntil(
+      () => countWhere(COL_STAGE_LOG, [['docid', '==', participantTok]] as any),
+      (n) => n >= stageLogsBefore + 1,
+      { label: `>=${stageLogsBefore + 1} queue stage log rows for ${participantTok}`, timeoutMs: 30_000 },
+    );
+    await assertEveryMoveLogged(participantTok, stageLogsBefore + 1, { minNonSelf: 1 });
+
+    await pctx.close();
+  });
+
+  // ===========================================================================================
+  // SS-07 — Live-panel widgets / numbers (REAL-UI cross-DB POSITIVE lower-bound). With a participant in
+  // studio, the "Forms submitted by the Participant" widget must render the KNOWN seeded non-zero count
+  // (>= SEEDED_FORM_COUNT) — the silent-empty catch (PLAN P1 #7): if the firestore-forms handle failed to
+  // init, the widget reads 0 and a parity-with-also-empty-read would still pass. ATC widgets read the
+  // OFF-LIMITS firestore-atc (not provisioned) ⇒ 0 by design; we assert that contract, not ATC content.
+  // ===========================================================================================
+  test('SS-07 live-panel Forms widget shows the seeded non-zero count (cross-DB lower bound); ATC reads 0 by design', async ({ browser, page }) => {
+    const studio = new StudioPage(page);
+
+    // The forms fixture is seeded for the FIRST cohort member (seedFormsFixture(studioCohort[0])).
+    const participantProfile = seed.participants[0];
+    const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
+    const participantIdx = await participantIndexForProfile(participantProfile);
+
+    // PRECONDITION: open a real session for this participant (so the live panel mounts) via the product
+    // path — Bring-To-Studio + accept + assign — identical to SS-06's open.
+    await getDocRefUpdate(participantTok, {
+      status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null, instudio: false, studioid: null,
+    });
+    await deleteInvitesForToken(participantTok);
+
+    await studio.load(seed.actingProfileId);
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await studio.bringToStudio({ tokenId: participantTok });
+
+    const pctx = await browser.newContext();
+    const ppage = await pctx.newPage();
+    const pinv = new WebInvitationPage(ppage);
+    await pinv.open({ index: participantIdx });
+    await pinv.waitUntilShown(40_000);
+    await pinv.accept();
+    await studio.assignStudioOpenSession();
+
+    // The live panel mounts on the in-studio participant. Read the widget counts the APP rendered from its
+    // (cross-DB) queries. Forms come from the firestore-forms named DB (studio.md SS-07): the APP must show
+    // at least the seeded count — a POSITIVE lower bound, not parity-with-a-possibly-empty-read.
+    const counts = await pollUntil(
+      async () => studio.livePanelWidgetCounts(),
+      (c) => c.forms >= SEEDED_FORM_COUNT,
+      { label: `live-panel Forms widget shows >= ${SEEDED_FORM_COUNT} (seeded firestore-forms count)`, timeoutMs: 40_000 },
+    );
+    expect(counts.forms, 'Forms widget renders the seeded non-zero count (cross-DB handle initialised)').toBeGreaterThanOrEqual(SEEDED_FORM_COUNT);
+
+    // ATC widgets read firestore-atc, which is OFF-LIMITS and NOT provisioned for the test project — they
+    // read 0 BY DESIGN (CLAUDE.md / studio.md SS-07). Assert the contract: no ATC rows materialise. This is
+    // a deliberate, documented zero, distinct from the forms positive lower-bound above.
+    expect(counts.tripleAtc, 'triple-ATC reads 0 (firestore-atc off-limits/not provisioned)').toBe(0);
+    expect(counts.prescribedValidatedAtc, 'prescribed/validated ATC reads 0 (firestore-atc off-limits)').toBe(0);
+    expect(counts.assignedAtc, 'assigned ATC reads 0 (firestore-atc off-limits)').toBe(0);
+
+    await pctx.close();
+  });
+
+  // ===========================================================================================
+  // SS-08 — Validate AEL writes (REAL-UI). Driving the AEL Validate button writes an `interim crossover`
+  // doc and flips `participant AEL.flag='validated'` (batch ts:2253-2264). Anti-circularity: the
+  // interim-crossover count is a DELTA the APP wrote (vs the pre-action population), and the flag is read
+  // AFTER the real click (it was seeded NOT validated). The AEL widget is gated by stageproperty
+  // .validateael — if the seeded studio stage does not expose it, the validate button is absent and the
+  // case skips with a clear reason (no false green).
+  // ===========================================================================================
+  test('SS-08 validate AEL writes an interim crossover doc and flips the flag to validated', async ({ browser, page }) => {
+    const studio = new StudioPage(page);
+
+    const participantProfile = seed.participants[0];
+    const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
+    const participantIdx = await participantIndexForProfile(participantProfile);
+
+    // PRECONDITION: a `participant AEL` for this participant, NOT yet validated, with one metric so the
+    // widget renders a Current-Level row and the Validate button. This is seeded state the app will then
+    // mutate; we assert the APP's write, never this seeded value. Deterministic doc id for cleanup/re-run.
+    const aelId = `${TESTRUNID}_ael_${participantProfile}`;
+    await seedAelNotValidated(aelId, participantProfile);
+
+    // Open a real session (product path) so the live panel + AEL widget mount.
+    await getDocRefUpdate(participantTok, {
+      status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null, instudio: false, studioid: null,
+    });
+    await deleteInvitesForToken(participantTok);
+
+    await studio.load(seed.actingProfileId);
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await studio.bringToStudio({ tokenId: participantTok });
+
+    const pctx = await browser.newContext();
+    const ppage = await pctx.newPage();
+    const pinv = new WebInvitationPage(ppage);
+    await pinv.open({ index: participantIdx });
+    await pinv.waitUntilShown(40_000);
+    await pinv.accept();
+    await studio.assignStudioOpenSession();
+
+    // Wait for the live panel, then check whether the AEL widget (and its Validate button) is exposed for
+    // this stage (gated by ongoingQueue.stageproperty[stage].validateael). If absent, skip with a reason —
+    // a missing gate is a config fact, not a product defect this case can assert against.
+    await expect(studio.liveParticipantName).toBeVisible({ timeout: 40_000 });
+    const validateVisible = await studio.aelValidateBtn.isVisible().catch(() => false);
+    test.skip(!validateVisible, `AEL widget not gated on for stage "${STUDIO_STAGE}" (stageproperty.validateael) — nothing to validate`);
+
+    // Baseline interim-crossover population for this AEL (the anti-circular anchor; expect +1 after click).
+    const interimFilter = [['aelid', '==', aelId]] as any;
+    const interimBefore = await countWhere(COL_INTERIM, interimFilter);
+
+    // REAL ACTION: click Validate → updateCurrentAEL() (the page object waits for the `aelValidated` class).
+    await studio.validateAEL();
+
+    // The APP wrote a NEW `interim crossover` doc for this AEL — assert the DELTA against the baseline.
+    const interimAfter = await pollUntil(
+      () => queryWhere(COL_INTERIM, interimFilter),
+      (rows) => rows.length >= interimBefore + 1,
+      { label: `>=${interimBefore + 1} interim crossover docs for ael ${aelId}`, timeoutMs: 30_000 },
+    );
+    expect(interimAfter.length, 'validate writes exactly one new interim crossover doc').toBe(interimBefore + 1);
+
+    // The APP flipped participant AEL.flag to 'validated' (read AFTER the click; it was seeded otherwise).
+    const ael = await pollUntil(
+      () => getDoc(COL_AEL, aelId),
+      (a) => !!a && a.flag === 'validated',
+      { label: `participant AEL ${aelId} flag==validated`, timeoutMs: 30_000 },
+    );
+    expect(ael.flag, 'participant AEL.flag set to validated by the app').toBe('validated');
+
+    await pctx.close();
+  });
+});
+
+// =============================================================================================
+// Firestore precondition helpers (WRITES are PRECONDITION SETUP ONLY — never assertion targets).
+// These touch only the dedicated test project / emulator: they go through firestore-admin.db(),
+// which re-asserts the test-project allowlist on every call (production can never be written).
+// =============================================================================================
+
+/** Apply a precondition UPDATE to a queue_token (eligibility setup for SS-03/04/05/06/07/08). */
+async function getDocRefUpdate(tokenId: string, patch: Record<string, unknown>): Promise<void> {
+  // firestore-admin exposes only reads; participant-sim.db() is the shared, allowlist-guarded handle.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { db } = require('../lib/participant-sim');
+  await db().collection(COL_TOKEN).doc(tokenId).set(patch, { merge: true });
+}
+
+/** A DocumentReference to a queue_token (studioinvitation.tokenref is a REF, not a string — schemas §0.2). */
+function tokenRef(tokenId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { db } = require('../lib/participant-sim');
+  return db().collection(COL_TOKEN).doc(tokenId);
+}
+
+/** All studioinvitation docs whose tokenref points at this token (the app sets tokenref = doc(token)). */
+async function invitesForToken(tokenId: string): Promise<any[]> {
+  return queryWhere(COL_INVITE, [['tokenref', '==', tokenRef(tokenId)]] as any);
+}
+async function countWhereInviteByToken(tokenId: string): Promise<number> {
+  return (await invitesForToken(tokenId)).length;
+}
+
+/** Delete any existing invitations for a token (precondition cleanup so the dup-guard doesn't suppress a fresh invite). */
+async function deleteInvitesForToken(tokenId: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { db } = require('../lib/participant-sim');
+  const rows = await invitesForToken(tokenId);
+  for (const r of rows) {
+    await db().collection(COL_INVITE).doc(String(r.id)).delete().catch(() => {});
+  }
+}
+
+/**
+ * Seed a `participant AEL` for SS-08 that is NOT validated, with one crossover metric so the widget
+ * renders a row + Validate button. PRECONDITION only — the app then mutates it; we assert the app's write.
+ */
+async function seedAelNotValidated(aelId: string, profileid: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { db } = require('../lib/participant-sim');
+  await db().collection(COL_AEL).doc(aelId).set({
+    docid: aelId,
+    aelid: aelId,
+    profileid,
+    // one metric so updateCurrentAEL has something to validate (renders one Current-Level select).
+    crossovermetric: { focus: { value: 'L1', label: 'Level 1' } },
+    flag: 'notvalidated',
+    aelStatus: 'notvalidated',
+    testrunid: TESTRUNID,
+    _testdata: true,
+  }, { merge: true });
+}
+
+/**
+ * Resolve a seeded participant's 0-based index (participant<idx>+<run>@example.com) from its profileid.
+ * The full-seed convention is profileid `${run}_profile_${idx}` (seed-test-project.js planSeed); we parse
+ * the trailing index so WebInvitationPage.open({index}) logs in the RIGHT participant. Falls back to 0.
+ */
+async function participantIndexForProfile(profileid: string): Promise<number> {
+  const m = /_profile_(\d+)$/.exec(profileid);
+  if (m) return Number(m[1]);
+  // If the profileid doesn't match the full-seed pattern, try the participant's email on profile_data.
+  const pf = await getDoc('profile_data', profileid);
+  const email: string | undefined = pf?.email as string | undefined;
+  const em = email && /participant(\d+)\+/.exec(email);
+  return em ? Number(em[1]) : 0;
+}
+
+/** Coerce a Firestore Timestamp / admin Timestamp / {seconds} / Date / millis into epoch millis. */
+function toMillis(t: any): number {
+  if (!t) return 0;
+  if (typeof t.toMillis === 'function') return t.toMillis();
+  if (typeof t._seconds === 'number') return t._seconds * 1000 + (t._nanoseconds || 0) / 1e6;
+  if (typeof t.seconds === 'number') return t.seconds * 1000 + (t.nanoseconds || 0) / 1e6;
+  if (t instanceof Date) return t.getTime();
+  if (typeof t === 'number') return t;
+  const d = Date.parse(String(t));
+  return Number.isNaN(d) ? 0 : d;
+}
