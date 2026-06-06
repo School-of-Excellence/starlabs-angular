@@ -23,7 +23,8 @@
  *
  * SEEDED PRECONDITIONS this spec relies on (full `seed-test-project.js --seed`, the suite global-setup):
  *   - ONE `queue studio pairing` (`<run>_pair_0`): participants = the first ≤3 participant profileids,
- *     checkin:true, studioin:true, status:null, openvidu:false, atcmodel:[], queueref → the main queue.
+ *     checkin:true, studioin:true, status:null, openvidu:false, atcmodel:null, queueref → the main queue.
+ *     (atcmodel MUST be null so the eligibility filter (ts:808) short-circuits before touching the absent token productref.)
  *   - per cohort participant: a pending `studioinvitation` (future expiry, stage "Diagnostics"),
  *     a `live assignment` (status 'live'), an `arena participant`.
  *   - SS-07 forms fixture: TWO `formsByClient` (firestore-forms named DB) for the FIRST cohort member —
@@ -255,9 +256,9 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     const studio = new StudioPage(page);
 
     // --- PRECONDITION SETUP (allowed: set up state the app will then filter) ---
-    // Pick two cohort tokens. The pairing's atcmodel is [] (seeded), and the eligibility filter requires
-    // selectedStudio.atcmodel ⊇ the token's product atcmodel; the seeded tokens carry no product atcmodel
-    // mismatch, so status+currentstage+liveassignmentid are the discriminating fields here.
+    // Pick two cohort tokens. The pairing's atcmodel is null (seeded), so the eligibility filter (ts:808)
+    // short-circuits the atcmodel branch ([null,undefined].includes(...)) BEFORE touching the token's
+    // productref — leaving status+currentstage+liveassignmentid as the discriminating fields here.
     const eligibleProfile = seed.participants[0];
     const ineligibleProfile = seed.participants[1] || seed.participants[0];
     const eligibleTok = seeder.tokenDocId(TESTRUNID, eligibleProfile);
