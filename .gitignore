@@ -63,4 +63,12 @@ e2e/test-results/
 e2e/.angular/
 e2e/results.xml
 e2e/evidence/
+e2e/.emu-restart.log
+firebase-debug.log
+firestore-debug.log
+e2e/firebase-debug.log
+e2e/firestore-debug.log
+e2e/smoke-*.png
 .angular/
+/dist-emulator/
+e2e/playwright.queue.emulator.4300.config.ts

@@ -103,13 +103,60 @@ node -e '
 ' "$PKG"
 echo "✓ functions entry -> index.emulator.js (will restore index.js on exit)"
 
+# --- 2b) STABILITY: stop the functions emulator (port 5001) from OOMing / orphaning runtimes on a long run --
+# The full ~194-test isolated run reseeds run1 between EVERY spec file (44 teardown+reseed bursts). Each burst
+# is a `db.batch().commit()` that fires a cascade of CF triggers AT ONCE. In firebase-tools' default AUTO
+# worker mode (functionsRuntimeWorker.js) every concurrent invocation that finds no idle worker spawns a fresh
+# `functionsEmulatorRuntime` child, and after finishing it goes IDLE but is NEVER reaped (only a trigger
+# *reload* calls pool.refresh()). So runtimes pile up across bursts until the box is under memory pressure and
+# the hub/runtime dies — 5001 stops listening while firestore(8080)/auth(9099) stay up, leaving orphaned
+# runtime children. Two reversible levers fix this at the source:
+#
+#   (1) NODE_OPTIONS heap ceiling. functionsEmulator.js spawns each runtime with {...process.env}, so a value
+#       exported here is inherited by the emulator hub AND every runtime child. A bounded old-space keeps a
+#       long run from exiting with "JavaScript heap out of memory". Default 4096 MB; override via FN_MAXOLDSPACE.
+#
+#   (2) --inspect-functions (BARE flag) => functions emulator runs in SEQUENTIAL worker mode
+#       (functionsEmulator.js: debugMode -> one REUSED runtime per codebase, getKey() -> "~shared~"), instead
+#       of a new-per-concurrent-invocation runtime that lingers IDLE. This caps runtime processes at ONE and is
+#       the real memory fix. The flag MUST be bare: firebase-tools' parseInspectionPort treats a BOOLEAN true
+#       (bare flag) as a dynamic inspector port, but a STRING ("--inspect-functions=true") goes through
+#       Number("true")=NaN and ABORTS boot with "... is not a valid port". Bare => boolean true => dynamic port
+#       (no fixed-9229 collision; the "multiple codebases on one port" guard only trips for a NUMERIC port, and
+#       we have a single codebase anyway). The specs assert FINAL CF side-effect documents, never
+#       concurrency/ordering, so serial execution changes no asserted output. Disable (back to AUTO/parallel)
+#       with FB_EMU_FN_SEQUENTIAL=0.
+FN_MAXOLDSPACE="${FN_MAXOLDSPACE:-4096}"
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=${FN_MAXOLDSPACE}"
+echo "✓ NODE_OPTIONS=$NODE_OPTIONS  (heap ceiling for the emulator hub + every function runtime)"
+
+FB_FN_FLAGS=""
+if [ "${FB_EMU_FN_SEQUENTIAL:-1}" = "1" ]; then
+  FB_FN_FLAGS="--inspect-functions"   # BARE flag (NOT =true) — see note above; dynamic inspector port
+  echo "✓ functions emulator: SEQUENTIAL worker mode (--inspect-functions) — ONE reused runtime (set FB_EMU_FN_SEQUENTIAL=0 for AUTO/parallel)"
+else
+  echo "✓ functions emulator: AUTO worker mode (FB_EMU_FN_SEQUENTIAL=0)"
+fi
+
+# --- 2c) make Java findable. The Firestore/Auth emulators need a JRE; Homebrew's openjdk is keg-only, so a
+# caller whose PATH lacks java (e.g. run-isolated.sh's auto-restart) would fail to boot 8080/9099. Prepend it
+# here so the script is self-sufficient. No-op if java is already resolvable. -----------------------------------
+if [ -x /opt/homebrew/opt/openjdk/bin/java ]; then
+  case ":$PATH:" in
+    *":/opt/homebrew/opt/openjdk/bin:"*) : ;;
+    *) export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"; echo "✓ PATH += /opt/homebrew/opt/openjdk/bin (JRE for firestore/auth)";;
+  esac
+fi
+
 # --- 3) boot the emulator (firestore + auth + functions). singleProjectMode is set in the config. ----------
 # NOTE: not `exec` — we run in the foreground so the EXIT/INT/TERM trap restores package.json `main` when the
 # emulator is stopped (Ctrl-C). The emulator is a long-running foreground process.
 echo "🚀 firebase emulators:start --project $FIREBASE_PROJECT (firestore:8080 auth:9099 functions:5001 ui:4001)"
 # shellcheck disable=SC2086
+# FB_FN_FLAGS / FB_EMU_EXTRA are intentionally unquoted: they word-split into 0+ flags (no spaces in values).
 firebase emulators:start \
   --project "$FIREBASE_PROJECT" \
   --config "$CONFIG" \
   --only firestore,auth,functions \
+  ${FB_FN_FLAGS} \
   ${FB_EMU_EXTRA:-}
