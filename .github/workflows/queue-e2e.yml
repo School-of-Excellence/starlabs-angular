@@ -1,0 +1,90 @@
+# Queue Manager e2e gate — runs the hermetic emulator suite (real Cloud Functions) so a change that
+# breaks queue/studio/BIG logic, makes a screen unusable, or drops a silent data gap FAILS the PR.
+# This is the "prevent future poor code" gate; the existing deploy_19.yml is deploy-only (no test gate).
+#
+# Isolation: e2e/scripts/run-isolated.sh runs each spec file as its own Playwright invocation, so each
+# gets a fresh globalSetup reseed and specs cannot pollute each other on the single shared emulator.
+#
+# ── ONE SECRET REQUIRED before this can run ───────────────────────────────────────────────────────────
+#   CF_REPO_TOKEN — a read-scoped PAT/deploy token for github.com/School-of-Excellence/starlabs-cloud-function
+#   (the Cloud Functions are a SEPARATE private repo, nested + gitignored here; the emulator needs them to
+#   execute the queue triggers). Without it the "Clone Cloud Functions" step fails fast with a clear message.
+name: queue-e2e (emulator)
+
+on:
+  pull_request:
+    paths:
+      - 'src/app/queue system/**'
+      - 'src/app/big/**'
+      - 'src/app/auth.guard.ts'
+      - 'starlabs-cloud-function/**'
+      - 'e2e/**'
+      - '.github/workflows/queue-e2e.yml'
+  workflow_dispatch: {}
+
+jobs:
+  queue-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      FIREBASE_PROJECT: demo-slabs-queue
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone Cloud Functions repo (the emulator runs the real triggers)
+        run: |
+          if [ -z "${{ secrets.CF_REPO_TOKEN }}" ]; then
+            echo "::error::CF_REPO_TOKEN secret is not set — needed to clone the Cloud Functions repo."; exit 1
+          fi
+          git clone --depth 1 --branch test/queue-e2e-deploy \
+            "https://x-access-token:${{ secrets.CF_REPO_TOKEN }}@github.com/School-of-Excellence/starlabs-cloud-function.git" \
+            starlabs-cloud-function
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'   # functions/package.json engines.node == 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'   # the Firestore/Auth emulators require a JRE
+
+      - name: Install firebase-tools
+        run: npm i -g firebase-tools@latest
+
+      - name: Install app deps
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Cloud Functions deps
+        run: cd starlabs-cloud-function/functions && npm ci
+
+      - name: Install e2e deps
+        run: cd e2e && npm ci
+
+      - name: Install Playwright chromium
+        run: cd e2e && npx playwright install --with-deps chromium
+
+      - name: Boot Firebase emulator + Cloud Functions
+        run: |
+          cd e2e && nohup bash scripts/deploy-cf-emulator.sh > /tmp/emu.log 2>&1 &
+          for i in $(seq 1 90); do grep -q "All emulators ready" /tmp/emu.log && break; sleep 2; done
+          if ! grep -q "All emulators ready" /tmp/emu.log; then echo "::error::emulator failed to boot"; cat /tmp/emu.log; exit 1; fi
+          grep -E "functions: Loaded|All emulators ready" /tmp/emu.log
+
+      - name: Boot emulator-wired Angular app
+        run: |
+          nohup npm run start:emulator > /tmp/app.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://localhost:4200 >/dev/null 2>&1 && break; sleep 3; done
+          if ! curl -sf http://localhost:4200 >/dev/null 2>&1; then echo "::error::app failed to serve on :4200"; tail -60 /tmp/app.log; exit 1; fi
+
+      - name: Run isolated queue e2e suite (the gate)
+        run: cd e2e && EMU_REUSE=1 EMU_REUSE_APP=1 TESTRUNID=run1 bash scripts/run-isolated.sh
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 14
