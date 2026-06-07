@@ -1,0 +1,10 @@
+variation,backbone_stages,config_edges,edges_covered,edge_coverage_pct,paths_generated,seeded_participants,walked_by_spec
+LYL - First Cycle,17,28,28,100%,3,4,e2e/queue/variations/lyl-first-cycle.spec.ts
+LYL - Next Cycle,18,29,29,100%,3,2,e2e/queue/variations/lyl-next-cycle.spec.ts
+B!G - Next Cycle,24,29,29,100%,3,14,e2e/queue/variations/big-next-cycle.spec.ts
+Prodigies - Next Cycle,16,30,30,100%,6,2,e2e/queue/variations/prodigies-next-cycle.spec.ts
+Prodigies - First Cycle,13,27,27,100%,6,1,e2e/queue/variations/prodigies-first-cycle.spec.ts
+uP! - First Cycle,17,31,31,100%,6,14,e2e/queue/variations/up-first-cycle.spec.ts
+uP! - Next Cycle,18,32,32,100%,6,9,e2e/queue/variations/up-next-cycle.spec.ts
+uP! - 3rd Cycle,18,31,31,100%,5,3,e2e/queue/variations/up-3rd-cycle.spec.ts
+uP! - Prep Hold,1,0,0,100%,1,1,e2e/queue/variations/up-prep-hold.spec.ts
