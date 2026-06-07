@@ -260,8 +260,10 @@ test.describe('BIG-08 — BIG Cohorts', () => {
 
     // Sanity: the app's audit-history SURFACE renders (the Progression report mounts and lists the moved
     // rows it re-reads fresh from `big cohorts log`). One rendered read proves the surface works; we use
-    // the Firestore row above (not a 2nd dialog read) for the precise delta, since the page object's
-    // openProgressionReport is idempotent and would not re-fetch on a repeat call.
+    // the Firestore row above (not a 2nd dialog read) for the precise delta. auditLogRows() opens the
+    // Progression dialog, reads, and then CLOSES it (page object) — crucial, because its full-viewport
+    // `.dialog-scrim` overlay would otherwise sit above the cohort cards and intercept the moveParticipant
+    // click below (the BIG-08 120s "dialog-scrim intercepts pointer events" timeout).
     const renderedMovedBefore = await cohorts.auditLogRows({ movedOnly: true });
     expect(renderedMovedBefore, 'Progression report should render the audit history surface').toBeGreaterThanOrEqual(
       0,

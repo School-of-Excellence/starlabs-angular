@@ -60,7 +60,7 @@ import { TESTRUNID, PASSWORD, actors, loginAs } from './support/actors';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from './support/console-guard';
 import { installAllExternalStubs } from './stubs';
 import { installDeliveryStatusSpy, waitForDeliveryStatusCalls } from './support/delivery-status-spy';
-import { getDoc, queryWhere, countWhere, pollUntil } from './support/firestore-admin';
+import { getDoc, queryWhere, countWhere, pollUntil, WhereClause } from './support/firestore-admin';
 
 // CommonJS deps (match the rest of e2e/lib + the other specs' require() style).
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -737,34 +737,59 @@ test.describe('Operator — Queue Manager board (OP-01…OP-13, OP-02b, OP-09b)'
     const planner = new BigPlannerPage(page);
     await planner.open(QUEUE1_DOCID);
 
-    // [GAP] completedToken (component ts:549; no DOM binding → read off the live instance) == the KNOWN
-    // Firestore count of Active tokens at the queue's LAST stage. Anti-circular: app-computed vs seeded.
-    const completed = await planner.readCompletedToken();
     const lastStage = seed.cfg.stages[seed.cfg.stages.length - 1];
-    // The component computes completedToken off its `queue_token` stream which is filtered to
-    // `tokenstatus == "Active"` (big-planner.component.ts:546 query). Mirror that filter EXACTLY so the
-    // Firestore oracle counts the same population the app does — otherwise a Completed-but-inActive token
-    // (left by another serialized test) inflates the oracle count above the app's number (a false mismatch).
-    const firestoreCompleted = await countWhere('queue_token', [
+    const queueRefFilter: WhereClause[] = [
       ['testrunid', '==', TESTRUNID],
       ['queueref', '==', db().collection('queue generation').doc(QUEUE1_DOCID)],
       ['tokenstatus', '==', 'Active'],
-      ['currentstage', '==', lastStage],
-    ]);
-    expect(completed, 'OP-12: planner completedToken must reconcile with Firestore tokens at the last stage').toBe(
-      firestoreCompleted,
-    );
+    ];
 
-    // [GAP] stageTokenMap totals sum to the KNOWN active-token population for the queue (no per-stage
-    // miscount masked by an aggregate — the per-stage map is the app's own computation, ts:552-578).
-    const map = await planner.readStageTokenMap();
-    const mapSum = Object.values(map).reduce((a, b) => a + b.total, 0);
-    const activeTokens = await countWhere('queue_token', [
-      ['testrunid', '==', TESTRUNID],
-      ['queueref', '==', db().collection('queue generation').doc(QUEUE1_DOCID)],
-      ['tokenstatus', '==', 'Active'],
-    ]);
-    expect(mapSum, 'OP-12: Σ stageTokenMap.total must equal the active-token count for the queue').toBe(activeTokens);
+    // [GAP] completedToken (component ts:549; no DOM binding → read off the live instance) == the
+    // Firestore count of Active tokens at the queue's LAST stage. Anti-circular: the planner computes
+    // `completedToken` from ITS OWN live `queue_token` stream (ts:546 query, filtered tokenstatus=="Active"),
+    // the oracle COUNTS Firestore — two independent derivations of whatever state exists; we assert they
+    // AGREE. We poll for that agreement rather than reading each once, because (a) earlier cases in this
+    // same spec file move tokens INTO `Completed` (OP-07/OP-08), so the last-stage population is non-zero
+    // and (b) the planner's collectionData stream converges to Firestore a tick after the underlying write
+    // lands — a one-shot read can sample the two sides mid-propagation and spuriously disagree. The Active
+    // filter on the oracle mirrors the component's query EXACTLY so a Completed-but-inactive token left by a
+    // serialized case never inflates only one side. (Anti-circular: never assert read==written; we compare
+    // the app's stream-computed number to the live Firestore count, settled.)
+    await expect
+      .poll(
+        async () => {
+          const completed = await planner.readCompletedToken();
+          const firestoreCompleted = await countWhere('queue_token', [
+            ...queueRefFilter,
+            ['currentstage', '==', lastStage],
+          ]);
+          return completed === firestoreCompleted;
+        },
+        {
+          timeout: 30_000,
+          message:
+            'OP-12: planner completedToken must reconcile with the live Firestore count of Active tokens at the last stage',
+        },
+      )
+      .toBe(true);
+
+    // [GAP] stageTokenMap totals sum to the Active-token population for the queue (no per-stage miscount
+    // masked by an aggregate — the per-stage map is the app's own computation, ts:552-578). Same
+    // convergence rationale: poll until the planner's per-stage Σ equals the live Firestore Active count.
+    await expect
+      .poll(
+        async () => {
+          const map = await planner.readStageTokenMap();
+          const mapSum = Object.values(map).reduce((a, b) => a + b.total, 0);
+          const activeTokens = await countWhere('queue_token', queueRefFilter);
+          return mapSum === activeTokens;
+        },
+        {
+          timeout: 30_000,
+          message: 'OP-12: Σ stageTokenMap.total must equal the live Active-token count for the queue',
+        },
+      )
+      .toBe(true);
   });
 
   // ===========================================================================================
@@ -789,15 +814,33 @@ test.describe('Operator — Queue Manager board (OP-01…OP-13, OP-02b, OP-09b)'
 
     // (b) Queue 1 still counts a token whose profile_data is missing (the count must not silently drop it).
     await board.selectQueue(QUEUE1_NAME);
-    const total = await board.readTotalParticipants();
-    const activeTokens = await countWhere('queue_token', [
+    // Poll for the board's stream-computed Total to CONVERGE on the live Firestore Active-token count.
+    // Same convergence rationale as OP-12: earlier cases in this file (OP-04..OP-08) churned queue 1's
+    // population and this case just seeded the missing-profile token, so the board's collectionData stream
+    // settles to Firestore a tick after those writes — a one-shot read can sample mid-propagation and
+    // spuriously disagree. Anti-circular: the board independently computes Total from its stream, the
+    // oracle counts Firestore; we assert they agree once settled (never read==written). The key invariant —
+    // the missing-profile token is NOT silently dropped — holds iff the two converge (it is one of the
+    // Active tokens both sides count).
+    const queue1ActiveFilter: WhereClause[] = [
       ['testrunid', '==', TESTRUNID],
       ['queueref', '==', db().collection('queue generation').doc(QUEUE1_DOCID)],
       ['tokenstatus', '==', 'Active'],
-    ]);
-    expect(total, 'OP-13: the board Total must include the missing-profile token (still counted, blank name)').toBe(
-      activeTokens,
-    );
+    ];
+    await expect
+      .poll(
+        async () => {
+          const total = await board.readTotalParticipants();
+          const activeTokens = await countWhere('queue_token', queue1ActiveFilter);
+          return total === activeTokens;
+        },
+        {
+          timeout: 30_000,
+          message:
+            'OP-13: the board Total must converge on the live Active-token count (the missing-profile token must still be counted, not silently dropped)',
+        },
+      )
+      .toBe(true);
     // Sanity: the missing-profile token is one of the counted Active tokens.
     const mp = await getDoc('queue_token', missingProfileTokenId);
     expect(mp && mp.tokenstatus, 'OP-13: the missing-profile token should be Active (counted)').toBe('Active');

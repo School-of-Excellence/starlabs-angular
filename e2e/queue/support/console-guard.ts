@@ -30,6 +30,16 @@ export const IGNORABLE: RegExp[] = [
   /ERR_FAILED/i,
   /Failed to load resource/i,
   /net::ERR_/i,
+  // Firestore JS SDK transient transport blips: under the single shared emulator (heavy long-poll /
+  // websocket load) the SDK logs an error-level "Could not reach Cloud Firestore backend. Connection
+  // failed N times … [code=unavailable]" then transparently RETRIES and recovers. This is benign
+  // retryable transport noise (same class as the network failures above), NOT an app bug — a genuine
+  // app fault surfaces as a different message/path. Without this, an unlucky reconnect blip during a
+  // case trips assertNoFatal. (A real Firestore *misuse* — e.g. an invalid query — is a distinct
+  // "FirebaseError: Invalid Query …"/"INVALID_ARGUMENT" string and is still caught.)
+  /Could not reach Cloud Firestore backend/i,
+  /code=unavailable/i,
+  /@firebase\/firestore:.*Connection failed/i,
   // analytics / voice SDKs (no-op in test)
   /posthog/i,
   /picovoice/i,

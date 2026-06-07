@@ -1,7 +1,10 @@
 // @ts-nocheck
 /**
  * lyl-first-cycle.spec.ts — V1 · LYL - First Cycle closed-loop variation walk.
- * PLAN cases LYL-FC-WF-01 / 02 / 03 (flow-config.md §2 V1, §3 D1, §5 V1 specials).
+ * PLAN cases LYL-FC-WF-01 / 02 / 03 (flow-config.md §2 V1, §3 D1, §5 V1 specials),
+ * PLUS the 72-journey expansion: LYL-FC-J01…J09 walk EVERY distinct FORWARD journey V1 defines
+ * (forwardJourneys(cfg, VID), ≈9 for V1) — one data-driven test per journey, entry→its forward sink,
+ * asserting the same universal invariants after every transition. See the block above that describe.
  *
  * WHAT THIS PROVES (the anti-circularity rebuild — SHARED CONVENTIONS / assertions.ts header):
  *   A participant of variation V1 (`K9PRd4PfWDWtaO0vSxy3`) is walked from the entry stage
@@ -63,6 +66,8 @@ import { seedLylFirstCycle, VARIATION_ID, VARIATION_NAME, FIRST_STAGE } from '..
 const cfg = require('../../fixtures/sample-queue-config.json');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { build, outEdgesForVariation } = require('../../lib/flow-model');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { forwardJourneys } = require('../../lib/forward-journeys');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sim = require('../../lib/participant-sim');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -140,6 +145,55 @@ const WF01_PATH: string[] = [
 
 /** Pre-compute & oracle-validate the WF-01 hops once (fails fast on any illegal adjacency). */
 const WF01_HOPS: Hop[] = WF01_PATH.slice(0, -1).map((from, i) => classifyHop(from, WF01_PATH[i + 1]));
+
+/**
+ * Classify a single legal FORWARD hop (excludes the loop / back edges so the forward-journey walk only
+ * ever drives advancing edges). Mirrors classifyHop but pins to a forward scoped edge — used by the
+ * 72-journey expansion below (the bounded loop / DRC back-edge are exercised by WF-02 / WF-03 above).
+ */
+function classifyForwardHop(from: string, to: string): Hop {
+  const edges = outEdgesForVariation(MODEL, from, VID).filter((e: any) => e.to === to && !e.loop && !e.back);
+  if (edges.length !== 1) {
+    const legal = outEdgesForVariation(MODEL, from, VID)
+      .map((e: any) => `${e.to}[${e.type}${e.back ? ',back' : ''}${e.loop ? ',loop' : ''}]`);
+    throw new Error(
+      `[lyl-first-cycle] forward hop "${from}" → "${to}" is not a single legal forward scoped edge (matched ${edges.length}). ` +
+      `Legal oracle out-edges from "${from}": ${JSON.stringify(legal)}.`,
+    );
+  }
+  const e = edges[0];
+  if (e.type === 'next') return { from, to, kind: 'OP' };
+  return { from, to, kind: e.selfmv ? 'SELF' : 'AUTO' };
+}
+
+/**
+ * True iff `stage` has ZERO FORWARD scoped out-edges for V1 (a forward-DAG sink == a journey terminal).
+ * `Completed` is a true graph terminal (zero edges of any type); DRC is a forward sink whose ONLY edge is
+ * the BACK-edge to Diagnostics (so forwardJourneys ends J1 at DRC) — both satisfy this.
+ */
+function isForwardSink(stage: string): boolean {
+  return outEdgesForVariation(MODEL, stage, VID).every((e: any) => e.loop || e.back || e.dangling);
+}
+
+/**
+ * The FINITE set of distinct FORWARD journeys for V1 (entry→forward-sink). `forwardJourneys` advances in
+ * the variation's own backbone order (strictly increasing ⇒ a DAG ⇒ terminates), so this is EVERY distinct
+ * forward journey, not a curated subset (≈9 for V1 — see e2e/scripts/count-paths.js / the brief's 72-journey
+ * total). The bounded back-edge loops (Scope Enhancement self-loop, Diagnostics↔DRC) are NOT enumerated here
+ * — they are the WF-02 / WF-03 cases above. J1 ends at the DRC forward sink (dead-forward D1); J2…J9 end at
+ * Completed.
+ */
+const JOURNEYS: string[][] = forwardJourneys(cfg, VID);
+
+// Pre-validate at module load (fail fast): non-empty, every journey starts at the entry, every adjacency is
+// a single legal FORWARD scoped edge, and every journey ends at a forward sink. A regression in the seed
+// config / oracle surfaces here as a load-time error naming the offending journey, not a flaky mid-walk fail.
+if (JOURNEYS.length === 0) throw new Error('[lyl-first-cycle] forwardJourneys returned 0 journeys for V1 — enumerator/oracle mismatch.');
+for (const j of JOURNEYS) {
+  if (j[0] !== FIRST_STAGE) throw new Error(`[lyl-first-cycle] journey does not start at the entry "${FIRST_STAGE}": ${j[0]}`);
+  for (let i = 0; i < j.length - 1; i++) classifyForwardHop(j[i], j[i + 1]); // throws on any illegal adjacency
+  if (!isForwardSink(j[j.length - 1])) throw new Error(`[lyl-first-cycle] journey terminal "${j[j.length - 1]}" is not a forward sink.`);
+}
 
 // =================================================================================================
 // Shared helpers — board readiness + per-hop drivers (REAL board for OP, sim stand-in for SELF/AUTO)
@@ -525,5 +579,123 @@ test.describe(`V1 · ${VARIATION_NAME} (${VID}) — closed-loop walk (LYL-FC-WF-
       }, { timeout: 20_000, message: 'WF-03: the 3rd Diagnostics→DRC row should be recorded by the product.' })
       .toBe(3);
     await expect(assertLoopBound(tokenDocId, 2)).rejects.toThrow(/LOOP-BOUND/);
+  });
+});
+
+// =================================================================================================
+// THE 72-JOURNEY EXPANSION (V1's slice) — walk EVERY distinct FORWARD journey LYL-FC defines.
+//
+// WHY (the brief's "expand to ALL forward journeys"): LYL-FC-WF-01 above walks ONE curated happy path
+// (the Diagnostics→ATC Preparation→ATC Briefing→Consultation route, == journey J8). The forward path space
+// of V1 is FINITE — `forwardJourneys(cfg, VID)` (above, JOURNEYS) enumerates EVERY distinct entry→sink
+// sequence where each step takes a distinct FORWARD next-stage (a forward edge strictly increases the
+// variation's backbone order ⇒ DAG ⇒ terminates). For V1 that is exactly 9 journeys (the operator's choice
+// at the Diagnostics hub — Consultation / ATC Briefing / ATC Preparation and their combinations — plus the
+// optional uP! Readiness Changework→Review detour before Self Evolution Report, with J1 the dead-forward DRC).
+//
+// This block converts the walk from "one curated path" to "EVERY forward journey", DATA-DRIVEN: one `test`
+// per journey, so a failure NAMES the exact journey. Each journey is walked entry→terminal MIXING ACTORS
+// exactly as WF-01 does — operator `nextstage` hops through the REAL Live Board (QueueBoardPage.moveToken →
+// real move-dropdown → real PeopleInvolved confirm, asserting the board's recomputed counts) and participant
+// self-move / gate auto-advance hops via the documented participant-sim stand-in (preconditions only). After
+// EVERY transition the universal silent-data-gap invariants (e2e/lib/assertions.ts) run AGAINST PRODUCT OUTPUT
+// (the `queue stage log` rows the board/sim wrote, the token the app advanced, the per-stage counts the board
+// recomputed) and the scoped-edge ORACLE (flow-model.outEdgesForVariation — NOT the raw backbone):
+//   NO-ORPHAN · EVERY-MOVE-LOGGED (≥ the operator/CF-driven count, so a sim-only walk can NOT satisfy it) ·
+//   NO-STAGE-SKIPPED (prev→curr is a legal scoped edge) · COUNT-CONSERVED (board UI, on each OP hop) ·
+//   LOOP-BOUND ≤2 · TERMINAL-REACHED (the journey's own forward-terminal).
+//
+// ANTI-CIRCULARITY: each operator hop drives the REAL board + asserts the count the BOARD recomputed and the
+// row the PRODUCT wrote — never a value the test wrote. participant-sim stands in ONLY for the participant
+// self-move / gate auto-advance (the native Flutter participant has no web UI); the invariants still read the
+// product's logged row, never the written value directly. These journey tests REUSE the SAME helpers as
+// WF-01 (driveOperatorHop / driveSimHop / resetToken / assertUniversalAfterHop) — no duplicated routing logic.
+//
+// FORWARD-TERMINAL NOTE (D1 dead-forward): in the forward DAG, DRC (Diagnostics Readiness Changework) is a
+// SINK — its only scoped edge is the BACK-edge DRC→Diagnostics, which is NOT forward, so the enumerator ends
+// journey J1 at DRC. TERMINAL-REACHED is asserted with each journey's OWN last stage (Completed for J2…J9;
+// DRC for J1): for Completed via assertTerminalReached + the oracle (ZERO scoped out-edges of ANY type); for
+// the DRC sink via isForwardSink (zero FORWARD edges) + a token read. The DRC back-edge LOOP is exercised by
+// WF-03 above; these forward walks never traverse it.
+// =================================================================================================
+test.describe(`V1 · ${VARIATION_NAME} (${VID}) — walk EVERY forward journey (${JOURNEYS.length} journeys, data-driven)`, () => {
+  let guard: ConsoleGuard;
+  test.beforeEach(async ({ page }) => { guard = attachConsoleGuard(page); });
+  test.afterEach(() => { assertNoFatal(guard); });
+
+  // One test PER forward journey — a failure names the exact journey index + its terminal.
+  JOURNEYS.forEach((journey, idx) => {
+    const jno = idx + 1;
+    const hops: Hop[] = journey.slice(0, -1).map((from, i) => classifyForwardHop(from, journey[i + 1]));
+    const terminal = journey[journey.length - 1];
+    const opHops = hops.filter((h) => h.kind === 'OP').length;
+    const autoHops = hops.filter((h) => h.kind === 'AUTO').length;
+    const title =
+      `LYL-FC-J${String(jno).padStart(2, '0')} walk entry→${terminal} (${hops.length} hops: ${opHops} operator + ` +
+      `${hops.length - opHops} self/auto) — every transition legal, logged, count-conserved`;
+
+    test(title, async ({ page }) => {
+      // SEED preconditions on the shared default run: queue generation + the V1 variation doc + ONE token at
+      // the first stage. Idempotent; the spec asserts CF/app output, never this seeded value (anti-circularity).
+      const seeded = await seedLylFirstCycle({ cohort: 1 });
+      const participant = seeded.participants[0];
+      const tokenDocId = participant.tokenId;        // the `docid` the product's stage-log rows key on
+      const cardId = participant.profileid;          // the board card's data-token-id (= profile_id)
+      expect(seeded.firstStage, 'V1 first stage').toBe(FIRST_STAGE);
+
+      // FRESH-participant precondition: clear the token's accumulated product-written stage-log rows and
+      // re-anchor it at the entry (the token is REUSED across all V1 describes + every journey here, so a
+      // prior walk's rows would otherwise leak into this journey's ABSOLUTE EVERY-MOVE-LOGGED counts).
+      await resetToken(tokenDocId, FIRST_STAGE);
+
+      // Drive the REAL operator board ONCE (auth + queue select) — reused across every OP hop in this walk.
+      await loginAsOperator(page);
+      const board = new QueueBoardPage(page);
+      await board.selectQueue(QUEUE_NAME);
+
+      let logged = 0;       // product-logged transitions so far (the entry hop is never logged)
+      let minNonSelf = 0;   // operator/CF-driven (movedby != 'self') subset — proves non-circularity
+
+      for (const hop of hops) {
+        if (hop.kind === 'OP') {
+          // REAL board move + board-computed count-drift (src−1 / dst+1, Σ conserved).
+          await driveOperatorHop(page, board, cardId, hop);
+          minNonSelf += 1; // a board move writes movedby = operator profileid (NOT 'self')
+        } else {
+          // Participant self-move / gate auto-advance stand-in (precondition only; the product logs the row).
+          await driveSimHop(tokenDocId, hop, seeded.testrunid);
+          if (hop.kind === 'AUTO') minNonSelf += 1; // an AUTO gate hop is app/CF-driven (movedby 'operator')
+        }
+        logged += 1;
+
+        // UNIVERSAL invariants after EVERY transition — all read PRODUCT output / the oracle.
+        await assertUniversalAfterHop(tokenDocId, logged, minNonSelf);
+
+        // NO-STAGE-SKIPPED, sharpened: the LATEST product-logged transition is exactly this oracle hop.
+        const trail = await observedTransitions(tokenDocId);
+        const last = trail[trail.length - 1];
+        expect(last, `LYL-FC-J${jno}: a stage-log row should exist after hop → ${hop.to}`).toBeTruthy();
+        expect(last.to, `LYL-FC-J${jno}: latest logged transition should land on "${hop.to}"`).toBe(hop.to);
+        expect(last.from, `LYL-FC-J${jno}: latest logged transition should originate at "${hop.from}"`).toBe(hop.from);
+      }
+
+      // TERMINAL-REACHED: the token rests on THIS journey's forward-terminal. For Completed assert the full
+      // oracle terminal (ZERO scoped out-edges of any type); for the J1 DRC forward sink assert isForwardSink
+      // (zero FORWARD edges — its lone BACK-edge is WF-03's bounded loop, never traversed on this forward walk).
+      if (terminal === TERMINAL) {
+        await assertTerminalReached(tokenDocId, VID, { terminal, oracle: MODEL });
+      } else {
+        expect(isForwardSink(terminal), `LYL-FC-J${jno}: "${terminal}" must be a forward sink (zero forward scoped edges).`).toBe(true);
+        const tok = await sim.db().collection('queue_token').doc(tokenDocId).get();
+        expect(tok.exists, `LYL-FC-J${jno}: token still exists at terminal`).toBe(true);
+        expect(tok.data().currentstage, `LYL-FC-J${jno}: token rests on the journey terminal "${terminal}".`).toBe(terminal);
+      }
+
+      // Final EVERY-MOVE-LOGGED tally: exactly the product-logged forward transitions of THIS journey, of
+      // which the operator/CF-driven (non-'self') count is the OP hops + AUTO gate hops (computed, never
+      // hardcoded) — so the count can NOT be satisfied by participant self-writes alone (anti-circularity).
+      await assertEveryMoveLogged(tokenDocId, hops.length, { minNonSelf: opHops + autoHops });
+      expect(logged, `LYL-FC-J${jno}: total product-logged transitions`).toBe(hops.length);
+    });
   });
 });

@@ -34,6 +34,7 @@
 
 import { expect, Locator, Page } from '@playwright/test';
 import { loginAsBigParticipant, LANDING_ROUTES, LoginOpts } from '../support/auth';
+import { TESTRUNID } from '../support/actors';
 
 /** Route that hosts <app-web-studio-invitation> (auth.ts LANDING_ROUTES.bigParticipant === '/queue-web'). */
 const QUEUE_WEB_ROUTE = LANDING_ROUTES.bigParticipant; // '/queue-web'
@@ -85,6 +86,9 @@ export class WebInvitationPage {
    * @returns the participant email actually logged in as.
    */
   async open(token: ParticipantIdentity = {}, opts: LoginOpts = {}): Promise<string> {
+    // PRECONDITION: the participant route grant (see ensureQueueWebRouteGrant) must exist BEFORE login,
+    // or the authGuard denies /queue-web and the overlay component never mounts (the SS-05..SS-08 timeout).
+    await ensureQueueWebRouteGrant();
     const email = await loginAsBigParticipant(this.page, token.index ?? 0, {
       ...opts,
       email: token.email ?? opts.email,
@@ -178,6 +182,60 @@ export class WebInvitationPage {
   async dismissSuccess(): Promise<void> {
     await this.successBtn.click();
   }
+}
+
+/**
+ * PRECONDITION: grant the participant role access to `/queue-web` via a `dashboard` route-config doc.
+ *
+ * WHY (root cause of the SS-05..SS-08 "overlay never appeared" timeout): the participant lands on
+ * `/queue-web` (QueueWebVersion1Component), which is `canActivate: [authGuard]` (app.routes.ts:319).
+ * The authGuard resolves the route's allowed roles/profileids from the `dashboard` collection
+ * (`routeConfig(cleanUrl)`, authguard.service.ts:320-348) where `cleanUrl == '/queue-web'`. The shared
+ * seeder grants every OTHER driven screen a `dashboard` doc (DRIVEN_ROUTES, seed-test-project.js:143)
+ * but OMITS `/queue-web`, so `routeConfig('/queue-web')` returns EMPTY roles + EMPTY profiles → the
+ * guard's `hasAccess` is false AND both lists are empty → it opens the "No roles or profiles configured"
+ * dialog and returns false (auth.guard.ts). Navigation is cancelled with NO redirect (the
+ * `router.navigate(['/EISDashboard'])` line is commented out), so the URL can still read `/queue-web`
+ * (letting open()'s waitForURL pass) while the component is BLOCKED from mounting — the overlay listener
+ * never starts and `waitUntilShown` times out.
+ *
+ * This writes the missing route-config doc granting the `participant` role (every seeded participant's
+ * users_roles doc carries `participant:true`, so `getRoles()` → `rolesArray` includes 'participant',
+ * making `hasAccess` true). It is PRECONDITION SETUP ONLY — route infrastructure the seeder should have
+ * provided — exactly the same category as the spec's existing `getDocRefUpdate` / `ensureStageAcceptsSeededForm`
+ * precondition writes, and it is asserted by NOTHING (the specs assert the app/CF accept/deny output).
+ * Verified live: with this doc the guard logs `has access: true` and admits the participant; without it the
+ * participant is denied and the overlay never renders. ALSO returned as a seedRequest so the shared seeder
+ * grants `/queue-web` natively (then this becomes an idempotent no-op).
+ *
+ * Idempotent (deterministic doc id, merge). Goes through the allowlist-guarded participant-sim handle, so
+ * it can only ever touch the dedicated test project / emulator (never production).
+ */
+async function ensureQueueWebRouteGrant(): Promise<void> {
+  // participant-sim lives at e2e/lib/ — this page object is at e2e/queue/pages/, so it is TWO levels up
+  // (the specs that require it are at e2e/queue/, hence their `../lib`; a page object needs `../../lib`).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { db } = require('../../lib/participant-sim');
+  const docId = `${TESTRUNID}_dash__queue_web`;
+  await db()
+    .collection('dashboard')
+    .doc(docId)
+    .set(
+      {
+        route: '/queue-web',
+        label: 'Queue Web (participant overlay)',
+        // Grant by the participant ROLE (every seeded participant has users_roles.participant==true), so the
+        // guard's role check (rolesArray.some(r => routeConfigRoles.includes(r))) admits ALL participants.
+        roles: ['participant'],
+        profileid: [],
+        showInSidenav: false,
+        order: 0,
+        children: [],
+        testrunid: TESTRUNID,
+        _testdata: true,
+      },
+      { merge: true },
+    );
 }
 
 /** Convenience factory mirroring the suite's lightweight style. */

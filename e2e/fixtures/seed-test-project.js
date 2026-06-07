@@ -170,6 +170,16 @@ const DRIVEN_ROUTES = [
   { route: '/zoommeeting_bigparticipants', label: 'Zoom Meeting (BIG)' },
   { route: '/joinroom', label: 'Join Room (OpenVidu)' },
   { route: '/web-studio-invitation', label: 'Web Studio Invitation' },
+  // /queue-web (QueueWebVersion1Component, app.routes.ts:319) is the PARTICIPANT landing route
+  // (LANDING_ROUTES.bigParticipant) that hosts the <app-web-studio-invitation> accept/deny overlay
+  // (studio SS-05/06/08). It is the ONLY driven participant screen with no dashboard grant — the
+  // authGuard resolves its allowed roles/profileids from `dashboard` (routeConfig('/queue-web'),
+  // authguard.service.ts) and, with NO doc, returns EMPTY roles+profiles → denies every seeded
+  // participant and the overlay never mounts. The other DRIVEN_ROUTES are STAFF screens, so they are
+  // granted to staff roles+profileids only; this one carries `participant: true` so the seedAuthChain
+  // dashboard loop ALSO grants the `participant` role + every seeded participant's profileid. (Makes
+  // web-invitation.page.ts ensureQueueWebRouteGrant() an idempotent no-op — the grant is now native.)
+  { route: '/queue-web', label: 'Queue Web', participant: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -239,6 +249,14 @@ const queueGenDocId2 = testrunid => `${testrunid}_${QUEUE_ID_2}`;
 const tokenDocId = (testrunid, profileid) => `${testrunid}_tok_${profileid}`;
 /** Stable doc-id for the run's single `arena events` doc (B!G Planner onQueueSelect 'in' query). */
 const arenaEventDocId = testrunid => `${testrunid}_arenaevt_0`;
+// BIG-core world (big-core BIG-03/04 + watch-videos) stable doc-ids. The PAB the big-core specs drive
+// logs in as the index-1 BIG provider (run1_pf_big_1; big-core.spec.ts PAB_ADMIN_INDEX = 1), so the
+// big participants assignments are owned by that profileid. Ids are run-namespaced + distinct from the
+// analytics-spec BIG world (fixtures/big-seed.ts uses `_bigm_0`/`_biga_0`/`_bigp_*`), so the two worlds
+// coexist on a shared emulator without colliding.
+const BIG_CORE_ADMIN_INDEX = 1;
+const bigCoreAdminProfileId = testrunid => `${testrunid}_pf_big_${BIG_CORE_ADMIN_INDEX}`;
+const bigCoreMarathonId = testrunid => `${testrunid}_bigcore_marathon_0`;
 
 /**
  * Deep-clone `sample-queue-config.json`'s `stageproperty` and remap every
@@ -388,9 +406,16 @@ async function seedAuthChain(db, auth, testrunid, roster) {
   // dashboard route-config: grant every driven route to the staff roles + profileids.
   const staffProfileIds = staff.map(s => s.profileid);
   const allRoles = [...new Set(staff.flatMap(s => s.roles || ['admin']))];
+  // Participant landing routes (those flagged `participant:true`, e.g. /queue-web) ALSO grant the
+  // `participant` role + every seeded participant's profileid — otherwise authGuard denies the seeded
+  // participants that screen and its overlay never mounts (studio SS-05/06/08). Staff screens keep the
+  // staff-only grant so the BIG-00b/BIG-05 deny assertions on management routes still hold.
+  const participantProfileIds = participants.map(p => p.profileid).filter(Boolean);
   for (const r of DRIVEN_ROUTES) {
+    const roles = r.participant ? [...new Set([...allRoles, 'participant'])] : allRoles;
+    const profileid = r.participant ? [...staffProfileIds, ...participantProfileIds] : staffProfileIds;
     await db.collection('dashboard').doc(`${testrunid}_dash_${r.route.replace(/\W+/g, '_')}`).set({
-      route: r.route, label: r.label, roles: allRoles, profileid: staffProfileIds,
+      route: r.route, label: r.label, roles, profileid,
       showInSidenav: true, order: 0, children: [], ...TAG(testrunid),
     });
   }
@@ -500,6 +525,21 @@ async function seedParticipantToken(db, admin, testrunid, p, queueRef) {
     profileid: p.profileid, mode: null, ...TAG(testrunid),
   });
   const id = tokenDocId(testrunid, p.profileid);
+  // VARIATION-ID NAMESPACE (§0.4): the token's `variationid` MUST equal the `queue variation` DOC id,
+  // which seedQueueAndVariations writes PREFIXED as `${testrunid}_${rawId}` (line ~425). The board keys
+  // `mapVariation[document.id]` (dynamic-queue-manager-clone.ts:1817) and scopes a token's move-dropdown
+  // via `mapVariation[token.variationid]` (checkAvailablestages:2784); the studio keys `queueVariation[doc.id]`
+  // (dynamic-studio.ts:383) and gates its move-next button on BOTH `queueVariation[token.variationid]` AND
+  // `config.variations.includes(token.variationid)` (dynamic-studio.html:527, config.variations = the
+  // PREFIXED nextstage.variations remapStagePropertyVariations:263 writes). With a RAW token.variationid
+  // every one of those lookups MISSES → the board falls back to the full 30-stage queue list (:2788) and
+  // the studio move-next button never renders. So we write the PREFIXED form here (the single source for
+  // seed-emulator.js:108 + _common.ts:136 + the per-variation builders, which all funnel through here).
+  // The flow-model ORACLE keeps reading the RAW `cfg.queuevariation[*].id`, so callers must continue to
+  // pass the RAW id into outEdgesForVariation/assertions — only this live token FIELD becomes prefixed.
+  const tokenVariationId = p.variationid && !String(p.variationid).startsWith(`${testrunid}_`)
+    ? `${testrunid}_${p.variationid}`   // raw → prefixed (the common case: callers pass the raw cfg id)
+    : p.variationid;                    // already prefixed (idempotent: never double-prefix)
   // queue_token = participant state; seeded at `p.stage` (the variation's first stage). The CF/app
   // advances it; the spec reads the resulting currentstage/stage-log — never this seeded value.
   await db.collection('queue_token').doc(id).set({
@@ -507,7 +547,7 @@ async function seedParticipantToken(db, admin, testrunid, p, queueRef) {
     // BOTH profile_id (board) AND profileid (some CFs read afterData['profileid'] inconsistently —
     // cf.md §1 GOTCHA, e.g. onQueueStageChange); seeding both removes that documented foot-gun so a
     // CF reading profileid gets the same value the board reads from profile_id.
-    profile_id: p.profileid, profileid: p.profileid, profile_name: p.email, queueref: queueRef, variationid: p.variationid,
+    profile_id: p.profileid, profileid: p.profileid, profile_name: p.email, queueref: queueRef, variationid: tokenVariationId,
     currentstage: p.stage, previousstage: null, status: 'queued', stagestatus: 'Yet to Start',
     tokenstatus: 'Active', tokennumber: p.queueposition, delete: false, // board counts tokenstatus==='Active' & !delete
     queueposition: p.queueposition, people_involved: [],
@@ -596,15 +636,21 @@ async function seedReferenceData(db, admin, testrunid) {
   }));
   // `big participants assignments` row the screen reads by participantAssignmentId. Field shape mirrors the
   // BIG fixture convention (big-seed.ts:290): docid + status + assignmenttype + profileid + the *ref fields.
-  // profileid → a SEEDED profile (the BIG admin the test logs in as: makeStaff bigProviders → _pf_big_0).
-  // assignmentref/cohortsref/marathonref are harmless placeholder refs (the screen only reads status here;
-  // cohortsref/marathonref are stored to component fields but not dereferenced on this smoke path).
+  // profileid → the SAME index-1 BIG admin the PAB specs log in as (bigCoreAdminProfileId == _pf_big_1).
+  // marathonref MUST point at a SEEDED `big marathon` (NOT the wrong `marathon` collection, and NOT a
+  // never-seeded doc): the PAB's getPendingList does `marathonMap[bpa.marathonref.id].pending++` with NO
+  // existence guard (participant-assignment-board.component.ts:305), and marathonMap is keyed ONLY by
+  // seeded `big marathon` doc ids (ts:134-142). A marathonref into an unseeded/wrong collection => the
+  // lookup is undefined => "Cannot read properties of undefined (reading 'pending')" crash on PAB mount
+  // for this admin. Pointing it at the seeded BIG-core marathon (seedBigCoreWorld below) makes the lookup
+  // resolve and lets the index-1 PAB mount with a real, non-zero pending badge. assignmentref/cohortsref
+  // are harmless placeholders (the FormBasedSubmission screen reads only `status` off this doc).
   const bigCorePaId = `${testrunid}_bigpa_form_0`;
   await db.collection('big participants assignments').doc(bigCorePaId).set({
-    docid: bigCorePaId, status: 'ongoing', assignmenttype: 'Form', profileid: `${testrunid}_pf_big_0`,
+    docid: bigCorePaId, status: 'ongoing', assignmenttype: 'Form', profileid: bigCoreAdminProfileId(testrunid),
     assignmentref: db.collection('big assignment').doc(`${testrunid}_bigassign_ph`),
     cohortsref: db.collection('big cohorts').doc(`${testrunid}_bigcohort_ph`),
-    marathonref: db.collection('marathon').doc(`${testrunid}_marathon_ph`),
+    marathonref: db.collection('big marathon').doc(bigCoreMarathonId(testrunid)),
     ...TAG(testrunid),
   });
 
@@ -838,6 +884,107 @@ async function seedSecondQueue(db, admin, testrunid) {
   return { queueGenRef2, decoyAdminProfileId };
 }
 
+/**
+ * BIG-CORE populated world (big-core BIG-03/BIG-04 + watch-videos P3#13). The BASE queue seed has NO
+ * BIG-domain docs, so those cases can only assert empty-state / skip. This seeds a SELF-CONTAINED BIG
+ * world owned by the index-1 BIG provider the PAB specs log in as (bigCoreAdminProfileId == _pf_big_1):
+ *   • one `big marathon` (the PAB auto-selects bigMarathonList[0]; surfaces a `pab-marathon-btn`),
+ *   • one Form-type `big assignment` (a generic Σ-badge/perform-action card for BIG-03/BIG-04),
+ *   • one Video-type `big assignment` (assignmenttype === 'Video' — the literal PAB type-badge text)
+ *     with a non-empty `selectedvideos` array of `arena video`-doc DocumentReferences — the ONLY product
+ *     path that opens WatchVideosComponent (PAB performAction on a Video card → OpenVideos → dialog;
+ *     watch-videos.component.ts:71 iterates data.activity['selectedvideos']),
+ *   • a `big participants assignments` row per assignment, owned by the PAB admin, status 'ongoing'.
+ *
+ * DATE SHAPE (load-bearing): the PAB card is built by spreading the `big assignment` doc
+ * (loadParticipantAssignments ts:213-227), and BOTH the template (html:215 reads `activity.startdate.seconds`
+ * UNCONDITIONALLY) and `checkActivityStart`/`categorizeActivities` (ts:254/305 call `.toDate()`) require
+ * `startdate`/`enddate` to be present Firestore Timestamps ON THE ASSIGNMENT. For the card to land in the
+ * `myactivities` bucket AND render an ENABLED perform-action button we need startdate IN THE PAST and
+ * enddate IN THE FUTURE (now ∈ [start,end]) with the participant-assignment status NOT completed/rework/review.
+ *
+ * ANTI-CIRCULARITY: PRECONDITION only — BIG-03/04 assert the count/status the PAB RECOMPUTES after a real
+ * marathon-select / perform-action; watch-videos asserts the videos.length / playedVideos.size the dialog
+ * COMPUTES from its own `selectedvideos` fetch. Idempotent (deterministic ids; overwrites on re-run).
+ * Coexists with fixtures/big-seed.ts's analytics world (distinct ids + a distinct owner profileid).
+ * @param {object} db admin.firestore()
+ * @param {object} admin firebase-admin (for Timestamp)
+ * @param {string} testrunid
+ * @returns {{marathonId:string, adminProfileId:string, videoAssignmentId:string, formAssignmentId:string}}
+ */
+async function seedBigCoreWorld(db, admin, testrunid) {
+  const T = admin.firestore.Timestamp;
+  const now = () => T.now();
+  const past = T.fromMillis(Date.now() - 7 * 86400e3);     // started a week ago (perform-action enabled)
+  const future = T.fromMillis(Date.now() + 30 * 86400e3);  // ends in a month (lands in `myactivities`)
+  const adminProfileId = bigCoreAdminProfileId(testrunid);
+
+  // 1. marathon — the PAB streams `big marathon` orderBy('startdate','desc') and auto-selects index 0
+  //    (ts:134-145). It is also the doc the BIG-06 precondition's marathonref points at (above), so the
+  //    index-1 PAB's getPendingList finds it in marathonMap and does not crash.
+  const marathonId = bigCoreMarathonId(testrunid);
+  const marathonRef = db.collection('big marathon').doc(marathonId);
+  await marathonRef.set({
+    docid: marathonId, title: `TEST BIG-core Marathon ${testrunid}`, name: `TEST BIG-core Marathon ${testrunid}`,
+    color: '#374151', startdate: past, enddate: future, status: 'live', ...TAG(testrunid),
+  });
+
+  // 2. video docs the Video assignment's `selectedvideos` refs point at. WatchVideosComponent pushes
+  //    snap.data() (with id) into `videos` and renders `videos.length` in the footer (ts:71-77 / html:114),
+  //    so each needs at least a `title`. Collection `arena video` (the app's video catalog).
+  const VIDEO_COL = 'arena video';
+  const videoRefs = [0, 1].map(i => {
+    const vid = `${testrunid}_bigcore_video_${i}`;
+    return { id: vid, ref: db.collection(VIDEO_COL).doc(vid) };
+  });
+  for (let i = 0; i < videoRefs.length; i++) {
+    await videoRefs[i].ref.set({
+      docid: videoRefs[i].id, title: `TEST BIG-core Video ${i}`, description: `fake video ${i}`,
+      url: 'https://example.test/v.mp4', ...TAG(testrunid),
+    });
+  }
+
+  // 3a. Form-type `big assignment` — a generic card for BIG-03 (Σ-badge conservation) / BIG-04
+  //     (perform-action write). mapAssignments is keyed by `big assignment` doc id and only includes
+  //     status ∈ ['initiated','ongoing','completed'] (ts:116-117). startdate/enddate present (see header).
+  const formAssignmentId = `${testrunid}_bigcore_assign_form`;
+  const formAssignmentRef = db.collection('big assignment').doc(formAssignmentId);
+  await formAssignmentRef.set({
+    docid: formAssignmentId, title: `TEST BIG-core Form Assignment ${testrunid}`, assignmenttype: 'Form',
+    marathonref: marathonRef, cohortsref: null, status: 'ongoing',
+    startdate: past, enddate: future, ...TAG(testrunid),
+  });
+
+  // 3b. Video-type `big assignment` — assignmenttype === 'Video' (the literal type-badge text the
+  //     watch-videos spec matches) with a non-empty `selectedvideos` ref array (the OpenVideos→dialog path).
+  const videoAssignmentId = `${testrunid}_bigcore_assign_video`;
+  const videoAssignmentRef = db.collection('big assignment').doc(videoAssignmentId);
+  await videoAssignmentRef.set({
+    docid: videoAssignmentId, title: `TEST BIG-core Video Assignment ${testrunid}`, assignmenttype: 'Video',
+    marathonref: marathonRef, cohortsref: null, status: 'ongoing',
+    selectedvideos: videoRefs.map(v => v.ref),    // DocumentReferences → WatchVideos iterates these
+    startdate: past, enddate: future, ...TAG(testrunid),
+  });
+
+  // 4. one `big participants assignments` row per assignment, OWNED by the PAB admin, in a NON-terminal
+  //    status so the card lands in `myactivities` (categorizeActivities ts:253-267). loadParticipantAssignments
+  //    requires assignmentref.id to be a key of mapAssignments (the `big assignment` above) — ts:208-211.
+  const paRows = [
+    { suffix: 'form', assignmentRef: formAssignmentRef },
+    { suffix: 'video', assignmentRef: videoAssignmentRef },
+  ];
+  for (const { suffix, assignmentRef } of paRows) {
+    const paId = `${testrunid}_bigcore_pa_${suffix}`;
+    await db.collection('big participants assignments').doc(paId).set({
+      docid: paId, profileid: adminProfileId, assignmentref: assignmentRef, cohortsref: null,
+      marathonref: marathonRef, status: 'ongoing', assignmenttype: suffix === 'video' ? 'Video' : 'Form',
+      startdate: past, enddate: future, ...TAG(testrunid),
+    });
+  }
+
+  return { marathonId, adminProfileId, videoAssignmentId, formAssignmentId };
+}
+
 async function runSeed() {
   const testrunid = process.env.TESTRUNID || newTestRunId();
   const admin = initAdmin();
@@ -859,6 +1006,12 @@ async function runSeed() {
   // 2b. SECOND queue — operator NOT in queueadmin (OP-02b negative visibility).
   await seedSecondQueue(db, admin, testrunid);
   console.log('   ✓ second queue (operator-excluded, for OP-02b)');
+
+  // 2c. BIG-core populated world (marathon + Form/Video `big assignment` + owner participant-assignments)
+  //     so big-core BIG-03/BIG-04 + watch-videos exercise the POPULATED PAB path (not empty-state/skip),
+  //     and the BIG-06 precondition's marathonref resolves in the PAB marathonMap (no mount crash).
+  const bigCore = await seedBigCoreWorld(db, admin, testrunid);
+  console.log(`   ✓ BIG-core world (marathon ${bigCore.marathonId} + Form/Video assignments) for ${bigCore.adminProfileId}`);
 
   // 3. Reference data (no per-participant dep): modes, journey, arenavideoask, delivery forms (named DB).
   const ref = await seedReferenceData(db, admin, testrunid);
@@ -921,6 +1074,9 @@ const SEEDED_COLLECTIONS = [
   // (distinct from the firestore-forms one torn down below — same name, different database handle, each
   // testrunid-filtered) and the `big participants assignments` row. All testrunid-tagged.
   'delivery forms', 'big participants assignments',
+  // BIG-core populated world (seedBigCoreWorld): marathon + Form/Video `big assignment` + the video
+  // catalog docs. (`big participants assignments` is already listed above.) All testrunid-tagged.
+  'big marathon', 'big assignment', 'arena video',
 ];
 // Named-DB (firestore-forms) collections — torn down via the firestore-forms handle.
 const SEEDED_COLLECTIONS_FORMS = ['delivery forms', 'formsByClient'];
@@ -941,6 +1097,33 @@ async function teardownCollections(database, cols, testrunid) {
   return docs;
 }
 
+/**
+ * Sweep `live assignment` docs the APP/CF created for THIS run's queue but that carry NO testrunid tag
+ * (so the testrunid-filtered teardownCollections leaves them). The dynamic-studio open-session path
+ * (studio-core SS-05/06) creates `live assignment` docs via the CF WITHOUT a testrunid, and they
+ * ACCUMULATE on the persistent shared emulator — breaking SS-10's single-live-assignment invariant and
+ * SS-15's bijective-card assertion across runs. They are keyed by `queueid` == the queue-generation
+ * DOC-ID STRING (schemas.md §0.5; dynamic-studio filters `where('queueid','==',ongoingQueue.docid)`),
+ * which is ITSELF run-namespaced (`${testrunid}_${QUEUE_ID}`), so every LA with that queueid belongs to
+ * THIS run regardless of tag — safe to delete. We scope strictly to this run's two queue doc-ids; we
+ * NEVER touch ATC and NEVER delete LAs for any other run's queue. Returns the count deleted.
+ * @param {object} db admin.firestore() (default DB)
+ * @param {string} testrunid
+ */
+async function sweepUntaggedLiveAssignments(db, testrunid) {
+  const queueIds = [queueGenDocId(testrunid), queueGenDocId2(testrunid)];
+  let docs = 0;
+  for (const qid of queueIds) {
+    const snap = await db.collection('live assignment').where('queueid', '==', qid).get();
+    for (let i = 0; i < snap.docs.length; i += 450) {
+      const batch = db.batch();
+      snap.docs.slice(i, i + 450).forEach(d => { batch.delete(d.ref); docs++; });
+      await batch.commit();
+    }
+  }
+  return docs;
+}
+
 async function runTeardown(testrunid) {
   if (!testrunid) { console.error('teardown requires a testrunid argument'); process.exit(1); }
   const admin = initAdmin();
@@ -950,6 +1133,11 @@ async function runTeardown(testrunid) {
 
   let docs = await teardownCollections(db, SEEDED_COLLECTIONS, testrunid);
   docs += await teardownCollections(getFormsDb(admin), SEEDED_COLLECTIONS_FORMS, testrunid);
+  // ALSO sweep CF-created `live assignment` docs for THIS run's queue that the CF wrote WITHOUT a
+  // testrunid tag (scoped by the run-namespaced queueid) — else they accumulate on the shared emulator
+  // and break SS-10/SS-15 across runs.
+  const sweptLa = await sweepUntaggedLiveAssignments(db, testrunid);
+  if (sweptLa) { docs += sweptLa; console.log(`   ✓ swept ${sweptLa} untagged CF live-assignment doc(s) for this run's queue`); }
 
   // Auth users: iterate and delete those whose custom claim matches.
   let users = 0;
@@ -982,8 +1170,10 @@ module.exports = {
   // seed primitives — feature collections (no-scopecut expansion)
   seedReferenceData, seedParticipantFeatureDocs, seedQueuePlanning,
   seedStudioFlowPreconditions, seedQueueWebChain, seedFormsFixture, seedSecondQueue,
-  // teardown helpers
-  teardownCollections, SEEDED_COLLECTIONS, SEEDED_COLLECTIONS_FORMS,
+  // seed primitives — BIG-core populated world (big-core BIG-03/04 + watch-videos)
+  seedBigCoreWorld, bigCoreMarathonId, bigCoreAdminProfileId,
+  // teardown helpers (+ the untagged CF live-assignment sweep)
+  teardownCollections, sweepUntaggedLiveAssignments, SEEDED_COLLECTIONS, SEEDED_COLLECTIONS_FORMS,
 };
 
 // ---------------------------------------------------------------------------

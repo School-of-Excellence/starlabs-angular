@@ -366,7 +366,22 @@ export class QueueCreationPage {
     // The chip-grid input is the textbox wired to `[matChipInputFor]` (html:305). Scope to the grid so
     // a chip-input elsewhere can't match.
     const chipInput = chipGrid.locator('input[matChipInputFor]');
-    await chipInput.focus(); // focus() not click() — avoid the Material outline/required-marker intercept.
+    // Wait EXPLICITLY for the input element itself (not just its enclosing grid) to attach + become
+    // visible, with a bounded timeout. The grid host can render a beat before its projected `<input>`
+    // settles inside the outlined mat-form-field; a bare `focus()` would otherwise sit on the default
+    // 120s ACTION timeout waiting for the locator (observed AUTH-01 hang) instead of failing fast here.
+    await expect(
+      chipInput,
+      'addOneStage: the Queue-Stages chip input never became visible inside its chip-grid (step-1 "Product Mapping" did not fully render — is the step-0 gate satisfied / the dialog past its loading spinner?).',
+    ).toBeVisible({ timeout: 15_000 });
+    // Focus the chip input so the typed stage commits on Enter. focus() avoids the Material outline /
+    // required-marker pointer intercept; if focus() can't land (e.g. the label briefly overlays the
+    // control), fall back to a force-click on the input, which the chip-input accepts to take focus.
+    try {
+      await chipInput.focus({ timeout: 10_000 });
+    } catch {
+      await chipInput.click({ force: true, timeout: 10_000 });
+    }
     await chipInput.fill(stage);
     await chipInput.press('Enter');
     // `addStage` pushes onto the stages array and renders a `mat-chip-row` with the stage text

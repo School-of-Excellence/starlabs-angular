@@ -82,6 +82,8 @@ const SEL = {
   // --- Progression report (audit history of `big cohorts log`) ------------------------------------
   progressionBtn: 'button.btn-success',              // "Progression" (html:39) — opens the report
   progressionDialog: '.prog-dialog',                 // dialog shell (html:896)
+  progressionClose: '.prog-dialog .prog-close',      // dialog "×" close button → closeProgressionDialog() (html:901)
+  progressionScrim: '.dialog-scrim',                 // full-viewport scrim wrapping the dialog (html:896)
   progressionLoader: '.prog-dialog .loader-wrap',    // *ngIf="progressionLoading" (html:907)
   // Each timeline log row carries a left border + the status text; a "moved" row also renders the
   // `from → to` line (html:924-941). The per-row block is the inner div with `border-left` style;
@@ -207,27 +209,36 @@ export class BigCohortsPage {
    */
   async auditLogRows(opts: { movedOnly?: boolean } = {}): Promise<number> {
     await this.openProgressionReport();
-    if (opts.movedOnly) {
-      // Count rendered "Moved" status labels (one per moved log row, html:928).
-      let count = 0;
-      await expect
-        .poll(
-          async () => {
-            count = await this.page.locator(SEL.progressionStatus, { hasText: exactText('Moved') }).count();
-            // Resolve once the dialog has finished loading (so a true 0 is trustworthy, not "still loading").
-            return (await this.page.locator(SEL.progressionLoader).count()) === 0;
-          },
-          {
-            ...POLL,
-            message:
-              'auditLogRows(movedOnly): progression dialog never finished loading while counting "Moved" rows.',
-          },
-        )
-        .toBe(true);
-      return count;
+    try {
+      if (opts.movedOnly) {
+        // Count rendered "Moved" status labels (one per moved log row, html:928).
+        let count = 0;
+        await expect
+          .poll(
+            async () => {
+              count = await this.page.locator(SEL.progressionStatus, { hasText: exactText('Moved') }).count();
+              // Resolve once the dialog has finished loading (so a true 0 is trustworthy, not "still loading").
+              return (await this.page.locator(SEL.progressionLoader).count()) === 0;
+            },
+            {
+              ...POLL,
+              message:
+                'auditLogRows(movedOnly): progression dialog never finished loading while counting "Moved" rows.',
+            },
+          )
+          .toBe(true);
+        return count;
+      }
+      // Total: read the footer count the app prints ("{n} total activities").
+      return await this.readProgressionTotal();
+    } finally {
+      // ALWAYS dismiss the Progression dialog before returning. Its full-viewport `.dialog-scrim`
+      // overlay (html:896) sits ABOVE the cohort cards and intercepts pointer events, so a following
+      // interaction (e.g. a per-row Move button click in moveParticipant) would otherwise retry-until-
+      // test-timeout against the scrim — the exact 120s "…dialog-scrim subtree intercepts pointer events"
+      // failure BIG-08 hit when it read the audit baseline (auditLogRows) BEFORE moving a participant.
+      await this.closeProgressionReport();
     }
-    // Total: read the footer count the app prints ("{n} total activities").
-    return this.readProgressionTotal();
   }
 
   // ---------------------------------------------------------------------------
@@ -315,6 +326,37 @@ export class BigCohortsPage {
         message: 'openProgressionReport: progression data never finished loading.',
       })
       .toBe(true);
+  }
+
+  /**
+   * Close the Progression report dialog (real click on its "×" `.prog-close` button →
+   * `closeProgressionDialog()` sets `showProgressionDialog=false`, removing the whole `.dialog-scrim`
+   * `*ngIf` subtree, html:896/901). Idempotent: a no-op when the dialog is already closed. Waits until
+   * the scrim has fully detached so the page underneath is clickable again — without this the scrim
+   * keeps intercepting pointer events and any following click (e.g. a row Move button) retries to the
+   * test timeout (the BIG-08 failure). Falls back to a scrim/backdrop click, then Escape, if the close
+   * button is momentarily not hittable.
+   */
+  async closeProgressionReport(): Promise<void> {
+    if ((await this.page.locator(SEL.progressionDialog).count()) === 0) return; // already closed
+    const closeBtn = this.page.locator(SEL.progressionClose);
+    if ((await closeBtn.count()) > 0) {
+      await closeBtn.first().click({ timeout: POLL.timeout }).catch(() => undefined);
+    }
+    // If the dialog is still up, dismiss by clicking the scrim backdrop, then by Escape.
+    if ((await this.page.locator(SEL.progressionDialog).count()) > 0) {
+      await this.page
+        .locator(SEL.progressionScrim)
+        .first()
+        .click({ position: { x: 5, y: 5 }, timeout: POLL.timeout })
+        .catch(() => undefined);
+    }
+    if ((await this.page.locator(SEL.progressionDialog).count()) > 0) {
+      await this.page.keyboard.press('Escape').catch(() => undefined);
+    }
+    // Confirm the scrim/dialog actually detached so the cards beneath are interactable again.
+    await expect(this.page.locator(SEL.progressionDialog), 'progression dialog did not close (scrim still intercepting clicks)')
+      .toHaveCount(0, { timeout: POLL.timeout });
   }
 
   /** Read the app's printed total-rows count from the progression footer ("{n} total activities",

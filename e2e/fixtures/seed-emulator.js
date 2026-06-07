@@ -93,6 +93,12 @@ async function runSeed() {
   await seed.seedSecondQueue(db, admin, testrunid);
   console.log('   ✓ second queue (operator-excluded, for OP-02b)');
 
+  // 2c. BIG-core populated world (marathon + Form/Video `big assignment` + owner participant-assignments)
+  //     — same shared writer as the cloud seeder, so big-core BIG-03/04 + watch-videos exercise the
+  //     populated PAB path on the emulator too (and the BIG-06 marathonref resolves in marathonMap).
+  const bigCore = await seed.seedBigCoreWorld(db, admin, testrunid);
+  console.log(`   ✓ BIG-core world (marathon ${bigCore.marathonId} + Form/Video assignments) for ${bigCore.adminProfileId}`);
+
   // 3. Reference data (modes, journey, arenavideoask, delivery forms in firestore-forms).
   const ref = await seed.seedReferenceData(db, admin, testrunid);
   console.log('   ✓ reference data (modes, journey, arenavideoask, delivery forms)');
@@ -146,6 +152,10 @@ async function runTeardown(testrunid) {
 
   let docs = await seed.teardownCollections(db, seed.SEEDED_COLLECTIONS, testrunid);
   docs += await seed.teardownCollections(seed.getFormsDb(admin), seed.SEEDED_COLLECTIONS_FORMS, testrunid);
+  // ALSO sweep CF-created `live assignment` docs for this run's queue written WITHOUT a testrunid tag
+  // (they accumulate on the persistent emulator and break SS-10/SS-15 across runs). Shared writer.
+  const sweptLa = await seed.sweepUntaggedLiveAssignments(db, testrunid);
+  if (sweptLa) { docs += sweptLa; console.log(`   ✓ swept ${sweptLa} untagged CF live-assignment doc(s) for this run's queue`); }
 
   let users = 0;
   let pageToken;

@@ -10,8 +10,15 @@
  * Stage list IDENTICAL to V7 (uP!-NC). The ONLY oracle difference: Diagnostics has 5 forward edges
  * (NOT 6) — it drops Diagnostics→Self Evolution Report. The spec's variation-scoping negative
  * assertion (PLAN P1 #12) checks the Diagnostics move-dropdown offers EXACTLY 5 buttons and omits
- * both →Consultation (LYL/B!G-only) and →Self Evolution Report (V4–V7). Seeds PRECONDITIONS only;
- * the spec asserts CF/app output.
+ * both →Consultation (LYL/B!G-only) and →Self Evolution Report (V4–V7). That dropped edge also drops
+ * V8's distinct FORWARD journey count to 8 (V7 has 9) — the spec's 72-journey expansion walks all 8.
+ * Seeds PRECONDITIONS only; the spec asserts CF/app output.
+ *
+ * NOTE (variationid namespace — RESOLVED in the shared seeder): `seedParticipantToken` now writes the
+ * token's `variationid` PREFIXED (`${testrunid}_${id}`) to match the `queue variation` DOC id + the
+ * queue's nextstage `variations` the board/studio key by (mapVariation / queueVariation). This builder
+ * therefore needs NO local re-pin — the prefixed token is produced at the source. (Any belt-and-suspenders
+ * re-pin in up-3rd-cycle.spec.ts is now an idempotent no-op writing the same prefixed value.)
  */
 import { seedVariation, VariationSeedOptions, VariationSeedResult } from './_common';
 

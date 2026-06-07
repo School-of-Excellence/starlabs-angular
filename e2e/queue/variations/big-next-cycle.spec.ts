@@ -1,6 +1,13 @@
 // @ts-nocheck
 /**
- * big-next-cycle.spec.ts — V3 · B!G - Next Cycle closed-loop variation walk (BIGNC-00 … BIGNC-06).
+ * big-next-cycle.spec.ts — V3 · B!G - Next Cycle variation suite. TWO describes:
+ *   (1) BIGNC-00 … BIGNC-06 — the curated closed-loop walk (mixed actors + a live studio session + a
+ *       bounded ≤2 loop + the operator terminal/delivery completion).
+ *   (2) BIGNC-J01 … J09 — the 72-JOURNEY EXPANSION (this variation's slice): walk EVERY distinct FORWARD
+ *       journey `forwardJourneys(cfg, VID)` enumerates (9 for BIGNC), DATA-DRIVEN (one test per journey),
+ *       asserting the e2e/lib/assertions.ts universal invariants after EVERY transition. See the block
+ *       header above that describe for the full rationale. The curated bounded-loop case (BIGNC-06) is
+ *       KEPT on top of the forward-journey coverage (loops are not enumerated by forwardJourneys).
  *
  * ──────────────────────────────────────────────────────────────────────────────────────────────
  * PATH NOTE (SHARED CONVENTIONS reconciliation):
@@ -91,6 +98,8 @@ const { build, outEdgesForVariation } = require('../../lib/flow-model');
 const sim = require('../../lib/participant-sim');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const assertions = require('../../lib/assertions');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { forwardJourneys } = require('../../lib/forward-journeys');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { seedBigNextCycle, VARIATION_ID, VARIATION_NAME, FIRST_STAGE } = require('../../fixtures/variation-seeds/big-next-cycle');
 
@@ -698,5 +707,309 @@ test.describe(`V3 · ${VARIATION_NAME} — closed-loop walk (BIGNC-00 … 06)`, 
       { label: `board re-rendered ${from}−1 / ${to}+1`, timeoutMs: 25_000 },
     );
     assertCountConserved(before, after, { src: srcKey, dst: dstKey });
+  }
+});
+
+// =================================================================================================
+// THE 72-JOURNEY EXPANSION (this variation's slice): walk EVERY distinct FORWARD journey BIGNC defines.
+//
+// WHY (the brief's "expand to ALL forward journeys"): BIGNC-00…06 above walk a CURATED subset of the
+// path space (the entry-reachable main spine + the studio session + one bounded loop). The forward path
+// space of a variation is FINITE — `forwardJourneys(cfg, VID)` enumerates EVERY distinct entry→terminal
+// sequence where each step takes a distinct forward next-stage (a forward edge strictly increases the
+// variation's own backbone order, so the forward graph is a DAG and the enumeration terminates). For V3
+// BIGNC that is exactly 9 journeys (≈9 per variation, ~72 across the 9 variations — see count-paths.js).
+//
+// This block converts the walk from "a curated subset" to "EVERY forward journey", DATA-DRIVEN: one
+// `test` per journey, so a failure NAMES the exact journey. Each journey is walked entry→terminal MIXING
+// the SAME actors as the curated cases — [SIM] participant form/auto self-moves (the documented Flutter
+// self-move stand-in, preconditions only) and [REAL-UI] operator board moves (QueueBoardPage) — and after
+// EVERY transition the universal silent-data-gap invariants (e2e/lib/assertions.ts) run AGAINST PRODUCT
+// OUTPUT (the `queue stage log` rows the board/sim wrote, the token the app advanced, the per-stage counts
+// the board recomputed) and the scoped-edge ORACLE (flow-model.outEdgesForVariation — NOT the raw backbone):
+//   NO-ORPHAN · EVERY-MOVE-LOGGED (≥ the operator-driven count, so a sim-only walk can NOT satisfy it) ·
+//   NO-STAGE-SKIPPED (prev→curr is a legal scoped edge) · COUNT-CONSERVED (board UI, on each OP hop) ·
+//   LOOP-BOUND ≤2 · TERMINAL-REACHED (the journey's own forward-terminal).
+//
+// ANTI-CIRCULARITY: each operator hop drives the REAL board (real move-dropdown → real click → the
+// PeopleInvolved confirm the product opens) and asserts the count the BOARD recomputed + the row the
+// PRODUCT wrote — never a value the test wrote. `participant-sim.advance` stands in ONLY for the
+// participant self-move / gate auto-advance (the native Flutter participant has no web UI) — a precondition
+// stand-in; the invariants still read the product's logged row, never the written value directly.
+//
+// FORWARD-TERMINAL NOTE: in the forward DAG, DRC (Diagnostics Readiness Changework) is a SINK — its only
+// scoped edge is the BACK-edge DRC→Diagnostics, which is NOT forward (it decreases backbone order), so the
+// enumerator ends journey J1 at DRC. `assertTerminalReached` is asserted with the journey's OWN last stage
+// (Completed for J2…J9; DRC for J1) AND `noForwardEdge` (zero forward scoped out-edges) — proving it is a
+// real forward sink, not a name. (Completed additionally has ZERO scoped out-edges of ANY type; DRC has the
+// one BACK-edge, exercised in the BIGNC-06 bounded-loop case above — these journeys never traverse it.)
+// =================================================================================================
+
+/** One walk transition, classified from the ORACLE (the flow-config authority), NOT the backbone array. */
+type JourneyHop = { from: string; to: string; kind: 'OP' | 'SELF' | 'AUTO' };
+
+/** Classify a single legal forward hop `from`→`to` for BIGNC against the oracle (throws if illegal). */
+function classifyJourneyHop(from: string, to: string): JourneyHop {
+  const edges = outEdgesForVariation(MODEL, from, VID).filter((e: any) => e.to === to && !e.loop && !e.back);
+  if (edges.length !== 1) {
+    const legal = outEdgesForVariation(MODEL, from, VID).map((e: any) => `${e.to}[${e.type}${e.back ? ',back' : ''}${e.loop ? ',loop' : ''}]`);
+    throw new Error(
+      `[big-next-cycle] forward hop "${from}" → "${to}" is not a single legal forward scoped edge (matched ${edges.length}). ` +
+        `Legal oracle out-edges from "${from}": ${JSON.stringify(legal)}.`,
+    );
+  }
+  const e = edges[0];
+  if (e.type === 'next') return { from, to, kind: 'OP' };
+  return { from, to, kind: e.selfmv ? 'SELF' : 'AUTO' };
+}
+
+/** True iff `stage` has ZERO FORWARD scoped out-edges for BIGNC (a forward-DAG sink == the journey terminal). */
+function isForwardSink(stage: string): boolean {
+  return outEdgesForVariation(MODEL, stage, VID).every((e: any) => e.loop || e.back || e.dangling);
+}
+
+/** Enumerate EVERY distinct forward journey for BIGNC (data source for the per-journey tests). */
+const JOURNEYS: string[][] = forwardJourneys(cfg, VID);
+
+// Pre-validate (fail fast at module load): the enumeration is non-empty, every journey starts at the
+// entry, every adjacency is a single legal forward scoped edge, and every journey ends at a forward sink.
+if (JOURNEYS.length === 0) throw new Error('[big-next-cycle] forwardJourneys returned 0 journeys for BIGNC — enumerator/oracle mismatch.');
+for (const j of JOURNEYS) {
+  if (j[0] !== FIRST_STAGE) throw new Error(`[big-next-cycle] journey does not start at the entry "${FIRST_STAGE}": ${j[0]}`);
+  for (let i = 0; i < j.length - 1; i++) classifyJourneyHop(j[i], j[i + 1]); // throws on any illegal adjacency
+  if (!isForwardSink(j[j.length - 1])) throw new Error(`[big-next-cycle] journey terminal "${j[j.length - 1]}" is not a forward sink.`);
+}
+
+test.describe(`V3 · ${VARIATION_NAME} — walk EVERY forward journey (${JOURNEYS.length} journeys, data-driven)`, () => {
+  let guard: ConsoleGuard;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let stubs: ExternalStubs;
+
+  test.beforeEach(async ({ page }) => {
+    guard = attachConsoleGuard(page);
+    stubs = installAllExternalStubs(page); // no real Zoom/LiveKit/FCM/Wati/email escapes
+  });
+  test.afterEach(() => assertNoFatal(guard));
+
+  // One test PER forward journey — a failure names the exact journey index + its terminal.
+  JOURNEYS.forEach((journey, idx) => {
+    const jno = idx + 1;
+    const hops: JourneyHop[] = journey.slice(0, -1).map((from, i) => classifyJourneyHop(from, journey[i + 1]));
+    const terminal = journey[journey.length - 1];
+    const opHops = hops.filter((h) => h.kind === 'OP').length;
+    const autoHops = hops.filter((h) => h.kind === 'AUTO').length;
+    const title =
+      `BIGNC-J${String(jno).padStart(2, '0')} walk entry→${terminal} (${hops.length} hops: ${opHops} operator + ` +
+      `${hops.length - opHops} self/auto) — every transition legal, logged, count-conserved`;
+
+    test(title, async ({ page }) => {
+      // A full forward walk drives up to 7 REAL board moves (each: open dropdown → click target → drive the
+      // PeopleInvolved confirm → poll the board's recomputed counts) PLUS up to 9 sim self-moves, with the
+      // universal invariants re-read after EVERY hop. The longest journeys (J04/J06/J08) exceed the default
+      // 120s budget, so mark the journey walks slow (×3 ⇒ 360s). This is a runtime allowance for the longer
+      // walk, NOT a weakened assertion — every invariant still runs against PRODUCT output after each hop.
+      test.slow();
+
+      // SEED preconditions on the shared run: queue generation + the BIGNC variation doc + 1 token at the
+      // first stage. Idempotent; the spec asserts CF/app output, never this seeded value (anti-circularity).
+      const seeded = await seedBigNextCycle({ testrunid: RUN, cohort: 1 });
+      expect(seeded.variationId, 'seed targets the V3 BIGNC variation').toBe(VID);
+      const tokenDocId: string = seeded.tokenIds[0];          // the `docid` the product's stage-log rows key on
+      const cardId: string = await tokenCardIdJ(tokenDocId);  // the board card's data-token-id (= profile_id)
+
+      // FRESH-participant precondition: clear the token's accumulated product-written stage-log rows and
+      // park it at the entry (status:'queued' → the board buckets it into the entry's Queued/simple column).
+      // The token is REUSED across the BIGNC describes + every journey here, so a prior walk's rows would
+      // otherwise leak into this journey's ABSOLUTE EVERY-MOVE-LOGGED counts. Allowlist-guarded handle (test
+      // project only); re-runnable; NOT an assertion target (mirrors lyl-first-cycle resetToken).
+      await resetTokenJ(tokenDocId, FIRST_STAGE);
+
+      // Drive the REAL operator board ONCE (auth + queue select) — reused across every OP hop in this walk.
+      await loginAsOperator(page);
+      const board = new QueueBoardPage(page);
+      await board.selectQueue(QUEUE_NAME);
+
+      let logged = 0;       // product-logged transitions so far (the entry hop is never logged)
+      let minNonSelf = 0;   // operator/CF-driven (movedby != 'self') subset — proves non-circularity
+
+      for (const hop of hops) {
+        if (hop.kind === 'OP') {
+          // REAL board move + board-computed count-drift (src−1 / dst+1, Σ conserved).
+          await driveOperatorHopJ(board, cardId, hop, jno);
+          minNonSelf += 1; // a board move writes movedby = operator profileid (NOT 'self')
+        } else {
+          // Participant self-move / gate auto-advance stand-in (precondition only; the product logs the row).
+          await driveSimHopJ(tokenDocId, hop, seeded.testrunid);
+          if (hop.kind === 'AUTO') minNonSelf += 1; // an AUTO gate hop is app/CF-driven (movedby 'operator')
+        }
+        logged += 1;
+
+        // UNIVERSAL invariants after EVERY transition — all read PRODUCT output / the oracle.
+        await assertUniversalAfterHopJ(tokenDocId, logged, minNonSelf, jno, hop);
+      }
+
+      // TERMINAL-REACHED: the token rests on THIS journey's forward-terminal AND that terminal has zero
+      // FORWARD scoped out-edges (a true forward sink). For Completed this is also a true graph terminal
+      // (zero out-edges of any type — assert via the oracle); for the J1 DRC sink we assert no FORWARD edge
+      // (its lone BACK-edge is the bounded-loop case above, never traversed on this forward walk).
+      await pollUntil(
+        () => getDoc('queue_token', tokenDocId),
+        (t: any) => !!t && t.currentstage === terminal,
+        { label: `BIGNC-J${jno}: token ${tokenDocId} reached terminal "${terminal}"`, timeoutMs: 25_000 },
+      );
+      if (terminal === TERMINAL) {
+        await assertTerminalReached(tokenDocId, VID, { terminal, oracle: MODEL });
+      } else {
+        // A forward sink that is NOT the graph terminal (J1 ends at DRC): assert it is a real forward sink.
+        expect(isForwardSink(terminal), `BIGNC-J${jno}: "${terminal}" must be a forward sink (zero forward scoped edges)`).toBe(true);
+        const tok = await getDoc('queue_token', tokenDocId);
+        expect(tok!.currentstage, `BIGNC-J${jno}: token rests on the journey terminal`).toBe(terminal);
+      }
+
+      // Final EVERY-MOVE-LOGGED tally: exactly the product-logged forward transitions of THIS journey, of
+      // which the operator/CF-driven (non-'self') count is the OP hops + AUTO gate hops (computed, never
+      // hardcoded) — so the count can NOT be satisfied by participant self-writes alone.
+      await assertEveryMoveLogged(tokenDocId, hops.length, { minNonSelf: opHops + autoHops });
+      expect(logged, `BIGNC-J${jno}: total product-logged transitions`).toBe(hops.length);
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // journey-walk helpers (block-scoped; reuse the page object + assertions — no duplicated routing logic)
+  // -------------------------------------------------------------------------------------------------
+
+  /** Read the walked token's profile_id (= the card's data-token-id) once it is seeded. */
+  async function tokenCardIdJ(tokenDocId: string): Promise<string> {
+    const tok = await getDoc('queue_token', tokenDocId);
+    if (!tok) throw new Error(`[precondition] queue_token ${tokenDocId} missing — run the seeder for TESTRUNID=${RUN}`);
+    return (tok.profile_id as string) || (tok.profileid as string) || tokenDocId;
+  }
+
+  /** Reset a token to a fresh-participant precondition: delete its stage-log rows + park it at `stage`. */
+  async function resetTokenJ(tokenDocId: string, stage: string): Promise<void> {
+    const dbh = sim.db();
+    const existing = await dbh.collection('queue stage log').where('docid', '==', tokenDocId).get();
+    if (!existing.empty) {
+      const batch = dbh.batch();
+      existing.docs.forEach((d: any) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    await dbh.collection('queue_token').doc(tokenDocId).set(
+      {
+        currentstage: stage,
+        previousstage: null,
+        status: 'queued',
+        variationid: VID,
+        liveassignmentid: null,
+        studioid: null,
+        tokenstatus: 'Active',
+        delete: false,
+      },
+      { merge: true },
+    );
+  }
+
+  /** Wait until the board has rendered the token's card AND a column for `stage` (collectionData is async). */
+  async function waitForCardOnStageJ(board: QueueBoardPage, cardId: string, stage: string, jno: number): Promise<void> {
+    await expect
+      .poll(async () => board.revealTokenCard(cardId), {
+        timeout: 25_000,
+        intervals: [300, 600, 1000],
+        message: `BIGNC-J${jno}: board never rendered token card data-token-id="${cardId}" on the way to "${stage}" (queue selected & stream loaded? — also paged via Load More)`,
+      })
+      .toBe(true);
+    await expect
+      .poll(async () => {
+        try { await board.readColumnCount(stage); return true; } catch { return false; }
+      }, { timeout: 20_000, message: `BIGNC-J${jno}: board never rendered a column for stage "${stage}".` })
+      .toBe(true);
+  }
+
+  /**
+   * Drive ONE operator (OP) transition through the REAL board and assert the board's recomputed count-drift
+   * (src−1 / dst+1, Σ conserved). The numbers are the APP's, captured before vs after the product's move.
+   */
+  async function driveOperatorHopJ(board: QueueBoardPage, cardId: string, hop: JourneyHop, jno: number): Promise<void> {
+    await waitForCardOnStageJ(board, cardId, hop.from, jno);
+    const before = await board.readAllColumnCounts();
+    const beforeSrc = await board.readColumnCount(hop.from);
+    const beforeDst = await board.readColumnCount(hop.to);
+
+    // REAL operator move: open this token's dropdown, click the scoped target, drive PeopleInvolved confirm.
+    // Forward targets on the BIGNC spine are NON-Activity destinations (the page object routes a split stage
+    // to its Queued bucket), so every OP hop is a NON-Activity move (PeopleInvolved path).
+    await board.moveToken(cardId, hop.to);
+
+    // AFTER: poll until the board re-rendered src−1 (collectionData is async), then diff the full snapshot.
+    await expect
+      .poll(async () => board.readColumnCount(hop.from), {
+        timeout: 20_000,
+        message: `BIGNC-J${jno} count-drift: board source column "${hop.from}" did not drop after the ${hop.from}→${hop.to} move.`,
+      })
+      .toBe(beforeSrc - 1);
+    const after = await board.readAllColumnCounts();
+    const srcKey = await resolveStageKeyForCountJ(board, hop.from, before, after, -1);
+    const dstKey = await resolveStageKeyForCountJ(board, hop.to, before, after, +1);
+    assertCountConserved(before, after, { src: srcKey, dst: dstKey });
+    expect(after[dstKey] ?? 0, `BIGNC-J${jno} count-drift: destination "${hop.to}" expected ${beforeDst + 1}.`).toBe(beforeDst + 1);
+  }
+
+  /** Resolve a stage NAME to the `data-stage-key` whose count changed by `expectDelta` (handles split columns). */
+  async function resolveStageKeyForCountJ(
+    board: QueueBoardPage,
+    stageName: string,
+    before: Record<string, number>,
+    after: Record<string, number>,
+    expectDelta: number,
+  ): Promise<string> {
+    const candidates = await board.stageKeysForName(stageName);
+    for (const key of candidates) {
+      if (Number(after[key] || 0) - Number(before[key] || 0) === expectDelta) return key;
+    }
+    if (expectDelta > 0) {
+      for (const key of candidates) if (!(key in before) && Number(after[key] || 0) === expectDelta) return key;
+    }
+    return board.resolveStageKeyPublic(stageName);
+  }
+
+  /**
+   * Drive ONE participant self-move / gate auto-advance via the documented simulator stand-in.
+   * SELF → movedby 'self' (participant form submit); AUTO → movedby 'operator' (an app/CF-driven gate hop,
+   * NOT a participant self-write). A precondition/self-move stand-in only — the spec still asserts the
+   * PRODUCT's logged row via the universal invariants, never this written value directly.
+   */
+  async function driveSimHopJ(tokenDocId: string, hop: JourneyHop, testrunid: string): Promise<void> {
+    await sim.advance(tokenDocId, hop.to, { by: hop.kind === 'SELF' ? 'self' : 'operator', testrunid });
+  }
+
+  /** Run the universal silent-data-gap invariants after a transition, against PRODUCT OUTPUT + the oracle. */
+  async function assertUniversalAfterHopJ(
+    tokenDocId: string,
+    loggedSoFar: number,
+    minNonSelfSoFar: number,
+    jno: number,
+    hop: JourneyHop,
+  ): Promise<void> {
+    // EVERY-MOVE-LOGGED depends on a live Firestore write the PRODUCT just made; poll until the product's
+    // row count reaches the expected total before the strict assertion (tolerate write/stream lag without
+    // weakening the invariant).
+    await expect
+      .poll(async () => (await assertions.observedTransitions(tokenDocId)).length, {
+        timeout: 20_000,
+        message: `BIGNC-J${jno} EVERY-MOVE-LOGGED: product stage-log rows for ${tokenDocId} did not reach ${loggedSoFar} (after → ${hop.to}).`,
+      })
+      .toBe(loggedSoFar);
+
+    await assertNoOrphan(tokenDocId);
+    await assertEveryMoveLogged(tokenDocId, loggedSoFar, { minNonSelf: minNonSelfSoFar });
+    await assertNoStageSkipped(tokenDocId, MODEL, VID);
+    await assertLoopBound(tokenDocId, 2);
+
+    // NO-STAGE-SKIPPED, sharpened: the LATEST product-logged transition is exactly this oracle hop.
+    const trail = await assertions.observedTransitions(tokenDocId);
+    const last = trail[trail.length - 1];
+    expect(last, `BIGNC-J${jno}: a stage-log row should exist after hop → ${hop.to}`).toBeTruthy();
+    expect(last.to, `BIGNC-J${jno}: latest logged transition should land on "${hop.to}"`).toBe(hop.to);
+    expect(last.from, `BIGNC-J${jno}: latest logged transition should originate at "${hop.from}"`).toBe(hop.from);
   }
 });

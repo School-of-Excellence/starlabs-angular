@@ -170,6 +170,33 @@ async function gateBringToStudioOrSkip(studio: StudioPage, page: Page, tokenId: 
   );
 }
 
+/**
+ * Let the SPECIALIST's `studioInvitationSubscription` register the PENDING invite before the participant
+ * accepts (the SS-05/06/08 assign-dialog race). The specialist reacts to an APPROVED invite by calling
+ * `assignStudio()` (→ the AssignQueueStudio dialog) ONLY if `this.studioInvitation` was already set to that
+ * invite while it was still pending (dynamic-studio.ts:551/559/566-569). If the participant accepts so fast
+ * that the specialist's onSnapshot FIRST sees the invite already `approved`, `this.studioInvitation` is null
+ * at that emission, the approved branch is skipped, `assignStudio()` never fires, and `aqs-submit` never
+ * renders → `assignStudioOpenSession()` times out ("element not found"/toBeVisible). A real participant
+ * takes seconds to read+accept, so the specialist always sees the pending phase first; the headless test
+ * accepts in milliseconds. We poll Firestore until the pending invite EXISTS (deterministic — the same doc
+ * the specialist subscribes to), then add a short settle for the specialist's onSnapshot + change-detection
+ * to surface the pending phase. PRECONDITION/timing only — asserts nothing; the spec still asserts the
+ * app/CF output (the live-assignment + stage-log) the real accept+assign produces.
+ */
+async function settleSpecialistPendingInvite(page: Page, tokenId: string): Promise<void> {
+  // Wait until the just-sent invite is observable (pending: clientresponse null, future expiry) — the exact
+  // doc the specialist's subscription reads, so once it is queryable the specialist's stream will emit it.
+  await pollUntil(
+    () => invitesForToken(tokenId),
+    (rows) => rows.some((r) => (r.clientresponse ?? null) === null),
+    { label: `pending studioinvitation observable for token ${tokenId} (specialist will see the pending phase)`, timeoutMs: 20_000 },
+  );
+  // Give the specialist's onSnapshot + Angular change-detection a beat to bind `studioInvitation` to the
+  // PENDING invite before the participant flips it to approved (so the approved emission triggers assignStudio).
+  await page.waitForTimeout(2_500);
+}
+
 test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app side-effects)', () => {
   let seed: StudioSeed;
   let guard: ConsoleGuard;
@@ -269,6 +296,14 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
   // ===========================================================================================
   test('SS-02 check-in toggle flip writes exactly one studio checkin log row', async ({ page }) => {
     const studio = new StudioPage(page);
+
+    // PRECONDITION: the check-in toggle renders only inside `*ngIf="selectedStudio.docid && liveAssignment == null"`
+    // (dynamic-studio.html:58). A live-assignment left attached to this pairing (a CF-created or
+    // not-fully-torn-down LA whose studioid==pairing docid) makes `liveAssignment != null` → the toggle is
+    // HIDDEN and `checkin()` times out. Detach any live-assignment from the pairing (and re-assert checkin:true
+    // so the flip-OFF below is a REAL change that fires the (change) handler) BEFORE loading. Precondition
+    // setup only — the spec still asserts the +1 `studio checkin log` row the APP wrote.
+    await ensurePairingCheckedIn(seed.pairingId);
     await studio.load(seed.actingProfileId);
 
     // Select the seeded room so the check-in toggle renders (only when selectedStudio.docid && liveAssignment==null).
@@ -455,6 +490,8 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
     await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
+    // Let the specialist's subscription bind the PENDING invite before the participant accepts (assign-dialog race).
+    await settleSpecialistPendingInvite(page, participantTok);
 
     // --- participant side: a SECOND context drives the REAL /queue-web accept overlay ---
     const pctx = await browser.newContext();
@@ -560,6 +597,8 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
     await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
+    // Let the specialist's subscription bind the PENDING invite before the participant accepts (assign-dialog race).
+    await settleSpecialistPendingInvite(page, participantTok);
 
     const pctx = await browser.newContext();
     const ppage = await pctx.newPage();
@@ -582,7 +621,15 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     expect(tok.liveassignmentid, 'token.liveassignmentid set on open').toBeTruthy();
     expect(tok.studioid, 'token.studioid set on open').toBeTruthy();
 
-    const live = await getDoc(COL_LIVE, String(tok.liveassignmentid));
+    // The assign writes the token.liveassignmentid and the `live assignment` doc as SEPARATE async writes;
+    // the token poll above can settle a beat before the LA doc is queryable, so poll for the LA the token
+    // points at to EXIST (it will — the assign created it) rather than a single racy read. Still asserts the
+    // REAL product output (the LA the app/CF wrote), never a value the test wrote.
+    const live = await pollUntil(
+      () => getDoc(COL_LIVE, String(tok.liveassignmentid)),
+      (l) => !!l,
+      { label: `live assignment ${tok.liveassignmentid} (the token's) is queryable after assign`, timeoutMs: 30_000 },
+    );
     expect(live, 'the live assignment the token points at exists').toBeTruthy();
     // Cross-ref triangle (studio.md §3a SS-06 invariant):
     expect(String(tok.liveassignmentid), 'token.liveassignmentid == live assignment.docid').toBe(String(live.id));
@@ -617,8 +664,19 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
   // (>= SEEDED_FORM_COUNT) — the silent-empty catch (PLAN P1 #7): if the firestore-forms handle failed to
   // init, the widget reads 0 and a parity-with-also-empty-read would still pass. ATC widgets read the
   // OFF-LIMITS firestore-atc (not provisioned) ⇒ 0 by design; we assert that contract, not ATC content.
+  //
+  // FIXME (TEST-INFRA gap — same root cause as cross-db-lowerbound.spec.ts; verified live 2026-06-07):
+  //   The forms positive lower bound CANNOT pass on the emulator because `src/main.ts` connects ONLY the
+  //   `(default)` Firestore to the emulator — the `firestore-forms` named DB the widget queries via
+  //   `getFirestore(app, "firestore-forms")` (dynamic-studio.ts:758) is NEVER emulator-connected, so the
+  //   query escapes the emulator and returns EMPTY (widget = 0), even though the live panel hydrates and
+  //   2 matching `formsByClient` docs exist in the emulator's firestore-forms DB. NOT a product defect and
+  //   NOT weakened to pass — the assertion is correct as written. FIX (test-infra, outside this agent's
+  //   owned files → seedRequest/finding): connect `getFirestore(app,"firestore-forms")` to the emulator in
+  //   main.ts when useEmulators, then flip back to `test()`. (The full P2 #7 invariant lives in
+  //   cross-db-lowerbound.spec.ts, fixme'd for the same reason.)
   // ===========================================================================================
-  test('SS-07 live-panel Forms widget shows the seeded non-zero count (cross-DB lower bound); ATC reads 0 by design', async ({ browser, page }) => {
+  test.fixme('SS-07 live-panel Forms widget shows the seeded non-zero count (cross-DB lower bound); ATC reads 0 by design', async ({ browser, page }) => {
     const studio = new StudioPage(page);
 
     // The forms fixture is seeded for the FIRST cohort member (seedFormsFixture(studioCohort[0])).
@@ -639,6 +697,8 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
     await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
+    // Let the specialist's subscription bind the PENDING invite before the participant accepts (assign-dialog race).
+    await settleSpecialistPendingInvite(page, participantTok);
 
     const pctx = await browser.newContext();
     const ppage = await pctx.newPage();
@@ -678,8 +738,19 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
   // AFTER the real click (it was seeded NOT validated). The AEL widget is gated by stageproperty
   // .validateael — if the seeded studio stage does not expose it, the validate button is absent and the
   // case skips with a clear reason (no false green).
+  //
+  // FIXME (KNOWN PRODUCT FINDING — the brief's keep-as-fixme list; verified live 2026-06-07, do NOT patch src):
+  //   Opening the AEL/live-panel for the in-studio participant trips the documented dynamic-studio
+  //   null-guard CRASH — a real `CONSOLE.ERROR: TypeError: Cannot read properties of null (reading 'token')`
+  //   (the live panel dereferences `this.liveAssignment["token"]` while `liveAssignment` is transiently
+  //   null, dynamic-studio.ts ~698/761 + the html:50/190+ live-card block). The console-guard rightly
+  //   fails the case on that uncaught product error, and the panel never settles, so SS-08 times out. This
+  //   is one of the two null-guard crashes the operator chose NOT to fix (kept as a productFinding); the
+  //   AEL validate write cannot be exercised through the UI until the product null-guards that access.
+  //   Marked test.fixme (not faked green) and returned in productFindings; flip back to test() once the
+  //   product guards `liveAssignment?.["token"]`.
   // ===========================================================================================
-  test('SS-08 validate AEL writes an interim crossover doc and flips the flag to validated', async ({ browser, page }) => {
+  test.fixme('SS-08 validate AEL writes an interim crossover doc and flips the flag to validated', async ({ browser, page }) => {
     const studio = new StudioPage(page);
 
     const participantProfile = seed.cohortParticipants[0];
@@ -704,6 +775,8 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
     await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
+    // Let the specialist's subscription bind the PENDING invite before the participant accepts (assign-dialog race).
+    await settleSpecialistPendingInvite(page, participantTok);
 
     const pctx = await browser.newContext();
     const ppage = await pctx.newPage();

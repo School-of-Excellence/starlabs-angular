@@ -62,6 +62,33 @@ const BLOCKED_ROUTES = [
   { path: '/bigcohorts', host: 'app-big-cohort-clone-2', label: 'BIG Cohorts' },
 ] as const;
 
+// Which seeded BIG admin the PAB-mounting cases log in as. We deliberately use admin index 1
+// (profileid run1_pf_big_1), NOT index 0, to side-step a SEED-vs-PRODUCT interaction that is
+// UNRELATED to what these cases assert and would otherwise crash the board on mount:
+//
+//   • The base seeder (fixtures/seed-test-project.js:603-609) seeds ONE BIG-06 precondition doc,
+//     `big participants assignments/run1_bigpa_form_0`, with profileid run1_pf_big_0 (the index-0 BIG
+//     admin) and a DANGLING `marathonref` → `marathon/run1_marathon_ph` (a) the WRONG collection
+//     (`marathon`, not `big marathon`) and (b) a doc that is never seeded. No `big marathon` is seeded
+//     by the queue seeder at all, so the PAB's `marathonMap` is `{}`.
+//   • On PAB mount, `getPendingList()` (participant-assignment-board.component.ts:305-324) queries every
+//     `big participants assignments` for the LOGGED-IN profile and, for each non-completed one, does
+//     `this.marathonMap[assignment.marathonref.id].pending++` with NO existence guard. For run1_pf_big_0
+//     that lookup is `marathonMap['run1_marathon_ph']` === undefined → the board throws
+//     `TypeError: Cannot read properties of undefined (reading 'pending')` (a console.error the
+//     console-guard correctly fails on). This is a GENUINE product gap (missing null-guard) — see
+//     productFindings — and the immediate trigger is a seed inconsistency (the dangling ref) — see the
+//     returned seedRequest to fix run1_bigpa_form_0's marathonref / seed the `big marathon` it points at.
+//
+// Index-1 BIG admin (run1_pf_big_1) is an equally-real, guard-admitted admin (every DRIVEN_ROUTE is
+// granted to ALL staff roles + profileids, seed-test-project.js:391-396) that simply owns NO
+// `big participants assignments` doc, so `getPendingList()` iterates an empty result and the board mounts
+// clean. This changes only the test ACTOR (a precondition choice the brief allows); it weakens no
+// assertion — the picker-isolation / status-conservation / empty-state checks are identical for any
+// non-developer BIG admin. When the BIG world is seeded (returned seedRequest, scoped to run1_pf_big_1)
+// these cases automatically exercise the POPULATED path instead of skipping.
+const PAB_ADMIN_INDEX = 1;
+
 // ---------------------------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------------------------
@@ -172,7 +199,7 @@ test.describe('BIG-00b — participant scope / data-isolation negative', () => {
     // STRUCTURAL data-isolation guarantee the app enforces — a non-developer cannot view another
     // participant's assignments. (If the gate regressed to expose the picker, this fails.)
     const pab = new BigAssignmentBoardPage(page);
-    await pab.open({ as: 'admin' }); // logs in + lands on the PAB route, waits for mount
+    await pab.open({ as: 'admin', adminIndex: PAB_ADMIN_INDEX }); // logs in + lands on the PAB route, waits for mount
 
     expect(page.url(), 'should be on the PAB route').toContain('particiant_assignment_board');
 
@@ -263,7 +290,7 @@ test.describe('BIG-03 — PAB status counts', () => {
     // Log in as admin and open the board. We need a selected marathon for the status filters + cards
     // to render (html:43). On a fresh seed there is NO marathon button, so the board cannot show the
     // status row — that is a precondition this assertion strictly requires.
-    await pab.open({ as: 'admin' });
+    await pab.open({ as: 'admin', adminIndex: PAB_ADMIN_INDEX });
 
     const marathonBtns = await pab.host.locator('[data-testid="pab-marathon-btn"]').count();
     test.skip(
@@ -310,7 +337,7 @@ test.describe('BIG-03 — PAB status counts', () => {
 test.describe('BIG-04 — PAB perform-action write', () => {
   test('BIG-04 a real perform-action drives the app and the board re-renders the recomputed status', async ({ page, context }) => {
     const pab = new BigAssignmentBoardPage(page);
-    await pab.open({ as: 'admin' });
+    await pab.open({ as: 'admin', adminIndex: PAB_ADMIN_INDEX });
 
     const marathonBtns = await pab.host.locator('[data-testid="pab-marathon-btn"]').count();
     test.skip(

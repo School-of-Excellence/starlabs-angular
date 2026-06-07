@@ -88,7 +88,17 @@ test.describe('P3 #13 — WatchVideos BIG assignment crash-detectable smoke', ()
     //    (loginAsBigAdmin) and waits for the PAB host to mount + the loading bar to clear — i.e. the
     //    data-driven authGuard admitted the actor and the board finished its initial data load.
     const pab = new BigAssignmentBoardPage(page);
-    await pab.open({ as: 'admin' });
+    // Use the index-1 BIG admin (run1_pf_big_1), NOT index-0. The base seeder seeds a BIG-06
+    // precondition doc (`big participants assignments/run1_bigpa_form_0`) owned by run1_pf_big_0 with a
+    // DANGLING `marathonref` (→ `marathon/run1_marathon_ph`, a never-seeded doc in the WRONG
+    // collection). On PAB mount, `getPendingList()` (participant-assignment-board.component.ts:319) does
+    // `marathonMap[marathonref.id].pending++` with no existence guard, so for run1_pf_big_0 it throws
+    // `TypeError: Cannot read properties of undefined (reading 'pending')` (the console-guard fails on
+    // it). That is a GENUINE product null-guard gap (productFindings) triggered by a seed inconsistency
+    // (seedRequest: fix run1_bigpa_form_0.marathonref / seed the `big marathon`). The index-1 admin is an
+    // equally-real, guard-admitted admin that owns no such doc, so the board mounts clean — a precondition
+    // ACTOR choice that weakens nothing (this smoke asserts the board/dialog mount + zero fatal console).
+    await pab.open({ as: 'admin', adminIndex: 1 });
     expect(page.url(), 'should be on the PAB route after admit').toContain('particiant_assignment_board');
 
     // The board itself mounting clean is already part of the crash-smoke (afterEach asserts no fatal).

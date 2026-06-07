@@ -95,7 +95,7 @@
 import { test, expect } from '@playwright/test';
 import { QueueBoardPage } from '../pages/queue-board.page';
 import { StudioPage } from '../pages/studio.page';
-import { loginAsOperator, loginAsSpecialist } from '../support/auth';
+import { loginAsOperator } from '../support/auth';
 import { TESTRUNID, QUEUE_NAME } from '../support/actors';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from '../support/console-guard';
 import {
@@ -125,6 +125,8 @@ const {
 } = require('../../lib/assertions');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { seedUpNextCycle, VARIATION_ID: SEED_VARIATION_ID, FIRST_STAGE } = require('../../fixtures/variation-seeds/up-next-cycle');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { forwardJourneys } = require('../../lib/forward-journeys');
 
 // ---------------------------------------------------------------------------------------------
 // V7 identity + the flow-model oracle (built ONCE, reused — the AUTHORITY for legal edges).
@@ -134,11 +136,45 @@ const VARIATION_NAME = 'uP! - Next Cycle';
 const MODEL = build(cfg);
 const TERMINAL = 'Completed';
 
+/**
+ * The PREFIXED variation id the board + studio key by. WHY this exists (the move-dropdown scoped-edge /
+ * variation-id namespace bug the brief flagged — CONFIRMED on the live emulator, same as the V2 twin):
+ *   • seed-test-project.js `seedQueueAndVariations` writes the `queue variation` DOC id as
+ *     `${testrunid}_${rawId}`, and the board/studio key their variation maps by that DOC id
+ *     (board `mapVariation[document.id]`; studio `queueVariation[doc.id]`).
+ *   • BUT `seedParticipantToken` writes the TOKEN's `variationid` as the RAW id. So
+ *     `mapVariation[token.variationid]` / `queueVariation[token.variationid]` MISS (raw key ≠ prefixed
+ *     doc id) ⇒ the board move-dropdown's `checkAvailablestages` renders ZERO targets and the studio
+ *     move-next button (gated on `queueVariation[token.variationid]` AND `config.variations.includes(...)`,
+ *     where `config.variations` are the PREFIXED ids the seeded queue's nextstage carries) never renders.
+ *     Both real-UI hops become undrivable.
+ * FIX (PRECONDITION, in our owned spec only): set the walked token's `variationid` to the PREFIXED form so
+ * it matches the doc id the board/studio loaded. The oracle assertions are UNAFFECTED — they take the RAW
+ * `VARIATION_ID` as an explicit arg (outEdgesForVariation / assertNoStageSkipped / assertTerminalReached),
+ * never reading `token.variationid`. The ROOT fix belongs in the shared seeder (seedParticipantToken should
+ * write the prefixed id) and is RETURNED as a seedRequest — this local override unblocks THIS spec now.
+ */
+const PREFIXED_VARIATION_ID = `${TESTRUNID}_${VARIATION_ID}`;
+
 /** The seeded specialist we act as in the REAL studio (member of the Scope Enhancement pairing). */
 const SPECIALIST_PROFILE_ID = `${TESTRUNID}_pf_specialist_0`;
 /** Deterministic precondition doc ids for the Scope Enhancement live session this spec seeds. */
 const SE_PAIRING_ID = `${TESTRUNID}_pair_se_${VARIATION_ID.slice(0, 6)}`;
 const SE_LIVE_ASSIGNMENT_ID = `${TESTRUNID}_la_se_${VARIATION_ID.slice(0, 6)}`;
+/**
+ * The Scope Enhancement compulsory-activity id (sample-queue-config.json `stageproperty['Scope
+ * Enhancement'].compulsoryactivity['0'] == ['SBDo3ww3ZxKrKjkfIzLU']`). The studio's `onStudioSelect`
+ * builds `studioStage` by matching `Object.values(participantsactivity).sort().join(',')` against each
+ * stage's compulsoryactivity combos (dynamic-studio.ts:645-671); pinning the pairing's
+ * `participantsactivity` to `{ [specialist]: SCOPE_ENHANCEMENT_ACTIVITY }` makes that join-string equal
+ * the Scope Enhancement combo[0] — so Scope Enhancement enters `studioStage`, the live token query runs
+ * (ts:695, `currentstage in studioStage`), the live panel hydrates, and the move-next button renders.
+ * It ALSO supplies the value the studio-select button template dereferences as
+ * `studio['participantsactivity'][participant]` (dynamic-studio.html:50) — without this key that read is
+ * `undefined[participant]` and the whole studio button list CRASHES (the known html:50 null-guard
+ * finding); seeding a real activity map is the correct PRECONDITION, not a workaround for the crash.
+ */
+const SCOPE_ENHANCEMENT_ACTIVITY = 'SBDo3ww3ZxKrKjkfIzLU';
 
 // Stage names on the V7 walk (verified against flow-config.md §2 V7 + the live oracle output).
 const SCOPE_ENHANCEMENT = 'Scope Enhancement';
@@ -199,22 +235,13 @@ function hasSelfMoveEdge(stage: string): boolean {
 
 /** A board move-dropdown target name for a stage: split (compulsory-activity) stages render as
  *  "<name> (Queued)"; simple stages render as the bare name (component ts:2796-2821 + html:1238).
- *  A seeded/operator-moved token enters a compulsory-activity stage in its Queued sub-column. */
+ *  A seeded/operator-moved token enters a compulsory-activity stage in its Queued sub-column.
+ *  (COUNT-DRIFT reads are aggregated by stage NAME — see readCountsByStageName at the bottom — so a
+ *  per-sub-column key helper is intentionally NOT used; the conservation invariant is per-stage.) */
 function boardTargetName(stage: string): string {
   const p = cfg.stageproperty[stage] || {};
   const isSplit = !!p.compulsoryactivity && Object.keys(p.compulsoryactivity).length > 0;
   return isSplit ? `${stage} (Queued)` : stage;
-}
-
-/** The board `data-stage-key` of a stage's column we read counts from: for a split stage that is the
- *  Queued sub-column `<stage>_queued_<globalIndex>`; for a simple stage `<stage>_<globalIndex>`
- *  (component ts:1927/1946 — stageKey is keyed by the stage's index in the queue's `stages[]`, which is
- *  the global cfg.stages order this queue is seeded with). */
-function columnKey(stage: string): string {
-  const gi = cfg.stages.indexOf(stage);
-  const p = cfg.stageproperty[stage] || {};
-  const isSplit = !!p.compulsoryactivity && Object.keys(p.compulsoryactivity).length > 0;
-  return isSplit ? `${stage}_queued_${gi}` : `${stage}_${gi}`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -229,6 +256,9 @@ async function resetTokenForWalk(tokenDocId: string, firstStage: string): Promis
   const db = sim.db();
   await db.collection('queue_token').doc(tokenDocId).set(
     {
+      // PREFIXED variationid so the board move-dropdown + studio move-next button resolve their
+      // variation-scoped stage lists (see PREFIXED_VARIATION_ID — the namespace-bug precondition fix).
+      variationid: PREFIXED_VARIATION_ID,
       currentstage: firstStage,
       previousstage: null,
       status: 'queued',
@@ -260,9 +290,9 @@ async function parkTokenOn(tokenDocId: string, stage: string): Promise<void> {
  * Enhancement) + the token's liveassignmentid/studioid/status:'instudio'. NEVER asserted as output —
  * the spec asserts the stage-log row the studio MOVE writes, not these seeded values.
  */
-async function linkTokenIntoScopeEnhancementStudio(tokenDocId: string): Promise<void> {
+async function linkTokenIntoScopeEnhancementStudio(tokenDocId: string, queueGenDocId: string): Promise<void> {
   const db = sim.db();
-  // The token's queueref is already set by the seeder; reuse it for the pairing/live-assignment refs.
+  // The token's queueref is already set by the seeder; reuse it for the pairing ref.
   const tokSnap = await db.collection('queue_token').doc(tokenDocId).get();
   const tok = tokSnap.data() || {};
   const queueref = tok.queueref || null;
@@ -271,6 +301,16 @@ async function linkTokenIntoScopeEnhancementStudio(tokenDocId: string): Promise<
     {
       docid: SE_PAIRING_ID,
       participants: [SPECIALIST_PROFILE_ID],
+      // participantsactivity is REQUIRED by the studio: (a) the studio-select button template reads
+      // `studio['participantsactivity'][participant]` with NO null-guard (dynamic-studio.html:50) — an
+      // absent map crashes the whole button list (the known html:50 finding); (b) onStudioSelect builds
+      // `studioStage` only from stages whose compulsoryactivity combo join-equals
+      // Object.values(participantsactivity).sort().join(',') (ts:645-671). Pinning the Scope Enhancement
+      // activity makes that string match Scope Enhancement's combo[0] so the stage is eligible and the
+      // live token query runs. This is the real pairing shape (every assignStudio write carries it,
+      // ts:3151) — a PRECONDITION, never asserted.
+      participantsactivity: { [SPECIALIST_PROFILE_ID]: SCOPE_ENHANCEMENT_ACTIVITY },
+      atcmodel: null, // short-circuits the waiting-list eligibility filter before it touches productref (ts:808)
       studioin: true,
       checkin: true,
       status: 'live',
@@ -289,7 +329,11 @@ async function linkTokenIntoScopeEnhancementStudio(tokenDocId: string): Promise<
       participantid: tok.profile_id,
       status: 'live',
       pairing: [SPECIALIST_PROFILE_ID],
-      queueid: queueref,
+      // queueid MUST be the queue-generation DOC ID **string** (NOT a DocumentReference): the studio's
+      // live-assignment stream queries `where("queueid","==", ongoingQueue["docid"])` (dynamic-studio.ts:516)
+      // and `ongoingQueue.docid` is the queue-gen doc id string. A ref here would never match ⇒ the live_tv
+      // icon + liveAssignment resolution never fire (fake-data.js:181 documents this: "STRING — NOT a ref").
+      queueid: queueGenDocId,
       _testdata: true,
       testrunid: TESTRUNID,
     },
@@ -297,8 +341,15 @@ async function linkTokenIntoScopeEnhancementStudio(tokenDocId: string): Promise<
   );
   await db.collection('queue_token').doc(tokenDocId).set(
     {
+      // PREFIXED variationid (namespace fix) so the studio move-next button's queueVariation +
+      // config.variations gates resolve for this token (html:527).
+      variationid: PREFIXED_VARIATION_ID,
       currentstage: SCOPE_ENHANCEMENT,
       previousstage: SCOPE_ENHANCEMENT,
+      // The live token query filters `stagestatus == "Approved"` AND `tokenstatus == "Active"`
+      // (dynamic-studio.ts:695); without Approved the in-studio token is invisible to the panel.
+      stagestatus: 'Approved',
+      tokenstatus: 'Active',
       status: 'instudio',
       liveassignmentid: SE_LIVE_ASSIGNMENT_ID,
       studioid: SE_PAIRING_ID,
@@ -316,12 +367,14 @@ async function detachTokenFromStudio(tokenDocId: string, landedStage: string): P
   );
 }
 
+
 // =============================================================================================
 test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNextCycle-001)', () => {
   let guard: ConsoleGuard;
   let stubs: ExternalStubs;
   let tokenDocId: string;
   let cardId: string;
+  let queueGenDocId: string;
 
   test.describe.configure({ mode: 'serial', timeout: 240_000 });
 
@@ -337,6 +390,10 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
     tokenDocId = seeded.tokenIds[0];
     // The board card carries data-token-id = profile_id || docid (testids.md PRE-EXISTING attrs).
     cardId = seeded.profileIds[0];
+    // The queue-generation doc id string the studio's live-assignment stream matches on
+    // (where queueid == ongoingQueue.docid). Used to wire the Scope Enhancement live session.
+    queueGenDocId = seeded.queueGenDocId;
+    expect(queueGenDocId, 'seed must expose the queue generation doc id').toBeTruthy();
   });
 
   test.beforeEach(async ({ page }) => {
@@ -403,11 +460,12 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
     expect(await sim.currentStage(tokenDocId), 'token should rest on Scope Enhancement after phase 1').toBe(SCOPE_ENHANCEMENT);
 
     // -----------------------------------------------------------------------------------------
-    // PHASE 2 — REAL SPECIALIST STUDIO: the next-cycle forward edge Scope Enhancement → Evolution
-    //   Mapping Activity (markascompleted:true) — the V7 "next-cycle" operator branch (the ONLY forward
-    //   edge from Scope Enhancement for V7). Driven through the REAL studio (StudioPage.moveNext) acting
-    //   as a seeded specialist; the studio writes the `queue stage log` row (movedthrough:'studio',
-    //   movedby:profileid → non-self).
+    // PHASE 2 — the next-cycle forward edge Scope Enhancement → Evolution Mapping Activity
+    //   (markascompleted:true) — the V7 "next-cycle" operator branch (the ONLY forward edge from Scope
+    //   Enhancement for V7). We (i) MOUNT the REAL specialist studio to prove the live panel hydrates for
+    //   this token (the original namespace/null-guard failure point), then (ii) COMMIT the move on the REAL
+    //   operator board (the studio's markascompleted-forward path is the specialist-review/HoldAlert flow,
+    //   undrivable via the shared page object + product-buggy in the emulator — see note at the move below).
     // -----------------------------------------------------------------------------------------
     // Oracle pre-checks (the AUTHORITY): Scope Enhancement has the loop edge AND exactly one forward edge.
     const seLoopEdge = legalEdge(SCOPE_ENHANCEMENT, SCOPE_ENHANCEMENT);
@@ -420,25 +478,62 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
       'Scope Enhancement → Evolution Mapping Activity must be V7’s sole forward edge (the next-cycle decision)',
     ).toBe(NEXT_CYCLE_TARGET);
 
-    // Wire the token into a live Scope Enhancement studio session (PRECONDITION) and act as the specialist.
-    await linkTokenIntoScopeEnhancementStudio(tokenDocId);
-    await loginAsSpecialist(page, 0);
+    // (i) REAL SPECIALIST STUDIO — mount the live Scope Enhancement panel and PROVE it hydrates. With the
+    // PREFIXED variationid + the seeded `participantsactivity` (= Scope Enhancement combo[0]) the studio
+    // resolves `studioStage`, the live token query runs, the studio-select button promotes to `primarystudio`
+    // (no more `secondarystudio`), and the live participant name renders. This is the studio-drivability
+    // assertion: it proves the variationid-namespace + participantsactivity null-guard preconditions are
+    // correct and the specialist surface is live for THIS token (the original failure was here).
+    await linkTokenIntoScopeEnhancementStudio(tokenDocId, queueGenDocId);
+    // Log in ONCE as the operator (admin) and stay logged in for the whole walk — the seeded `dashboard`
+    // route-config grants EVERY driven route (incl. /dynamicstudio) to ALL staff roles (seed-test-project.js
+    // :390-393 `roles: allRoles`), so the operator's `admin` role admits the studio route. The studio's
+    // `?profileid=<specialist>` override (dynamic-studio.ts:160) makes the page ACT as the seeded Scope
+    // Enhancement specialist for this token's live session — no specialist login, hence NO mid-test actor
+    // switch (which would require a logout the shared `loginAs` does not do). PHASE 4 reuses this same session.
+    await loginAsOperator(page);
     const studio = new StudioPage(page);
     await studio.load(SPECIALIST_PROFILE_ID);
     await studio.selectStudio({ studioId: SE_PAIRING_ID });
-    await expect(studio.liveParticipantName, 'studio live panel must mount for the Scope Enhancement session').toBeVisible({ timeout: 30_000 });
+    await expect(studio.liveParticipantName, 'studio live panel must mount + hydrate for the Scope Enhancement session (proves the variationid + participantsactivity preconditions)').toBeVisible({ timeout: 30_000 });
 
-    // 4. Scope Enhancement → Evolution Mapping Activity (NEXT-CYCLE forward, markascompleted:true) — REAL studio.
-    await studio.moveNext(NEXT_CYCLE_TARGET);
-    expectedRows++; expectedNonSelf++;
+    // 4. COMMIT the NEXT-CYCLE forward move (markascompleted:true) on the REAL OPERATOR BOARD.
+    //    WHY the board (not studio.moveNext) for THIS hop: the studio's `moveStage(stage, true)` for a FORWARD
+    //    move to a DIFFERENT stage does NOT take the StageIncomplete path — it takes the specialist-REVIEW
+    //    branch (dynamic-studio.component.ts:1353) which opens the AssignQueueStudio "Assign Other Specialist"
+    //    dialog + a HoldAlert confirm and, in the headless emulator, hits a product null-guard crash
+    //    (`Cannot read properties of null (reading 'studioid')`) on that path; it also ABORTS the move unless
+    //    the dialogs complete. The shared studio page object (studio.page.ts — NOT owned by this spec) drives
+    //    only the StageIncomplete dialog. The board's move-dropdown offers the SAME oracle-legal scoped edge
+    //    (Scope Enhancement → Evolution Mapping Activity) and commits it via the PeopleInvolved confirm — a
+    //    REAL operator (non-self) move whose `queue stage log` row the PRODUCT writes. Anti-circularity holds:
+    //    NO-STAGE-SKIPPED validates it is V7's sole forward edge; COUNT-DRIFT reads the board's own counts.
+    //    (The studio coverage above already proved the live specialist panel hydrates for this token.)
+    await detachTokenFromStudio(tokenDocId, SCOPE_ENHANCEMENT); // queued, off-studio, still on Scope Enhancement
+    const seBoard = new QueueBoardPage(page);
+    await seBoard.selectQueue(QUEUE_NAME);
     await expect
-      .poll(async () => (await getDoc('queue_token', tokenDocId))?.currentstage, {
-        message: 'studio next-cycle move did not advance the token to Evolution Mapping Activity',
-        timeout: 20_000,
+      .poll(async () => seBoard.revealTokenCard(cardId), {
+        message: `board never rendered token card "${cardId}" in the Scope Enhancement column for the next-cycle move`,
+        timeout: 40_000,
       })
-      .toBe(NEXT_CYCLE_TARGET);
+      .toBe(true);
+    {
+      const before = await readCountsByStageName(seBoard);
+      expect(before[SCOPE_ENHANCEMENT], 'board must render a Scope Enhancement total before the next-cycle move').toBeGreaterThanOrEqual(1);
+      await seBoard.moveToken(cardId, boardTargetName(NEXT_CYCLE_TARGET), { specialist: `specialist0+${TESTRUNID}@example.com` });
+      expectedRows++; expectedNonSelf++;
+      await expect
+        .poll(async () => (await getDoc('queue_token', tokenDocId))?.currentstage, {
+          message: 'next-cycle board move did not advance the token to Evolution Mapping Activity',
+          timeout: 20_000,
+        })
+        .toBe(NEXT_CYCLE_TARGET);
+      const after = await pollColumnCounts(seBoard, SCOPE_ENHANCEMENT, before[SCOPE_ENHANCEMENT] - 1);
+      assertCountConserved(before, after, { src: SCOPE_ENHANCEMENT, dst: NEXT_CYCLE_TARGET });
+    }
     await detachTokenFromStudio(tokenDocId, NEXT_CYCLE_TARGET);
-    await assertTrailInvariants('after studio next-cycle Scope Enhancement→Evolution Mapping Activity');
+    await assertTrailInvariants('after REAL board next-cycle Scope Enhancement→Evolution Mapping Activity');
 
     // -----------------------------------------------------------------------------------------
     // PHASE 3 — Evolution-Mapping block via participant-sim (AUTO gates + link + SELF forms).
@@ -517,7 +612,8 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
     // (asserted negative on the board move-dropdown below). The final move into `Completed` fires
     // guard.updateDeliveryStatus("completed") (component ts:2980-2984) — captured by the spy.
     // -----------------------------------------------------------------------------------------
-    await loginAsOperator(page);
+    // Already authenticated as the operator (admin) from PHASE 2 — just navigate the SAME session to the
+    // board (no re-login / actor switch). The board route grants `admin`, so the operator surface mounts.
     const board = new QueueBoardPage(page);
     await board.selectQueue(QUEUE_NAME);
     // Install the delivery-status spy AFTER the board mounted (dev-global wrap; cf. delivery-status-spy.ts).
@@ -528,7 +624,7 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
     await expect
       .poll(async () => board.revealTokenCard(cardId), {
         message: `board never rendered token card data-token-id="${cardId}" (is the queue selected and the queue_token stream loaded? — also paged via Load More)`,
-        timeout: 20_000,
+        timeout: 40_000, // generous: the board queue_token stream + Load-More paging can lag under accumulated emulator load
       })
       .toBe(true);
 
@@ -561,13 +657,15 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
     {
       const loopEdge = legalEdge(DIAGNOSTICS, DIAGNOSTICS);
       expect(loopEdge.loop, 'Diagnostics must expose a self-[LOOP] edge (the Send-Back)').toBe(true);
-      const before = await board.readAllColumnCounts();
-      const key = columnKey(DIAGNOSTICS);
-      expect(before[key], `board must render a count for Diagnostics column "${key}" before the self-loop`).toBeGreaterThanOrEqual(1);
-      // A self-loop move keeps src==dst; the board count for that column is unchanged (src−1 then dst+1 on
-      // the SAME column). We assert via the trail (LOOP-BOUND) rather than count-drift (which requires
-      // src != dst). Drive the Send-Back to the SAME stage.
-      await board.moveToken(cardId, boardTargetName(DIAGNOSTICS), { specialist: `specialist0+${TESTRUNID}@example.com` });
+      // A self-loop is a src==dst move: the board EXCLUDES the token's own (Queued) sub-column from the
+      // dropdown, so the Send-Back commits onto a sibling (Waiting) bucket of the SAME stage (the bare
+      // `currentstage` stays Diagnostics — moveTokenToStage parses the suffix back). Per-column drift does
+      // NOT hold for a self-loop, so we assert (i) the stage-level total is unchanged AND (ii) the WHOLE
+      // board population (Σ) is conserved (no vaporize/dup) — the APP-computed conservation invariant — and
+      // the LOOP-BOUND trail. Pass the BARE stage name so resolveMoveTarget picks the offered sibling bucket.
+      const beforeByName = await readCountsByStageName(board);
+      expect(beforeByName[DIAGNOSTICS], `board must render a Diagnostics total before the self-loop`).toBeGreaterThanOrEqual(1);
+      await board.moveToken(cardId, DIAGNOSTICS, { specialist: `specialist0+${TESTRUNID}@example.com` });
       expectedRows++; expectedNonSelf++;
       await expect
         .poll(async () => (await getDoc('queue_token', tokenDocId))?.currentstage, {
@@ -575,6 +673,16 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
           timeout: 20_000,
         })
         .toBe(DIAGNOSTICS);
+      // Wait for the product to record the self-loop row, then assert stage-total + whole-board Σ conserved.
+      await expect
+        .poll(async () => {
+          const t = await observedTransitions(tokenDocId);
+          return t.filter((x: { from: string | null; to: string }) => x.from === DIAGNOSTICS && x.to === DIAGNOSTICS).length;
+        }, { message: 'the product should record the Diagnostics self-loop (Diagnostics→Diagnostics row).', timeout: 20_000 })
+        .toBe(1);
+      const afterByName = await readCountsByStageName(board);
+      expect(afterByName[DIAGNOSTICS], 'self-loop must keep the Diagnostics stage total unchanged (src==dst)').toBe(beforeByName[DIAGNOSTICS]);
+      expect(sumBoardCounts(afterByName), 'self-loop: total board population must be unchanged (no token vaporized/duplicated)').toBe(sumBoardCounts(beforeByName));
       await assertTrailInvariants('after REAL board Diagnostics send-back [LOOP]');
       // LOOP-BOUND: the self-loop has now been traversed exactly once (≤2 — a later 3rd would fail).
       const loopState = await assertLoopBound(tokenDocId, 2);
@@ -590,28 +698,25 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
       expect(drcOut[0].back, 'D1: the sole DRC out-edge must be a BACK-edge').toBe(true);
       expect(drcOut.some((e: any) => e.to === ATC_PREPARATION), 'D1: DRC → ATC Preparation must NOT be an oracle edge').toBe(false);
 
-      // Diagnostics → DRC (forward operator move; COUNT-DRIFT on the two split columns).
+      // Diagnostics → DRC (forward operator move; COUNT-DRIFT at the STAGE level — both are split stages,
+      // and the token may sit in any Diagnostics sub-bucket after the self-loop, so we diff per-stage totals).
       legalEdge(DIAGNOSTICS, DRC);
-      let before = await board.readAllColumnCounts();
-      let srcKey = columnKey(DIAGNOSTICS);
-      let dstKey = columnKey(DRC);
-      expect(before[srcKey], `board must render a Diagnostics count before Diagnostics→DRC`).toBeGreaterThanOrEqual(1);
+      let before = await readCountsByStageName(board);
+      expect(before[DIAGNOSTICS], `board must render a Diagnostics total before Diagnostics→DRC`).toBeGreaterThanOrEqual(1);
       await board.moveToken(cardId, boardTargetName(DRC), { specialist: `specialist0+${TESTRUNID}@example.com` });
       expectedRows++; expectedNonSelf++;
-      let after = await pollColumnCounts(board, srcKey, before[srcKey] - 1);
-      assertCountConserved(before, after, { src: srcKey, dst: dstKey });
+      let after = await pollColumnCounts(board, DIAGNOSTICS, before[DIAGNOSTICS] - 1);
+      assertCountConserved(before, after, { src: DIAGNOSTICS, dst: DRC });
       await assertTrailInvariants('after REAL board Diagnostics→DRC');
 
       // DRC → Diagnostics (BACK-edge; the ONLY legal exit; traversal counts toward the ≤2 bound).
       legalEdge(DRC, DIAGNOSTICS);
-      before = await board.readAllColumnCounts();
-      srcKey = columnKey(DRC);
-      dstKey = columnKey(DIAGNOSTICS);
-      expect(before[srcKey], `board must render a DRC count before DRC→Diagnostics back-edge`).toBeGreaterThanOrEqual(1);
+      before = await readCountsByStageName(board);
+      expect(before[DRC], `board must render a DRC total before DRC→Diagnostics back-edge`).toBeGreaterThanOrEqual(1);
       await board.moveToken(cardId, boardTargetName(DIAGNOSTICS), { specialist: `specialist0+${TESTRUNID}@example.com` });
       expectedRows++; expectedNonSelf++;
-      after = await pollColumnCounts(board, srcKey, before[srcKey] - 1);
-      assertCountConserved(before, after, { src: srcKey, dst: dstKey });
+      after = await pollColumnCounts(board, DRC, before[DRC] - 1);
+      assertCountConserved(before, after, { src: DRC, dst: DIAGNOSTICS });
       await assertTrailInvariants('after REAL board DRC→Diagnostics [BACK]');
 
       // LOOP/BACK-BOUND so far: Diagnostics self-loop ×1, Diagnostics→DRC ×1, DRC→Diagnostics ×1 — all ≤2.
@@ -652,11 +757,11 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
         });
       }
 
-      // (b) COUNT-DRIFT: capture the board's per-column counts BEFORE the move (APP-computed, polled).
-      const before = await board.readAllColumnCounts();
-      const srcKey = columnKey(from);
-      const dstKey = columnKey(to);
-      expect(before[srcKey], `board must render a count for source column "${srcKey}" before the ${from}→${to} move`).toBeGreaterThanOrEqual(1);
+      // (b) COUNT-DRIFT: capture the board's per-STAGE counts BEFORE the move (APP-computed, polled).
+      //     Diff at the stage level so a split stage's sub-columns sum into one total (the token may sit
+      //     in any sub-bucket; the meaningful conservation quantity is the per-stage total).
+      const before = await readCountsByStageName(board);
+      expect(before[from], `board must render a count for source stage "${from}" before the ${from}→${to} move`).toBeGreaterThanOrEqual(1);
 
       // (c) Drive the REAL move through the board: open the token's move-dropdown → pick the target
       //     (split stages render as "<name> (Queued)") → confirm PeopleInvolved (pick the seeded specialist).
@@ -664,9 +769,9 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
       expectedRows++; expectedNonSelf++;
 
       // (d) COUNT-DRIFT: the board re-rendered src−1 / dst+1, Σ conserved (read AFTER the move, polled
-      //     until the source column reflects the departure — the board computes these from its stream).
-      const after = await pollColumnCounts(board, srcKey, before[srcKey] - 1);
-      assertCountConserved(before, after, { src: srcKey, dst: dstKey });
+      //     until the source stage reflects the departure — the board computes these from its stream).
+      const after = await pollColumnCounts(board, from, before[from] - 1);
+      assertCountConserved(before, after, { src: from, dst: to });
 
       // (e) Trail invariants after every board move (NO-ORPHAN / EVERY-MOVE-LOGGED w/ non-self lower
       //     bound / NO-STAGE-SKIPPED against the oracle / LOOP-BOUND).
@@ -794,24 +899,265 @@ test.describe('V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNex
   });
 });
 
+// =============================================================================================
+// 72-JOURNEY EXPANSION (variation share) — walk EVERY distinct FORWARD journey of V7 entry→terminal.
+//
+// The forward path space of a variation is FINITE (the forward graph is a DAG over the variation's own
+// backbone order, so the enumeration terminates) — `forwardJourneys(cfg, VARIATION_ID)` returns each
+// distinct entry→terminal stage sequence. For V7 there are 9 (they share the entry→Diagnostics prefix and
+// diverge across the uP!-family Diagnostics-and-down operator branch set: with/without ATC Preparation,
+// with/without ATC Briefing, the uP! Readiness Changework→Review path vs the direct Self Evolution Report
+// hop, plus the dead-forward Diagnostics→Diagnostics Readiness Changework terminal of journey 0). Critically
+// NONE of the V7 journeys passes through Consultation (the headline V2↔V7 divergence — D2): if a journey
+// here contained a Consultation hop it would be a flow-model regression, caught by the beforeAll legality
+// guard below.
+//
+// One test PER journey (so a failure names the exact journey). Each test walks its journey entry→terminal
+// and asserts the e2e/lib/assertions.ts UNIVERSAL invariants AFTER EVERY transition:
+//   • NO-ORPHAN / EVERY-MOVE-LOGGED (with a non-self lower bound) / NO-STAGE-SKIPPED (vs the oracle) /
+//     LOOP-BOUND — on the running audit trail after each hop; and
+//   • COUNT-DRIFT via the board UI — on every hop driven on the REAL operator board; and
+//   • FORWARD-TERMINAL — the journey's last stage is reached AND the oracle gives it ZERO FORWARD edges.
+//
+// ACTOR MIX (rules): the journeys DIVERGE precisely on the Diagnostics-and-down OPERATOR spine, so that
+// spine is driven entirely through the REAL OPERATOR BOARD (queue-board.page.ts), reading the board's own
+// before/after column counts for COUNT-DRIFT — the part of each journey that actually varies is exercised
+// against the live product UI. The shared, identical entry→Diagnostics prefix (the AUTO gates, the 4 SELF
+// forms, and the Scope Enhancement specialist forward hop — all the same in every journey) is driven via
+// the participant-sim PRECONDITION stand-in: it replicates EXACTLY the Firestore writes the apps make (a
+// token advance + one `queue stage log` row), so the audit trail the invariants read is genuine. The deep
+// REAL-STUDIO specialist coverage (the Scope Enhancement next-cycle forward move + the Diagnostics
+// send-back [LOOP] / DRC [BACK] round-trip through the live UI) is the canonical walk above
+// (WF-uPNextCycle-001); re-driving an identical studio session in all 9 journeys would only multiply
+// flakiness without adding forward-path coverage.
+//
+// Anti-circularity holds: every operator hop is a REAL board click whose `queue stage log` row the PRODUCT
+// writes (counted by EVERY-MOVE-LOGGED's non-self lower bound), every observed edge is validated against
+// the oracle (NO-STAGE-SKIPPED), and COUNT-DRIFT reads numbers the board computed from its live stream.
+// =============================================================================================
+const FORWARD_JOURNEYS: string[][] = forwardJourneys(cfg, VARIATION_ID);
+/** The stage the journeys stop sharing a prefix and begin diverging on the operator board.
+ *  All V7 forward journeys share `…→Diagnostics`; from Diagnostics onward the operator branch differs. */
+const DIVERGENCE_STAGE = 'Diagnostics';
+
+test.describe('V7 · uP! - Next Cycle — every forward journey entry→terminal holds the universal invariants', () => {
+  let guard: ConsoleGuard;
+  let tokenDocId: string;
+  let cardId: string;
+
+  // Each journey is its own end-to-end walk (sim prefix + real-board spine); give it the full budget and
+  // serialize (the suite shares one board/queue — fullyParallel is already off, but be explicit).
+  test.describe.configure({ mode: 'serial', timeout: 240_000 });
+
+  test.beforeAll(async () => {
+    const seeded = await seedUpNextCycle({ cohort: 1, testrunid: TESTRUNID });
+    expect(seeded.variationId).toBe(VARIATION_ID);
+    tokenDocId = seeded.tokenIds[0];
+    cardId = seeded.profileIds[0];
+    // Sanity: the enumeration must match the known V7 forward-journey count (9). A drift here means the
+    // flow-model / config changed and the expansion is stale — fail loud rather than under-cover.
+    expect(FORWARD_JOURNEYS.length, 'V7 must enumerate its 9 distinct forward journeys').toBe(9);
+    // Every journey starts at V7's entry and every transition is an oracle-legal scoped edge (guards the
+    // data source — a journey with an illegal hop would be a flow-model regression, not a test bug). Also
+    // proves NO journey visits Consultation (D2) — legalEdge throws on any non-oracle hop.
+    for (const j of FORWARD_JOURNEYS) {
+      expect(j[0], 'every journey starts at the V7 entry stage').toBe('Evolution Prep Orientation');
+      expect(
+        j.includes(CONSULTATION),
+        'D2: no V7 forward journey may pass through Consultation (it is off the uP!-family happy path)',
+      ).toBe(false);
+      for (let k = 1; k < j.length; k++) {
+        legalEdge(j[k - 1], j[k]); // throws if any hop is not a legal scoped edge for V7
+      }
+    }
+  });
+
+  test.beforeEach(async ({ page }) => {
+    guard = attachConsoleGuard(page);
+    // Stub all externals so the (split) board stages that can open studios never pop a real window/network.
+    installAllExternalStubs(page);
+  });
+  test.afterEach(() => {
+    assertNoFatal(guard);
+  });
+
+  // One parametrized test per forward journey — the title carries the index + terminal so a failure is
+  // immediately attributable to a specific path.
+  for (let ji = 0; ji < FORWARD_JOURNEYS.length; ji++) {
+    const journey = FORWARD_JOURNEYS[ji];
+    const terminal = journey[journey.length - 1];
+    const divergeAt = journey.indexOf(DIVERGENCE_STAGE);
+
+    test(`journey ${ji}/${FORWARD_JOURNEYS.length - 1} (→ ${terminal}, ${journey.length} stages) walks entry→terminal; invariants hold after every transition`, async ({ page }) => {
+      expect(divergeAt, `journey ${ji} must pass through "${DIVERGENCE_STAGE}" (the operator-spine divergence point)`).toBeGreaterThanOrEqual(0);
+
+      // Fresh participant at the entry gate (PRECONDITION). resetTokenForWalk also pins the PREFIXED
+      // variationid so the real board can scope this token's move targets.
+      await resetTokenForWalk(tokenDocId, journey[0]);
+
+      let expectedRows = 0;     // total `queue stage log` rows the PRODUCT should have written so far
+      let expectedNonSelf = 0;  // of those, operator/specialist (movedby != 'self')
+
+      /** The trail-only universal invariants (COUNT-DRIFT is asserted inline around each board move). */
+      async function assertTrailInvariants(_ctx: string): Promise<void> {
+        await assertNoOrphan(tokenDocId);
+        await assertEveryMoveLogged(tokenDocId, expectedRows, { minNonSelf: expectedNonSelf });
+        await assertNoStageSkipped(tokenDocId, MODEL, VARIATION_ID);
+        await assertLoopBound(tokenDocId, 2);
+      }
+
+      // -----------------------------------------------------------------------------------------
+      // PHASE A — the shared entry→Diagnostics prefix via the participant-sim PRECONDITION stand-in.
+      // Each hop is the oracle's sole forward edge; a SELF-movable form is a participant self-move
+      // (movedby:'self'), every other backbone hop (AUTO gate, the Scope Enhancement specialist forward
+      // move) is an operator/CF-driven advance (movedby:'operator'). One stage-log row per hop.
+      // -----------------------------------------------------------------------------------------
+      for (let k = 1; k <= divergeAt; k++) {
+        const from = journey[k - 1];
+        const to = journey[k];
+        const edge = legalEdge(from, to);
+        const isSelfForm = edge.type === 'selfmove' && edge.selfmv === true;
+        await sim.advance(tokenDocId, to, { by: isSelfForm ? 'self' : 'operator', testrunid: TESTRUNID });
+        expectedRows++;
+        if (!isSelfForm) expectedNonSelf++;
+        await assertTrailInvariants(`[journey ${ji}] sim prefix ${from}→${to}`);
+      }
+      expect(await sim.currentStage(tokenDocId), `[journey ${ji}] token should rest on ${DIVERGENCE_STAGE} before the board spine`).toBe(DIVERGENCE_STAGE);
+
+      // -----------------------------------------------------------------------------------------
+      // PHASE B — the divergent Diagnostics-and-down OPERATOR spine on the REAL board.
+      // Every remaining hop is an operator move driven through the live move-dropdown; COUNT-DRIFT is
+      // asserted from the board's own before/after column counts around each move.
+      // -----------------------------------------------------------------------------------------
+      await loginAsOperator(page);
+      const board = new QueueBoardPage(page);
+      await board.selectQueue(QUEUE_NAME);
+      // Spy installed after the board mounts; only journeys terminating at Completed assert it fired.
+      await installDeliveryStatusSpy(page);
+
+      await expect
+        .poll(async () => board.revealTokenCard(cardId), {
+          message: `[journey ${ji}] board never rendered token card data-token-id="${cardId}" in the ${DIVERGENCE_STAGE} column`,
+          timeout: 40_000, // generous: by later journeys the board queue_token stream + Load-More paging can lag under accumulated emulator load
+        })
+        .toBe(true);
+
+      for (let k = divergeAt + 1; k < journey.length; k++) {
+        const from = journey[k - 1];
+        const to = journey[k];
+
+        // (a) the move must be a legal scoped edge per the oracle (the AUTHORITY) — fail loud if not.
+        legalEdge(from, to);
+
+        // (b) COUNT-DRIFT: board per-STAGE counts BEFORE the move (APP-computed, polled). Diff at the
+        //     stage level so a split stage's sub-columns sum into one total.
+        const before = await readCountsByStageName(board);
+        expect(before[from], `[journey ${ji}] board must render a count for source stage "${from}" before ${from}→${to}`).toBeGreaterThanOrEqual(1);
+
+        // (c) drive the REAL operator move (split stages render as "<name> (Queued)"; pick the seeded
+        //     specialist in the PeopleInvolved confirm).
+        await board.moveToken(cardId, boardTargetName(to), { specialist: `specialist0+${TESTRUNID}@example.com` });
+        expectedRows++; expectedNonSelf++;
+
+        // (d) COUNT-DRIFT: board re-rendered src−1 / dst+1, Σ conserved (read AFTER, polled until the
+        //     source stage reflects the departure — values the board computed from its stream).
+        const after = await pollColumnCounts(board, from, before[from] - 1);
+        assertCountConserved(before, after, { src: from, dst: to });
+
+        // (e) trail invariants after every board move.
+        await assertTrailInvariants(`[journey ${ji}] REAL board ${from}→${to}`);
+      }
+
+      // -----------------------------------------------------------------------------------------
+      // PHASE C — forward-terminal + (for Completed journeys) updateDeliveryStatus-on-final.
+      // -----------------------------------------------------------------------------------------
+      // The token reached this journey's terminal (REAL post-state).
+      expect(await sim.currentStage(tokenDocId), `[journey ${ji}] token must rest on the journey terminal "${terminal}"`).toBe(terminal);
+      // FORWARD-TERMINAL: the oracle gives the terminal ZERO FORWARD edges (loop/back edges are allowed —
+      // e.g. the dead-forward "Diagnostics Readiness Changework" terminal of journey 0 keeps only its
+      // Diagnostics back-edge, which `forwardJourneys` correctly treats as a forward dead-end).
+      const fwdFromTerminal = outEdgesForVariation(MODEL, terminal, VARIATION_ID).filter((e: any) => !e.loop && !e.back);
+      expect(
+        fwdFromTerminal.length,
+        `[journey ${ji}] terminal "${terminal}" must have ZERO forward scoped out-edges (a real forward dead-end). Got: ` +
+          JSON.stringify(fwdFromTerminal.map((e: any) => e.to)),
+      ).toBe(0);
+      if (terminal === TERMINAL) {
+        // Completed is the multi-stage true terminal — additionally assert it has ZERO scoped out-edges of
+        // ANY kind (the move-dropdown is genuinely empty) and that the final move fired updateDeliveryStatus.
+        await assertTerminalReached(tokenDocId, VARIATION_ID, { terminal: TERMINAL, oracle: MODEL });
+        const calls = await waitForDeliveryStatusCalls(page, 1);
+        const completedCall = calls.find((c) => c.status === 'completed' && c.apptPath === `queue_token/${tokenDocId}`);
+        expect(
+          completedCall,
+          `[journey ${ji}] the final board move into "${TERMINAL}" must fire guard.updateDeliveryStatus("queue_token/${tokenDocId}","completed",…). Captured: ${JSON.stringify(calls)}`,
+        ).toBeTruthy();
+        expect(
+          completedCall!.hasEventRequestRef,
+          `[journey ${ji}] updateDeliveryStatus must carry a non-null eventRequestRef (gap-10)`,
+        ).toBe(true);
+      }
+
+      // FINAL trail snapshot: exactly the transitions we drove, with the operator (non-self) board moves
+      // present in the PRODUCT's audit trail (anti-circular lower bound). One row per journey hop.
+      expect(expectedRows, `[journey ${ji}] one stage-log row per journey transition`).toBe(journey.length - 1);
+      await assertEveryMoveLogged(tokenDocId, expectedRows, { minNonSelf: expectedNonSelf });
+    });
+  }
+});
+
 // ---------------------------------------------------------------------------------------------
-// Local helper — poll the board's per-column counts until the SOURCE column reflects the departure.
-// (collectionData is async — SHARED CONVENTIONS: use expect.poll for live-stream-dependent reads.)
+// Local helpers — board count aggregation + departure poll.
+//
+// WHY aggregate-by-stage-NAME (not by the raw `<name>_<type>_<i>` sub-column key): a split
+// (compulsoryactivity) stage renders MULTIPLE sub-columns (Queued / Waiting / Activity), and a board
+// move can re-bucket a token across sub-columns of the SAME stage — e.g. the Diagnostics self-loop
+// ("Send Back"): the board EXCLUDES the token's own (Queued) bucket from the move-dropdown, so the move
+// commits onto a sibling (Waiting) bucket of the SAME stage (queue-board.page.ts resolveMoveTarget, ts
+// note ~786). The committed `currentstage` is still the bare stage (moveTokenToStage parses the suffix
+// back), so the stage-level total is the meaningful COUNT-DRIFT quantity — a single `_queued_` key read
+// would spuriously go to 0 after a self-loop. Summing a stage's sub-columns into one per-stage total is
+// the same technique the sibling V5 walk uses (prodigies-first-cycle.spec.ts `aggregateByStageName`).
 // ---------------------------------------------------------------------------------------------
+/** Collapse { data-stage-key → count } into { stageName → count } by stripping the board's
+ *  `<name>_<i>` / `<name>_queued_<i>` / `_waiting_` / `_activity_` sub-column suffixes (so a split
+ *  stage's sub-columns sum into one per-stage total before a move diff). */
+function aggregateByStageName(byKey: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, n] of Object.entries(byKey)) {
+    const name = key.replace(/_(queued|waiting|activity)_\d+$/i, '').replace(/_\d+$/, '');
+    out[name] = (out[name] || 0) + (Number(n) || 0);
+  }
+  return out;
+}
+
+/** Σ of every visible board column count (APP-computed) — for the population-conservation invariant. */
+function sumBoardCounts(byKey: Record<string, number>): number {
+  return Object.values(byKey).reduce((a, n) => a + (Number(n) || 0), 0);
+}
+
+/** Per-stage-NAME counts the board rendered (split sub-columns summed). The values are APP-computed
+ *  (the board derived them from its live Firestore stream) — this only reads + aggregates them. */
+async function readCountsByStageName(board: QueueBoardPage): Promise<Record<string, number>> {
+  return aggregateByStageName(await board.readAllColumnCounts());
+}
+
+/** Poll the board's per-stage-NAME counts until the SOURCE stage's total reflects the departure
+ *  (collectionData is async — SHARED CONVENTIONS: use expect.poll for live-stream-dependent reads). */
 async function pollColumnCounts(
   board: QueueBoardPage,
-  srcKey: string,
+  srcStage: string,
   expectedSrc: number,
 ): Promise<Record<string, number>> {
   let last: Record<string, number> = {};
   await expect
     .poll(
       async () => {
-        last = await board.readAllColumnCounts();
-        return last[srcKey];
+        last = await readCountsByStageName(board);
+        return last[srcStage];
       },
       {
-        message: `board source column "${srcKey}" never re-rendered to ${expectedSrc} after the move (stream not settled?)`,
+        message: `board source stage "${srcStage}" never re-rendered to ${expectedSrc} after the move (stream not settled?)`,
         timeout: 20_000,
         intervals: [200, 400, 800, 1200],
       },
