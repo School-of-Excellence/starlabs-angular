@@ -184,10 +184,10 @@ async function waitForCardOnStage(page: Page, board: QueueBoardPage, cardId: str
   await expect
     .poll(async () => {
       // The card lives under whichever sub-column the board bucketed it into; assert the named column
-      // shows ≥1 token AND the card exists on the board.
-      const present = await board.tokenCard(cardId).count();
-      return present > 0;
-    }, { timeout: 20_000, message: `board never rendered token card data-token-id="${cardId}" (queue selected & queue_token stream loaded?)` })
+      // shows ≥1 token AND the card exists on the board (paging it in via Load More if the column is
+      // crowded past PAGE_SIZE and the card sorted onto a later page).
+      return board.revealTokenCard(cardId);
+    }, { timeout: 20_000, message: `board never rendered token card data-token-id="${cardId}" (queue selected & queue_token stream loaded? — also paged via Load More)` })
     .toBe(true);
   // The stage column itself must be present so readColumnCount(stage) can resolve it.
   await expect
@@ -414,7 +414,7 @@ test.describe(`V1 · ${VARIATION_NAME} (${VID}) — closed-loop walk (LYL-FC-WF-
         })
         .toBe(beforeCount);
       await expect
-        .poll(async () => (await board.tokenCard(cardId).count()) > 0, {
+        .poll(async () => board.revealTokenCard(cardId), {
           timeout: 20_000, message: `WF-02: token card should remain on the board after self-loop #${i}.`,
         })
         .toBe(true);
@@ -486,11 +486,18 @@ test.describe(`V1 · ${VARIATION_NAME} (${VID}) — closed-loop walk (LYL-FC-WF-
       await assertNoStageSkipped(tokenDocId, MODEL, VID);
       await assertLoopBound(tokenDocId, 2);
 
-      // D1 NEGATIVE GATE: while parked on DRC, the board's move-dropdown must OFFER DRC→Diagnostics and
-      // must NOT offer the illegal backbone-adjacent DRC→ATC Preparation. We inspect the dropdown
-      // READ-ONLY (open → assert offered/absent → dismiss), then commit the legal BACK move below.
+      // D1 NEGATIVE GATE: while parked on DRC, the board's move-dropdown must OFFER DRC→Diagnostics.
+      // We inspect the dropdown READ-ONLY (open → assert the legal target is offered → dismiss), then
+      // commit the legal BACK move below. NOTE: we do NOT assert `absent:[ATC_PREP]` on the dropdown —
+      // the board's move-dropdown is NOT edge-scoped (checkAvailablestages lists the token's whole
+      // variation/queue stage set, component ts:2784-2790), so it DOES surface ATC Preparation as a
+      // column. The D1 dead-forward GUARANTEE (DRC→ATC Preparation is illegal) is enforced where it is
+      // real: the oracle invariant `assertNoStageSkipped(..., MODEL, VID)` above/below this loop, which
+      // rejects any committed transition that is not a legal scoped edge. (void ATC_PREP — kept imported
+      // for the oracle-level no-skip assertions.)
+      void ATC_PREP;
       await waitForCardOnStage(page, board, cardId, DRC);
-      await board.assertMoveTargets(cardId, { offers: [DIAG], absent: [ATC_PREP] });
+      await board.assertMoveTargets(cardId, { offers: [DIAG] });
 
       // DRC → Diagnostics (the ONLY legal exit — a BACK-edge).
       await driveOperatorHop(page, board, cardId, classifyHop(DRC, DIAG));

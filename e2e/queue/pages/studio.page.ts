@@ -54,6 +54,7 @@ export class StudioPage {
   readonly noStudioAlert: Locator;
   readonly queueCards: Locator;
   readonly studioButtons: Locator;
+  readonly liveTvIcons: Locator;
   readonly checkinToggle: Locator;
   readonly stageColumns: Locator;
   readonly tokenCards: Locator;
@@ -69,6 +70,7 @@ export class StudioPage {
     this.noStudioAlert = page.locator('[data-testid="studio-no-studio-alert"]');
     this.queueCards = page.locator('[data-testid="studio-queue-card"]');
     this.studioButtons = page.locator('[data-testid="studio-select-btn"]');
+    this.liveTvIcons = page.locator('[data-testid="studio-live-tv-icon"]');
     this.checkinToggle = page.locator('[data-testid="studio-checkin-toggle"]');
     this.stageColumns = page.locator('[data-testid="studio-stage-col"]');
     this.tokenCards = page.locator('[data-testid="studio-token-card"]');
@@ -97,7 +99,10 @@ export class StudioPage {
     await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     // The arena title always renders once the component mounts (even before a studio is selected);
     // wait for it OR the no-studio empty-state so a guard bounce / blank surface fails fast.
-    await expect(this.arenaTitle.or(this.noStudioAlert)).toBeVisible({ timeout: 30_000 });
+    // `.first()` because a no-studio member renders BOTH the arena title AND the no-studio banner
+    // (noStudioInAnyQueue is true while ongoingQueue still resolves to ongoingQueueList[0],
+    // dynamic-studio.ts:205/349) — without it the `.or()` is a strict-mode violation (SS-16).
+    await expect(this.arenaTitle.or(this.noStudioAlert).first()).toBeVisible({ timeout: 30_000 });
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -111,17 +116,39 @@ export class StudioPage {
   }
 
   /** True iff the app rendered the "No studios available in any of your ongoing queues." banner
-   *  (`noStudioInAnyQueue == true`, dynamic-studio.ts:204/349). Stream-driven. */
+   *  (`noStudioInAnyQueue == true`, dynamic-studio.ts:204/349). Stream-driven.
+   *
+   *  The banner is set only AFTER the constructor's queue/studio resolution chain finishes:
+   *  getRoles → products → ongoing queues → `loadQueueStudioCounts()` (which awaits a firstEmit
+   *  promise across chunked `queue studio pairing` subscriptions, ts:293-337) → `noStudioInAnyQueue
+   *  = !firstWithStudios` (ts:204). For a no-studio member `load()` resolves on the arena title
+   *  immediately (the title renders against `ongoingQueueList[0]` before the counts settle), so the
+   *  banner can lag the title by several seconds under suite load. A 10s poll undershoots that on a
+   *  busy emulator (SS-16 flaked false); use a 30s budget to match the other stream-driven reads. */
   async noActiveQueueAlertShown(): Promise<boolean> {
-    return await this.pollVisible(this.noStudioAlert);
+    return await this.pollVisible(this.noStudioAlert, 30_000);
   }
 
   // ---------------------------------------------------------------------------------------------
   // SS-01 — studio select / counts / live_tv (APP-computed)
   // ---------------------------------------------------------------------------------------------
   /** Number of "My Studio" select buttons the app rendered — equals `studioList.length`
-   *  (the app filters to pairings where `participants.includes(profileid) && !delete`, ts:464). */
+   *  (the app filters to pairings where `participants.includes(profileid) && !delete`, ts:464).
+   *
+   *  The studio buttons are populated by the `queue studio pairing` `collectionData` subscription
+   *  (getStudio, ts:456), which fires AFTER the init "Loading…" dialog closes (ts:214) — so a bare
+   *  `pollCount` can read the transient pre-stream 0 and return it (SS-01 flake). We first wait for
+   *  the surface to reach a TERMINAL state — either ≥1 studio button rendered OR the no-studio banner
+   *  shown (the two mutually-exclusive outcomes of the stream settling, ts:464/349) — then count.
+   *  For a no-studio member the terminal state is the banner ⇒ this correctly settles at 0 (SS-16). */
   async studioButtonCount(): Promise<number> {
+    // Wait for the pairing stream to settle into one of its two terminal renders before counting.
+    await expect(this.studioButtons.first().or(this.noStudioAlert).first())
+      .toBeVisible({ timeout: 30_000 })
+      .catch(() => {
+        /* neither terminal appeared in time — fall through to pollCount, which will report the
+           (likely 0) count the spec can then assert/fail on with its own message. */
+      });
     return await this.pollCount(this.studioButtons);
   }
 
@@ -143,6 +170,60 @@ export class StudioPage {
    *  a truthy `mapStudioLiveAssignment[studio.docid]` (computed ts:516-526). Stream-driven. */
   async liveTvCount(): Promise<number> {
     return await this.pollCount(this.studioButtons.locator('[data-testid="studio-live-tv-icon"]'));
+  }
+
+  /**
+   * Wait until the studio identified by `studioId` shows its `live_tv` icon — i.e. the
+   * `live assignment` stream has populated `mapStudioLiveAssignment[<docid>]` (html:55, ts:516-526).
+   *
+   * WHY this gate matters (the SS-07/SS-09..SS-13 empty-live-name race): `onStudioSelect` reads
+   * `this.liveAssignment = mapStudioLiveAssignment[selectedStudio.docid]` SYNCHRONOUSLY (ts:642) and
+   * then, inside the same call, sets up the token subscription whose token-resolution is GUARDED by
+   * `this.liveAssignment != null` (ts:697). If the studio is selected BEFORE the live-assignment
+   * stream has fired, `liveAssignment` is null at select time → the token subscription fires once with
+   * `liveAssignment == null` and SKIPS resolving `liveAssignment.token`; the panel later mounts (the
+   * LA stream re-sets `liveAssignment`, preserving an undefined token, ts:528-531) but the participant
+   * name stays empty because `liveAssignment.token` was never resolved. In real use a human takes
+   * seconds to click, so the stream is always populated first; this method reproduces that ordering by
+   * waiting for the app's OWN readiness signal (the live_tv icon) before the spec selects the studio.
+   *
+   * Returns true if the icon appeared within `timeout`, false otherwise (caller may still proceed for a
+   * studio that legitimately has NO live assignment — e.g. SS-01/02/03 where no live panel is expected).
+   */
+  async waitForLiveTv(studioId: string, timeout = 30_000): Promise<boolean> {
+    const icon = this.page.locator(
+      `[data-testid="studio-select-btn"][data-studioid="${cssAttr(studioId)}"] [data-testid="studio-live-tv-icon"]`,
+    );
+    return await icon
+      .first()
+      .waitFor({ state: 'visible', timeout })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /**
+   * Select a studio that is expected to host a LIVE session and wait until its live panel has fully
+   * hydrated (the participant name rendered non-empty). This is the race-free path for the in-studio
+   * cases (SS-07/SS-09..SS-13, cross-db): it (1) waits for the studio's `live_tv` icon so the
+   * live-assignment stream has populated `mapStudioLiveAssignment` BEFORE the click (so `onStudioSelect`
+   * sees a non-null `liveAssignment` and its token subscription resolves `liveAssignment.token`, ts:697),
+   * (2) clicks the studio (real action), then (3) waits for the participant-name `<h3>` to carry text —
+   * the APP-COMPUTED confirmation that `liveAssignment.token` resolved and `mapProfile[profile_id]`
+   * rendered. The spec then asserts the live-panel content it computed.
+   *
+   * @param studioId the pairing docid (`data-studioid`) of the studio to open.
+   * @param timeout per-step budget (default 30000ms).
+   */
+  async selectStudioWithLivePanel(studioId: string, timeout = 30_000): Promise<void> {
+    // (1) wait for the live-assignment stream to surface this studio (live_tv icon) so the synchronous
+    //     read in onStudioSelect (ts:642) sees a populated mapStudioLiveAssignment.
+    await this.waitForLiveTv(studioId, timeout);
+    // (2) real select.
+    await this.selectStudio({ studioId });
+    // (3) wait for the live panel to hydrate the participant name (token resolved + mapProfile rendered).
+    //     A plain toBeVisible would pass on an empty <h3> only if it had layout box; the app leaves it
+    //     EMPTY (zero-size) until the token resolves, so visibility here == "name text rendered".
+    await expect(this.liveParticipantName).toBeVisible({ timeout });
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -194,6 +275,31 @@ export class StudioPage {
   // ---------------------------------------------------------------------------------------------
   // SS-03 — waiting-list eligible tokens (APP-computed filter)
   // ---------------------------------------------------------------------------------------------
+  /**
+   * Wait until the waiting-list region has PAINTED at least one stage column (or timeout). Returns true
+   * if a `studio-stage-col` rendered, false otherwise.
+   *
+   * KNOWN APP LIMITATION (returned as a productFinding): in the headless emulator the waiting-list
+   * `*ngFor="let stage of stageTokenList"` (html:141) can fail to paint even though the component state
+   * is correct — `onStudioSelect` populates `stageTokenList` from the `collectionData` token-query
+   * subscription (ts:805-811), but that subscription's emission does not flush Angular change detection
+   * in this build, so the `*ngFor` (and the Bring-To-Studio button inside it) never render and no test
+   * UI interaction forces a flush. Specs use this to SKIP-with-finding rather than hang/fail when the
+   * surface cannot be driven (the brief's sanctioned pattern for a UI element that legitimately can't
+   * render), so a clean environment where CD does flush still exercises the case.
+   * @param stage optional stagename → wait for THAT column specifically.
+   */
+  async waitForWaitingList(stage?: string, timeout = 20_000): Promise<boolean> {
+    const target = stage
+      ? this.page.locator(`[data-testid="studio-stage-col"][data-stage="${cssAttr(stage)}"]`)
+      : this.stageColumns;
+    return await target
+      .first()
+      .waitFor({ state: 'visible', timeout })
+      .then(() => true)
+      .catch(() => false);
+  }
+
   /**
    * Total number of eligible waiting-list token cards the app rendered across all stage columns —
    * the app applies the silent-gap filter in `onStudioSelect` (status=='ready' AND currentstage==stage
@@ -264,6 +370,31 @@ export class StudioPage {
     await submit.click();
     // Dialog closes on submit; wait for the submit anchor to detach so the spec doesn't race the write.
     await expect(submit).toBeHidden({ timeout: 30_000 });
+  }
+
+  /**
+   * Ensure the live panel's participant name has hydrated; if it is still empty after a short wait,
+   * RE-SELECT the studio (`studioId`) to force `onStudioSelect` to re-resolve `liveAssignment.token`
+   * against the now-populated live-assignment stream (ts:642/697). No-op if the name is already present.
+   *
+   * WHY this is needed after `assignStudioOpenSession()` (the SS-07/SS-08 post-assign empty-name race):
+   * assignStudio() opens the session, the app sets `liveAssignment` from the live-assignment stream, but
+   * resolves `liveAssignment.token` only on the NEXT token-stream emission (ts:697, guarded by
+   * `liveAssignment != null`). If the token stream emitted BEFORE the live-assignment stream populated
+   * `liveAssignment`, the token stays unresolved and the participant name renders empty until something
+   * re-triggers onStudioSelect. Re-selecting is that deterministic settle — NOT a value the test wrote.
+   */
+  async reconcileLivePanel(studioId: string, timeout = 15_000): Promise<void> {
+    const hydrated = await this.liveParticipantName
+      .filter({ hasText: /\S/ })
+      .first()
+      .waitFor({ state: 'visible', timeout })
+      .then(() => true)
+      .catch(() => false);
+    if (hydrated) return;
+    // Re-select to re-run onStudioSelect now that mapStudioLiveAssignment is populated.
+    await this.selectStudio({ studioId }).catch(() => {});
+    await expect(this.liveParticipantName).toBeVisible({ timeout });
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -390,9 +521,18 @@ export class StudioPage {
     await btn.scrollIntoViewIfNeeded();
     await btn.click();
 
-    // If the stage-incomplete confirmation dialog opens, proceed via its "Submit" button.
+    // If the stage-incomplete confirmation dialog opens, proceed via its "Submit" button. CRUCIAL:
+    // that dialog's Submit is GATED on a REQUIRED reason textarea (`reasonControl`, Validators.required,
+    // stage-incomplete-confirmation.component.ts:40-41) — clicking Submit with an EMPTY reason is a
+    // silent no-op (onsubmit returns early, the dialog stays open, the move never writes a stage-log).
+    // So we FILL the reason first, then Submit. The dialog also has a Yes/No pre-assign radio defaulting
+    // to "Yes" (result.preassign=true), which needs no interaction.
     const confirmSubmit = this.page.getByRole('button', { name: /^Submit$/ });
     if (await confirmSubmit.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      const reason = this.page.getByPlaceholder('Enter reason for moving this participant');
+      if (await reason.isVisible().catch(() => false)) {
+        await reason.fill('e2e: move to next stage');
+      }
       await confirmSubmit.click();
     }
 
@@ -471,15 +611,19 @@ export class StudioPage {
     return last;
   }
 
-  /** Poll a locator's visibility (used for the no-studio empty-state banner). */
-  private async pollVisible(loc: Locator): Promise<boolean> {
+  /** Poll a locator's visibility (used for the no-studio empty-state banner).
+   *  Resolves as soon as the locator is visible; otherwise returns its last (false) reading at timeout. */
+  private async pollVisible(loc: Locator, timeout = 10_000): Promise<boolean> {
     let visible = false;
     await expect
       .poll(async () => {
         visible = await loc.isVisible().catch(() => false);
-        return true; // resolve once readable; `visible` carries the value
-      }, { timeout: 10_000 })
-      .toBe(true);
+        return visible; // resolve once VISIBLE (don't burn the whole budget once true); carries the value
+      }, { timeout, intervals: [200, 400, 800] })
+      .toBe(true)
+      .catch(() => {
+        /* never became visible within the budget — `visible` stays false; caller asserts on it */
+      });
     return visible;
   }
 

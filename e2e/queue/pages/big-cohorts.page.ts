@@ -38,10 +38,22 @@
 // e2e/queue/support/firestore-admin.ts / e2e/lib/assertions.ts — not here.
 
 import { Page, Locator, expect } from '@playwright/test';
+import { loginAsBigAdmin } from '../support/auth';
 
 /** Route segment (query-stripped guard key is `/bigcohorts`, big.md §4a). baseURL comes from the
  *  Playwright config — no project id hardcoded (SHARED CONVENTIONS). */
 const ROUTE = '/bigcohorts';
+
+/** Options for {@link BigCohortsPage.open}. */
+export interface CohortsOpenOpts {
+  /** Skip the real login (caller already authenticated) and only navigate + wait for the brand. */
+  skipLogin?: boolean;
+  /** Override the actor email to log in as (defaults to the seeded BIG admin). Pass the seed's
+   *  mentor email when the spec seeds its own BIG world so the data-driven authGuard admits us. */
+  email?: string;
+  /** Max time to wait for the route + brand to mount. Default 30000ms. */
+  timeoutMs?: number;
+}
 
 const SEL = {
   // --- Page shell --------------------------------------------------------------------------------
@@ -93,15 +105,27 @@ export class BigCohortsPage {
   // ---------------------------------------------------------------------------
 
   /**
-   * Open /bigcohorts and wait until the screen has mounted past its loading spinner (the "B!G Cohorts"
-   * brand chip renders only inside the `*ngIf="!loading"` wrapper, html:7/12). Auth (a BIG admin) must
-   * already be established by the spec via e2e/queue/support/auth.ts `loginAsBigAdmin` BEFORE calling
-   * this; bigcohorts has NO in-component role gate (big.md §4b) — only the data-driven authGuard.
+   * Log in as the seeded BIG admin (via the REAL login form — `loginAsBigAdmin`, which lands on
+   * /big-dashboard so the data-driven authGuard has already admitted us), then open /bigcohorts and
+   * wait until the screen has mounted past its loading spinner (the "B!G Cohorts" brand chip renders
+   * only inside the `*ngIf="!loading"` wrapper, html:7/12). bigcohorts has NO in-component role gate
+   * (big.md §4b) — only the data-driven authGuard, which the seeded BIG-admin / mentor passes.
+   *
+   * Mirrors BigDashboardPage / BigMiscPage, which log in inside open(): this object USED to assume the
+   * spec had already authenticated, but the BIG-08 spec calls open() directly, so an un-authenticated
+   * goto('/bigcohorts') bounced to /login and the brand never rendered. Pass `{ skipLogin: true }` when
+   * the caller already logged in, or `{ email }` to pick a specific seeded actor (e.g. the run's mentor).
    */
-  async open(): Promise<void> {
+  async open(opts: CohortsOpenOpts = {}): Promise<void> {
+    const timeout = opts.timeoutMs ?? 30_000;
+    if (!opts.skipLogin) {
+      await loginAsBigAdmin(this.page, 0, { timeoutMs: timeout, email: opts.email });
+    }
     await this.page.goto(ROUTE, { waitUntil: 'domcontentloaded' });
+    // Confirm the guard admitted us to the route (it did not bounce back to /login).
+    await this.page.waitForURL((u) => u.pathname.includes('bigcohorts'), { timeout });
     // Loader disappears and the dashboard wrapper (with the brand chip) appears once cohorts resolve.
-    await expect(this.page.locator(SEL.brand)).toBeVisible({ timeout: 30_000 });
+    await expect(this.page.locator(SEL.brand)).toBeVisible({ timeout });
   }
 
   // ---------------------------------------------------------------------------

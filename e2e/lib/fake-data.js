@@ -112,17 +112,29 @@ function queuePlanning(ctx) {
 
 /** queue studio pairing — a live studio room (db default). schemas.md §B. */
 function queueStudioPairing(ctx) {
-  const { docid, queueDocId, participants = [], studioin = true, checkin = true } = ctx;
+  const {
+    docid, queueDocId, participants = [], studioin = true, checkin = true,
+    // participantsactivity drives dynamic-studio.onStudioSelect's studioStage derivation
+    // (ts:645-671): Object.values(...).sort().join(',') must EQUAL a Diagnostics
+    // compulsoryactivity combo for the studio token query (ts:695) to run at all. Default {}
+    // is the EMPTY-studio case; the studio cohort seeder passes a Diagnostics-matching map.
+    participantsactivity = {},
+    // atcmodel === null makes the waiting-list eligibility filter (ts:808) short-circuit
+    // ([null,undefined].includes(atcmodel)) BEFORE it dereferences token.productref.id — which
+    // the seeded tokens omit (else the filter throws). Use null, NOT [] (an array does NOT
+    // short-circuit and the filter would touch the missing productref). Caller may override.
+    atcmodel = null,
+  } = ctx;
   return {
     docid,
     queueref: ctx.queueGenRef(queueDocId),               // REF (§0.2); board filters on it (:1752)
     participants,                                        // [profileid] — array-contains queried (:395)
-    participantsactivity: {},
+    participantsactivity,                                // map; values join-match a Diagnostics combo (:647)
     studioin,                                            // true to surface on board (:1753)
     checkin,                                             // true to surface on board
     openvidu: false,
     status: null,
-    atcmodel: [],
+    atcmodel,                                            // null ⇒ waiting-list filter short-circuits (:808)
     created: ctx.now(),
   };
 }

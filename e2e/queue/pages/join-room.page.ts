@@ -8,16 +8,17 @@
 // scope. Drive assertions up to the pre-join screen.
 //
 // STUBBED MEDIA — two pieces are required for the pre-join screen to render and for the methods
-// here to be meaningful; the caller wires them in `beforeEach` (this page object does NOT install
-// them, to keep one source of truth):
+// here to be meaningful:
 //   1. getUserMedia: the real `prepareParticipant()` calls navigator.mediaDevices.getUserMedia
-//      ({video,audio}) (join-openvidu-call.component.ts:224). Headless Chromium with the queue
-//      config's Desktop-Chrome project must be launched with fake media so the grant resolves to
-//      `granted` rather than `denied`. The spec's project/use should add launch args
-//      `--use-fake-ui-for-media-stream` + `--use-fake-device-for-media-stream` (see RISKS in the
-//      page-object return — the queue config currently does NOT set these). `enableFakeMedia()`
-//      below grants the Permissions API so the prompt never blocks; combined with the launch flags
-//      the camera/mic resolve to granted.
+//      ({video,audio}) (join-openvidu-call.component.ts:224). The queue Playwright project does NOT
+//      set the Chromium fake-media launch flags, so the real getUserMedia throws
+//      `NotSupportedError: Not supported` → the component's `console.error('Permission error:', err)`
+//      (ts:238) → the console guard records a FATAL (SS-11b failure). `open()` therefore calls
+//      `enableFakeMedia()` (BEFORE navigation) which (a) grants the camera/mic Permissions API and
+//      (b) installs an init-script that replaces `getUserMedia` with a synthetic
+//      `<canvas>.captureStream()` + silent-WebAudio MediaStream, so `prepareParticipant()` resolves
+//      (cameraStatus/micStatus → 'granted') with NO console error and the pre-join controls render.
+//      This is the page object's OWN responsibility (it owns the media boundary it asserts against).
 //   2. createOpenViduToken + room-control CFs + the `openviduroom/{roomid}` doc: install via
 //      `installOpenViduStub(page)` / `installAllExternalStubs(page)` and stand the room doc in with
 //      `seedOpenViduRoom(roomId, …)` BEFORE `open()` for a /joinroom-direct spec (a PRECONDITION
@@ -79,12 +80,25 @@ export class JoinRoomPage {
   }
 
   /**
-   * Grant camera + microphone via the Permissions API so `prepareParticipant()`'s
-   * getUserMedia prompt resolves without a manual dialog. This handles the PERMISSION prompt;
-   * the actual fake video/audio TRACKS still require the browser launch flags
-   * `--use-fake-ui-for-media-stream` + `--use-fake-device-for-media-stream` (see file header
-   * RISKS) — without them, getUserMedia may still reject and cameraStatus becomes 'denied'.
-   * Safe to call before navigation; no-op if the context does not support granting.
+   * Make the pre-join screen's media acquisition succeed WITHOUT a real camera/mic or browser
+   * launch flags. Two parts:
+   *
+   *  (1) Grant the camera/microphone PERMISSIONS via the Permissions API so any permission prompt
+   *      resolves without a manual dialog.
+   *  (2) Install a page init-script that replaces `navigator.mediaDevices.getUserMedia` with a fake
+   *      that returns a synthetic `MediaStream` (a `<canvas>.captureStream()` video track + a silent
+   *      WebAudio audio track). This is required because the queue Playwright project does NOT set the
+   *      Chromium fake-media launch flags (`--use-fake-device-for-media-stream` /
+   *      `--use-fake-ui-for-media-stream`), so the REAL `getUserMedia` throws
+   *      `NotSupportedError: Not supported` (no device) → the component's `prepareParticipant()`
+   *      `console.error('Permission error:', err)` (join-openvidu-call.component.ts:238) → the console
+   *      guard records a FATAL and fails SS-11b. With this stub, `prepareParticipant()` resolves
+   *      (cameraStatus/micStatus → 'granted') and no error is logged. This is a legitimate external-
+   *      media stub (the page-object header documents that the spec must supply fake media); it is
+   *      NOT a circular read-back — it only stands in the device boundary the test cannot provide.
+   *
+   * MUST run BEFORE navigation (init scripts apply at document start) — `open()` calls it first.
+   * Safe to call repeatedly; the Permissions grant is best-effort (non-fatal if the channel rejects).
    */
   async enableFakeMedia(): Promise<void> {
     try {
@@ -92,10 +106,83 @@ export class JoinRoomPage {
         origin: new URL(this.page.url() || 'http://localhost:4200').origin,
       });
     } catch {
-      // Some channels reject unknown permission names or a blank origin; the launch flags are the
-      // real media source, so a failure here is non-fatal — surfaced as a RISK, not thrown.
+      // Some channels reject unknown permission names or a blank origin — non-fatal; the init-script
+      // stub below is the real media source, so we proceed.
     }
+    if (this._fakeMediaInstalled) return;
+    this._fakeMediaInstalled = true;
+    await this.page
+      .addInitScript(() => {
+        const makeStream = (): MediaStream => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;
+            canvas.height = 240;
+            const c2d = canvas.getContext('2d');
+            if (c2d) {
+              c2d.fillStyle = '#111';
+              c2d.fillRect(0, 0, 320, 240);
+              // keep the captured video track "live" by repainting a frame periodically.
+              setInterval(() => {
+                c2d.fillStyle = '#' + (((Math.random() * 0xffffff) | 0).toString(16).padStart(6, '0'));
+                c2d.fillRect(0, 0, 320, 240);
+              }, 250);
+            }
+            const stream: MediaStream = (canvas as any).captureStream
+              ? (canvas as any).captureStream(10)
+              : new MediaStream();
+            // add a silent audio track so getUserMedia({audio:true}) also yields an audio track.
+            try {
+              const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+              if (AC) {
+                const ac = new AC();
+                const dst = ac.createMediaStreamDestination();
+                const osc = ac.createOscillator();
+                osc.connect(dst);
+                osc.start();
+                dst.stream.getAudioTracks().forEach((t: MediaStreamTrack) => stream.addTrack(t));
+              }
+            } catch {
+              /* audio track is optional — video alone satisfies prepareParticipant's video grab */
+            }
+            return stream;
+          } catch {
+            return new MediaStream();
+          }
+        };
+        const gum = (): Promise<MediaStream> => Promise.resolve(makeStream());
+        try {
+          const md: any = navigator.mediaDevices || ({} as any);
+          try {
+            Object.defineProperty(md, 'getUserMedia', { configurable: true, writable: true, value: gum });
+          } catch {
+            md.getUserMedia = gum;
+          }
+          try {
+            Object.defineProperty(md, 'enumerateDevices', {
+              configurable: true,
+              writable: true,
+              value: async () => [
+                { kind: 'videoinput', deviceId: 'fake-cam', label: 'fake-cam', groupId: 'g', toJSON() { return this; } },
+                { kind: 'audioinput', deviceId: 'fake-mic', label: 'fake-mic', groupId: 'g', toJSON() { return this; } },
+              ],
+            });
+          } catch {
+            /* enumerateDevices override is best-effort */
+          }
+          // legacy fallback some SDKs probe
+          (navigator as any).getUserMedia = (_c: unknown, ok: (s: MediaStream) => void) => ok(makeStream());
+        } catch {
+          /* no mediaDevices to patch (very old context) — nothing to do */
+        }
+      })
+      .catch(() => {
+        /* addInitScript can only be added before any navigation in some channels — non-fatal */
+      });
   }
+
+  /** Guard so the fake-media init script is installed at most once per page. */
+  private _fakeMediaInstalled = false;
 
   /**
    * Navigate to `/joinroom/:roomid` and wait until the component has mounted past its initial

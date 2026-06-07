@@ -204,6 +204,7 @@ function runPlan() {
   console.log(`   participant mode checklist×${participants.length}, participantvideoask×${participants.length}`);
   console.log(`   queue studio pairing×1, studioinvitation×${studioCohort}, live assignment×${studioCohort}, arena participant×${studioCohort}`);
   console.log('   modes×5, journey×1, arenavideoask×1');
+  console.log('   delivery forms×1 (default-DB, BIG-06), big participants assignments×1 (default-DB, BIG-06)');
   console.log('   user_data, users_roles, dashboard (staff auth chain + route grants)');
   console.log('                 (firestore-forms named DB)');
   console.log('   delivery forms×1, formsByClient×2  (SS-07 positive lower-bound, forms half)');
@@ -236,6 +237,42 @@ const queueGenDocId = testrunid => `${testrunid}_${QUEUE_ID}`;
 const queueGenDocId2 = testrunid => `${testrunid}_${QUEUE_ID_2}`;
 /** Stable doc-id for a queue_token, keyed by participant profileid. */
 const tokenDocId = (testrunid, profileid) => `${testrunid}_tok_${profileid}`;
+/** Stable doc-id for the run's single `arena events` doc (B!G Planner onQueueSelect 'in' query). */
+const arenaEventDocId = testrunid => `${testrunid}_arenaevt_0`;
+
+/**
+ * Deep-clone `sample-queue-config.json`'s `stageproperty` and remap every
+ * `stageproperty[*].nextstage[*].variations` entry from the RAW sample-config variation id
+ * (e.g. 'K9PRd4PfWDWtaO0vSxy3') to the PREFIXED seeded-doc form (`${testrunid}_<rawId>`) — the SAME
+ * `${testrunid}_` prefix the `queue variation` docs get (seedQueueAndVariations below).
+ *
+ * WHY: the dynamic-studio move-next button (dynamic-studio.html:527) renders only when BOTH
+ * `queueVariation[token.variationid].includes(stage)` (queueVariation is keyed by the PREFIXED variation
+ * DOC id — onStudioSelect/onQueueSelect ts:382) AND `config.variations.includes(token.variationid)`
+ * (config = this seeded stageproperty's nextstage). With raw ids in `variations` those two key-spaces
+ * never intersect, so the button can't render (studio SS-12/SS-13). Aligning the seeded queue's
+ * nextstage `variations` to the prefixed ids closes the gap.
+ *
+ * SAFE: returns a DEEP CLONE — the in-memory `cfg.stageproperty` (which flow-model.js / path-generator.js
+ * / the oracle read against the RAW `cfg.queuevariation[*].id`) is NEVER mutated. The operator board does
+ * NOT read nextstage `variations` (it moves via columns), so the remap is invisible to it.
+ * @param {object} stageproperty cfg.stageproperty
+ * @param {string} testrunid
+ * @returns {object} a remapped deep clone
+ */
+function remapStagePropertyVariations(stageproperty, testrunid) {
+  const clone = JSON.parse(JSON.stringify(stageproperty));
+  for (const stage of Object.keys(clone)) {
+    const nextstage = clone[stage] && clone[stage].nextstage;
+    if (!Array.isArray(nextstage)) continue;
+    for (const btn of nextstage) {
+      if (Array.isArray(btn.variations)) {
+        btn.variations = btn.variations.map(rawId => `${testrunid}_${rawId}`);
+      }
+    }
+  }
+  return clone;
+}
 
 /**
  * The firestore-forms named-DB handle. Memoized per process. Uses the MODULAR
@@ -322,6 +359,32 @@ async function seedAuthChain(db, auth, testrunid, roster) {
     });
   }
 
+  // AUTH CHAIN for PARTICIPANTS (participant-ONLY role) so they can LOG IN and then be correctly DENIED
+  // the management screens (big-core BIG-00b / BIG-05). WHY the FULL chain (not just role_ref):
+  //   • login.component.ts:157 derefs profileDocData['role_ref']['path'] → TypeError on an absent role_ref
+  //     ⇒ participant stranded on /login (realLogin's waitForURL times out).
+  //   • authguard.getRoles() (authguard.service.ts:311) resolves the logged-in profile by
+  //     where('user_ref','==', user_data/{uid}); with NO user_ref it returns undefined, and auth.guard.ts:38
+  //     `Object.keys(currentRoles)` THROWS → the catch REDIRECTS to /EISDashboard (auth.guard.ts:82-88) —
+  //     NOT the "Access denied" ConfirmComponent dialog BIG-00b asserts. So profile_data MUST carry user_ref
+  //     → user_data/{uid} so getRoles resolves a participant-only role; then hasAccess is false on a BIG
+  //     route (no staff role, profileid not granted) → the clean "Access denied" dialog (auth.guard.ts:64).
+  // Roles are participant-only (no BIG/staff flag) so the data-driven guard still DENIES BIG routes.
+  for (const p of participants) {
+    if (!p.uid) continue; // need the Auth uid for the user_ref ↔ user_data link
+    const roleId = `${testrunid}_role_${p.uid}`;
+    const userDataRef = db.collection('user_data').doc(p.uid);
+    const profileRef = db.collection('profile_data').doc(p.profileid);
+    const roleRef = db.collection('users_roles').doc(roleId);
+    await userDataRef.set({ name: p.email, email: p.email, number: '9999900000', ...TAG(testrunid) });
+    await roleRef.set({ id: roleId, name: p.email, participant: true, profile_ref: profileRef, ...TAG(testrunid) });
+    await profileRef.set({
+      docid: p.profileid, profileid: p.profileid, email: p.email.toLowerCase(), name: p.email,
+      number: '9999900000', countrycode: '+91',
+      user_ref: userDataRef, role_ref: roleRef, ...TAG(testrunid),
+    });
+  }
+
   // dashboard route-config: grant every driven route to the staff roles + profileids.
   const staffProfileIds = staff.map(s => s.profileid);
   const allRoles = [...new Set(staff.flatMap(s => s.roles || ['admin']))];
@@ -365,6 +428,13 @@ async function seedQueueAndVariations(db, admin, testrunid, operators, opts = {}
     await vref.set({ docid: vref.id, variationname: v.variationname, stages: v.stages, atcmodel: null, queueref: queueGenRef, ...TAG(testrunid) });
     varRefs.push(vref);
   }
+  // One `arena events` doc the B!G Planner's onQueueSelect 'in' query needs (see queue gen
+  // arenaeventidlist below). productref is a DocumentReference (the planner reads `.productref.id`).
+  const arenaEventId = arenaEventDocId(testrunid);
+  await db.collection('arena events').doc(arenaEventId).set({
+    docid: arenaEventId, productref: db.collection('products').doc(REF_IDS['products']),
+    name: `TEST Arena Event ${testrunid}`, ...TAG(testrunid),
+  });
   await queueGenRef.set({
     docid: queueGenDocId(testrunid),
     queuename: `TEST ${cfg.stages.length}-stage L3rqCr`,
@@ -374,8 +444,24 @@ async function seedQueueAndVariations(db, admin, testrunid, operators, opts = {}
     queueadmin: operators.filter(o => o.role === 'admin').map(o => o.profileid),
     queuementor: operators.filter(o => o.role === 'mentor').map(o => o.profileid),
     stages: cfg.stages,
-    stageproperty: cfg.stageproperty,
+    // stageproperty with nextstage `variations` remapped to the PREFIXED variation-doc ids so the studio
+    // move-next button can render (studio SS-12/SS-13); deep clone — cfg.stageproperty is left untouched.
+    stageproperty: remapStagePropertyVariations(cfg.stageproperty, testrunid),
     queuevariation: varRefs,
+    // arenaeventidlist MUST be a NON-EMPTY array of `arena events` docids: BigPlannerComponent.onQueueSelect
+    // (big-planner.component.ts:376) runs where('docid','in', selectedQueue['arenaeventidlist']); undefined
+    // or [] throws "non-empty array required for in filters" and aborts the queue_token stream subscription
+    // that computes completedToken/stageTokenMap (OP-12). The operator board does NOT read it (0 refs).
+    arenaeventidlist: [arenaEventId],
+    // eventid MUST be a NON-EMPTY string: BigPlannerComponent's queue subscribe reads
+    // selectedEvent = selectedQueue['eventid'] then calls doc(firestore,'event collection', selectedEvent)
+    // UNCONDITIONALLY (big-planner.component.ts:226-228). With eventid absent, selectedEvent is undefined and
+    // ResourcePath.fromString throws "Cannot read properties of undefined (reading 'indexOf')" — the exact
+    // pageerror that fails OP-12's console guard and leaves completedToken/stageTokenMap at 0. Production
+    // queues always carry an eventid; we point it at the run's seeded `arena events` doc id (a real,
+    // non-empty string) so the planner's queue_token stream computes. (The downstream `big cohorts`
+    // collectionData at :229 just returns empty and is handled — no further read of this id is asserted.)
+    eventid: arenaEventId,
     zoomlinkrequired: true,
     iscommunicationsdisabled: true, // externals stubbed — no real comms in test
     queuestartdate: past, queueenddate: future, lastregistrationdate: future,
@@ -399,10 +485,14 @@ async function seedQueueAndVariations(db, admin, testrunid, operators, opts = {}
  */
 async function seedParticipantToken(db, admin, testrunid, p, queueRef) {
   const ts = () => admin.firestore.Timestamp.now();
+  // profile_data merged (NOT overwritten) so the participant auth chain seedAuthChain wrote
+  // (role_ref + user_ref — the bits login.component.ts:157 / authguard.getRoles need) is preserved.
+  // seedAuthChain runs FIRST (runSeed + _common.ts both call it before the token loop), so a plain
+  // set() here would clobber role_ref and strand the participant on /login (BIG-00b / BIG-05).
   await db.collection('profile_data').doc(p.profileid).set({
     docid: p.profileid, profileid: p.profileid, email: p.email, name: p.email,
     number: '9999900000', countrycode: '+91', ...TAG(testrunid),
-  });
+  }, { merge: true });
   await db.collection('participantjourneyproduct').doc(`${testrunid}_pjp_${p.profileid}`).set({
     profileid: p.profileid, journeyref: null, purchasedate: ts(), ...TAG(testrunid),
   });
@@ -414,7 +504,10 @@ async function seedParticipantToken(db, admin, testrunid, p, queueRef) {
   // advances it; the spec reads the resulting currentstage/stage-log — never this seeded value.
   await db.collection('queue_token').doc(id).set({
     docid: id,
-    profile_id: p.profileid, profile_name: p.email, queueref: queueRef, variationid: p.variationid,
+    // BOTH profile_id (board) AND profileid (some CFs read afterData['profileid'] inconsistently —
+    // cf.md §1 GOTCHA, e.g. onQueueStageChange); seeding both removes that documented foot-gun so a
+    // CF reading profileid gets the same value the board reads from profile_id.
+    profile_id: p.profileid, profileid: p.profileid, profile_name: p.email, queueref: queueRef, variationid: p.variationid,
     currentstage: p.stage, previousstage: null, status: 'queued', stagestatus: 'Yet to Start',
     tokenstatus: 'Active', tokennumber: p.queueposition, delete: false, // board counts tokenstatus==='Active' & !delete
     queueposition: p.queueposition, people_involved: [],
@@ -436,8 +529,10 @@ async function seedParticipantToken(db, admin, testrunid, p, queueRef) {
  * `delivery forms` (named DB). Seeded once per run, tagged for teardown. `delivery forms`
  * templates are referenced by `formsByClient.formid` (the SS-07 forms fixture) and by stage
  * `actionresource` refs; `modes` drives the ordered mode list; `arenavideoask` is the Video-Ask
- * question template (orderBy('title')). Returns the ids other seeders reference.
- * @returns {{deliveryFormId:string, arenaVideoAskId:string}}
+ * question template (orderBy('title')). ALSO seeds the BIG-06 default-db preconditions (a `delivery forms`
+ * template + a `big participants assignments` row — both in the DEFAULT db, see inline note). Returns the
+ * ids other seeders reference.
+ * @returns {{deliveryFormId:string, arenaVideoAskId:string, bigCoreFormId:string, bigCorePaId:string}}
  */
 async function seedReferenceData(db, admin, testrunid) {
   const ctx = makeCtx(admin, db, testrunid);
@@ -468,7 +563,52 @@ async function seedReferenceData(db, admin, testrunid) {
     ...ctx, docid: deliveryFormId, formname: `TEST Delivery Form ${testrunid}`,
   }));
 
-  return { deliveryFormId, arenaVideoAskId };
+  // AWS_System/instance_status — the SINGLETON infra-status doc InstanceStatusService.getStatus()
+  // reads (docData('AWS_System/instance_status'), instance-status.service.ts:65). The /joinroom
+  // prejoin gate (join-openvidu-call.component.ts checkServer ts:190-214) only calls
+  // prepareParticipant() (→ renders the prejoin container) when master.state=='running' &&
+  // media.instanceStates.healthy>0; without this doc it never resolves and SS-11b times out.
+  // FIXED doc path (not run-namespaced) — a Firestore doc, not an HTTP CF, so a page.route stub
+  // cannot supply it. Tagged + idempotent; content is identical across runs (healthy single state).
+  await db.collection('AWS_System').doc('instance_status').set({
+    master: { state: 'running' },
+    media: { instanceStates: { healthy: 1, unhealthy: 0, pending: 0, terminating: 0, total: 1 } },
+    lastUpdated: ctx.now(), ...TAG(testrunid),
+  }, { merge: true });
+
+  // BIG-06 (FormBasedSubmissionComponent, route /formbasedsubmission) PRECONDITIONS — both in the DEFAULT
+  // db (`this.afs`), NOT firestore-forms. The legacy screen reads BOTH unconditionally in ngAfterViewInit:
+  //   • getDoc(doc(afs,'delivery forms', queryParams.id))           (form-based-submission.component.ts:170)
+  //       → snap.data().formarray drives the dynamic-control builder (:177-198) and flips showcontent=true
+  //         (host becomes visible, [data-testid=form-submit] renders). A MISSING template throws
+  //         "Cannot read properties of undefined (reading 'formarray')".
+  //   • getDoc(doc(afs,'big participants assignments', participantAssignmentId)) (:164-166)
+  //       → res.data()['status']; a MISSING doc throws "...(reading 'status')".
+  // The existing firestore-forms `delivery forms` seed above does NOT satisfy the FIRST read (wrong DB), so
+  // we seed a DEFAULT-db template here. Ids match the BIG-06 spec's pre-wired drive
+  // (/formbasedsubmission?id=run1_bigform_0&participantAssignmentId=run1_bigpa_form_0); with TESTRUNID=run1
+  // these resolve to run1_bigform_0 / run1_bigpa_form_0. Tagged + idempotent.
+  const bigCoreFormId = `${testrunid}_bigform_0`;
+  await db.collection('delivery forms').doc(bigCoreFormId).set(buildDoc('delivery forms', {
+    ...ctx, docid: bigCoreFormId, formname: `TEST BIG-06 Form ${testrunid}`,
+    // explicit non-empty formarray (one plain text field) so the control-builder loop runs and showcontent flips.
+    formarray: [{ fieldname: 'Notes', type: 'text', required: false, options: [], array: [] }],
+  }));
+  // `big participants assignments` row the screen reads by participantAssignmentId. Field shape mirrors the
+  // BIG fixture convention (big-seed.ts:290): docid + status + assignmenttype + profileid + the *ref fields.
+  // profileid → a SEEDED profile (the BIG admin the test logs in as: makeStaff bigProviders → _pf_big_0).
+  // assignmentref/cohortsref/marathonref are harmless placeholder refs (the screen only reads status here;
+  // cohortsref/marathonref are stored to component fields but not dereferenced on this smoke path).
+  const bigCorePaId = `${testrunid}_bigpa_form_0`;
+  await db.collection('big participants assignments').doc(bigCorePaId).set({
+    docid: bigCorePaId, status: 'ongoing', assignmenttype: 'Form', profileid: `${testrunid}_pf_big_0`,
+    assignmentref: db.collection('big assignment').doc(`${testrunid}_bigassign_ph`),
+    cohortsref: db.collection('big cohorts').doc(`${testrunid}_bigcohort_ph`),
+    marathonref: db.collection('marathon').doc(`${testrunid}_marathon_ph`),
+    ...TAG(testrunid),
+  });
+
+  return { deliveryFormId, arenaVideoAskId, bigCoreFormId, bigCorePaId };
 }
 
 /**
@@ -528,10 +668,41 @@ async function seedStudioFlowPreconditions(db, admin, testrunid, cohort, opts = 
   const { specialistProfileids = [], queueDocId } = opts;
   const roomMembers = [...new Set([...specialistProfileids, ...profileids])];
 
+  // LINCHPIN for the whole studio surface (studio.md SS-03..SS-13): dynamic-studio.onStudioSelect
+  // (ts:645-671) only adds a stage to `studioStage` when Object.values(participantsactivity)
+  // .sort().join(',') EQUALS one of that stage's compulsoryactivity combos. With `{}` studioStage is
+  // empty, the token query (ts:695, gated by studioStage.length) never runs, and the waiting-list /
+  // live-panel cards never render. We pin a map whose single value 'HFWFwv7YFPTNtcwkwAGK' join-matches
+  // the Diagnostics compulsoryactivity combo '8' (=['HFWFwv7YFPTNtcwkwAGK'], sample-queue-config.json),
+  // keyed on the FIRST logged-in specialist's profileid (the studio specs log in as specialist 0).
+  // `atcmodel: null` makes the waiting-list eligibility filter (ts:808) short-circuit before touching
+  // the seeded tokens' (absent) productref.id (else it throws); null — NOT [] — is required.
+  const diagnosticsSpecialist = specialistProfileids[0] || profileids[0];
+  const participantsactivity = { [diagnosticsSpecialist]: 'HFWFwv7YFPTNtcwkwAGK' };
+
   // one room holding the specialist(s) + the cohort, scoped to the run1 queue
   const pairingId = `${testrunid}_pair_0`;
   await db.collection('queue studio pairing').doc(pairingId).set(buildDoc('queue studio pairing', {
     ...ctx, docid: pairingId, queueDocId, participants: roomMembers, studioin: true, checkin: true,
+    participantsactivity, atcmodel: null,
+  }));
+
+  // AVAILABLE pairing for OP-05 (and any operator move INTO an Activity stage). The board's board-side
+  // studio assignment (dynamic-queue-manager-clone.ts:3011-3023) builds `availableStudio` from
+  // `queueStudioList` (already filtered to studioin==true && checkin==true at :1753) keeping ONLY pairings
+  // whose `status == null` (:3015) AND whose Object.values(participantsactivity).sort().join(',') is a
+  // substring of the dropped Activity stage's compulsoryactivity parse (:3019). The cohort's `_pair_0` is
+  // a LIVE room consumed by OP-06 (its `live assignment` is status 'live'), and OP-05 must NOT depend on
+  // it staying status==null across the serial run — so we seed a DEDICATED, always-available room here:
+  // status:null (builder default — NOT overridable, exactly what availableStudio requires) + a
+  // participantsactivity whose single value 'HFWFwv7YFPTNtcwkwAGK' join-equals Diagnostics
+  // compulsoryactivity combo[8] (=['HFWFwv7YFPTNtcwkwAGK'], sample-queue-config.json), so it is offered
+  // as an enabled AssignQueueStudio option (else aqs-studio-select has zero mat-options and pickMatOption
+  // times out, queue-board.page.ts:791). Keyed on the first seeded specialist so the room is a real one.
+  const availPairingId = `${testrunid}_pair_avail_0`;
+  await db.collection('queue studio pairing').doc(availPairingId).set(buildDoc('queue studio pairing', {
+    ...ctx, docid: availPairingId, queueDocId, participants: [diagnosticsSpecialist],
+    studioin: true, checkin: true, participantsactivity, atcmodel: null,
   }));
 
   // per-participant: a pending invitation + a live-assignment + arena enrolment
@@ -592,6 +763,38 @@ async function seedFormsFixture(db, admin, testrunid, p, deliveryFormId, count =
 }
 
 /**
+ * /queue-web (WebInvitationPage) PRECONDITION chain for the studio cohort (studio.md SS-05..SS-08).
+ * QueueWebVersion1Component.loadProfileJourneyProduct (queue-web-version1.component.ts:123-160) resolves
+ * the participant's live token by walking: participantsproduct (where profileid==X && mode=='Event Mode'
+ * && status=='ongoing') → its doc id is the `participantproductid` → deliverables (where participantproductid
+ * == that id && type=='queue' && status=='ongoing') → fileref[last] (a queue_token DocumentReference) →
+ * queuetoken.queueref. None of that is wired by seedParticipantToken (it writes participantsproduct with
+ * mode:null and NO deliverables), so the web overlay queries queueref==undefined and accept()/deny() time
+ * out. This seeds, per cohort participant: (a) the participantsproduct flipped to Event Mode/ongoing, and
+ * (b) a deliverables doc whose fileref array-contains the participant's queue_token ref (also array-contains
+ * queried at queue-web ts:246). PRECONDITION only — the spec asserts the app/CF accept/deny result.
+ * Applied ONLY to the studio cohort, so non-studio participants keep mode:null (other specs unaffected).
+ * @param {object[]} cohort up to N participants {profileid}
+ */
+async function seedQueueWebChain(db, admin, testrunid, cohort) {
+  const ts = () => admin.firestore.Timestamp.now();
+  for (const p of cohort) {
+    const ppId = `${testrunid}_pp_${p.profileid}`;       // == the doc seedParticipantToken created
+    const tokRef = db.collection('queue_token').doc(tokenDocId(testrunid, p.profileid));
+    // (a) flip the participant's product to the Event-Mode/ongoing the /queue-web query requires.
+    await db.collection('participantsproduct').doc(ppId).set({
+      docid: ppId, profileid: p.profileid, mode: 'Event Mode', status: 'ongoing', ...TAG(testrunid),
+    }, { merge: true });
+    // (b) the deliverables row keyed by participantproductid, fileref → the participant's token.
+    const delvId = `${testrunid}_delv_${p.profileid}`;
+    await db.collection('deliverables').doc(delvId).set({
+      docid: delvId, participantproductid: ppId, type: 'queue', status: 'ongoing',
+      profileid: p.profileid, fileref: [tokRef], createdAt: ts(), ...TAG(testrunid),
+    });
+  }
+}
+
+/**
  * SECOND queue for OP-02b (negative visibility). Same config, but `queueadmin` does NOT include
  * any test operator's profileid — it lists a DIFFERENT (decoy) admin profileid. `queueadmin` is a
  * proper ARRAY (§A; the board filters `array-contains profileid`, :1546). The non-admin operator's
@@ -619,6 +822,13 @@ async function seedSecondQueue(db, admin, testrunid) {
     stages: cfg.stages,
     stageproperty: cfg.stageproperty,
     queuevariation: [vref],
+    // non-empty so a B!G-Planner onQueueSelect on queue 2 would not throw on the 'in' filter (reuses the
+    // run's shared arena-events doc, seeded in seedQueueAndVariations). OP-02b only checks dropdown
+    // visibility, but keeping the shape valid avoids a latent FAILED_PRECONDITION if a spec selects it.
+    arenaeventidlist: [arenaEventDocId(testrunid)],
+    // eventid (non-empty) so a planner load on queue 2 would not crash at big-planner.component.ts:228
+    // (doc('event collection', undefined) → 'indexOf' throw). Same shared arena-events id as queue 1.
+    eventid: arenaEventDocId(testrunid),
     zoomlinkrequired: true,
     iscommunicationsdisabled: true,
     queuestartdate: past, queueenddate: future, lastregistrationdate: future,
@@ -676,6 +886,10 @@ async function runSeed() {
       queueDocId: queueGenRef.id,
     });
     console.log(`   ✓ studio preconditions (pairing[+specialists] + invitation + live assignment + arena) for ${studioCohort.length}`);
+    // 5b. /queue-web chain (participantsproduct Event Mode/ongoing + deliverables→token) so the REAL
+    // participant accept/deny overlay (SS-05..SS-08) resolves its queueref.
+    await seedQueueWebChain(db, admin, testrunid, studioCohort);
+    console.log(`   ✓ /queue-web chain (participantsproduct + deliverables) for ${studioCohort.length}`);
   }
 
   // 6. SS-07 positive lower-bound: KNOWN non-zero forms count (named DB) for the first participant.
@@ -699,10 +913,14 @@ const SEEDED_COLLECTIONS = [
   'queue generation', 'queue variation', 'queue_token', 'queue stage log',
   'queue planning', 'queue studio pairing', 'studioinvitation',
   'live assignment', 'arena participant',
-  'profile_data', 'participantjourneyproduct', 'participantsproduct',
+  'profile_data', 'participantjourneyproduct', 'participantsproduct', 'deliverables',
   'participant mode checklist', 'participantvideoask',
-  'arenavideoask', 'modes', 'journey',
+  'arenavideoask', 'modes', 'journey', 'arena events', 'AWS_System',
   'user_data', 'users_roles', 'dashboard',
+  // BIG-06 default-db preconditions (seedReferenceData): a `delivery forms` template in the DEFAULT db
+  // (distinct from the firestore-forms one torn down below — same name, different database handle, each
+  // testrunid-filtered) and the `big participants assignments` row. All testrunid-tagged.
+  'delivery forms', 'big participants assignments',
 ];
 // Named-DB (firestore-forms) collections — torn down via the firestore-forms handle.
 const SEEDED_COLLECTIONS_FORMS = ['delivery forms', 'formsByClient'];
@@ -763,7 +981,7 @@ module.exports = {
   seedAuthChain, seedQueueAndVariations, seedParticipantToken,
   // seed primitives — feature collections (no-scopecut expansion)
   seedReferenceData, seedParticipantFeatureDocs, seedQueuePlanning,
-  seedStudioFlowPreconditions, seedFormsFixture, seedSecondQueue,
+  seedStudioFlowPreconditions, seedQueueWebChain, seedFormsFixture, seedSecondQueue,
   // teardown helpers
   teardownCollections, SEEDED_COLLECTIONS, SEEDED_COLLECTIONS_FORMS,
 };

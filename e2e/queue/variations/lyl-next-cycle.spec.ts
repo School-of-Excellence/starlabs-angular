@@ -495,13 +495,14 @@ test.describe('V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-W
     // Install the delivery-status spy AFTER the board mounted (dev-global wrap; cf. delivery-status-spy.ts).
     await installDeliveryStatusSpy(page);
 
-    // The walked token must render on the board (board bucketed it into Diagnostics' Queued sub-column).
+    // The walked token must render on the board (board bucketed it into Diagnostics' Queued sub-column;
+    // paged in via Load More if the column is crowded past PAGE_SIZE).
     await expect
-      .poll(async () => board.tokenCard(cardId).count(), {
-        message: `board never rendered token card data-token-id="${cardId}" (is the queue selected and the queue_token stream loaded?)`,
+      .poll(async () => board.revealTokenCard(cardId), {
+        message: `board never rendered token card data-token-id="${cardId}" (is the queue selected and the queue_token stream loaded? — also paged via Load More)`,
         timeout: 20_000,
       })
-      .toBeGreaterThan(0);
+      .toBe(true);
 
     // The board spine (each entry: the legal oracle target + the dropdown option name the board renders).
     const boardSpine: { from: string; to: string }[] = [

@@ -101,9 +101,12 @@ export class QueueListPage {
   async filterByName(frag: string): Promise<number> {
     await this.filterInput.click();
     await this.filterInput.fill('');
-    await this.filterInput.fill(frag);
-    // MatTableDataSource.filter is set on keyup; `fill` fires it. The default predicate matches the
-    // concatenation of all column values, so every surviving row's text must contain the fragment.
+    // The template binds the filter to (keyup) — `fill()` only dispatches `input`, NOT `keyup`, so it
+    // would set the value WITHOUT ever calling applyFilter() (the table would stay unfiltered). Type the
+    // value with real keystrokes so each `keyup` fires the handler (queue-list.component.ts:77-79).
+    await this.filterInput.pressSequentially(frag, { delay: 20 });
+    // The default MatTableDataSource predicate matches the concatenation of all column values, so every
+    // surviving row's NAME cell must contain the fragment once the filter has applied.
     const needle = frag.trim().toLowerCase();
     await expect
       .poll(async () => {

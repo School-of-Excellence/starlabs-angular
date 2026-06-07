@@ -569,6 +569,45 @@ export class QueueBoardPage {
     return this.page.locator(`${SEL.tokenCard}[data-token-id="${this.cssEscape(tokenSel)}"]`);
   }
 
+  /**
+   * Reveal a token card that the board paginated out of the DOM. The board renders only the first
+   * `PAGE_SIZE` (15) tokens per column ordered by `logdate asc` and hides the rest behind a "Load More"
+   * button (component ts:getDisplayedTokens/PAGE_SIZE=15; html:1592 `.load-more-btn`). A freshly seeded
+   * token has the LATEST `logdate`, so on a crowded shared column (e.g. the common "Evolution Prep
+   * Orientation" entry, where the base seed + every variation cohort pile up well past 15) it sorts last
+   * and never renders until the column is paged open. This clicks every currently-visible "Load More"
+   * button (across all columns) until either the card is in the DOM or no Load-More remains. It is a
+   * no-op when the card is already on the first page, and it drives the product's REAL Load-More control
+   * (never mutates state) — so it is safe to call before any card-presence wait. Returns true once the
+   * card is present, false if it could not be revealed within the bound.
+   */
+  async revealTokenCard(tokenSel: TokenRef, opts: { maxClicks?: number } = {}): Promise<boolean> {
+    const card = this.tokenCard(tokenSel);
+    if ((await card.count()) > 0) return true;
+    const loadMore = this.page.locator('.load-more-btn');
+    const maxClicks = opts.maxClicks ?? 40;
+    for (let i = 0; i < maxClicks; i++) {
+      if ((await card.count()) > 0) return true;
+      const buttons = await loadMore.elementHandles();
+      if (buttons.length === 0) break;
+      let clickedAny = false;
+      for (const b of buttons) {
+        try {
+          if (await b.isVisible()) {
+            await b.click({ timeout: 2_000 });
+            clickedAny = true;
+          }
+        } catch {
+          // a button may detach as the column re-renders after a sibling click — ignore and continue.
+        }
+      }
+      if (!clickedAny) break;
+      // let the *ngFor re-render the newly paged-in tokens before the next presence check.
+      await this.page.waitForTimeout(150);
+    }
+    return (await card.count()) > 0;
+  }
+
   /** Locator for a stage column header by exact data-stage-key. */
   stageHeaderByKey(stageKey: string): Locator {
     return this.page.locator(`${SEL.stageHeader}[data-stage-key="${this.cssEscape(stageKey)}"]`);
@@ -609,6 +648,7 @@ export class QueueBoardPage {
    */
   async assertMoveTargets(tokenSel: TokenRef, opts: { offers?: string[]; absent?: string[] } = {}): Promise<void> {
     const card = this.tokenCard(tokenSel);
+    await this.revealTokenCard(tokenSel); // page the card in if a crowded column hid it (>15 tokens)
     await expect(card, `assertMoveTargets: token card ${tokenSel} not found on the board.`).toBeVisible({ timeout: 15_000 });
     const moveBtn = card.locator(SEL.moveBtn);
     await expect(moveBtn, `assertMoveTargets: Move button for token ${tokenSel} disabled/missing.`).toBeEnabled({ timeout: 10_000 });
@@ -616,15 +656,21 @@ export class QueueBoardPage {
     await expect(this.page.locator(SEL.moveDropdown).first(), `assertMoveTargets: move-dropdown did not open for token ${tokenSel}.`).toBeVisible({ timeout: 10_000 });
     try {
       for (const name of opts.offers || []) {
+        // A SPLIT stage (compulsoryactivity) renders ONLY as typed buckets "<name> (Queued|Waiting|Activity)",
+        // never bare — so "offered" means the exact name OR any of its typed sub-column buckets is present.
+        // A split stage yields MULTIPLE matches (up to 3 typed buckets), so assert on `.first()` to avoid a
+        // strict-mode violation — "offered" only requires that AT LEAST ONE matching option is visible.
         await expect(
-          this.page.locator(`${SEL.moveTarget}[data-stage-name="${this.cssEscape(name)}"]`),
-          `assertMoveTargets: dropdown for token ${tokenSel} must OFFER scoped target "${name}" (the board did not render it).`,
+          this.moveTargetAnyVariant(name).first(),
+          `assertMoveTargets: dropdown for token ${tokenSel} must OFFER scoped target "${name}" (the board did not render it, bare or as a typed "(Queued|Waiting|Activity)" bucket).`,
         ).toBeVisible({ timeout: 10_000 });
       }
       for (const name of opts.absent || []) {
+        // Absence is STRICT: neither the bare name nor ANY typed bucket may appear (an illegal/backbone-only
+        // skip must not be reachable through any sub-column — flow-config §3 D1).
         await expect(
-          this.page.locator(`${SEL.moveTarget}[data-stage-name="${this.cssEscape(name)}"]`),
-          `assertMoveTargets: dropdown for token ${tokenSel} must NOT offer "${name}" (illegal/backbone-only skip — flow-config §3 D1).`,
+          this.moveTargetAnyVariant(name),
+          `assertMoveTargets: dropdown for token ${tokenSel} must NOT offer "${name}" (bare or any typed bucket — illegal/backbone-only skip, flow-config §3 D1).`,
         ).toHaveCount(0, { timeout: 10_000 });
       }
     } finally {
@@ -658,12 +704,14 @@ export class QueueBoardPage {
    */
   async assertNoEnabledMoveTargets(tokenSel: TokenRef, expectSelfStage?: string): Promise<void> {
     const card = this.tokenCard(tokenSel);
+    await this.revealTokenCard(tokenSel); // page the card in if a crowded column hid it (>15 tokens)
     await expect(card, `assertNoEnabledMoveTargets: token card ${tokenSel} not found on the board.`).toBeVisible({ timeout: 15_000 });
     const moveBtn = card.locator(SEL.moveBtn);
     // The Move ⇄ button itself renders for every (non-DFU) token; it is only disabled for locked/
     // defaulted/DFU financial cases (component html move-btn [disabled]). A parked terminal token is
     // none of those, so the button is enabled and opens a dropdown that lists no pickable destination.
     await expect(moveBtn, `assertNoEnabledMoveTargets: Move button for token ${tokenSel} disabled/missing.`).toBeEnabled({ timeout: 10_000 });
+    await moveBtn.scrollIntoViewIfNeeded().catch(() => {});
     await moveBtn.click();
     await expect(this.page.locator(SEL.moveDropdown).first(), `assertNoEnabledMoveTargets: move-dropdown did not open for token ${tokenSel}.`).toBeVisible({ timeout: 10_000 });
     try {
@@ -676,11 +724,14 @@ export class QueueBoardPage {
           message: `assertNoEnabledMoveTargets: token ${tokenSel} must have ZERO enabled move-targets (terminal/parking stage), but the board rendered at least one pickable destination.`,
         })
         .toBe(0);
-      // Defensive: the only option the board may render is the disabled self-stage.
+      // Defensive: the only option the board may render is the disabled self-stage (bare for an un-split
+      // stage, or a typed bucket for a split one — match either form).
       if (expectSelfStage) {
-        const others = this.page.locator(`${SEL.moveTarget}:not([data-stage-name="${this.cssEscape(expectSelfStage)}"])`);
+        const self = this.moveTargetAnyVariant(expectSelfStage);
+        const selfBare = `${SEL.moveTarget}[data-stage-name="${this.cssEscape(expectSelfStage)}"]`;
+        const selfTyped = `${SEL.moveTarget}[data-stage-name^="${this.cssEscape(`${expectSelfStage} (`)}"]`;
+        const others = this.page.locator(`${SEL.moveTarget}:not(${selfBare}):not(${selfTyped})`);
         await expect(others, `assertNoEnabledMoveTargets: dropdown for token ${tokenSel} rendered a target other than the disabled self-stage "${expectSelfStage}".`).toHaveCount(0, { timeout: 10_000 });
-        const self = this.page.locator(`${SEL.moveTarget}[data-stage-name="${this.cssEscape(expectSelfStage)}"]`);
         // If the self-stage option renders at all, it must be DISABLED (cannot move onto itself).
         if ((await self.count()) > 0) {
           await expect(self.first(), `assertNoEnabledMoveTargets: the self-stage option "${expectSelfStage}" must be rendered DISABLED.`).toBeDisabled({ timeout: 10_000 });
@@ -703,14 +754,59 @@ export class QueueBoardPage {
    */
   private async clickMoveTarget(tokenSel: TokenRef, targetStage: string): Promise<void> {
     const card = this.tokenCard(tokenSel);
+    await this.revealTokenCard(tokenSel); // page the card in if a crowded column hid it (>15 tokens)
     await expect(card, `move: token card ${tokenSel} not found on the board.`).toBeVisible({ timeout: 15_000 });
     const moveBtn = card.locator(SEL.moveBtn);
     await expect(moveBtn, `move: Move button for token ${tokenSel} is disabled (DFU/locked) or missing.`).toBeEnabled({ timeout: 10_000 });
+    await moveBtn.scrollIntoViewIfNeeded().catch(() => {});
     await moveBtn.click();
-    // The dropdown for this token is now open; target options carry data-stage-name = stagename.
-    const target = this.page.locator(`${SEL.moveTarget}[data-stage-name="${this.cssEscape(targetStage)}"]`);
-    await expect(target, `move: target option "${targetStage}" not available in the move dropdown for token ${tokenSel} (not a legal scoped edge from its current stage?).`).toBeVisible({ timeout: 10_000 });
+    // The dropdown for this token is now open; target options carry data-stage-name = targetColumn.stagename.
+    // For a SPLIT stage (compulsoryactivity) the board renders NO bare option — only the typed sub-column
+    // buckets "<name> (Queued)" / "(Waiting)" / "(Activity)" (component checkAvailablestages, ts:2796-2821).
+    // So resolve the destination to a real, present option: prefer the exact name the caller passed (works
+    // when a caller already passed a suffixed bucket, e.g. "Diagnostics (Activity)"); else fall back to the
+    // "(Queued)" bucket — the canonical non-Activity "send to this stage" destination (moveTokenToStage
+    // parses the suffix back to the bare stage, ts:2856-2860, so the committed currentstage is the bare
+    // name either way). This is the product's real surface, not a relaxed selector.
+    const target = await this.resolveMoveTarget(targetStage, tokenSel);
     await target.click();
+  }
+
+  /**
+   * Resolve a caller-supplied destination NAME to the move-dropdown option the board actually renders,
+   * accounting for split-stage sub-column suffixes. Returns a Locator scoped to the OPEN dropdown's
+   * `qm-move-target` whose data-stage-name is either the exact name or its "(Queued)" bucket. Asserts
+   * the option exists (visible) before returning — so callers fail with a clear message if no legal
+   * destination is offered (e.g. an illegal scoped edge). The dropdown must already be open.
+   */
+  private async resolveMoveTarget(targetStage: string, tokenSel: TokenRef): Promise<Locator> {
+    const exact = this.page.locator(`${SEL.moveTarget}[data-stage-name="${this.cssEscape(targetStage)}"]`);
+    // Split stages render ONLY as typed buckets "<name> (Queued|Waiting|Activity)"; un-split stages render
+    // bare. The board's checkAvailablestages EXCLUDES exactly the (stage,type) sub-column the token
+    // currently sits in (component ts:2803) — so for a SELF-LOOP onto a split stage (target == the token's
+    // own stage, e.g. the "Send Back" edge), the "(Queued)" bucket the token sits in is NOT offered, but the
+    // sibling "(Waiting)"/"(Activity)" buckets ARE (and committing any of them re-buckets the token onto the
+    // SAME bare stage — moveTokenToStage parses the suffix back, ts:2856-2860). So accept the exact name OR
+    // its "(Queued)" bucket OR ANY typed sub-column bucket of this stage. Wait until at least one has
+    // rendered (the dropdown's *ngFor populates async on open) so we never race-read 0 and pick nothing.
+    const queued = this.page.locator(`${SEL.moveTarget}[data-stage-name="${this.cssEscape(`${targetStage} (Queued)`)}"]`);
+    const waiting = this.page.locator(`${SEL.moveTarget}[data-stage-name="${this.cssEscape(`${targetStage} (Waiting)`)}"]`);
+    const anyTyped = this.page.locator(`${SEL.moveTarget}[data-stage-name^="${this.cssEscape(`${targetStage} (`)}"]`);
+    await expect(
+      exact.or(queued).or(anyTyped).first(),
+      `move: target option "${targetStage}" (or any "${targetStage} (Queued|Waiting|Activity)" split bucket) not available ` +
+        `in the move dropdown for token ${tokenSel} (not a legal scoped edge from its current stage?).`,
+    ).toBeVisible({ timeout: 10_000 });
+    // Prefer the exact match (caller may have passed a suffixed bucket, e.g. "Diagnostics (Activity)", or
+    // the stage is un-split); then the "(Queued)" bucket; then the "(Waiting)" bucket. We deliberately
+    // prefer a NON-Activity sub-column for the self-loop case (the token's own "(Queued)" is excluded by
+    // the board): committing to "(Activity)" would route moveTokenToStage down the studio-assign branch
+    // (dropType=="Activity" → AssignQueueStudio dialog, component ts:2883/2900) instead of a plain
+    // same-stage move. anyTyped is the last resort (Activity-only would be a genuine studio target).
+    if ((await exact.count()) > 0) return exact.first();
+    if ((await queued.count()) > 0) return queued.first();
+    if ((await waiting.count()) > 0) return waiting.first();
+    return anyTyped.first();
   }
 
   /**
@@ -878,6 +974,20 @@ export class QueueBoardPage {
   private cssEscape(v: string): string {
     // Playwright accepts double-quoted attr values; escape embedded quotes/backslashes.
     return v.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+
+  /**
+   * A `qm-move-target` locator that matches a stage NAME whether the board rendered it bare (un-split
+   * stage) OR as any of its typed sub-column buckets "<name> (Queued|Waiting|Activity)" (a split
+   * compulsoryactivity stage — component checkAvailablestages, ts:2796-2821). Used by the read-only
+   * dropdown assertions so an "offered"/"absent" check is correct for both kinds of stage. The CSS
+   * attribute prefix-match `^="<name> ("` pins the typed buckets to exactly this stage (the trailing
+   * " (" cannot collide with a longer stage name that merely starts with `name`).
+   */
+  private moveTargetAnyVariant(name: string): Locator {
+    const exact = `${SEL.moveTarget}[data-stage-name="${this.cssEscape(name)}"]`;
+    const typed = `${SEL.moveTarget}[data-stage-name^="${this.cssEscape(`${name} (`)}"]`;
+    return this.page.locator(`${exact}, ${typed}`);
   }
 
   /** Human-readable StageRef for error messages. */

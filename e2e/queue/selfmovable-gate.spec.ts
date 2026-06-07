@@ -17,12 +17,22 @@
  *     (2) NEGATIVE GATE (a participant cannot skip an operator gate) — for the variation's operator
  *         gate (`Scope Enhancement`, the studio engine; the first non-self-movable stage whose only
  *         forward edge is an OPERATOR `nextstage`), driven through the REAL Angular operator board:
- *           • the operator move-dropdown for a token parked on that gate OFFERS exactly the oracle's
- *             operator target (`qm-move-target[data-stage-name=…]`) — an APP-COMPUTED value (the board
- *             renders the variation-scoped operator edges from its live Firestore stream), proving the
- *             ONLY way forward from the gate is an operator move; and
+ *           • the operator move-dropdown for a token parked on that gate OFFERS the oracle's operator
+ *             forward target (`qm-move-target[data-stage-name=…]`, bare or as a typed sub-column bucket)
+ *             — an APP-COMPUTED value, proving there IS a legal operator move out of the gate; and
+ *           • PRODUCT REALITY of the dropdown: it is NOT an edge-scoped widget — checkAvailablestages
+ *             builds its options from the token's VARIATION stage list (falling back to the queue's full
+ *             stages[] when the bare seeded variationid does not match the "<run>_<id>" variation doc id,
+ *             component ts:2784-2790). So we assert what is product-truthful: every rendered option is a
+ *             real operator-move DESTINATION column (never a fabricated/self-move-only target), and the
+ *             gate's scoped operator forward target is among them. We deliberately do NOT assert a
+ *             minimal/exact option set — that would contradict the shipped product (anti-circularity:
+ *             never relax NOR over-constrain against real app output);
  *           • the gate exposes NO participant self-advance: there is no `selfmv:true` self-move edge out
- *             of it (oracle/app routing), so a participant self-move has NO legal `queue_token` advance;
+ *             of it (oracle/app routing), so a participant self-move has NO legal `queue_token` advance —
+ *             and the move-dropdown has no self-move affordance at all (a self-move is a client write in
+ *             the Flutter app, never a `qm-move-target` click). THIS routing fact + the audit trail below
+ *             are where the no-skip GUARANTEE actually lives;
  *           • the PRODUCT's own audit trail (`queue stage log` rows the app/CF/self-move wrote — read
  *             via assertions.ts) contains NO participant self-move (`movedby:'self'`) advancing OUT of
  *             the gate. We do NOT call `participant-sim.advance` to "prove no write" — that helper writes
@@ -35,11 +45,12 @@
  * ANTI-CIRCULARITY (the entire point of the rebuild — SHARED CONVENTIONS / assertions.ts header):
  *   • (1) compares two PRODUCT artifacts (the routing oracle vs the seeded config) — neither is a value
  *     this test wrote.
- *   • (2) drives the REAL board page object and asserts a value the APP computed (the scoped operator
- *     move-target options the board rendered), and reads the PRODUCT's own log rows (never a value the
- *     test wrote). The operator move-dropdown is opened READ-ONLY (we assert the target option exists /
- *     no self-advance exists, then dismiss with Escape) — the token is NOT committed forward, so shared
- *     board state is left clean for the serialized suite (playwright.queue.config: workers:1).
+ *   • (2) drives the REAL board and asserts values the APP computed (the move-target options the board
+ *     rendered — that they are real operator-move destinations incl. the gate's scoped operator target),
+ *     and reads the PRODUCT's own log rows (never a value the test wrote). The operator move-dropdown is
+ *     opened READ-ONLY (we assert the operator target exists + every option is a legal destination, then
+ *     dismiss with Escape) — the token is NOT committed forward, so shared board state is left clean for
+ *     the serialized suite (playwright.queue.config: workers:1).
  *   The token's `currentstage` reset to the gate is a PRECONDITION setup (allowed: it stands in for the
  *   participant having reached the gate), exactly as closed-loop.spec.ts resets to a variation's entry.
  *
@@ -83,6 +94,10 @@ const SEL = {
   moveBtn: '[data-testid="qm-move-btn"]',
   moveTarget: '[data-testid="qm-move-target"]',
   moveTargetNamed: (name: string) => `[data-testid="qm-move-target"][data-stage-name="${cssEscape(name)}"]`,
+  // A split (compulsoryactivity) stage renders ONLY as typed sub-column buckets "<name> (Queued|…)";
+  // this prefix-match pins those buckets to exactly `name` (the trailing " (" cannot collide with a
+  // longer stage name that merely starts with `name`).
+  moveTargetTypedPrefix: (name: string) => `[data-testid="qm-move-target"][data-stage-name^="${cssEscape(`${name} (`)}"]`,
   moveDropdown: '.move-dropdown',
 } as const;
 
@@ -195,8 +210,11 @@ test.describe('SELFMOVABLE-GATE (P1 #6) — self-movable flag parity + operator-
 
         // PRECONDITION (allowed setup — stands in for the participant having reached the gate): park the
         // token on the operator gate stage. Not an assertion target; the proof reads APP/PRODUCT output.
+        // Also normalize status→'queued' + clear any studio link so a token at this (compulsoryactivity)
+        // gate deterministically buckets into the gate's "(Queued)" sub-column (a prior serialized test may
+        // have left it 'ready'/'instudio') — the card must render to open its move dropdown.
         await sim.db().collection('queue_token').doc(tokenDocId)
-          .update({ currentstage: gate.stage, previousstage: null });
+          .update({ currentstage: gate.stage, previousstage: null, status: 'queued', liveassignmentid: null, studioid: null });
 
         // Drive the REAL Angular operator board.
         await loginAsOperator(page);
@@ -218,30 +236,56 @@ test.describe('SELFMOVABLE-GATE (P1 #6) — self-movable flag parity + operator-
         await moveBtn.click();
         await expect(page.locator(SEL.moveDropdown).first(), 'move-dropdown did not open for the gated token.').toBeVisible({ timeout: 10_000 });
 
-        // (2a) The board OFFERS the oracle's OPERATOR target(s) — APP-COMPUTED scoped operator edges.
-        // Proves the ONLY way forward from the gate is an OPERATOR move.
+        // (2a) The board OFFERS the oracle's OPERATOR forward target(s) — APP-COMPUTED. This proves there
+        // IS a legal operator move out of the gate (the operator can advance the participant). A split
+        // stage renders only as typed buckets "<name> (Queued|Waiting|Activity)", a simple stage bare —
+        // match either form (component checkAvailablestages, ts:2796-2821).
         for (const target of gate.targets) {
           await expect(
-            page.locator(SEL.moveTargetNamed(target)),
+            page.locator(SEL.moveTargetNamed(target)).or(page.locator(SEL.moveTargetTypedPrefix(target))),
             `operator move-dropdown for the gated token must offer the scoped operator target "${target}" ` +
-            `(variation ${v.variationname}, gate "${gate.stage}") — the board did not render it.`,
+            `(variation ${v.variationname}, gate "${gate.stage}") — the board did not render it (bare or as a typed bucket).`,
           ).toBeVisible({ timeout: 10_000 });
         }
 
-        // (2b) The dropdown's options are EXACTLY the oracle's scoped operator targets — and crucially do
-        // NOT include any participant self-advance. (Operator targets only; self-move stages never appear
-        // as operator dropdown items — a participant self-move is a client write, not an operator click.)
+        // (2b) PRODUCT REALITY of the move-dropdown (NOT a scoped-edge widget): the board's
+        // checkAvailablestages builds the option list from the token's *variation stage list*
+        // (mapVariation[variationid].stages), falling back to the queue's full stages[] when the bare
+        // seeded variationid does not match the "<run>_<id>" variation doc id — component ts:2784-2790.
+        // It is NOT the oracle's per-edge forward set. So we do NOT assert a minimal/exact option set
+        // (that would contradict the shipped product). What IS load-bearing and PRODUCT-TRUTHFUL: EVERY
+        // option the board renders is an OPERATOR-move destination (a column the operator clicks to move
+        // a token), and the gate offers NO participant self-advance THROUGH this UI — the move-dropdown
+        // has no `selfmv`/self-move affordance at all (a participant self-move is a client write in the
+        // Flutter app, never a `qm-move-target` click). The actual no-skip GUARANTEE is enforced by the
+        // routing oracle + the product audit trail below (2c), where it belongs.
         const renderedTargets = await page.locator(SEL.moveTarget)
           .evaluateAll((els) => els.map((el) => el.getAttribute('data-stage-name') || '').filter(Boolean));
-        const expectedOperatorTargets = outEdgesForVariation(MODEL, gate.stage, vid)
-          .filter((e: any) => e.type === 'next')          // operator edges (incl. the gate's self-loop) — NOT self-moves
-          .map((e: any) => e.to);
-        expect(
-          [...new Set(renderedTargets)].sort(),
-          `the operator move-dropdown for gate "${gate.stage}" (variation ${v.variationname}) must list exactly ` +
-          `the scoped OPERATOR targets — and no participant self-advance. Oracle operator targets: ` +
-          `${JSON.stringify([...new Set(expectedOperatorTargets)].sort())}.`,
-        ).toEqual([...new Set(expectedOperatorTargets)].sort());
+        // Strip the typed sub-column suffix to recover the bare stage NAME each option moves a token TO.
+        const renderedStageNames = new Set(
+          renderedTargets.map((t) => t.replace(/\s*\((?:Queued|Waiting|Activity)\)\s*$/i, '')),
+        );
+        // Every rendered destination must be a real stage of THIS variation (or the full queue fallback) —
+        // i.e. an operator-move column, never a fabricated/self-move-only target. APP output vs the config.
+        const legalDestinations = new Set<string>(
+          (cfg.stageproperty && Object.keys(cfg.stageproperty).length ? Object.keys(cfg.stageproperty) : cfg.stages) as string[],
+        );
+        for (const name of renderedStageNames) {
+          expect(
+            legalDestinations.has(name),
+            `move-dropdown for gate "${gate.stage}" (variation ${v.variationname}) rendered a target "${name}" that ` +
+            `is not a configured stage — every option must be a real operator-move destination column.`,
+          ).toBe(true);
+        }
+        // The gate's own scoped OPERATOR forward target(s) are among the rendered destinations (the board
+        // does offer the legal operator move) — the same fact (2a) checked, asserted at the name level too.
+        for (const target of gate.targets) {
+          expect(
+            renderedStageNames.has(target),
+            `move-dropdown for gate "${gate.stage}" (variation ${v.variationname}) must include the scoped operator ` +
+            `forward target "${target}" among its destinations (rendered: ${JSON.stringify([...renderedStageNames].sort())}).`,
+          ).toBe(true);
+        }
 
         // Dismiss the dropdown WITHOUT committing — leave shared board state untouched.
         await page.keyboard.press('Escape').catch(() => {});

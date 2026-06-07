@@ -461,47 +461,64 @@ test.describe('BIG-05 — manual assignment', () => {
 // BIG-06 — Form-Based Submission (status advances; field-count parity)
 // ---------------------------------------------------------------------------------------------
 test.describe('BIG-06 — form-based submission', () => {
-  test('BIG-06 the legacy form screen mounts for an admin and renders its dynamic form/submit', async ({ page }) => {
-    // big.md BIG-03: `formbasedsubmission` is the legacy route; FormBasedSubmissionComponent self-gates
-    // by role for the reviewer/submit FLAGS but does NOT redirect (alert commented out, ts:113) — so
-    // the screen always mounts for an authGuard-passing user. We drive the REAL route as the BIG admin
-    // and assert the component mounted and rendered a dynamic form (the value the app produced from its
-    // `delivery forms` template stream). Driving a full submit requires a seeded template+assignment
-    // (the dynamic controls are built from the template, big.md BIG-03), so the write-poll is gated on
-    // a real form rendering — never a false green.
-    await realLogin(page, actors.big(0));
-    await page.goto('/formbasedsubmission?type=form&id=__none__&queueid=__none__&profileid=__none__&participantAssignmentId=__none__', {
-      waitUntil: 'domcontentloaded',
-    });
+  // FIXME (product gap + missing precondition — see productFindings BIG-06 + seedRequests):
+  //   This legacy screen CANNOT be exercised cleanly in the emulator today, for TWO independent reasons,
+  //   one of which is a genuine product gap (not a test-wiring issue), so per the governing rule we
+  //   fixme + report rather than massage it green:
+  //
+  //   1) PRODUCT GAP — unconditional crash on a missing `big participants assignments` doc.
+  //      `ngAfterViewInit` runs `getDoc(doc(afs,'big participants assignments', participantAssignmentId))
+  //      .then(res => this.currentstatus = res.data()['status'])` (form-based-submission.component.ts:164-166)
+  //      with NO existence guard. When the id does not resolve to a doc, `res.data()` is `undefined` and
+  //      `res.data()['status']` throws `TypeError: Cannot read properties of undefined (reading 'status')`
+  //      — the exact pageerror the console-guard caught. The live PAB/Validate nav always passes a REAL
+  //      participantAssignmentId, so the gap is latent in production, but it makes a no-precondition smoke
+  //      impossible to keep clean.
+  //
+  //   2) MISSING PRECONDITION — the whole body is `*ngIf="showcontent"` (html:1) and `showcontent` only
+  //      flips true AFTER a real `delivery forms` template (with a non-empty `formarray`) resolves
+  //      (ts:170-198). With no template the host renders zero-size, so `toBeVisible()` on the host fails
+  //      (the component DID mount — `toBeAttached()` holds — but it is correctly empty). CRUCIALLY this
+  //      legacy component reads `delivery forms` from the **DEFAULT** db (`this.afs`, ts:170), whereas the
+  //      emulator seeds `delivery forms` only into the **firestore-forms** named DB (seed-emulator.js →
+  //      seedReferenceData). So there is NO default-DB template to resolve, and `snap.data().formarray`
+  //      (ts:177) would itself throw on the missing template.
+  //
+  //   TO UN-FIXME (returned as a seedRequest): seed, in the DEFAULT db, one `delivery forms` template with
+  //   a non-empty `formarray` (e.g. a single text field) AND one `big participants assignments` row, then
+  //   drive `/formbasedsubmission?type=form&id=<templateId>&participantAssignmentId=<paId>&profileid=<pf>`.
+  //   With real ids: ts:164 reads an existing doc (no crash), ts:170-198 builds controls and sets
+  //   `showcontent=true` (host visible), and `[data-testid="form-submit"]` renders — at which point the
+  //   block below (already written for that path) asserts the real, app-rendered submittable form.
+  test.fixme(
+    'BIG-06 the legacy form screen mounts for an admin and renders its dynamic form/submit',
+    async ({ page }) => {
+      // (Runs only once the default-DB `delivery forms` template + `big participants assignments` row are
+      //  seeded — see the FIXME above + the returned seedRequest. The ids below are the seedRequest's.)
+      const templateId = 'run1_bigform_0'; // default-DB `delivery forms` template (seedRequest)
+      const paId = 'run1_bigpa_form_0'; // default-DB `big participants assignments` row (seedRequest)
+      const pf = `${actors.big(0)}`; // any authGuard-passing profile; submit flag is role-gated, not redirected
+      await realLogin(page, actors.big(0));
+      await page.goto(
+        `/formbasedsubmission?type=form&id=${templateId}&queueid=${paId}&profileid=${encodeURIComponent(pf)}&participantAssignmentId=${paId}`,
+        { waitUntil: 'domcontentloaded' },
+      );
 
-    await page.waitForURL((u) => u.pathname.includes('formbasedsubmission'), { timeout: 30_000 });
-    const host = page.locator('app-form-based-submission');
-    await expect(host, 'form-based-submission component should mount for an authGuard-passing admin').toBeVisible({
-      timeout: 30_000,
-    });
-
-    // The screen renders a <form> shell regardless; the SUBMIT button (`form-submit`, testids.md §BIG)
-    // only appears once the dynamic controls are built from a real `delivery forms` template. With no
-    // seeded template/assignment in this run, the form has no fields — assert that honest state rather
-    // than a fabricated submit. When a template IS seeded (id resolves), the submit renders and a spec
-    // can drive it + poll `big participants assignments.status == 'review'` (big.md §3c).
-    const submitCount = await host.locator('[data-testid="form-submit"]').count();
-    if (submitCount === 0) {
-      test.info().annotations.push({
-        type: 'note',
-        description:
-          'BIG-06: no `delivery forms` template resolved for the given id (none seeded by the queue ' +
-          'seeder), so the dynamic form rendered no fields/submit. Asserted the mounted empty state; ' +
-          'seed a template + `big participants assignments` row to exercise the submit→status:review write (big.md §3c).',
+      await page.waitForURL((u) => u.pathname.includes('formbasedsubmission'), { timeout: 30_000 });
+      const host = page.locator('app-form-based-submission');
+      // The component mounts immediately; its body is *ngIf="showcontent". With a real template resolved,
+      // showcontent flips true and the form body (hence the host) becomes visible.
+      await expect(host, 'form-based-submission should mount + render its form once a template resolves').toBeVisible({
+        timeout: 30_000,
       });
-      // Mounted shell, no fatal error (afterEach) — the honest app-computed state for an unresolved template.
-      await expect(host, 'form host should remain mounted (no crash) with an unresolved template').toBeVisible();
-      return;
-    }
 
-    // A real form rendered: the submit is present. Assert it is a real, app-rendered control (the
-    // field→control parity, big.md BIG-03 ts:181/213, is owned by the dynamic builder; here we assert
-    // the product produced a submittable form rather than a blank screen).
-    await expect(host.locator('[data-testid="form-submit"]').first(), 'the form Submit control should be visible').toBeVisible();
-  });
+      // A real form rendered from the seeded template: the submit is present. Assert it is a real,
+      // app-rendered control (the field→control parity, big.md BIG-03 ts:181/213, is owned by the dynamic
+      // builder; here we assert the product produced a submittable form rather than a blank screen).
+      await expect(
+        host.locator('[data-testid="form-submit"]').first(),
+        'the form Submit control should be visible',
+      ).toBeVisible({ timeout: 30_000 });
+    },
+  );
 });

@@ -50,8 +50,20 @@ export interface OpenOpts extends LoginOpts {
    * Queue NAME to select in the "Select Queue" picker. The board renders NO cards until a queue is
    * chosen (onQueueSelect wires the `live assignment` subscription, ts:90-99), so most specs pass this.
    * Omit to land on the monitor without selecting (e.g. to assert the empty/initial state).
+   *
+   * ⚠️ Multiple queues can share a name on the shared emulator (every variation spec seeds a queue
+   * named "TEST 30-stage L3rqCr" under its own testrunid). Selecting by name alone picks the FIRST
+   * match — which is often a DIFFERENT run's queue (whose live-assignments don't match this run's
+   * seed), yielding zero cards. Prefer `queueId` (the exact `queue generation` docid) which targets
+   * the option by its bound value (`mat-option [value]="list.docid"`).
    */
   queueName?: string;
+  /**
+   * Exact queue docid to select (the `queue generation` doc id, e.g. `<run>_<QUEUE_ID>`). When given,
+   * the picker option is matched by its bound value (`ng-reflect-value` in dev mode) — UNAMBIGUOUS even
+   * when several queues share a visible name. Takes precedence over `queueName`.
+   */
+  queueId?: string;
 }
 
 export class ArenaMonitorPage {
@@ -106,7 +118,7 @@ export class ArenaMonitorPage {
    * page as the developer/operator beforehand (see RISKS).
    */
   async open(opts: OpenOpts = {}): Promise<void> {
-    const { login = true, specialistIndex = 0, queueName, landingRoute, timeoutMs, email } = opts;
+    const { login = true, specialistIndex = 0, queueName, queueId, landingRoute, timeoutMs, email } = opts;
 
     if (login) {
       // loginAsSpecialist lands on /dynamicstudio; we then push to the monitor route below.
@@ -118,7 +130,10 @@ export class ArenaMonitorPage {
     }
     await expect(this.title()).toBeVisible({ timeout: 30_000 });
 
-    if (queueName !== undefined) {
+    // Prefer the exact docid (unambiguous) over the visible name (can collide across runs).
+    if (queueId !== undefined) {
+      await this.selectQueueById(queueId);
+    } else if (queueName !== undefined) {
       await this.selectQueue(queueName);
     }
   }
@@ -127,6 +142,9 @@ export class ArenaMonitorPage {
    * Open the queue picker and choose the queue whose visible name matches `queueName`. The options are
    * the top-5 queues by `queueenddate` (ts:63); selecting one fires `onQueueSelect` and wires the
    * live-assignment + token streams (ts:90-131).
+   *
+   * ⚠️ When several top-5 queues share `queueName` this picks the FIRST — which may be a different
+   * run's queue. Use `selectQueueById` for the unambiguous selection the SS-15 assertions need.
    */
   async selectQueue(queueName: string): Promise<void> {
     await this.queueSelect().click();
@@ -134,6 +152,24 @@ export class ArenaMonitorPage {
     const option = this.page.locator('mat-option', { hasText: queueName }).first();
     await option.click();
     // The picker closes; nothing else to await synchronously — counts are polled by the readers.
+    await expect(this.queueSelect()).toBeVisible();
+  }
+
+  /**
+   * Open the queue picker and choose the option whose bound value (`[value]="list.docid"`, html:10)
+   * equals `queueId`. In Angular dev mode the bound value is reflected to the `ng-reflect-value`
+   * attribute, so we can target the EXACT `queue generation` doc — unambiguous even when several
+   * top-5 queues share a visible name (the shared-emulator collision that made name selection pick a
+   * foreign run's queue and render zero cards). Selecting fires `onQueueSelect(value)` → wires the
+   * live-assignment + token streams for THIS queue (ts:90-131).
+   */
+  async selectQueueById(queueId: string): Promise<void> {
+    await this.queueSelect().click();
+    const option = this.page.locator(`mat-option[ng-reflect-value="${cssAttr(queueId)}"]`).first();
+    await expect(option, `arena queue option for docid "${queueId}" should be in the top-5 picker`).toBeVisible({
+      timeout: 15_000,
+    });
+    await option.click();
     await expect(this.queueSelect()).toBeVisible();
   }
 
@@ -176,6 +212,8 @@ export class ArenaMonitorPage {
    */
   async cardCount(): Promise<number> {
     let count = 0;
+    let prev = -1;
+    let stableHits = 0;
     await expect
       .poll(
         async () => {
@@ -185,13 +223,23 @@ export class ArenaMonitorPage {
             return 'settled';
           }
           const n = await this.cards().count();
-          if (n > 0) {
-            count = n;
-            return 'settled';
+          // `collectionSnapshots` can render the cards incrementally, so a bare first-non-zero read can
+          // catch a HALF-rendered list and make an exact-count assertion flaky. Require the count to be
+          // STABLE across two consecutive polls (and > 0) before settling — the app's filtered render has
+          // finished streaming. (Still an APP-computed value; we just wait for the stream to quiesce.)
+          if (n > 0 && n === prev) {
+            stableHits += 1;
+            if (stableHits >= 1) {
+              count = n;
+              return 'settled';
+            }
+          } else {
+            stableHits = 0;
           }
+          prev = n;
           return 'pending';
         },
-        { timeout: 20_000, message: 'arena card count to settle (cards rendered or empty-state shown)' }
+        { timeout: 20_000, intervals: [250, 400, 600], message: 'arena card count to settle (cards rendered or empty-state shown)' }
       )
       .toBe('settled');
     return count;
@@ -251,4 +299,10 @@ export class ArenaMonitorPage {
       .not.toBeNaN();
     return value;
   }
+}
+
+/** Escape a value for use inside a CSS attribute selector (`[attr="..."]`). Firestore docids are
+ *  token-safe, but escape defensively in case a value carries quotes/backslashes. */
+function cssAttr(value: string): string {
+  return String(value).replace(/(["\\])/g, '\\$1');
 }

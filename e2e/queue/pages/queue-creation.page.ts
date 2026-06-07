@@ -154,7 +154,12 @@ export class QueueCreationPage {
   async fillQueueName(name: string): Promise<void> {
     const input = this.host.locator(SEL.queueName);
     await expect(input).toBeVisible({ timeout: 15_000 });
-    await input.click();
+    // Do NOT click() the input: the Material outline's `.mat-mdc-form-field-required-marker` (the "*"
+    // floating-label span) overlays the field and intercepts the pointer event, so a real click hangs
+    // (observed: 120s timeout on "subtree intercepts pointer events"). `fill()` focuses the element
+    // programmatically (no hit-test) and sets the value — exactly what we need. `focus()` first makes
+    // the floating label settle so the value commits cleanly.
+    await input.focus();
     await input.fill(name);
     // `updateOn:'change'` (ctor ts:124) commits on input; blur to flush before validation/advance.
     await input.blur();
@@ -213,10 +218,12 @@ export class QueueCreationPage {
     const startInput = this.host.locator(SEL.startDate);
     const endInput = this.host.locator(SEL.endDate);
     await expect(startInput).toBeVisible({ timeout: 15_000 });
-    await startInput.click();
+    // focus() (not click()) — the Material outline's required-marker/notched-outline overlays the input
+    // and intercepts pointer events (a click hangs). focus()+fill() sets the value without a hit-test.
+    await startInput.focus();
     await startInput.fill(start);
     await startInput.blur();
-    await endInput.click();
+    await endInput.focus();
     await endInput.fill(end);
     await endInput.blur();
   }
@@ -250,7 +257,9 @@ export class QueueCreationPage {
     const fillText = async (selector: string, value: string) => {
       const el = this.host.locator(selector);
       await expect(el).toBeVisible({ timeout: 15_000 });
-      await el.click();
+      // focus() (not click()) — the Material form-field outline/required-marker overlays matInput and
+      // intercepts the pointer event (a real click hangs). focus()+fill() sets the value hit-test-free.
+      await el.focus();
       await el.fill(value);
       await el.blur(); // updateOn:'change' commits on input; blur flushes before the gate runs.
     };
@@ -307,7 +316,16 @@ export class QueueCreationPage {
   async pickFirstProfile(field: 'queueadmin' | 'queuementor'): Promise<string> {
     const select = this.host.locator(field === 'queueadmin' ? SEL.queueAdmin : SEL.queueMentor);
     await expect(select).toBeVisible({ timeout: 15_000 });
-    await select.click();
+    await select.scrollIntoViewIfNeeded().catch(() => {});
+    // The Material notched-outline label (`<mat-label>`) overlaps the mat-select trigger and intercepts
+    // the pointer, so a plain click can hang ("subtree intercepts pointer events"). Click the trigger
+    // element itself; fall back to a force-click (the overlay opens on the bound mousedown either way).
+    const trigger = select.locator('.mat-mdc-select-trigger');
+    if ((await trigger.count()) > 0) {
+      await trigger.first().click({ force: true });
+    } else {
+      await select.click({ force: true });
+    }
     const options = this.overlayOption();
     await expect(options.first()).toBeVisible({ timeout: 10_000 });
     // Find the first option with a non-empty bound value (the search box has none).
@@ -348,7 +366,7 @@ export class QueueCreationPage {
     // The chip-grid input is the textbox wired to `[matChipInputFor]` (html:305). Scope to the grid so
     // a chip-input elsewhere can't match.
     const chipInput = chipGrid.locator('input[matChipInputFor]');
-    await chipInput.click();
+    await chipInput.focus(); // focus() not click() — avoid the Material outline/required-marker intercept.
     await chipInput.fill(stage);
     await chipInput.press('Enter');
     // `addStage` pushes onto the stages array and renders a `mat-chip-row` with the stage text

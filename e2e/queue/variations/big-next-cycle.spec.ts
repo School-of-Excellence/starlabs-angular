@@ -228,13 +228,27 @@ async function simSelfMove(tokenDocId: string, toStage: string): Promise<void> {
   await sim.advance(tokenDocId, toStage, { by: 'self', testrunid: RUN });
 }
 
+/**
+ * PRECONDITION: delete every `queue stage log` row the product wrote for this token, so a case that
+ * asserts the EXACT log-row count / per-edge traversal cap starts from a clean trail (the token is
+ * reused across the describe). Allowlist-guarded handle (test project only); re-runnable; NOT an
+ * assertion target. Rows key on `docid == <queue_token docid>` (cf. BIGNC log shape / lyl resetToken).
+ */
+async function clearStageLog(tokenDocId: string): Promise<void> {
+  const existing = await db().collection('queue stage log').where('docid', '==', tokenDocId).get();
+  if (existing.empty) return;
+  const batch = db().batch();
+  existing.docs.forEach((d: any) => batch.delete(d.ref));
+  await batch.commit();
+}
+
 /** Wait until the board re-rendered a token card into a given stage column (collectionData is async). */
 async function waitForCardOnBoard(board: QueueBoardPage, cardId: string): Promise<void> {
   await expect
-    .poll(async () => (await board.tokenCard(cardId).count()) > 0, {
+    .poll(async () => board.revealTokenCard(cardId), {
       timeout: 25_000,
       intervals: [300, 600, 1000],
-      message: `board never rendered token card data-token-id="${cardId}" (is the queue selected and the queue_token stream loaded?)`,
+      message: `board never rendered token card data-token-id="${cardId}" (is the queue selected and the queue_token stream loaded? — also paged via Load More)`,
     })
     .toBe(true);
 }
@@ -590,6 +604,12 @@ test.describe(`V3 · ${VARIATION_NAME} — closed-loop walk (BIGNC-00 … 06)`, 
   test('BIGNC-06 bounded loop ≤2: Diagnostics ↔ DRC round-trip twice via REAL board, 3rd would be rejected (D1)', async ({ page }) => {
     walkedTokenId = walkedTokenId && walkedTokenId !== STUDIO_TOKEN_ID ? walkedTokenId : await firstBigncToken();
     walkedCardId = await tokenCardId(walkedTokenId);
+    // FRESH-LOG precondition: this token is REUSED across the BIGNC describe (BIGNC-01..05 advanced it), so
+    // its `queue stage log` carries earlier rows. This bounded-loop case asserts the EXACT count of rows the
+    // round-trip produces (4) and the per-edge traversal cap (each edge exactly twice), so it must start from
+    // a clean trail. Delete the token's prior product-written rows (allowlist-guarded handle, test project
+    // only) — a re-runnable precondition, NOT an assertion target (mirrors lyl-first-cycle resetToken).
+    await clearStageLog(walkedTokenId);
     await parkToken(walkedTokenId, S.diagnostics);
 
     // Oracle facts (flow-config.md §2 V3 rows 10–11; §3 D1):

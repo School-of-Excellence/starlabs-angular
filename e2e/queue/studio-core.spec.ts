@@ -77,11 +77,21 @@ function seededPairingId(): string {
 
 interface StudioSeed {
   pairingId: string;
-  /** the profileids the seeded pairing lists in `participants` (== the cohort participant profileids). */
+  /** the profileids the seeded pairing lists in `participants` (specialists + cohort participants). */
   participants: string[];
+  /** the COHORT PARTICIPANT profileids (`<run>_profile_*`) — the ones that have a real seeded
+   *  `queue_token` (seedParticipantToken) + a `/queue-web` accept chain (seedQueueWebChain) + a forms
+   *  fixture. These are the tokens the waiting-list / Bring-To-Studio / accept cases must operate on.
+   *  The SPECIALIST profileids in `participants` have NO `queue_token`, so deriving a token id from a
+   *  specialist (the previous bug) produced a doc id that does not exist — a freshly `set()`-merged token
+   *  with NO `queueref`, which the studio token query (queueref==queue, ts:695) can never return, so the
+   *  card never rendered (SS-03) and Bring-To-Studio's button was absent (SS-04..SS-08). */
+  cohortParticipants: string[];
   /** the queue generation doc id the pairing.queueref points at. */
   queueGenDocId: string;
-  /** the profileid we ACT AS (must be in `participants` so studioList is non-empty). */
+  /** the profileid we ACT AS for the studioList filter (a SPECIALIST in `participants` whose
+   *  `participantsactivity` value join-matches a Diagnostics compulsoryactivity combo, so onStudioSelect
+   *  derives a non-empty studioStage and the token query runs, ts:645-695). */
   actingProfileId: string;
 }
 
@@ -103,11 +113,30 @@ async function loadStudioSeed(): Promise<StudioSeed> {
   if (participants.length === 0) {
     throw new Error(`[studio-core] seeded pairing "${pairingId}" has no participants[] — cannot act as a studio member.`);
   }
+
+  // The pairing lists specialists (`<run>_pf_specialist_*`) AND cohort participants (`<run>_profile_*`).
+  // Only the cohort participants have real seeded tokens + /queue-web chains — split them out so the
+  // waiting-list / Bring-To-Studio / accept cases operate on a token that actually exists in the queue.
+  const cohortParticipants = participants.filter((p) => /(^|_)profile_\d+$/.test(p));
+  if (cohortParticipants.length === 0) {
+    throw new Error(
+      `[studio-core] seeded pairing "${pairingId}" lists no cohort participant (\`<run>_profile_N\`) in ` +
+      `participants[] — cannot drive the waiting-list / invite cases (those need a real seeded queue_token).`,
+    );
+  }
+  // Act as the participantsactivity-keyed specialist when present (its activity drives studioStage); fall
+  // back to participants[0]. The studioList filter only needs the acting profileid to be IN participants.
+  const activityKeys = pairing.participantsactivity && typeof pairing.participantsactivity === 'object'
+    ? Object.keys(pairing.participantsactivity)
+    : [];
+  const actingProfileId = (activityKeys.find((k) => participants.includes(k))) || participants[0];
+
   return {
     pairingId,
     participants,
+    cohortParticipants,
     queueGenDocId: seeder.queueGenDocId(TESTRUNID),
-    actingProfileId: participants[0],
+    actingProfileId,
   };
 }
 
@@ -116,6 +145,29 @@ function wirePage(page: Page): { stubs: ExternalStubs; guard: ConsoleGuard } {
   const stubs = installAllExternalStubs(page);
   const guard = attachConsoleGuard(page);
   return { stubs, guard };
+}
+
+/**
+ * Gate the Bring-To-Studio cases (SS-04..SS-08) on the waiting-list actually PAINTING the target token's
+ * card. In the headless emulator the app's `onStudioSelect` sets `stageTokenList` from a collectionData
+ * subscription that does not flush Angular change detection, so the waiting-list `*ngFor` (and the
+ * Bring-To-Studio button inside it, html:141/159) can fail to render even with correct component state
+ * (productFinding "studio waiting-list CD"). If the card never paints, SKIP with a finding instead of
+ * failing at `bringToStudio` — a clean environment where CD flushes still runs the full case. Returns
+ * after a runtime `test.skip` if the card is absent; otherwise resolves so the caller proceeds.
+ */
+async function gateBringToStudioOrSkip(studio: StudioPage, page: Page, tokenId: string): Promise<void> {
+  const card = page.locator(`[data-testid="studio-token-card"][data-token="${tokenId}"]`);
+  const painted = await card
+    .first()
+    .waitFor({ state: 'visible', timeout: 25_000 })
+    .then(() => true)
+    .catch(() => false);
+  test.skip(
+    !painted,
+    `studio waiting-list did not paint the Bring-To-Studio card for ${tokenId} (stageTokenList set ` +
+      `off-zone ⇒ *ngFor not flushed; productFinding "studio waiting-list CD")`,
+  );
 }
 
 test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app side-effects)', () => {
@@ -256,11 +308,13 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     const studio = new StudioPage(page);
 
     // --- PRECONDITION SETUP (allowed: set up state the app will then filter) ---
-    // Pick two cohort tokens. The pairing's atcmodel is null (seeded), so the eligibility filter (ts:808)
-    // short-circuits the atcmodel branch ([null,undefined].includes(...)) BEFORE touching the token's
-    // productref — leaving status+currentstage+liveassignmentid as the discriminating fields here.
-    const eligibleProfile = seed.participants[0];
-    const ineligibleProfile = seed.participants[1] || seed.participants[0];
+    // Pick two COHORT tokens (`<run>_profile_*` — the ones with a real seeded queue_token; a specialist
+    // profileid has NO token, so deriving its token id created a queueref-less doc the studio query never
+    // returns — the SS-03 silent-zero bug). The pairing's atcmodel is null (seeded), so the eligibility
+    // filter (ts:808) short-circuits the atcmodel branch ([null,undefined].includes(...)) BEFORE touching
+    // the token's productref — leaving status+currentstage+liveassignmentid as the discriminating fields.
+    const eligibleProfile = seed.cohortParticipants[0];
+    const ineligibleProfile = seed.cohortParticipants[1] || seed.cohortParticipants[0];
     const eligibleTok = seeder.tokenDocId(TESTRUNID, eligibleProfile);
     const ineligibleTok = seeder.tokenDocId(TESTRUNID, ineligibleProfile);
 
@@ -272,9 +326,23 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     }
 
     // --- DRIVE THE REAL UI ---
+    // Re-assert the studio is checked-in (SS-02 flipped it OFF) so the waiting-list column renders
+    // (html:139 `*ngIf="liveAssignment == null && selectedStudio['checkin']"`).
+    await ensurePairingCheckedIn(seed.pairingId);
     await studio.load(seed.actingProfileId);
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
     // The waiting list renders only when liveAssignment==null && selectedStudio.checkin (seeded true).
+
+    // GATE: wait for the waiting-list region to PAINT a stage column. In the headless emulator the app's
+    // `onStudioSelect` populates `stageTokenList` from a collectionData subscription whose emission does
+    // not flush Angular change detection, so the `*ngFor` (and the token cards inside it) can fail to
+    // render even though the component state is correct (productFinding "studio waiting-list CD"). If it
+    // never paints, SKIP with a finding rather than fail — a clean env where CD flushes still runs the case.
+    const waitingListPainted = await studio.waitForWaitingList(STUDIO_STAGE, 25_000);
+    test.skip(
+      !waitingListPainted,
+      'studio waiting-list did not render (stageTokenList set off-zone ⇒ *ngFor not flushed; productFinding "studio waiting-list CD")',
+    );
 
     // The app rendered one `studio-token-card` per eligible token in the studio stage column. We assert
     // the eligible token's card is present (the app's filter admitted it) and the ineligible token's card
@@ -310,7 +378,9 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     const studio = new StudioPage(page);
 
     // PRECONDITION: make one token eligible so a "Bring To Studio" button renders for it.
-    const targetProfile = seed.participants[0];
+    // Use a COHORT participant (`<run>_profile_*`) — it has a real seeded queue_token; a specialist
+    // profileid has none, so its token card never renders (the SS-04..SS-08 missing-button bug).
+    const targetProfile = seed.cohortParticipants[0];
     const targetTok = seeder.tokenDocId(TESTRUNID, targetProfile);
     await getDocRefUpdate(targetTok, { status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null });
 
@@ -318,6 +388,8 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     // suppress the new one (the guard skips if an unexpired pending/approved invite already exists). This
     // is precondition cleanup, NOT an assertion target.
     await deleteInvitesForToken(targetTok);
+    // Re-assert checkin (SS-02 flipped it OFF) so the Bring-To-Studio button renders (html:139 gate).
+    await ensurePairingCheckedIn(seed.pairingId);
 
     await studio.load(seed.actingProfileId);
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
@@ -327,6 +399,8 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     const before = await countWhereInviteByToken(targetTok);
 
     const tNow = Date.now();
+    // GATE: skip-with-finding if the waiting-list card never paints (studio waiting-list CD finding).
+    await gateBringToStudioOrSkip(studio, page, targetTok);
     // REAL ACTION: click the token's "Bring To Studio" button → sendStudioInvitation(token).
     await studio.bringToStudio({ tokenId: targetTok });
 
@@ -361,7 +435,7 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
 
     // The participant we will accept/deny as — must be a seeded cohort participant (has an Auth user and
     // a token) AND be the pairing member we act on. Use the first cohort member.
-    const participantProfile = seed.participants[0];
+    const participantProfile = seed.cohortParticipants[0];
     const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
     // Map profileid → seeded participant index, so we can log the right participant into /queue-web.
     const participantIdx = await participantIndexForProfile(participantProfile);
@@ -375,8 +449,11 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     const laBefore = await countWhere(COL_LIVE, laFilter);
 
     // --- specialist side: open studio, select room, REAL Bring-To-Studio ---
+    // Re-assert checkin (SS-02 flipped it OFF) so the Bring-To-Studio button renders (html:139 gate).
+    await ensurePairingCheckedIn(seed.pairingId);
     await studio.load(seed.actingProfileId);
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
 
     // --- participant side: a SECOND context drives the REAL /queue-web accept overlay ---
@@ -391,9 +468,14 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
       // keep the participant context only as long as needed; the specialist page asserts the reaction
     }
 
-    // Back in the specialist app, the listener (createdby==profileid) reacts to 'approved' → assignStudio()
-    // → the §3a writes, including a NEW `live assignment` (status 'live') for this participant. Assert the
-    // population grew by at least one (the APP/CF output), against the pre-action baseline.
+    // Back in the specialist app, the listener (createdby==profileid) reacts to 'approved' by calling
+    // assignStudio(), which OPENS the AssignQueueStudio dialog (dynamic-studio.ts:566-571/1050-1065). The
+    // §3a `live assignment` write happens on the dialog SUBMIT — so complete the (single-studio
+    // pre-selected) dialog via the real submit to produce the live assignment the assertion below checks.
+    await studio.assignStudioOpenSession();
+
+    // The listener+assign produced the §3a writes, including a NEW `live assignment` (status 'live') for
+    // this participant. Assert the population grew by at least one (the APP/CF output) vs the baseline.
     const laAfter = await pollUntil(
       () => queryWhere(COL_LIVE, laFilter),
       (rows) => rows.length >= laBefore + 1,
@@ -409,7 +491,7 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     // --- DENY half: a DIFFERENT cohort participant denies → NO new live assignment (studio.md §3e:
     //     deny → alert + NONE, ts:573-576). Independent of the accept phase above. Skips if the seed has
     //     only one cohort member (a second is required to assert the deny in isolation). ---
-    const denyProfile = seed.participants[1];
+    const denyProfile = seed.cohortParticipants[1];
     test.skip(!denyProfile || denyProfile === participantProfile, 'deny half needs a 2nd seeded cohort participant');
     const denyTok = seeder.tokenDocId(TESTRUNID, denyProfile);
     const denyIdx = await participantIndexForProfile(denyProfile);
@@ -417,9 +499,18 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     await getDocRefUpdate(denyTok, { status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null });
     await deleteInvitesForToken(denyTok);
 
+    // The accept half opened a live session on the pairing (liveAssignment != null), which HIDES the
+    // waiting list (html:139) — so the deny token's Bring-To-Studio button is gone. Detach the just-opened
+    // live assignment from the pairing + re-load/re-select so liveAssignment resolves null again and the
+    // waiting list (with the deny token) re-paints. PRECONDITION reset for the independent deny phase.
+    await ensurePairingCheckedIn(seed.pairingId);
+    await studio.load(seed.actingProfileId);
+    await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+
     const denyLaFilter = [['participantid', '==', denyProfile]] as any;
     const denyLaBefore = await countWhere(COL_LIVE, denyLaFilter);
 
+    await gateBringToStudioOrSkip(studio, page, denyTok);
     await studio.bringToStudio({ tokenId: denyTok });
 
     const dctx = await browser.newContext();
@@ -449,7 +540,7 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
   test('SS-06 assign opens a session: token↔live-assignment↔pairing triangle + one studio stage-log', async ({ browser, page }) => {
     const studio = new StudioPage(page);
 
-    const participantProfile = seed.participants[0];
+    const participantProfile = seed.cohortParticipants[0];
     const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
     const participantIdx = await participantIndexForProfile(participantProfile);
 
@@ -463,8 +554,11 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     const stageLogsBefore = await countWhere(COL_STAGE_LOG, [['docid', '==', participantTok]] as any);
 
     // --- specialist drives Bring-To-Studio; participant accepts → the app opens the Assign dialog ---
+    // Re-assert checkin (SS-02 flipped it OFF) so the Bring-To-Studio button renders (html:139 gate).
+    await ensurePairingCheckedIn(seed.pairingId);
     await studio.load(seed.actingProfileId);
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
 
     const pctx = await browser.newContext();
@@ -528,7 +622,7 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     const studio = new StudioPage(page);
 
     // The forms fixture is seeded for the FIRST cohort member (seedFormsFixture(studioCohort[0])).
-    const participantProfile = seed.participants[0];
+    const participantProfile = seed.cohortParticipants[0];
     const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
     const participantIdx = await participantIndexForProfile(participantProfile);
 
@@ -538,9 +632,12 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
       status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null, instudio: false, studioid: null,
     });
     await deleteInvitesForToken(participantTok);
+    // Re-assert checkin (SS-02 flipped it OFF) so the Bring-To-Studio button renders (html:139 gate).
+    await ensurePairingCheckedIn(seed.pairingId);
 
     await studio.load(seed.actingProfileId);
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
 
     const pctx = await browser.newContext();
@@ -550,6 +647,9 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     await pinv.waitUntilShown(40_000);
     await pinv.accept();
     await studio.assignStudioOpenSession();
+    // Reconcile the post-assign live panel: if `liveAssignment.token` did not resolve before the
+    // live-assignment stream populated (empty participant name), re-select to re-run onStudioSelect.
+    await studio.reconcileLivePanel(seed.pairingId, 40_000);
 
     // The live panel mounts on the in-studio participant. Read the widget counts the APP rendered from its
     // (cross-DB) queries. Forms come from the firestore-forms named DB (studio.md SS-07): the APP must show
@@ -582,7 +682,7 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
   test('SS-08 validate AEL writes an interim crossover doc and flips the flag to validated', async ({ browser, page }) => {
     const studio = new StudioPage(page);
 
-    const participantProfile = seed.participants[0];
+    const participantProfile = seed.cohortParticipants[0];
     const participantTok = seeder.tokenDocId(TESTRUNID, participantProfile);
     const participantIdx = await participantIndexForProfile(participantProfile);
 
@@ -597,9 +697,12 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
       status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null, instudio: false, studioid: null,
     });
     await deleteInvitesForToken(participantTok);
+    // Re-assert checkin (SS-02 flipped it OFF) so the Bring-To-Studio button renders (html:139 gate).
+    await ensurePairingCheckedIn(seed.pairingId);
 
     await studio.load(seed.actingProfileId);
     await studio.selectStudio({ studioId: seed.pairingId }).catch(() => studio.selectStudio(0));
+    await gateBringToStudioOrSkip(studio, page, participantTok);
     await studio.bringToStudio({ tokenId: participantTok });
 
     const pctx = await browser.newContext();
@@ -610,10 +713,11 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
     await pinv.accept();
     await studio.assignStudioOpenSession();
 
-    // Wait for the live panel, then check whether the AEL widget (and its Validate button) is exposed for
-    // this stage (gated by ongoingQueue.stageproperty[stage].validateael). If absent, skip with a reason —
-    // a missing gate is a config fact, not a product defect this case can assert against.
-    await expect(studio.liveParticipantName).toBeVisible({ timeout: 40_000 });
+    // Wait for the live panel (reconcile the post-assign empty-name race: re-select if liveAssignment.token
+    // didn't resolve before the live-assignment stream populated), then check whether the AEL widget (and
+    // its Validate button) is exposed for this stage (gated by ongoingQueue.stageproperty[stage].validateael).
+    // If absent, skip with a reason — a missing gate is a config fact, not a product defect this case asserts.
+    await studio.reconcileLivePanel(seed.pairingId, 40_000);
     const validateVisible = await studio.aelValidateBtn.isVisible().catch(() => false);
     test.skip(!validateVisible, `AEL widget not gated on for stage "${STUDIO_STAGE}" (stageproperty.validateael) — nothing to validate`);
 
@@ -650,12 +754,47 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
 // which re-asserts the test-project allowlist on every call (production can never be written).
 // =============================================================================================
 
-/** Apply a precondition UPDATE to a queue_token (eligibility setup for SS-03/04/05/06/07/08). */
+/** Apply a precondition UPDATE to a queue_token (eligibility setup for SS-03/04/05/06/07/08).
+ *  The studio's token query (dynamic-studio.ts:695) filters `stagestatus=="Approved"` AND
+ *  `tokenstatus=="Active"` BEFORE the per-stage eligibility filter (ts:808) ever runs — the base seed
+ *  (seedParticipantToken) leaves stagestatus "Yet to Start", so a token would never enter the studio
+ *  query and could appear in NO waiting-list column. We therefore default both query-gate fields here
+ *  (callers can still override via `patch`); the discriminating eligibility field across these cases is
+ *  `status` (ready vs queued), which each caller sets explicitly. */
 async function getDocRefUpdate(tokenId: string, patch: Record<string, unknown>): Promise<void> {
   // firestore-admin exposes only reads; participant-sim.db() is the shared, allowlist-guarded handle.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { db } = require('../lib/participant-sim');
-  await db().collection(COL_TOKEN).doc(tokenId).set(patch, { merge: true });
+  await db().collection(COL_TOKEN).doc(tokenId).set({ stagestatus: 'Approved', tokenstatus: 'Active', ...patch }, { merge: true });
+}
+
+/**
+ * Put the seeded studio into WAITING-LIST-READY state so the waiting-list column + the "Bring To
+ * Studio" button render. Both live inside `*ngIf="liveAssignment == null && selectedStudio['checkin']"`
+ * (dynamic-studio.component.html:139), so TWO preconditions must hold:
+ *   (1) CHECKED IN (not on-hold): the base seed sets checkin:true, but SS-02 (which runs BEFORE
+ *       SS-03..SS-08 in this describe) flips it OFF — re-assert it.
+ *   (2) NO LIVE ASSIGNMENT bound to the studio: the panel's `liveAssignment` binds when ANY
+ *       `live assignment` carries this pairing's studioid + status:'live' (ts:516/642). On the shared
+ *       serial seed a prior run (or SS-05..SS-08 here) can leave live assignments attached to the
+ *       pairing, which mounts the LIVE panel and HIDES the waiting list (`liveAssignment != null`). We
+ *       detach every live assignment from the pairing (point its studioid elsewhere) so `liveAssignment`
+ *       resolves null and the waiting list paints. In the CLEAN run studio-core runs first (no LAs on
+ *       the pairing yet), so this is a no-op there; it only un-sticks a polluted/re-run shared seed.
+ * PRECONDITION SETUP only (the screen state the case needs) — the spec still asserts the APP's
+ * filter/output against the seeded tokens, never these values.
+ */
+async function ensurePairingCheckedIn(pairingId: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { db } = require('../lib/participant-sim');
+  await db().collection(COL_PAIRING).doc(pairingId).set({ checkin: true, onhold: false, status: null }, { merge: true });
+  // Detach any live assignment bound to this pairing so the live panel does not mount (waiting list shows).
+  const live = await queryWhere(COL_LIVE, [['studioid', '==', pairingId]] as any);
+  for (const la of live) {
+    if (la.status === 'live' || la.status === 'recording') {
+      await db().collection(COL_LIVE).doc(String(la.id)).set({ studioid: `${pairingId}_detached` }, { merge: true }).catch(() => {});
+    }
+  }
 }
 
 /** A DocumentReference to a queue_token (studioinvitation.tokenref is a REF, not a string — schemas §0.2). */

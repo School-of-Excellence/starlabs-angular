@@ -225,6 +225,22 @@ export async function seedBigWorld(opts: BigSeedOptions = {}): Promise<BigSeedRe
     ...tag,
   });
 
+  // -- 3b. event collection (BIG-08): ONE accelerator event tied to THIS marathon ----------------
+  // big-cohort-clone-2 sets loading=false ONLY via getAssignmentData() ← onFilterAcceleratorEvent ←
+  // toRunFilterFunctions, which is gated on acceleratorEventList.length != 0 (ts:1735). acceleratorEventList
+  // is built from `event collection` filtered by bigmarathonref != undefined (ts:362-368). With NO event doc
+  // loading stays true forever and the '.brand' mount anchor (behind *ngIf="!loading") never renders →
+  // BigCohortsPage.open() times out. onFilterAcceleratorEvent (ts:1786) then matches
+  // e['bigmarathonref'].id === selectedMarathon, so bigmarathonref.id MUST equal the auto-selected
+  // marathon docid (== marathonId). Dates are optional (the component null-handles their absence).
+  const eventId = `${testrunid}_bigevt_0`;
+  await d.collection('event collection').doc(eventId).set({
+    docid: eventId, name: `TEST Event ${testrunid}`, bigmarathonref: marathonRef,
+    startdate: Ts.fromMillis(Date.now() + 365 * 86400e3),
+    enddate: Ts.fromMillis(Date.now() + 400 * 86400e3),
+    ...tag,
+  });
+
   // -- 4. participants (profile_data) the screens render by name ----------------------------------
   // Cohorts mapProfile[id] = profile_data.name (docid → name); Validate participant-name =
   // mapProfile[p.profileid].name. Seed ONE pool used by both cohorts and the kanban cards.
@@ -294,7 +310,12 @@ export async function seedBigWorld(opts: BigSeedOptions = {}): Promise<BigSeedRe
     const docid = `${testrunid}_mlc_${i}`;
     await d.collection('atcmodel level config').doc(docid).set({
       docid, atcmodel: `MODEL_${testrunid}`, level: `L${i + 1}`,
-      primaryactivity: 'TEST', metrics: {}, validation: {}, stabilization: {}, ...tag,
+      // metrics/validation/stabilization MUST be ARRAYS: the template *ngFor's each of them
+      // (atcmodel-level-config.component.html:36/45/54) — iterating an OBJECT throws RuntimeError
+      // NG02200 ("NgFor only supports binding to Iterables"), which aborts row rendering (BIG-09b).
+      // Empty arrays render no <li> and no crash. level/primaryactivity stay strings (row['level'].id
+      // on a string is undefined → renders blank, not a crash).
+      primaryactivity: 'TEST', metrics: [], validation: [], stabilization: [], ...tag,
     });
     modelConfigCount++;
   }
@@ -302,12 +323,28 @@ export async function seedBigWorld(opts: BigSeedOptions = {}): Promise<BigSeedRe
   // -- 8. AEL analytics rows (BIG-10): big aggregate event level ----------------------------------
   // Streamed orderBy('atcmodel') → dataSource.data; ael-total-count = filteredData.length
   // (unfiltered by default). `atcmodel` must be present (the orderBy key) + `profileid`.
+  //
+  // `regular` MUST be a NON-EMPTY ARRAY of {activity:<ref|obj-with-id>, completed, metric}:
+  //   - the component builds mapActivityPerParticipant[profileid][atcmodel][queueid] ONLY by iterating
+  //     non-empty regular/specialactivity/boosteractivity/warmup arrays (big-aggregate-event-level.ts:
+  //     229-262); with regular:{} that map stays EMPTY and the participant column (html:92) does
+  //     mapActivityPerParticipant[profileid][atcmodel][queueid] → "Cannot read properties of undefined
+  //     (reading 'MODEL_run1')" — the per-row fatal that aborts the mount (BIG-10a loadsWithoutFatal).
+  //   - the `regular` column template also *ngFor's row['regular'] (html:119) and reads list['activity'].id
+  //     (html:120) — an OBJECT throws NG02200, and a missing `activity` throws on `.id`. So each element
+  //     carries an `activity` DocumentReference (a bigactivity doc, seeded just below, so mapBigActivity
+  //     resolves its name) plus a `completed` count the map sums.
+  const bigActivityId = `${testrunid}_bigact_0`;
+  await d.collection('bigactivity').doc(bigActivityId).set({
+    docid: bigActivityId, activity: `TEST Activity ${testrunid}`, ...tag,
+  });
+  const bigActivityRef = d.collection('bigactivity').doc(bigActivityId);
   for (let i = 0; i < aelCount; i++) {
     const docid = `${testrunid}_ael_${i}`;
     await d.collection('big aggregate event level').doc(docid).set({
       docid, id: docid, atcmodel: `MODEL_${testrunid}`, profileid: pool[i % pool.length].profileid,
       level: `L${(i % configRows) + 1}`, queueid: queueGenDocId,
-      regular: {}, lastupdated: now(), ...tag,
+      regular: [{ activity: bigActivityRef, completed: 0, metric: 1 }], lastupdated: now(), ...tag,
     });
   }
 
@@ -386,6 +423,7 @@ export const BIG_SEED_COLLECTIONS = [
   'big marathon', 'big cohorts', 'big cohorts log', 'big assignment',
   'big participants assignments', 'big aggregate event level',
   'biglevel', 'atcmodel level config',
+  'event collection', 'bigactivity',
 ];
 
 export default seedBigWorld;

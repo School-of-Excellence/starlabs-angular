@@ -207,15 +207,20 @@ test.describe('PFC-WF-01 — Prodigies-First-Cycle closed-loop walk (operator + 
     const board = new QueueBoardPage(page);
     await board.selectQueue(QUEUE_NAME);
 
-    // ── COHORT CONSERVATION baseline (APP number): Σ of all column counts the board rendered == N.
-    // Read from the board UI (the app computed it from its live queue_token stream), not from the seed.
+    // ── POPULATION CONSERVATION baseline (APP number): Σ of all column counts the board rendered. The
+    // board's live queue_token stream is the SHARED queue 1 (the main seed places its 50-participant
+    // roster there too — seed-emulator.js — and this variation's cohort is ADDED to it), so the absolute
+    // Σ is NOT the cohort size; it is "everyone currently on queue 1". We capture that APP-computed
+    // baseline and later assert it is CONSERVED across the walk (no vaporized/duplicated token). We assert
+    // it is ≥ the seeded cohort (the cohort IS present) so the baseline is non-vacuous. Read from the board
+    // UI (the app computed it from its stream), never a value the test wrote.
     const cohortN = seed.tokenIds.length;
     const startTotal = await sumBoardCounts(board);
     expect(
       startTotal,
-      `cohort conservation: the board's summed column counts must equal the seeded cohort N=${cohortN} at the start ` +
-        '(APP-computed Σ vs known cohort — not a value the test wrote)',
-    ).toBe(cohortN);
+      `population conservation: the board's summed column counts must include this run's seeded cohort (N=${cohortN}) ` +
+        'on the shared queue (APP-computed Σ ≥ cohort — not a value the test wrote)',
+    ).toBeGreaterThanOrEqual(cohortN);
 
     // ── BLANK-NAME GUARD (APP render): the walked token's card shows a non-blank participant name.
     await assertCardNameNotBlank(board, tokenCardId);
@@ -286,14 +291,16 @@ test.describe('PFC-WF-01 — Prodigies-First-Cycle closed-loop walk (operator + 
     );
     await assertTerminalReached(tokenId, variationId, { terminal: TERMINAL, oracle: ORACLE });
 
-    // ── COHORT CONSERVATION after the walk (APP number): Σ board counts still == N. The walked token
-    // moved across columns but the TOTAL population is conserved (no vaporized/duplicated token).
+    // ── POPULATION CONSERVATION after the walk (APP number): Σ board counts is UNCHANGED from the
+    // baseline. The walked token moved across columns, but the TOTAL population on the (shared) queue is
+    // conserved — no vaporized/duplicated token. We compare to the captured `startTotal` (the real
+    // APP-computed baseline), NOT to the cohort size: the queue holds the whole shared roster.
     const endTotal = await sumBoardCounts(board);
     expect(
       endTotal,
-      `cohort conservation: Σ board column counts must still equal N=${cohortN} after the walk ` +
-        '(the walked token traversed columns; the total population is conserved)',
-    ).toBe(cohortN);
+      `population conservation: Σ board column counts must be unchanged (${startTotal}) after the walk ` +
+        '(the walked token traversed columns; the total population is conserved — no drop/duplicate)',
+    ).toBe(startTotal);
 
     // ── EVERY-MOVE-LOGGED final tally: exactly WALK.length rows, with the real operator+studio moves
     // present as non-self provenance (we drove all of them to reach here).
@@ -468,6 +475,7 @@ async function tryBoardMove(
   seed: SeedHandles,
 ): Promise<boolean> {
   const card = board.tokenCard(tokenCardId);
+  await board.revealTokenCard(tokenCardId).catch(() => {}); // page the card in if a crowded column hid it
   if ((await card.count().catch(() => 0)) === 0) return false;
   // The move-target option for this stage must be offered by the app's variation-scoped dropdown. If
   // it is not present (control did not render / not a legal scoped edge), do NOT force it.
@@ -643,6 +651,7 @@ async function openMoveDropdownTargets(
   tokenCardId: string,
 ): Promise<string[] | null> {
   const card = board.tokenCard(tokenCardId);
+  await board.revealTokenCard(tokenCardId).catch(() => {}); // page the card in if a crowded column hid it
   if ((await card.count().catch(() => 0)) === 0) return null;
   const moveBtn = card.locator('[data-testid="qm-move-btn"]');
   if ((await moveBtn.count().catch(() => 0)) === 0) return null;
@@ -666,6 +675,7 @@ async function openMoveDropdownTargets(
 /** Assert the walked token's board card renders a NON-blank participant name (blank-name guard). */
 async function assertCardNameNotBlank(board: QueueBoardPage, tokenCardId: string): Promise<void> {
   const card = board.tokenCard(tokenCardId);
+  await board.revealTokenCard(tokenCardId); // page the card in if a crowded column hid it (>15 tokens)
   await expect(card, `blank-name guard: token card ${tokenCardId} must be on the board`).toBeVisible({ timeout: 30_000 });
   // The card shows "Name:" then the value span (queue-board.page.ts tokenName reads the same element).
   const nameValue = card.locator('.label:text-is("Name:") + span, .label:has-text("Name") + span').first();

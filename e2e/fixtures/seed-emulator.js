@@ -119,6 +119,9 @@ async function runSeed() {
       queueDocId: queueGenRef.id,
     });
     console.log(`   ✓ studio preconditions (pairing[+specialists] + invitation + live assignment + arena) for ${studioCohort.length}`);
+    // 5b. /queue-web chain (participantsproduct Event Mode/ongoing + deliverables→token) for SS-05..SS-08.
+    await seed.seedQueueWebChain(db, admin, testrunid, studioCohort);
+    console.log(`   ✓ /queue-web chain (participantsproduct + deliverables) for ${studioCohort.length}`);
     // 6. SS-07 positive lower-bound: KNOWN non-zero forms count (named DB) for the first participant.
     const { profileid, formCount } = await seed.seedFormsFixture(db, admin, testrunid, studioCohort[0], ref.deliveryFormId, 2);
     console.log(`   ✓ SS-07 forms fixture: ${formCount} formsByClient docs for ${profileid} (firestore-forms)`);

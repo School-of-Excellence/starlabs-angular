@@ -562,10 +562,56 @@ export class BigMiscPage {
    * for each `*matRowDef` data row (the header is `tr.mat-mdc-header-row`, excluded). Scoped to the host
    * so a stray table elsewhere can't match. This is the "metric" for the config tables, which have no
    * headline count label — it is the count the COMPONENT rendered from its stream.
+   *
+   * ⚠ The table's data stream is async (`collectionData`/`collectionSnapshots` behind a
+   * `guard.getRoles()` promise) — on first paint there are 0 rows. A bare `pollCount` would resolve
+   * IMMEDIATELY at 0 (its `>= 0` predicate is trivially true), returning a premature 0 and failing a
+   * `rows >= seededCount` assertion even though rows are about to render (the real cause of BIG-09a).
+   *
+   * ⚠⚠ RACE (the actual BIG-09a failure): a `MatTableDataSource` whose `data` is the INITIAL `[]`
+   * renders the `*matNoDataRow` cell WHILE the stream is still loading — so "0 data rows AND the
+   * no-data marker present" is ALSO the transient pre-first-emit state, not only the settled-empty
+   * state. Returning on the first sighting of the no-data marker therefore yields a premature 0 the
+   * instant before the stream emits its rows (biglevel lost this race; modellevelconfig won it — same
+   * page object, same seed). The DOM snapshot proved the table held the 2 seeded rows at failure time.
+   *
+   * FIX: treat the no-data marker as a trustworthy "settled empty" ONLY when it stays present across
+   * consecutive polls with still-zero data rows (the stream emitted `[]` and STAYED empty), debouncing
+   * the transient initial empty. ≥1 data row is always an immediate settle. This waits out the
+   * load-then-emit race without weakening the count (a genuinely-empty table still settles after the
+   * marker persists). If neither settles within the budget we return the last observed count WITHOUT
+   * throwing, leaving the verdict to the caller's assert.
    */
   private async pollRowCount(host: Locator): Promise<number> {
     // `tr[mat-row]` matches the attribute the template author wrote; `.mat-mdc-row` is Material's emitted
     // class. Use both via a comma-OR so this is robust to either being the queryable handle.
-    return this.pollCount(host.locator('tr[mat-row], tr.mat-mdc-row'), 'table rows');
+    const dataRows = host.locator('tr[mat-row], tr.mat-mdc-row');
+    // The `*matNoDataRow` empty marker shipped on every BIG config table: `td.mat-cell.emptytext`.
+    const noData = host.locator('td.emptytext, tr td.mat-cell.emptytext');
+    // Number of CONSECUTIVE polls the no-data marker must persist (with zero data rows) before we
+    // trust it as a settled-empty verdict — debounces the transient pre-first-emit `[]` render.
+    const NODATA_STABLE_POLLS = 3;
+    let last = 0;
+    let noDataStreak = 0;
+    await expect
+      .poll(
+        async () => {
+          last = await dataRows.count();
+          if (last > 0) return true; // rows rendered — settled immediately
+          // No rows yet. The no-data marker alone is NOT trustworthy on first sight (it shows during
+          // the initial `[]` before the stream emits). Require it to PERSIST across consecutive polls.
+          if ((await noData.count()) > 0) {
+            noDataStreak += 1;
+            return noDataStreak >= NODATA_STABLE_POLLS;
+          }
+          // Marker gone (stream still loading / re-rendering) → reset the streak and keep waiting.
+          noDataStreak = 0;
+          return false;
+        },
+        { message: 'table rows: the data stream never settled (no rows and no stable "No data" marker)', timeout: 20_000 },
+      )
+      .toBe(true)
+      .catch(() => undefined); // a genuinely-empty table with no no-data row → return last (0) below
+    return last;
   }
 }

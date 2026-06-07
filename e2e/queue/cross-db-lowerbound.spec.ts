@@ -218,12 +218,15 @@ test.describe('Cross-DB lower bound — SS-07 live-panel widget shows the EXACT 
         message: 'seeded studio button should render for the acting member',
       })
       .toBeGreaterThan(0);
-    await studio.selectStudio({ studioId: PAIRING_ID });
 
-    // The live panel mounts on the in-studio participant (its name renders once liveAssignment.token
-    // resolved). This is the APP confirming the (default)-DB join succeeded — the forms hydrate runs
-    // off the SAME liveAssignment.token, so a non-zero forms count below isolates the secondary DB.
-    await expect(studio.liveParticipantName).toBeVisible({ timeout: 40_000 });
+    // Race-free open: wait for the studio's live_tv icon (the live-assignment stream populated
+    // mapStudioLiveAssignment) BEFORE selecting, so onStudioSelect reads a non-null liveAssignment and
+    // its token subscription resolves liveAssignment.token (ts:642/697) — otherwise the participant name
+    // (and the forms hydrate, gated by liveAssignment.token at ts:761) never bind. selectStudioWithLivePanel
+    // then clicks and waits for the participant name to render — the APP confirming the (default)-DB join
+    // succeeded, off the SAME liveAssignment.token the forms hydrate uses (so a non-zero forms count below
+    // isolates the secondary DB).
+    await studio.selectStudioWithLivePanel(PAIRING_ID, 40_000);
 
     // --- ASSERT THE APP-COMPUTED CROSS-DB COUNT (the positive lower bound) ---
     // Poll the count the live panel RENDERED for the Forms widget until it reaches the KNOWN seeded
@@ -350,11 +353,34 @@ async function linkTokenIntoLiveSession(profileId: string, tokenId: string, live
   if (!la) throw new Error(`[cross-db] seeded live assignment ${liveAssignmentId} missing — run the seeder for TESTRUNID=${TESTRUNID}`);
 
   const db = defaultDb();
+
+  // SINGLE-OCCUPANT precondition: the live panel binds `liveAssignment = mapStudioLiveAssignment[
+  // selectedStudio.docid]`, and the live-assignment subscription does `map[e.studioid] = e` for EVERY
+  // matching row (dynamic-studio.ts:516-521) — LAST one wins. The forms fixture is seeded for THIS
+  // profileId only, so if another cohort member's live-assignment also maps to PAIRING_ID the panel can
+  // bind to the wrong member and the forms count reads 0 (a false silent-zero). Detach every OTHER seeded
+  // cohort live-assignment from this pairing so EXACTLY this member's LA maps to PAIRING_ID.
+  for (let i = 0; i < 3; i++) {
+    const otherPid = cohortProfileId(i);
+    if (otherPid === profileId) continue;
+    await db
+      .collection(COL_LIVE)
+      .doc(`${TESTRUNID}_la_${otherPid}`)
+      .set({ studioid: `${PAIRING_ID}_detached` }, { merge: true })
+      .catch(() => {});
+  }
+
   await db.collection(COL_TOKEN).doc(tokenId).set(
     {
       currentstage: STUDIO_STAGE,
       previousstage: STUDIO_STAGE,
       status: 'instudio',
+      // dynamic-studio.ts:695 gates the studio token query on stagestatus=="Approved" AND
+      // tokenstatus=="Active"; the base seed leaves stagestatus "Yet to Start", so without these the
+      // token never enters the query and `liveAssignment.token` (ts:698) — the forms hydrate gate
+      // (ts:761) — never resolves, leaving the live panel empty. Part of the in-studio precondition.
+      stagestatus: 'Approved',
+      tokenstatus: 'Active',
       liveassignmentid: liveAssignmentId,
       studioid: PAIRING_ID,
     },

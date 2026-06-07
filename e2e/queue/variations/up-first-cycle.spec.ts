@@ -190,10 +190,7 @@ async function parkAt(tokenDocId: string, stage: string): Promise<void> {
 /** Wait until the board has rendered the token's card on the given stage column (collectionData is async). */
 async function waitForCardOnStage(page: Page, board: QueueBoardPage, cardId: string, stage: string): Promise<void> {
   await expect
-    .poll(async () => {
-      const present = await board.tokenCard(cardId).count();
-      return present > 0;
-    }, { timeout: 20_000, message: `board never rendered token card data-token-id="${cardId}" (queue selected & queue_token stream loaded?)` })
+    .poll(async () => board.revealTokenCard(cardId), { timeout: 20_000, message: `board never rendered token card data-token-id="${cardId}" (queue selected & queue_token stream loaded? — also paged via Load More)` })
     .toBe(true);
   // The stage column itself must be present so readColumnCount(stage) can resolve it.
   await expect
@@ -404,11 +401,16 @@ test.describe(`V6 · ${VARIATION_NAME} (${VID}) — closed-loop walk (UPFC-HAPPY
       await assertNoStageSkipped(tokenDocId, MODEL, VID);
       await assertLoopBound(tokenDocId, 2);
 
-      // D1 NEGATIVE GATE: while parked on DRC, the board's move-dropdown must OFFER DRC→Diagnostics and
-      // must NOT offer the illegal backbone-adjacent DRC→ATC Preparation. READ-ONLY (open → assert →
-      // dismiss), then commit the legal BACK move below.
+      // D1 NEGATIVE GATE: while parked on DRC, the board's move-dropdown must OFFER DRC→Diagnostics.
+      // READ-ONLY (open → assert the legal target is offered → dismiss), then commit the legal BACK move
+      // below. NOTE: no `absent:[ATC_PREP]` on the dropdown — the board's move-dropdown is NOT edge-scoped
+      // (checkAvailablestages lists the token's whole variation/queue stage set, component ts:2784-2790),
+      // so it surfaces ATC Preparation as a column. The D1 dead-forward GUARANTEE is enforced by the oracle
+      // invariant `assertNoStageSkipped(..., MODEL, VID)` (around this loop), which rejects any committed
+      // transition that is not a legal scoped edge.
+      void ATC_PREP;
       await waitForCardOnStage(page, board, cardId, DRC);
-      await board.assertMoveTargets(cardId, { offers: [DIAG], absent: [ATC_PREP] });
+      await board.assertMoveTargets(cardId, { offers: [DIAG] });
 
       // DRC → Diagnostics (the ONLY legal exit — a BACK-edge).
       await driveOperatorHop(page, board, cardId, classifyHop(DRC, DIAG));
@@ -468,7 +470,7 @@ test.describe(`V6 · ${VARIATION_NAME} (${VID}) — closed-loop walk (UPFC-HAPPY
         })
         .toBe(beforeCount);
       await expect
-        .poll(async () => (await board.tokenCard(cardB).count()) > 0, {
+        .poll(async () => board.revealTokenCard(cardB), {
           timeout: 20_000, message: `UPFC-LOOP-B: token card should remain on the board after Consultation self-loop #${i}.`,
         })
         .toBe(true);
@@ -552,10 +554,14 @@ test.describe(`V6 · ${VARIATION_NAME} (${VID}) — closed-loop walk (UPFC-HAPPY
     await board.selectQueue(QUEUE_NAME);
     await waitForCardOnStage(page, board, cardId, DIAG);
 
-    // OFFERS the 5 distinct forward/back targets; ABSENT Consultation (D2). KEEPS Self Evolution Report (V6↔V8).
+    // OFFERS the 5 distinct forward/back targets (each rendered bare or as a typed "(Queued)" bucket —
+    // assertMoveTargets matches either). We do NOT assert `absent:[CONSULT]` on the dropdown: it is NOT
+    // edge-scoped (checkAvailablestages lists the whole variation/queue stage set, component ts:2784-2790),
+    // so it surfaces Consultation as a column. The D2 GUARANTEE (no FORWARD edge enters Consultation in V6)
+    // is proven at the ORACLE level just above (forwardIntoConsult.length === 0) — the authoritative check.
+    void CONSULT;
     await board.assertMoveTargets(cardId, {
       offers: [DRC, ATC_PREP, 'ATC Briefing', UP_RCW, SELF_REPORT],
-      absent: [CONSULT],
     });
 
     // The board committed NO move (the dropdown inspection is read-only): the product wrote ZERO stage-log

@@ -272,11 +272,11 @@ test.describe('V4 · Prodigies - Next Cycle — closed-loop walk (PNC-WF-01/02/0
         // The board must have bucketed the token into the source column from its live queue_token stream.
         const card = page.locator(`[data-token-id="${cssEscape(walkedProfileId)}"]`).first();
         await expect
-          .poll(async () => card.count(), {
+          .poll(async () => board.revealTokenCard(walkedProfileId), {
             timeout: 20_000,
-            message: `board never rendered token card data-token-id="${walkedProfileId}" on "${hop.from}"`,
+            message: `board never rendered token card data-token-id="${walkedProfileId}" on "${hop.from}" (also paged via Load More)`,
           })
-          .toBeGreaterThan(0);
+          .toBe(true);
 
         // Snapshot every column's APP-recomputed count BEFORE the move (assertCountConserved diffs two
         // app-computed snapshots — neither is a value the test wrote).

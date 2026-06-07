@@ -180,26 +180,60 @@ export class BigValidatePage {
   private async selectMarathon(marathonId: string | undefined, marathonTitle: string | undefined, timeout: number): Promise<void> {
     await expect(this.marathonSelect).toBeVisible({ timeout });
     if (marathonId !== undefined) {
-      // Native <select> bound with [ngValue]; Angular serialises a string ngValue so the option's
-      // `value` is often the raw id, but can be Angular's index-prefixed encoding ("1: <id>"). Try a
-      // value match first; if it fails, try an option whose value CONTAINS the id, then give up to the
-      // first-selectable fallback below (so the kanban still mounts rather than leaving none selected).
-      const byValue = await this.marathonSelect.selectOption(marathonId).then(
-        () => true,
-        () => false,
-      );
-      if (byValue) return;
-      const opt = this.marathonSelect.locator(`option[value*="${escapeText(marathonId)}"]`).first();
-      if ((await opt.count()) > 0) {
-        const value = await opt.getAttribute('value');
-        if (value) {
-          await this.marathonSelect.selectOption(value);
-          return;
-        }
-      }
-      // id did not resolve to an option — fall through to title (if given) or first-selectable.
+      // The marathon list is stream-driven (loadMarathons getDocs, ts:231-242): wait until the option
+      // for this id has actually rendered before we try to select it.
+      //
+      // ⚠ The <select> is bound with `[ngValue]="marathon.id"`. Angular's SelectControlValueAccessor
+      // serialises EVERY ngValue with a registration-index prefix — the option's DOM `value` is
+      // `"<index>: <marathon.id>"` (forms.mjs `_buildValueString`), NOT the raw id. So
+      // `selectOption(marathonId)` would match NOTHING and — because the queue emulator config sets no
+      // actionTimeout — Playwright's selectOption would RETRY UNTIL THE 120s TEST TIMEOUT (the real
+      // cause of the BIG-07 "Target page closed" failures). We therefore NEVER call selectOption with
+      // the raw id; we resolve the option's real DOM `value` first (bounded count/getAttribute calls)
+      // and select by THAT value (or fall back to label/index), so a missing option fails fast.
+      const byId = this.marathonSelect.locator(`option[value$=": ${cssAttrValue(marathonId)}"]`).first();
+      const byIdContains = this.marathonSelect.locator(`option[value*="${cssAttrValue(marathonId)}"]`).first();
+      let resolvedValue: string | null = null;
+      await expect
+        .poll(
+          async () => {
+            // Prefer the exact `"<idx>: <id>"` suffix match; fall back to a contains-match (covers any
+            // Angular encoding variant). Read the real `value` attribute and select by it.
+            for (const opt of [byId, byIdContains]) {
+              if ((await opt.count()) > 0) {
+                const v = await opt.getAttribute('value');
+                if (v) {
+                  resolvedValue = v;
+                  return true;
+                }
+              }
+            }
+            return false;
+          },
+          {
+            timeout,
+            message:
+              `validate marathon option for id "${marathonId}" never rendered (is the marathon seeded? ` +
+              `the <select> uses [ngValue], so its option value is "<index>: ${marathonId}").`,
+          },
+        )
+        .toBe(true);
+      await this.marathonSelect.selectOption(resolvedValue!);
+      return;
     }
     if (marathonTitle !== undefined) {
+      // Resolve the matching option's value by its visible text BEFORE selecting, so a non-matching
+      // label fails fast (selectOption({ label }) would otherwise retry to the test timeout — see above).
+      const opt = this.marathonSelect.locator('option', { hasText: marathonTitle }).first();
+      await expect(
+        opt,
+        `validate marathon option with title "${marathonTitle}" never rendered`,
+      ).toBeAttached({ timeout });
+      const value = await opt.getAttribute('value');
+      if (value) {
+        await this.marathonSelect.selectOption(value);
+        return;
+      }
       await this.marathonSelect.selectOption({ label: marathonTitle });
       return;
     }
@@ -485,4 +519,9 @@ export class BigValidatePage {
 /** Escape double-quotes for use inside a Playwright :has-text("…") string. */
 function escapeText(s: string): string {
   return s.replace(/"/g, '\\"');
+}
+
+/** Escape a value for use inside a double-quoted CSS attribute selector (e.g. `[value$="…"]`). */
+function cssAttrValue(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
