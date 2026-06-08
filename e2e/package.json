@@ -14,7 +14,12 @@
     "test:emu": "TARGET=emulator playwright test --config=playwright.queue.emulator.config.ts",
     "test:cloud": "TARGET=cloud playwright test --config=playwright.queue.config.ts",
     "seed:cloud": "TEST_PROJECT=slabs-queue-e2e-exdcz node fixtures/seed-test-project.js --seed",
-    "report:cloud": "TARGET=cloud EVIDENCE=1 bash scripts/run-isolated.sh"
+
+    "report": "npm run report:cloud",
+    "report:cloud": "TARGET=cloud EVIDENCE=1 bash scripts/run-isolated.sh",
+    "report:emulator": "TARGET=emulator EVIDENCE=1 EMU_REUSE=1 EMU_REUSE_APP=1 bash scripts/run-isolated.sh",
+    "report:cloud:full": "TARGET=cloud EVIDENCE=1 TRACE=full bash scripts/run-isolated.sh",
+    "report:emulator:full": "TARGET=emulator EVIDENCE=1 TRACE=full EMU_REUSE=1 EMU_REUSE_APP=1 bash scripts/run-isolated.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

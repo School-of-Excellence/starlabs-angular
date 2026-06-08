@@ -36,6 +36,13 @@
 #   EMU_REUSE=1 EMU_REUSE_APP=1 bash scripts/run-isolated.sh
 #   ONLY='queue/studio-core.spec.ts queue/studio-session.spec.ts' bash scripts/run-isolated.sh   # subset
 #   TARGET=cloud EVIDENCE=1 bash scripts/run-isolated.sh          # disposable cloud project + screenshots
+#
+# Two paths × three evidence levels (the npm scripts wrap these):
+#   PATH:  TARGET=emulator (quick, hermetic)  |  TARGET=cloud (actual Firestore + CFs — the "proof" path)
+#   LEVEL: A lean      EVIDENCE=0             screenshot only-on-failure, no merged report  → test:emu / test:cloud
+#          B receipts  EVIDENCE=1 (DEFAULT)   screenshot EVERY test + on-first-retry trace  → report:emulator / report:cloud
+#          C full      EVIDENCE=1 TRACE=full  screenshot EVERY test + FULL trace per test    → report:*:full
+#   (B is the default report level — a shot per test, no per-action trace tax; C adds full traces: slower + large.)
 # Env knobs (resilience, emulator target only):
 #   EMU_AUTORESTART=0   disable the health-check/restart (fail fast if the emulator is down).
 #   EMU_READY_TIMEOUT   seconds to wait for a restarted emulator to report ready (default 200).
@@ -43,6 +50,9 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2   # -> e2e
 export TESTRUNID="${TESTRUNID:-run1}"
+# Seed-OOM guard: globalSetup's teardown+seed subprocess (66 Auth users + hundreds of docs via
+# firebase-admin) gets SIGKILL'd under the default Node heap on heavier files. Give children 4GB.
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
 
 # Target selection: emulator (default, CI) or the disposable CLOUD project slabs-queue-e2e-exdcz.
 # Cloud uses the real Firestore + deployed Cloud Functions; EMU_REUSE* are emulator-only and must be
@@ -63,8 +73,22 @@ if [ "${TARGET:-emulator}" = "cloud" ]; then
 else
   IS_EMULATOR=1
   export EMU_REUSE="${EMU_REUSE:-1}" EMU_REUSE_APP="${EMU_REUSE_APP:-1}"
-  CONFIG="${CONFIG:-playwright.queue.emulator.config.ts}"
+  if [ "${EVIDENCE:-0}" = "1" ]; then
+    CONFIG="${CONFIG:-playwright.queue.emulator.evidence.config.ts}"
+  else
+    CONFIG="${CONFIG:-playwright.queue.emulator.config.ts}"
+  fi
+  echo "[run-isolated] TARGET=emulator  CONFIG=$CONFIG  TESTRUNID=$TESTRUNID  EVIDENCE=${EVIDENCE:-0}"
 fi
+
+# Evidence mode (EVIDENCE=1): each spec file emits a per-file Playwright BLOB report — which embeds a
+# screenshot + trace for EVERY test (the *.evidence config sets use.screenshot:'on'/trace:'on') — and
+# after the loop they merge into ONE browsable playwright-report. run-isolated runs each file as its own
+# invocation, so a plain html reporter would OVERWRITE per file; blob+merge is the only way to get a
+# single complete report. Lean runs (EVIDENCE=0) keep the fast line reporter + only-on-failure shots.
+EVIDENCE="${EVIDENCE:-0}"
+BLOBS_DIR="${BLOBS_DIR:-.report-blobs}"
+if [ "$EVIDENCE" = "1" ]; then rm -rf "$BLOBS_DIR" blob-report playwright-report; mkdir -p "$BLOBS_DIR"; fi
 
 FIREBASE_PROJECT="${FIREBASE_PROJECT:-demo-slabs-queue}"
 DEPLOY_SCRIPT="scripts/deploy-cf-emulator.sh"
@@ -190,8 +214,17 @@ fi
 
 # ──────────────── run one spec file (sets globals: p / fl / sk) ────────────────
 run_file() {
-  local f="$1" out
-  out="$(npx playwright test --config="$CONFIG" "$f" --reporter=line 2>&1)"
+  local f="$1" out base z
+  if [ "$EVIDENCE" = "1" ]; then
+    # blob = the evidence artifact (a screenshot + trace for every test); line = the tally we parse below.
+    rm -rf blob-report
+    out="$(npx playwright test --config="$CONFIG" "$f" --reporter=blob,line 2>&1)"
+    base="$(echo "$f" | tr '/' '_')"
+    if [ -f blob-report/report.zip ]; then mv blob-report/report.zip "$BLOBS_DIR/$base.zip"
+    else z="$(ls blob-report/*.zip 2>/dev/null | head -1)"; [ -n "$z" ] && mv "$z" "$BLOBS_DIR/$base.zip"; fi
+  else
+    out="$(npx playwright test --config="$CONFIG" "$f" --reporter=line 2>&1)"
+  fi
   echo "$out" | grep -E "[0-9]+ (passed|failed|skipped)|Error:" | tail -4
   p="$(printf '%s' "$out"  | grep -oE '[0-9]+ passed'  | grep -oE '[0-9]+' | tail -1)"; p="${p:-0}"
   fl="$(printf '%s' "$out" | grep -oE '[0-9]+ failed'  | grep -oE '[0-9]+' | tail -1)"; fl="${fl:-0}"
@@ -233,4 +266,13 @@ echo "  tests: ${total_pass} passed · ${total_fail} failed · ${total_skip} ski
 echo "  spec files with >=1 failure: ${bad_files}"
 [ "$IS_EMULATOR" = "1" ] && echo "  emulator restarts: ${restarts} · files retried after a crash: ${retried}"
 [ -n "$report" ] && printf '%s\n' "$report"
+
+# Evidence mode: merge the per-file blob reports into ONE browsable report (screenshot + trace per test).
+if [ "$EVIDENCE" = "1" ]; then
+  shards="$(ls "$BLOBS_DIR"/*.zip 2>/dev/null | wc -l | tr -d ' ')"
+  echo ""
+  echo "  merging ${shards} blob report(s) → playwright-report (a screenshot + trace for EVERY test) ..."
+  npx playwright merge-reports --reporter=html "$BLOBS_DIR" 2>&1 | tail -2
+  echo "  📸 evidence report → e2e/playwright-report/index.html   (open: npx playwright show-report)"
+fi
 exit "$bad_files"
