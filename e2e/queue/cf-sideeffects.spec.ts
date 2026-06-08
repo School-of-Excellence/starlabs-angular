@@ -100,18 +100,17 @@ test.describe('CF side-effects after a stage move (deployed triggers)', () => {
   // ===========================================================================================
   // CF-01 (P2 #11) — onQueueStageChange touchpoint + the board's stage-log row, via a REAL UI move.
   //
-  // FIXME (PRODUCT/CF-RUNTIME bug, not a test defect): the REAL board move + stage-log row (parts a/b)
-  // are correct, but onQueueStageChange's touchpoint write CRASHES in the emulator runtime. The functions
-  // log shows, for EVERY queue_token write: `Touch Point Error - Stage Moved TypeError: Cannot read
-  // properties of undefined (reading 'serverTimestamp')` — i.e. `admin.firestore.FieldValue` is undefined
-  // inside service.js `updateParticipantTouchPoint` (queuesystem.js:342 → service.js:944). This is a
-  // SYSTEMIC failure (~1524 such errors in one run) affecting every CF touchpoint write (Queue Token
-  // Created / Queue Completed / Queue Stage Moved). So NO `participant touchpoint` doc is ever written and
-  // the read-back at the bottom of this test cannot pass. The bug is in the deployed CF code/runtime
-  // (firebase-admin FieldValue namespace), NOT in this spec's wiring — massaging it green would assert a
-  // value the product never produced. See productFindings; tracked for a CF-side fix (admin import / SDK
-  // version in the emulator codebase, outside this category's owned files).
-  test.fixme('CF-01 a real board move fires onQueueStageChange → "Queue Stage Moved" touchpoint + a logged operator move', async ({ page }) => {
+  // CLOUD UPDATE (the emulator FieldValue-crash artifact no longer applies): on real cloud Firestore +
+  // deployed CFs, onQueueStageChange's touchpoint write SUCCEEDS — the move fires a "Queue Stage Moved"
+  // `participant touchpoint` with `label == "Moved to '<currentstage>' in <queuename>"` (queuesystem.js:339,
+  // service.js:942). The emulator-only `FieldValue undefined` crash described in earlier runs is gone, so
+  // this test asserts the CF's real output and stays a `test` (not fixme). The ONLY wiring subtlety the
+  // cloud surfaced: `participant touchpoint` carries no `testrunid` and is NOT in the seeder teardown set,
+  // and the token ids are deterministic (TESTRUNID='run1'), so "Queue Stage Moved" touchpoints from PRIOR
+  // runs persist with this same parentreference. The read-back therefore fences off the pre-move docset
+  // (touchpointsBefore) and accepts ONLY a NEW doc — the one the CF wrote for THIS move — so a stale
+  // earlier-run touchpoint (e.g. a previous "Moved to 'Diagnostics'") cannot masquerade as this move's.
+  test('CF-01 a real board move fires onQueueStageChange → "Queue Stage Moved" touchpoint + a logged operator move', async ({ page }) => {
     test.setTimeout(180_000);
 
     // --- PRECONDITION (stand-in, not asserted): reposition ONE LYL-FC token to the Review stage so the
@@ -136,6 +135,13 @@ test.describe('CF side-effects after a stage move (deployed triggers)', () => {
     const countsBefore = await board.readAllColumnCounts();
     const srcKey = resolveStageKey(countsBefore, MOVE_FROM);
     const dstKey = resolveStageKey(countsBefore, MOVE_TO);
+
+    // Snapshot the "Queue Stage Moved" touchpoints that ALREADY exist for this token BEFORE the move, so
+    // the post-move read-back (c) can demand a NEW doc. `participant touchpoint` carries no testrunid tag
+    // and is not torn down (seed-test-project.js), and token ids are deterministic (run1_…) — so stale
+    // touchpoints from earlier runs persist with this same parentreference; fencing them off keeps the
+    // assertion on the doc THIS move produced (anti-circularity preserved — the label is still the CF's).
+    const touchpointsBefore = await touchpointIdsFor(tokenId, 'Queue Stage Moved');
 
     // REAL move (real testid locator → real click → real confirm dialog). The PRODUCT writes the
     // queue_token update + the `queue stage log` row; the CF reacts. We do NOT read back what we wrote.
@@ -167,8 +173,10 @@ test.describe('CF side-effects after a stage move (deployed triggers)', () => {
 
     // (c) CF §1 read-back: onQueueStageChange wrote a NEW `participant touchpoint` for this move.
     //     Robust query is by parentreference == /queue_token/{T} (cf.md §1 GOTCHA: the CF's `profileid`
-    //     field is undefined because the seed token has `profile_id`, not `profileid`).
-    const moved = await pollUntilTouchpoint(tokenId, 'Queue Stage Moved');
+    //     field is undefined because the seed token has `profile_id`, not `profileid`). We require a doc
+    //     NOT seen before the move (touchpointsBefore) so a stale, un-torn-down touchpoint from an earlier
+    //     run cannot satisfy it — the one the CF wrote for THIS move is the only acceptable hit.
+    const moved = await pollUntilTouchpoint(tokenId, 'Queue Stage Moved', touchpointsBefore);
     expect(moved, 'onQueueStageChange wrote no "Queue Stage Moved" participant touchpoint for the moved token').toBeTruthy();
     // The label the CF computed embeds the stage the APP moved the token to + the queue name.
     expect(String(moved.label || '')).toContain(`Moved to '${MOVE_TO}'`);
@@ -192,7 +200,7 @@ test.describe('CF side-effects after a stage move (deployed triggers)', () => {
   // deployed-CF/emulator-runtime gap, NOT this spec's wiring. The trigger doc IS created with a random id
   // (participant-sim.advance → .doc().id), so a re-run is not the cause. See productFindings; tracked for
   // a CF/emulator-side fix outside this category's owned files.
-  test.fixme('CF-02 a stage-log create at an Activity stage fires queueParticipantPositionUpdate → ready tokens recompute to 1..M', async ({ page: _page }) => {
+  test('CF-02 a stage-log create at an Activity stage fires queueParticipantPositionUpdate → ready tokens recompute to 1..M', async ({ page: _page }) => {
     test.setTimeout(180_000);
 
     // --- PRECONDITION 1: patch the queue stageproperty so the position CF gate fires ONLY at the
@@ -290,15 +298,46 @@ function refPath(ref: any): string | null {
   return null;
 }
 
-/** Poll `participant touchpoint` for a doc the CF wrote for THIS token (matched by parentreference path,
- *  robust to the undefined `profileid` field — cf.md §1 GOTCHA). Returns the doc data or null on timeout. */
-async function pollUntilTouchpoint(tokenId: string, touchpoint: string): Promise<any | null> {
+/** Firestore serverTimestamp → millis (the CF writes touchpoint.logdate via FieldValue.serverTimestamp,
+ *  service.js:944; Admin reads it back as a Timestamp). 0 when absent so a pending write sinks last. */
+function tsMillis(t: any): number {
+  if (!t) return 0;
+  if (typeof t.toMillis === 'function') return t.toMillis();
+  if (typeof t._seconds === 'number') return t._seconds * 1000 + (t._nanoseconds || 0) / 1e6;
+  if (typeof t.seconds === 'number') return t.seconds * 1000 + (t.nanoseconds || 0) / 1e6;
+  return 0;
+}
+
+/** Snapshot the docids of every `participant touchpoint` the CF has ALREADY written for THIS token under
+ *  the given touchpoint type (matched by parentreference path — robust to the undefined `profileid` field,
+ *  cf.md §1 GOTCHA). Used to fence off pre-existing docs so the post-move poll only accepts a NEW one.
+ *  WHY this is needed: `participant touchpoint` is written by the CF WITHOUT a `testrunid` tag and is NOT
+ *  in the seeder's teardown set (seed-test-project.js SEEDED_COLLECTIONS), so touchpoints from earlier runs
+ *  PERSIST. The token ids are deterministic (TESTRUNID='run1' → `run1_tok_…`), so a prior run that moved
+ *  THIS token to a different stage leaves a stale "Queue Stage Moved" doc with the same parentreference.
+ *  Matching by parentreference alone would then return the stale doc (Firestore order is arbitrary) and its
+ *  label embeds the OLD stage — the observed failure ("Moved to 'Diagnostics'" vs the just-moved-to stage). */
+async function touchpointIdsFor(tokenId: string, touchpoint: string): Promise<Set<string>> {
+  const wantPath = `queue_token/${tokenId}`;
+  const snap = await adb().collection('participant touchpoint').where('touchpoint', '==', touchpoint).get();
+  return new Set(snap.docs.filter((d: any) => refPath(d.data().parentreference) === wantPath).map((d: any) => d.id));
+}
+
+/** Poll `participant touchpoint` for the doc the CF wrote for THIS move (matched by parentreference path,
+ *  robust to the undefined `profileid` field — cf.md §1 GOTCHA). `excludeIds` fences off touchpoints that
+ *  already existed BEFORE the move (see touchpointIdsFor) so we accept ONLY a NEW doc the CF wrote in
+ *  reaction to this move — never a stale, un-torn-down doc from an earlier run. When several NEW docs land
+ *  (a token can re-fire the CF), the newest by `logdate` wins. Returns the doc data or null on timeout. */
+async function pollUntilTouchpoint(tokenId: string, touchpoint: string, excludeIds: Set<string> = new Set()): Promise<any | null> {
   const wantPath = `queue_token/${tokenId}`;
   const deadline = Date.now() + CF_POLL.timeout;
   for (;;) {
     const snap = await adb().collection('participant touchpoint').where('touchpoint', '==', touchpoint).get();
-    const hit = snap.docs.map((d: any) => d.data()).find((x: any) => refPath(x.parentreference) === wantPath);
-    if (hit) return hit;
+    const fresh = snap.docs
+      .filter((d: any) => !excludeIds.has(d.id) && refPath(d.data().parentreference) === wantPath)
+      .map((d: any) => d.data())
+      .sort((a: any, b: any) => tsMillis(b.logdate) - tsMillis(a.logdate)); // newest first
+    if (fresh.length) return fresh[0];
     if (Date.now() >= deadline) return null;
     await new Promise((r) => setTimeout(r, 800));
   }

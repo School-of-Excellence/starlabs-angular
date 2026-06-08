@@ -554,6 +554,21 @@ test.describe('V4 · Prodigies - Next Cycle — closed-loop walk + every forward
         })
         .toBeGreaterThanOrEqual(dstBefore + 1);
     }
+
+    // SETTLE: the board commits the move (queue_token update + `queue stage log` set) ASYNCHRONOUSLY —
+    // its `afterClosed()` confirm resolves and the column count above re-renders from the live stream
+    // BEFORE the writeBatch is guaranteed visible to a fresh admin read (Firestore eventual consistency /
+    // stream-vs-direct-read lag; pronounced on cloud while indexes settle). Do NOT return until the
+    // PRODUCT's own `currentstage` reflects this move, so the caller's immediate post-hop `isAt(...)` (a
+    // strong admin read) asserts the same real value without racing the commit. This polls a value the
+    // APP wrote (token.currentstage) — never one the test wrote — matching the SHARED CONVENTION of
+    // expect.poll for live-Firestore reads (e.g. lyl-next-cycle.spec.ts post-board-move currentstage poll).
+    await expect
+      .poll(async () => sim.currentStage(tokenId), {
+        timeout: 20_000,
+        message: `real-board move committed (board re-rendered "${to}") but queue_token ${tokenId}.currentstage never settled to "${to}"`,
+      })
+      .toBe(to);
   }
 
   /** The board's current rendered count for a stage NAME (sum across its columns), or 0 if absent. */

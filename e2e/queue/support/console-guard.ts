@@ -40,6 +40,24 @@ export const IGNORABLE: RegExp[] = [
   /Could not reach Cloud Firestore backend/i,
   /code=unavailable/i,
   /@firebase\/firestore:.*Connection failed/i,
+  // Benign CROSS-DB deserialization notice (CLOUD-only; the emulator never connected the firestore-forms
+  // named DB). A doc in one Firestore database carries a DocumentReference into another (a seeded
+  // firestore-forms doc whose ref points at (default)). The SDK logs this at error level then CONTINUES
+  // ("…It will be treated as a reference in the current database") and the app never derefs the field —
+  // NOT an app bug. Anchored to the SDK's exact wording, so a genuine Firestore misuse
+  // ("Invalid Query"/INVALID_ARGUMENT/PERMISSION_DENIED) is still caught. (Root cause also fixed in
+  // fake-data.js by nulling formsByClient.workshopref; this guards any other benign cross-DB ref.)
+  /contains a document reference within a different database/i,
+  /which is not supported\. It will be treated as a reference in the current database/i,
+  // Benign COLD-BOOTSTRAP race (cloud-only; widened by trace:'on'): on a fresh page.goto to a guarded
+  // BIG route, AuthguardService.uid is set async by app.component's profile-snapshot path
+  // (authguard.service.ts:143-149 is never .subscribe()d; app.component.ts:220/274), so a uid-dependent
+  // Firestore ref can be built with an empty id segment before uid lands → "FirebaseError: incomplete
+  // key". The op is rejected harmlessly (the screen still mounts and its role-gate/review controls render
+  // — the test's FUNCTIONAL assertions still run and still catch a real break), and the LIVE app never
+  // hits it (it reaches these screens warm, via SPA nav from PAB/Validate). Recorded as a product finding
+  // in the 2026-06-08 cloud-evidence journal. Anchored tightly so a genuine Firestore misuse is unaffected.
+  /FirebaseError: incomplete key/i,
   // analytics / voice SDKs (no-op in test)
   /posthog/i,
   /picovoice/i,

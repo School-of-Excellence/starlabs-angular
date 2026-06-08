@@ -451,22 +451,41 @@ test.describe(`V1 · ${VARIATION_NAME} (${VID}) — closed-loop walk (LYL-FC-WF-
     const board = new QueueBoardPage(page);
     await board.selectQueue(QUEUE_NAME);
 
-    // Drive the "Send Back" self-loop TWICE through the REAL board. Each loop is a src==dst move, so the
-    // board's column count is unchanged (a token leaves and re-enters the same Queued column); we assert
-    // the board still renders the card on the SAME stage after each loop (APP-computed), and the product
-    // logged a Scope Enhancement → Scope Enhancement row each time.
+    // The board total for a SPLIT studio stage = Σ of its (Queued)+(Waiting)+(Activity) sub-column counts
+    // (Scope Enhancement is a compulsoryactivity stage → 3 sub-columns; component ts:1944-1985). The
+    // "Send Back" self-loop is a same-STAGE move whose target the real board can only offer as a SIBLING
+    // sub-column bucket: the token sits in (Queued), and checkAvailablestages EXCLUDES the token's own
+    // (stage,type) sub-column (component ts:2803), so the only "Scope Enhancement" target the dropdown
+    // renders is the (Waiting)/(Activity) bucket. Committing it re-buckets the token onto the SAME bare
+    // stage with status:'ready' (moveTokenToStage parses the suffix → status by dropType, ts:2953/1964),
+    // i.e. it leaves (Queued) and re-enters (Waiting). The per-(Queued)-column count therefore does NOT
+    // net back — the CONSERVED quantity is the STAGE TOTAL across all sub-columns. Read it APP-computed
+    // (the board's re-rendered sub-column counts), never a value the test wrote.
+    const readStageTotal = async (): Promise<number> => {
+      const keys = await board.stageKeysForName(LOOP_STAGE);
+      const all = await board.readAllColumnCounts();
+      return keys.reduce((sum, k) => sum + Number(all[k] || 0), 0);
+    };
+
+    // Drive the "Send Back" self-loop TWICE through the REAL board. Each loop is a src==dst (same-stage)
+    // move, so the board's STAGE TOTAL (Σ sub-columns) is unchanged (a token leaves one sub-column and
+    // re-enters a sibling sub-column of the SAME stage); we assert the stage total nets to the same value
+    // (APP-computed) and the product logged a Scope Enhancement → Scope Enhancement row each time.
     for (let i = 1; i <= 2; i++) {
       await waitForCardOnStage(page, board, cardId, LOOP_STAGE);
-      const beforeCount = await board.readColumnCount(LOOP_STAGE);
-      // The self-loop target carries data-stage-name == the stage's own name (the "Send Back" button).
+      const beforeTotal = await readStageTotal();
+      // The self-loop target carries data-stage-name == the stage's own name (the "Send Back" button);
+      // the board offers it as a sibling (Waiting)/(Activity) sub-column bucket (the token's own (Queued)
+      // bucket is excluded), which moveToken resolves to.
       await board.moveToken(cardId, LOOP_STAGE);
-      // The card returns to the same stage; column count nets to the same value (token left+re-entered).
+      // The card stays on the same STAGE; the stage total (Σ sub-columns) nets to the same value
+      // (the token left one sub-column and re-entered a sibling sub-column of the same stage).
       await expect
-        .poll(async () => (await board.readColumnCount(LOOP_STAGE)), {
+        .poll(readStageTotal, {
           timeout: 20_000,
-          message: `WF-02: after self-loop #${i} the board should still show the token on "${LOOP_STAGE}".`,
+          message: `WF-02: after self-loop #${i} the board should still show the token on "${LOOP_STAGE}" (stage total across sub-columns conserved).`,
         })
-        .toBe(beforeCount);
+        .toBe(beforeTotal);
       await expect
         .poll(async () => board.revealTokenCard(cardId), {
           timeout: 20_000, message: `WF-02: token card should remain on the board after self-loop #${i}.`,

@@ -150,6 +150,19 @@ const PAIRING_ID = `${RUN}_pair_0`;
 const STUDIO_MEMBER = `${RUN}_profile_0`;          // profile_id == card data-token-id; a pairing.participant
 const STUDIO_TOKEN_ID = `${RUN}_tok_${STUDIO_MEMBER}`;
 const STUDIO_LIVE_ASSIGNMENT_ID = `${RUN}_la_${STUDIO_MEMBER}`;
+/**
+ * The BIGNC variation's PREFIXED doc id (`${RUN}_${VID}`) — the form the studio surface keys on.
+ * VID is the RAW config id (it drives the flow-model oracle, which expects raw ids), but the
+ * `queue variation` DOCS are seeded as `${testrunid}_${rawId}` (seed-test-project.js:453) and the
+ * studio reads `queueVariation[doc.id]` (dynamic-studio.component.ts:383) + gates the move-next button
+ * on `queueVariation[token.variationid] && config.variations.includes(token.variationid)` (html:527,
+ * where config.variations are the PREFIXED nextstage ids remapStagePropertyVariations:290 writes).
+ * So the IN-STUDIO token must carry the PREFIXED variationid for the move-next button to render —
+ * mirrors studio-session.spec.ts's `DIAGNOSTICS_VARIATION = ${RUN}_<raw>`. (The OPERATOR board moves
+ * via columns and does NOT read nextstage.variations (seeder:279), so the operator-path `parkToken`
+ * keeps the RAW VID — only the studio link needs the prefixed form.)
+ */
+const STUDIO_VARIATION_ID = `${RUN}_${VID}`;
 
 /** Scoped operator FORWARD targets (excludes self-loop / back edges) from `stage` for BIGNC. */
 function forwardOperatorTargets(stage: string): string[] {
@@ -218,9 +231,23 @@ async function linkTokenIntoLiveSession(tokenDocId: string): Promise<void> {
       currentstage: S.diagnostics,
       previousstage: S.diagnostics,
       status: 'instudio',
+      // The studio token subscription (dynamic-studio.component.ts:695) gates on
+      // `stagestatus=="Approved" AND tokenstatus=="Active"` (with currentstage IN the studio's eligible
+      // stages) before `liveAssignment.token` can resolve and the live participant-name <h3> hydrate.
+      // The MAIN seeder creates this cohort token with `stagestatus:'Yet to Start'`
+      // (seed-test-project.js seedParticipantToken:554), so without upgrading it here the token never
+      // matches the subscription, `liveAssignment.token` stays undefined, the <h3> renders EMPTY, and
+      // `selectStudioWithLivePanel`'s name-visible wait times out (studio.page.ts:229). Set BOTH as part
+      // of the §3a in-studio precondition link — exactly as studio-session.spec.ts:166-167 does. This is
+      // precondition wiring only; the spec still asserts the PRODUCT's close output (stage-log + LA flip).
+      stagestatus: 'Approved',
+      tokenstatus: 'Active',
       liveassignmentid: STUDIO_LIVE_ASSIGNMENT_ID,
       studioid: PAIRING_ID,
-      variationid: VID,
+      // PREFIXED variationid (not the raw VID): the studio move-next button (BIGNC-04 step) renders only
+      // when `queueVariation[token.variationid]` (keyed by the prefixed doc id) exists AND the prefixed
+      // nextstage config.variations include it (dynamic-studio.html:527). See STUDIO_VARIATION_ID above.
+      variationid: STUDIO_VARIATION_ID,
     },
     { merge: true },
   );
@@ -469,9 +496,17 @@ test.describe(`V3 · ${VARIATION_NAME} — closed-loop walk (BIGNC-00 … 06)`, 
     // PRECONDITION: ensure the live session is wired (re-runnable / order-independent).
     await linkTokenIntoLiveSession(tokenDocId);
 
-    // The legal forward studio exit from Diagnostics for BIGNC (a scoped operator edge the move-next
-    // button renders). Diagnostics→ATC Briefing is the spine choice; assert it is legal first.
-    const nextStage = S.atcBriefing;
+    // The legal forward studio exit from Diagnostics for BIGNC (a scoped edge the move-next button
+    // renders). We use Diagnostics→Diagnostics Readiness Changework: it is a legal scoped FORWARD edge
+    // for BIGNC AND its nextstage config has `markascompleted:false` (sample-queue-config.json), so
+    // moveStage opens the StageIncompleteConfirmation dialog (ts:1274) the page object's moveNext drives
+    // (fills the required reason + Submit). The Diagnostics→ATC Briefing/Consultation edges carry
+    // `markascompleted:true`, which routes moveStage down the REVIEW branch (inviteMore + HoldAlert
+    // dialogs, ts:1353-1406) that the studio page object does not script — so the close would never write.
+    // This mirrors studio-session.spec.ts SS-12, which closes the same studio via the same markascompleted
+    // :false DRC edge. (DRC is "dead-FORWARD" only on its OUT-edges — D1; the Diagnostics→DRC IN-edge is a
+    // valid forward studio exit, confirmed by the oracle.)
+    const nextStage = S.drc;
     expect(isLegalEdge(S.diagnostics, nextStage), `Diagnostics → ${nextStage} must be a legal scoped edge for ${VARIATION_NAME}`).toBe(true);
 
     // KNOWN baselines BEFORE the real move.
@@ -490,10 +525,16 @@ test.describe(`V3 · ${VARIATION_NAME} — closed-loop walk (BIGNC-00 … 06)`, 
         message: 'the seeded studio button must render for the acting member',
       })
       .toBeGreaterThan(0);
-    await studio.selectStudio({ studioId: PAIRING_ID });
+    // Race-free open: wait for the studio's live_tv icon (the `live assignment` stream populated
+    // mapStudioLiveAssignment) BEFORE selecting, so onStudioSelect (dynamic-studio.ts:642) reads a
+    // non-null liveAssignment and its token subscription resolves liveAssignment.token (ts:697) — a bare
+    // selectStudio races the stream and leaves the participant-name <h3> empty (selected-before-the-stream;
+    // StudioPage.waitForLiveTv). Mirrors studio-session.spec.ts openStudioAsMember + asserts the same name.
+    await studio.selectStudioWithLivePanel(PAIRING_ID, 30_000);
     await expect(studio.liveParticipantName, 'the live participant panel must mount for the in-studio token').toBeVisible({ timeout: 30_000 });
 
-    // REAL action: click the move-next button for the legal next stage (Diagnostics → ATC Briefing).
+    // REAL action: click the move-next button for the legal next stage (Diagnostics → DRC, markascompleted
+    // :false → StageIncompleteConfirmation path, which moveNext fills+submits).
     await studio.moveNext(nextStage);
 
     // APP/CF OUTPUT — exactly ONE new stage-log row, carrying the studio provenance the PRODUCT writes.

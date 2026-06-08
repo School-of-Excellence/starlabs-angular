@@ -160,7 +160,10 @@ export class StudioPage {
    */
   async selectStudio(i: StudioSelector): Promise<void> {
     const btn = this.studioButtonAt(i);
-    await btn.scrollIntoViewIfNeeded();
+    // No explicit one-shot scrollIntoViewIfNeeded(): on cloud the chunked `queue studio pairing`
+    // collectionData stream rebuilds the studioList and can detach the button mid-select ("Element is
+    // not attached to the DOM"). locator.click() auto-scrolls, auto-waits for actionability, and
+    // re-resolves the locator on detach — so the explicit scroll was the sole fragile step.
     await btn.click();
     // onStudioSelect flips the class to 'primarystudio' for the selected studio (html:47).
     await expect(btn).toHaveClass(/primarystudio/, { timeout: 20_000 });

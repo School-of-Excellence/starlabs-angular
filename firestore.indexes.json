@@ -1,5 +1,5 @@
 {
-  "//": "Composite indexes the Tier-A happy paths need in the emulator. Discovered via read-only probes (e.g. appointments attended+starttime hit FAILED_PRECONDITION). EMULATOR/test use; production indexes are managed separately.",
+  "//": "Composite indexes the Queue Manager e2e queries need on the cloud test project slabs-queue-e2e-exdcz (and the emulator with --import). Each was ground-truth-verified by a read-only Admin-SDK probe that captured Firestore's exact create_composite token; see the 2026-06-08 cloud-evidence journal. EMULATOR/test use; production indexes are managed separately.",
   "indexes": [
     {
       "collectionGroup": "queue_token",
@@ -10,7 +10,6 @@
       ]
     },
     {
-      "//": "Backs bulkReadyInvitation (queuesystem.js:2611): where queueref== + currentstage== + orderBy logdate. Without it the CF throws FAILED_PRECONDITION and the studioinvitation fan-out aborts (OP-09b sees 0 invites).",
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
@@ -20,7 +19,6 @@
       ]
     },
     {
-      "//": "Backs queueParticipantPositionUpdate (queuesystem.js:1677/1716): where queueref== + currentstage== + tokenstatus== + orderBy logdate asc. Without it the CF throws FAILED_PRECONDITION and positions never recompute (CF-02 sees seeded [900,901,902] unchanged).",
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
@@ -28,6 +26,24 @@
         { "fieldPath": "currentstage", "order": "ASCENDING" },
         { "fieldPath": "tokenstatus", "order": "ASCENDING" },
         { "fieldPath": "logdate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue_token",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "tokenstatus", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue_token",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "testrunid", "order": "ASCENDING" },
+        { "fieldPath": "queueposition", "order": "ASCENDING" }
       ]
     },
     {
@@ -64,11 +80,114 @@
       ]
     },
     {
+      "collectionGroup": "queue stage log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue stage log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "currentstage", "order": "ASCENDING" },
+        { "fieldPath": "profile_id", "order": "ASCENDING" },
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "participantjourneyproduct",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "profileid", "order": "ASCENDING" },
         { "fieldPath": "subscriptionstart", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studioinvitation",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "specialistpairing", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "studioid", "order": "ASCENDING" },
+        { "fieldPath": "expirydate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studioinvitation",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tokenref", "order": "ASCENDING" },
+        { "fieldPath": "expirydate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studioinvitation",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientresponse", "order": "ASCENDING" },
+        { "fieldPath": "profileid", "order": "ASCENDING" },
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "expirydate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue studio pairing",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "created", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studio checkin log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "logparticipant", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue stage log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "docid", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue activity log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueid", "order": "ASCENDING" },
+        { "fieldPath": "activitydate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "queue activity log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueid", "order": "ASCENDING" },
+        { "fieldPath": "activitydate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studio activity log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueid", "order": "ASCENDING" },
+        { "fieldPath": "created", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studio activity log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueid", "order": "ASCENDING" },
+        { "fieldPath": "activitydate", "order": "DESCENDING" }
       ]
     }
   ],

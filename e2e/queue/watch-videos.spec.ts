@@ -147,9 +147,17 @@ test.describe('P3 #13 — WatchVideos BIG assignment crash-detectable smoke', ()
     );
 
     // Confirm we really resolved a Video card (the app-rendered badge text), so the perform-action below
-    // is the OpenVideos branch and nothing else.
+    // is the OpenVideos branch and nothing else. `cardType` reads the badge via Playwright `innerText`,
+    // which honours the `.type-badge { text-transform: uppercase }` rule shipped by the component
+    // (participant-assignment-board.component.css:145-152) — so the live render is "VIDEO" while the
+    // app's underlying `activity.assignmenttype` data value is "Video". Compare case-insensitively: we
+    // assert the real app-rendered badge is the Video type (the CSS only changes its visual casing),
+    // which faithfully proves the OpenVideos branch without weakening the check.
     const resolvedType = await pab.cardType({ type: VIDEO_TYPE });
-    expect(resolvedType, 'the resolved card should be a Video card (its type-badge text)').toBe(VIDEO_TYPE);
+    expect(
+      resolvedType.toLowerCase(),
+      'the resolved card should be a Video card (its type-badge text, CSS-uppercased on screen)',
+    ).toBe(VIDEO_TYPE.toLowerCase());
 
     // 5) Drive the REAL perform-action on the Video card. Unlike most PAB types (which `window.open`
     //    a new tab), Video → OpenVideos opens the dialog IN THIS PAGE synchronously (no popup), so no

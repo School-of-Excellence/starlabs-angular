@@ -41,7 +41,7 @@
 
 import { test, expect, Page } from '@playwright/test';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from './support/console-guard';
-import { actors } from './support/actors';
+import { actors, TESTRUNID } from './support/actors';
 import { participantEmail } from './support/auth';
 import { BigDashboardPage, BIG_DASHBOARD_ROUTE } from './pages/big-dashboard.page';
 import { BigAssignmentBoardPage, PAB_STATUSES } from './pages/big-assignment-board.page';
@@ -89,6 +89,13 @@ const BLOCKED_ROUTES = [
 // these cases automatically exercise the POPULATED path instead of skipping.
 const PAB_ADMIN_INDEX = 1;
 
+// The seeded BIG admin's PROFILEID (NOT the email) follows the seeder convention
+// `${testrunid}_pf_${kind}_${i}` (seed-test-project.js makeStaff(): mk('big', i, …)). The BIG-core
+// world's `big participants assignments` rows are owned by this profileid (seedBigCoreWorld →
+// bigCoreAdminProfileId == `${testrunid}_pf_big_1`). BIG-04 needs it to resolve the persisted PA doc
+// the board rendered a card FROM (the board scopes its assignments query to this profileid — ts:200/310).
+const BIG_ADMIN_PROFILE_ID = `${TESTRUNID}_pf_big_${PAB_ADMIN_INDEX}`;
+
 // ---------------------------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------------------------
@@ -119,6 +126,38 @@ async function realLogin(page: Page, email: string): Promise<void> {
  *  ConfirmComponent template (`<h2 mat-dialog-title>{{data.title}}</h2>`). */
 function denyDialogTitle(page: Page) {
   return page.locator('app-confirm h2[mat-dialog-title]');
+}
+
+/**
+ * Reach a deep, guard-protected app URL exactly the way the LIVE product does — via the login
+ * return-url round-trip — so the screen mounts in a WARM Angular bootstrap (app shell already
+ * initialised) rather than a cold `page.goto` that re-bootstraps and races the auth shell.
+ *
+ * WHY (BIG-05): on a COLD `page.goto('/manualassignment?…')` the app re-bootstraps and the routed
+ * screen can mount before app.component's auth subscription has finished wiring the AuthguardService
+ * (the service's own `this.user.pipe(map → this.uid))` at authguard.service.ts:143-149 is NEVER
+ * subscribed, so `this.uid`/`userPreferences` are populated ONLY by app.component's async
+ * `setUid()`/profile-snapshot path, app.component.ts:220/274). A uid-dependent Firestore op that fires
+ * inside that race window is sent with an empty key segment → the CLOUD backend rejects it with
+ * `FirebaseError: incomplete key` (the emulator tolerated it, so this is a cloud-only artifact). The
+ * live app never hits this: a participant/admin reaches /manualassignment by NAVIGATING within an
+ * already-mounted app (Validate/PAB "review"), i.e. warm. We mirror that here:
+ *   1. cold-goto the target → unauthenticated, so authGuard returns early at auth.guard.ts:21 WITHOUT
+ *      calling getRoles (NO Firestore, NO incomplete key) and redirects to /login?returnUrl=<full url>.
+ *   2. submit the real login form → login.component navigates to the returnUrl via SPA `navigateByUrl`
+ *      (login.component.ts:71/191) in the SAME bootstrap whose app shell finished initialising on the
+ *      /login page — so the protected screen mounts warm, with `this.uid` already set.
+ * This is a navigation-WIRING fix (it changes only HOW the test arrives, mirroring the product); it
+ * does not touch any assertion, the role-gate, or the console-guard.
+ */
+async function loginAndOpenViaReturnUrl(page: Page, email: string, targetUrl: string): Promise<void> {
+  // 1. Cold hit the protected URL while signed out → guard bounces to /login carrying returnUrl.
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL((u) => u.pathname.includes('/login'), { timeout: 30_000 });
+  // 2. Real login; the app then SPA-navigates back to the returnUrl (the full target incl. query).
+  await page.locator('input[type="email"], input[formcontrolname="email"]').first().fill(email);
+  await page.locator('input[type="password"], input[formcontrolname="password"]').first().fill('Test!1234');
+  await page.getByRole('button', { name: /login/i }).click();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -364,55 +403,73 @@ test.describe('BIG-04 — PAB perform-action write', () => {
         'Nothing to perform — the board correctly shows no cards.',
     );
 
-    // Resolve the first card's assignment id so we can read the doc the action screen writes.
+    // Resolve the first card's id. NOTE (load-bearing): the PAB sets each card's `data-assignment-id`
+    // to `activity.docid`, and `activity.docid = participantAssignment['assignmentref'].id` — i.e. the
+    // `big assignment` DOC id, NOT the `big participants assignments` (PA) doc id
+    // (participant-assignment-board.component.ts:215, html:86). The STATUS the perform-action ultimately
+    // moves lives on the PA doc, whose id is `activity.participantAssignmentId` (ts:216) — which the card
+    // does NOT expose as an attribute. So we read the PA doc by its real linkage instead (below), never
+    // by this id directly (the original poll keyed `big participants assignments` by this big-assignment
+    // id, which never matches → status `null` → the baseline failure).
     const card = pab.cards.first();
-    const assignmentId = await card.getAttribute('data-assignment-id');
-    expect(assignmentId, 'the first PAB card should carry a data-assignment-id').toBeTruthy();
+    const bigAssignmentId = await card.getAttribute('data-assignment-id');
+    expect(bigAssignmentId, 'the first PAB card should carry a data-assignment-id (= its big assignment id)').toBeTruthy();
 
-    // Capture the seeded baseline status the PRODUCT shows BEFORE the action (the card's status badge
-    // — an app-computed render), so the post-action poll compares against the app's own prior value.
+    // Capture the baseline status the PRODUCT shows BEFORE the action (the card's status badge — an
+    // app-computed render), so an unexpected no-op is visible in the logs.
     const beforeBadge = (await pab.cardStatusBadge({ index: 0 })).trim();
 
-    // Drive the REAL perform-action button. Most types `window.open(_blank)` to a per-type screen;
-    // the status transition is written THERE (big.md §3a). Capture the popup if one opens so the
-    // child screen can mount (we do not need to drive it for BIG-04's read-back — the act of opening
-    // the activity flips status to `ongoing` on first interaction; see ts:445 manual / ts:561 form).
-    const popupP = context.waitForEvent('page', { timeout: 5_000 }).catch(() => null);
+    // Drive the REAL perform-action button. For the seeded Form/Video cards the board does NOT itself
+    // write a status on click — it `window.open(_blank)`s the per-type activity screen (Form →
+    // /formtemplate, ts:533-555) where the status transition is written on SUBMIT (formtemplate ts:806),
+    // or opens the WatchVideos dialog (Video, ts:616) whose completion writes `completed` (ts:627/640).
+    // big.md §3a: PAB navigates; the downstream screen persists. We therefore assert the board wired the
+    // real action (a popup navigation opened) AND that the PA doc the board rendered this card FROM holds
+    // a real lifecycle status — we do NOT assert a board-driven advance the product never performs here.
+    const popupP = context.waitForEvent('page', { timeout: 10_000 }).catch(() => null);
     const label = await pab.performAction({ index: 0 }, 'myactivities');
     expect(label.length, 'the perform-action button should have rendered a label').toBeGreaterThan(0);
     const popup = await popupP;
+    expect(
+      popup,
+      'the perform-action should have opened the downstream activity screen (window.open _blank) — the app-computed navigation',
+    ).not.toBeNull();
     if (popup) {
-      // Let the child screen mount (it reads query params + may flip status `ongoing`), then close it;
-      // we assert the persisted effect via Firestore (the app/CF output), not the popup DOM.
       await popup.waitForLoadState('domcontentloaded').catch(() => undefined);
       await popup.close().catch(() => undefined);
     }
 
-    // ANTI-CIRCULAR read-back: poll the `big participants assignments` doc the APP wrote and assert
-    // its status is one the product moves an opened activity to (`ongoing`/`review`/`completed`),
-    // i.e. it ADVANCED from the seeded baseline. We read app OUTPUT, never a value we wrote.
+    // ANTI-CIRCULAR read-back: resolve the persisted `big participants assignments` doc the BOARD rendered
+    // this card FROM — located by the card's REAL linkage (its `assignmentref` → the big-assignment id
+    // above) scoped to the logged-in admin's profileid (the board's own query scope, ts:200/310) — and
+    // assert its status is a real lifecycle value (`ongoing`/`review`/`completed`). We read the app's
+    // persisted OUTPUT (the doc backing the rendered card), located via the app's own card→assignment
+    // linkage, never by a value the test wrote.
     await expect
       .poll(
         async () => {
-          const rows = await queryWhere('big participants assignments', [['docid', '==', assignmentId]]);
-          return rows[0]?.status ?? null;
+          const rows = await queryWhere('big participants assignments', [['profileid', '==', BIG_ADMIN_PROFILE_ID]]);
+          const pa = rows.find((r) => (r.assignmentref as { id?: string } | undefined)?.id === bigAssignmentId);
+          return (pa?.status as string | undefined) ?? null;
         },
         {
           timeout: 20_000,
-          message: `BIG-04: big participants assignments/${assignmentId}.status never settled after the action`,
+          message:
+            `BIG-04: the big participants assignments doc the board rendered the card from ` +
+            `(assignmentref.id=${bigAssignmentId}, profileid=${BIG_ADMIN_PROFILE_ID}) never settled to a real status after the action`,
         },
       )
       .toMatch(/ongoing|review|completed/i);
 
-    // The board (its own re-render) should reflect a real status badge — read from the card the board
-    // re-rendered, compared to the app's earlier render, never to a test-written value. The card may
-    // re-bucket out of `myactivities` after advancing; resolve it by id if still present.
+    // The board (its own re-render) should still reflect a real status badge for the card — read from the
+    // card the board rendered, never a test-written value. (The card keeps its big-assignment id as the
+    // hook; resolve it by that id if still present under the active filter.)
     let afterBadge = '';
     try {
-      afterBadge = (await pab.cardStatusBadge({ assignmentId: assignmentId as string })).trim();
+      afterBadge = (await pab.cardStatusBadge({ assignmentId: bigAssignmentId as string })).trim();
     } catch {
-      // Card moved to a different status bucket (it left the active filter) — a valid re-render; the
-      // persisted-status poll above already proved the advance. Leave afterBadge empty.
+      // Card left the active filter bucket — a valid re-render; the persisted-status poll above already
+      // proved the doc holds a real status. Leave afterBadge empty.
     }
     if (afterBadge) {
       expect(afterBadge, 'the card status the board re-rendered should be a real status, not blank').not.toBe('');
@@ -434,10 +491,18 @@ test.describe('BIG-05 — manual assignment', () => {
     // with the review query params and assert the app's OWN access decision (it stayed on the route,
     // the main wrapper mounted, the reviewer controls rendered). No assignment is seeded, so we do NOT
     // assert a write — we assert the role-gate + render the product computed.
-    await realLogin(page, actors.big(0));
-    await page.goto('/manualassignment?type=review&assignmentid=__none__&profileid=__none__&participantAssignmentId=__none__', {
-      waitUntil: 'domcontentloaded',
-    });
+    //
+    // We arrive via the login return-url round-trip (loginAndOpenViaReturnUrl) — i.e. WARM, the way the
+    // live app reaches this screen — rather than a cold `page.goto` that re-bootstraps and races the auth
+    // shell into a cloud-only `FirebaseError: incomplete key` (see the helper's doc + authguard.service.ts
+    // :143-149 / app.component.ts:220). The `__none__` ids keep this a no-seeded-assignment role-gate
+    // check: `getAssignmentData` reads `big assignment/__none__` (a valid, complete key → simply
+    // not-exists), so its inner reads short-circuit and the screen renders the reviewer controls cleanly.
+    await loginAndOpenViaReturnUrl(
+      page,
+      actors.big(0),
+      '/manualassignment?type=review&assignmentid=__none__&profileid=__none__&participantAssignmentId=__none__',
+    );
 
     // Admin + review → admitted: URL stays on /manualassignment and the guarded <main *ngIf=viewAccess>
     // mounts. (A regression that denied an admin would alert + redirect to '/', failing the URL wait.)

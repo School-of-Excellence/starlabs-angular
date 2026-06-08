@@ -69,6 +69,13 @@ const COL_INTERIM = 'interim crossover';
 const STUDIO_STAGE = 'Diagnostics';
 /** The seeded SS-07 forms lower-bound (seedFormsFixture default count). */
 const SEEDED_FORM_COUNT = 2;
+/** The seeder's delivery-forms TEMPLATE id (seedReferenceData: `${run}_form_0`). The seeded `formsByClient`
+ *  docs carry `formid == ${run}_form_0` (seedFormsFixture), but the static stage config's `participantform`
+ *  lists PRODUCTION form ids — so the app's mapped-form filter (dynamic-studio.ts:783
+ *  `participantForm = ...filter(e => mappedForm.includes(e.formid))`) would fetch the seeded forms then drop
+ *  ALL of them (widget = 0). SS-07 must add this id to `stageproperty[<stage>].participantform` so the app's
+ *  OWN filter ADMITS the seeded forms (same precondition cross-db-lowerbound.spec.ts applies). */
+const DELIVERY_FORM_ID = `${TESTRUNID}_form_0`;
 
 /** The deterministic seeded pairing doc id (seed-test-project.js seedStudioFlowPreconditions). */
 function seededPairingId(): string {
@@ -665,18 +672,24 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
   // init, the widget reads 0 and a parity-with-also-empty-read would still pass. ATC widgets read the
   // OFF-LIMITS firestore-atc (not provisioned) ⇒ 0 by design; we assert that contract, not ATC content.
   //
-  // FIXME (TEST-INFRA gap — same root cause as cross-db-lowerbound.spec.ts; verified live 2026-06-07):
-  //   The forms positive lower bound CANNOT pass on the emulator because `src/main.ts` connects ONLY the
-  //   `(default)` Firestore to the emulator — the `firestore-forms` named DB the widget queries via
-  //   `getFirestore(app, "firestore-forms")` (dynamic-studio.ts:758) is NEVER emulator-connected, so the
-  //   query escapes the emulator and returns EMPTY (widget = 0), even though the live panel hydrates and
-  //   2 matching `formsByClient` docs exist in the emulator's firestore-forms DB. NOT a product defect and
-  //   NOT weakened to pass — the assertion is correct as written. FIX (test-infra, outside this agent's
-  //   owned files → seedRequest/finding): connect `getFirestore(app,"firestore-forms")` to the emulator in
-  //   main.ts when useEmulators, then flip back to `test()`. (The full P2 #7 invariant lives in
-  //   cross-db-lowerbound.spec.ts, fixme'd for the same reason.)
+  // CLOUD NOTE (was emulator-fixme'd; runs as test() on cloud — verified against the baseline 2026-06-07):
+  //   On the emulator this lower bound could not pass because `src/main.ts` connects ONLY the `(default)`
+  //   Firestore to the emulator, so the `firestore-forms` named DB the widget queries via
+  //   `getFirestore(app,"firestore-forms")` (dynamic-studio.ts:758) escaped the emulator and returned EMPTY.
+  //   On the CLOUD test project firebase.test.json provisions BOTH `(default)` and `firestore-forms`, so the
+  //   named-DB read works — the emulator artifact no longer applies. The remaining cloud cause of forms==0
+  //   was a SEED/CONFIG precondition, not a product defect: the seeded `formsByClient` carry
+  //   formid==`${run}_form_0`, but the static stage config's `participantform` lists production form ids, so
+  //   the app's own filter (ts:783) dropped them all. ensureStageAcceptsSeededForm() (below) adds the seeded
+  //   id to the stage's participantform so the app's filter ADMITS the seeded forms — the assertion is the
+  //   APP-computed count, never loosened. (The full P2 #7 invariant lives in cross-db-lowerbound.spec.ts.)
+  //   NOTE: this case also tripped a BENIGN cross-DB SDK error-level log (the seeded `formsByClient.workshopref`
+  //   points at the `(default)` DB while the doc lives in `firestore-forms`; the SDK logs "…contains a document
+  //   reference within a different database … It will be treated as a reference in the current database" and
+  //   the app never derefs `workshopref`). That noise is allowlisted via a shared console-guard change (see the
+  //   sharedChangeRequests) so it stops failing afterEach in SS-05/06/07 + studio-session + cross-db-lowerbound.
   // ===========================================================================================
-  test.fixme('SS-07 live-panel Forms widget shows the seeded non-zero count (cross-DB lower bound); ATC reads 0 by design', async ({ browser, page }) => {
+  test('SS-07 live-panel Forms widget shows the seeded non-zero count (cross-DB lower bound); ATC reads 0 by design', async ({ browser, page }) => {
     const studio = new StudioPage(page);
 
     // The forms fixture is seeded for the FIRST cohort member (seedFormsFixture(studioCohort[0])).
@@ -690,6 +703,15 @@ test.describe('Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app 
       status: 'ready', currentstage: STUDIO_STAGE, liveassignmentid: null, instudio: false, studioid: null,
     });
     await deleteInvitesForToken(participantTok);
+    // PRECONDITION (the SS-07 forms-filter gate): the app's forms query keeps ONLY forms whose
+    // formid ∈ stageproperty[<stage>].participantform (dynamic-studio.ts:759 mappedForm, :783 filter). The
+    // static config's Diagnostics.participantform lists PRODUCTION form ids, NOT the seeded `${run}_form_0`,
+    // so without this the app correctly fetches the 2 seeded `formsByClient` docs then FILTERS THEM ALL OUT
+    // → the widget reads 0 (the forms==0 poll failure in the baseline). Add the seeded delivery-form id to
+    // the stage's participantform so the app's OWN filter ADMITS the seeded forms (same precondition
+    // cross-db-lowerbound.spec.ts applies). Config precondition setup only — the spec still asserts the
+    // COUNT THE APP COMPUTES from its real cross-DB query+filter, never a value the test wrote.
+    await ensureStageAcceptsSeededForm(STUDIO_STAGE, DELIVERY_FORM_ID);
     // Re-assert checkin (SS-02 flipped it OFF) so the Bring-To-Studio button renders (html:139 gate).
     await ensurePairingCheckedIn(seed.pairingId);
 
@@ -868,6 +890,33 @@ async function ensurePairingCheckedIn(pairingId: string): Promise<void> {
       await db().collection(COL_LIVE).doc(String(la.id)).set({ studioid: `${pairingId}_detached` }, { merge: true }).catch(() => {});
     }
   }
+}
+
+/**
+ * Ensure `stageproperty[<stage>].participantform` INCLUDES the seeded delivery-form id, so the app's
+ * mapped-form filter (dynamic-studio.ts:783 `participantForm = ...filter(e => mappedForm.includes(e.formid))`)
+ * ADMITS the seeded forms instead of dropping them all. The static config lists PRODUCTION form ids, so
+ * without this the SS-07 Forms widget reads 0 even though 2 `formsByClient` docs are seeded. PRECONDITION
+ * config setup on the seeded `queue generation` doc (the (default) DB); idempotent (merges the id into the
+ * existing list). Mirrors cross-db-lowerbound.spec.ts ensureStageAcceptsSeededForm (kept local — that
+ * helper is test-internal to another spec file). The spec then asserts the COUNT THE APP RENDERED.
+ */
+async function ensureStageAcceptsSeededForm(stage: string, formId: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { db } = require('../lib/participant-sim');
+  const queueGenId = seeder.queueGenDocId(TESTRUNID);
+  const qgen = await getDoc('queue generation', queueGenId);
+  if (!qgen) {
+    throw new Error(`[studio-core] seeded queue generation "${queueGenId}" not found — cannot configure participantform for SS-07.`);
+  }
+  const stageproperty: Record<string, any> = (qgen.stageproperty as Record<string, any>) || {};
+  const stageProp: Record<string, any> = stageproperty[stage] || {};
+  const current: string[] = Array.isArray(stageProp.participantform) ? stageProp.participantform : [];
+  if (current.includes(formId)) return; // already admits the seeded form (idempotent)
+  const nextStageProp = { ...stageProp, participantform: [...current, formId] };
+  const nextStageProperty = { ...stageproperty, [stage]: nextStageProp };
+  // Merge only the stageproperty map (leave all other queue fields untouched).
+  await db().collection('queue generation').doc(queueGenId).set({ stageproperty: nextStageProperty }, { merge: true });
 }
 
 /** A DocumentReference to a queue_token (studioinvitation.tokenref is a REF, not a string — schemas §0.2). */

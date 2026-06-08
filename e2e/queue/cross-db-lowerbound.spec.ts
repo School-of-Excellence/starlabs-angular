@@ -210,7 +210,7 @@ test.describe('Cross-DB lower bound — SS-07 live-panel widget shows the EXACT 
   //   AS WRITTEN and must NOT be loosened. The ATC-zero contract below is unaffected (ATC is off-limits
   //   and reads 0 by design regardless).
   // ===========================================================================================
-  test.fixme('Forms widget renders the EXACT seeded non-zero count from firestore-forms (catches secondary-DB silent zero)', async ({ page }) => {
+  test('Forms widget renders the EXACT seeded non-zero count from firestore-forms (catches secondary-DB silent zero)', async ({ page }) => {
     // --- PRECONDITION SETUP (allowed: configure the queue + token so the product's real cross-DB
     //     forms path executes against the seeded fixture; the spec then asserts what the APP rendered). ---
 

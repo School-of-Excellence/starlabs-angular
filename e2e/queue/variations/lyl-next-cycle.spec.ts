@@ -85,7 +85,7 @@
 import { test, expect } from '@playwright/test';
 import { QueueBoardPage } from '../pages/queue-board.page';
 import { StudioPage } from '../pages/studio.page';
-import { loginAsOperator, loginAsSpecialist } from '../support/auth';
+import { loginAsOperator } from '../support/auth';
 import { TESTRUNID, QUEUE_NAME } from '../support/actors';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from '../support/console-guard';
 import {
@@ -354,6 +354,32 @@ async function detachTokenFromStudio(tokenDocId: string, landedStage: string): P
   );
 }
 
+/**
+ * Wait until the PRODUCT's `queue stage log` collection has at least `expectedRows` rows for this token
+ * before running the trail invariants. This is a pure read-after-WRITE-PROPAGATION settle, NOT a relaxed
+ * assertion: a REAL board/studio move commits the `queue_token` update + its `queue stage log` row in ONE
+ * writeBatch (dynamic-queue-manager-clone.ts:2956-2964 / dynamic-studio.ts moveStage), and the board's
+ * own optimistic in-memory splice re-renders the column counts the instant `batch.commit()` resolves —
+ * so the spec's COUNT-DRIFT check can pass within ~200ms of the commit ack. Against the REAL cloud
+ * Firestore (vs the in-process emulator, where a committed write is instantly queryable) a `where('docid',
+ * '==', T)` query can lag the commit-ack by a small index-propagation window, so a single un-polled
+ * `assertEveryMoveLogged` read immediately after the move occasionally sees N−1 rows (a read-after-write
+ * race, not a missing row — the row IS committed). Poll until the count catches up, then the caller runs
+ * the EXACT invariant (`=== expectedRows` + the non-self lower bound) unchanged. If the product genuinely
+ * never wrote the row this poll times out and the subsequent assertion still fails with its full trail —
+ * nothing is masked. (assertions.ts `readLogRows` reads the rows the PRODUCT wrote — never a test value.)
+ */
+async function settleLogRows(tokenDocId: string, expectedRows: number): Promise<void> {
+  await expect
+    .poll(async () => (await readLogRows(tokenDocId)).length, {
+      message: `queue stage log row count did not reach ${expectedRows} for token ${tokenDocId} ` +
+        `(real-cloud read-after-write index propagation); the trail invariant will report the detail if it never settles`,
+      timeout: 20_000,
+      intervals: [200, 400, 800, 1200, 2000],
+    })
+    .toBeGreaterThanOrEqual(expectedRows);
+}
+
 // =============================================================================================
 test.describe('V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-WF-01)', () => {
   let guard: ConsoleGuard;
@@ -405,6 +431,10 @@ test.describe('V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-W
      *  (COUNT-DRIFT is asserted inline around each REAL-BOARD move, where before/after board counts
      *  are captured from the UI — it is not part of this trail-only checkpoint.) */
     async function assertTrailInvariants(ctx: string): Promise<void> {
+      // Settle the just-committed log row into the query index before the un-polled count assertion
+      // (real-cloud read-after-write race — see settleLogRows). Sim-prefix writes are already present,
+      // so this returns immediately there; it only waits after a REAL board/studio move.
+      await settleLogRows(tokenDocId, expectedRows);
       await assertNoOrphan(tokenDocId);
       await assertEveryMoveLogged(tokenDocId, expectedRows, { minNonSelf: expectedNonSelf });
       await assertNoStageSkipped(tokenDocId, MODEL, VARIATION_ID);
@@ -458,11 +488,28 @@ test.describe('V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-W
 
     // Wire the token into a live Scope Enhancement studio session (PRECONDITION) and act as the specialist.
     await linkTokenIntoScopeEnhancementStudio(tokenDocId, queueGenDocId);
-    await loginAsSpecialist(page, 0);
+    // Log in ONCE as the operator (admin) and stay logged in for the WHOLE walk — do NOT switch actors
+    // mid-test. The shared `loginAs` (support/actors.ts:18-24) does `page.goto('/')` + fill, with NO
+    // logout; on real cloud the persisted auth session means a second login re-navigates to '/' and the
+    // app redirects an already-authenticated user away from the login form, so `input[type="email"]`
+    // never appears and the fill hangs to the test timeout (the observed cloud failure at the PHASE 4
+    // operator login). Instead we authenticate as the operator here and drive the SPECIALIST studio via
+    // the `?profileid=<specialist>` override (dynamic-studio.component.ts:160 — `studio.load` threads it
+    // through): the page then ACTS as the seeded Scope Enhancement specialist for this token's live
+    // session. The seeded `dashboard` route-config grants `/dynamicstudio` to ALL staff roles
+    // (seed-test-project.js:149,411-420 `roles: allRoles`), so the operator's `admin` role admits the
+    // studio route. PHASE 4's operator board then REUSES this same session — no second login. (This is
+    // the exact pattern the sibling up-next-cycle.spec.ts uses for the same studio→board walk.)
+    await loginAsOperator(page);
     const studio = new StudioPage(page);
     await studio.load(SPECIALIST_PROFILE_ID);
-    await studio.selectStudio({ studioId: SE_PAIRING_ID });
-    await expect(studio.liveParticipantName, 'studio live panel must mount for the Scope Enhancement session').toBeVisible({ timeout: 30_000 });
+    // Select the studio the race-free way: wait for the live-assignment stream to surface this studio's
+    // live_tv icon (mapStudioLiveAssignment populated) BEFORE the click, so onStudioSelect resolves the
+    // live token AND the studio-button list has settled. On real cloud the chunked `queue studio pairing`
+    // stream re-emits more (and slower) than on the emulator, so selecting right after navigation could
+    // catch the button mid-re-render → "Element is not attached to the DOM" (studio.page.ts:163). Waiting
+    // on the app's own readiness signal first avoids that detach race; it still asserts the live panel.
+    await studio.selectStudioWithLivePanel(SE_PAIRING_ID);
 
     // 4. Scope Enhancement → Scope Enhancement (SEND-BACK [LOOP], markascompleted:false) — REAL studio.
     //    moveNext to the SAME stage triggers the StageIncompleteConfirmation dialog (component ts:1274),
@@ -483,15 +530,37 @@ test.describe('V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-W
     }
 
     // The send-back move detaches the live session (closeStudio); re-link for the forward move so the
-    // live panel + move-next button render again (PRECONDITION only).
+    // live panel + move-next button render again (PRECONDITION only). Re-select via the live-panel-aware
+    // path (waits for the re-linked live_tv icon before clicking) so the post-navigation button re-render
+    // can't detach the element mid-select — this is the exact hop that flaked on cloud (studio.page.ts:163).
     await linkTokenIntoScopeEnhancementStudio(tokenDocId, queueGenDocId);
     await studio.load(SPECIALIST_PROFILE_ID);
-    await studio.selectStudio({ studioId: SE_PAIRING_ID });
-    await expect(studio.liveParticipantName).toBeVisible({ timeout: 30_000 });
+    await studio.selectStudioWithLivePanel(SE_PAIRING_ID);
 
     // 5. Scope Enhancement → Evolution Mapping Activity (NEXT-CYCLE forward, markascompleted:true) — REAL studio.
+    //    UNLIKE the send-back loop (markascompleted:false → the StageIncompleteConfirmation branch that
+    //    StudioPage.moveNext drives), a studio FORWARD-COMPLETE to a DIFFERENT stage takes the product's
+    //    `moveStage` ELSE branch (dynamic-studio.ts:1353): it (a) opens the "Assign Specialist if attended"
+    //    AssignQueueStudio dialog via `inviteMore(true)` and ABORTS the move if it returns falsy
+    //    (`if(!reviewSpecialist) return`, ts:1354-1355), then (b) opens the HoldAlertDialog "Confirmation!"
+    //    and ABORTS if cancelled (`if(result == null) return`, ts:1360-1363) before it writes the token +
+    //    stage-log (ts:1365-1405). StudioPage.moveNext only handles the StageIncompleteConfirmation dialog,
+    //    so without driving these two product dialogs the forward move silently no-ops and the token stays
+    //    on Scope Enhancement (the observed cloud failure). Drive BOTH real dialogs to completion here — no
+    //    assertion is weakened; this is the genuine specialist forward-complete interaction the product
+    //    requires. The aqs form is pre-valid (single studio is pre-selected, no mandatory bonus rows for
+    //    this seeded pairing — aqs.ts:73-77,102-118), so Assign is enabled immediately.
     await studio.moveNext(NEXT_CYCLE_TARGET);
     expectedRows++; expectedNonSelf++;
+    // (5a) Confirm the "Assign Specialist if attended in this Studio" dialog (inviteMore(true)).
+    const aqsSubmit = page.locator('[data-testid="aqs-submit"]');
+    await expect(aqsSubmit, 'studio forward-complete must open the Assign-Specialist dialog (inviteMore)').toBeVisible({ timeout: 20_000 });
+    await expect(aqsSubmit).toBeEnabled({ timeout: 20_000 });
+    await aqsSubmit.click();
+    // (5b) Confirm the HoldAlert "Confirmation!" dialog (Confirm → "confirm"; Cancel → null aborts).
+    const holdConfirm = page.getByRole('button', { name: /^Confirm$/ });
+    await expect(holdConfirm, 'studio forward-complete must open the HoldAlert confirmation dialog').toBeVisible({ timeout: 20_000 });
+    await holdConfirm.click();
     await expect
       .poll(async () => (await getDoc('queue_token', tokenDocId))?.currentstage, {
         message: 'studio next-cycle move did not advance the token to Evolution Mapping Activity',
@@ -558,7 +627,10 @@ test.describe('V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-W
     // discriminator — that edge exists only in V1/V2/V3). The final move into `Completed` (the last board
     // column) fires guard.updateDeliveryStatus("completed") (component ts:2980-2984) — captured by the spy.
     // -----------------------------------------------------------------------------------------
-    await loginAsOperator(page);
+    // REUSE the operator session established in PHASE 2 (no second login — a re-login on the same page
+    // would re-navigate to '/', which an already-authenticated session redirects away from the login
+    // form, hanging the email fill; see the PHASE 2 note). The operator is `admin`, so the board route
+    // (/dynamicqueuemanager) is already admitted; just navigate to the board and select the queue.
     const board = new QueueBoardPage(page);
     await board.selectQueue(QUEUE_NAME);
     // Install the delivery-status spy AFTER the board mounted (dev-global wrap; cf. delivery-status-spy.ts).
@@ -630,6 +702,7 @@ test.describe('V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-W
 
     // FINAL trail snapshot: exactly the number of transitions we drove, with the operator/specialist
     // (non-self) moves present in the PRODUCT's audit trail (anti-circular lower bound).
+    await settleLogRows(tokenDocId, expectedRows);
     await assertEveryMoveLogged(tokenDocId, expectedRows, { minNonSelf: expectedNonSelf });
     // 16 transitions total, broken down by driver:
     //   phase 1: 1 AUTO (operator/CF) + 2 SELF                      → rows 3, nonSelf 1
@@ -773,6 +846,9 @@ test.describe('V2 · LYL - Next Cycle — every forward journey entry→terminal
 
       /** The trail-only universal invariants (COUNT-DRIFT is asserted inline around each board move). */
       async function assertTrailInvariants(ctx: string): Promise<void> {
+        // Settle the just-committed log row into the query index before the un-polled count assertion
+        // (real-cloud read-after-write race — see settleLogRows). No-op delay during the sim prefix.
+        await settleLogRows(tokenDocId, expectedRows);
         await assertNoOrphan(tokenDocId);
         await assertEveryMoveLogged(tokenDocId, expectedRows, { minNonSelf: expectedNonSelf });
         await assertNoStageSkipped(tokenDocId, MODEL, VARIATION_ID);
@@ -875,6 +951,7 @@ test.describe('V2 · LYL - Next Cycle — every forward journey entry→terminal
       // FINAL trail snapshot: exactly the transitions we drove, with the operator (non-self) board moves
       // present in the PRODUCT's audit trail (anti-circular lower bound). One row per journey hop.
       expect(expectedRows, `[journey ${ji}] one stage-log row per journey transition`).toBe(journey.length - 1);
+      await settleLogRows(tokenDocId, expectedRows);
       await assertEveryMoveLogged(tokenDocId, expectedRows, { minNonSelf: expectedNonSelf });
     });
   }

@@ -1,22 +1,25 @@
 #!/usr/bin/env node
 /**
- * seed-test-project.js — stand up the sample queue + fake users/data on `starlabs-test`.
+ * seed-test-project.js — stand up the sample queue + fake users/data on the dedicated,
+ * disposable test project `slabs-queue-e2e-exdcz` (resolved from lib/test-project.js).
  *
- * Adapted from seed-emulator.js, but targets the REAL `starlabs-test` Firebase project
+ * Adapted from seed-emulator.js, but targets a REAL Firebase project
  * (full complexity: deployed cloud functions, named DBs, real FCM) — NEVER the emulator,
- * NEVER production. Seeds the exact L3rqCr config (30 stages, 9 variations) from
- * `sample-queue-config.json`, ~50 fake participants distributed across the 9 variations
- * mirroring the real journey×cycle mix (see path-generator.js), plus operators/specialists.
+ * NEVER production, NEVER the shared `starlabs-test`. Seeds the exact L3rqCr config
+ * (30 stages, 9 variations) from `sample-queue-config.json`, ~50 fake participants
+ * distributed across the 9 variations mirroring the real journey×cycle mix
+ * (see path-generator.js), plus operators/specialists. All users are `@example.com`.
  *
- * PRODUCTION-SAFE BY CONSTRUCTION:
- *   - HARD-ABORTS if the resolved project id is production (`fir-sample-aae4a`).
- *   - Only ever targets `starlabs-test` (override with TEST_PROJECT, prod ids still blocked).
+ * PRODUCTION-SAFE BY CONSTRUCTION (lib/test-project.js allowlist):
+ *   - HARD-ABORTS unless the resolved project id is exactly the dedicated test project.
+ *   - Denylists prod (`fir-sample-aae4a`), the shared `starlabs-test`, and Watson/Sales-CRM —
+ *     they abort even if TEST_PROJECT is (mis)pointed at them.
  *   - ATC collections are denylisted (defence in depth) — never seeded.
  *   - Every doc + Auth user is tagged with a `testrunid` for clean teardown.
  *
  * Auth (no service-account file needs to be hand-supplied):
  *   - Application Default Credentials — run `gcloud auth application-default login` once, OR
- *   - GOOGLE_APPLICATION_CREDENTIALS=/path/to/starlabs-test-sa.json
+ *   - GOOGLE_APPLICATION_CREDENTIALS=/path/to/test-project-sa.json
  *
  * Usage:
  *   node e2e/fixtures/seed-test-project.js --plan            # dry-run: guards + plan, NO creds needed

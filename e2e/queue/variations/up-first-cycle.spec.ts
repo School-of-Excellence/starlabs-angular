@@ -582,19 +582,35 @@ test.describe(`V6 · ${VARIATION_NAME} (${VID}) — closed-loop walk (UPFC-HAPPY
     await assertNoStageSkipped(tokenDocId, MODEL, VID);
     await assertLoopBound(tokenDocId, 2);
 
-    // Consultation self-loop TWICE through the REAL board ("Send back", to==from). Each loop is a src==dst
-    // move, so the board's column count is unchanged (token leaves & re-enters the same Queued column);
-    // assert the card stays on Consultation (APP-computed) and the product logged a self-loop row each time.
+    // Consultation self-loop TWICE through the REAL board ("Send back", to==from). Consultation is a
+    // compulsoryactivity (split) stage → the board renders it as (Queued)+(Waiting)+(Activity) sub-columns
+    // (component ts:1944-1985; its `compulsoryactivity` map is non-empty in the seed config). The "Send
+    // Back" self-loop is a same-STAGE move whose target the board can only offer as a SIBLING sub-column
+    // bucket: the token sits in (Queued) and checkAvailablestages EXCLUDES the token's own (stage,type)
+    // sub-column (component ts:2803), so the only "Consultation" target the dropdown renders is the
+    // (Waiting)/(Activity) bucket. Committing it re-buckets the token onto the SAME bare stage with
+    // status:'ready' (moveTokenToStage parses the suffix → status by dropType, ts:2953/1964), i.e. it
+    // leaves (Queued) and re-enters (Waiting). The per-(Queued)-column count therefore does NOT net back —
+    // the CONSERVED quantity is the STAGE TOTAL across all sub-columns. Read it APP-computed (the board's
+    // re-rendered sub-column counts), never a value the test wrote. (Mirrors the green V1 sibling's
+    // Scope-Enhancement self-loop, lyl-first-cycle.spec.ts WF-02.)
+    const readConsultStageTotal = async (): Promise<number> => {
+      const keys = await board.stageKeysForName(CONSULT);
+      const all = await board.readAllColumnCounts();
+      return keys.reduce((sum, k) => sum + Number(all[k] || 0), 0);
+    };
     for (let i = 1; i <= 2; i++) {
       await waitForCardOnStage(page, board, cardId, CONSULT);
-      const beforeCount = await board.readColumnCount(CONSULT);
+      const beforeTotal = await readConsultStageTotal();
       await board.moveToken(cardId, CONSULT); // the self-loop target carries data-stage-name == Consultation
+      // The card stays on the same STAGE; the stage total (Σ sub-columns) nets to the same value (the token
+      // left one sub-column and re-entered a sibling sub-column of the SAME stage — never leaving Consultation).
       await expect
-        .poll(async () => (await board.readColumnCount(CONSULT)), {
+        .poll(readConsultStageTotal, {
           timeout: 20_000,
-          message: `UPFC-LOOP-B: after Consultation self-loop #${i} the board should still show the token on "${CONSULT}".`,
+          message: `UPFC-LOOP-B: after Consultation self-loop #${i} the board should still show the token on "${CONSULT}" (stage total across sub-columns conserved).`,
         })
-        .toBe(beforeCount);
+        .toBe(beforeTotal);
       await expect
         .poll(async () => board.revealTokenCard(cardId), {
           timeout: 20_000, message: `UPFC-LOOP-B: token card should remain on the board after Consultation self-loop #${i}.`,

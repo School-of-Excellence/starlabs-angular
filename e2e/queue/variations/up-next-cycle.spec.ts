@@ -1064,6 +1064,23 @@ test.describe('V7 · uP! - Next Cycle — every forward journey entry→terminal
         const after = await pollColumnCounts(board, from, before[from] - 1);
         assertCountConserved(before, after, { src: from, dst: to });
 
+        // (d.1) CROSS-CLIENT LOG SETTLE (cloud-only): the board commits the queue_token update + the
+        //   `queue stage log` row in ONE atomic batch (component ts:2958-2968), but the board's own
+        //   web-SDK listener (which drove the COUNT re-render polled in (d)) can observe that commit a
+        //   beat BEFORE the separate Node admin-SDK one-shot query that readLogRows/assertEveryMoveLogged
+        //   uses sees it — a cloud Firestore cross-client read lag that does NOT exist on the in-process
+        //   emulator (where both clients hit the same process). Poll the PRODUCT's own audit trail until
+        //   the just-committed row is observable, mirroring the canonical walk's self-loop settle
+        //   (expect.poll on observedTransitions). This waits out the lag — it does NOT weaken the count:
+        //   assertEveryMoveLogged below still requires the exact `expectedRows` with the non-self bound.
+        await expect
+          .poll(async () => (await readLogRows(tokenDocId)).length, {
+            message: `[journey ${ji}] the board move ${from}→${to} must write its "queue stage log" row (admin-SDK trail did not yet observe the committed batch)`,
+            timeout: 20_000,
+            intervals: [200, 400, 800, 1200],
+          })
+          .toBe(expectedRows);
+
         // (e) trail invariants after every board move.
         await assertTrailInvariants(`[journey ${ji}] REAL board ${from}→${to}`);
       }

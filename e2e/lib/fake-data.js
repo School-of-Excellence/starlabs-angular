@@ -335,7 +335,13 @@ function formsByClient(ctx) {
     stagename,
     queueref: ctx.queueGenRefForms(queueDocId),          // REF within firestore-forms (§0.2 + named-DB caveat)
     queuetokenref: ctx.tokenRefForms(tokenDocId),        // REF within firestore-forms
-    workshopref: ctx.refFor('eiflix workshop'),
+    // workshopref is NULL here on purpose: this doc lives in the firestore-forms named DB, and a
+    // DocumentReference into the (default) DB is a cross-database ref — on cloud the Firestore SDK logs
+    // an error-level "document reference within a different database … not supported" for every such doc
+    // when dynamic-studio hydrates the forms widget. The app never dereferences workshopref, so null is
+    // faithful and removes the benign-but-noisy cross-DB warning at the source (vs the emulator, where
+    // firestore-forms was never connected so the read never happened). See cross-db-lowerbound.spec.ts.
+    workshopref: null,
     date: ctx.now(),
   };
 }

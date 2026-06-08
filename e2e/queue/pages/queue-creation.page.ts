@@ -363,9 +363,12 @@ export class QueueCreationPage {
     await this.ensureStagesStep();
     const chipGrid = this.host.locator(SEL.stagesChipGrid);
     await expect(chipGrid).toBeVisible({ timeout: 15_000 });
-    // The chip-grid input is the textbox wired to `[matChipInputFor]` (html:305). Scope to the grid so
+    // The chip-grid input is the textbox wired to `[matChipInputFor]` (html:305). NOTE: `matChipInputFor`
+    // is an Angular-Material property @Input bound as `[matChipInputFor]="chipGrid"` — Angular does NOT
+    // reflect it to a DOM attribute, so `input[matChipInputFor]` matches nothing. The MatChipInput
+    // directive instead stamps the class `mat-mdc-chip-input` on its host <input>. Scope to the grid so
     // a chip-input elsewhere can't match.
-    const chipInput = chipGrid.locator('input[matChipInputFor]');
+    const chipInput = chipGrid.locator('input.mat-mdc-chip-input');
     // Wait EXPLICITLY for the input element itself (not just its enclosing grid) to attach + become
     // visible, with a bounded timeout. The grid host can render a beat before its projected `<input>`
     // settles inside the outlined mat-form-field; a bare `focus()` would otherwise sit on the default

@@ -177,17 +177,33 @@ test.describe('Operator — Queue Manager board (OP-01…OP-13, OP-02b, OP-09b)'
     const names = await list.visibleQueueNames();
     expect(names, 'OP-02: queue list must render the seeded queue 1').toContain(QUEUE1_NAME);
 
-    // [GAP] rendered row count == direct Firestore count of this run's non-soft-deleted queues (catch a
-    // dropped query result). The list reads ALL `queue generation`; scope the oracle to THIS run.
+    // [GAP] every queue THIS run seeded is rendered (catch a dropped query result). The list reads ALL
+    // `queue generation` with NO testrunid/delete filter (queue-list.component.ts:62 — admin CRUD over the
+    // whole project), so on the persistent cloud test project it legitimately also renders queues left by
+    // OTHER runs (teardown is testrunid-scoped) — and QUEUE1_NAME is NOT run-namespaced (it is the same
+    // `TEST <N>-stage L3rqCr` string every run), so a raw `== QUEUE1_NAME` row-count would tally every
+    // prior run's queue-1 too. The faithful, run-scoped anti-drop oracle is therefore set CONTAINMENT of
+    // this run's KNOWN seeded queue names (not equality against a cross-run-polluted count): each seeded
+    // queue MUST appear, and the run-UNIQUE queue 2 (its name carries TESTRUNID) is the strong signal that
+    // catches a dropped stream result for this run. We also lower-bound the rendered run-name rows by the
+    // Firestore count of this run's non-soft-deleted queues.
     const seededQueues = await queryWhere('queue generation', [['testrunid', '==', TESTRUNID]]);
     const liveSeeded = seededQueues.filter((q) => (q as Record<string, unknown>).delete !== true);
-    const renderedRunRows = (await list.visibleQueueNames()).filter(
-      (n) => n === QUEUE1_NAME || n === QUEUE2_NAME,
-    );
+    const renderedNames = await list.visibleQueueNames();
+    // The run-unique queue 2 (name contains TESTRUNID) must be present — a dropped query result would lose it.
+    expect(
+      renderedNames,
+      'OP-02: this run\'s operator-excluded queue 2 (run-unique name) must be rendered (catches a dropped query result)',
+    ).toContain(QUEUE2_NAME);
+    // …and queue 1 (asserted present above) — both seeded run queues are rendered.
+    expect(renderedNames, 'OP-02: this run\'s seeded queue 1 must be rendered').toContain(QUEUE1_NAME);
+    // No run-scoped queue silently dropped: the list shows at least as many QUEUE1/QUEUE2-named rows as
+    // Firestore holds for this run (other runs\' leftover same-named queue-1 rows only ever ADD to this).
+    const renderedRunRows = renderedNames.filter((n) => n === QUEUE1_NAME || n === QUEUE2_NAME);
     expect(
       renderedRunRows.length,
-      'OP-02: both seeded queues for this run should be rendered (admin sees all; catches a dropped query result)',
-    ).toBe(liveSeeded.length);
+      'OP-02: the rendered list must include at least this run\'s seeded queues (no dropped query result)',
+    ).toBeGreaterThanOrEqual(liveSeeded.length);
 
     // [GAP] no `undefined` date cell — the date column rendered a real range string for each row.
     const dates = await list.rowDateCells();
@@ -307,7 +323,18 @@ test.describe('Operator — Queue Manager board (OP-01…OP-13, OP-02b, OP-09b)'
     expect(latest.currentstage, 'OP-04: the move row must record the destination stage').toBe(NONACTIVITY_DST);
     expect(latest.previousstage, 'OP-04: the move row must record the source stage').toBe(NONACTIVITY_SRC);
     // The board tags operator moves movedthrough 'queue manager' (operator.md §3.1b) — read the raw row.
-    const latestRaw = (await queryWhere('queue stage log', [['docid', '==', tokenId]], { orderBy: 'logdate' })).pop() as Record<string, unknown>;
+    // Fetch by docid WITHOUT an orderBy (the cloud project has no `queue stage log` composite index on
+    // `docid + logdate` — only profile_id+createdon / queueref+logdate exist, firestore.indexes.json — so
+    // an `orderBy:'logdate'` here throws FAILED_PRECONDITION on cloud). Re-select the SAME latest row that
+    // readLogRows already identified (by its logdocid, sorted in memory exactly as assertions.ts does), so
+    // the assertion is semantically unchanged: it reads movedthrough off the latest move row the app wrote.
+    const rawRows = await queryWhere('queue stage log', [['docid', '==', tokenId]]);
+    const latestRaw =
+      (rawRows.find(
+        (r) =>
+          (r as Record<string, unknown>).logdocid === latest.logdocid ||
+          (r as Record<string, unknown>).id === latest.logdocid,
+      ) as Record<string, unknown>) ?? (rawRows[rawRows.length - 1] as Record<string, unknown>);
     expect(latestRaw.movedthrough, 'OP-04: the move row must be tagged as a queue-manager (operator) move').toBe('queue manager');
 
     // [GAP] the token itself has studio fields cleared by the non-Activity move (operator.md §3.1a).
@@ -584,7 +611,7 @@ test.describe('Operator — Queue Manager board (OP-01…OP-13, OP-02b, OP-09b)'
   // ("queue stage log" creates). This is an emulator/CF event-delivery gap (collections whose onCreate
   // triggers got no events this run), NOT this spec's wiring — forcing it green would assert output the
   // product never produced. See productFindings; tracked for a CF/emulator-side fix.
-  test.fixme('OP-09b bulk-invite fan-out conserves (N invitations == N selected, all tokens→invited) and totalaccepted ++1 per accept only', async () => {
+  test('OP-09b bulk-invite fan-out conserves (N invitations == N selected, all tokens→invited) and totalaccepted ++1 per accept only', async () => {
     // This is a CF-side-effect conservation case (the anti-circularity rule's branch (b): assert values
     // the CF computed against a KNOWN seeded N). The operator UI writes ONE `bulk invitation` doc
     // (CreateBulkInvitationComponent.sendInvitation, verified shape); we create that exact trigger doc as
@@ -672,6 +699,36 @@ test.describe('Operator — Queue Manager board (OP-01…OP-13, OP-02b, OP-09b)'
     const board = new QueueBoardPage(page);
     await board.selectQueue(QUEUE1_NAME);
 
+    // Capture the pre-filter Total only ONCE the board's stream-computed value has SETTLED. selectQueue's
+    // "Staging Queue..." loader is NOT a reliable readiness signal on cloud: the component closes that
+    // dialog UNCONDITIONALLY and synchronously (dynamic-queue-manager-clone.component.ts:1856) right after
+    // registering the queue_token subscription — its count-based close (count>=6) is unreachable (only 3
+    // streams increment), so the loader is gone before the queue_token collectionData has landed. The board
+    // therefore still shows its initial `totalParticipants = 0` (ts:174) for a tick, and a one-shot
+    // readTotalParticipants() here samples that stale 0 (the cloud round-trip widens the window). Anti-
+    // circular & faithful: poll until the board's OWN stream-computed Total converges on the live Firestore
+    // count of Active tokens for queue 1 (the same reconciliation OP-03 asserts and OP-13's convergence
+    // rationale), then snapshot it as the real pre-filter baseline. The product assertion below (clearing
+    // restores this EXACT Total) is unchanged.
+    const queue1ActiveFilter: WhereClause[] = [
+      ['testrunid', '==', TESTRUNID],
+      ['queueref', '==', db().collection('queue generation').doc(QUEUE1_DOCID)],
+      ['tokenstatus', '==', 'Active'],
+    ];
+    await expect
+      .poll(
+        async () => {
+          const total = await board.readTotalParticipants();
+          const activeTokens = await countWhere('queue_token', queue1ActiveFilter);
+          return total === activeTokens && total > 0;
+        },
+        {
+          timeout: 30_000,
+          message:
+            'OP-10: the board Total never settled to the live Active-token count for queue 1 (queue_token stream not yet rendered after selectQueue)',
+        },
+      )
+      .toBe(true);
     const totalBefore = await board.readTotalParticipants();
     expect(await board.filterBadgeCount(), 'OP-10: no filter should be active initially').toBe(0);
 

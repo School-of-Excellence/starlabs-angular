@@ -331,7 +331,6 @@ async function assertUniversalAfterHop(
   tokenDocId: string,
   loggedSoFar: number,
   minNonSelfSoFar: number,
-  expectSiblings: number,
 ): Promise<void> {
   // EVERY-MOVE-LOGGED depends on a live Firestore write the PRODUCT just made; poll until the row count
   // reaches the expected total before the strict assertion (tolerate stream/write lag without weakening).
@@ -342,7 +341,11 @@ async function assertUniversalAfterHop(
     })
     .toBe(loggedSoFar);
 
-  await assertNoOrphan(tokenDocId, { expectSiblings });
+  // NO-ORPHAN: the seeder gives EACH cohort participant a UNIQUE profile_id (`${run}_pf_<tag>_<i>`,
+  // seed-test-project.js seedParticipantToken:553), so the (testrunid, profile_id) cohort the
+  // invariant queries is always EXACTLY this one token — expectSiblings is 1 regardless of cohort N
+  // (cohort N is the BOARD-population conservation invariant, NOT a per-profile sibling count).
+  await assertNoOrphan(tokenDocId, { expectSiblings: 1 });
   await assertEveryMoveLogged(tokenDocId, loggedSoFar, { minNonSelf: minNonSelfSoFar });
   await assertNoStageSkipped(tokenDocId, MODEL, VID);
   await assertLoopBound(tokenDocId, 2);
@@ -455,7 +458,7 @@ test.describe(`V5 · ${VARIATION_NAME} (${VID}) — forward-journey walk + Move-
         logged += 1;
         if (wasReal || hop.kind === 'AUTO') minNonSelf += 1; // a board move OR an AUTO gate hop is non-'self'
 
-        await assertUniversalAfterHop(tokenDocId, logged, minNonSelf, cohortN);
+        await assertUniversalAfterHop(tokenDocId, logged, minNonSelf);
 
         // NO-STAGE-SKIPPED, sharpened: the LATEST product-logged transition is exactly this oracle hop.
         const trail = await observedTransitions(tokenDocId);
@@ -540,7 +543,9 @@ test.describe(`V5 · ${VARIATION_NAME} (${VID}) — forward-journey walk + Move-
       );
 
       // LOOP-BOUND holds at i (≤2); no-orphan / no-stage-skipped hold (self-loop is a legal scoped edge).
-      await assertNoOrphan(tokenDocId, { expectSiblings: SEED.tokenIds.length });
+      // expectSiblings: 1 — each participant has a UNIQUE profile_id, so its (run, profile_id) cohort is
+      // exactly this one token (NOT the cohort N; seed-test-project.js seedParticipantToken:553).
+      await assertNoOrphan(tokenDocId, { expectSiblings: 1 });
       await assertNoStageSkipped(tokenDocId, MODEL, VID);
       await assertLoopBound(tokenDocId, 2);
     }
@@ -631,15 +636,28 @@ test.describe(`V5 · ${VARIATION_NAME} (${VID}) — forward-journey walk + Move-
   });
 
   // -----------------------------------------------------------------------------------------------
-  // SPECIALIST STUDIO HOP — the Diagnostics → ATC Briefing forward decision driven through the REAL
+  // SPECIALIST STUDIO HOP — a Diagnostics → ATC Preparation forward decision driven through the REAL
   // Dynamic Studio move-next button (the specialist surface), so the suite MIXES the operator board
   // AND the specialist studio for V5's central studio-engine stage. Wires the in-studio link as a
   // PRECONDITION (token instudio + a live-assignment + a live pairing the acting member belongs to),
   // then drives the REAL moveNext and asserts the PRODUCT's stage-log row + token advance + the
   // universal invariants. If the live panel / move-next button cannot render in this environment, the
   // test records a FINDING and SKIPs — the sim is NEVER substituted for the real specialist move.
+  //
+  // WHY ATC Preparation (not ATC Briefing): the studio move-next handler `moveStage(stage, markascompleted)`
+  // (dynamic-studio.component.ts:1274) routes a `markascompleted:true` forward hop (ATC Briefing, "Send for
+  // ATC Briefing" — sample-queue-config Diagnostics.nextstage) through the `inviteMore(true)` +
+  // `HoldAlertDialogComponent` REVIEW branch (ts:1353-1406, recon studio.md SS-12 §181), which requires an
+  // Assign-Specialist submission the shared `StudioPage.moveNext` page object does not drive. A
+  // `markascompleted:false` forward hop instead routes through the `StageIncompleteConfirmationComponent`
+  // (ts:1274/1284) that `moveNext` DOES drive (fills the required reason + Submit). ATC Preparation is the
+  // V5 `markascompleted:false` forward operator edge from Diagnostics (flow-config.md §2 V5 row Diagnostics:
+  // `OP→ATC Preparation {¬done}`), so it exercises a REAL specialist studio forward move end-to-end without
+  // a page-object change. (On the emulator this case skipped via the finding hatch because the live panel
+  // never mounted; on real cloud Firestore it mounts, surfacing that the chosen ATC-Briefing target needs
+  // the un-drivable review branch — the retarget is the wiring fix, never a sim substitution.)
   // -----------------------------------------------------------------------------------------------
-  test('PFC-WF-01 · specialist studio move-next drives Diagnostics → ATC Briefing on the REAL studio surface', async ({
+  test('PFC-WF-01 · specialist studio move-next drives Diagnostics → ATC Preparation on the REAL studio surface', async ({
     page,
   }) => {
     // Use the 2nd cohort member so the per-journey walked token (member 0) is untouched.
@@ -647,12 +665,12 @@ test.describe(`V5 · ${VARIATION_NAME} (${VID}) — forward-journey walk + Move-
     const tokenDocId: string = member.tokenId;
     const profileId: string = member.profileid;
     const FROM = S.diagnostics;
-    const TO = S.atcBriefing;
+    const TO = S.atcPrep;
 
-    // The Diagnostics→ATC Briefing hop must be a legal forward operator edge in V5 (assert against oracle).
+    // The Diagnostics→ATC Preparation hop must be a legal forward operator edge in V5 (assert against oracle).
     expect(
       outEdgesForVariation(MODEL, FROM, VID).some((e: any) => e.to === TO && e.type === 'next'),
-      `V5 Diagnostics must offer a forward operator edge to ATC Briefing`,
+      `V5 Diagnostics must offer a forward operator edge to ${TO}`,
     ).toBe(true);
 
     // Clean the token's prior rows so EVERY-MOVE-LOGGED counts only this hop (re-runnable precondition).
@@ -762,8 +780,9 @@ test.describe(`V5 · ${VARIATION_NAME} (${VID}) — forward-journey walk + Move-
       return;
     }
 
-    // REAL specialist action: moveStage(ATC Briefing). The PRODUCT advances the token + writes ONE
-    // `queue stage log` row (movedby/movedthrough studio) — we assert THAT output, never a seeded value.
+    // REAL specialist action: moveStage(ATC Preparation) → the StageIncompleteConfirmation path (a
+    // `markascompleted:false` forward hop). The PRODUCT advances the token + writes ONE `queue stage log`
+    // row (movedby=specialist / movedthrough='studio') — we assert THAT output, never a seeded value.
     await studio.moveNext(TO);
 
     // Wait for the product to advance the token, then assert the universal invariants on its output.
@@ -784,10 +803,12 @@ test.describe(`V5 · ${VARIATION_NAME} (${VID}) — forward-journey walk + Move-
       .toBe(1);
     await assertEveryMoveLogged(tokenDocId, 1, { minNonSelf: 1 });
     await assertNoStageSkipped(tokenDocId, MODEL, VID);
-    await assertNoOrphan(tokenDocId, { expectSiblings: SEED.tokenIds.length });
+    // expectSiblings: 1 — this member's profile_id is unique to it (seedParticipantToken:553), so its
+    // (run, profile_id) cohort is exactly this one token, not the seeded cohort N.
+    await assertNoOrphan(tokenDocId, { expectSiblings: 1 });
     const trail = await observedTransitions(tokenDocId);
     expect(trail[trail.length - 1].from, 'studio move originates at Diagnostics').toBe(FROM);
-    expect(trail[trail.length - 1].to, 'studio move lands on ATC Briefing').toBe(TO);
+    expect(trail[trail.length - 1].to, `studio move lands on ${TO}`).toBe(TO);
   });
 });
 

@@ -105,7 +105,7 @@
 import { test, expect, Page } from '@playwright/test';
 import { QueueBoardPage } from '../pages/queue-board.page';
 import { StudioPage } from '../pages/studio.page';
-import { loginAsOperator, loginAsSpecialist } from '../support/auth';
+import { loginAsOperator } from '../support/auth';
 import { TESTRUNID, QUEUE_NAME } from '../support/actors';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from '../support/console-guard';
 import { installDeliveryStatusSpy, waitForDeliveryStatusCalls } from '../support/delivery-status-spy';
@@ -474,7 +474,11 @@ async function driveStudioHop(
   await detachTokenFromStudio(ctx.tokenDocId, hop.to);
 
   // Re-focus the operator board (the studio move happened on /dynamicstudio) so its stream re-renders.
-  await loginAsOperator(page);
+  // NO re-login here: the operator session established by the caller persists across the
+  // /dynamicstudio→/dynamicqueuemanager navigation (the shared `loginAs` never logged us out, and re-
+  // calling it while authed hangs on the absent login form). board.selectQueue → open() navigates back to
+  // the board via page.goto and re-subscribes the queue_token stream — exactly the V7 sibling's pattern
+  // (up-next-cycle.spec.ts:512-514 re-focuses the board with selectQueue and no second login).
   await board.selectQueue(QUEUE_NAME);
   const after = await pollColumnCounts(board, hop.from, before[hop.from] - 1);
   assertCountConserved(before, after, { src: hop.from, dst: hop.to });
@@ -496,9 +500,16 @@ async function tryStudioMove(
   // REAL moveStage, never these seeded values).
   await linkTokenIntoScopeEnhancementStudio(ctx.tokenDocId, ctx.queueGenDocId);
 
-  // Act as the seeded studio member: log in as a real specialist to pass authGuard, then the
-  // ?profileid override resolves studioList/live-assignment to the seeded pairing.
-  await loginAsSpecialist(page, 0);
+  // Act as the seeded studio member WITHOUT any mid-test login (mirrors the V7 sibling exactly —
+  // up-next-cycle.spec.ts:494-498, which logs in ONCE per test then only navigates via page objects). The
+  // caller (UP3-WF-01-HAPPY) is ALREADY signed in as the operator, and the shared `loginAs` does NOT log
+  // out — so re-invoking ANY login helper here (loginAsSpecialist OR loginAsOperator) makes `page.goto('/')`
+  // redirect off /login (the operator is still authed) and `loginAs` then hangs forever on the absent email
+  // input — the observed 240s cloud timeout. Instead we keep the persistent operator session and just
+  // navigate to the studio: the seeded `dashboard` route-config grants /dynamicstudio to ALL staff roles
+  // (seed-test-project.js:409-411 `allRoles`), so the operator's `admin` role admits the route, and the
+  // `?profileid` hook (dynamic-studio.component.ts:160,171) makes the page ACT as the seeded Scope
+  // Enhancement specialist for this token's live session.
   const studio = new StudioPage(page);
   await studio.load(SPECIALIST_PROFILE_ID);
 
@@ -981,6 +992,20 @@ test.describe('V8 · uP! - 3rd Cycle — every forward journey entry→terminal 
 
       /** The trail-only universal invariants (COUNT-DRIFT is asserted inline around each board move). */
       async function assertTrailInvariants(_ctx: string): Promise<void> {
+        // Let the PRODUCT's `queue stage log` write SETTLE before the strict row-count assertion (same
+        // guard the UP3-WF-01-HAPPY walk uses in assertUniversalAfterHop). The board move advances the
+        // token via the live `queue_token` stream (which `pollColumnCounts` waits on for COUNT-DRIFT), but
+        // the matching stage-log row lands in a SEPARATE collection that propagates independently — on real
+        // cloud Firestore that row can trail the token update by a beat, so reading it the instant
+        // pollColumnCounts resolves can catch N-1 rows (the observed cloud miss: 9 found, 10 expected). This
+        // ONLY waits for the row to appear; it does NOT relax the assertion below (still exact == expectedRows
+        // with the same non-self lower bound).
+        await expect
+          .poll(async () => (await observedTransitions(tokenDocId)).length, {
+            timeout: 30_000,
+            message: `[journey] exactly ${expectedRows} stage-log row(s) expected for ${tokenDocId} after this transition (the product's async write must settle first).`,
+          })
+          .toBe(expectedRows);
         await assertNoOrphan(tokenDocId);
         await assertEveryMoveLogged(tokenDocId, expectedRows, { minNonSelf: expectedNonSelf });
         await assertNoStageSkipped(tokenDocId, MODEL, VID);

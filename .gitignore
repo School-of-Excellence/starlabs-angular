@@ -59,6 +59,7 @@ watson-cloud-functions/
 # e2e run artifacts (not committed)
 e2e/node_modules/
 e2e/playwright-report/
+e2e/blob-report/
 e2e/test-results/
 e2e/.angular/
 e2e/results.xml
