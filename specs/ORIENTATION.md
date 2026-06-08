@@ -13,7 +13,7 @@
 - **Production is read-only.** Use the service accounts only to read. Test users (incl. admin) live in `starlabs-test`/emulator, never prod.
 
 ## The system is THREE Firebase projects (email-joined)
-| Project | Role | Service file (in `~/Downloads/`) |
+| Project | Role | Service file (in `~/solarcode/` on `antano`; NOT `~/Downloads` — TCC) |
 |---|---|---|
 | `fir-sample-aae4a` | **StarLabs** — delivery, participants, content, **mode engine** | `serviceAccountKeyProduction.json` |
 | `watsonproduction-becde` | **Watson** — finance: purchases, payments, EMI/NACH, invoices | `watson_servicefile.json` (has a text prefix + NBSP indentation — strip both) |
@@ -25,7 +25,10 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 **Branches (important):** Angular work is on **`docs/system-documentation-prod`** — cut from `origin/production` (today's live code). **Do NOT use `main`** — it is 308 commits / 234 files stale (frozen 2026-04-17). The CF backend repo is on **`development`**.
 
 ## The read-only data harness
-`~/Downloads/svstats/` — Node + `firebase-admin`. Pattern: `cd ~/Downloads/svstats && node <probe>.js`. The query scripts for each investigation are **copied into the repo** under `specs/journals/<date>-<topic>-artifacts/` with a `DATA_OUTPUTS.txt` of the captured data. (`firebase-admin` already installed there.)
+`<harness>/` — Node + `firebase-admin`. Pattern: `cd <harness> && node <probe>.js`. The query scripts for each investigation are **copied into the repo** under `specs/journals/<date>-<topic>-artifacts/` with a `DATA_OUTPUTS.txt` of the captured data.
+- **⚠️ macOS TCC gotcha (learned 2026-06-05):** do **NOT** keep the harness or the service-account JSONs under `~/Downloads`, `~/Desktop`, or `~/Documents` — those are TCC-protected and the shell gets `Operation not permitted` on every read/`mv` (Finder still works, which is misleading). Put them under a non-protected dir.
+- **On the `antano` machine:** harness = `~/solarcode/starlabs-svstats/`; SA files = `~/solarcode/serviceAccountKeyProduction.json` + `~/solarcode/watson_servicefile.json`. `firebase-admin@13.10.0` installed there.
+- The probe scripts **hardcode absolute SA/output paths** — on a new machine, `sed` them to the local location (they were authored on a `/Users/solar/Downloads/...` machine).
 
 ## Documentation map (what to read for what)
 - **`specs/validated/`** = the **authoritative, operator-validated** truth (supersedes the auto-docs per topic). `README.md` is the validation-sequence index.
@@ -41,7 +44,7 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 | 1 | Journey & Products | ✅ validated → `validated/01` |
 | 2 | Product Modes | ✅ **fully mapped** → `validated/02` §7 (`participantmode.js` engine) + §7d (`participantmetadata.js` projection) |
 | 3 | Queue Manager | ✅ **validated** → `validated/03` (+ `specs/queue-flow-visualizer/`) |
-| 4 | Dynamic Studio | ⏳ **next** (boundary = `live assignment` creation; the studio runtime — `arena participant` stageroles, OpenVidu/Zoom rooms, where ATC widgets get clicked) |
+| 4 | Dynamic Studio | 🟡 **DRAFT** → `validated/04` (investigated 2026-06-05; awaiting operator sign-off). Studio runtime `/dynamicstudio`. **data-widgets vs action-widgets** + hybrids; boundary = `live assignment` create **confirmed**; **84% solo, video ~99% Zoom** (LiveKit dead), 100% manual pairing. Open Qs in §10 |
 | 5 | Appointment System | ⏳ pending |
 | 6 | Events, Arena & Calendar | ⏳ pending |
 
@@ -61,7 +64,7 @@ This folder is **one git repo** with **separate git repos nested inside it** (al
 - **`starlabs-cloud-function/`** = the StarLabs backend, **its own repo** (`github.com/School-of-Excellence/starlabs-cloud-function`). On a fresh machine you must **clone it into this exact nested path and `git checkout development`** — it will NOT be here otherwise, and `validated/02`/`03` cite it.
 - **`Watson-Angular/`, `watson-cloud-functions/`** = separate repos (finance/Watson); clone only if needed.
 - **`graphify-out/`** (gitignored, ~26MB) = the knowledge graph — not committed; rebuild with `/graphify .` (+ the CF repo) if you want it.
-- The **read-only probe harness** lives outside the repo (`~/Downloads/svstats/` + the production service-account JSON) — copy it + the SA file to the new machine to re-run probes. Key queue probes are also archived in `specs/journals/2026-06-05-queue-manager-artifacts/`.
+- The **read-only probe harness** lives outside the repo (the `starlabs-svstats/` folder + the two service-account JSONs) — copy them to the new machine to re-run probes, but **NOT into `~/Downloads`/`~/Desktop`/`~/Documents`** (macOS TCC blocks shell reads there — see "The read-only data harness" above). On `antano` they live in `~/solarcode/`. After copying, `sed` the hardcoded paths in the `.js` probes to the local location, and `npm install firebase-admin`. Key queue probes are also archived in `specs/journals/2026-06-05-queue-manager-artifacts/`.
 
 ## Gotchas (this repo specifically)
 - **Folder names have spaces** ("Journey Onboarding", "queue system"…) → `grep --include=*.ts` and unquoted `xargs` BREAK. Use `find … -print0 | xargs -0 grep`.
