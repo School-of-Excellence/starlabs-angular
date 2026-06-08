@@ -104,6 +104,216 @@
         {{currentfailedRate}} New Messages Failed
       </div>
     </div>
+
+        <div class="followup-card" (click)="openFailuresDialog()">
+          <div class="followup-card-header">
+            <div class="followup-icon-wrap">
+              <mat-icon class="send-icon">send</mat-icon>
+            </div>
+            <span class="followup-title">Follow-up status</span>
+            <mat-icon class="chevron-icon">chevron_right</mat-icon>
+          </div>
+
+          <div class="followup-sent-count">
+            <span class="sent-number">{{ totalFollowUpSent }}</span>
+            <span class="sent-label">sent</span>
+          </div>
+
+        <div class="followup-breakdown">
+          <div class="followup-row">
+            <mat-icon class="row-icon resolved-icon">check_circle</mat-icon>
+            <span class="row-label">Resolved</span>
+            <span class="row-value resolved-value">{{ resolvedCount }}</span>
+          </div>
+          <div class="followup-row">
+            <mat-icon class="row-icon watching-icon">radio_button_checked</mat-icon>
+            <span class="row-label">Watching</span>
+            <span class="row-value watching-value">{{ watchingCount }}</span>
+          </div>
+          <div class="followup-row">
+            <mat-icon class="row-icon no-response-icon">schedule</mat-icon>
+            <span class="row-label">No response</span>
+            <span class="row-value no-response-value">{{ noResponseCount }}</span>
+          </div>
+        </div>
+        </div>
+
+        <div *ngIf="showFailuresDialog" class="failures-overlay" (click)="closeFailuresDialog()">
+          <div class="failures-panel" (click)="$event.stopPropagation()">
+
+            <div class="failures-header">
+          <div>
+            <h2 class="failures-title">Failure triage</h2>
+            <p class="failures-subtitle">
+              {{ totalFailedParticipants }} unique failed Participants across {{ totalFailedBroadcasts }} broadcasts
+              · {{ needsFollowUpCount }} awaiting follow-up
+            </p>
+          </div>
+
+          <div class="failures-header-actions">
+            <button mat-raised-button class="action-btn-compact whatsapp-btn"
+                    [disabled]="selectedFailureCount === 0"
+                    (click)="sendFailureFollowUpWhatsApp(); $event.stopPropagation()">
+              <mat-icon>chat</mat-icon>
+              <span>WhatsApp</span>
+              <span class="count-bubble" *ngIf="selectedFailureCount > 0">{{ selectedFailureCount }}</span>
+            </button>
+
+            <button mat-raised-button class="action-btn-compact email-btn"
+                    [disabled]="selectedFailureCount === 0"
+                    (click)="sendFailureFollowUpEmail(); $event.stopPropagation()">
+              <mat-icon>email</mat-icon>
+              <span>Email</span>
+              <span class="count-bubble" *ngIf="selectedFailureCount > 0">{{ selectedFailureCount }}</span>
+            </button>
+
+            <button mat-icon-button (click)="closeFailuresDialog()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+
+            <div class="failures-tabs">
+              <button
+                *ngFor="let tab of failureTabs"
+                class="failure-tab"
+                [class.active]="activeFailureTab === tab.key"
+                (click)="setFailureTab(tab.key)">
+                {{ tab.label }}
+                <span class="tab-count">{{ tab.count }}</span>
+              </button>
+            </div>
+
+            <div class="failures-table-wrap">
+              <table mat-table [dataSource]="failureTableSource" class="failures-table">
+
+                <!-- Participant Column -->
+                <ng-container matColumnDef="Participant">
+          <th mat-header-cell *matHeaderCellDef>PARTICIPANT</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="Participant-cell">
+              <mat-checkbox
+                *ngIf="row.channelStatus === 'Not sent'"
+                [checked]="row.selected"
+                (change)="toggleFailureSelection(row)"
+                (click)="$event.stopPropagation()"
+                color="primary"
+                style="margin-right: 8px;">
+              </mat-checkbox>
+              <span *ngIf="row.channelStatus !== 'Not sent'" style="width: 40px; display:inline-block;"></span>
+
+              <div class="avatar-circle" [style.background-color]="getAvatarColor(row.name)">
+                {{ getInitials(row.name) }}
+              </div>
+              <div>
+                <div class="Participant-name">{{ row.name }}</div>
+                <div class="Participant-sub">{{ row.cohort }}</div>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="broadcast">
+          <th mat-header-cell *matHeaderCellDef>CHANNEL</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="broadcast-cell">
+              <mat-icon class="broadcast-icon">campaign</mat-icon>
+              <div>
+                <div class="broadcast-name">{{ row.broadcastName }}</div>
+                <div class="broadcast-meta">{{ row.broadcastCategory }} · {{ row.broadcastTime | date:'h:mm a' }}</div>
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="failure">
+          <th mat-header-cell *matHeaderCellDef>FAILURE</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="failure-badge"
+                  [ngClass]="{
+                    'failure-app-not-linked': row.failureReason === 'App not linked',
+                    'failure-delivery-error': row.failureReason === 'Delivery error',
+                    'failure-unknown':        row.failureReason === 'Unknown error'
+                  }">
+              <mat-icon class="failure-badge-icon">
+                {{ row.failureReason === 'App not linked' ? 'phonelink_erase'
+                : row.failureReason === 'Delivery error' ? 'cloud_off'
+                : 'error_outline' }}
+              </mat-icon>
+              <span [matTooltip]="row.rawFailureReason" matTooltipPosition="above">
+                {{ row.failureReason }}
+              </span>
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="age">
+          <th mat-header-cell *matHeaderCellDef>LAST SENT</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="age-cell">
+            <div class="age-ago">{{ getAgeLabel(row.ageMinutes) }}</div>
+            <div class="age-time">{{ row.sentAt | date:'d MMM, h:mm a' }}</div>
+          </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="channelStatus" >
+          <th mat-header-cell *matHeaderCellDef>CHANNEL STATUS</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="channel-status-badge"
+                  [ngClass]="{
+                    'status-delivered-read': row.channelStatus === 'Delivered · Read',
+                    'status-not-sent':       row.channelStatus === 'Not sent',
+                    'status-failed':         row.channelStatus === 'Failed',
+                    'status-sent':           row.channelStatus === 'Sent'    
+                  }">
+              <mat-icon class="status-icon">
+                {{ row.channelStatus === 'Delivered · Read' ? 'check_circle'
+                : row.channelStatus === 'Sent'             ? 'send'
+                : row.channelStatus === 'Not sent'         ? 'remove_circle_outline'
+                : 'cancel' }}
+              </mat-icon>
+              {{ row.channelStatus }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="followUp">
+          <th mat-header-cell *matHeaderCellDef>FOLLOW-UP</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="followup-status-cell">
+              <span class="followup-status-badge"
+              [ngClass]="{
+                'fu-resolved':      row.followUpStatus === 'Resolved',
+                'fu-watching':      row.followUpStatus === 'Watching',
+                'fu-no-response':   row.followUpStatus === 'No response',
+                'fu-needs-followup': row.followUpStatus === 'Needs follow-up'
+              }">
+          <mat-icon class="fu-icon">
+            {{ row.followUpStatus === 'Resolved'       ? 'check_circle'
+            : row.followUpStatus === 'Watching'       ? 'radio_button_checked'
+            : row.followUpStatus === 'Needs follow-up' ? 'notification_important'
+            : 'schedule' }}
+          </mat-icon>
+          {{ row.followUpStatus }}
+        </span>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="failureColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: failureColumns;"
+            [class.needs-followup-row]="row.followUpStatus === 'Needs follow-up'"></tr>
+      </table>
+
+      <div *ngIf="failureTableSource.data.length === 0" class="no-failures">
+        <mat-icon>check_circle_outline</mat-icon>
+        <span>No failures in this category</span>
+      </div>
+    </div>
+
+  </div>
+</div>
   </div>
 
   <!-- Data Table -->
@@ -147,6 +357,23 @@
         </td>
       </ng-container>
 
+<ng-container matColumnDef="actionClicks">
+  <th mat-header-cell *matHeaderCellDef>Action Clicks</th>
+  <td mat-cell *matCellDef="let element">
+
+    <span *ngIf="!hasButtons(element)" class="no-buttons-dash">—</span>
+
+    <button *ngIf="hasButtons(element)"
+            mat-stroked-button
+            class="action-clicks-btn"
+            (click)="openButtonClicksDialog(element, $event)">
+      <mat-icon>ads_click</mat-icon>
+      <span>{{ getTotalButtonClicks(element) }} clicks</span>
+    </button>
+
+  </td>
+</ng-container>
+
       <!-- Category Column — name resolved from categoryMap via metadata.category -->
       <ng-container matColumnDef="category">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
@@ -159,7 +386,7 @@
       <ng-container matColumnDef="sentTo">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Sent To</th>
         <td mat-cell *matCellDef="let element">
-          <button mat-flat-button (click)="openRecipientsDialog(element)">
+          <button mat-flat-button (click)="openParticipantDialog(element)">
             <mat-icon style="padding: 5px;">group</mat-icon>
             <span style="color: green;">✓ {{element.profilesuccess?.length || 0}} </span>
             <span style="color: red;">✗ {{element.profilefailed?.length || 0}} </span>
@@ -189,13 +416,11 @@
     <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
   </div>
 
-  <!-- Recipients Dialog -->
-  <div *ngIf="showRecipientsDialog" class="recipients-overlay" (click)="closeRecipientsDialog()">
-    <div class="recipients-dialog" (click)="$event.stopPropagation()">
+  <div *ngIf="showParticipantsDialog" class="Participants-overlay" (click)="closeParticipantsDialog()">
+    <div class="Participants-dialog" (click)="$event.stopPropagation()">
       <div class="dialog-header">
-        <h3>Recipient Details</h3>
+        <h3>Participant Details</h3>
         <div class="header-actions">
-          <!-- Load All Logs Button -->
           <button mat-stroked-button
                   *ngIf="!allLogsLoaded"
                   color="accent"
@@ -205,27 +430,25 @@
             {{isLoadingAllLogs ? 'Loading... ' + logsLoadingProgress + '%' : 'Load All Logs'}}
           </button>
 
-          <!-- Export Button -->
           <button mat-raised-button
                   color="primary"
-                  (click)="exportRecipientsToExcel()"
+                  (click)="exportParticipantsToExcel()"
                   [disabled]="!allLogsLoaded || isExporting"
                   [matTooltip]="!allLogsLoaded ? 'Load all logs first to enable export' : ''">
             <mat-icon>{{isExporting ? 'hourglass_empty' : 'file_download'}}</mat-icon>
             {{isExporting ? 'Exporting...' : 'Export'}}
           </button>
 
-          <button mat-icon-button (click)="closeRecipientsDialog()">
+          <button mat-icon-button (click)="closeParticipantsDialog()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
       </div>
 
       <div class="dialog-content">
-        <!-- Progress indicator -->
         <div *ngIf="!allLogsLoaded" class="logs-progress-container">
           <div class="logs-progress-info">
-            <span>Logs loaded: {{logsCheckedCount}} / {{totalRecipientsWithUserRef}}</span>
+            <span>Logs loaded: {{logsCheckedCount}} / {{totalParticipantsWithUserRef}}</span>
             <span>{{logsLoadingProgress}}%</span>
           </div>
           <div class="logs-progress-bar">
@@ -234,7 +457,6 @@
           <small class="logs-progress-hint">Click "Load All Logs" to enable export</small>
         </div>
 
-        <!-- Tab Buttons -->
         <div class="tab-buttons">
           <button mat-flat-button
                   [class.active-tab]="selectedTab === 'success'"
@@ -242,7 +464,7 @@
                   (click)="switchTab('success')"
                   class="tab-btn">
             <mat-icon>check_circle</mat-icon>
-            Success ({{filteredSuccessRecipients.length}})
+            Success ({{filteredSuccessParticipants.length}})
           </button>
           <button mat-flat-button
                   [class.active-tab]="selectedTab === 'failed'"
@@ -250,92 +472,90 @@
                   (click)="switchTab('failed')"
                   class="tab-btn">
             <mat-icon>error</mat-icon>
-            Failed ({{filteredFailedRecipients.length}})
+            Failed ({{filteredFailedParticipants.length}})
           </button>
         </div>
 
-        <!-- Search input -->
-        <mat-form-field appearance="outline" class="search-recipients">
+        <mat-form-field appearance="outline" class="search-Participants">
           <mat-icon matPrefix>search</mat-icon>
-          <input matInput placeholder="Search by name..." [(ngModel)]="recipientSearchText" (input)="filterRecipients()">
+          <input matInput placeholder="Search by name..." [(ngModel)]="ParticipantSearchText" (input)="filterParticipants()">
         </mat-form-field>
 
-        <!-- Loading indicator -->
         <div *ngIf="logsLoadingCount > 0" class="loading-indicator">
           <mat-icon class="spin">sync</mat-icon>
-          Loading logs for {{logsLoadingCount}} recipient(s)...
+          Loading logs for {{logsLoadingCount}} Participant(s)...
         </div>
 
         <!-- SUCCESS TAB -->
-        <div *ngIf="selectedTab === 'success'" class="recipients-table-container">
-          <table mat-table [dataSource]="getPaginatedSuccessRecipients()" class="recipients-table">
+        <div *ngIf="selectedTab === 'success'" class="Participants-table-container">
+          <table mat-table [dataSource]="getPaginatedSuccessParticipants()" class="Participants-table">
             <ng-container matColumnDef="name">
               <th mat-header-cell *matHeaderCellDef>Name</th>
-              <td mat-cell *matCellDef="let recipient">{{recipient.name}}</td>
+              <td mat-cell *matCellDef="let Participant">{{Participant.name}}</td>
             </ng-container>
 
             <ng-container matColumnDef="status">
               <th mat-header-cell *matHeaderCellDef>Status</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span class="status-badge success">{{recipient.status}}</span>
+              <td mat-cell *matCellDef="let Participant">
+                <span class="status-badge success">{{Participant.status}}</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="channel">
               <th mat-header-cell *matHeaderCellDef>Channel</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.appstatus" class="channel-badge app">{{recipient.appstatus}}</span>
-                <span *ngIf="recipient.webstatus" class="channel-badge web">{{recipient.webstatus}}</span>
-                <span *ngIf="!recipient.appstatus && !recipient.webstatus">-</span>
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.appstatus" class="channel-badge app">{{Participant.appstatus}}</span>
+                <span *ngIf="Participant.webstatus" class="channel-badge web">{{Participant.webstatus}}</span>
+                <span *ngIf="!Participant.appstatus && !Participant.webstatus">-</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="read">
               <th mat-header-cell *matHeaderCellDef>Read</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.logsLoading" class="log-status loading">
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.logsLoading" class="log-status loading">
                   <mat-icon class="spin">sync</mat-icon>
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked"
-                      [class.read-yes]="recipient.read === true"
-                      [class.read-no]="recipient.read === false">
-                  {{recipient.read ? 'true' : 'false'}}
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked"
+                      [class.read-yes]="Participant.read === true"
+                      [class.read-no]="Participant.read === false">
+                  {{Participant.read ? 'true' : 'false'}}
                 </span>
-                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+                <span *ngIf="!Participant.logsLoading && !Participant.logsChecked">-</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="clicked">
               <th mat-header-cell *matHeaderCellDef>Clicked</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.logsLoading" class="log-status loading">
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.logsLoading" class="log-status loading">
                   <mat-icon class="spin">sync</mat-icon>
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked"
-                      [class.clicked-yes]="recipient.clicked === 'Yes'"
-                      [class.clicked-unknown]="recipient.clicked === 'unknown'">
-                  {{recipient.clicked}}
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked"
+                      [class.clicked-yes]="Participant.clicked === 'Yes'"
+                      [class.clicked-unknown]="Participant.clicked === 'unknown'">
+                  {{Participant.clicked}}
                 </span>
-                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+                <span *ngIf="!Participant.logsLoading && !Participant.logsChecked">-</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="logStatus">
               <th mat-header-cell *matHeaderCellDef>Log Created</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.logsLoading" class="log-status loading">
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.logsLoading" class="log-status loading">
                   <mat-icon class="spin">sync</mat-icon> Loading...
                 </span>
-                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked && recipient.hasUserRef" class="log-status pending">
+                <span *ngIf="!Participant.logsLoading && !Participant.logsChecked && Participant.hasUserRef" class="log-status pending">
                   <mat-icon>schedule</mat-icon> Pending
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked && recipient.hasLogs" class="log-status success">
-                  <mat-icon>check_circle</mat-icon> Yes ({{recipient.logCount}})
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked && Participant.hasLogs" class="log-status success">
+                  <mat-icon>check_circle</mat-icon> Yes ({{Participant.logCount}})
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked && !recipient.hasLogs && recipient.hasUserRef" class="log-status warning">
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked && !Participant.hasLogs && Participant.hasUserRef" class="log-status warning">
                   <mat-icon>warning</mat-icon> No
                 </span>
-                <span *ngIf="!recipient.hasUserRef" class="log-status error">
+                <span *ngIf="!Participant.hasUserRef" class="log-status error">
                   <mat-icon>person_off</mat-icon> No user ref
                 </span>
               </td>
@@ -346,7 +566,7 @@
           </table>
 
           <mat-paginator
-            [length]="filteredSuccessRecipients.length"
+            [length]="filteredSuccessParticipants.length"
             [pageSize]="pageSize"
             [pageIndex]="successPageIndex"
             [pageSizeOptions]="pageSizeOptions"
@@ -354,89 +574,89 @@
             showFirstLastButtons>
           </mat-paginator>
 
-          <div *ngIf="filteredSuccessRecipients.length === 0" class="no-recipients">
+          <div *ngIf="filteredSuccessParticipants.length === 0" class="no-Participants">
             <mat-icon>check_circle_outline</mat-icon>
-            <span>No successful recipients</span>
+            <span>No successful Participants</span>
           </div>
         </div>
 
         <!-- FAILED TAB -->
-        <div *ngIf="selectedTab === 'failed'" class="recipients-table-container">
-          <table mat-table [dataSource]="getPaginatedFailedRecipients()" class="recipients-table">
+        <div *ngIf="selectedTab === 'failed'" class="Participants-table-container">
+          <table mat-table [dataSource]="getPaginatedFailedParticipants()" class="Participants-table">
             <ng-container matColumnDef="name">
               <th mat-header-cell *matHeaderCellDef>Name</th>
-              <td mat-cell *matCellDef="let recipient">{{recipient.name}}</td>
+              <td mat-cell *matCellDef="let Participant">{{Participant.name}}</td>
             </ng-container>
 
             <ng-container matColumnDef="status">
               <th mat-header-cell *matHeaderCellDef>Status</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span class="status-badge failed">{{recipient.status}}</span>
+              <td mat-cell *matCellDef="let Participant">
+                <span class="status-badge failed">{{Participant.status}}</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="reason">
               <th mat-header-cell *matHeaderCellDef>Reason</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span class="failed-reason" [title]="recipient.reason">{{recipient.reason}}</span>
+              <td mat-cell *matCellDef="let Participant">
+                <span class="failed-reason" [title]="Participant.reason">{{Participant.reason}}</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="channel">
               <th mat-header-cell *matHeaderCellDef>Channel</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.appstatus" class="channel-badge app-failed">{{recipient.appstatus}}</span>
-                <span *ngIf="recipient.webstatus" class="channel-badge web-failed">{{recipient.webstatus}}</span>
-                <span *ngIf="!recipient.appstatus && !recipient.webstatus">-</span>
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.appstatus" class="channel-badge app-failed">{{Participant.appstatus}}</span>
+                <span *ngIf="Participant.webstatus" class="channel-badge web-failed">{{Participant.webstatus}}</span>
+                <span *ngIf="!Participant.appstatus && !Participant.webstatus">-</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="read">
               <th mat-header-cell *matHeaderCellDef>Read</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.logsLoading" class="log-status loading">
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.logsLoading" class="log-status loading">
                   <mat-icon class="spin">sync</mat-icon>
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked"
-                      [class.read-yes]="recipient.read === true"
-                      [class.read-no]="recipient.read === false">
-                  {{recipient.read ? 'true' : 'false'}}
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked"
+                      [class.read-yes]="Participant.read === true"
+                      [class.read-no]="Participant.read === false">
+                  {{Participant.read ? 'true' : 'false'}}
                 </span>
-                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+                <span *ngIf="!Participant.logsLoading && !Participant.logsChecked">-</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="clicked">
               <th mat-header-cell *matHeaderCellDef>Clicked</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.logsLoading" class="log-status loading">
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.logsLoading" class="log-status loading">
                   <mat-icon class="spin">sync</mat-icon>
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked"
-                      [class.clicked-yes]="recipient.clicked === 'Yes'"
-                      [class.clicked-unknown]="recipient.clicked === 'unknown'">
-                  {{recipient.clicked}}
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked"
+                      [class.clicked-yes]="Participant.clicked === 'Yes'"
+                      [class.clicked-unknown]="Participant.clicked === 'unknown'">
+                  {{Participant.clicked}}
                 </span>
-                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked">-</span>
+                <span *ngIf="!Participant.logsLoading && !Participant.logsChecked">-</span>
               </td>
             </ng-container>
 
             <ng-container matColumnDef="logStatus">
               <th mat-header-cell *matHeaderCellDef>Log Created</th>
-              <td mat-cell *matCellDef="let recipient">
-                <span *ngIf="recipient.logsLoading" class="log-status loading">
+              <td mat-cell *matCellDef="let Participant">
+                <span *ngIf="Participant.logsLoading" class="log-status loading">
                   <mat-icon class="spin">sync</mat-icon> Loading...
                 </span>
-                <span *ngIf="!recipient.logsLoading && !recipient.logsChecked && recipient.hasUserRef" class="log-status pending">
+                <span *ngIf="!Participant.logsLoading && !Participant.logsChecked && Participant.hasUserRef" class="log-status pending">
                   <mat-icon>schedule</mat-icon> Pending
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked && recipient.hasLogs" class="log-status success">
-                  <mat-icon>check_circle</mat-icon> Yes ({{recipient.logCount}})
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked && Participant.hasLogs" class="log-status success">
+                  <mat-icon>check_circle</mat-icon> Yes ({{Participant.logCount}})
                 </span>
-                <span *ngIf="!recipient.logsLoading && recipient.logsChecked && !recipient.hasLogs && recipient.hasUserRef" class="log-status warning">
+                <span *ngIf="!Participant.logsLoading && Participant.logsChecked && !Participant.hasLogs && Participant.hasUserRef" class="log-status warning">
                   <mat-icon>warning</mat-icon> No
                 </span>
-                <span *ngIf="!recipient.hasUserRef" class="log-status error">
+                <span *ngIf="!Participant.hasUserRef" class="log-status error">
                   <mat-icon>person_off</mat-icon> No user ref
                 </span>
               </td>
@@ -447,7 +667,7 @@
           </table>
 
           <mat-paginator
-            [length]="filteredFailedRecipients.length"
+            [length]="filteredFailedParticipants.length"
             [pageSize]="pageSize"
             [pageIndex]="failedPageIndex"
             [pageSizeOptions]="pageSizeOptions"
@@ -455,13 +675,58 @@
             showFirstLastButtons>
           </mat-paginator>
 
-          <div *ngIf="filteredFailedRecipients.length === 0" class="no-recipients">
+          <div *ngIf="filteredFailedParticipants.length === 0" class="no-Participants">
             <mat-icon>error_outline</mat-icon>
-            <span>No failed recipients</span>
+            <span>No failed Participants</span>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+<div *ngIf="buttonClicksDialogOpen" class="Participants-overlay" (click)="closeButtonClicksDialog()">
+  <div class="Participants-dialog" (click)="$event.stopPropagation()">
+
+    <div class="dialog-header">
+      <h3>Action Button Clicks</h3>
+      <div class="header-actions">
+        <button mat-icon-button (click)="closeButtonClicksDialog()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="dialog-content">
+      <p class="button-clicks-subtitle">{{ currentButtonClicksTitle }}</p>
+
+      <div *ngFor="let btn of currentButtonClicks" class="button-click-section">
+
+        <div class="button-click-header">
+          <div class="button-click-label-row">
+            <mat-icon class="btn-icon">smart_button</mat-icon>
+            <span class="btn-label">{{ btn.label }}</span>
+          </div>
+          <span class="btn-click-count">{{ btn.clickers.length }} clicked</span>
+        </div>
+
+        <div *ngIf="btn.clickers.length > 0" class="clickers-list">
+          <div *ngFor="let c of btn.clickers" class="clicker-row">
+            <div class="avatar-circle small-avatar" [style.background-color]="getAvatarColor(c.name)">
+              {{ getInitials(c.name) }}
+            </div>
+            <span class="clicker-name">{{ c.name }}</span>
+          </div>
+        </div>
+
+        <div *ngIf="btn.clickers.length === 0" class="no-clickers">
+          <mat-icon>mouse</mat-icon>
+          <span>No clicks yet</span>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
 
 </div>

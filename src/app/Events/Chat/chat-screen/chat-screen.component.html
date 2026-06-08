@@ -269,15 +269,28 @@
       <!-- Chat Header -->
       <div class="chat-header-bar">
         <div class="chat-header-info">
-          <img [src]="selectedChat.chatprofile" class="header-avatar">
-          <div class="header-text">
-            <h3>
-              {{ selectedChat.chatname }}
-              <span *ngIf="isInactiveChatSelected" class="inactive-tag">(Inactive)</span>
-            </h3>
-            <p>{{ selectedChat.members?.length }} members • {{ selectedChat.chattype }}</p>
-          </div>
-        </div>
+  <!-- Clickable avatar → opens profile pic modal -->
+  <div class="header-avatar-wrap" (click)="openProfileModal($event, selectedChat)">
+    <img [src]="selectedChat.chatprofile" class="header-avatar">
+    <div class="header-avatar-overlay">
+      <mat-icon>photo_camera</mat-icon>
+    </div>
+  </div>
+
+  <div class="header-text">
+    <h3>
+      {{ selectedChat.chatname }}
+      <span *ngIf="isInactiveChatSelected" class="inactive-tag">(Inactive)</span>
+    </h3>
+    <p>
+      <span class="members-link"
+            (click)="openParticipantsPanel($event, selectedChat)">
+        {{ selectedChat.members?.length }} members
+      </span>
+      • {{ selectedChat.chattype }}
+    </p>
+  </div>
+</div>
 
         <!-- Selection Mode Actions -->
         <div *ngIf="selectionMode" class="selection-actions">
@@ -554,6 +567,18 @@
     </a>
   </div>
 
+  <!-- Buttons from metadata -->
+<div class="channel-buttons-section" 
+    *ngIf="message.buttons && parseChannelButtons(message.buttons).length > 0">
+  <a *ngFor="let btn of parseChannelButtons(message.buttons)"
+    [href]="btn.url"
+    target="_blank"
+    class="channel-action-btn">
+    <mat-icon class="channel-btn-icon">open_in_new</mat-icon>
+    <span>{{ btn.label }}</span>
+  </a>
+</div>
+
   <!-- Footer -->
   <div class="channel-footer-text" *ngIf="message.footer">
     {{ message.footer }}
@@ -800,7 +825,7 @@
       <span>Participants</span>
       <span class="participants-total-badge">{{ getTotalParticipantsCount(selectedMessageForParticipants) }}</span>
     </div>
-    <button mat-icon-button (click)="closeChannelParticipants()" matTooltip="Close">
+    <button mat-icon-button (click)="closeChannelParticipants()" matTooltip="Close" style="color: white;">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -895,7 +920,7 @@
         <mat-icon>campaign</mat-icon>
         <span>Send One-Way Communication</span>
       </div>
-      <button mat-icon-button (click)="closeChannelSendDialog()">
+      <button mat-icon-button (click)="closeChannelSendDialog()" style="color: white;">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -1006,6 +1031,77 @@
         Proceed ({{ selectedChannelParticipantsList.length }})
       </button>
     </div>
+  </div>
+</div>
+<!-- ── Profile Picture Modal ─────────────────────────────────────────── -->
+<div *ngIf="showProfileModal" class="profile-modal-overlay" (click)="closeProfileModal()">
+  <div class="profile-modal" (click)="$event.stopPropagation()">
+
+    <div class="profile-modal-header">
+      <span>Profile Picture</span>
+      <button mat-icon-button (click)="closeProfileModal()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="profile-modal-body">
+      <div class="profile-modal-img-wrap">
+        <img *ngIf="profileModalChat?.chatprofile"
+             [src]="profileModalChat?.chatprofile"
+             class="profile-modal-img"
+             alt="Profile Picture">
+        <div *ngIf="!profileModalChat?.chatprofile" class="profile-modal-placeholder">
+          <mat-icon>image</mat-icon>
+          <span>No profile picture</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-modal-footer" *ngIf="!isInactiveChatSelected">
+      <button mat-raised-button color="primary"
+              [disabled]="profileUploading"
+              (click)="triggerProfileUpload()">
+        <mat-spinner *ngIf="profileUploading" diameter="18" style="display:inline-block;margin-right:6px;"></mat-spinner>
+        <mat-icon *ngIf="!profileUploading">edit</mat-icon>
+        {{ profileUploading ? 'Uploading...' : (profileModalChat?.chatprofile ? 'Change Picture' : 'Add Picture') }}
+      </button>
+    </div>
+
+  </div>
+</div>
+<!-- ── Participants List Panel ───────────────────────────────────────── -->
+<div *ngIf="showParticipantsPanel" class="participants-list-overlay" (click)="closeParticipantsPanel()">
+  <div class="participants-list-panel" (click)="$event.stopPropagation()">
+
+    <div class="participants-list-header">
+      <div class="participants-list-title">
+        <mat-icon>group</mat-icon>
+        <span>Members</span>
+        <span class="participants-list-count">{{ participantsPanelList.length }}</span>
+      </div>
+      <button mat-icon-button (click)="closeParticipantsPanel()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="participants-list-body">
+      <div *ngFor="let profile of participantsPanelList" class="participants-list-item">
+        <div class="participants-list-avatar">
+          <img *ngIf="profile?.profile" [src]="profile.profile" [alt]="profile.name">
+          <mat-icon *ngIf="!profile?.profile">person</mat-icon>
+        </div>
+        <div class="participants-list-info">
+          <span class="participants-list-name">{{ profile?.name || 'Unknown' }}</span>
+          <span class="participants-list-email">{{ profile?.email || '—' }}</span>
+        </div>
+      </div>
+
+      <div *ngIf="participantsPanelList.length === 0" class="participants-list-empty">
+        <mat-icon>group_off</mat-icon>
+        <span>No members found</span>
+      </div>
+    </div>
+
   </div>
 </div>
 </div>

@@ -154,6 +154,16 @@ csdOpen = false;
 csdQuery = '';
 csdOptions: any[] = [];
 
+// profile picture view and edit
+showProfileModal: boolean = false;
+profileModalChat: any = null;
+profileUploading: boolean = false;
+
+// total participants in the channel dialog open
+showParticipantsPanel: boolean = false;
+participantsPanelChat: any = null;
+participantsPanelList: any[] = [];
+
 // pagination variables
   lastActiveChannelDoc: any = null;
   lastInactiveChannelDoc: any = null;
@@ -283,6 +293,22 @@ csdOptions: any[] = [];
   this.loadInitialChannels(true, baseFilter);
 }
 
+parseChannelButtons(buttons: any): { url: string; label: string }[] {
+  if (!buttons) return [];
+  if (Array.isArray(buttons)) {
+    return buttons.filter(btn => btn?.url && btn?.label);
+  }
+  if (typeof buttons === 'object') {
+    return Object.values(buttons).filter((btn: any) => btn?.url && btn?.label) as any[];
+  }
+  try {
+    const parsed = JSON.parse(buttons);
+    return Array.isArray(parsed) ? parsed.filter(btn => btn?.url && btn?.label) : [];
+  } catch {
+    return [];
+  }
+}
+
 private async loadInitialChannels(isInactive: boolean, baseFilter: any[]) {
   const q = query(
     this.supportchatCollection,
@@ -322,6 +348,90 @@ private async loadInitialChannels(isInactive: boolean, baseFilter: any[]) {
     console.error('load initial channels', e);
     this.chatlistloading = false;
   }
+}
+
+openProfileModal(event: Event, chat: any): void {
+  event.stopPropagation();
+  this.profileModalChat = chat;
+  this.showProfileModal = true;
+}
+
+closeProfileModal(): void {
+  this.showProfileModal = false;
+  this.profileModalChat = null;
+}
+
+triggerProfileUpload(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file || !this.profileModalChat) return;
+    this.profileUploading = true;
+    try {
+      const path = `channel-images/${Date.now()}_${file.name}`;
+      const storageRef = ref(this.storage, path);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      await updateDoc(
+        doc(this.firestore, 'supportchat', this.profileModalChat.docid),
+        { group_profile: url }
+      );
+      // Update local object so UI reflects immediately
+      this.profileModalChat.chatprofile = url;
+      // Also update in the list arrays
+      for (const list of [
+        this.activeChannelList, this.filteredActiveChannelList,
+        this.activeChatList,    this.filteredActiveChatList
+      ]) {
+        const item = list.find(c => c.docid === this.profileModalChat.docid);
+        if (item) item.chatprofile = url;
+      }
+      if (this.selectedChat?.docid === this.profileModalChat.docid) {
+        this.selectedChat.chatprofile = url;
+      }
+      this.snackBar.open('Profile picture updated', 'Close', { duration: 2000 });
+    } catch (err) {
+      console.error('Profile upload error', err);
+      this.snackBar.open('Error uploading image', 'Close', { duration: 2000 });
+    } finally {
+      this.profileUploading = false;
+    }
+  };
+  input.click();
+}
+
+openParticipantsPanel(event: Event, chat: any): void {
+  event.stopPropagation();
+  this.participantsPanelChat = chat;
+
+  const memberIds: string[] = chat.members || [];
+
+  this.participantsPanelList = memberIds
+    .map((profileDocId: string) => {
+      const idx = this.profileList.indexOf(profileDocId);
+      if (idx === -1) return null;
+
+      const uid = this.userListId[idx];
+      if (!uid) return null;
+
+      const profile = this.mapProfileuid[uid];
+      if (!profile) return null;
+
+      return { ...profile, profileDocId };
+    })
+    .filter((p: any) => p !== null);
+
+    console.log("participantslist :" ,this.participantsPanelList)
+
+  this.showParticipantsPanel = true;
+}
+
+closeParticipantsPanel(): void {
+  this.showParticipantsPanel = false;
+  this.participantsPanelChat = null;
+  this.participantsPanelList = [];
 }
 
 async loadMoreActiveChannels() {

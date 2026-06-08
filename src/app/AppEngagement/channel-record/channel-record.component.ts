@@ -2,12 +2,10 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/co
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { Subscription, Observable, startWith, map } from 'rxjs';
+import { Subscription, Observable, startWith, map, Subject, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import {
-  collection, collectionData, doc, Firestore, getDocs,
-  orderBy, query, where, getDoc
-} from '@angular/fire/firestore';
+  collection, collectionData, doc, Firestore, getDocs,orderBy, query, where, getDoc,updateDoc,arrayUnion,setDoc} from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -20,6 +18,12 @@ import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/ma
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import * as XLSX from 'xlsx';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { environment } from '../../../environments/environment';
+import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 
 @Component({
   selector: 'app-channel-record',
@@ -39,6 +43,8 @@ import * as XLSX from 'xlsx';
     MatButtonModule,
     MatAutocompleteModule,
     MatTooltipModule,
+    MatCheckboxModule,
+    MatDialogModule
   ],
   templateUrl: './channel-record.component.html',
   styleUrl: './channel-record.component.css'
@@ -49,7 +55,7 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
   @ViewChild(MatSort) sort: MatSort;
 
   displayedColumns: string[] = [
-    'logDateTime', 'channelName', 'message', 'category', 'sentTo', 'receivedRate'
+    'logDateTime', 'channelName', 'message', 'category', 'sentTo','actionClicks','receivedRate'
   ];
 
   notificationDataSource = new MatTableDataSource<any>();
@@ -92,17 +98,20 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
 
   allNotifications: any[] = [];
 
-  // ── Recipients dialog ─────────────────────────────────────────────────────
-  showRecipientsDialog: boolean = false;
+  // ── Participants dialog ─────────────────────────────────────────────────────
+  showParticipantsDialog: boolean = false;
   currentNotificationData: any = null;
   selectedTab: 'success' | 'failed' = 'success';
 
-  successRecipients: any[] = [];
-  failedRecipients: any[] = [];
-  filteredSuccessRecipients: any[] = [];
-  filteredFailedRecipients: any[] = [];
+  currentChannelId: string = '';
+  currentMessagesDocId: string = '';
 
-  recipientSearchText: string = '';
+  successParticipants: any[] = [];
+  failedParticipants: any[] = [];
+  filteredSuccessParticipants: any[] = [];
+  filteredFailedParticipants: any[] = [];
+
+  ParticipantSearchText: string = '';
 
   // Pagination inside dialog
   successPageIndex: number = 0;
@@ -113,16 +122,46 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
   // Log-loading state
   logsLoadingCount: number = 0;
   logsCheckedCount: number = 0;
-  totalRecipientsWithUserRef: number = 0;
+  totalParticipantsWithUserRef: number = 0;
   isLoadingAllLogs: boolean = false;
   isExporting: boolean = false;
 
-  NotificationReadUserID: string[] = [];
+   // Follow-up card counts
+  resolvedCount: number = 0;
+  watchingCount: number = 0;
+  noResponseCount: number = 0;
+  totalFollowUpSent: number = 0;
+  totalFailedParticipants: number = 0;
+  totalFailedBroadcasts: number = 0;
+ 
+  // Failures dialog
+  showFailuresDialog: boolean = false;
+  activeFailureTab: string = 'all';
+  failureColumns: string[] = ['Participant', 'broadcast', 'failure', 'age', 'channelStatus', 'followUp'];
+  failureTableSource = new MatTableDataSource<any>();
+  failureTabs: { key: string; label: string; count: number }[] = [];
+  selectedFailureProfileIds: Set<string> = new Set();
+
+  // button click event
+  buttonClicksDialogOpen: boolean = false;
+  currentButtonClicks: { label: string; url: string; clickers: { profileId: string; name: string }[] }[] = [];
+  currentButtonClicksTitle: string = '';
+ 
+  private allFailureRows: any[] = [];
+
+    private avatarColors = [
+    '#4f6bed', '#e85d9f', '#2bb06b', '#f5a623',
+    '#9b59b6', '#1abc9c', '#e74c3c', '#3498db'
+  ];
+
+  private destroy$ = new Subject<void>();
 
   constructor(
     private firestore: Firestore,
     private guard: AuthguardService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private dialog: MatDialog,        
+    private http: HttpClient 
   ) {}
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -136,13 +175,7 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
 
     // Load channels map (id -> name) from channels collection
     this.fetchChannelMap();
-
-    // Load users that have read a notification at the parent level
-    getDocs(query(collection(this.firestore, 'notifications'), where('read', '==', true)))
-      .then(snap => {
-        this.NotificationReadUserID = snap.docs.map(d => d.id);
-      })
-      .then(() => this.fetchData());
+    this.fetchData();
 
     // Load profile map
     this.guard.getProfileMap().then(data => {
@@ -154,7 +187,30 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.notificationSubscription?.unsubscribe();
+      this.destroy$.next();
+  this.destroy$.complete();
   }
+
+  private async fetchButtonClicksData(channelId: string, messagesDocId: string): Promise<{
+  buttons: { label: string; url: string }[];
+  button_clicks: { [label: string]: string[] };
+}> {
+  if (!channelId || !messagesDocId) return { buttons: [], button_clicks: {} };
+  try {
+    const messagesRef = collection(this.firestore, 'supportchat', channelId, 'messages');
+    const q = query(messagesRef, where('messageid', '==', messagesDocId));
+    const snap = await getDocs(q);
+    if (snap.empty) return { buttons: [], button_clicks: {} };
+    const data = snap.docs[0].data();
+    return {
+      buttons:       data['buttons']       || [],
+      button_clicks: data['button_clicks'] || {},
+    };
+  } catch (err) {
+    console.error('Error fetching button clicks:', err);
+    return { buttons: [], button_clicks: {} };
+  }
+}
 
   // ── Fetch categories from classify/channelcategories ──────────────────────
 
@@ -209,19 +265,469 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Resolve channel name from a notification record ───────────────────────
+  async buildFailureRows(notifications: any[]): Promise<void> {
+    const rowMap = new Map<string, any>();
+    const now = new Date();
+
+    await Promise.all(notifications.map(async notif => {
+      const failedProfiles: string[] = notif.profilefailed || [];
+      if (!failedProfiles.length) return;
+
+      const channelId  = notif?.metadata?.channelid || notif?.channelid || '';
+      const messagesId = notif?.metadata?.messageid || '';
+
+      const [readBySet, followUpSet, followUpSent] = await Promise.all([
+        this.fetchReadBySet(channelId, messagesId),
+        this.fetchFollowUpSet(channelId, messagesId),
+        this.fetchFollowUpSentStatus(channelId, messagesId),
+      ]);
+
+      const sentAt: Date = notif.date?.toDate ? notif.date.toDate() : new Date(notif.date);
+      const ageMinutes = Math.round((now.getTime() - sentAt.getTime()) / 60000);
+
+      for (const profileId of failedProfiles) {
+        if (rowMap.has(profileId)) continue;
+
+        const name   = this.mapProfile[profileId]     || 'Unknown';
+        const cohort = this.mapProfiledata[profileId]?.cohort || '';
+
+        const failedlist: { [id: string]: string } = notif.failedlist || {};
+        const rawReason: string = failedlist[profileId] || '';
+        const hasRead     = readBySet.has(profileId);
+        const hasFollowUp = followUpSet.has(profileId);
+
+        let failureReason: string;
+        if (!rawReason) {
+          failureReason = 'Unknown error';
+        } else if (
+          rawReason.toLowerCase().includes('no active fcm token') ||
+          rawReason.toLowerCase().includes('no user_ref') ||
+          rawReason.toLowerCase().includes('profile not found') ||
+          rawReason.toLowerCase().includes('registration-token-not-registered') ||
+          rawReason.toLowerCase().includes('invalid-registration-token')
+        ) {
+          failureReason = 'App not linked';
+        } else {
+          failureReason = rawReason;
+        }
+
+        const appFCMSuccess: string[] = notif.appFCMSuccess || [];
+        const webFCMSuccess: string[] = notif.webFCMSuccess || [];
+        const delivered = appFCMSuccess.includes(profileId) || webFCMSuccess.includes(profileId);
+
+        let followUpStatus: string;
+        let channelStatus: string;
+
+  const hasFollowUpSent = followUpSet.has(profileId);  
+
+  if (hasRead) {
+    followUpStatus = 'Resolved';
+    channelStatus  = 'Delivered · Read';
+  } else if (hasFollowUpSent) {
+    followUpStatus = 'Watching';
+    channelStatus  = 'Sent';
+  } else if (delivered && !hasRead) {
+    followUpStatus = 'Watching';
+    channelStatus  = 'Delivered';
+  } else {
+    followUpStatus = 'Needs follow-up';
+    channelStatus  = 'Not sent';
+  }
+
+        rowMap.set(profileId, {
+          profileId,
+          name,
+          cohort,
+          broadcastName:     notif.title || this.getChannelName(notif),
+          broadcastCategory: this.getCategoryName(notif),
+          sentAt,
+          ageMinutes,
+          failureReason,
+          rawFailureReason:  rawReason || 'No error detail available',
+          channelStatus,
+          followUpStatus,
+          notifDocId:    notif.docid,
+          messagesDocId: notif.metadata?.messageid || null,
+          channelId:     notif.metadata?.channelid || notif.channelid || null,
+          selected: false,
+        });
+      }
+    }));
+
+    this.allFailureRows = Array.from(rowMap.values());
+    this.computeFollowUpCounts(this.allFailureRows, notifications);  // ← updates card counts
+    this.setFailureTab(this.activeFailureTab || 'all');
+  }
+
+  getAgeLabel(ageMinutes: number): string {
+    if (ageMinutes < 60) {
+      return `${ageMinutes}m ago`;
+    } else if (ageMinutes < 1440) {         
+      const hours = Math.floor(ageMinutes / 60);
+      const mins  = ageMinutes % 60;
+      return mins > 0 ? `${hours}h ${mins}m ago` : `${hours}h ago`;
+    } else {
+      const days  = Math.floor(ageMinutes / 1440);
+      const hours = Math.floor((ageMinutes % 1440) / 60);
+      return hours > 0 ? `${days}d ${hours}h ago` : `${days}d ago`;
+    }
+  }
+
+  private async refreshFollowUpStatusForRows(
+    rows: any[],
+    channelId: string,
+    notifDocId: string
+  ): Promise<void> {
+      const notif       = this.allNotifications.find(n => n.docid === notifDocId);
+      const messagesId  = notif?.metadata?.messageid || '';       
+      const readBySet   = await this.fetchReadBySet(channelId, messagesId);
+      const followUpSent = await this.fetchFollowUpSentStatus(channelId, messagesId);
+
+      for (const row of rows) {
+        const appFCMSuccess: string[] = notif?.appFCMSuccess || [];
+        const webFCMSuccess: string[] = notif?.webFCMSuccess || [];
+        const delivered  = appFCMSuccess.includes(row.profileId) || webFCMSuccess.includes(row.profileId);
+        const hasRead    = readBySet.has(row.profileId);
+
+        let followUpStatus: string;
+        let channelStatus: string;
+
+    const followUpSet = await this.fetchFollowUpSet(channelId, messagesId);
+    const hasFollowUpSent = followUpSet.has(row.profileId);
+
+    if (hasRead) {
+      followUpStatus = 'Resolved';
+      channelStatus  = 'Delivered · Read';
+    } else if (hasFollowUpSent) {
+      followUpStatus = 'Watching';
+      channelStatus  = 'Sent';
+    } else if (delivered && !hasRead) {
+      followUpStatus = 'Watching';
+      channelStatus  = 'Delivered';
+    } else {
+      followUpStatus = 'Needs follow-up';
+      channelStatus  = 'Not sent';
+    }
+
+        row.followUpStatus = followUpStatus;
+        row.channelStatus  = channelStatus;
+
+        const idx = this.allFailureRows.findIndex(r => r.profileId === row.profileId);
+        if (idx > -1) {
+          this.allFailureRows[idx].followUpStatus = followUpStatus;
+          this.allFailureRows[idx].channelStatus  = channelStatus;
+        }
+      }
+
+      this.computeFollowUpCounts(this.allFailureRows, this.allNotifications);
+      this.setFailureTab(this.activeFailureTab);
+  }
+
+    // ── Checkbox selection ────────────────────────────────────────────────────
+  toggleFailureSelection(row: any): void {
+    row.selected = !row.selected;
+    if (row.selected) {
+      this.selectedFailureProfileIds.add(row.profileId);
+    } else {
+      this.selectedFailureProfileIds.delete(row.profileId);
+    }
+  }
+
+  getSelectedFailureRows(): any[] {
+    return this.failureTableSource.data.filter(r => r.selected);
+  }
+
+  get selectedFailureCount(): number {
+    return this.failureTableSource.data.filter(r => r.selected).length;
+  }
+
+  async sendFailureFollowUpEmail(): Promise<void> {
+    const selected = this.getSelectedFailureRows();
+    if (selected.length === 0) { alert('Please select at least one Participant'); return; }
+
+    const selectedProfiles = selected.map(r => this.mapProfiledata[r.profileId]).filter(p => p != null);
+    if (selectedProfiles.length === 0) { alert('No profile data found for selected Participants'); return; }
+
+    const dialogRef = this.dialog.open(EmailInputComponent, {
+      data: {
+        profiles: selectedProfiles,
+        filterTemplateName: 'Create template'   
+      },
+      minWidth: '600px',
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+    if (result != null && result != undefined) {
+      const archiveid = result?.docid ?? result?.archiveid ?? null;  // ← extract here
+
+      const docRef = doc(collection(this.firestore, 'email archive'), result['docid']);
+      if (result['status'] === 'queued' || result['status'] === 'send') {
+        await setDoc(docRef, result, { merge: true })
+          .then(() => this.guard.openSnackBar('Email Sent', 'OK', 600))
+          .catch(err => { console.error(err); this.guard.openSnackBar('Error Sending Email', 'OK', 600); });
+      } else if (result['status'] === 'validated') {
+        let url = environment.firebase.projectId === 'starlabs-test'
+          ? 'https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail'
+          : 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail';
+        let data = result; data['archiveid'] = result['docid'];
+        this.http.post(url, JSON.stringify(data), { responseType: 'text', headers: new HttpHeaders().set('Content-Type', 'application/json') })
+          .subscribe({ next: res => console.log(res), error: err => console.error(err) });
+      }
+
+      await this.writeFollowUpRecord(selected, 'email', archiveid);  // ← pass it
+    }
+  });
+
+  }
+
+  private async writeFollowUpRecord(rows: any[], medium: 'wati' | 'email', archiveid?: string): Promise<void> {
+    const byBroadcast = new Map<string, { profileIds: string[]; messagesDocId: string; channelId: string }>();
+
+    rows.forEach(r => {
+      if (!byBroadcast.has(r.notifDocId)) {
+        byBroadcast.set(r.notifDocId, {
+          profileIds:    [],
+          messagesDocId: r.messagesDocId || '',
+          channelId:     r.channelId     || '',
+        });
+      }
+      byBroadcast.get(r.notifDocId)!.profileIds.push(r.profileId);
+    });
+
+    for (const [notifDocId, { profileIds, messagesDocId, channelId }] of byBroadcast.entries()) {
+
+      if (!channelId || !messagesDocId) {
+        console.warn(`Missing channelId or messagesDocId for notifDocId: ${notifDocId}`);
+        this.guard.openSnackBar('Could not find channel — follow-up not recorded', 'OK', 3000);
+        continue;
+      }
+
+      try {
+        const messagesRef = collection(this.firestore, 'supportchat', channelId, 'messages');
+        const q           = query(messagesRef, where('messageid', '==', messagesDocId));
+        const snap        = await getDocs(q);
+
+        if (snap.empty) {
+          console.warn(`channelId: ${channelId}, messageid: ${messagesDocId}`);
+          this.guard.openSnackBar('Messages doc not found for broadcast', 'OK', 3000);
+          continue;
+        }
+
+        const msgDocRef = snap.docs[0].ref;
+
+        const followupEntry: Record<string, any> = archiveid
+          ? (medium === 'wati'
+              ? { wati_archiveid: doc(this.firestore, 'wati archive', archiveid) }
+              : { email_archiveid: doc(this.firestore, 'email archive', archiveid) })
+          : {};
+
+      await updateDoc(msgDocRef, {
+        'follow_up': arrayUnion(...profileIds),
+        ...(archiveid ? { followup_medium: arrayUnion(followupEntry as any) } : {}),
+      });
+
+        console.log(`channel: ${channelId}, messageid: ${messagesDocId}, medium: ${medium}`);
+        await this.refreshFollowUpStatusForRows(rows, channelId, notifDocId);
+
+      } catch (err) {
+        console.error('Error writing follow-up record:', err);
+        this.guard.openSnackBar('Error saving follow-up record', 'OK', 3000);
+      }
+    }
+
+    this.failureTableSource.data.forEach(r => r.selected = false);
+    this.selectedFailureProfileIds.clear();
+  }
+
+  private async fetchFollowUpSentStatus(channelId: string, messagesDocId: string): Promise<boolean> {
+    if (!channelId || !messagesDocId) return false;
+    try {
+      const messagesRef = collection(this.firestore, 'supportchat', channelId, 'messages');
+      const q = query(messagesRef, where('messageid', '==', messagesDocId));
+      const snap = await getDocs(q);
+      if (snap.empty) return false;
+
+      const followupMedium: any[] = snap.docs[0].data()['followup_medium'] || [];
+      if (!followupMedium.length) return false;
+
+      // Check each entry by reading the actual archive document
+      const checks = await Promise.all(followupMedium.map(async (entry: any) => {
+        const archiveId = entry?.wati_archiveid || entry?.email_archiveid || null;
+        const collection_name = entry?.wati_archiveid ? 'wati archive' : 'email archive';
+        if (!archiveId) return false;
+        try {
+          const archiveSnap = await getDoc(doc(this.firestore, collection_name, archiveId));
+          if (!archiveSnap.exists()) return false;
+          const data = archiveSnap.data();
+          return data?.['status'] === 'sent' && !!data?.['sentAt'];
+        } catch {
+          return false;
+        }
+      }));
+
+      return checks.some(Boolean);
+    } catch (err) {
+      console.error('Error fetching followup_sent:', err);
+      return false;
+    }
+  }
+
+  private async fetchFollowUpSet(channelId: string, messagesDocId: string): Promise<Set<string>> {
+    const result = new Set<string>();
+    if (!channelId || !messagesDocId) return result;
+
+    try {
+      const messagesRef = collection(this.firestore, 'supportchat', channelId, 'messages');
+      const q = query(messagesRef, where('messageid', '==', messagesDocId));
+      const snap = await getDocs(q);
+
+      snap.docs.forEach(d => {
+        const followUp: string[] = d.data()['follow_up'] || [];
+        followUp.forEach(pid => result.add(pid));
+      });
+    } catch (err) {
+      console.error('Error fetching follow_up for channel', channelId, err);
+    }
+
+    return result;
+  }
+
+  async sendFailureFollowUpWhatsApp(): Promise<void> {
+    const selected = this.getSelectedFailureRows();
+    if (selected.length === 0) { alert('Please select at least one Participant'); return; }
+
+    const selectedProfiles = selected
+      .map(r => {
+        const pd = this.mapProfiledata[r.profileId];
+        if (!pd) return null;
+        return {
+          ...pd,
+          profileid: r.profileId,
+          name:      pd.name        || this.mapProfile[r.profileId] || r.name || '',
+          email:     pd.email       || '',
+          number:    pd.number      || pd.phonenumber || pd.phone   || '',
+        };
+      })
+      .filter(p => p != null);
+
+    if (selectedProfiles.length === 0) {
+      alert('No profile data found for selected Participants');
+      return;
+    }
+
+    const dialogRef = this.dialog.open(WatiInputComponent, {
+      data: { profiles: selectedProfiles, filterTemplateName: 'evol_4' },
+      width: '70vw',
+      height: '80vh',
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        if (result === 'success' || result?.status === 'success') {
+          const archiveid = result?.archiveid ?? null;   // ← extract here
+          this.guard.openSnackBar('Wati Message Sent Successfully', 'OK', 3000);
+          await this.writeFollowUpRecord(selected, 'wati', archiveid);  // ← pass it
+        } else if (result === 'failed') {
+          this.guard.openSnackBar('Sending Wati Message Failed', 'OK', 3000);
+        }
+      }
+    });
+  }
+
+  get needsFollowUpCount(): number {
+    return this.allFailureRows.filter(
+      r => r.followUpStatus === 'Needs follow-up'
+    ).length;
+  }
+
+  private async fetchReadBySet(channelId: string, messagesDocId: string): Promise<Set<string>> {
+    const result = new Set<string>();
+    if (!channelId || !messagesDocId) return result;
+ 
+    try {
+      const messagesRef = collection(this.firestore, 'supportchat', channelId, 'messages');
+      const q = query(messagesRef, where('messageid', '==', messagesDocId));
+      const snap = await getDocs(q);
+ 
+      snap.docs.forEach(d => {
+        const readBy: string[] = d.data()['read_by'] || [];
+        readBy.forEach(pid => result.add(pid));
+      });
+    } catch (err) {
+      console.error('Error fetching read_by for channel', channelId, err);
+    }
+ 
+    return result;
+  }
+ 
+  private computeFollowUpCounts(rows: any[], notifications: any[]): void {
+    this.resolvedCount   = rows.filter(r => r.followUpStatus === 'Resolved').length;
+    this.watchingCount   = rows.filter(r => r.followUpStatus === 'Watching').length;
+    this.noResponseCount = rows.filter(r => r.followUpStatus === 'No response').length;
+
+    this.totalFollowUpSent = rows.filter(r =>
+      r.followUpStatus === 'Resolved' ||
+      r.followUpStatus === 'Watching' ||
+      r.followUpStatus === 'No response'
+    ).length;
+      this.totalFailedParticipants = rows.length;
+      this.totalFailedBroadcasts = new Set(rows.map(r => r.notifDocId)).size;
+
+      const appNotLinked = rows.filter(r => r.failureReason === 'App not linked').length;
+
+      this.failureTabs = [
+        { key: 'all',           label: 'All failures',   count: rows.length        },
+        { key: 'watching',      label: 'Watching',        count: this.watchingCount },
+        { key: 'noResponse',    label: 'No response',     count: this.noResponseCount },
+        { key: 'appNotLinked',  label: 'App not linked',  count: appNotLinked       },
+      ];
+    }
+
+  openFailuresDialog(): void {
+    this.showFailuresDialog = true;
+    this.setFailureTab('all');
+  }
+ 
+  closeFailuresDialog(): void {
+    this.showFailuresDialog = false;
+  }
+ 
+  setFailureTab(key: string): void {
+  this.activeFailureTab = key;
+  let filtered = [...this.allFailureRows];
+
+  switch (key) {
+    case 'watching':      filtered = filtered.filter(r => r.followUpStatus === 'Watching');        break;
+    case 'noResponse':    filtered = filtered.filter(r => r.followUpStatus === 'No response');     break;
+    case 'needsFollowUp': filtered = filtered.filter(r => r.followUpStatus === 'Needs follow-up'); break;
+    case 'appNotLinked':  filtered = filtered.filter(r => r.failureReason  === 'App not linked');  break;
+  }
+
+  this.failureTableSource.data = filtered;
+}
+ 
+  getInitials(name: string): string {
+    if (!name || name === 'Unknown') return '?';
+    return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
+  }
+ 
+  getAvatarColor(name: string): string {
+    if (!name) return this.avatarColors[0];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return this.avatarColors[Math.abs(hash) % this.avatarColors.length];
+  }
+
 
   getChannelName(element: any): string {
-    // metadata.channelid -> channelMap lookup
     const channelId = element?.metadata?.channelid || element?.channelid;
     if (channelId && this.channelMap[channelId]) {
       return this.channelMap[channelId];
     }
-    // Fallback to stored channelname/channel field
     return element.channelname || element.channel || '-';
   }
-
-  // ── Resolve category name from a notification record ─────────────────────
 
   getCategoryName(element: any): string {
     const categoryId = element?.metadata?.category || element?.categoryid || element?.category;
@@ -272,8 +778,57 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
         this.notificationDataSource.sort = this.sort;
         this.notificationDataSource.paginator = this.paginator;
         this.updateStatistics(list);
+        this.buildFailureRows(list);
+        this.notificationClickButton(list);
       });
   }
+
+  private async notificationClickButton(notifications: any[]): Promise<void> {
+  await Promise.all(notifications.map(async notif => {
+    const channelId  = notif?.metadata?.channelid || notif?.channelid || '';
+    const messagesId = notif?.metadata?.messageid || '';
+    if (!channelId || !messagesId) return;
+
+    const { buttons, button_clicks } = await this.fetchButtonClicksData(channelId, messagesId);
+    notif['_buttons']       = buttons;
+    notif['_button_clicks'] = button_clicks;
+  }));
+
+  this.notificationDataSource.data = [...this.allNotifications];
+}
+
+getTotalButtonClicks(element: any): number {
+  const button_clicks: { [label: string]: string[] } = element['_button_clicks'] || {};
+  const allIds = new Set<string>();
+  Object.values(button_clicks).forEach(ids => ids.forEach(id => allIds.add(id)));
+  return allIds.size;
+}
+
+hasButtons(element: any): boolean {
+  return (element['_buttons']?.length || 0) > 0;
+}
+
+openButtonClicksDialog(element: any, event: Event): void {
+  event.stopPropagation();
+  const buttons: { label: string; url: string }[]      = element['_buttons']       || [];
+  const button_clicks: { [label: string]: string[] }   = element['_button_clicks'] || {};
+
+  this.currentButtonClicksTitle = element.title || this.getChannelName(element);
+  this.currentButtonClicks = buttons.map(btn => ({
+    label:    btn.label,
+    url:      btn.url,
+    clickers: (button_clicks[btn.label] || []).map(profileId => ({
+      profileId,
+      name: this.mapProfile[profileId] || 'Unknown',
+    })),
+  }));
+
+  this.buttonClicksDialogOpen = true;
+}
+
+closeButtonClicksDialog(): void {
+  this.buttonClicksDialogOpen = false;
+}
 
   onDateChange(): void {
     this.fetchData();
@@ -435,28 +990,30 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
     return this.sanitizer.bypassSecurityTrustHtml(html || '');
   }
 
-  // ── Recipients dialog ─────────────────────────────────────────────────────
+  // ── Participants dialog ─────────────────────────────────────────────────────
 
-  openRecipientsDialog(notificationData: any): void {
-    this.showRecipientsDialog = true;
-    this.currentNotificationData = notificationData;
+  openParticipantDialog(notificationData: any): void {
+  this.showParticipantsDialog = true;
+  this.currentNotificationData = notificationData;
+  this.currentChannelId   = notificationData?.metadata?.channelid || notificationData?.channelid || '';
+  this.currentMessagesDocId = notificationData?.metadata?.messageid || '';
     this.selectedTab = 'success';
-    this.successRecipients = [];
-    this.failedRecipients = [];
-    this.recipientSearchText = '';
+    this.successParticipants = [];
+    this.failedParticipants = [];
+    this.ParticipantSearchText = '';
     this.successPageIndex = 0;
     this.failedPageIndex = 0;
     this.logsLoadingCount = 0;
     this.logsCheckedCount = 0;
-    this.totalRecipientsWithUserRef = 0;
+    this.totalParticipantsWithUserRef = 0;
     this.isLoadingAllLogs = false;
 
-    // Build success recipients
+    // Build success Participants
     if (notificationData.profilesuccess?.length) {
-      this.successRecipients = notificationData.profilesuccess.map((profileId: string) => {
+      this.successParticipants = notificationData.profilesuccess.map((profileId: string) => {
         const userRef = this.mapProfiledata[profileId]?.user_ref ?? null;
         const hasUserRef = !!userRef;
-        if (hasUserRef) this.totalRecipientsWithUserRef++;
+        if (hasUserRef) this.totalParticipantsWithUserRef++;
 
         return {
           profileId,
@@ -475,14 +1032,14 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
         };
       });
     }
-    this.filteredSuccessRecipients = [...this.successRecipients];
+    this.filteredSuccessParticipants = [...this.successParticipants];
 
-    // Build failed recipients
+    // Build failed Participants
     if (notificationData.profilefailed?.length) {
-      this.failedRecipients = notificationData.profilefailed.map((profileId: string) => {
+      this.failedParticipants = notificationData.profilefailed.map((profileId: string) => {
         const userRef = this.mapProfiledata[profileId]?.user_ref ?? null;
         const hasUserRef = !!userRef;
-        if (hasUserRef) this.totalRecipientsWithUserRef++;
+        if (hasUserRef) this.totalParticipantsWithUserRef++;
 
         return {
           profileId,
@@ -501,43 +1058,43 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
         };
       });
     }
-    this.filteredFailedRecipients = [...this.failedRecipients];
+    this.filteredFailedParticipants = [...this.failedParticipants];
 
     this.loadLogsForVisibleItems();
   }
 
-  closeRecipientsDialog(): void {
-    this.showRecipientsDialog = false;
+  closeParticipantsDialog(): void {
+    this.showParticipantsDialog = false;
   }
 
   // ── Log loading helpers ───────────────────────────────────────────────────
 
   get allLogsLoaded(): boolean {
-    return this.totalRecipientsWithUserRef === 0 ||
-      this.logsCheckedCount >= this.totalRecipientsWithUserRef;
+    return this.totalParticipantsWithUserRef === 0 ||
+      this.logsCheckedCount >= this.totalParticipantsWithUserRef;
   }
 
   get logsLoadingProgress(): number {
-    if (this.totalRecipientsWithUserRef === 0) return 100;
-    return Math.round((this.logsCheckedCount / this.totalRecipientsWithUserRef) * 100);
+    if (this.totalParticipantsWithUserRef === 0) return 100;
+    return Math.round((this.logsCheckedCount / this.totalParticipantsWithUserRef) * 100);
   }
 
   loadAllLogsForExport(): void {
     if (this.allLogsLoaded || this.isLoadingAllLogs) return;
     this.isLoadingAllLogs = true;
 
-    [...this.successRecipients, ...this.failedRecipients].forEach(r => {
+    [...this.successParticipants, ...this.failedParticipants].forEach(r => {
       if (!r.logsChecked && r.hasUserRef) {
-        const type = this.successRecipients.includes(r) ? 'success' : 'failed';
-        this.fetchRecipientLogs(r.profileId, this.currentNotificationData.docid, type);
+        const type = this.successParticipants.includes(r) ? 'success' : 'failed';
+        this.fetchParticipantLogs(r.profileId, this.currentNotificationData.docid, type);
       }
     });
   }
 
   private loadLogsForVisibleItems(): void {
     const list = this.selectedTab === 'success'
-      ? this.filteredSuccessRecipients
-      : this.filteredFailedRecipients;
+      ? this.filteredSuccessParticipants
+      : this.filteredFailedParticipants;
 
     const pageIndex = this.selectedTab === 'success' ? this.successPageIndex : this.failedPageIndex;
     const start = pageIndex * this.pageSize;
@@ -545,12 +1102,12 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
 
     visible.forEach(r => {
       if (!r.logsChecked && r.hasUserRef) {
-        this.fetchRecipientLogs(r.profileId, this.currentNotificationData.docid, this.selectedTab);
+        this.fetchParticipantLogs(r.profileId, this.currentNotificationData.docid, this.selectedTab);
       }
     });
   }
 
-  async fetchRecipientLogs(
+  async fetchParticipantLogs(
     profileId: string,
     docId: string,
     type: 'success' | 'failed'
@@ -558,13 +1115,13 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
     const userRef = this.mapProfiledata[profileId]?.user_ref;
     if (!userRef) return;
 
-    const recipient = type === 'success'
-      ? this.successRecipients.find(r => r.profileId === profileId)
-      : this.failedRecipients.find(r => r.profileId === profileId);
+    const Participant = type === 'success'
+      ? this.successParticipants.find(r => r.profileId === profileId)
+      : this.failedParticipants.find(r => r.profileId === profileId);
 
-    if (recipient?.logsChecked || recipient?.logsLoading) return;
+    if (Participant?.logsChecked || Participant?.logsLoading) return;
 
-    this.updateRecipientLogStatus(profileId, type, { logsLoading: true });
+    this.updateParticipantLogStatus(profileId, type, { logsLoading: true });
     this.logsLoadingCount++;
 
     const logsRef = collection(this.firestore, 'notifications', userRef.id, 'logs');
@@ -578,20 +1135,22 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
       let read = false;
       let clicked = 'unknown';
 
-      if (!snap.empty) {
-        const logData = snap.docs[0].data();
-        read = (logData['read'] === true) || this.NotificationReadUserID.includes(userRef.id);
-        clicked = logData['clicked'] === true ? 'Yes' : 'unknown';
-      } else {
-        read = this.NotificationReadUserID.includes(userRef.id);
+      if (this.currentChannelId && this.currentMessagesDocId) {
+        const readBySet = await this.fetchReadBySet(this.currentChannelId, this.currentMessagesDocId);
+        read = readBySet.has(profileId);
       }
 
-      this.updateRecipientLogStatus(profileId, type, {
+      if (!snap.empty) {
+        const logData = snap.docs[0].data();
+        clicked = logData['clicked'] === true ? 'Yes' : 'unknown';
+      }
+
+      this.updateParticipantLogStatus(profileId, type, {
         logCount, hasLogs, logsLoading: false, logsChecked: true, read, clicked
       });
     } catch (err) {
       console.error('Error fetching channel logs:', err);
-      this.updateRecipientLogStatus(profileId, type, { logsLoading: false, logsChecked: true });
+      this.updateParticipantLogStatus(profileId, type, { logsLoading: false, logsChecked: true });
     } finally {
       this.logsLoadingCount--;
       this.logsCheckedCount++;
@@ -601,39 +1160,39 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
     }
   }
 
-  private updateRecipientLogStatus(
+  private updateParticipantLogStatus(
     profileId: string,
     type: 'success' | 'failed',
     updates: Partial<any>
   ): void {
     if (type === 'success') {
-      const idx = this.successRecipients.findIndex(r => r.profileId === profileId);
+      const idx = this.successParticipants.findIndex(r => r.profileId === profileId);
       if (idx > -1) {
-        this.successRecipients[idx] = { ...this.successRecipients[idx], ...updates };
-        this.filteredSuccessRecipients = [...this.successRecipients];
+        this.successParticipants[idx] = { ...this.successParticipants[idx], ...updates };
+        this.filteredSuccessParticipants = [...this.successParticipants];
       }
     } else {
-      const idx = this.failedRecipients.findIndex(r => r.profileId === profileId);
+      const idx = this.failedParticipants.findIndex(r => r.profileId === profileId);
       if (idx > -1) {
-        this.failedRecipients[idx] = { ...this.failedRecipients[idx], ...updates };
-        this.filteredFailedRecipients = [...this.failedRecipients];
+        this.failedParticipants[idx] = { ...this.failedParticipants[idx], ...updates };
+        this.filteredFailedParticipants = [...this.failedParticipants];
       }
     }
   }
 
-  // ── Recipient search & tabs ───────────────────────────────────────────────
+  // ── Participant search & tabs ───────────────────────────────────────────────
 
-  filterRecipients(): void {
-    const term = this.recipientSearchText?.toLowerCase().trim() || '';
+  filterParticipants(): void {
+    const term = this.ParticipantSearchText?.toLowerCase().trim() || '';
 
     if (!term) {
-      this.filteredSuccessRecipients = [...this.successRecipients];
-      this.filteredFailedRecipients = [...this.failedRecipients];
+      this.filteredSuccessParticipants = [...this.successParticipants];
+      this.filteredFailedParticipants = [...this.failedParticipants];
     } else {
-      this.filteredSuccessRecipients = this.successRecipients.filter(r =>
+      this.filteredSuccessParticipants = this.successParticipants.filter(r =>
         r.name?.toLowerCase().includes(term)
       );
-      this.filteredFailedRecipients = this.failedRecipients.filter(r =>
+      this.filteredFailedParticipants = this.failedParticipants.filter(r =>
         r.name?.toLowerCase().includes(term) || r.reason?.toLowerCase().includes(term)
       );
     }
@@ -645,8 +1204,8 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
 
   switchTab(tab: 'success' | 'failed'): void {
     this.selectedTab = tab;
-    this.recipientSearchText = '';
-    this.filterRecipients();
+    this.ParticipantSearchText = '';
+    this.filterParticipants();
     this.loadLogsForVisibleItems();
   }
 
@@ -664,24 +1223,24 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
     this.loadLogsForVisibleItems();
   }
 
-  getPaginatedSuccessRecipients(): any[] {
+  getPaginatedSuccessParticipants(): any[] {
     const start = this.successPageIndex * this.pageSize;
-    return this.filteredSuccessRecipients.slice(start, start + this.pageSize);
+    return this.filteredSuccessParticipants.slice(start, start + this.pageSize);
   }
 
-  getPaginatedFailedRecipients(): any[] {
+  getPaginatedFailedParticipants(): any[] {
     const start = this.failedPageIndex * this.pageSize;
-    return this.filteredFailedRecipients.slice(start, start + this.pageSize);
+    return this.filteredFailedParticipants.slice(start, start + this.pageSize);
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
 
-  exportRecipientsToExcel(): void {
+  exportParticipantsToExcel(): void {
     if (!this.allLogsLoaded) return;
     this.isExporting = true;
 
     const rows = [
-      ...this.successRecipients.map(r => ({
+      ...this.successParticipants.map(r => ({
         Name: r.name || 'Unknown',
         Status: 'Success',
         Reason: '-',
@@ -690,7 +1249,7 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
         Clicked: r.clicked,
         'Log Created': this.getLogStatusText(r)
       })),
-      ...this.failedRecipients.map(r => ({
+      ...this.failedParticipants.map(r => ({
         Name: r.name || 'Unknown',
         Status: 'Failed',
         Reason: r.reason || 'Unknown error',
@@ -708,17 +1267,17 @@ export class ChannelRecordComponent implements OnInit, OnDestroy {
     ];
 
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Recipients');
+    XLSX.utils.book_append_sheet(wb, ws, 'Participants');
 
     const title = this.currentNotificationData?.title || 'channel';
-    const fileName = `channel_recipients_${title.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `channel_Participants_${title.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
     this.isExporting = false;
   }
 
-  getLogStatusText(recipient: any): string {
-    if (!recipient.hasUserRef) return 'No User Ref';
-    if (recipient.hasLogs) return `Yes (${recipient.logCount})`;
+  getLogStatusText(Participant: any): string {
+    if (!Participant.hasUserRef) return 'No User Ref';
+    if (Participant.hasLogs) return `Yes (${Participant.logCount})`;
     return 'No';
   }
 }
