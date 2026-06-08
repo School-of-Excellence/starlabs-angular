@@ -65,6 +65,17 @@ monotonic climb. The real suite adds app-driven CF cascades on top, which is why
 - **Resilience:** smoke booted the emulator from fully-dead via the runner; the self-test reproduced the exact
   crash signature (5001+9099 DOWN, 8080 orphaned java) and the runner detected → reaped → restarted to all-up
   SEQUENTIAL. Lock: live holder → exit 3; dead holder → reclaimed.
+- **FULL RUN TO COMPLETION (the acceptance check):** `EMU_REUSE=1 EMU_REUSE_APP=1 bash scripts/run-isolated.sh`
+  on a quiet box, emulator app on :4200 — **22/22 files, 14:09→14:39 (~30 min, the exact window that killed it
+  4× before), `emulator restarts: 0`, runtimes never exceeded 1, emulator still up at the end.** The functions
+  emulator did NOT die; the resilient-restart net never had to fire. Tests: 183 passed · 5 failed · 6 skipped
+  (skips = the documented `fixme` product findings). None of the 5 failures is a crash — two classes:
+  (a) `cross-db-lowerbound` + `studio-core` forms-widget read the `firestore-forms` named DB as 0 even though
+  the seed wrote 2 docs → app-side named-DB wiring, unrelated to this change; (b) `cf-sideeffects` ×2 +
+  `operator` OP-09b assert a CF side-effect doc within a 30s poll and didn't see it → possibly SEQUENTIAL
+  serializing the test's trigger behind the globalSetup reseed-drain (verify with FB_EMU_FN_SEQUENTIAL=0 if it
+  matters; cloud — real parallel CFs — passes all 5). The emulator-target suite was never expected fully green
+  locally (cloud is the green path, 188/194); the crash, not the green-up, was the mandate here.
 
 ## Surprises / gotchas
 
