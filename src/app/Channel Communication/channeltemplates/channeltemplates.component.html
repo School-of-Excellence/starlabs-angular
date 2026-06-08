@@ -415,6 +415,14 @@
                 </mat-card-title>
             </mat-card-header>
 
+             <div *ngIf="isEditMode && currentEditingTemplate?.status === 'approved'"
+                style="margin: 0 16px 16px;padding: 12px 16px;background: #fff8e1;border-left: 4px solid #f59e0b;border-radius: 6px;display:flex;align-items:center;gap:10px;">
+                <mat-icon style="color:#f59e0b;flex-shrink:0;">info</mat-icon>
+                <span style="font-size:13px;color:#92400e;">
+                  Approved template. Enter a new template name to submit changes.  
+                </span>
+            </div>
+
             <mat-card-content>
                 <div class="form-row">
                     <mat-form-field appearance="outline" class="form-field" floatLabel="always">

@@ -794,6 +794,32 @@
           </div>
         </div>
 
+        <!-- EVOLUTION MAPPING LIVE FILTER -->
+        <div class="fsb-expandable" *ngIf="hasEvolutionMappingParticipants">
+          <div class="fsb-row" [class.fsb-row-active]="evolutionMappingLiveFilter !== 'all'">
+            <mat-icon class="fsb-icon">video_library</mat-icon>
+            <span class="fsb-label">Evolution Mapping</span>
+          </div>
+          <div style="display: flex; gap: 8px; padding: 8px 12px;">
+            <button 
+              style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1.5px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
+              [style.background]="evolutionMappingLiveFilter === 'live' ? '#2e7d32' : 'transparent'"
+              [style.color]="evolutionMappingLiveFilter === 'live' ? '#fff' : '#2e7d32'"
+              [style.border-color]="'#2e7d32'"
+              (click)="setEvolutionMappingFilter(evolutionMappingLiveFilter === 'live' ? 'all' : 'live')">
+              ✓ Video Live
+            </button>
+            <button 
+              style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1.5px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
+              [style.background]="evolutionMappingLiveFilter === 'unlive' ? '#c62828' : 'transparent'"
+              [style.color]="evolutionMappingLiveFilter === 'unlive' ? '#fff' : '#c62828'"
+              [style.border-color]="'#c62828'"
+              (click)="setEvolutionMappingFilter(evolutionMappingLiveFilter === 'unlive' ? 'all' : 'unlive')">
+              ✕ Not Live
+            </button>
+          </div>
+        </div>
+
         <!-- TODAY REMINDERS ROW -->
         <div class="fsb-row fsb-toggle-row" *ngIf="todayReminders.length > 0"
           [class.fsb-row-active]="reminderTodayFilterActive"
@@ -1082,6 +1108,11 @@
           <mat-chip *ngIf="noAtcFilterActive"
             (removed)="noAtcFilterActive=false; processTokensIntoStages(allTokensData)">
             No ATC
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+          <mat-chip *ngIf="evolutionMappingLiveFilter !== 'all'"
+            (removed)="setEvolutionMappingFilter('all')">
+            Evolution Mapping: {{ evolutionMappingLiveFilter === 'live' ? 'Live' : 'Not Live' }}
             <mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="selectedCustomerSupportCategories.length > 0"

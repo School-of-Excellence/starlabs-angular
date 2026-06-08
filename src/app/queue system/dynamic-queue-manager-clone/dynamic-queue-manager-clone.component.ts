@@ -358,6 +358,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   stageActivityCacheQueueId: string | null = null;
   stageActivityCacheLoading: boolean = false;
   participantSearchTerm: string = '';
+  //in evolution mapping
+  evolutionMappingLiveFilter: 'all' | 'live' | 'unlive' = 'all';
+  evolutionMappingLiveMap: { [profileId: string]: boolean } = {};
+  evolutionMappingLiveLoaded: boolean = false;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -920,6 +924,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.noAtcFilterActive = false;
     this.noAtcProfileIds = new Set();
     this.noAtcCount = 0;
+    this.evolutionMappingLiveFilter = 'all';
+    this.evolutionMappingLiveMap = {};
+    this.evolutionMappingLiveLoaded = false;
     this.clearSearch();
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -1403,16 +1410,22 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       default: return status;
     }
   }
+
   get filteredStageQueue(): any[] {
-    if (this.activeStageCountFilter.length === 0) {
-      return this.stageQueue;
+    let queue = this.stageQueue;
+    if (this.evolutionMappingLiveFilter !== 'all') {
+      return queue.filter(
+        column => column.stagename === 'In Evolution Mapping Activity'
+      );
     }
-    const filtered = this.stageQueue.filter(column => {
-      const shouldShow = this.activeStageCountFilter.includes(column.stagename);
-      return shouldShow;
-    });
-    
-    return filtered;
+
+    if (this.activeStageCountFilter.length === 0) {
+      return queue;
+    }
+
+    return queue.filter(column =>
+      this.activeStageCountFilter.includes(column.stagename)
+    );
   }
   
 
@@ -1735,6 +1748,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.availableCustomerSupportCategories = [];
     this.selectedCustomerSupportCategories = [];
     this.atcDateRangeOnlyProfileIds = new Set();
+    this.evolutionMappingLiveFilter = 'all';
+    this.evolutionMappingLiveMap = {};
+    this.evolutionMappingLiveLoaded = false;
 
     let count = 0
     this.currentQueueParticipants = [];
@@ -2194,6 +2210,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       filteredTokens = filteredTokens.filter(
         token => todayProfileIds.has(token.profile_id)
       );
+    }
+
+    if (this.evolutionMappingLiveFilter !== 'all') {
+      filteredTokens = filteredTokens.filter(token => {
+        if (token.currentstage !== 'In Evolution Mapping Activity') return true;
+        const isLive = this.evolutionMappingLiveMap[token.profile_id] === true;
+        if (this.evolutionMappingLiveFilter === 'live') return isLive;
+        if (this.evolutionMappingLiveFilter === 'unlive') return !isLive;
+        return true;
+      });
     }
 
     return filteredTokens;
@@ -5055,6 +5081,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     if (this.noAtcFilterActive) count++;
     count += this.selectedCustomerSupportCategories.length;
     if (this.selectedArenaEventId) count++;
+    if (this.evolutionMappingLiveFilter !== 'all') count++;
     return count;
   }
 
@@ -6135,5 +6162,42 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       return name.includes(search) || email.includes(search);
     });
   }
+
+  async setEvolutionMappingFilter(filter: 'all' | 'live' | 'unlive') {
+    this.evolutionMappingLiveFilter = filter;
+
+    if (filter === 'all') {
+      this.processTokensIntoStages(this.allTokensData);
+      return;
+    }
+
+    // Always fetch fresh data on filter selection
+    const evolutionTokens = this.allTokensData.filter(
+      t => t.currentstage === 'In Evolution Mapping Activity'
+        && t.tokenstatus === 'Active'
+    );
+
+    await Promise.all(evolutionTokens.map(async token => {
+      try {
+        const snap = await getDoc(
+          doc(this.firestore, 'liveevolutionmapping', token.profile_id)
+        );
+        this.evolutionMappingLiveMap[token.profile_id] =
+          snap.exists() ? snap.data()['live'] === true : false;
+      } catch {
+        this.evolutionMappingLiveMap[token.profile_id] = false;
+      }
+    }));
+
+    this.evolutionMappingLiveLoaded = true;
+
+    this.processTokensIntoStages(this.allTokensData);
+  }
+  get hasEvolutionMappingParticipants(): boolean {
+  return this.stageQueue.some(
+    s => s.stagename === 'In Evolution Mapping Activity' 
+      && s.tokenlist?.length > 0
+  );
+}
 
 }
