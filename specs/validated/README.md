@@ -15,7 +15,7 @@ As each concept group is validated, its `specs/validated/NN-*.md` becomes canoni
 1. **Journey & Products** — `01-journey-and-products.md` ✅ validated 2026-06-03
 2. **Product Modes** — `02-product-modes.md` ✅ **validated 2026-06-04, end-to-end** (the transition **engine** is mapped: `participantmode.js` §7 + the `participantmetadata.js` projection §7d, in the `starlabs-cloud-function/` repo on `development`; TD-016 closed)
 3. **Queue Manager** — `03-queue-manager.md` ✅ **validated 2026-06-05** (session-series → ATC; **two transition types** = operator `nextstage` + self-move/auto-advance; variation = journey-family × cycle; config model; + a live **flow-visualizer** spec for `queue-creation-v3` in `specs/queue-flow-visualizer/`)
-4. Dynamic Studio — _pending_
+4. **Dynamic Studio** — `04-dynamic-studio.md` 🟡 **DRAFT (investigated 2026-06-05)** — the studio runtime (`/dynamicstudio`). Core model **validated in session**: **data-widgets vs action-widgets** (read-only upstream projections vs in-studio authoring) + **hybrid** AEL/Triple-ATC; boundary = `live assignment` creation **confirmed**. Data findings: **84% solo delivery**, **video ~99% Zoom** (LiveKit dead — 1 studio), 100% manual pairing. Open items for operator sign-off in §10.
 5. Appointment System — _pending_
 6. Events, Arena & Calendar — _pending_
 
