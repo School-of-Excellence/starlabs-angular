@@ -1,6 +1,6 @@
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
-import { Component, Inject, OnInit, ViewChild } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { collection, deleteDoc, doc, Firestore, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormControl, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
@@ -9,7 +9,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormArray } from '@angular/forms';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { Observable, Subject } from 'rxjs';
-import { map, startWith } from 'rxjs/operators';
+import { map, startWith, debounceTime, takeUntil } from 'rxjs/operators';
+import { QueueFlowVisualizerComponent } from '../queue-flow-visualizer/queue-flow-visualizer.component';
+import { formValueToFlowConfig } from '../queue-flow-visualizer/queue-form-mapping';
+import { FlowConfig } from '../queue-flow-visualizer/queue-flow.model';
 import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatStepper, MatStepperModule } from '@angular/material/stepper';
@@ -49,13 +52,19 @@ import { AuthguardService } from '../../authguard.service';
     MatButtonModule,
     DragDropModule,
     NgxMatSelectSearchModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    QueueFlowVisualizerComponent
   ],
   templateUrl: './queue-creation-v3.component.html',
   styleUrl: './queue-creation-v3.component.css'
 })
-export class QueueCreationV3Component {
+export class QueueCreationV3Component implements OnDestroy {
 
+  // ---- Queue Flow Visualizer (read-only live mirror of the form) ----
+  showFlow = false;
+  flowConfig: FlowConfig | null = null;
+  flowFocusStage: string | null = null;
+  private flowDestroy$ = new Subject<void>();
 
   @ViewChild('stepper') stepper: MatStepper;
   editingVariation: boolean[] = [];
@@ -145,6 +154,14 @@ export class QueueCreationV3Component {
       introdescription: [null, { validators: [Validators.required], updateOn: "change" }],
       products: this.formbuilder.array([])
     });
+
+    // Live read-only flow mirror: re-derive the FlowConfig from the form value
+    // on every edit (debounced) so the visualizer stays in sync while authoring.
+    this.queueform.valueChanges
+      .pipe(debounceTime(150), takeUntil(this.flowDestroy$))
+      .subscribe(() => {
+        if (this.showFlow) this.flowConfig = formValueToFlowConfig(this.queueform.value);
+      });
 
 
     if (data != null) {
@@ -493,6 +510,24 @@ export class QueueCreationV3Component {
     this.filteredActivity = this.activityCtrl.valueChanges.pipe(
       startWith(null),
       map((activity: string | null) => activity ? this._filteractivity(activity) : this.bigactivity.slice()));
+  }
+
+  ngOnDestroy(): void {
+    this.flowDestroy$.next();
+    this.flowDestroy$.complete();
+  }
+
+  /** Toggle the read-only flow panel; seed it from the current form value on open. */
+  toggleFlow(): void {
+    this.showFlow = !this.showFlow;
+    if (this.showFlow) this.flowConfig = formValueToFlowConfig(this.queueform.value);
+  }
+
+  /** Node clicked in the visualizer → remember the stage so the form can highlight it. */
+  onFlowStageFocus(stage: string): void {
+    this.flowFocusStage = stage;
+    const idx = (this.queueform.get('stages')?.value || []).indexOf(stage);
+    if (idx >= 0) this.currentStageIndex = idx;
   }
 
 

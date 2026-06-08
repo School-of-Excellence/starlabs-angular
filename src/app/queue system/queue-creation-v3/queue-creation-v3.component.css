@@ -805,3 +805,18 @@
 
 
   
+/* Queue Flow Visualizer panel (read-only live mirror) */
+.flow-toggle-btn {
+  margin-left: 16px;
+  vertical-align: middle;
+}
+.flow-panel {
+  height: 620px;
+  margin: 8px 0 20px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.flow-panel app-queue-flow-visualizer {
+  display: block;
+  height: 100%;
+}

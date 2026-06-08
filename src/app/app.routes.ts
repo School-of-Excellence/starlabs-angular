@@ -319,6 +319,10 @@ export const routes: Routes = [
 
   // Dev - Test
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
+
+  // Queue Flow Visualizer (read-only viewer) — demo/verification harness, unguarded so
+  // the viewer renders real exported configs without Firebase auth.
+  {path: 'queue-flow', loadComponent: () => import('./queue system/queue-flow-visualizer/queue-flow-demo.component').then(m => m.QueueFlowDemoComponent) },
 ];
 
 // import { Routes } from '@angular/router';
