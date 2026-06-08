@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
 import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
-import { orderBy, Timestamp } from 'firebase/firestore';
+import { getFirestore, orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take, combineLatest } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, KeyValue } from '@angular/common';
@@ -4095,16 +4095,17 @@ export class JourneycoachDashboardComponent {
   getAtcAlpha() {
     let atcQuery: any;
     let unvalidatedATCQuery: any;
+    const firestoreATC = getFirestore("firestore-atc")
 
     if (this.filterMode === 'queue' && this.selectedQueueIds.length > 0) {
       // Queue mode — no date filter
       atcQuery = query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where('queueid', 'in', this.selectedQueueIds),
         where("isdelete", "==", false)
       );
       unvalidatedATCQuery = query(
-        collection(this.firestore, "atc_to_validate"),
+        collection(firestoreATC, "atc_to_validate"),
         where('queueid', 'in', this.selectedQueueIds),
         where("isdelete", "==", false)
       );
@@ -4128,13 +4129,13 @@ export class JourneycoachDashboardComponent {
       if (!startdate || !enddate) return;
 
       atcQuery = query(
-        collection(this.firestore, "atc_alpha"),
+        collection(firestoreATC, "atc_alpha"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)
       );
       unvalidatedATCQuery = query(
-        collection(this.firestore, "atc_to_validate"),
+        collection(firestoreATC, "atc_to_validate"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)
