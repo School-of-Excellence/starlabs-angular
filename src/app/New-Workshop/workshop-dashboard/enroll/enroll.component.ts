@@ -10,6 +10,8 @@ import { Subject, takeUntil } from 'rxjs';
 import { MatSelectModule } from '@angular/material/select';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AuthguardService } from '../../../authguard.service';
 
 @Component({
   selector: 'app-enroll',
@@ -20,7 +22,8 @@ import { MatIconModule } from '@angular/material/icon';
     MatInputModule,
     MatButtonModule,
     MatSelectModule,
-    MatChipsModule,MatIconModule
+    MatChipsModule,MatIconModule,
+    MatProgressSpinnerModule
   ],
   templateUrl: './enroll.component.html',
   styleUrl: './enroll.component.css'
@@ -31,19 +34,27 @@ export class EnrollComponent {
   profiles :string[] = [];
   profilestoenroll :string[] = []
   mapProfile: any = {};
+  isLoading = true;
   nameControl = new FormControl<string[]>([], Validators.required);
 
   constructor(
     private firestore: Firestore,
+    public guard: AuthguardService,
     private dialogRef: MatDialogRef<EnrollComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {
-    if (data?.workshopId && data?.profiledata) {
-      console.log(data.profiledata,"Print Data");
-      this.mapProfile = data.profiledata
-      this.profiles = Object.keys(data.profiledata);
-      this.loadParticipantEnrolled(data?.workshopId)
-    }
+    this.guard.getProfileMap().then(e => {
+      this.mapProfile = e.map;
+      if (data?.workshopId && this.mapProfile) {
+        console.log(data.profiledata,"Print Data");
+        // this.mapProfile = data.profiledata
+        this.profiles = Object.keys(this.mapProfile);
+        this.loadParticipantEnrolled(data?.workshopId)
+      }
+      this.isLoading = false;
+    }).catch(() => {
+      this.isLoading = false;
+    });
   }
   async loadParticipantEnrolled(workshopId:string){
     const workshopref = doc(this.firestore,`workshopconfiguration/${workshopId}`)
@@ -55,11 +66,13 @@ export class EnrollComponent {
       this.profilestoenroll = this.profiles.filter(
         (id) =>
           !this.enrolledParticipantProfileIds.includes(id) &&
-          this.mapProfile[id]?.name &&
-          this.mapProfile[id]?.name.trim() !== ''
+          this.mapProfile[id] &&
+          this.mapProfile[id].trim() !== ''
       );
       console.log('enrolledParticipantProfileIds:', this.enrolledParticipantProfileIds);
       console.log('Available (Not Enrolled) Profile IDs:', this.profilestoenroll.length);
+      console.log('profilesprofilesprofiles:', this.profiles.length);
+      console.log('mapProfileconsoleeeee:', this.mapProfile);
     })
     console.log(this.profiles.length,"Consoling profiles");
     
@@ -84,9 +97,10 @@ export class EnrollComponent {
         const participantDoc = doc(participantCollection);
         await setDoc(participantDoc,{
           profileid,
-          status:'enrollednotstarted',
+          status:'enrolled',
           workshopref,
           enrollmentdate: serverTimestamp(),
+          workshopStartedAt: serverTimestamp(),
           participantworkshopref:participantWorkshopRef
         })
         await setDoc(participantWorkshopRef,{
