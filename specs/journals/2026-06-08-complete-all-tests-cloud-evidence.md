@@ -270,3 +270,15 @@ fixed only its own spec's wiring; shared-file changes were returned as requests 
 `src/app/**` and no `starlabs-cloud-function/**` code touched.** Every fix was test wiring, a seed
 precondition, a composite index, or harness config. The product was never edited to make a test pass, and
 no assertion was loosened; genuine product defects remain `test.fixme` findings for the operator to triage.
+
+## Addendum — two run paths, both green (emulator confirmed 2026-06-08)
+
+The suite runs as **two paths × three evidence levels** (`scripts/run-isolated.sh`; the `npm run` scripts wrap them):
+- **PROOF path — cloud** (`report:cloud`, actual Firestore + deployed CFs): **188 passed · 0 failed · 6 skipped / 194**.
+- **QUICK path — emulator** (`report:emulator`, hermetic): **184 passed · 0 failed · 10 skipped / 194**.
+- Levels: **A** lean (`test:*`, screenshot only-on-failure, no report), **B** default (`report:*`, screenshot EVERY test + on-first-retry trace + merged report), **C** full (`report:*:full`, full trace per test). Each `report:*` builds ONE merged screenshot-per-test report via per-file Playwright **blob** → `merge-reports` (the cloud report is ~1.3 GB at C; the emulator report is ~9 MB at B).
+
+**Why the emulator skips 4 more (10 vs 6):** five tests exercise cloud-only platform features the local emulator cannot provide, so they are guarded `test.skip(!!process.env.FIRESTORE_EMULATOR_HOST, …)` — they RUN on cloud (still green), SKIP on emulator with a documented reason:
+- CF-event delivery (`onCreate`/`onWrite`) for spaced collections (`queue stage log`, `bulk invitation`) + the FieldValue touchpoint write — cf-sideeffects **CF-01/CF-02**, operator **OP-09b**.
+- the `firestore-forms` named DB (`src/main.ts` emulator-connects only `(default)`) — cross-db **Forms widget**, studio-core **SS-07**.
+Honest platform-gating, not weakening: on cloud the assertions run in full; on the emulator the platform genuinely can't deliver the event/DB. (A future `src/main.ts` change to emulator-connect the named DB + an emulator workaround for spaced-collection `onCreate` would let the emulator run them too.) The 1 operator failure first seen on the emulator was a flake coincident with the run's single emulator self-heal restart — re-ran 13/13.
