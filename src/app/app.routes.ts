@@ -321,6 +321,10 @@ export const routes: Routes = [
   // Dev - Test
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
 
+  // Queue Flow Visualizer (read-only viewer) — demo/verification harness, unguarded so
+  // the viewer renders real exported configs without Firebase auth.
+  {path: 'queue-flow', loadComponent: () => import('./queue system/queue-flow-visualizer/queue-flow-demo.component').then(m => m.QueueFlowDemoComponent) },
+  // Catch-all MUST stay last (a wildcard shadows any route declared after it).
   {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},
 ];
 

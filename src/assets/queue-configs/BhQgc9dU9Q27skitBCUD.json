@@ -1,0 +1,365 @@
+{
+  "id": "BhQgc9dU9Q27skitBCUD",
+  "queuename": "Evolution Prep (Oct 2025 - Jan 2026)",
+  "stages": [
+    "Evolution Prep Orientation",
+    "uP! Prep Process - Hold",
+    "Accelerated Evolution Level Form",
+    "Prodigies Preparation Form",
+    "uP! Life Aspiration Report",
+    "ATC Orientation Form",
+    "ATC Orientation Group Call",
+    "uP! Life Report",
+    "Scope Enhancement",
+    "Evolution Mapping Activity",
+    "In Evolution Mapping Activity",
+    "Self Evaluation Form",
+    "My Evolution Wishlist",
+    "Guided Pre ATC Orientation",
+    "Guided Self ATC",
+    "Evolution Prep Completed",
+    "Queue Transferred",
+    "Completed"
+  ],
+  "queuevariation": [
+    {
+      "id": "kH8xfBLPEi1bBVPEehOT",
+      "variationname": "uP! - First Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "ATC Orientation Group Call",
+        "Scope Enhancement",
+        "Guided Self ATC",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    },
+    {
+      "id": "ppDajRs7K5hG51P1bbE6",
+      "variationname": "uP! - Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Guided Self ATC",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    },
+    {
+      "id": "FY5Lii4iZolP2StHwroW",
+      "variationname": "LYL - First Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "ATC Orientation Group Call",
+        "Scope Enhancement",
+        "Guided Self ATC",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    },
+    {
+      "id": "41KiwsFl4dZ6JhtfPemA",
+      "variationname": "LYL - Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Guided Self ATC",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    },
+    {
+      "id": "kjVzrUHM3R1VRcZN1H0k",
+      "variationname": "B!G Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Guided Self ATC",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    },
+    {
+      "id": "SRpOFd0RWZgS3jCSiGgB",
+      "variationname": "Process Hold",
+      "stages": [
+        "uP! Prep Process - Hold",
+        "Queue Transferred"
+      ]
+    },
+    {
+      "id": "BnRYVUrv6l7STTgELeZI",
+      "variationname": "Prodigies - First Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "ATC Orientation Form",
+        "ATC Orientation Group Call",
+        "Scope Enhancement",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    },
+    {
+      "id": "WksRztIBPYpuL7JbsPZq",
+      "variationname": "Prodigies - Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "Prodigies Preparation Form",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    },
+    {
+      "id": "27IXW4MP59K4dVEEtHV8",
+      "variationname": "uP!- 3rd Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "My Evolution Wishlist",
+        "Guided Self ATC",
+        "Evolution Prep Completed",
+        "Queue Transferred",
+        "Completed"
+      ]
+    }
+  ],
+  "stageproperty": {
+    "Evolution Prep Orientation": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Prep Process - Hold": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Accelerated Evolution Level Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Prodigies Preparation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Life Aspiration Report": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "ATC Orientation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "ATC Orientation Group Call": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Life Report": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Scope Enhancement": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "addunvalidatedatc",
+        "prescribedunvalidatedatc"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "SBDo3ww3ZxKrKjkfIzLU"
+        ],
+        "1": [
+          "SBDo3ww3ZxKrKjkfIzLU",
+          "zHZhg9GOmeuIEuqvCOPY"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "Guided Pre ATC Orientation",
+          "calltoaction": "If new participant. send them to Guided Self ATC Orientation",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Evolution Mapping Activity",
+          "calltoaction": "If old participant, send to Evolution Mapping Activity",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Scope Enhancement",
+          "calltoaction": "Send Back",
+          "markascompleted": false,
+          "variations": []
+        },
+        {
+          "stage": "Completed",
+          "calltoaction": "If first cycle & Prodigie participant. send them to Diagnostics Ready",
+          "markascompleted": true,
+          "variations": []
+        }
+      ]
+    },
+    "Evolution Mapping Activity": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "In Evolution Mapping Activity": {
+      "selfmovable": false,
+      "actiontype": "link",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Self Evaluation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "My Evolution Wishlist": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Guided Pre ATC Orientation": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Guided Self ATC": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Evolution Prep Completed": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Queue Transferred": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Completed": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    }
+  }
+}

@@ -9,8 +9,21 @@
   
   <div *ngIf="!loading" class="mainscreen">
     <div class="queue-creation-container">
-      <h2 class="page-title">Queue Creation</h2>
-      
+      <h2 class="page-title">
+        Queue Creation
+        <button type="button" mat-stroked-button class="flow-toggle-btn" (click)="toggleFlow()">
+          <mat-icon>account_tree</mat-icon> {{ showFlow ? 'Hide' : 'Show' }} Flow
+        </button>
+      </h2>
+
+      <!-- Read-only flow visualizer: live mirror of the form (brief Phase 1) -->
+      <div class="flow-panel" *ngIf="showFlow">
+        <app-queue-flow-visualizer
+          [config]="flowConfig"
+          (stageFocus)="onFlowStageFocus($event)"
+        ></app-queue-flow-visualizer>
+      </div>
+
       <!-- Stepper -->
       <mat-horizontal-stepper [linear]="true" #stepper>
         <mat-step label="Queue Details" state="queue-details" completed="true">

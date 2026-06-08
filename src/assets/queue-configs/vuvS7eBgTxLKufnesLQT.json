@@ -1,0 +1,376 @@
+{
+  "id": "vuvS7eBgTxLKufnesLQT",
+  "queuename": "A&H Evolution Preparation Event - April 2026",
+  "stages": [
+    "Evolution Prep Orientation",
+    "uP! Preparation Hold",
+    "Accelerated Evolution Level Form",
+    "uP! Life Aspiration Report",
+    "ATC Orientation Form",
+    "Prodigies Preparation Form",
+    "uP! Life Report",
+    "Scope Enhancement",
+    "Evolution Mapping Activity",
+    "In Evolution Mapping Activity",
+    "Self Evaluation Form",
+    "Scope Enhancement Changework",
+    "Transfered",
+    "Completed"
+  ],
+  "queuevariation": [
+    {
+      "id": "rkx1mx2bkzpjHjSKF860",
+      "variationname": "uP! Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Transfered",
+        "Completed"
+      ]
+    },
+    {
+      "id": "oP0QUBFZ7TzlWtTsr1J3",
+      "variationname": "Prodigies Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Prodigies Preparation Form",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Completed"
+      ]
+    },
+    {
+      "id": "PJn62qQjVNtS2zfCQtTU",
+      "variationname": "Scope Enhancement Changework ",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "Prodigies Preparation Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Scope Enhancement Changework",
+        "Completed"
+      ]
+    },
+    {
+      "id": "zDSNSEe2mF23g6NIqhm3",
+      "variationname": "uP! First Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "Scope Enhancement",
+        "Completed"
+      ]
+    },
+    {
+      "id": "zUuoZoJHHDQnPTA6Ap68",
+      "variationname": "Prodigies first cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "ATC Orientation Form",
+        "Scope Enhancement",
+        "Completed"
+      ]
+    },
+    {
+      "id": "a7vbJz0GJBOBzXN4chmF",
+      "variationname": "Transfer",
+      "stages": [
+        "Transfered"
+      ]
+    },
+    {
+      "id": "YdR8kPr4hc2cRyr8cokx",
+      "variationname": "LYL First Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "Scope Enhancement",
+        "Completed"
+      ]
+    },
+    {
+      "id": "xyZTFI2Pc6yGpYMvdK0X",
+      "variationname": "B!G Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Completed"
+      ]
+    },
+    {
+      "id": "HktZMrU1qx9SzXGc6nxx",
+      "variationname": "LYL Next Cycle",
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Completed"
+      ]
+    },
+    {
+      "id": "Dy1dEimoqjm5KFoy6Y8j",
+      "variationname": "uP! Prep Hold",
+      "stages": [
+        "uP! Preparation Hold"
+      ]
+    }
+  ],
+  "stageproperty": {
+    "Evolution Prep Orientation": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Preparation Hold": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Accelerated Evolution Level Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Life Aspiration Report": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "ATC Orientation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Prodigies Preparation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Life Report": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Scope Enhancement": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "addunvalidatedatc"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "SBDo3ww3ZxKrKjkfIzLU"
+        ],
+        "1": [
+          "SBDo3ww3ZxKrKjkfIzLU",
+          "zHZhg9GOmeuIEuqvCOPY"
+        ]
+      },
+      "participantform": [
+        "KqHfM292QPXRLpv9RQNi",
+        "QundpMXgXlXiCJYZ7WU4",
+        "v5zrrmaIodoaBCrMKUY8"
+      ],
+      "enablezoom": true,
+      "nextstage": [
+        {
+          "stage": "Evolution Mapping Activity",
+          "calltoaction": "Send to the Evolution Mapping Activity",
+          "markascompleted": true,
+          "variations": [
+            "rkx1mx2bkzpjHjSKF860",
+            "oP0QUBFZ7TzlWtTsr1J3",
+            "PJn62qQjVNtS2zfCQtTU",
+            "xyZTFI2Pc6yGpYMvdK0X",
+            "HktZMrU1qx9SzXGc6nxx"
+          ]
+        },
+        {
+          "stage": "Completed",
+          "calltoaction": "Move to Next Stage",
+          "markascompleted": true,
+          "variations": [
+            "zDSNSEe2mF23g6NIqhm3",
+            "zUuoZoJHHDQnPTA6Ap68",
+            "YdR8kPr4hc2cRyr8cokx"
+          ]
+        },
+        {
+          "stage": "Scope Enhancement",
+          "calltoaction": "Scope Enhancement Pending / Not Started – Move Back",
+          "markascompleted": false,
+          "variations": [
+            "rkx1mx2bkzpjHjSKF860",
+            "oP0QUBFZ7TzlWtTsr1J3",
+            "PJn62qQjVNtS2zfCQtTU",
+            "zDSNSEe2mF23g6NIqhm3",
+            "zUuoZoJHHDQnPTA6Ap68",
+            "a7vbJz0GJBOBzXN4chmF",
+            "YdR8kPr4hc2cRyr8cokx",
+            "xyZTFI2Pc6yGpYMvdK0X",
+            "HktZMrU1qx9SzXGc6nxx",
+            "Dy1dEimoqjm5KFoy6Y8j"
+          ]
+        }
+      ]
+    },
+    "Evolution Mapping Activity": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "In Evolution Mapping Activity": {
+      "selfmovable": false,
+      "actiontype": "link",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Self Evaluation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Scope Enhancement Changework": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "prescribedvalidatedatc",
+        "assignedatc"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "ocH3kB9SL9Cgec9i7Uqq"
+        ],
+        "1": [
+          "W0knU88qllYmVsdw87f5"
+        ],
+        "2": [
+          "54toXo6Nl3UU03ehuV7V",
+          "DtUbBAdrLVUYcKipIXD0"
+        ],
+        "3": [
+          "DtUbBAdrLVUYcKipIXD0",
+          "ocH3kB9SL9Cgec9i7Uqq"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": true,
+      "nextstage": [
+        {
+          "stage": "Scope Enhancement",
+          "calltoaction": "Changework Completed, Send to Scope Enhancement",
+          "markascompleted": true,
+          "variations": [
+            "rkx1mx2bkzpjHjSKF860",
+            "oP0QUBFZ7TzlWtTsr1J3",
+            "PJn62qQjVNtS2zfCQtTU",
+            "zDSNSEe2mF23g6NIqhm3",
+            "zUuoZoJHHDQnPTA6Ap68",
+            "YdR8kPr4hc2cRyr8cokx",
+            "xyZTFI2Pc6yGpYMvdK0X",
+            "HktZMrU1qx9SzXGc6nxx"
+          ]
+        },
+        {
+          "stage": "Scope Enhancement Changework",
+          "calltoaction": "If the participant didn't attend, Send them back",
+          "markascompleted": false,
+          "variations": [
+            "rkx1mx2bkzpjHjSKF860",
+            "oP0QUBFZ7TzlWtTsr1J3",
+            "PJn62qQjVNtS2zfCQtTU",
+            "zDSNSEe2mF23g6NIqhm3",
+            "zUuoZoJHHDQnPTA6Ap68",
+            "YdR8kPr4hc2cRyr8cokx",
+            "xyZTFI2Pc6yGpYMvdK0X",
+            "HktZMrU1qx9SzXGc6nxx"
+          ]
+        }
+      ]
+    },
+    "Transfered": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Completed": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": true,
+      "nextstage": []
+    }
+  }
+}
