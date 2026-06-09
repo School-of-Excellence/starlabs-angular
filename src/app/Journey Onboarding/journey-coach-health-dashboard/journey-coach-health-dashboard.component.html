@@ -24,9 +24,21 @@
     </div>
   </header>
 
-  <div class="jchd-state" *ngIf="loading">
-    <mat-spinner diameter="36"></mat-spinner>
-    <span>Loading the base…</span>
+  <div class="jchd-skeleton" *ngIf="loading" aria-busy="true" aria-label="Loading the base">
+    <div class="sk-band">
+      <div class="sk-stat" *ngFor="let s of [1,2,3,4,5,6]">
+        <div class="sk-line sk-line-sm"></div>
+        <div class="sk-line sk-line-lg"></div>
+      </div>
+    </div>
+    <div class="sk-table">
+      <div class="sk-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+        <div class="sk-line sk-cell-a"></div>
+        <div class="sk-line sk-cell-b"></div>
+        <div class="sk-line sk-cell-c"></div>
+        <div class="sk-line sk-cell-d"></div>
+      </div>
+    </div>
   </div>
   <div class="jchd-state error" *ngIf="!loading && loadError">
     <mat-icon>error_outline</mat-icon>
@@ -56,12 +68,30 @@
     </section>
 
     <section class="jchd-summary" *ngIf="selectedCoachId !== UNASSIGNED">
-      <mat-card class="kpi"><div class="kpi-num">{{ summary.total }}</div><div class="kpi-label">Participants</div></mat-card>
-      <mat-card class="kpi good"><div class="kpi-num">{{ summary.active }}</div><div class="kpi-label">Active</div></mat-card>
-      <mat-card class="kpi bad clickable" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned"><div class="kpi-num">{{ summary.inactive }}</div><div class="kpi-label">Inactive (lost)</div></mat-card>
-      <mat-card class="kpi clickable" (click)="kpi('renewalsSoon')"><div class="kpi-num">{{ summary.renewalsSoon }}</div><div class="kpi-label">Renewals &le;90d</div></mat-card>
-      <mat-card class="kpi clickable" (click)="kpi('goingQuiet')"><div class="kpi-num">{{ summary.goingQuiet }}</div><div class="kpi-label">Going quiet</div></mat-card>
-      <mat-card class="kpi"><div class="kpi-num">{{ summary.withOpenTickets }}</div><div class="kpi-label">Open tickets</div></mat-card>
+      <div class="kpi">
+        <div class="kpi-label">Participants</div>
+        <div class="kpi-num">{{ summary.total }}</div>
+      </div>
+      <div class="kpi good">
+        <div class="kpi-label">Active</div>
+        <div class="kpi-num">{{ summary.active }}</div>
+      </div>
+      <div class="kpi bad clickable" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned">
+        <div class="kpi-label">Inactive (lost)</div>
+        <div class="kpi-num">{{ summary.inactive }}</div>
+      </div>
+      <div class="kpi clickable" (click)="kpi('renewalsSoon')">
+        <div class="kpi-label">Renewals &le;90d</div>
+        <div class="kpi-num">{{ summary.renewalsSoon }}</div>
+      </div>
+      <div class="kpi clickable" (click)="kpi('goingQuiet')">
+        <div class="kpi-label">Going quiet <span class="kpi-scope" *ngIf="pagedMode">in view</span></div>
+        <div class="kpi-num">{{ summary.goingQuiet }}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Open tickets <span class="kpi-scope" *ngIf="pagedMode">in view</span></div>
+        <div class="kpi-num">{{ summary.withOpenTickets }}</div>
+      </div>
     </section>
 
     <div class="jchd-phase-note" *ngIf="selectedCoachId !== UNASSIGNED">
@@ -105,9 +135,79 @@
           <mat-option value="discontinued">Discontinued</mat-option>
         </mat-select>
       </mat-form-field>
+      <button mat-stroked-button class="filter-toggle-btn" [class.active]="filtersExpanded || hasActiveFilters"
+        (click)="filtersExpanded = !filtersExpanded"
+        matTooltip="Product type, tier, priority, health, finance, renewal & quiet filters">
+        <mat-icon>tune</mat-icon> Filters
+        <mat-icon class="chevron">{{ filtersExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
       <button mat-stroked-button class="export-btn" (click)="exportCsv()" matTooltip="Export the current list as CSV">
         <mat-icon>download</mat-icon> Export
       </button>
+    </section>
+
+    <!-- Intelligent filter panel (collapsible). Product type defaults to Ecosystem. -->
+    <section class="jchd-filter-panel" *ngIf="selectedCoachId !== UNASSIGNED && filtersExpanded">
+      <div class="fp-grid">
+        <mat-form-field appearance="outline" class="fp-field">
+          <mat-label>Product type</mat-label>
+          <mat-select [(ngModel)]="productTypeFilter" (ngModelChange)="applyFilters()">
+            <mat-option value="">All products</mat-option>
+            <mat-option value="ecosystem">Ecosystem</mat-option>
+            <mat-option value="dfu">DFU</mat-option>
+            <mat-option value="gifts">Gifts</mat-option>
+            <mat-option value="other">Other</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field">
+          <mat-label>Tier</mat-label>
+          <mat-select [(ngModel)]="tierFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option *ngFor="let t of tierOptions" [value]="t">{{ t }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field">
+          <mat-label>Priority band</mat-label>
+          <mat-select [(ngModel)]="bandFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option value="High">High</mat-option>
+            <mat-option value="Medium">Medium</mat-option>
+            <mat-option value="Low">Low</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field">
+          <mat-label>Coach health</mat-label>
+          <mat-select [(ngModel)]="healthFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option *ngFor="let h of healthOptions" [value]="h">{{ healthLabel(h) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field" *ngIf="financeOptions.length">
+          <mat-label>Financial status</mat-label>
+          <mat-select [(ngModel)]="financeFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option *ngFor="let f of financeOptions" [value]="f">{{ f }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="fp-toggles">
+        <mat-checkbox [(ngModel)]="renewalWindowOnly" (ngModelChange)="applyFilters()"
+          matTooltip="Subscription ends within {{ RENEWAL_DAYS }} days">Renewal window</mat-checkbox>
+        <mat-checkbox [(ngModel)]="goingQuietOnly" (ngModelChange)="applyFilters()"
+          matTooltip="No coach contact in {{ QUIET_DAYS }}+ days">Going quiet</mat-checkbox>
+        <span class="fp-spacer"></span>
+        <button mat-stroked-button class="fp-clear" [disabled]="!hasActiveFilters" (click)="clearFilters()">
+          <mat-icon>filter_alt_off</mat-icon> Clear filters
+        </button>
+      </div>
+
+      <div class="fp-note" *ngIf="pagedMode">
+        <mat-icon>info</mat-icon>
+        <span>Search, product type, tier, status &amp; finance filters cover the
+          <strong>full base</strong> via a lightweight index. Priority band, coach-health &amp;
+          renewal/quiet refine within loaded pages — page through to apply them across everyone.</span>
+      </div>
     </section>
 
     <div class="jchd-diag" *ngIf="!pagedMode && selectedCoachId !== UNASSIGNED">
