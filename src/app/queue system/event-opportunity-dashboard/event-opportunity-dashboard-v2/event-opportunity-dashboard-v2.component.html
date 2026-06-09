@@ -7,8 +7,20 @@
       </h4>
     </span>
 
-    <div *ngIf="showQueueSelect" class="d-flex flex-row justify-content-center">
+    <div *ngIf="showQueueSelect" class="d-flex flex-row justify-content-center align-items-center" style="gap:10px">
       <mat-form-field appearance="outline" class="w-50">
+        <mat-label>Select Event</mat-label>
+        <mat-select [(ngModel)]="selectedEvent" (selectionChange)="onEventSelectForQueue()">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterEvent" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let event of getFilteredEvents()" [value]="event['id']">
+            {{event.name}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+       <mat-form-field appearance="outline" class="w-50" *ngIf="selectedEvent && queueList?.length > 0">
         <mat-label>Select queue</mat-label>
         <mat-select [value]="selectedQueueList" multiple>
           <mat-option *ngFor="let item of queueList" [value]="item['docid']"
@@ -17,6 +29,37 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
+      <p style="font-size:large;" *ngIf="selectedEvent && queueList?.length == 0">No Queue Mapped to {{mapEvent[selectedEvent]}}</p>
+      
+    </div>
+  
+    <div class="row w-100">
+        <div class="col-sm">
+          <div *ngIf="liveEventList.length != 0" class="border ps-2 pt-1">
+            <div class="fw-bold mb-2 h5">Live Event</div>
+            <span *ngFor="let live of liveEventList">
+              <button mat-stroked-button class="me-2 mb-2"
+                [ngClass]="{'selectedevent': selectedEvent != null && selectedEvent === live['id']}"
+                (click)="selectedEvent = live['id']; onEventSelectForQueue()">
+                {{live["name"]}}
+              </button>
+            </span>
+          </div>
+        </div>
+    </div>
+
+    <div *ngIf="showQueueSelect" class="d-flex flex-row justify-content-center">
+      <!-- <mat-form-field appearance="outline" class="w-50" *ngIf="queueList?.length > 0">
+        <mat-label>Select queue</mat-label>
+        <mat-select [value]="selectedQueueList" multiple>
+          <mat-option *ngFor="let item of queueList" [value]="item['docid']"
+            (onSelectionChange)="updateSelectedQueues(item['docid'], $event)">
+            {{item.queuename}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <p style="font-size:large;" *ngIf="queueList?.length == 0">No Queue Mapped to {{mapEvent[selectedEvent]}}</p>
+       -->
       <div *ngIf="selectedQueueList.length != 0" style="margin-left: 20px;">
         <button (click)="openAddStageCount()" class="report-button">Add Stagescount</button>
       </div>
@@ -60,7 +103,7 @@
       </app-event-opportunity>
     </ng-container>
 
-    <div *ngIf="isContainerOpen" class="diagnostic-dashboard">
+    <div *ngIf="isContainerOpen && selectedQueueList.length > 0" class="diagnostic-dashboard">
       <div class="drag-drop-container" 
            cdkDropList 
            cdkDropListOrientation="mixed"

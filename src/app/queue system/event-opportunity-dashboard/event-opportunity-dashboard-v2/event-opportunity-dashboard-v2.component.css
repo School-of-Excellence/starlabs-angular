@@ -4,6 +4,10 @@
   --primary-dark: #6a1fb0;
 }
 
+.selectedevent {
+  background-color: rgb(224, 223, 223);
+}
+
 .config-stages-btn {
   display: inline-flex;
   align-items: center;

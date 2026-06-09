@@ -19,6 +19,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 @Component({
   selector: 'app-event-opportunity-dashboard-v2',
@@ -37,7 +38,8 @@ import { MatChipsModule } from '@angular/material/chips';
     MatButtonModule,
     DragDropModule,
     MatMenuModule,
-    MatChipsModule
+    MatChipsModule,
+    NgxMatSelectSearchModule,
   ],
   templateUrl: './event-opportunity-dashboard-v2.component.html',
   styleUrl: './event-opportunity-dashboard-v2.component.css'
@@ -75,8 +77,11 @@ export class EventOpportunityDashboardV2Component {
   selectedCustomStage: any = null;
   customStageSearchText: string = '';
 
-  selectedQueueList: string[] = []
-  queueList: any[]
+  selectedQueueList: string[] = [];
+  selectedEvent : string = null;
+  queueList: any[] = [];
+  filterEvent : string = '';
+  liveEventList : string[] = []
   mapQueue = {}
   showQueueSelect: boolean = true
   mapData = {}
@@ -176,7 +181,18 @@ export class EventOpportunityDashboardV2Component {
         if (roleData["developer"]) {
           this.developerRole = true;
         }
-        this.getQueueData()
+        this.loadEventCohorts();
+        // this.getQueueData();
+        getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
+        this.eventList = snap.docs.map(e => {
+        let element = e.data()
+        element["id"] = e.id 
+        element["ref"] = e.ref 
+        this.mapEvent[e.id] = e.data()['name'];
+        return element
+      })
+      this.liveEventList = this.eventList.filter(e => e["start_date"].toDate() <= new Date() && e["end_date"].toDate() >= new Date());
+    })
       // } else {
       //   this.router.navigateByUrl("/")
       // }
@@ -327,9 +343,21 @@ export class EventOpportunityDashboardV2Component {
     this.eventCohorts = map;
   }
 
+
+  onEventSelectForQueue(){
+    console.log('triggered elevnt selection' , this.selectedEvent)
+    if(this.selectedEvent){
+      this.ngOnDestroy();
+      this.selectedQueueList = [];
+      // this.isContainerOpen = false;
+      this.getselectedStages();
+      this.fetchQueueTokens();
+      this.getQueueData();
+    }
+  }
+
   getQueueData() {
-    this.loadEventCohorts();
-    getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()))).then(async queueData => {
+    getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()) , where('eventid' , 'array-contains' , this.selectedEvent))).then(async queueData => {
       this.queueList = queueData.docs.map(e => e.data())
       for (let i = 0; i < this.queueList.length; i++) {
         const element = this.queueList[i];
@@ -337,21 +365,12 @@ export class EventOpportunityDashboardV2Component {
         this.mapQueue[element['docid']] = element
       }
     })
-    getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
-        this.eventList = snap.docs.map(e => {
-        let element = e.data()
-        element["id"] = e.id 
-        element["ref"] = e.ref 
-        this.mapEvent[e.id] = e.data()['name']
-        return element
-      })
-    })
   }
 
   getselectedStages() {
     if (this.selectedQueueList.length !== 0) {
 
-      collectionData(query(collection(this.firestore, "stage opportunity count"), where("queuelist", "array-contains-any", this.selectedQueueList))).subscribe((queueData) => {
+      collectionData(query(collection(this.firestore, "stage opportunity count"), where("queuelist", "array-contains-any", this.selectedQueueList))).pipe(takeUntil(this.subscription)).subscribe((queueData) => {
         this.customValuesFromSelectedQueues = queueData.filter(e => e['queuelist'].every((item: string) => this.selectedQueueList.includes(item))).sort((a, b) => (a['sequence'] ?? 999) - (b['sequence'] ?? 999));
       })
 
@@ -753,8 +772,9 @@ export class EventOpportunityDashboardV2Component {
   }
 
   private getShadowCohortParticipants(queueid: string, stage: string): Array<{ profileid: string, bigactivity: string }> {
-    const eventId = this.mapQueue[queueid]?.['eventid'];
+    const eventId = this.selectedEvent;
     const cohorts = eventId ? this.eventCohorts[eventId] : null;
+    console.log(cohorts , eventId)
     if (!cohorts?.length) return [];
     const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
     const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
@@ -1568,5 +1588,10 @@ export class EventOpportunityDashboardV2Component {
     });
 
     return result;
+  }
+
+  getFilteredEvents(){
+    const search = this.filterEvent.toLowerCase().trim();
+    return [null , undefined , ''].includes(search) ? this.eventList : this.eventList.filter((event)=>(event?.name ?? '').toLowerCase().trim().includes(search))
   }
 }
