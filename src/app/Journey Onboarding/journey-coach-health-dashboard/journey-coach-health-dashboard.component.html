@@ -110,14 +110,22 @@
       </button>
     </section>
 
-    <div class="jchd-diag" *ngIf="selectedCoachId !== UNASSIGNED">
+    <div class="jchd-diag" *ngIf="!pagedMode && selectedCoachId !== UNASSIGNED">
       {{ summary.total }} participant(s) for <strong>{{ selectedCoachName || 'selected coach' }}</strong>
       · matched {{ matchedCount }} of {{ scannedCount }} journey-product records · ranked by priority
-      <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>onboardedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
+      <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>coachedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
     </div>
-    <div class="jchd-diag" *ngIf="selectedCoachId === UNASSIGNED">
-      {{ dataSource.data.length }} participant(s) with no journey coach. Select rows and assign them to a coach above —
-      this writes <code>onboardedby</code> so they appear in that coach's base everywhere.
+    <!-- paged views (ALL / UNASSIGNED) — priority is page-local; counts accumulate as you page -->
+    <div class="jchd-diag" *ngIf="pagedMode && selectedCoachId !== UNASSIGNED">
+      Page {{ currentPage + 1 }} · showing {{ dataSource.data.length }} · {{ loadedRowCount }} loaded so far<span *ngIf="reachedEnd"> · end of list</span>.
+      Priority is ranked within each page.
+    </div>
+    <div class="jchd-diag" *ngIf="pagedMode && selectedCoachId === UNASSIGNED">
+      Page {{ currentPage + 1 }} · {{ dataSource.data.length }} unassigned on this page · {{ loadedRowCount }} loaded so far<span *ngIf="reachedEnd"> · end of list</span>.
+      Select rows and assign a coach above — this writes <code>coachedby</code>. Some pages may show fewer rows as participants get assigned.
+    </div>
+    <div class="jchd-state" *ngIf="pageLoading">
+      <mat-spinner diameter="24"></mat-spinner><span>Loading page…</span>
     </div>
 
     <div class="jchd-table-wrap">
@@ -262,11 +270,15 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
       </table>
 
-      <div class="jchd-empty" *ngIf="dataSource.data.length === 0">
-        No participants match the current filters.
+      <div class="jchd-empty" *ngIf="dataSource.data.length === 0 && !pageLoading">
+        <span *ngIf="!pagedMode">No participants match the current filters.</span>
+        <span *ngIf="pagedMode && !reachedEnd">No matching participants on this page — use the paginator to load more.</span>
+        <span *ngIf="pagedMode && reachedEnd">No more participants.</span>
       </div>
 
-      <mat-paginator [pageSizeOptions]="[25, 50, 100]" pageSize="25" showFirstLastButtons></mat-paginator>
+      <mat-paginator pageSize="50" [pageSizeOptions]="[25, 50, 100]"
+        [length]="pagedMode ? pageLength : dataSource.data.length"
+        (page)="onPageEvent($event)" showFirstLastButtons></mat-paginator>
     </div>
 
     </ng-container>

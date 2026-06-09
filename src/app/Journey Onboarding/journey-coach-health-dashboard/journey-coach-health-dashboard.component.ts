@@ -3,14 +3,15 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs, doc, addDoc, updateDoc, serverTimestamp
+  Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, serverTimestamp,
+  orderBy, startAfter, limit, documentId, getCountFromServer, QueryDocumentSnapshot
 } from '@angular/fire/firestore';
 import { Auth, authState } from '@angular/fire/auth';
 import { firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
 
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
-import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -86,7 +87,7 @@ type DashboardView = 'base' | 'scoreboard';
 interface ScoreboardRow {
   coachId: string;
   coachName: string;
-  baseSize: number;       // distinct participants assigned to this coach (onboardedby)
+  baseSize: number;       // distinct participants assigned to this coach (coachedby)
   touchpoints: number;    // healthtracker_touchpoint by this coach in range
   contacted: number;      // distinct participants reached (real contact) in range
   coverage: number;       // contacted / baseSize, 0..1
@@ -157,6 +158,29 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   scannedCount = 0;
   matchedCount = 0;
 
+  // ---- server-side pagination (ALL / UNASSIGNED views only) ----
+  // The per-coach view keeps the existing full-load + client paginator + global priority sort.
+  // ALL / UNASSIGNED page through participantjourneyproduct by documentId() (so no doc is ever
+  // skipped — important for UNASSIGNED, whose docs may lack the coachedby field entirely).
+  pagedMode = false;
+  pageSize = 50;
+  currentPage = 0;
+  pageLength = 0;                 // estimate for mat-paginator [length]
+  loadedRowCount = 0;            // distinct participants materialised across loaded pages
+  pageLoading = false;          // per-page spinner (distinct from the initial `loading`)
+  reachedEnd = false;           // last server page returned < pageSize
+  private lastDoc: QueryDocumentSnapshot | null = null;
+  private pageCache = new Map<number, QueryDocumentSnapshot[]>();
+  // full dataset cached so switching back to a specific coach doesn't re-read 10k each time
+  private fullPjpData: any[] | null = null;
+  // paged KPI: accurate server counts (countable cards) + accumulate-over-loaded (the rest)
+  private countedProfiles = new Set<string>();
+  private serverCounts = { total: 0, renewalsSoon: 0, notStarted: 0 };
+  private serverCountsReady = false;
+  // scoreboard runs over the full base; loaded on demand so the base view can page
+  private sbPjp: any[] = [];
+  private scoreboardLoaded = false;
+
   allRows: PortfolioRow[] = [];
   dataSource = new MatTableDataSource<PortfolioRow>([]);
 
@@ -178,6 +202,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private contactEventByProfile: Record<string, number> = {}; // raw attended-session recency
   // profileid -> most-recent event participation request {eventName, date, status}
   private recentEventByProfile: Record<string, { eventName: string; date: Date | null; status: string }> = {};
+  // eventref id -> {name, start} resolved on demand (paged mode), cached across pages
+  private eventInfoCache: Record<string, { name: string; start: Date | null }> = {};
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -216,7 +242,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   ngAfterViewInit(): void {
-    this.dataSource.paginator = this.paginator;
+    this.applyPaginatorBinding();
     this.dataSource.sort = this.sort;
     this.dataSource.sortingDataAccessor = (row: PortfolioRow, id: string): string | number => {
       switch (id) {
@@ -253,6 +279,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
   }
 
+  /** ALL / UNASSIGNED page through the collection; a specific coach loads its full base. */
+  isPagedView(id: string): boolean {
+    return id === this.ALL || id === this.UNASSIGNED;
+  }
+
+  /** Client paginator drives slicing in full mode; in paged mode we drive mat-paginator manually. */
+  private applyPaginatorBinding(): void {
+    if (!this.paginator) return;
+    this.dataSource.paginator = this.pagedMode ? null : this.paginator;
+  }
+
   private async loadPortfolio(): Promise<void> {
     this.profileMap = await this.guard.getProfileMap();
     this.journeyNameMap = await this.guard.getJourneyMap();
@@ -261,13 +298,31 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const journeyDocs = await getDocs(collection(this.firestore, 'journey'));
     journeyDocs.forEach(d => { this.atcByJourney[d.id] = (d.data() as any)['atcmodel'] ?? null; });
 
+    await this.loadCoaches();
+
+    this.selectedCoachId =
+      (this.coachId && this.coaches.some(c => c.id === this.coachId)) ? this.coachId : this.ALL;
+    this.pagedMode = this.isPagedView(this.selectedCoachId);
+    this.applyPaginatorBinding();
+
+    if (this.pagedMode) {
+      await this.loadServerCounts();
+      await this.loadFirstPage();
+    } else {
+      await this.loadFullPortfolio();
+    }
+  }
+
+  /** Existing full-collection path — used for a specific coach (and cached for re-use). */
+  private async loadFullPortfolio(): Promise<void> {
     const pjpSnap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
     this.pjpData = pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id }));
+    this.fullPjpData = this.pjpData;
     this.scannedCount = this.pjpData.length;
     // count distinct participants with no coach assigned (for the Unassigned view)
     const unassignedProfiles = new Set<string>();
     for (const d of this.pjpData) {
-      if (d['profileid'] && this.isUnassigned(d['onboardedby'])) unassignedProfiles.add(d['profileid']);
+      if (d['profileid'] && this.isUnassigned(d['coachedby'])) unassignedProfiles.add(d['profileid']);
     }
     this.unassignedCount = unassignedProfiles.size;
 
@@ -275,13 +330,254 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     await this.loadTouchpoints();
     await this.loadContactEvents();
     await this.loadRecentEventRequests();
-    await this.loadCoaches();
-
-    this.selectedCoachId =
-      (this.coachId && this.coaches.some(c => c.id === this.coachId)) ? this.coachId : this.ALL;
 
     this.computeRows();
   }
+
+  // ===================== server-side pagination (ALL / UNASSIGNED) =====================
+
+  /** Accurate KPI counts that can be derived purely from fields on the pjp doc.
+   *  Each is best-effort: any that needs a missing composite index just stays 0 (the card
+   *  then falls back to the accumulate-over-loaded value). */
+  private async loadServerCounts(): Promise<void> {
+    const pjp = collection(this.firestore, 'participantjourneyproduct');
+    const now = new Date();
+    const in90 = new Date(now.getTime() + this.RENEWAL_DAYS * 86400000);
+    await Promise.all([
+      getCountFromServer(pjp)
+        .then(s => { this.serverCounts.total = s.data().count; }).catch(() => {}),
+      getCountFromServer(query(pjp, where('subscriptionend', '>=', now), where('subscriptionend', '<=', in90)))
+        .then(s => { this.serverCounts.renewalsSoon = s.data().count; }).catch(() => {}),
+      getCountFromServer(query(pjp, where('journeystatus', 'in', ['Initiated', 'initiated']), where('onboarded', '==', true)))
+        .then(s => { this.serverCounts.notStarted = s.data().count; }).catch(() => {}),
+    ]);
+    this.serverCountsReady = true;
+  }
+
+  private buildPjpPageQuery(startAfterDoc?: QueryDocumentSnapshot) {
+    const ref = collection(this.firestore, 'participantjourneyproduct');
+    // order by documentId() so NO doc is skipped (UNASSIGNED docs may lack coachedby / ordering fields)
+    const constraints: any[] = [orderBy(documentId())];
+    if (startAfterDoc) constraints.push(startAfter(startAfterDoc));
+    constraints.push(limit(this.pageSize));
+    return query(ref, ...constraints);
+  }
+
+  private async fetchPjpPage(startAfterDoc?: QueryDocumentSnapshot): Promise<QueryDocumentSnapshot[]> {
+    const snap = await getDocs(this.buildPjpPageQuery(startAfterDoc));
+    const docs = snap.docs as QueryDocumentSnapshot[];
+    if (docs.length) this.lastDoc = docs[docs.length - 1];
+    this.reachedEnd = docs.length < this.pageSize;
+    this.pageCache.set(this.currentPage, docs);
+    // estimate paginator length (mirrors the house pattern in participant-form-tracker)
+    if (this.currentPage === 0) {
+      this.pageLength = this.reachedEnd ? docs.length : docs.length * 10;
+    } else if (this.reachedEnd) {
+      this.pageLength = this.currentPage * this.pageSize + docs.length;
+    } else {
+      this.pageLength = Math.max(this.pageLength, (this.currentPage + 2) * this.pageSize);
+    }
+    return docs;
+  }
+
+  private resetPagedAccumulators(): void {
+    this.countedProfiles.clear();
+    this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0 };
+    this.loadedRowCount = 0;
+  }
+
+  private async loadFirstPage(): Promise<void> {
+    this.currentPage = 0;
+    this.lastDoc = null;
+    this.pageCache.clear();
+    this.resetPagedAccumulators();
+    if (this.paginator) this.paginator.firstPage();
+    const docs = await this.fetchPjpPage();
+    await this.renderPage(docs);
+  }
+
+  /** mat-paginator (page) handler — only active in paged mode (full mode lets the dataSource slice). */
+  onPageEvent(event: PageEvent): void {
+    if (this.pagedMode) void this.onPjpPageChange(event);
+  }
+
+  private async onPjpPageChange(event: PageEvent): Promise<void> {
+    if (event.pageSize !== this.pageSize) {
+      this.pageSize = event.pageSize;
+      await this.loadFirstPage();
+      return;
+    }
+    if (event.pageIndex > this.currentPage) {
+      this.currentPage = event.pageIndex;
+      const cached = this.pageCache.get(this.currentPage);
+      await this.renderPage(cached ?? await this.fetchPjpPage(this.lastDoc ?? undefined));
+    } else if (event.pageIndex < this.currentPage) {
+      this.currentPage = event.pageIndex;
+      const cached = this.pageCache.get(this.currentPage)!;
+      this.lastDoc = cached.length ? cached[cached.length - 1] : null;
+      await this.renderPage(cached);
+    }
+  }
+
+  /** Build rows for ONE page: filter (UNASSIGNED), load page-scoped dependents, score, accumulate KPI. */
+  private async renderPage(pageDocs: QueryDocumentSnapshot[]): Promise<void> {
+    this.pageLoading = true;
+    try {
+      let pjpForPage = pageDocs.map(d => ({ ...d.data(), __id: d.id }));
+      if (this.selectedCoachId === this.UNASSIGNED) {
+        pjpForPage = pjpForPage.filter(d => this.isUnassigned(d['coachedby']));
+      }
+      const profileIds = Array.from(new Set(pjpForPage.map(d => d['profileid']).filter(Boolean)));
+      await Promise.all([
+        this.loadOpenTicketCountsFor(profileIds),
+        this.loadTouchpointsFor(profileIds),
+        this.loadContactEventsFor(profileIds),
+        this.loadRecentEventRequestsFor(profileIds),
+      ]);
+      this.pjpData = pjpForPage;       // computeRows reads this.pjpData (page-local matching + scoring)
+      this.computeRows();
+      this.accumulatePagedSummary();
+    } finally {
+      this.pageLoading = false;
+    }
+  }
+
+  /** KPI in paged mode: accurate server counts where available, else accumulate over loaded pages.
+   *  Keyed by profileid so revisiting a cached page never double-counts. */
+  private accumulatePagedSummary(): void {
+    for (const r of this.allRows) {
+      if (this.countedProfiles.has(r.profileid)) continue;
+      this.countedProfiles.add(r.profileid);
+      if (this.isInactiveStatus(r.customerstatus)) { this.summary.inactive++; continue; }
+      if ((r.customerstatus ?? '').toLowerCase() === 'active') this.summary.active++;
+      if (r.renewalWindow) this.summary.renewalsSoon++;
+      if (r.lapsed) this.summary.lapsed++;
+      if (r.openTickets > 0) this.summary.withOpenTickets++;
+      if (r.goingQuiet) this.summary.goingQuiet++;
+      if (r.notStarted) this.summary.notStarted++;
+    }
+    this.loadedRowCount = this.countedProfiles.size;
+    if (this.selectedCoachId === this.UNASSIGNED) this.unassignedCount = this.loadedRowCount;
+    // accurate server counts take precedence for the cards they can power
+    if (this.serverCountsReady) {
+      this.summary.total = this.serverCounts.total;
+      this.summary.renewalsSoon = this.serverCounts.renewalsSoon;
+      this.summary.notStarted = this.serverCounts.notStarted;
+    } else {
+      this.summary.total = this.loadedRowCount;
+    }
+  }
+
+  private chunk30<T>(arr: T[]): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += 30) out.push(arr.slice(i, i + 30));
+    return out;
+  }
+
+  // page-scoped variants of the full-collection dependent loaders — merge into the same maps
+  private async loadOpenTicketCountsFor(profileIds: string[]): Promise<void> {
+    if (!profileIds.length) return;
+    try {
+      for (const batch of this.chunk30(profileIds)) {
+        const snap = await getDocs(query(collection(this.firestore, 'clientissue'), where('clientid', 'in', batch)));
+        snap.forEach(d => {
+          const data: any = d.data();
+          if ((data['status']?.status ?? '').toLowerCase() !== 'open') return;
+          const cid = data['clientid'];
+          const key = typeof cid === 'string' ? cid : cid?.id;
+          if (key) this.openTicketCounts[key] = (this.openTicketCounts[key] ?? 0) + 1;
+        });
+      }
+    } catch (e) { console.warn('open tickets (paged) failed', e); }
+  }
+
+  private async loadTouchpointsFor(profileIds: string[]): Promise<void> {
+    if (!profileIds.length) return;
+    try {
+      for (const batch of this.chunk30(profileIds)) {
+        const snap = await getDocs(query(collection(this.firestore, 'healthtracker_touchpoint'), where('profileid', 'in', batch)));
+        snap.forEach(d => {
+          const data: any = d.data();
+          const pid = data['profileid'];
+          const dt = this.toDate(data['date']);
+          if (pid && dt) this.touchpointByProfile[pid] = Math.max(this.touchpointByProfile[pid] ?? 0, dt.getTime());
+        });
+      }
+    } catch (e) { console.warn('touchpoints (paged) failed', e); }
+  }
+
+  private async loadContactEventsFor(profileIds: string[]): Promise<void> {
+    if (!profileIds.length) return;
+    try {
+      for (const batch of this.chunk30(profileIds)) {
+        // single-field 'in' on bookedby (refs) — auto-indexed; filter journeycoach/attended client-side
+        const refBatch = batch.map(pid => doc(this.firestore, 'profile_data', pid));
+        const snap = await getDocs(query(collection(this.firestore, 'appointments'), where('bookedby', 'in', refBatch)));
+        snap.forEach(d => {
+          const data: any = d.data();
+          if (data['journeycoach'] !== true || data['attended'] !== true) return;
+          const pid = data['bookedby']?.id ?? (typeof data['profileid'] === 'string' ? data['profileid'] : null);
+          const dt = this.toDate(data['starttime']) ?? this.toDate(data['date']);
+          if (pid && dt) this.contactEventByProfile[pid] = Math.max(this.contactEventByProfile[pid] ?? 0, dt.getTime());
+        });
+      }
+    } catch (e) { console.warn('contact events (paged) failed', e); }
+  }
+
+  private async loadRecentEventRequestsFor(profileIds: string[]): Promise<void> {
+    if (!profileIds.length) return;
+    try {
+      const requests: any[] = [];
+      for (const batch of this.chunk30(profileIds)) {
+        const snap = await getDocs(query(collection(this.firestore, 'event participation request'), where('profileid', 'in', batch)));
+        snap.forEach(d => requests.push(d.data()));
+      }
+      // resolve ONLY the referenced event/queue docs by id (cached across pages)
+      const eventIds = Array.from(new Set(requests.map(r => r['eventref']?.id).filter(Boolean)));
+      await Promise.all(eventIds.filter(id => !(id in this.eventInfoCache)).map(async (id) => {
+        try {
+          const ev = await getDoc(doc(this.firestore, 'event collection', id));
+          if (ev.exists()) { const dd: any = ev.data(); this.eventInfoCache[id] = { name: dd['name'] ?? dd['eventname'] ?? id, start: this.toDate(dd['start_date']) }; return; }
+        } catch { /* fall through */ }
+        try {
+          const qd = await getDoc(doc(this.firestore, 'queue generation', id));
+          if (qd.exists()) { const dd: any = qd.data(); this.eventInfoCache[id] = { name: dd['queuename'] ?? id, start: this.toDate(dd['queuestartdate']) }; return; }
+        } catch { /* leave unresolved */ }
+        this.eventInfoCache[id] = { name: id, start: null };
+      }));
+      const recent: Record<string, { eventName: string; date: Date | null; status: string; sortMs: number }> = {};
+      for (const data of requests) {
+        const pid = data['profileid'];
+        if (!pid) continue;
+        const eventId = data['eventref']?.id ?? null;
+        const info = eventId ? this.eventInfoCache[eventId] : null;
+        const reqDate = this.toDate(data['doccreateddate']) ?? info?.start ?? null;
+        const sortMs = reqDate ? reqDate.getTime() : 0;
+        const status = typeof data['status'] === 'string' ? data['status'] : 'requested';
+        const existing = recent[pid];
+        if (!existing || sortMs > existing.sortMs) recent[pid] = { eventName: info?.name ?? (eventId ?? '—'), date: reqDate, status, sortMs };
+      }
+      for (const pid of Object.keys(recent)) {
+        this.recentEventByProfile[pid] = { eventName: recent[pid].eventName, date: recent[pid].date, status: recent[pid].status };
+      }
+    } catch (e) { console.warn('recent event requests (paged) failed', e); }
+  }
+
+  /** Scoreboard spans the whole base regardless of the table's paging — load it once on demand. */
+  private async ensureScoreboardData(): Promise<void> {
+    if (this.scoreboardLoaded) return;
+    if (this.fullPjpData) {
+      this.sbPjp = this.fullPjpData;     // a prior full load already has everything (+ full touchpoints)
+    } else {
+      const pjpSnap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
+      this.sbPjp = pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id }));
+      await this.loadTouchpoints();      // populates allTouchpoints + touchpointByProfile (full)
+      await this.loadContactEvents();    // populates contactEventByProfile (full)
+    }
+    this.scoreboardLoaded = true;
+  }
+
+  // ===================================================================================
 
   private async loadCoaches(): Promise<void> {
     const list: { id: string; name: string }[] = [];
@@ -424,8 +720,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.selectedProfiles.clear();
 
     for (const d of this.pjpData) {
-      if (showUnassigned) { if (!this.isUnassigned(d['onboardedby'])) continue; }
-      else if (!showAll && !this.isMine(d['onboardedby'], this.selectedCoachId)) continue;
+      if (showUnassigned) { if (!this.isUnassigned(d['coachedby'])) continue; }
+      else if (!showAll && !this.isMine(d['coachedby'], this.selectedCoachId)) continue;
       const profileid = d['profileid'];
       if (!profileid) continue;
       matched++;
@@ -452,7 +748,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         profileid,
         name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
         number: this.profileMap.phonenumber?.[profileid] ?? null,
-        coachname: this.coachNameFor(d['onboardedby']),
+        coachname: this.coachNameFor(d['coachedby']),
         journeyname: journeyId ? (this.journeyNameMap[journeyId] ?? journeyId) : (meta['activejourney'] ?? '-'),
         atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
         journeystatus: jstatus ?? 'Initiated',
@@ -495,7 +791,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.matchedCount = matched;
     this.allRows = Array.from(byProfile.values()).sort((a, b) => b.priority - a.priority);
     this.journeyOptions = Array.from(new Set(this.allRows.map(r => r.journeyname))).sort();
-    this.computeSummary();
+    // paged mode builds the summary via accumulatePagedSummary() (server counts + loaded-so-far)
+    if (!this.pagedMode) this.computeSummary();
     this.applyFilters();
   }
 
@@ -615,8 +912,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   /** Per-row assign / change coach — works for any participant (assign or reassign).
-   *  Writes real onboardedby for every pjp doc of the row (reusing the Phase-B write pattern),
-   *  reflects locally (onboardedby + coach name + unassignedCount), and snackbars the result. */
+   *  Writes real coachedby for every pjp doc of the row (reusing the Phase-B write pattern),
+   *  reflects locally (coachedby + coach name + unassignedCount), and snackbars the result. */
   async assignCoachToRow(row: PortfolioRow, coachId: string): Promise<void> {
     if (!coachId) return;
     const coachRef = doc(this.firestore, 'profile_data', coachId);
@@ -624,9 +921,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     let fail = 0;
     for (const pjpId of row.pjpIds) {
       try {
-        await updateDoc(doc(this.firestore, 'participantjourneyproduct', pjpId), { onboardedby: [coachRef] });
+        await updateDoc(doc(this.firestore, 'participantjourneyproduct', pjpId), { coachedby: [coachRef] });
         const d = this.pjpData.find(x => x['__id'] === pjpId);
-        if (d) d['onboardedby'] = [coachRef]; // reflect locally
+        if (d) d['coachedby'] = [coachRef]; // reflect locally
       } catch (e: any) {
         console.error('assignCoachToRow write failed', pjpId, e);
         fail++;
@@ -640,7 +937,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     row.coachname = coachName;
     const unassignedProfiles = new Set<string>();
     for (const d of this.pjpData) {
-      if (d['profileid'] && this.isUnassigned(d['onboardedby'])) unassignedProfiles.add(d['profileid']);
+      if (d['profileid'] && this.isUnassigned(d['coachedby'])) unassignedProfiles.add(d['profileid']);
     }
     this.unassignedCount = unassignedProfiles.size;
     // if we're viewing a single coach or the unassigned bucket, this row may no longer belong here
@@ -650,10 +947,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   // ---- Phase C: Coach Scoreboard ----
 
-  setView(v: DashboardView): void {
+  async setView(v: DashboardView): Promise<void> {
     if (!v) return; // mat-button-toggle can emit null on deselect; ignore
     this.view = v;
-    if (v === 'scoreboard' && !this.scoreboardComputed) this.computeScoreboard();
+    if (v === 'scoreboard' && !this.scoreboardComputed) {
+      await this.ensureScoreboardData();   // scoreboard spans all coaches; loaded once on demand
+      this.computeScoreboard();
+    }
   }
 
   onRangeChange(): void {
@@ -697,18 +997,18 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const from = this.rangeFrom ? this.startOfDay(this.rangeFrom).getTime() : 0;
     const to = this.rangeTo ? this.endOfDay(this.rangeTo).getTime() : now;
 
-    // base size + current going-quiet are computed from current assignments (onboardedby)
+    // base size + current going-quiet are computed from current assignments (coachedby)
     const baseByCoach: Record<string, Set<string>> = {};
     const quietByCoach: Record<string, number> = {};
     for (const c of this.coaches) { baseByCoach[c.id] = new Set(); quietByCoach[c.id] = 0; }
 
     // distinct participant -> coach (first matching assignment), so quiet is counted once per person
     const seen = new Set<string>();
-    for (const d of this.pjpData) {
+    for (const d of this.sbPjp) {
       const pid = d['profileid'];
       if (!pid) continue;
       for (const c of this.coaches) {
-        if (!this.isMine(d['onboardedby'], c.id)) continue;
+        if (!this.isMine(d['coachedby'], c.id)) continue;
         baseByCoach[c.id].add(pid);
         const key = c.id + '|' + pid;
         if (!seen.has(key)) {
@@ -775,11 +1075,21 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private startOfDay(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
   private endOfDay(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
 
-  onCoachChange(id: string): void {
+  async onCoachChange(id: string): Promise<void> {
     this.selectedCoachId = id;
     this.activeLever = 'all';
     this.assignTargetCoachId = '';
-    this.computeRows();
+    this.pagedMode = this.isPagedView(id);
+    this.applyPaginatorBinding();
+    if (this.pagedMode) {
+      if (!this.serverCountsReady) await this.loadServerCounts();
+      await this.loadFirstPage();
+    } else {
+      // a specific coach needs the full base (global priority sort + accurate KPIs)
+      if (this.paginator) this.paginator.firstPage();
+      if (this.fullPjpData) { this.pjpData = this.fullPjpData; this.computeRows(); }
+      else await this.loadFullPortfolio();
+    }
   }
 
   /** Clickable KPI cards -> set the relevant lever. */
@@ -811,32 +1121,32 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     URL.revokeObjectURL(url);
   }
 
-  private coachNameFor(onboardedby: any): string {
+  private coachNameFor(coachedby: any): string {
     let id: string | null = null;
-    if (Array.isArray(onboardedby)) {
-      const first = onboardedby[0];
+    if (Array.isArray(coachedby)) {
+      const first = coachedby[0];
       id = first ? (typeof first === 'string' ? first : first?.id) : null;
-    } else if (typeof onboardedby === 'string') {
-      id = onboardedby;
+    } else if (typeof coachedby === 'string') {
+      id = coachedby;
     } else {
-      id = onboardedby?.id ?? null;
+      id = coachedby?.id ?? null;
     }
     return id ? (this.profileMap.map?.[id] ?? '—') : '—';
   }
 
-  private isMine(onboardedby: any, coachId: string): boolean {
-    if (!coachId || onboardedby == null) return false;
-    if (typeof onboardedby === 'string') return onboardedby === coachId;
-    if (Array.isArray(onboardedby)) {
-      return onboardedby.some((x: any) => (typeof x === 'string' ? x : x?.id) === coachId);
+  private isMine(coachedby: any, coachId: string): boolean {
+    if (!coachId || coachedby == null) return false;
+    if (typeof coachedby === 'string') return coachedby === coachId;
+    if (Array.isArray(coachedby)) {
+      return coachedby.some((x: any) => (typeof x === 'string' ? x : x?.id) === coachId);
     }
-    return (onboardedby?.id ?? null) === coachId;
+    return (coachedby?.id ?? null) === coachId;
   }
 
-  private isUnassigned(onboardedby: any): boolean {
-    if (onboardedby == null) return true;
-    if (typeof onboardedby === 'string') return onboardedby.trim() === '';
-    if (Array.isArray(onboardedby)) return onboardedby.length === 0 || onboardedby.every((x: any) => x == null);
+  private isUnassigned(coachedby: any): boolean {
+    if (coachedby == null) return true;
+    if (typeof coachedby === 'string') return coachedby.trim() === '';
+    if (Array.isArray(coachedby)) return coachedby.length === 0 || coachedby.every((x: any) => x == null);
     return false; // a single ref object means assigned
   }
 
@@ -857,7 +1167,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
   get selectedCount(): number { return this.selectedProfiles.size; }
 
-  /** Bulk-assign the selected unassigned participants to a coach — writes real onboardedby. */
+  /** Bulk-assign the selected unassigned participants to a coach — writes real coachedby. */
   async assignSelected(): Promise<void> {
     if (!this.assignTargetCoachId || this.selectedProfiles.size === 0) return;
     this.assigning = true;
@@ -870,9 +1180,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (!row) continue;
       for (const pjpId of row.pjpIds) {
         try {
-          await updateDoc(doc(this.firestore, 'participantjourneyproduct', pjpId), { onboardedby: [coachRef] });
+          await updateDoc(doc(this.firestore, 'participantjourneyproduct', pjpId), { coachedby: [coachRef] });
           const d = this.pjpData.find(x => x['__id'] === pjpId);
-          if (d) d['onboardedby'] = [coachRef]; // reflect locally so they leave the unassigned view
+          if (d) d['coachedby'] = [coachRef]; // reflect locally so they leave the unassigned view
         } catch (e: any) {
           console.error('assign write failed', pjpId, e);
           fail++;
@@ -886,7 +1196,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       'Close', 5000);
     const unassignedProfiles = new Set<string>();
     for (const d of this.pjpData) {
-      if (d['profileid'] && this.isUnassigned(d['onboardedby'])) unassignedProfiles.add(d['profileid']);
+      if (d['profileid'] && this.isUnassigned(d['coachedby'])) unassignedProfiles.add(d['profileid']);
     }
     this.unassignedCount = unassignedProfiles.size;
     this.assignTargetCoachId = '';
