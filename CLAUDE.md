@@ -34,6 +34,12 @@ Firebase projects: `fir-sample-aae4a` = **production**, `starlabs-test` = test, 
 
 ---
 
+## Commit discipline
+
+- **Commit after every self-contained piece of code.** The moment a change is coherent and green — a bug fixed, a test added and passing, a refactor step finished — commit it right away with a clear, scoped message. Prefer small, frequent commits over batching unrelated changes. This is a standing operator instruction: do not wait to be asked to commit.
+- **Branch first if on a protected branch.** The working line is **`cicd`** (feature branches such as `test/queue-e2e` merge into it). **`main`** tracks the upstream School-of-Excellence repo — never merge or push to `main` without explicit operator approval.
+- **Pushing is a separate, gated step** — `git push` publishes; do it only when the operator asks. Committing locally does not.
+
 ## Session Protocol
 
 ### Start of every session

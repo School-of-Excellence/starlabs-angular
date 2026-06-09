@@ -148,7 +148,7 @@ test.describe('SELFMOVABLE-GATE (P1 #6) — self-movable flag parity + operator-
     const stages: string[] = v.stages || [];
     const gate = operatorGateFor(vid, stages);
 
-    test(`V:${v.variationname} — every stage's selfmovable flag matches the flow-model oracle (config parity)`, async () => {
+    test(`V:${v.variationname} — every stage's selfmovable flag matches the flow-model oracle (config parity)`, { tag: '@oracle' }, async () => {
       // (1) ORACLE PARITY — for EVERY stage on this variation's backbone, the routing oracle's
       // selfmovable flag equals the seeded config's, and the self-move EDGE structure agrees with it.
       // Compares two PRODUCT artifacts (oracle vs config) — neither value was written by this test.
@@ -324,7 +324,7 @@ test.describe('SELFMOVABLE-GATE (P1 #6) — self-movable flag parity + operator-
       // V9 (uP! - Prep Hold): single-stage parking terminal — NO operator gate. Assert there is no
       // participant CTA at all (non-self-movable, no self-move edge, ZERO scoped out-edges), and the
       // seeded token sits on its sole stage with no self-move in its product log.
-      test(`V:${v.variationname} — single-stage parking terminal has no participant self-advance (no gate, no CTA)`, async () => {
+      test(`V:${v.variationname} — single-stage parking terminal has no participant self-advance (no gate, no CTA)`, { tag: '@oracle' }, async () => {
         expect(stages.length, `${v.variationname} is expected to be the single-stage parking variation`).toBe(1);
         const only = stages[0];
 
