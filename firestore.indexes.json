@@ -878,6 +878,34 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "delivery forms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "formfor",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "formname",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "supportchat",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isdelete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "last_modification",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
