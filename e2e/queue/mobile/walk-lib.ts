@@ -8,7 +8,7 @@
  * reads PRODUCT output (the token/log the app or board wrote) via the unchanged guards — anti-circular.
  */
 import { Page, expect, TestInfo } from '@playwright/test';
-import { execFileSync } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -181,8 +181,13 @@ export function bootedSimUdid(): string {
   return m[1];
 }
 
-/** Drive `count` contiguous form self-moves for one participant via a single `flutter drive`. */
-export function driveFlutterSelfRun(t: VariationTarget, count: number, label: string): void {
+/** Drive `count` contiguous form self-moves for one participant via a single `flutter drive`, and
+ *  capture a REAL per-stage mobile screenshot via `xcrun simctl io screenshot` (the OS-level screen)
+ *  each time the robot reaches a stage. (iOS integration_test `binding.takeScreenshot` returns a BLANK
+ *  image for this GPU/platform-view app, so we screenshot the simulator screen instead.) The robot
+ *  prints `WALK[label] hop N: at "<stage>"` then pumps through dismiss+scroll before tapping, giving a
+ *  window where the queue card (with the action button) is on screen — we shoot on that marker. */
+export async function driveFlutterSelfRun(t: VariationTarget, count: number, label: string): Promise<void> {
   const udid = bootedSimUdid();
   const args = [
     'drive',
@@ -195,7 +200,33 @@ export function driveFlutterSelfRun(t: VariationTarget, count: number, label: st
     `--dart-define=E2E_SELF_HOPS=${count}`,
     `--dart-define=E2E_LABEL=${label}`,
   ];
-  execFileSync(FLUTTER_BIN, args, { cwd: FLUTTER_APP, stdio: 'inherit', timeout: 12 * 60_000, env: flutterEnv() });
+  if (!fs.existsSync(EVIDENCE_DIR)) fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
+  const logPath = path.join(os.tmpdir(), `flutterdrive-${label}.log`);
+  const logFd = fs.openSync(logPath, 'w');
+  const proc = spawn(FLUTTER_BIN, args, { cwd: FLUTTER_APP, env: flutterEnv(), stdio: ['ignore', logFd, logFd] });
+  const seen = new Set<string>();
+  let shotIdx = 0;
+  await new Promise<void>((resolve, reject) => {
+    const poll = setInterval(() => {
+      let log = '';
+      try { log = fs.readFileSync(logPath, 'utf8'); } catch { return; }
+      for (const m of log.matchAll(/WALK\[[^\]]*\] hop \d+: at "([^"]+)"/g)) {
+        const stage = m[1];
+        if (seen.has(stage)) continue;
+        seen.add(stage);
+        const safe = `${label}-${String(shotIdx++).padStart(2, '0')}-${stage.replace(/[^A-Za-z0-9]+/g, '_')}.png`;
+        try { execFileSync('xcrun', ['simctl', 'io', udid, 'screenshot', path.join(EVIDENCE_DIR, safe)], { stdio: 'ignore', timeout: 20_000 }); } catch { /* best-effort */ }
+      }
+    }, 700);
+    const kill = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 12 * 60_000);
+    proc.on('exit', (code) => {
+      clearInterval(poll); clearTimeout(kill); try { fs.closeSync(logFd); } catch {}
+      if (code === 0) resolve();
+      else reject(new Error(`flutter drive (${label}) exited ${code}. Tail:\n` +
+        fs.readFileSync(logPath, 'utf8').split('\n').slice(-25).join('\n')));
+    });
+    proc.on('error', (e) => { clearInterval(poll); clearTimeout(kill); reject(e); });
+  });
 }
 
 /** Attach all PNGs the Flutter run wrote to the Playwright report, then clear them for the next run. */

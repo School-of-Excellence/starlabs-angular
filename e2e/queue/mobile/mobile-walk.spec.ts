@@ -59,7 +59,7 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
           let j = i;
           while (j < t.hops.length && t.hops[j].kind === 'SELF') j++;
           const runLen = j - i;
-          driveFlutterSelfRun(t, runLen, `${t.vid}-p${t.participantIndex}`);
+          await driveFlutterSelfRun(t, runLen, `${t.vid}-p${t.participantIndex}`);
           logged += runLen;
           await assertAfterHop(t.tokenId, t.vid, logged, minNonSelf);
           i = j;
