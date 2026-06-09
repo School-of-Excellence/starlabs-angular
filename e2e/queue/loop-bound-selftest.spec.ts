@@ -80,7 +80,7 @@ const CF_POLL = { timeout: 30_000, intervals: [500, 1000, 2000] };
  *  GUARD's verdict on the rows the PRODUCT+stand-in wrote — read via e2e/lib/assertions.ts. */
 const adb = () => sim.db();
 
-test.describe('LOOP-BOUND self-test — the loop guard catches a stuck token (P3 #14)', () => {
+test.describe('LOOP-BOUND self-test — the loop guard catches a stuck token (P3 #14)', { tag: '@oracle' }, () => {
   let guard: ConsoleGuard;
   test.beforeEach(async ({ page }) => {
     guard = attachConsoleGuard(page); // fail on a REAL app error (benign stubbed-external noise ignored)

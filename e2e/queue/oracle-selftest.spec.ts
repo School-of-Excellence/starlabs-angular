@@ -6,7 +6,7 @@ const cfg = require('../fixtures/sample-queue-config.json');
 const { oracle, build } = require('../lib/flow-model');
 const clone = () => JSON.parse(JSON.stringify(cfg));
 
-test.describe('Oracle self-test (the suite can detect breakage)', () => {
+test.describe('Oracle self-test (the suite can detect breakage)', { tag: '@oracle' }, () => {
   test('healthy config: oracle returns the known real issues only (2 documented orphans)', () => {
     const o = oracle(cfg);
     // baseline: matches validated spec §8 — 2 orphans, no dangling

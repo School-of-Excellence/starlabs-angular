@@ -282,3 +282,53 @@ The suite runs as **two paths × three evidence levels** (`scripts/run-isolated.
 - CF-event delivery (`onCreate`/`onWrite`) for spaced collections (`queue stage log`, `bulk invitation`) + the FieldValue touchpoint write — cf-sideeffects **CF-01/CF-02**, operator **OP-09b**.
 - the `firestore-forms` named DB (`src/main.ts` emulator-connects only `(default)`) — cross-db **Forms widget**, studio-core **SS-07**.
 Honest platform-gating, not weakening: on cloud the assertions run in full; on the emulator the platform genuinely can't deliver the event/DB. (A future `src/main.ts` change to emulator-connect the named DB + an emulator workaround for spaced-collection `onCreate` would let the emulator run them too.) The 1 operator failure first seen on the emulator was a flake coincident with the run's single emulator self-heal restart — re-ran 13/13.
+
+## Addendum — clean cloud reproduction (2026-06-09, `npm run report:cloud`, B level)
+
+Re-ran the full PROOF path end-to-end on a fresh cloud dist (development config → `slabs-queue-e2e-exdcz`, emulator stopped, machine-wide lock free). Reproduces the baseline exactly:
+- **Result: 188 passed · 0 failed · 6 skipped / 194** — `spec files with >=1 failure: 0`. All 22 blob reports merged → one HTML report.
+- **Screenshot evidence (authoritative count from the merged blobs → JSON):** **188 screenshots** across the 188 passed tests. **184 of 188 passed tests carry ≥1 screenshot; the SS-05/06/07 studio cases carry 2–3** (explicit mid-test shots + the auto end-shot). The HTML report stores them as **118 unique PNGs** — Playwright content-hash-dedups byte-identical end-screens, so file-count < attachment-count is expected, not loss.
+- **The only 4 passed tests WITHOUT a screenshot are all `oracle-selftest.spec.ts`** (oracle returns documented orphans / detects a dangling edge / new orphan / unreachable cycle) — pure flow-graph **meta-tests that never open a browser page**, so there is nothing to capture. Not a gap.
+- **The 6 skips are all intentional, documented:** `test.fixme` product findings — **BIG-06** (legacy form screen, product gap + missing precondition), **SS-08** (AEL crossover doc), **SS-15b** (negative role gate the product *should* enforce); runtime `test.skip(condition, reason)` precondition/surface guards — **OP-06** (needs a seeded live-assignment), **SS-15** (monitor surface didn't render for the seeded variation), **UP3-WF-01-HAPPY** (real specialist studio control didn't render). None faked green; no `FIRESTORE_EMULATOR_HOST` leaked into the cloud run.
+- **Report:** `e2e/playwright-report/index.html` (~9 MB, B level). View with `cd e2e && npx playwright show-report` → click any test → the screenshot is inline + under the **Attachments / Screenshots** section. Gitignored — ship as a CI artifact, not in git.
+
+## Addendum — independent evidence audit (2026-06-09): all 191 screenshots SEEN + pass/fail honesty verified
+
+A 38-agent verification workflow (16 vision agents classified EVERY screenshot by on-screen content; 22 code agents audited EVERY spec's assertions) + personal adjudication of all flags. Screenshots were extracted from the 22 blob reports and attributed to test + declared status + content-hash (`/tmp/evidence/manifest.json` builder + `/tmp/synth.js`).
+
+**Pass/fail declarations are HONEST.** No faked greens: 0 trivially-true assertions, 0 swallowed-catch masking a failure, 0 dishonest skips, and **0 tests passed while their screenshot showed an error/stack/404** (visual hasErrorIndicator count = 0). 158/188 audited tests assert real app/CF output, 21 oracle/config, 6 seeded, only 3 outright circular. Negative-path tests (BIG-00 `/login` redirect, BIG-00b access-denied ×3) correctly END on the denied/login state — that IS the asserted success.
+
+**But the "188 screenshots, one per test" headline OVERSTATES the visual proof.** 191 attachments, **118 unique by content**. Visually: 164 real-UI (122 board, 24 studio, 8 admin-other, 7 access-control dialog, 3 forms), 23 blank-white, 3 partial-render, 1 login (all expected):
+- **23 passed tests carry a byte-identical BLANK 4254-byte screenshot** — SIM/oracle/data tests (selfmovable-gate parity, loop-bound, form-write integrity, up-prep-hold) that take a `page` but never drive UI. Their pass rests on Firestore/oracle assertions, not the screenshot.
+- **Journey-walk tests share identical end-board screenshots** (one image = 14 different walk tests) — every walk ends on the same empty board (all stages "- 0").
+- OP-01 + BIG-05 captured only the app chrome (empty body) due to end-of-test screenshot timing; their assertions ran mid-test on real testids and are valid.
+
+**~15 tests are circular/tautological meta-tests (green + honest, low product-validation value):**
+- 9 `selfmovable-gate` PARITY tests — assertion 1a `oracle.selfmv === config.selfmovable` is tautological (`flow-model.js:90` sets `n.selfmv = !!p.selfmovable`). The REAL product validation is their sibling GATE tests (drive the board, read the audit trail — NOT flagged).
+- 3–4 SIM log-shape tests (BIGNC-01/03, lyl/up-next form-write) assert log fields participant-sim wrote (circular); partial value from row-count equality + oracle edge-legality.
+- 2 prodigies-next (PNC-WF-02/03) — oracle/config + sim meta-tests of the loop-guard infra.
+
+**Conclusion:** every "passed" is legitimately green (real/seeded/oracle assertions actually ran; nothing faked, nothing errored-yet-green, every skip documented), but the screenshot is meaningful UI proof for ~164 of 191, and ~15 greens validate the test's own oracle/config/sim rather than product behavior. Suggested follow-ups: (a) drop/skip-screenshot the no-UI tests so receipts are uniformly meaningful; (b) replace tautological parity assertion 1a with a check against the app's real routing (or fold into the gate test); (c) screenshot before teardown to fix chrome-only frames.
+
+## Addendum — report split (product vs test-oracle) + meta-layer completeness CLOSED (2026-06-09)
+
+**Report split.** Tagged the pure harness/meta tests `@oracle` so the report partitions into two layers:
+- `--grep @oracle` → **20 test-oracle tests** (oracle-selftest 4, loop-bound-selftest 2, selfmovable-gate parity 9 + parking-terminal 1, invariants-selftest 4).
+- `--grep-invert @oracle` → **178 product tests**. Total now **198** (was 194; +4 new self-tests).
+The tautological selfmovable parity 1a is KEPT by decision (it's a change-detector / contract-pin on the oracle that other tests trust), but now lives under the test-oracle layer instead of inflating the product count.
+
+**Meta completeness — the 4 gaps the audit found are now closed.** New `e2e/queue/invariants-selftest.spec.ts` adds mutation/negative self-tests (same gold-standard pattern as oracle-selftest + loop-bound-selftest) proving the previously-unguarded harness invariants FIRE on a defect:
+- **INV2 `assertEveryMoveLogged`** — throws on a dropped row, a duplicate row, and an unmet `minNonSelf` (the count-conservation guard behind ~50 walk tests — previously had NO self-test).
+- **INV3 `assertNoStageSkipped`** — throws on an illegal scoped edge (the no-skip invariant — previously only run on clean configs).
+- **INV-selfmv** — flipping an operator gate to `selfmovable:true` is caught by the parity edge-check 1b (turns 1a's sibling into a proven detector).
+- **INV-scope** — an edge scoped to one variation is excluded for another (`outEdgesForVariation` isolation).
+INV2/INV3 are hermetic — they write/read ONLY the `queue stage log` collection by a unique self-test docid (no app/CF/seed). All 4 green on the firestore emulator.
+
+**Proven non-vacuous (mutation-checked).** Each self-test was confirmed to go RED when its guard is broken — disabling the `assertEveryMoveLogged`/`assertNoStageSkipped` throws turned INV2/INV3 red; disabling `build()` edge-suppression + `outEdgesForVariation` scoping turned INV-selfmv/INV-scope red — then the guards were restored (empty git diff on the lib files). None is vacuously green.
+
+**Run locally (firestore emulator needs Java):**
+```
+PATH="/opt/homebrew/opt/openjdk/bin:$PATH" firebase emulators:start --only firestore --config firebase.emulator.json --project demo-slabs-queue
+FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_PROJECT=demo-slabs-queue npx playwright test --config=e2e/playwright.invariants.config.ts
+```
+In the merged evidence report the spec also runs under the normal emulator/cloud configs unchanged.
