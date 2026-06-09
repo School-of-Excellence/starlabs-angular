@@ -264,8 +264,9 @@
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
           <td mat-cell *matCellDef="let r">
-            <a class="cell-name name-link" [routerLink]="['/userprofile', r.profileid]"
-               matTooltip="Open profile">{{ r.name }}</a>
+            <a class="cell-name name-link" role="button" tabindex="0"
+               (click)="openSlideover(r)" (keydown.enter)="openSlideover(r)" (keydown.space)="openSlideover(r)"
+               matTooltip="Open participant panel">{{ r.name }}</a>
             <div class="cell-sub">{{ r.number || '—' }}</div>
           </td>
         </ng-container>
