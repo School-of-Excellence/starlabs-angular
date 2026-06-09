@@ -103,7 +103,7 @@ function queuePlanning(ctx) {
     segmentlist: [`${docid}_seg1`],
     planning: [{
       variationid: variationId,
-      segments: [{ segmentid: `${docid}_seg1`, slots: {}, stagecohort: {} }],
+      segments: [{ segmentid: `${docid}_seg1`, slots: [], stagecohort: [] }],
     }],
     slotinterest: [],
     createdAt: ctx.now(), updatedAt: ctx.now(),

@@ -5,189 +5,838 @@
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "currentstage", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "currentstage",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "currentstage", "order": "ASCENDING" },
-        { "fieldPath": "tokenstatus", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "currentstage",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tokenstatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "tokenstatus", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tokenstatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "testrunid", "order": "ASCENDING" },
-        { "fieldPath": "queueposition", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "testrunid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "queueposition",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "FCM_token",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "device_os", "order": "ASCENDING" },
-        { "fieldPath": "profile_ref", "order": "ASCENDING" },
-        { "fieldPath": "last_modified", "order": "ASCENDING" }
+        {
+          "fieldPath": "device_os",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "profile_ref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "last_modified",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue generation",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueadmin", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "queuename", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueadmin",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "queuename",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "appointments",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "attended", "order": "ASCENDING" },
-        { "fieldPath": "starttime", "order": "DESCENDING" }
+        {
+          "fieldPath": "attended",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "starttime",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue stage log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "profile_id", "order": "ASCENDING" },
-        { "fieldPath": "createdon", "order": "ASCENDING" }
+        {
+          "fieldPath": "profile_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdon",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue stage log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue stage log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "currentstage", "order": "ASCENDING" },
-        { "fieldPath": "profile_id", "order": "ASCENDING" },
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "DESCENDING" }
+        {
+          "fieldPath": "currentstage",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "profile_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "participantjourneyproduct",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "profileid", "order": "ASCENDING" },
-        { "fieldPath": "subscriptionstart", "order": "DESCENDING" }
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "subscriptionstart",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "studioinvitation",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "specialistpairing", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "studioid", "order": "ASCENDING" },
-        { "fieldPath": "expirydate", "order": "ASCENDING" }
+        {
+          "fieldPath": "specialistpairing",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "studioid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expirydate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "studioinvitation",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tokenref", "order": "ASCENDING" },
-        { "fieldPath": "expirydate", "order": "ASCENDING" }
+        {
+          "fieldPath": "tokenref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expirydate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "studioinvitation",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "clientresponse", "order": "ASCENDING" },
-        { "fieldPath": "profileid", "order": "ASCENDING" },
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "expirydate", "order": "ASCENDING" }
+        {
+          "fieldPath": "clientresponse",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expirydate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue studio pairing",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "created", "order": "DESCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "studio checkin log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "logparticipant", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "logparticipant",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue stage log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "docid", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "docid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue activity log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueid", "order": "ASCENDING" },
-        { "fieldPath": "activitydate", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "activitydate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue activity log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueid", "order": "ASCENDING" },
-        { "fieldPath": "activitydate", "order": "DESCENDING" }
+        {
+          "fieldPath": "queueid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "activitydate",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "studio activity log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueid", "order": "ASCENDING" },
-        { "fieldPath": "created", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "studio activity log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueid", "order": "ASCENDING" },
-        { "fieldPath": "activitydate", "order": "DESCENDING" }
+        {
+          "fieldPath": "queueid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "activitydate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantsproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sequenceorder",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantsproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sequenceorder",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participant messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participant AEL",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tentativestart",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantjourneyproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "journeystatus",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "content analytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "content analytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "from",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "content analytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "postcollection",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "private",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "content_urls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "available",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "added",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "recommended mix playlist",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "3minuteshpc",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "3minuteshpc",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "evolutionwishlistlog",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "interimreport log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastupdate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "livechangework",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "participantsinvolved",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "procedurestatus",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "supportchat",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "members",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "isdelete",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sticky",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "stagechat",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "stage",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "studioinvitation",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "clientresponse",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expirydate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "queue studio pairing",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "checkin",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "studioin",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantjourneyproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "journeyref",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cohorts queue planner",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "queueid",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantsproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "productref",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "queue_token",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "profile_id",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "arena events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "delete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startdate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "event rsvp",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "arenaeventid",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "arena e-ticket",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "eventref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "arenavideoask",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "eventref",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "participantvideoask",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "arenaevent",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "interimreport log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastupdate",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
