@@ -3,15 +3,25 @@
   <header class="jchd-header">
     <div>
       <h1>Journey Coach — Health Dashboard</h1>
-      <p class="subtitle" *ngIf="selectedCoachName">{{ selectedCoachName }}'s base</p>
+      <p class="subtitle" *ngIf="view === 'base' && selectedCoachName">{{ selectedCoachName }}'s base</p>
+      <p class="subtitle" *ngIf="view === 'scoreboard'">Coach scoreboard</p>
     </div>
-    <mat-form-field appearance="outline" class="coach-picker" *ngIf="!loading && !loadError">
-      <mat-label>Viewing</mat-label>
-      <mat-select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)">
-        <mat-option [value]="ALL">All participants</mat-option>
-        <mat-option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</mat-option>
-      </mat-select>
-    </mat-form-field>
+    <div class="jchd-header-controls" *ngIf="!loading && !loadError">
+      <mat-button-toggle-group class="view-toggle" [value]="view" (change)="setView($event.value)"
+        aria-label="Dashboard view">
+        <mat-button-toggle value="base">Base</mat-button-toggle>
+        <mat-button-toggle value="scoreboard">Scoreboard</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <mat-form-field appearance="outline" class="coach-picker" *ngIf="view === 'base'">
+        <mat-label>Viewing</mat-label>
+        <mat-select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)">
+          <mat-option [value]="ALL">All participants</mat-option>
+          <mat-option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</mat-option>
+          <mat-option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
   </header>
 
   <div class="jchd-state" *ngIf="loading">
@@ -25,22 +35,41 @@
 
   <ng-container *ngIf="!loading && !loadError">
 
-    <section class="jchd-summary">
+    <!-- ===== Base view (existing dashboard) ===== -->
+    <ng-container *ngIf="view === 'base'">
+
+    <!-- Phase B: assignment bar (Unassigned view only) -->
+    <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED">
+      <mat-icon>person_add</mat-icon>
+      <span class="assign-text"><strong>{{ selectedCount }}</strong> of {{ dataSource.data.length }} selected · these participants have no journey coach</span>
+      <mat-form-field appearance="outline" class="assign-coach">
+        <mat-label>Assign to coach</mat-label>
+        <mat-select [(ngModel)]="assignTargetCoachId">
+          <mat-option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-flat-button color="primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
+        (click)="assignSelected()">
+        <mat-icon>how_to_reg</mat-icon> Assign {{ selectedCount }}
+      </button>
+      <mat-spinner *ngIf="assigning" diameter="22"></mat-spinner>
+    </section>
+
+    <section class="jchd-summary" *ngIf="selectedCoachId !== UNASSIGNED">
       <mat-card class="kpi"><div class="kpi-num">{{ summary.total }}</div><div class="kpi-label">Participants</div></mat-card>
       <mat-card class="kpi good"><div class="kpi-num">{{ summary.active }}</div><div class="kpi-label">Active</div></mat-card>
-      <mat-card class="kpi warn clickable" (click)="kpi('late')"><div class="kpi-num">{{ summary.late }}</div><div class="kpi-label">Late</div></mat-card>
-      <mat-card class="kpi bad clickable" (click)="kpi('discontinued')"><div class="kpi-num">{{ summary.discontinued }}</div><div class="kpi-label">Discontinued</div></mat-card>
+      <mat-card class="kpi bad clickable" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned"><div class="kpi-num">{{ summary.inactive }}</div><div class="kpi-label">Inactive (lost)</div></mat-card>
       <mat-card class="kpi clickable" (click)="kpi('renewalsSoon')"><div class="kpi-num">{{ summary.renewalsSoon }}</div><div class="kpi-label">Renewals &le;90d</div></mat-card>
       <mat-card class="kpi clickable" (click)="kpi('goingQuiet')"><div class="kpi-num">{{ summary.goingQuiet }}</div><div class="kpi-label">Going quiet</div></mat-card>
       <mat-card class="kpi"><div class="kpi-num">{{ summary.withOpenTickets }}</div><div class="kpi-label">Open tickets</div></mat-card>
     </section>
 
-    <div class="jchd-phase-note">
+    <div class="jchd-phase-note" *ngIf="selectedCoachId !== UNASSIGNED">
       <mat-icon>info</mat-icon>
       <span><strong>Priority</strong> is a Phase-1 triage heuristic over live data (who to act on first). The calibrated <strong>Health Score</strong> (Sad / Neutral / Happy / Evangelist) is wired and turns on in Phase 2 once instrumentation &amp; calibration land.</span>
     </div>
 
-    <section class="jchd-levers">
+    <section class="jchd-levers" *ngIf="selectedCoachId !== UNASSIGNED">
       <button mat-stroked-button [class.active]="activeLever==='all'" (click)="setLever('all')">All</button>
       <button mat-stroked-button [class.active]="activeLever==='goingQuiet'" (click)="setLever('goingQuiet')"
         matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (attended sessions + logged touchpoints)">Going quiet ({{ summary.goingQuiet }})</button>
@@ -50,6 +79,8 @@
         matTooltip="Subscription ended within the last {{ LAPSED_DAYS }} days — win-back">Lapsed ({{ summary.lapsed }})</button>
       <button mat-stroked-button [class.active]="activeLever==='notStarted'" (click)="setLever('notStarted')"
         matTooltip="Onboarded but journey not started">Not started ({{ summary.notStarted }})</button>
+      <button mat-stroked-button [class.active]="activeLever==='inactive'" (click)="setLever('inactive')"
+        matTooltip="Gone — late / discontinued / banned (unactionable)">Inactive ({{ summary.inactive }})</button>
       <button mat-stroked-button disabled matTooltip="Available in Phase 2 (needs Wins + Advocacy)">Referral-ready · Phase 2</button>
     </section>
 
@@ -79,14 +110,27 @@
       </button>
     </section>
 
-    <div class="jchd-diag">
+    <div class="jchd-diag" *ngIf="selectedCoachId !== UNASSIGNED">
       {{ summary.total }} participant(s) for <strong>{{ selectedCoachName || 'selected coach' }}</strong>
       · matched {{ matchedCount }} of {{ scannedCount }} journey-product records · ranked by priority
       <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>onboardedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
     </div>
+    <div class="jchd-diag" *ngIf="selectedCoachId === UNASSIGNED">
+      {{ dataSource.data.length }} participant(s) with no journey coach. Select rows and assign them to a coach above —
+      this writes <code>onboardedby</code> so they appear in that coach's base everywhere.
+    </div>
 
     <div class="jchd-table-wrap">
       <table mat-table [dataSource]="dataSource" matSort matSortActive="priority" matSortDirection="desc" class="jchd-table">
+
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-checkbox [checked]="allVisibleSelected" (change)="toggleSelectAll()"></mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let r">
+            <mat-checkbox [checked]="isSelected(r.profileid)" (change)="toggleSelect(r.profileid)"></mat-checkbox>
+          </td>
+        </ng-container>
 
         <ng-container matColumnDef="health">
           <th mat-header-cell *matHeaderCellDef>Health</th>
@@ -108,7 +152,8 @@
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
           <td mat-cell *matCellDef="let r">
-            <div class="cell-name">{{ r.name }}</div>
+            <a class="cell-name name-link" [routerLink]="['/userprofile', r.profileid]"
+               matTooltip="Open profile">{{ r.name }}</a>
             <div class="cell-sub">{{ r.number || '—' }}</div>
           </td>
         </ng-container>
@@ -128,6 +173,18 @@
           <td mat-cell *matCellDef="let r">
             {{ r.journeyname }}
             <span class="cell-sub">{{ r.journeystatus }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="recentEvent">
+          <th mat-header-cell *matHeaderCellDef>Recent event request</th>
+          <td mat-cell *matCellDef="let r">
+            <ng-container *ngIf="r.recentEventRequest; else noEvent">
+              <div class="evt-name">{{ r.recentEventRequest.eventName }}</div>
+              <div class="cell-sub" *ngIf="r.recentEventRequest.date">{{ fmtDate(r.recentEventRequest.date) }}</div>
+              <span class="chip" [ngClass]="eventStatusClass(r.recentEventRequest.status)">{{ r.recentEventRequest.status }}</span>
+            </ng-container>
+            <ng-template #noEvent><span class="evt-none">—</span></ng-template>
           </td>
         </ng-container>
 
@@ -177,14 +234,26 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
+            <button mat-icon-button [routerLink]="['/userprofile', r.profileid]" matTooltip="Open profile">
+              <mat-icon>open_in_new</mat-icon>
+            </button>
             <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Actions"><mat-icon>more_vert</mat-icon></button>
             <mat-menu #rowMenu="matMenu">
-              <button mat-menu-item (click)="logTouchpoint(r)">
-                <mat-icon>add_task</mat-icon><span>Log touchpoint</span>
+              <button mat-menu-item (click)="logCall(r)">
+                <mat-icon>add_task</mat-icon><span>Log call</span>
+              </button>
+              <button mat-menu-item [matMenuTriggerFor]="assignMenu">
+                <mat-icon>person_add</mat-icon><span>Assign coach</span>
               </button>
               <button mat-menu-item [routerLink]="['/userprofile', r.profileid]">
                 <mat-icon>open_in_new</mat-icon><span>Open profile</span>
               </button>
+              <mat-menu #assignMenu="matMenu">
+                <button mat-menu-item *ngFor="let c of coaches" (click)="assignCoachToRow(r, c.id)">
+                  <mat-icon *ngIf="r.coachname === c.name">check</mat-icon>
+                  <span [class.assign-current]="r.coachname === c.name">{{ c.name }}</span>
+                </button>
+              </mat-menu>
             </mat-menu>
           </td>
         </ng-container>
@@ -199,6 +268,101 @@
 
       <mat-paginator [pageSizeOptions]="[25, 50, 100]" pageSize="25" showFirstLastButtons></mat-paginator>
     </div>
+
+    </ng-container>
+    <!-- ===== /Base view ===== -->
+
+    <!-- ===== Phase C: Coach Scoreboard ===== -->
+    <ng-container *ngIf="view === 'scoreboard'">
+
+      <section class="jchd-range">
+        <mat-button-toggle-group class="period-toggle" [value]="period" (change)="setPeriod($event.value)"
+          aria-label="Scoreboard period">
+          <mat-button-toggle value="week">This week</mat-button-toggle>
+          <mat-button-toggle value="month">This month</mat-button-toggle>
+          <mat-button-toggle value="custom">Custom</mat-button-toggle>
+        </mat-button-toggle-group>
+
+        <mat-form-field appearance="outline" *ngIf="period === 'custom'">
+          <mat-label>From</mat-label>
+          <input matInput [matDatepicker]="fromPicker" [(ngModel)]="rangeFrom" (dateChange)="onRangeChange()" />
+          <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+        <mat-form-field appearance="outline" *ngIf="period === 'custom'">
+          <mat-label>To</mat-label>
+          <input matInput [matDatepicker]="toPicker" [(ngModel)]="rangeTo" (dateChange)="onRangeChange()" />
+          <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
+        <span class="range-hint">Leaderboard across all journey coaches for the selected range.</span>
+      </section>
+
+      <div class="jchd-target-line">
+        <mat-icon>flag</mat-icon>
+        <span>Target: contact at least {{ COVERAGE_TARGET * 100 }}% of your base this period.</span>
+      </div>
+
+      <div class="jchd-phase-note">
+        <mat-icon>emoji_events</mat-icon>
+        <span>This scoreboard rewards <strong>keeping the pipeline active</strong> (engagement &amp; coverage).
+          Outcome metrics (renewals / referrals / wins) join the score later once instrumentation lands.</span>
+      </div>
+
+      <div class="jchd-table-wrap">
+        <table class="jchd-table scoreboard-table">
+          <thead>
+            <tr>
+              <th class="col-rank">Rank</th>
+              <th>Coach</th>
+              <th class="num">Base</th>
+              <th class="cov-col">Contacted / Coverage</th>
+              <th>Target</th>
+              <th class="num">Touchpoints</th>
+              <th class="num">Quality</th>
+              <th class="num">Going quiet</th>
+              <th class="num">Engagement</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of scoreboard" [class.is-podium]="r.rank <= 3">
+              <td class="col-rank">
+                <span class="rank-badge" [ngClass]="rankClass(r.rank)">{{ r.rank }}</span>
+              </td>
+              <td class="cell-name">{{ r.coachName }}</td>
+              <td class="num">{{ r.baseSize }}</td>
+              <td class="cov-col">
+                <div class="cov-line">{{ r.contacted }} / {{ r.baseSize }}
+                  <span class="cell-sub">{{ (r.coverage * 100) | number:'1.0-0' }}%</span>
+                </div>
+                <div class="cov-bar"><span [style.width.%]="r.coverage * 100"></span></div>
+              </td>
+              <td>
+                <span class="chip chip-good" *ngIf="r.onTarget">On target</span>
+                <span class="chip chip-neutral" *ngIf="!r.onTarget">{{ (r.coverage * 100) | number:'1.0-0' }}% / {{ COVERAGE_TARGET * 100 }}%</span>
+              </td>
+              <td class="num">{{ r.touchpoints }}</td>
+              <td class="num">
+                <span class="chip" [ngClass]="r.qualityRate >= 0.5 ? 'chip-good' : 'chip-neutral'"
+                  matTooltip="share of logged calls that actually reached the participant">Quality {{ (r.qualityRate * 100) | number:'1.0-0' }}%</span>
+              </td>
+              <td class="num">
+                <span class="chip" [ngClass]="r.goingQuiet > 0 ? 'chip-warn' : 'chip-neutral'">{{ r.goingQuiet }}</span>
+              </td>
+              <td class="num">
+                <span class="score-pill">{{ r.engagementScore }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="jchd-empty" *ngIf="scoreboard.length === 0">
+          No journey coaches found.
+        </div>
+      </div>
+
+    </ng-container>
+    <!-- ===== /Coach Scoreboard ===== -->
 
   </ng-container>
 </div>
