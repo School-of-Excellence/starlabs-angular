@@ -51,6 +51,7 @@ interface PortfolioRow {
   coachname: string;
   journeyname: string;
   atcmodel: string | null;
+  productType: ProductType;        // ecosystem / dfu / gifts / other (derived from journey.type)
   journeystatus: string;
   subscriptionend: Date | null;
   purchasedate: Date | null;
@@ -85,6 +86,24 @@ interface PortfolioRow {
 type Lever = 'all' | 'goingQuiet' | 'renewalWindow' | 'lapsed' | 'notStarted' | 'inactive';
 
 type DashboardView = 'base' | 'scoreboard';
+
+/** Product-type classification, derived from the `journey` collection's `type` field
+ *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
+type ProductType = 'ecosystem' | 'dfu' | 'gifts' | 'other';
+
+/** Lightweight full-base index row: just the fields needed to search + filter the WHOLE base
+ *  (every coach's / the admin's participants) without loading the heavy dependent collections.
+ *  Built once from participantjourneyproduct + the already-loaded profile/meta/journey maps. */
+interface LiteIndexRow {
+  profileid: string;
+  name: string;
+  number: string | null;
+  coachedby: any;                  // raw coachedby value (for isMine / isUnassigned)
+  productType: ProductType;
+  atcmodel: string | null;
+  customerstatus: string | null;
+  financialstatus: string | null;
+}
 
 /** Phase C: one coach's gamified scoreboard row for the selected date range. */
 interface ScoreboardRow {
@@ -178,11 +197,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private fullPjpData: any[] | null = null;
   // paged KPI: accurate server counts (countable cards) + accumulate-over-loaded (the rest)
   private countedProfiles = new Set<string>();
-  private serverCounts = { total: 0, renewalsSoon: 0, notStarted: 0 };
+  private serverCounts = { total: 0, renewalsSoon: 0, notStarted: 0, inactive: 0, active: 0 };
   private serverCountsReady = false;
+  // true only if BOTH the total and the inactive count queries resolved — guards active = total - inactive
+  private serverActiveReady = false;
   // scoreboard runs over the full base; loaded on demand so the base view can page
   private sbPjp: any[] = [];
   private scoreboardLoaded = false;
+  // true once the FULL touchpoint + contact-event collections have been read (scoreboard needs
+  // all coaches' raw data). Full-mode table loads are now scoped, so this stays false until the
+  // scoreboard explicitly pulls the full collections on demand.
+  private fullTouchAndContactLoaded = false;
+  // true once the FULL coach-health-state collection has been read (paged mode keys health by
+  // profileid independent of paging, so it needs the global map). Full mode scopes it instead.
+  private coachHealthFullLoaded = false;
 
   allRows: PortfolioRow[] = [];
   dataSource = new MatTableDataSource<PortfolioRow>([]);
@@ -193,6 +221,27 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   activeLever: Lever = 'all';
   journeyOptions: string[] = [];
 
+  // ---- Intelligent filter panel (client-side, applied over the FULL base) ----
+  filtersExpanded = false;                         // collapsible panel state
+  // Product type defaults to ECOSYSTEM so the board opens scoped to ecosystem participants.
+  productTypeFilter: ProductType | '' = 'ecosystem';
+  tierFilters: string[] = [];                      // atcmodel: B!G / LYL / uP! / CPM (multi)
+  bandFilters: Array<'High' | 'Medium' | 'Low'> = []; // priority band (multi)
+  healthFilters: HealthState[] = [];               // coach-set health state (multi)
+  financeFilters: string[] = [];                   // financialstatus values (multi)
+  renewalWindowOnly = false;                        // renewal window (yes)
+  goingQuietOnly = false;                           // going quiet (yes)
+  readonly tierOptions = ['B!G', 'LYL', 'uP!', 'CPM'];
+  readonly healthOptions: HealthState[] = ['HAPPY', 'NEUTRAL', 'SAD', 'EVANGELIST'];
+  financeOptions: string[] = [];                    // discovered from the loaded base
+
+  // Set of profileids that pass the lightweight full-base filters (paged mode only). When non-null,
+  // it gates which rows render — so search + filters + the ecosystem default cover EVERYONE, not
+  // just the current page. null in full mode (allRows is already the full base there).
+  private fullBaseMatchIds: Set<string> | null = null;
+  private fullIndex: LiteIndexRow[] = [];           // lightweight full-base index (paged mode)
+  private fullIndexBuilt = false;
+
   summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0 };
 
   private pjpData: any[] = [];
@@ -200,6 +249,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private metaMap: any = {};
   private journeyNameMap: any = {};
   private atcByJourney: Record<string, string> = {};
+  // journey doc id -> product type ('ecosystem' | 'dfu' | 'gifts' | 'other'), from journey.type / FTO.
+  private typeByJourney: Record<string, ProductType> = {};
   private openTicketCounts: Record<string, number> = {};
   private touchpointByProfile: Record<string, number> = {};
   private contactEventByProfile: Record<string, number> = {}; // raw attended-session recency
@@ -297,11 +348,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   private async loadPortfolio(): Promise<void> {
     this.profileMap = await this.guard.getProfileMap();
-    this.journeyNameMap = await this.guard.getJourneyMap();
     this.metaMap = await this.guard.getParticipantMetaMap();
 
+    // single read of the 'journey' collection powers BOTH the name map and the atc-model map
+    // (previously getJourneyMap() and a separate getDocs('journey') each scanned it once).
     const journeyDocs = await getDocs(collection(this.firestore, 'journey'));
-    journeyDocs.forEach(d => { this.atcByJourney[d.id] = (d.data() as any)['atcmodel'] ?? null; });
+    const nameMap: Record<string, any> = {};
+    journeyDocs.forEach(d => {
+      const data = d.data() as any;
+      nameMap[d.id] = data['journey'];
+      this.atcByJourney[d.id] = data['atcmodel'] ?? null;
+      // product type: same signal the sales dashboards use — journey.type, with FTO as gifts.
+      this.typeByJourney[d.id] = this.classifyJourneyType(data['type'], data['journey']);
+    });
+    this.journeyNameMap = nameMap;
 
     await this.loadCoaches();
 
@@ -310,17 +370,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.pagedMode = this.isPagedView(this.selectedCoachId);
     this.applyPaginatorBinding();
 
-    // Coach-set health states are keyed by profileid and loaded scoped to the participants
-    // actually shown: per-page (paged mode, in renderPage) or with the full base (loadFullPortfolio).
+    // Coach-set health states (keyed by profileid) load scoped to the rows actually shown:
+    // per-page in paged mode (renderPage) and with the coach's base in full mode (loadFullPortfolio).
     if (this.pagedMode) {
       await this.loadServerCounts();
+      await this.ensureFullIndex();   // lightweight full-base index drives search + filters off-page
       await this.loadFirstPage();
     } else {
+      // full mode scopes coach-set health to the coach's base (inside loadFullPortfolio)
       await this.loadFullPortfolio();
     }
   }
 
-  /** Existing full-collection path — used for a specific coach (and cached for re-use). */
+  /** Per-coach path — used when a SPECIFIC coach is selected (and cached for re-use).
+   *  The pjp collection is still read in full (it powers the Unassigned count and is cached for
+   *  the scoreboard), but the dependent joins are now SCOPED to the coach's base via the same
+   *  batched `where(... 'in', chunk30)` loaders the paged path uses — no full-collection scans. */
   private async loadFullPortfolio(): Promise<void> {
     const pjpSnap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
     this.pjpData = pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id }));
@@ -333,13 +398,33 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     this.unassignedCount = unassignedProfiles.size;
 
-    await this.loadOpenTicketCounts();
-    await this.loadTouchpoints();
-    await this.loadContactEvents();
-    await this.loadRecentEventRequests();
-    await this.loadCoachHealthStates();
+    await this.loadFullDependentsForBase();
 
     this.computeRows();
+  }
+
+  /** Distinct profileids assigned to the currently-selected coach (full-mode base). */
+  private currentBaseProfileIds(): string[] {
+    return Array.from(new Set(
+      this.pjpData
+        .filter(d => d['profileid'] && this.isMine(d['coachedby'], this.selectedCoachId))
+        .map(d => d['profileid']),
+    ));
+  }
+
+  /** Load every dependent join for the selected coach's base, SCOPED via batched 'in' queries.
+   *  Reuses the exact paged-mode loaders (chunk30 / where(... 'in', chunk)); replaces the old
+   *  full-collection scans. Maps merge, so switching between coaches accumulates harmlessly —
+   *  computeRows only reads entries for the currently-matched profiles. */
+  private async loadFullDependentsForBase(): Promise<void> {
+    const baseProfileIds = this.currentBaseProfileIds();
+    await Promise.all([
+      this.loadOpenTicketCountsFor(baseProfileIds),
+      this.loadTouchpointsFor(baseProfileIds),
+      this.loadContactEventsFor(baseProfileIds),
+      this.loadRecentEventRequestsFor(baseProfileIds),
+      this.loadCoachHealthStatesFor(baseProfileIds),
+    ]);
   }
 
   // ===================== server-side pagination (ALL / UNASSIGNED) =====================
@@ -351,14 +436,21 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const pjp = collection(this.firestore, 'participantjourneyproduct');
     const now = new Date();
     const in90 = new Date(now.getTime() + this.RENEWAL_DAYS * 86400000);
+    let totalOk = false, inactiveOk = false;
     await Promise.all([
       getCountFromServer(pjp)
-        .then(s => { this.serverCounts.total = s.data().count; }).catch(() => {}),
+        .then(s => { this.serverCounts.total = s.data().count; totalOk = true; }).catch(() => {}),
       getCountFromServer(query(pjp, where('subscriptionend', '>=', now), where('subscriptionend', '<=', in90)))
         .then(s => { this.serverCounts.renewalsSoon = s.data().count; }).catch(() => {}),
       getCountFromServer(query(pjp, where('journeystatus', 'in', ['Initiated', 'initiated']), where('onboarded', '==', true)))
         .then(s => { this.serverCounts.notStarted = s.data().count; }).catch(() => {}),
+      // inactive = customerstatus in the gone-set (matches isInactiveStatus). Field lives on the
+      // pjp doc; <=10 values so a single Firestore `in` covers it. active is then total - inactive.
+      getCountFromServer(query(pjp, where('customerstatus', 'in', ['late', 'discontinued', 'banned'])))
+        .then(s => { this.serverCounts.inactive = s.data().count; inactiveOk = true; }).catch(() => {}),
     ]);
+    this.serverActiveReady = totalOk && inactiveOk;
+    this.serverCounts.active = Math.max(0, this.serverCounts.total - this.serverCounts.inactive);
     this.serverCountsReady = true;
   }
 
@@ -472,6 +564,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.summary.total = this.serverCounts.total;
       this.summary.renewalsSoon = this.serverCounts.renewalsSoon;
       this.summary.notStarted = this.serverCounts.notStarted;
+      // active/inactive are base-wide via the customerstatus count query (not page-scoped) — only
+      // when BOTH total and inactive counts resolved; otherwise leave the page-accumulated values.
+      if (this.serverActiveReady) {
+        this.summary.inactive = this.serverCounts.inactive;
+        this.summary.active = this.serverCounts.active;
+      }
     } else {
       this.summary.total = this.loadedRowCount;
     }
@@ -572,16 +670,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } catch (e) { console.warn('recent event requests (paged) failed', e); }
   }
 
-  /** Scoreboard spans the whole base regardless of the table's paging — load it once on demand. */
+  /** Scoreboard spans the whole base (all coaches) regardless of the table's paging — load it
+   *  once on demand. The full touchpoint + contact-event collections are required here because
+   *  the scoreboard ranks every coach; the table's full-mode load is now SCOPED, so we pull the
+   *  full collections lazily (guarded by fullTouchAndContactLoaded) only when the scoreboard opens. */
   private async ensureScoreboardData(): Promise<void> {
     if (this.scoreboardLoaded) return;
     if (this.fullPjpData) {
-      this.sbPjp = this.fullPjpData;     // a prior full load already has everything (+ full touchpoints)
+      this.sbPjp = this.fullPjpData;     // pjp already cached from a prior full load
     } else {
       const pjpSnap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
       this.sbPjp = pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id }));
+    }
+    if (!this.fullTouchAndContactLoaded) {
       await this.loadTouchpoints();      // populates allTouchpoints + touchpointByProfile (full)
       await this.loadContactEvents();    // populates contactEventByProfile (full)
+      this.fullTouchAndContactLoaded = true;
     }
     this.scoreboardLoaded = true;
   }
@@ -604,24 +708,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       list.push({ id: this.coachId, name: this.coachName || this.coachId });
     }
     this.coaches = list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }
-
-  private async loadOpenTicketCounts(): Promise<void> {
-    const counts: Record<string, number> = {};
-    try {
-      const snap = await getDocs(query(
-        collection(this.firestore, 'clientissue'),
-        where('status.status', 'in', ['Open', 'open']),
-      ));
-      snap.forEach(d => {
-        const cid = (d.data() as any)['clientid'];
-        const key = typeof cid === 'string' ? cid : cid?.id;
-        if (key) counts[key] = (counts[key] ?? 0) + 1;
-      });
-    } catch (e) {
-      console.warn('open ticket count failed (non-fatal)', e);
-    }
-    this.openTicketCounts = counts;
   }
 
   private async loadTouchpoints(): Promise<void> {
@@ -672,54 +758,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.contactEventByProfile = map;
   }
 
-  /** Most-recent event participation/confirmation request per participant.
-   *  Source: 'event participation request' (fields: profileid, eventref [DocumentReference to
-   *  'event collection' or 'queue generation'], status, doccreateddate). Event name is resolved
-   *  from 'event collection' (field 'name') / 'queue generation' (field 'queuename'); the request's
-   *  own doccreateddate is the request date, falling back to the event's start_date/queuestartdate. */
-  private async loadRecentEventRequests(): Promise<void> {
-    const recent: Record<string, { eventName: string; date: Date | null; status: string; sortMs: number }> = {};
-    try {
-      // event id -> { name, startDate } for both events and queues (same as userprofile mapping)
-      const eventInfo: Record<string, { name: string; start: Date | null }> = {};
-      const [eventSnap, queueSnap] = await Promise.all([
-        getDocs(collection(this.firestore, 'event collection')),
-        getDocs(collection(this.firestore, 'queue generation')),
-      ]);
-      eventSnap.forEach(d => {
-        const data: any = d.data();
-        eventInfo[d.id] = { name: data['name'] ?? data['eventname'] ?? d.id, start: this.toDate(data['start_date']) };
-      });
-      queueSnap.forEach(d => {
-        const data: any = d.data();
-        eventInfo[d.id] = { name: data['queuename'] ?? d.id, start: this.toDate(data['queuestartdate']) };
-      });
-
-      const reqSnap = await getDocs(collection(this.firestore, 'event participation request'));
-      reqSnap.forEach(d => {
-        const data: any = d.data();
-        const pid = data['profileid'];
-        if (!pid) return;
-        const eventId = data['eventref']?.id ?? null;
-        const info = eventId ? eventInfo[eventId] : null;
-        const reqDate = this.toDate(data['doccreateddate']) ?? info?.start ?? null;
-        const sortMs = reqDate ? reqDate.getTime() : 0;
-        const status = typeof data['status'] === 'string' ? data['status'] : 'requested';
-        const existing = recent[pid];
-        if (!existing || sortMs > existing.sortMs) {
-          recent[pid] = { eventName: info?.name ?? (eventId ?? '—'), date: reqDate, status, sortMs };
-        }
-      });
-    } catch (e) {
-      console.warn('recent event request load failed (non-fatal)', e);
-    }
-    const out: Record<string, { eventName: string; date: Date | null; status: string }> = {};
-    for (const pid of Object.keys(recent)) {
-      out[pid] = { eventName: recent[pid].eventName, date: recent[pid].date, status: recent[pid].status };
-    }
-    this.recentEventByProfile = out;
-  }
-
   /** Coach-set Health State: read the 'healthtracker_healthstate' audit collection once and keep
    *  the MOST RECENT doc per participant (by date). Each save is a new doc (history preserved);
    *  the latest is the current state. Degrades to none on failure. */
@@ -748,9 +786,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       out[pid] = { state: latest[pid].state, note: latest[pid].note, date: latest[pid].date };
     }
     this.coachHealthByProfile = out;
+    this.coachHealthFullLoaded = true;
   }
 
-  /** Page-scoped variant of loadCoachHealthStates — query healthtracker_healthstate by the
+  /** Scoped coach-set Health State — query healthtracker_healthstate by the
    *  current page's profileids (batched 'in' of 30) and merge the MOST RECENT per participant
    *  into coachHealthByProfile. Avoids the full-collection scan in paged (ALL / UNASSIGNED) views. */
   private async loadCoachHealthStatesFor(profileIds: string[]): Promise<void> {
@@ -815,6 +854,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         coachname: this.coachNameFor(d['coachedby']),
         journeyname: journeyId ? (this.journeyNameMap[journeyId] ?? journeyId) : (meta['activejourney'] ?? '-'),
         atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
+        productType: journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other',
         journeystatus: jstatus ?? 'Initiated',
         subscriptionend: subEnd,
         purchasedate: this.toDate(d['purchasedate']),
@@ -856,6 +896,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.matchedCount = matched;
     this.allRows = Array.from(byProfile.values()).sort((a, b) => b.priority - a.priority);
     this.journeyOptions = Array.from(new Set(this.allRows.map(r => r.journeyname))).sort();
+    // full mode: derive finance filter options from the (full) base; paged mode sources them from
+    // ensureFullIndex (the page-local allRows would otherwise miss off-page financial statuses).
+    if (!this.pagedMode) {
+      this.financeOptions = Array.from(
+        new Set(this.allRows.map(r => r.financialstatus).filter((v): v is string => !!v)),
+      ).sort();
+    }
     // paged mode builds the summary via accumulatePagedSummary() (server counts + loaded-so-far)
     if (!this.pagedMode) this.computeSummary();
     this.applyFilters();
@@ -935,6 +982,27 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   isInactiveStatus(s: string | null | undefined): boolean {
     return ['late', 'discontinued', 'banned'].includes((s ?? '').toLowerCase());
+  }
+
+  /** Map a journey's `type` field (and name) to a product type. Mirrors the sales/delivery
+   *  dashboards: type 'Eco system' -> ecosystem, 'DFU' -> dfu, the FTO journey -> gifts. */
+  private classifyJourneyType(type: any, journeyName: any): ProductType {
+    if ((journeyName ?? '') === 'FTO') return 'gifts';
+    const t = (typeof type === 'string' ? type : '').trim().toLowerCase();
+    if (t === 'eco system' || t === 'ecosystem') return 'ecosystem';
+    if (t === 'dfu') return 'dfu';
+    return 'other';
+  }
+
+  /** Human label for a product type (used by the filter chips / option labels). */
+  productTypeLabel(t: ProductType | ''): string {
+    switch (t) {
+      case 'ecosystem': return 'Ecosystem';
+      case 'dfu': return 'DFU';
+      case 'gifts': return 'Gifts';
+      case 'other': return 'Other';
+      default: return 'All';
+    }
   }
 
   /** Open the Log-call dialog; on save, write the enriched touchpoint and close the loop. */
@@ -1190,13 +1258,23 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.pagedMode = this.isPagedView(id);
     this.applyPaginatorBinding();
     if (this.pagedMode) {
+      // paged mode keys coach-set health by profileid globally — ensure the full map is present
+      // (it may not be if the dashboard first opened on a specific coach, which scopes health)
+      if (!this.coachHealthFullLoaded) await this.loadCoachHealthStates();
       if (!this.serverCountsReady) await this.loadServerCounts();
+      await this.ensureFullIndex();   // lightweight full-base index drives search + filters off-page
       await this.loadFirstPage();
     } else {
-      // a specific coach needs the full base (global priority sort + accurate KPIs)
+      // a specific coach needs its full base (global priority sort + accurate KPIs); the pjp
+      // collection is cached, but the dependent joins must be (re)loaded SCOPED to this coach.
       if (this.paginator) this.paginator.firstPage();
-      if (this.fullPjpData) { this.pjpData = this.fullPjpData; this.computeRows(); }
-      else await this.loadFullPortfolio();
+      if (this.fullPjpData) {
+        this.pjpData = this.fullPjpData;
+        await this.loadFullDependentsForBase();
+        this.computeRows();
+      } else {
+        await this.loadFullPortfolio();
+      }
     }
   }
 
@@ -1328,25 +1406,145 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   applyFilters(): void {
+    // In paged mode, recompute the full-base match set so search + filters + the ecosystem default
+    // cover EVERYONE (not just the loaded page). In full mode allRows is already the full base.
+    if (this.pagedMode) this.recomputeFullBaseMatch();
+    this.dataSource.data = this.allRows.filter(r => this.rowMatches(r));
+  }
+
+  /** Full per-row predicate: levers + journey/status + search + the intelligent filter panel.
+   *  In paged mode rows also have to be in the full-base match set (so off-page filtering counts). */
+  private rowMatches(r: PortfolioRow): boolean {
     const term = this.search.trim().toLowerCase();
     const wantInactive = this.activeLever === 'inactive';
-    this.dataSource.data = this.allRows.filter(r => {
-      // inactive (gone) participants are hidden from the active board unless explicitly viewing them
-      if (this.isInactiveStatus(r.customerstatus) !== wantInactive) return false;
-      if (this.activeLever === 'goingQuiet' && !r.goingQuiet) return false;
-      if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
-      if (this.activeLever === 'lapsed' && !r.lapsed) return false;
-      if (this.activeLever === 'notStarted' && !r.notStarted) return false;
-      if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
-      if (this.statusFilter && (r.customerstatus ?? '') !== this.statusFilter) return false;
-      if (term && !(`${r.name} ${r.number ?? ''}`.toLowerCase().includes(term))) return false;
-      return true;
-    });
+    // inactive (gone) participants are hidden from the active board unless explicitly viewing them
+    if (this.isInactiveStatus(r.customerstatus) !== wantInactive) return false;
+    if (this.activeLever === 'goingQuiet' && !r.goingQuiet) return false;
+    if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
+    if (this.activeLever === 'lapsed' && !r.lapsed) return false;
+    if (this.activeLever === 'notStarted' && !r.notStarted) return false;
+    if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
+    if (this.statusFilter && (r.customerstatus ?? '') !== this.statusFilter) return false;
+    if (term && !(`${r.name} ${r.number ?? ''}`.toLowerCase().includes(term))) return false;
+    // --- intelligent filter panel ---
+    if (this.productTypeFilter && r.productType !== this.productTypeFilter) return false;
+    if (this.tierFilters.length && !this.tierFilters.includes(r.atcmodel ?? '')) return false;
+    if (this.bandFilters.length && !this.bandFilters.includes(r.priorityBand)) return false;
+    if (this.healthFilters.length && !this.healthFilters.includes(r.coachHealthState?.state as HealthState)) return false;
+    if (this.financeFilters.length && !this.financeFilters.includes(r.financialstatus ?? '')) return false;
+    if (this.renewalWindowOnly && !r.renewalWindow) return false;
+    if (this.goingQuietOnly && !r.goingQuiet) return false;
+    // paged mode: only rows whose lightweight full-base entry also matches the index-level filters
+    if (this.pagedMode && this.fullBaseMatchIds && !this.fullBaseMatchIds.has(r.profileid)) return false;
+    return true;
+  }
+
+  /** Lightweight predicate over the full-base index. Only covers the filters that can be evaluated
+   *  WITHOUT the heavy dependent data: scope (coach/unassigned), search, product type, tier,
+   *  customerstatus, financial status. Band / health / renewal-window / going-quiet need per-row
+   *  dependent data and stay page-local refinements (see report tradeoff). */
+  private liteMatches(lite: LiteIndexRow): boolean {
+    const term = this.search.trim().toLowerCase();
+    const wantInactive = this.activeLever === 'inactive';
+    // scope to the current view (ALL = everyone; UNASSIGNED = no coach)
+    if (this.selectedCoachId === this.UNASSIGNED) {
+      if (!this.isUnassigned(lite.coachedby)) return false;
+    }
+    if (this.isInactiveStatus(lite.customerstatus) !== wantInactive) return false;
+    if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
+    if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
+    if (this.productTypeFilter && lite.productType !== this.productTypeFilter) return false;
+    if (this.tierFilters.length && !this.tierFilters.includes(lite.atcmodel ?? '')) return false;
+    if (this.financeFilters.length && !this.financeFilters.includes(lite.financialstatus ?? '')) return false;
+    return true;
+  }
+
+  /** Rebuild fullBaseMatchIds from the lightweight index (paged mode only). */
+  private recomputeFullBaseMatch(): void {
+    if (!this.fullIndexBuilt) { this.fullBaseMatchIds = null; return; }
+    const ids = new Set<string>();
+    for (const lite of this.fullIndex) {
+      if (this.liteMatches(lite)) ids.add(lite.profileid);
+    }
+    this.fullBaseMatchIds = ids;
+  }
+
+  /** Build the lightweight full-base index once (paged mode), reducing the cached full pjp data to
+   *  just the searchable/filterable fields via the already-loaded profile / meta / journey maps.
+   *  Reuses fullPjpData when present (cached by a prior full load / scoreboard); otherwise reads the
+   *  pjp collection ONCE. Does NOT touch the heavy collections (touchpoints / appointments / events).*/
+  private async ensureFullIndex(): Promise<void> {
+    if (this.fullIndexBuilt) return;
+    let pjp = this.fullPjpData;
+    if (!pjp) {
+      const snap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
+      pjp = snap.docs.map(d => ({ ...d.data(), __id: d.id }));
+      this.fullPjpData = pjp;
+    }
+    // one lite row per distinct participant (keep the highest-signal product type if a person has
+    // several journey-products: ecosystem ranks above dfu above gifts above other).
+    const rank: Record<ProductType, number> = { ecosystem: 3, dfu: 2, gifts: 1, other: 0 };
+    const byProfile = new Map<string, LiteIndexRow>();
+    const finance = new Set<string>();
+    for (const d of pjp) {
+      const profileid = d['profileid'];
+      if (!profileid) continue;
+      const meta: any = this.metaMap.docdata?.[profileid] ?? {};
+      const journeyId = d['journeyref']?.id ?? null;
+      const productType: ProductType = journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other';
+      const fin = meta['financialstatus'] ?? null;
+      if (fin) finance.add(fin);
+      const lite: LiteIndexRow = {
+        profileid,
+        name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
+        number: this.profileMap.phonenumber?.[profileid] ?? null,
+        coachedby: d['coachedby'] ?? null,
+        productType,
+        atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
+        customerstatus: meta['customerstatus'] ?? null,
+        financialstatus: fin,
+      };
+      const existing = byProfile.get(profileid);
+      if (!existing) { byProfile.set(profileid, lite); }
+      else {
+        // keep the strongest product type; a coachedby on either doc means assigned
+        if (rank[productType] > rank[existing.productType]) existing.productType = productType;
+        if (this.isUnassigned(existing.coachedby) && !this.isUnassigned(lite.coachedby)) existing.coachedby = lite.coachedby;
+      }
+    }
+    this.fullIndex = Array.from(byProfile.values());
+    this.financeOptions = Array.from(finance).sort();
+    this.fullIndexBuilt = true;
   }
 
   setLever(lever: Lever): void {
     this.activeLever = lever;
     this.applyFilters();
+  }
+
+  /** Clear every filter affordance (panel + journey/status/search + lever) and reset to defaults.
+   *  Product type returns to its ECOSYSTEM default — the intended opening scope of the board. */
+  clearFilters(): void {
+    this.search = '';
+    this.journeyFilter = '';
+    this.statusFilter = '';
+    this.activeLever = 'all';
+    this.productTypeFilter = 'ecosystem';
+    this.tierFilters = [];
+    this.bandFilters = [];
+    this.healthFilters = [];
+    this.financeFilters = [];
+    this.renewalWindowOnly = false;
+    this.goingQuietOnly = false;
+    this.applyFilters();
+  }
+
+  /** True when any filter differs from its default (drives the "Clear filters" affordance). */
+  get hasActiveFilters(): boolean {
+    return !!this.search || !!this.journeyFilter || !!this.statusFilter || this.activeLever !== 'all'
+      || this.productTypeFilter !== 'ecosystem' || this.tierFilters.length > 0 || this.bandFilters.length > 0
+      || this.healthFilters.length > 0 || this.financeFilters.length > 0
+      || this.renewalWindowOnly || this.goingQuietOnly;
   }
 
   get selectedCoachName(): string {
