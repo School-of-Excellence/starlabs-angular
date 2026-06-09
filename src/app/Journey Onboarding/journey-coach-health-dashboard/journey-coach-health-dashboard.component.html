@@ -68,27 +68,27 @@
     </section>
 
     <section class="jchd-summary" *ngIf="selectedCoachId !== UNASSIGNED">
-      <div class="kpi">
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('total')" (click)="kpi('total')" matTooltip="Show all">
         <div class="kpi-label">Participants</div>
         <div class="kpi-num">{{ summary.total }}</div>
       </div>
-      <div class="kpi good">
+      <div class="kpi good clickable" [class.kpi-selected]="kpiActive('active')" (click)="kpi('active')" matTooltip="Active only">
         <div class="kpi-label">Active</div>
         <div class="kpi-num">{{ summary.active }}</div>
       </div>
-      <div class="kpi bad clickable" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned">
+      <div class="kpi bad clickable" [class.kpi-selected]="kpiActive('inactive')" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned">
         <div class="kpi-label">Inactive (lost)</div>
         <div class="kpi-num">{{ summary.inactive }}</div>
       </div>
-      <div class="kpi clickable" (click)="kpi('renewalsSoon')">
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')">
         <div class="kpi-label">Renewals &le;90d</div>
         <div class="kpi-num">{{ summary.renewalsSoon }}</div>
       </div>
-      <div class="kpi clickable" (click)="kpi('goingQuiet')">
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')">
         <div class="kpi-label">Going quiet <span class="kpi-scope" *ngIf="pagedMode">in view</span></div>
         <div class="kpi-num">{{ summary.goingQuiet }}</div>
       </div>
-      <div class="kpi">
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('tickets')" (click)="kpi('tickets')" matTooltip="Only open tickets">
         <div class="kpi-label">Open tickets <span class="kpi-scope" *ngIf="pagedMode">in view</span></div>
         <div class="kpi-num">{{ summary.withOpenTickets }}</div>
       </div>
@@ -106,6 +106,8 @@
         matTooltip="Onboarded but journey not started">Not started ({{ summary.notStarted }})</button>
       <button mat-stroked-button [class.active]="activeLever==='inactive'" (click)="setLever('inactive')"
         matTooltip="Gone — late / discontinued / banned (unactionable)">Inactive ({{ summary.inactive }})</button>
+      <button mat-stroked-button [class.active]="activeLever==='tickets'" (click)="setLever('tickets')"
+        matTooltip="Participants with at least one open ticket">Open tickets ({{ summary.withOpenTickets }})</button>
       <button mat-stroked-button disabled matTooltip="Available in Phase 2 (needs Wins + Advocacy)">Referral-ready · Phase 2</button>
     </section>
 

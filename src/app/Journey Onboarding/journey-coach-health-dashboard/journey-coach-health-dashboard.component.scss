@@ -126,6 +126,13 @@ $mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
       cursor: pointer; transition: background-color .12s ease;
       &:hover { background: $page-bg; }
     }
+
+    &.kpi-selected {
+      background: $accent-soft;
+      box-shadow: inset 0 -3px 0 0 $accent;
+      &:hover { background: $accent-soft; }
+      .kpi-label { color: $accent; }
+    }
   }
 }
 
