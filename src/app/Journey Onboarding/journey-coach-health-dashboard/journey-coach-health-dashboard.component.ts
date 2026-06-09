@@ -231,6 +231,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   financeFilters: string[] = [];                   // financialstatus values (multi)
   renewalWindowOnly = false;                        // renewal window (yes)
   goingQuietOnly = false;                           // going quiet (yes)
+  noEventRequestOnly = false;                       // no recent event request (null)
   readonly tierOptions = ['B!G', 'LYL', 'uP!', 'CPM'];
   readonly healthOptions: HealthState[] = ['HAPPY', 'NEUTRAL', 'SAD', 'EVANGELIST'];
   financeOptions: string[] = [];                    // discovered from the loaded base
@@ -1452,6 +1453,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.financeFilters.length && !this.financeFilters.includes(r.financialstatus ?? '')) return false;
     if (this.renewalWindowOnly && !r.renewalWindow) return false;
     if (this.goingQuietOnly && !r.goingQuiet) return false;
+    if (this.noEventRequestOnly && r.recentEventRequest) return false;
     // paged mode: only rows whose lightweight full-base entry also matches the index-level filters
     if (this.pagedMode && this.fullBaseMatchIds && !this.fullBaseMatchIds.has(r.profileid)) return false;
     return true;
@@ -1555,6 +1557,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.financeFilters = [];
     this.renewalWindowOnly = false;
     this.goingQuietOnly = false;
+    this.noEventRequestOnly = false;
     this.applyFilters();
   }
 
@@ -1563,7 +1566,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return !!this.search || !!this.journeyFilter || !!this.statusFilter || this.activeLever !== 'all'
       || !(this.productTypeFilters.length === 1 && this.productTypeFilters[0] === 'ecosystem') || this.tierFilters.length > 0 || this.bandFilters.length > 0
       || this.healthFilters.length > 0 || this.financeFilters.length > 0
-      || this.renewalWindowOnly || this.goingQuietOnly;
+      || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
   }
 
   get selectedCoachName(): string {
