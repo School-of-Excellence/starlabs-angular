@@ -215,12 +215,14 @@ export class PrescribeATCComponent {
   //network status
   isonline:boolean
   pageloadedatfirsttime:boolean = false
+  aigeneratedEntry:boolean = false  // true when opened from an AI-generated draft link (hides "open another draft")
 
   // Draft
   draftStatus = {
-    message: "No Draft Created!",
+    message: "Draft not saved yet.",
     code: 0
   }
+  existingDraftIds: string[] = []  // ids of this participant's existing drafts (to detect drafts other than the current one)
 
   audiolist = []
   imagelist = []
@@ -299,9 +301,11 @@ export class PrescribeATCComponent {
             alert("Access for this screen is denied")
             this.router.navigateByUrl('/')
           }
-          guardservice.getProfileMap().then(e => this.getDirectiveAssignments(e.docdata))
           // this.addActivity()
           await this.setupData()
+          // await the assignment check so its popup resolves before setup completes
+          const profileMapData = await guardservice.getProfileMap()
+          await this.getDirectiveAssignments(profileMapData.docdata)
           if(this.participantProfileid){
             await this.onProfileSelect()
           }
@@ -435,6 +439,7 @@ export class PrescribeATCComponent {
         const value = draftSnap.data();
 
         this.autoSaveID = docid;
+        this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
         this.participantProfileid = value['profileid'] ?? null;
         this.transcript = value['transcript'] ?? [];
         this.consultationSummary = value['consultationsummary'] ?? null;
@@ -507,6 +512,7 @@ export class PrescribeATCComponent {
       this.pendingAIJson = parsedJson;
 
       this.autoSaveID = docid;
+      this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
 
       await setDoc(draftRef, {
         profileid: this.participantProfileid,
@@ -546,10 +552,7 @@ export class PrescribeATCComponent {
       if(!this.isonline){
         this.pageloadedatfirsttime = true
       }
-      if(this.pageloadedatfirsttime && this.isonline){
-        console.log("atc draft runned");
-        this.autoSave()
-      }
+      // reconnect autosave is handled once by ConnectivityGuardService.register; no duplicate save here
     });
     // Big Assignment
     if(this.bigActivity()){
@@ -971,7 +974,7 @@ export class PrescribeATCComponent {
   async getATCoptions(){
     console.log("ATC Draft")
     this.draftStatus = {
-      message: "No Draft Created!",
+      message: "Draft not saved yet.",
       code: 0
     }
     this.lastDraftSavedOn = null
@@ -993,6 +996,7 @@ export class PrescribeATCComponent {
       draftATC = (await getDocs(q)).docs;
     }
     console.log(draftATC.map(e => e.ref.path))
+    this.existingDraftIds = draftATC.map(e => e.id)  // remember this participant's existing draft ids
     this.autoSaveID = this.guardservice.generateId(this.firestoreATC, "temporary_ATC")
     if(draftATC.length != 0){
       var dialogRef = this.matDialog.open(AtcOptionComponent, {
@@ -1441,7 +1445,18 @@ export class PrescribeATCComponent {
   }
 
 
+  // serialize draft saves so concurrent autosaves cannot overwrite each other
+  private autoSaveInFlight: Promise<void> | null = null;
+
   async autoSave() {
+    // chain each save after the previous one so writes stay in order
+    this.autoSaveInFlight = (this.autoSaveInFlight ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => this.runAutoSave());
+    return this.autoSaveInFlight;
+  }
+
+  async runAutoSave() {
     this.filteredSpecialist = "";
     try {
       if (this.autoSaveID != null) {
@@ -1455,7 +1470,11 @@ export class PrescribeATCComponent {
         var authorprofileid = [];
         Object.values<any>(this.authorMap ?? {}).forEach(value => {
           if (value) {
-            var id = (value ?? []).map(e => doc(this.firestoreDefault, e).id);
+            // guard each path so a malformed ref can't throw and abort the whole draft save
+            var id = (value ?? []).map(e => {
+              try { return doc(this.firestoreDefault, e).id; }
+              catch { return null; }
+            }).filter(id => id != null);
             authorprofileid = [...authorprofileid, ...id];
           }
         });
@@ -1510,7 +1529,7 @@ export class PrescribeATCComponent {
         await setDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID), data);
 
         this.draftStatus = {
-          message: "ATC and Audio Saved to Draft.",
+          message: "Draft saved.",
           code: 1
         };
         this.lastDraftSavedOn = new Date();
@@ -1520,7 +1539,7 @@ export class PrescribeATCComponent {
     } catch (error) {
       console.error("Error in autoSave:", error);
       this.draftStatus = {
-        message: "Failed to Save Draft. " + JSON.stringify(error),
+        message: "Couldn't save draft. Waiting for network...",
         code: -1
       };
       this.uploadProgress.isUploading = false;
@@ -1529,6 +1548,22 @@ export class PrescribeATCComponent {
 
 
 
+
+  // re-open the draft picker for the same participant after flushing the current draft
+  async openAnotherDraft(){
+    await this.autoSave();
+    this.getATCoptions();
+  }
+
+  // open a fresh prescribe-atc screen in a new browser tab to start a new ATC
+  createNewATC(){
+    window.open(window.location.origin + window.location.pathname, '_blank');
+  }
+
+  // true when the participant has at least one draft other than the one currently open
+  get hasOtherDrafts(): boolean {
+    return this.existingDraftIds.some(id => id !== this.autoSaveID);
+  }
 
   drop(event: CdkDragDrop<string[]>) {
     moveItemInArray(this.transcript, event.previousIndex, event.currentIndex);
@@ -1855,6 +1890,8 @@ async removeATCImage(index: number) {
 }
 
   async submit(){
+    // wait for any in-flight draft save to finish so it can't re-create the draft after the soft-delete
+    await this.autoSaveInFlight;
     this.alphaid = generateId(this.firestoreATC, 'atc_alpha');
 
     if(this.date == null || this.date == undefined){
@@ -2281,7 +2318,8 @@ async removeATCImage(index: number) {
     this.loadingref?.close()
     this.loading = false
     // await this.cleanTemporaryaudio()
-    updateDoc(doc(this.firestoreATC, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
+    // wait for the soft-delete to complete so the submitted draft does not reappear
+    await updateDoc(doc(this.firestoreATC, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
       console.log(err)
     })
 
@@ -2321,7 +2359,9 @@ async removeATCImage(index: number) {
       this.mentornotes = null;
       this.audioBlob = [];
       this.audioBlobURL = [];
-      this.autoSaveID = generateId(this.firestoreATC, 'temporary_ATC');
+      this.autoSaveID = null;  // clear draft context so the name unlocks and a new participant can be selected
+      this.aigeneratedEntry = false;
+      this.existingDraftIds = [];
       this.selectedNoteImages = []
       this.previewNoteImages = []
       this.selectedATCImages = []
