@@ -4400,3 +4400,147 @@
   color: #234C58;
   margin-left: 4px;
 }
+
+.ep-filter-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;  
+}
+
+.ep-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px !important;
+  border-radius: 4px !important;
+  padding: 0 15px !important;
+  height: 48px !important;
+  min-width: 160px !important;
+  line-height: 48px !important;
+}
+
+.ep-filter-active {
+  background: #234C58 !important;
+  color: white !important;
+  border-color: #234C58 !important;
+}
+
+.ep-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  min-width: 280px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ep-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+  font-size: 13px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.ep-search-input {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ep-search-input:focus {
+  border-color: #234C58;
+}
+
+.ep-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ep-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  background: #f5f5f5;
+  transition: background 0.15s;
+}
+
+.ep-list-item:hover {
+  background: #e8f4f8;
+}
+
+.ep-list-item-selected {
+  background: #e3f2fd !important;
+}
+
+.ep-type-badge {
+  font-size: 10px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.ep-radio-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #1976d2;
+  flex-shrink: 0;
+}
+
+.ep-empty {
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.ep-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #1976d2;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+  font-weight: 500;
+}
+
+.ep-back-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.ep-apply-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.ep-reset-btn {
+  color: #666;
+}

@@ -211,6 +211,19 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   // Arena event id for selected queue
   selectedQueueArenaEventId: string | null = null;
   selectedQueueProductRef: any = null;
+
+  // Event Participation Filter
+  eventParticipationDataLoaded: boolean = false;
+  eventParticipationLoading: boolean = false;
+  showEventParticipationPicker: boolean = false;
+  eventParticipationList: any[] = [];
+  eventParticipationListLoaded: boolean = false;
+  selectedEventParticipation: any = null;
+  eventParticipationSearchTerm: string = '';
+  arenaEventFilterList: Array<{ docid: string; name: string }> = [];
+  selectedArenaEventId: string | null = null;
+  arenaEventProfileMap: { [arenaeventid: string]: Set<string> } = {};
+  eventParticipationProfileIds: Set<string> = new Set();
   
   slotPlannerFilter = {
     startDate: null,
@@ -416,6 +429,18 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.completedInterimProfileIds = new Set();
     this.notCompletedInterimProfileIds = new Set();
     this.allInterimProfileIds = new Set();
+
+    this.eventParticipationDataLoaded = false;
+    this.eventParticipationLoading = false;
+    this.showEventParticipationPicker = false;
+    this.eventParticipationList = [];
+    this.eventParticipationListLoaded = false;
+    this.selectedEventParticipation = null;
+    this.eventParticipationSearchTerm = '';
+    this.arenaEventFilterList = [];
+    this.selectedArenaEventId = null;
+    this.arenaEventProfileMap = {};
+    this.eventParticipationProfileIds = new Set();
 
     const loading = this.dialog.open(LoadingProgressComponent, {
       data: { msg: "Loading Queue Data..." },
@@ -694,9 +719,14 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
     this.mergedSlots.sort((a, b) => a.startdate.getTime() - b.startdate.getTime());
   }
+
   recalculateMergedSlotParticipants() {
-    const filterSet = this.activeInterimCard === 'completed' ? this.completedInterimProfileIds
+    const interimSet = this.activeInterimCard === 'completed' ? this.completedInterimProfileIds
       : this.activeInterimCard === 'not-completed' ? this.notCompletedInterimProfileIds
+      : null;
+
+    const eventSet = this.eventParticipationDataLoaded
+      ? this.eventParticipationProfileIds
       : null;
 
     for (const slot of this.mergedSlots) {
@@ -705,21 +735,21 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           for (const stageName of Object.keys(variation.stageData)) {
             const sd: any = variation.stageData[stageName];
 
-            // Store full lists on first call
             if (!sd._allConfirmed) {
               sd._allConfirmed = sd.confirmedParticipants || [];
               sd._allNonConfirmed = sd.nonConfirmedParticipants || [];
             }
 
-            if (filterSet) {
-              sd.confirmedParticipants = sd._allConfirmed.filter((p: any) => {
+            if (interimSet || eventSet) {
+              const pass = (p: any) => {
                 const pid = p.profile_id || p.profileid;
-                return pid && filterSet.has(pid);
-              });
-              sd.nonConfirmedParticipants = sd._allNonConfirmed.filter((p: any) => {
-                const pid = p.profile_id || p.profileid;
-                return pid && filterSet.has(pid);
-              });
+                if (!pid) return false;
+                if (interimSet && !interimSet.has(pid)) return false;
+                if (eventSet && !eventSet.has(pid)) return false;
+                return true;
+              };
+              sd.confirmedParticipants = sd._allConfirmed.filter(pass);
+              sd.nonConfirmedParticipants = sd._allNonConfirmed.filter(pass);
             } else {
               sd.confirmedParticipants = sd._allConfirmed;
               sd.nonConfirmedParticipants = sd._allNonConfirmed;
@@ -5338,4 +5368,106 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     }
   }
 
+  async loadEventParticipationList() {
+    if (this.eventParticipationListLoaded) return;
+    this.eventParticipationLoading = true;
+
+    const [eventsSnap, queuesSnap] = await Promise.all([
+      getDocs(query(collection(this.firestore, 'event collection'),orderBy('end_date', 'desc'))),
+      getDocs(query(collection(this.firestore, 'queue generation'),orderBy('queueenddate', 'desc')))
+    ]);
+
+    this.eventParticipationList = [
+      ...eventsSnap.docs
+        .filter(d => !d.data()['delete'])
+        .map(d => ({ ...d.data(), docid: d.id, type: 'event', name: d.data()['name'] })),
+      ...queuesSnap.docs
+        .filter(d => !d.data()['delete'])
+        .map(d => ({ ...d.data(), docid: d.id, type: 'queue', name: d.data()['queuename'] }))
+    ];
+
+    this.eventParticipationListLoaded = true;
+    this.eventParticipationLoading = false;
+  }
+
+  async onEventParticipationSelect(item: any) {
+    this.selectedEventParticipation = item;
+    this.selectedArenaEventId = null;
+    this.arenaEventFilterList = [];
+    this.arenaEventProfileMap = {};
+    this.eventParticipationLoading = true;
+
+    const docRef = item.type === 'queue'
+      ? doc(this.firestore, 'queue generation', item.docid)
+      : doc(this.firestore, 'event collection', item.docid);
+
+    const arenaSnap = await getDocs(
+      query(collection(this.firestore, 'arena events'), where('eventref', '==', docRef))
+    );
+
+    if (!arenaSnap.empty) {
+      this.arenaEventFilterList = arenaSnap.docs.map(d => ({
+        docid: d.id,
+        name: d.data()['title']
+          ? `${d.data()['eventname']} - ${d.data()['title']}`
+          : d.data()['eventname'] || d.id
+      }));
+
+      const ids = arenaSnap.docs.map(d => d.id);
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+
+      const results = await Promise.all(chunks.map(chunk =>
+        getDocs(query(
+          collection(this.firestore, 'event participation request'),
+          where('arenaeventid', 'in', chunk),
+          where('status', 'in', ['approved', 'requested', 'attended'])
+        ))
+      ));
+
+      results.forEach(snap => snap.docs.forEach(d => {
+        const data = d.data();
+        const aeid = data['arenaeventid'];
+        const pid = data['profileid'];
+        if (!this.arenaEventProfileMap[aeid]) {
+          this.arenaEventProfileMap[aeid] = new Set<string>();
+        }
+        this.arenaEventProfileMap[aeid].add(pid);
+      }));
+    }
+
+    this.eventParticipationLoading = false;
+  }
+
+  applyEventParticipationFilter() {
+    if (!this.selectedArenaEventId) return;
+    this.eventParticipationProfileIds = this.arenaEventProfileMap[this.selectedArenaEventId] || new Set<string>();
+    this.eventParticipationDataLoaded = true;
+    this.showEventParticipationPicker = false;
+    this.recalculateMergedSlotParticipants();
+  }
+
+  resetEventParticipationFilter() {
+    this.eventParticipationDataLoaded = false;
+    this.showEventParticipationPicker = false;
+    this.selectedEventParticipation = null;
+    this.arenaEventFilterList = [];
+    this.selectedArenaEventId = null;
+    this.arenaEventProfileMap = {};
+    this.eventParticipationProfileIds = new Set();
+    this.recalculateMergedSlotParticipants();
+  }
+
+  get filteredEventParticipationList(): any[] {
+    if (!this.eventParticipationSearchTerm.trim()) return this.eventParticipationList;
+    const term = this.eventParticipationSearchTerm.toLowerCase().trim();
+    return this.eventParticipationList.filter(e =>
+      (e.name || '').toLowerCase().includes(term)
+    );
+  }
+
+  get selectedArenaEventName(): string {
+    if (!this.selectedArenaEventId) return 'Event Filter';
+    return this.arenaEventFilterList.find(e => e.docid === this.selectedArenaEventId)?.name || 'Event Filter';
+  }
 }

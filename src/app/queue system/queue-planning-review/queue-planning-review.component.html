@@ -103,6 +103,80 @@
       </ng-container>
 
 
+      <!-- Event Participation Filter -->
+      <div class="ep-filter-wrapper" *ngIf="selectedQueue != null">
+
+        <button mat-stroked-button class="ep-filter-btn"
+          [class.ep-filter-active]="eventParticipationDataLoaded"
+          [disabled]="eventParticipationLoading"
+          (click)="showEventParticipationPicker = !showEventParticipationPicker; loadEventParticipationList()">
+          <mat-icon>event</mat-icon>
+          <span *ngIf="!eventParticipationDataLoaded">Event Filter</span>
+          <span *ngIf="eventParticipationDataLoaded">{{ selectedArenaEventName }}</span>
+          <mat-spinner *ngIf="eventParticipationLoading" diameter="14"
+            style="display:inline-block; margin-left:4px;">
+          </mat-spinner>
+        </button>
+
+        <div class="ep-dropdown" *ngIf="showEventParticipationPicker">
+
+          <div *ngIf="eventParticipationLoading" class="ep-loading">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Loading...</span>
+          </div>
+
+          <ng-container *ngIf="!eventParticipationLoading && arenaEventFilterList.length === 0">
+            <input class="ep-search-input" type="text"
+              [(ngModel)]="eventParticipationSearchTerm"
+              placeholder="Search events or queues...">
+            <div class="ep-list">
+              <div *ngFor="let item of filteredEventParticipationList"
+                class="ep-list-item"
+                (click)="onEventParticipationSelect(item)">
+                <span>{{ item.name }}</span>
+                <span class="ep-type-badge">{{ item.type }}</span>
+              </div>
+              <div *ngIf="filteredEventParticipationList.length === 0" class="ep-empty">
+                No results found
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="!eventParticipationLoading && arenaEventFilterList.length > 0">
+            <div class="ep-back-btn"
+              (click)="selectedEventParticipation = null; arenaEventFilterList = []; arenaEventProfileMap = {}; selectedArenaEventId = null;">
+              <mat-icon>arrow_back</mat-icon>
+              <span>{{ selectedEventParticipation?.name }}</span>
+            </div>
+            <div class="ep-list">
+              <div *ngFor="let event of arenaEventFilterList"
+                class="ep-list-item"
+                [class.ep-list-item-selected]="selectedArenaEventId === event.docid"
+                (click)="selectedArenaEventId = event.docid">
+                <mat-icon class="ep-radio-icon">
+                  {{ selectedArenaEventId === event.docid ? 'radio_button_checked' : 'radio_button_unchecked' }}
+                </mat-icon>
+                <span>{{ event.name }}</span>
+              </div>
+            </div>
+            <button mat-raised-button color="primary" class="ep-apply-btn"
+              [disabled]="!selectedArenaEventId"
+              (click)="applyEventParticipationFilter()">
+              Apply
+            </button>
+          </ng-container>
+
+        </div>
+
+        <button mat-icon-button class="ep-reset-btn"
+          *ngIf="eventParticipationDataLoaded"
+          matTooltip="Reset Event Filter"
+          (click)="resetEventParticipationFilter()">
+          <mat-icon>close</mat-icon>
+        </button>
+
+      </div>
+
     <!-- NEW: Overall Counts Section -->
     <div class="overall-counts-section" [class.with-interim-cards]="interimDataLoaded" *ngIf="selectedQueue && !loading">
       <div>
