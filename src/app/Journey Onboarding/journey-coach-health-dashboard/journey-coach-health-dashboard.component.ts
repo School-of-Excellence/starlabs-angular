@@ -33,6 +33,7 @@ import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
+import { ParticipantSlideoverComponent } from './participant-slideover.component';
 
 /**
  * Journey Coach - Health Dashboard (Phase 1.5 + Phase-2 wiring prepped).
@@ -1004,6 +1005,19 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       case 'other': return 'Other';
       default: return 'All';
     }
+  }
+
+  /** Open the participant slide-over (right-side overlay) instead of navigating to /userprofile.
+   *  Hands the in-memory row to the panel, which runs its own scoped reads for the detail. */
+  openSlideover(row: PortfolioRow): void {
+    this.dialog.open(ParticipantSlideoverComponent, {
+      data: { row },
+      position: { right: '0', top: '0' },
+      height: '100vh',
+      width: 'min(520px, 100vw)',
+      panelClass: 'jchd-slideover-panel',
+      autoFocus: false,
+    });
   }
 
   /** Open the Log-call dialog; on save, write the enriched touchpoint and close the loop. */
