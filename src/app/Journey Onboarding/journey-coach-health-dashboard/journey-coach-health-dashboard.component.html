@@ -1,0 +1,204 @@
+<div class="jchd-wrap">
+
+  <header class="jchd-header">
+    <div>
+      <h1>Journey Coach — Health Dashboard</h1>
+      <p class="subtitle" *ngIf="selectedCoachName">{{ selectedCoachName }}'s base</p>
+    </div>
+    <mat-form-field appearance="outline" class="coach-picker" *ngIf="!loading && !loadError">
+      <mat-label>Viewing</mat-label>
+      <mat-select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)">
+        <mat-option [value]="ALL">All participants</mat-option>
+        <mat-option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </header>
+
+  <div class="jchd-state" *ngIf="loading">
+    <mat-spinner diameter="36"></mat-spinner>
+    <span>Loading the base…</span>
+  </div>
+  <div class="jchd-state error" *ngIf="!loading && loadError">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ loadError }}</span>
+  </div>
+
+  <ng-container *ngIf="!loading && !loadError">
+
+    <section class="jchd-summary">
+      <mat-card class="kpi"><div class="kpi-num">{{ summary.total }}</div><div class="kpi-label">Participants</div></mat-card>
+      <mat-card class="kpi good"><div class="kpi-num">{{ summary.active }}</div><div class="kpi-label">Active</div></mat-card>
+      <mat-card class="kpi warn clickable" (click)="kpi('late')"><div class="kpi-num">{{ summary.late }}</div><div class="kpi-label">Late</div></mat-card>
+      <mat-card class="kpi bad clickable" (click)="kpi('discontinued')"><div class="kpi-num">{{ summary.discontinued }}</div><div class="kpi-label">Discontinued</div></mat-card>
+      <mat-card class="kpi clickable" (click)="kpi('renewalsSoon')"><div class="kpi-num">{{ summary.renewalsSoon }}</div><div class="kpi-label">Renewals &le;90d</div></mat-card>
+      <mat-card class="kpi clickable" (click)="kpi('goingQuiet')"><div class="kpi-num">{{ summary.goingQuiet }}</div><div class="kpi-label">Going quiet</div></mat-card>
+      <mat-card class="kpi"><div class="kpi-num">{{ summary.withOpenTickets }}</div><div class="kpi-label">Open tickets</div></mat-card>
+    </section>
+
+    <div class="jchd-phase-note">
+      <mat-icon>info</mat-icon>
+      <span><strong>Priority</strong> is a Phase-1 triage heuristic over live data (who to act on first). The calibrated <strong>Health Score</strong> (Sad / Neutral / Happy / Evangelist) is wired and turns on in Phase 2 once instrumentation &amp; calibration land.</span>
+    </div>
+
+    <section class="jchd-levers">
+      <button mat-stroked-button [class.active]="activeLever==='all'" (click)="setLever('all')">All</button>
+      <button mat-stroked-button [class.active]="activeLever==='goingQuiet'" (click)="setLever('goingQuiet')"
+        matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (attended sessions + logged touchpoints)">Going quiet ({{ summary.goingQuiet }})</button>
+      <button mat-stroked-button [class.active]="activeLever==='renewalWindow'" (click)="setLever('renewalWindow')"
+        matTooltip="Subscription ends within {{ RENEWAL_DAYS }} days">Renewal window ({{ summary.renewalsSoon }})</button>
+      <button mat-stroked-button [class.active]="activeLever==='lapsed'" (click)="setLever('lapsed')"
+        matTooltip="Subscription ended within the last {{ LAPSED_DAYS }} days — win-back">Lapsed ({{ summary.lapsed }})</button>
+      <button mat-stroked-button [class.active]="activeLever==='notStarted'" (click)="setLever('notStarted')"
+        matTooltip="Onboarded but journey not started">Not started ({{ summary.notStarted }})</button>
+      <button mat-stroked-button disabled matTooltip="Available in Phase 2 (needs Wins + Advocacy)">Referral-ready · Phase 2</button>
+    </section>
+
+    <section class="jchd-filters">
+      <mat-form-field appearance="outline" class="f-search">
+        <mat-label>Search name / number</mat-label>
+        <input matInput [(ngModel)]="search" (ngModelChange)="applyFilters()" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Journey</mat-label>
+        <mat-select [(ngModel)]="journeyFilter" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option *ngFor="let j of journeyOptions" [value]="j">{{ j }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Status</mat-label>
+        <mat-select [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="active">Active</mat-option>
+          <mat-option value="late">Late</mat-option>
+          <mat-option value="discontinued">Discontinued</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button class="export-btn" (click)="exportCsv()" matTooltip="Export the current list as CSV">
+        <mat-icon>download</mat-icon> Export
+      </button>
+    </section>
+
+    <div class="jchd-diag">
+      {{ summary.total }} participant(s) for <strong>{{ selectedCoachName || 'selected coach' }}</strong>
+      · matched {{ matchedCount }} of {{ scannedCount }} journey-product records · ranked by priority
+      <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>onboardedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
+    </div>
+
+    <div class="jchd-table-wrap">
+      <table mat-table [dataSource]="dataSource" matSort matSortActive="priority" matSortDirection="desc" class="jchd-table">
+
+        <ng-container matColumnDef="health">
+          <th mat-header-cell *matHeaderCellDef>Health</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="state" [ngClass]="stateClass(r.healthState)">{{ r.healthState || '—' }}</span>
+            <span class="cell-sub" *ngIf="r.healthState">{{ (r.healthCoverage*100) | number:'1.0-0' }}% cov</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="priority">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Priority</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="pri" [ngClass]="bandClass(r.priorityBand)" matTooltip="Phase-1 triage score (not the Health Score)">
+              {{ r.priorityBand }} · {{ r.priority }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+          <td mat-cell *matCellDef="let r">
+            <div class="cell-name">{{ r.name }}</div>
+            <div class="cell-sub">{{ r.number || '—' }}</div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="coach">
+          <th mat-header-cell *matHeaderCellDef>Coach</th>
+          <td mat-cell *matCellDef="let r">{{ r.coachname }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="reason">
+          <th mat-header-cell *matHeaderCellDef>Reason / next action</th>
+          <td mat-cell *matCellDef="let r"><span class="reason">{{ r.reason }}</span></td>
+        </ng-container>
+
+        <ng-container matColumnDef="journey">
+          <th mat-header-cell *matHeaderCellDef>Journey</th>
+          <td mat-cell *matCellDef="let r">
+            {{ r.journeyname }}
+            <span class="cell-sub">{{ r.journeystatus }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="tier">
+          <th mat-header-cell *matHeaderCellDef>Tier</th>
+          <td mat-cell *matCellDef="let r">{{ r.atcmodel || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="chip" [ngClass]="statusClass(r.customerstatus)">{{ r.customerstatus || '—' }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="finance">
+          <th mat-header-cell *matHeaderCellDef>Finance</th>
+          <td mat-cell *matCellDef="let r">
+            <div [class.text-warn]="(r.financialstatus||'')!=='regular' && r.financialstatus">{{ r.financialstatus || '—' }}</div>
+            <div class="cell-sub" *ngIf="r.balance != null">Bal: {{ r.balance | number }}</div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="renewal">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Renewal</th>
+          <td mat-cell *matCellDef="let r">
+            <span [class.text-warn]="r.renewalWindow || r.lapsed">{{ fmtDate(r.subscriptionend) }}</span>
+            <span class="cell-sub" *ngIf="r.daysToRenewal != null">{{ r.daysToRenewal }}d</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="lastcoach">
+          <th mat-header-cell *matHeaderCellDef>Last touch</th>
+          <td mat-cell *matCellDef="let r">
+            <span [class.text-warn]="r.goingQuiet">{{ fmtDate(r.lastcoachdate) }}</span>
+            <span class="cell-sub" *ngIf="r.daysSinceCoach != null">{{ r.daysSinceCoach }}d ago</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="tickets">
+          <th mat-header-cell *matHeaderCellDef>Tickets</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="chip" [ngClass]="r.openTickets > 0 ? 'chip-warn' : 'chip-neutral'">{{ r.openTickets }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r">
+            <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Actions"><mat-icon>more_vert</mat-icon></button>
+            <mat-menu #rowMenu="matMenu">
+              <button mat-menu-item (click)="logTouchpoint(r)">
+                <mat-icon>add_task</mat-icon><span>Log touchpoint</span>
+              </button>
+              <button mat-menu-item [routerLink]="['/userprofile', r.profileid]">
+                <mat-icon>open_in_new</mat-icon><span>Open profile</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+
+      <div class="jchd-empty" *ngIf="dataSource.data.length === 0">
+        No participants match the current filters.
+      </div>
+
+      <mat-paginator [pageSizeOptions]="[25, 50, 100]" pageSize="25" showFirstLastButtons></mat-paginator>
+    </div>
+
+  </ng-container>
+</div>
