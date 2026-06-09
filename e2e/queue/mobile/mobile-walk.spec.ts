@@ -36,9 +36,12 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
       // Fresh-participant precondition: clean log, park at the variation entry (re-runnable).
       await resetToken(t.tokenId, t.firstStage);
 
-      // Degenerate single-stage variation (V9 uP! Prep Hold): no hops — assert the parked terminal.
+      // Degenerate single-stage variation (V9 uP! Prep Hold): no hops — assert the parked terminal,
+      // then boot the REAL app to capture the parked stage as imaging proof (parity with the other 8).
       if (t.hops.length === 0) {
         await assertTerminalReached(t.tokenId, t.vid, { terminal: t.terminal });
+        await driveFlutterSelfRun(t, 0, `${t.vid}-p${t.participantIndex}`);
+        await attachMobileScreenshots(testInfo, `${t.vid}-p${t.participantIndex}`);
         return;
       }
 
