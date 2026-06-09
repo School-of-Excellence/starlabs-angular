@@ -68,7 +68,9 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
           i = j;
         } else {
           // OP / AUTO → REAL board move (movedby = operator profileid), board-computed count-drift.
-          await driveBoardHop(board, t.profileid, t.hops[i]);
+          // The hop also captures the participant's REAL card on the REAL board at the source stage
+          // (imaging proof of the operator hop; the count-drift assertion is the numeric proof).
+          await driveBoardHop(board, t.profileid, t.hops[i], { label: `${t.vid}-p${t.participantIndex}`, seq: i });
           minNonSelf += 1;
           logged += 1;
           await assertAfterHop(t.tokenId, t.vid, logged, minNonSelf);

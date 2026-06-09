@@ -149,8 +149,11 @@ async function resolveStageKeyForCount(board, stageName, before, after, expectDe
 }
 
 /** Drive ONE operator/auto hop through the REAL board, asserting the board's recomputed count-drift. */
-export async function driveBoardHop(board: QueueBoardPage, cardId: string, hop: Hop): Promise<void> {
+export async function driveBoardHop(board: QueueBoardPage, cardId: string, hop: Hop, shot?: { label: string; seq: number }): Promise<void> {
   await waitForCardOnStage(board, cardId, hop.from);
+  // IMAGING: the card is now guaranteed rendered at hop.from (waitForCardOnStage polled for it) —
+  // capture it on the real board BEFORE the move, so every operator hop has a visible-card frame.
+  if (shot) await captureBoardCard(board, cardId, shot.label, shot.seq, hop.from);
   const beforeSrc = await board.readColumnCount(hop.from);
   const beforeAll = await board.readAllColumnCounts();
   await board.moveToken(cardId, hop.to);
@@ -160,6 +163,14 @@ export async function driveBoardHop(board: QueueBoardPage, cardId: string, hop: 
   const srcKey = await resolveStageKeyForCount(board, hop.from, beforeAll, afterAll, -1);
   const dstKey = await resolveStageKeyForCount(board, hop.to, beforeAll, afterAll, +1);
   assertCountConserved(beforeAll, afterAll, { src: srcKey, dst: dstKey });
+}
+
+/** IMAGING: capture the participant's card on the REAL board at `stage`, into the evidence dir (so it
+ *  is attached alongside the mobile frames). Best-effort — never throws into the walk. */
+export async function captureBoardCard(board: QueueBoardPage, tokenSel: string, label: string, seq: number, stage: string): Promise<void> {
+  if (!fs.existsSync(EVIDENCE_DIR)) fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
+  const safe = `${label}-board-${String(seq).padStart(2, '0')}-at-${stage.replace(/[^A-Za-z0-9]+/g, '_')}.png`;
+  try { await board.captureTokenCardShot(tokenSel, path.join(EVIDENCE_DIR, safe)); } catch { /* best-effort */ }
 }
 
 // ── the universal guards after every hop (read PRODUCT output) ───────────────────────────────────
@@ -225,7 +236,6 @@ export async function driveFlutterSelfRun(t: VariationTarget, count: number, lab
   const logFd = fs.openSync(logPath, 'w');
   const proc = spawn(FLUTTER_BIN, args, { cwd: FLUTTER_APP, env: flutterEnv(), stdio: ['ignore', logFd, logFd] });
   const seen = new Set<string>();
-  let shotIdx = 0;
   let promptDismissed = false;
   await new Promise<void>((resolve, reject) => {
     const poll = setInterval(() => {
@@ -233,11 +243,13 @@ export async function driveFlutterSelfRun(t: VariationTarget, count: number, lab
       if (!promptDismissed) promptDismissed = dismissIosNotificationPrompt(udid);
       let log = '';
       try { log = fs.readFileSync(logPath, 'utf8'); } catch { return; }
-      for (const m of log.matchAll(/WALK\[[^\]]*\] hop \d+: at "([^"]+)"/g)) {
-        const stage = m[1];
-        if (seen.has(stage)) continue;
-        seen.add(stage);
-        const safe = `${label}-${String(shotIdx++).padStart(2, '0')}-${stage.replace(/[^A-Za-z0-9]+/g, '_')}.png`;
+      // Capture on each CAP marker the robot emits (queue card / open FillForm / advanced card /
+      // parked terminal). The marker text is the full frame name (carries hop index + a|b|c tag + stage).
+      for (const m of log.matchAll(/CAP marker: (.+)/g)) {
+        const name = m[1].trim();
+        if (seen.has(name)) continue;
+        seen.add(name);
+        const safe = `${name.replace(/[^A-Za-z0-9._-]+/g, '_')}.png`;
         try { execFileSync('xcrun', ['simctl', 'io', udid, 'screenshot', path.join(EVIDENCE_DIR, safe)], { stdio: 'ignore', timeout: 20_000 }); } catch { /* best-effort */ }
       }
     }, 700);

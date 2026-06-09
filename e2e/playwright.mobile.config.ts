@@ -19,7 +19,8 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:4200',
     trace: 'on-first-retry',
-    screenshot: 'on',              // desktop board shots; mobile shots are attached from the flutter run
+    screenshot: 'only-on-failure', // board hops are now captured explicitly per-hop (see mobile-walk.spec);
+                                   // mobile frames are attached from the flutter run. (Avoids the empty end-of-test auto-shot.)
     video: 'off',
   },
   projects: [

@@ -608,6 +608,27 @@ export class QueueBoardPage {
     return (await card.count()) > 0;
   }
 
+  /**
+   * Best-effort IMAGING capture: reveal the participant's card (paging it in if a crowded column hid
+   * it past the 15-row "Load More" limit), scroll it into view, and write a VIEWPORT screenshot to
+   * `absPath` — visual proof the participant's REAL card is on the REAL operator board at its current
+   * stage (the column header + card are both in frame). Never mutates state (drives only Load-More +
+   * scroll). Returns whether the card was captured.
+   */
+  async captureTokenCardShot(tokenSel: TokenRef, absPath: string): Promise<boolean> {
+    try {
+      await this.revealTokenCard(tokenSel);
+      const card = this.tokenCard(tokenSel);
+      if ((await card.count()) === 0) return false;
+      await card.first().scrollIntoViewIfNeeded().catch(() => {});
+      await this.page.waitForTimeout(250);
+      await this.page.screenshot({ path: absPath }); // viewport — shows the card in its column context
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Locator for a stage column header by exact data-stage-key. */
   stageHeaderByKey(stageKey: string): Locator {
     return this.page.locator(`${SEL.stageHeader}[data-stage-key="${this.cssEscape(stageKey)}"]`);
