@@ -558,7 +558,10 @@
                   <mat-icon class="fsb-option-check">
                     {{selectedTimeSlots.includes(slot.timeRange) ? 'check_box' : 'check_box_outline_blank'}}
                   </mat-icon>
-                  <span>{{slot.timeRange}} ({{slot.count}})</span>
+                  <span>
+                    <span *ngIf="slot.title" style="font-weight:600; color:#234C58;">{{slot.title}} · </span>
+                    {{slot.timeRange}} ({{slot.count}})
+                  </span>
                 </div>
               </div>
             </ng-container>
@@ -807,7 +810,7 @@
               [style.color]="evolutionMappingLiveFilter === 'live' ? '#fff' : '#2e7d32'"
               [style.border-color]="'#2e7d32'"
               (click)="setEvolutionMappingFilter(evolutionMappingLiveFilter === 'live' ? 'all' : 'live')">
-              ✓ Video Live
+               Video Live
             </button>
             <button 
               style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1.5px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
@@ -815,7 +818,7 @@
               [style.color]="evolutionMappingLiveFilter === 'unlive' ? '#fff' : '#c62828'"
               [style.border-color]="'#c62828'"
               (click)="setEvolutionMappingFilter(evolutionMappingLiveFilter === 'unlive' ? 'all' : 'unlive')">
-              ✕ Not Live
+               Not Live
             </button>
           </div>
         </div>
@@ -1428,8 +1431,11 @@
                     <div *ngIf="selectedStageSlot && getBookedSlot(token)">
                       <span class="label">Slot Booked:&nbsp;</span>
                       <span>
-                        {{ getBookedSlot(token)!.start | date:'MMM d, y' }}
-                        [{{ getBookedSlot(token)!.start | date:'h:mm a' }} – {{ getBookedSlot(token)!.end | date:'h:mm a' }}]
+                        <span *ngIf="slotTitleMap[selectedStageSlot + '_' + getBookedSlot(token)!.start.getTime() + '_' + getBookedSlot(token)!.end.getTime()]"
+                          style="font-weight:600; color:#234C58;">
+                          {{ slotTitleMap[selectedStageSlot + '_' + getBookedSlot(token)!.start.getTime() + '_' + getBookedSlot(token)!.end.getTime()] }}
+                        </span>
+                        [{{ getBookedSlot(token)!.start | date:'h:mm a' }} - {{ getBookedSlot(token)!.end | date:'h:mm a' }}]
                       </span>
                     </div>
 

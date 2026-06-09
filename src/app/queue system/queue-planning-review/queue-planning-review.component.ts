@@ -55,6 +55,7 @@ interface MergedSlot {
         [stageName: string]: {
           maxslot: number;
           usedslot: number;
+          title: string; 
           bigparticipants: any[];
           confirmedParticipants: any[];
           nonConfirmedParticipants: any[];
@@ -181,7 +182,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   showQueueTabPanel: boolean = false;
   queueTabPanelParticipants: any[] = [];
   queueTabPanelTitle: string = '';
-  queueTabPanelType: 'confirmed' | 'non-confirmed' = 'confirmed';
+  queueTabPanelType: 'confirmed' | 'non-confirmed' | 'all' = 'confirmed';
   queueTabPanelSegmentName: string = '';
   queueTabPanelSlotTime: string = '';
   selectedSegmentIds: Set<string> = new Set();
@@ -623,6 +624,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
                   segVariationData.stageData[stageName] = {
                     maxslot: slot.maxslot || 0,
                     usedslot: slot.usedslot || 0,
+                    title: slot.title || '', 
                     startdate: startDate,
                     enddate: endDate
                   };
@@ -764,6 +766,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       result[stageName] = {
         maxslot: slot.maxslot || 0,
         usedslot: confirmedParticipants.length,
+        title: slot.title || '',
         bigparticipants: bigparticipants,
         confirmedParticipants: confirmedParticipants,
         nonConfirmedParticipants: nonConfirmedParticipants
@@ -4648,7 +4651,54 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     });
     return count;
   }
-  openQueueTabPanel(slot: MergedSlot, stage: string, segmentId: string, type: 'confirmed' | 'non-confirmed') {
+
+  openTotalPanelForStage(type: 'confirmed' | 'non-confirmed' | 'all') {
+    const slots = this.getSlotsGroupForStage().flatMap(group => group.slots);
+    const virtualSlot = {
+      startdate: new Date(),
+      enddate: new Date(),
+      segmentVariations: [] as any[]
+    };
+    const addedPerSegment = new Map<string, any>();
+
+    slots.forEach(slot => {
+      slot.segmentVariations.forEach(segVar => {
+        if (!addedPerSegment.has(segVar.segmentId)) {
+          addedPerSegment.set(segVar.segmentId, {
+            ...segVar,
+            variations: segVar.variations.map(v => ({
+              ...v,
+              stageData: {
+                [this.selectedStage]: {
+                  confirmedParticipants: [],
+                  nonConfirmedParticipants: []
+                }
+              }
+            }))
+          });
+        }
+        segVar.variations.forEach((variation, vi) => {
+          const target = addedPerSegment.get(segVar.segmentId).variations[vi]?.stageData[this.selectedStage];
+          if (!target || !variation.stageData?.[this.selectedStage]) return;
+          (variation.stageData[this.selectedStage].confirmedParticipants || []).forEach(p => {
+            if (!target.confirmedParticipants.some(x => (x.profile_id || x.profileid) === (p.profile_id || p.profileid)))
+              target.confirmedParticipants.push(p);
+          });
+          (variation.stageData[this.selectedStage].nonConfirmedParticipants || []).forEach(p => {
+            if (!target.nonConfirmedParticipants.some(x => (x.profile_id || x.profileid) === (p.profile_id || p.profileid)))
+              target.nonConfirmedParticipants.push(p);
+          });
+        });
+      });
+    });
+
+    virtualSlot.segmentVariations = Array.from(addedPerSegment.values());
+    this.openQueueTabPanelForSlot(virtualSlot as any, this.selectedStage, type);
+    this.queueTabPanelSlotTime = 'All Slots';
+    this.queueTabPanelSegmentName = 'All Segments';
+  }
+
+  openQueueTabPanel(slot: MergedSlot, stage: string, segmentId: string, type: 'confirmed' | 'non-confirmed' | 'all') {
     const segmentVar = slot.segmentVariations.find(sv => sv.segmentId === segmentId);
     if (!segmentVar) return;
     const participants: any[] = [];
@@ -4656,8 +4706,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
     segmentVar.variations.forEach(variation => {
       if (variation.stageData && variation.stageData[stage]) {
-        const list = type === 'confirmed' ? variation.stageData[stage].confirmedParticipants : variation.stageData[stage].nonConfirmedParticipants;
-        (list || []).forEach(p => {
+      const list = type === 'all' ? [...(variation.stageData[stage].confirmedParticipants || []), ...(variation.stageData[stage].nonConfirmedParticipants || [])] : type === 'confirmed' ? variation.stageData[stage].confirmedParticipants: variation.stageData[stage].nonConfirmedParticipants;
+          (list || []).forEach(p => {
           const profileId = p.profile_id || p.profileid;
           if (profileId && !addedIds.has(profileId)) {
             addedIds.add(profileId);
@@ -4672,19 +4722,21 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     this.showQueueTabPanel = true;
     this.currentPanelSlot = slot;
     this.queueTabPanelType = type;
-    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : type === 'non-confirmed' ? 'Non-Confirmed' : 'All';
     this.queueTabPanelSegmentName = segmentVar.segmentName;
-    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title;
+    this.queueTabPanelSlotTime = (slotTitle ? slotTitle + ' · ' : '') + this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
     this.selectedSegmentIds = new Set([segmentId]);
   }
-  openQueueTabPanelForSlot(slot: MergedSlot, stage: string, type: 'confirmed' | 'non-confirmed') {
+  openQueueTabPanelForSlot(slot: MergedSlot, stage: string, type: 'confirmed' | 'non-confirmed' | 'all') {
     this.currentPanelSlot = slot;
     this.queueTabPanelType = type;
-    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title;
+    this.queueTabPanelSlotTime = (slotTitle ? slotTitle + ' · ' : '') + this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
     this.selectedSegmentIds = new Set((slot.segmentVariations || []).map(sv => sv.segmentId));
     this.refreshQueuePanelParticipants(slot, stage, type);
     this.showQueueTabPanel = true;
-    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : type === 'non-confirmed' ? 'Non-Confirmed' : 'All';
     this.queueTabPanelSegmentName = 'All Segments';
   }
 
@@ -4697,7 +4749,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
     // Set panel context if not already open
     this.currentPanelSlot = slot;
-    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title;
+    this.queueTabPanelSlotTime = (slotTitle ? slotTitle + ' · ' : '') + this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
     if (!this.showQueueTabPanel) {
       this.queueTabPanelType = 'confirmed';
       this.queueTabPanelTitle = 'Confirmed';
@@ -4723,7 +4776,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     return this.selectedSegmentIds.has(segmentId);
   }
 
-  refreshQueuePanelParticipants(slot: any, stage: string, type: 'confirmed' | 'non-confirmed') {
+  refreshQueuePanelParticipants(slot: any, stage: string, type: 'confirmed' | 'non-confirmed' | 'all') {
     const participants: any[] = [];
     const addedIds = new Set<string>();
 
@@ -4731,7 +4784,12 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       if (!this.selectedSegmentIds.has(segmentVar.segmentId)) return;
       segmentVar.variations.forEach(variation => {
         if (variation.stageData && variation.stageData[stage]) {
-          const list = type === 'confirmed'
+          const list = type === 'all'
+            ? [
+                ...(variation.stageData[stage].confirmedParticipants || []),
+                ...(variation.stageData[stage].nonConfirmedParticipants || [])
+              ]
+            : type === 'confirmed'
             ? variation.stageData[stage].confirmedParticipants
             : variation.stageData[stage].nonConfirmedParticipants;
           (list || []).forEach(p => {
@@ -4758,10 +4816,11 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     return `${slot.startdate.getTime()}_${slot.enddate.getTime()}`;
   }
 
-  switchPanelType(type: 'confirmed' | 'non-confirmed') {
+  switchPanelType(type: 'confirmed' | 'non-confirmed' | 'all') {
     if (!this.currentPanelSlot) return;
     this.queueTabPanelType = type;
-    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : type === 'non-confirmed' ? 'Non-Confirmed' : 'All';
+
     this.refreshQueuePanelParticipants(this.currentPanelSlot, this.selectedStage, type);
   }
 

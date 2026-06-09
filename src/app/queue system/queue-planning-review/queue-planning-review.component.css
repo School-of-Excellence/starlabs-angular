@@ -4371,3 +4371,32 @@
   background-color: #6366f1 !important;
   color: white !important;
 }
+.slot-title-row {
+  font-weight: 700;
+  font-size: 13px;
+  color: #234C58;
+  border-bottom: 1px solid rgba(35, 76, 88, 0.15);
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.slot-title-text {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-slot-title {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+  color: #234C58;
+  margin-bottom: 2px;
+}
+
+.table-slot-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: #234C58;
+  margin-left: 4px;
+}

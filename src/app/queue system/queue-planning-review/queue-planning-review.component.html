@@ -201,8 +201,16 @@
                   <!-- Slot Cards for this Stage -->
                   <div *ngFor="let slot of getSlotsForStage(stage)" class="slot-card-wrapper">
                     <div class="slot-card" (click)="openSlotPanel(slot, stage)">
-                      <!-- Show Dates with Time in Single Box -->
                       <div class="slot-datetime-box">
+                        <div class="datetime-row slot-title-row" 
+                          *ngIf="slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title">
+                          <mat-icon>label</mat-icon>
+                          <span class="datetime-label" style="color: black;">Title:</span>
+                          <span class="slot-title-text">
+                            {{ slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title }}
+                          </span>
+                        </div>
+
                         <div class="datetime-row">
                           <mat-icon>event</mat-icon>
                           <span class="datetime-label">Start:</span>
@@ -216,6 +224,7 @@
                           <span class="datetime-value">{{ slot.enddate | date:'dd MMM yyyy' }} {{
                             formatTimeTo12Hour(slot.endtime) }}</span>
                         </div>
+
                       </div>
 
                       <!-- Counts Display -->
@@ -309,6 +318,11 @@
 
         <h4 *ngIf="panelViewType === 'slot'">
           <span class="info-value">
+            <span class="panel-slot-title" style="color: white;" 
+              *ngIf="selectedSlot?.segmentVariations[0]?.variations[0]?.stageData[selectedStageForPanel]?.title">
+              <span style="color: white;">Title:</span>   
+              {{ selectedSlot?.segmentVariations[0]?.variations[0]?.stageData[selectedStageForPanel]?.title }}
+            </span>
             {{ selectedSlot?.startdate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.starttime) }}
             <span class="separator">—</span>
             {{ selectedSlot?.enddate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.endtime) }}
@@ -983,7 +997,14 @@
               <td>
                 <span class="expand-arrow" [class.expanded]="slot.expanded" *ngIf="slot.showExpand">▶</span>
               </td>
-              <td><strong>{{ getDateAndMonthString(slot?.startdate) }}</strong></td>
+              <td>
+                <div *ngIf="slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title"
+                  class="table-slot-title">
+                  <span class="datetime-label" style="color: black;">Title:</span>  
+                  {{ slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title }}
+                </div>
+                <strong>{{ getDateAndMonthString(slot?.startdate) }}</strong>
+              </td>
               <td>{{ getTimeString(slot?.startdate , slot?.enddate) }}</td>
               <td style="text-align:center">
                 <span class="badge badge-none">{{ getMaxSlotsCount(slot, selectedStage) }}</span>
@@ -1076,6 +1097,11 @@
                     [class.expanded]="isQueueRowExpanded(slot)">▶</span>
                 </td>
                 <td (click)="toggleQueueRow(slot)">
+                  <div *ngIf="slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title"
+                    class="table-slot-title">
+                    <span class="datetime-label" style="color: black;">Title:</span>  
+                    {{ slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title }}
+                  </div>
                   <strong>{{ getDateAndMonthString(slot.startdate) }}</strong>
                   {{ getTimeString(slot.startdate, slot.enddate) }}
                 </td>
@@ -1094,7 +1120,9 @@
                   </span>
                 </td>
                 <td style="text-align:center">
-                  <span class="badge badge-none">
+                  <span class="badge badge-none clickable-badge"
+                    (click)="openQueueTabPanelForSlot(slot, selectedStage, 'all')">
+                    <mat-icon class="badge-click-icon">people</mat-icon>
                     {{ getConfirmedCountForSlot(slot, selectedStage) + getNonConfirmedCountForSlot(slot, selectedStage) }}
                   </span>
                 </td>
@@ -1142,7 +1170,9 @@
                               </span>
                             </td>
                             <td style="text-align:center">
-                              <span class="badge badge-none">
+                              <span class="badge badge-none clickable-badge"
+                                (click)="openQueueTabPanel(slot, selectedStage, segmentVar.segmentId, 'all')">
+                                <mat-icon class="badge-click-icon">people</mat-icon>
                                 {{ getConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) + getNonConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
                               </span>
                             </td>
@@ -1153,30 +1183,34 @@
                   </div>
                 </td>
               </tr>
-
             </ng-container>
           </ng-container>
 
-          <!-- Total Row -->
           <tr class="total-row">
-            <td></td>
-            <td><strong>TOTAL</strong></td>
-            <td style="text-align:center">
-              <span class="badge badge-booked">
-                {{ getTotalConfirmedParticipantInTable() }}
-              </span>
-            </td>
-            <td style="text-align:center">
-              <span class="badge badge-nonconf">
-                {{ getTotalQueueNonConfirmedInTable() }}
-              </span>
-            </td>
-            <td style="text-align:center">
-              <span class="badge badge-none">
-                {{ getTotalConfirmedParticipantInTable() + getTotalQueueNonConfirmedInTable() }}
-              </span>
-            </td>
-          </tr>
+          <td></td>
+          <td><strong>TOTAL</strong></td>
+          <td style="text-align:center">
+            <span class="badge badge-booked clickable-badge"
+              (click)="openTotalPanelForStage('confirmed')">
+              <mat-icon class="badge-click-icon">how_to_reg</mat-icon>
+              {{ getTotalConfirmedParticipantInTable() }}
+            </span>
+          </td>
+          <td style="text-align:center">
+            <span class="badge badge-nonconf clickable-badge"
+              (click)="openTotalPanelForStage('non-confirmed')">
+              <mat-icon class="badge-click-icon">schedule</mat-icon>
+              {{ getTotalQueueNonConfirmedInTable() }}
+            </span>
+          </td>
+          <td style="text-align:center">
+            <span class="badge badge-none clickable-badge"
+              (click)="openTotalPanelForStage('all')">
+              <mat-icon class="badge-click-icon">people</mat-icon>
+              {{ getTotalConfirmedParticipantInTable() + getTotalQueueNonConfirmedInTable() }}
+            </span>
+          </td>
+        </tr>
         </tbody>
       </table>
     </div>

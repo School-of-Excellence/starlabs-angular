@@ -227,15 +227,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   currentMatchIndex: number = -1;
   isSearchActive: boolean = false;
   searchHighlightMap: { [tokenId: string]: boolean } = {};
-  stageHighlightMap: { [stageKey: string]: boolean } = {}; // NEW: Track stage name matches
+  stageHighlightMap: { [stageKey: string]: boolean } = {}; 
   currentHighlightTokenId: string | null = null;
-  currentHighlightStageKey: string | null = null; // NEW: Track current stage highlight
+  currentHighlightStageKey: string | null = null; 
   caseSensitiveSearch: boolean = false;
   segmentDropdownOpen: boolean = false;
   tagDropdownOpen: boolean = false;
   mapTagsName = {};
   mapTagsMetaData = {};
   preassignedFilter: 'all' | 'preassigned' | 'not-preassigned' = 'all';
+  slotTitleMap: { [key: string]: string } = {};
 
   roundRobbinformData = {
     howManyParticipantsNeeded:2,
@@ -245,7 +246,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   
   //dharshan
   availableStagesFromSlot: string[] = [];
-  availableTimeSlots: { timeRange: string; count: number }[] = [];
+  availableTimeSlots: { timeRange: string; count: number; title?: string }[] = [];
   quickLinks: Array<{ screenName: string; url: string; isInternal: boolean }> = [];
   activeStageCountFilter: string[] = []; 
   selectedTimeSlots: string[] = [];
@@ -1200,9 +1201,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.showTimeSlotPicker = false;
       return;
     }
-
-    const timeMap = new Map<string, number>(); // key = "6:00 PM – 8:00 PM", value = count
-
+    const timeMap = new Map<string, { count: number; title?: string }>();
     this.allTokensData.forEach(token => {
       const slotData = token.selectedstageslot;
       if (!slotData) return;
@@ -1242,7 +1241,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           });
 
           const key = `${startTime} – ${endTime}`;
-          timeMap.set(key, (timeMap.get(key) || 0) + 1);
+          const existing = timeMap.get(key);
+          const titleKey = `${this.selectedStageSlot}_${startDate.getTime()}_${endDate.getTime()}`;
+          const title = this.slotTitleMap[titleKey] || '';
+          timeMap.set(key, { count: (existing?.count || 0) + 1, title });
         }
       });
     });
@@ -1254,12 +1256,12 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         const timeB = new Date(`1970/01/01 ${b[0].split(' – ')[0]}`).getTime();
         return timeA - timeB;
       })
-      .map(([timeRange, count]) => ({ timeRange, count }));
+      .map(([timeRange, data]) => ({ timeRange, count: data.count, title: data.title }));
 
     this.showTimeSlotPicker = this.availableTimeSlots.length > 0;
   }
 
-  selectTimeSlot(time: string | null) { //dharshan
+  selectTimeSlot(time: string | null) { 
     if (time === null) {
       // Clicking "All" clears all selections
       this.selectedTimeSlots = [];
@@ -1760,6 +1762,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       },
       disableClose: true
     })
+
 
     // Fetch segments for this queue
     await this.fetchQueueSegments();
@@ -2364,9 +2367,21 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       );
       const queuePlanningSnap = await getDocs(queuePlanningQuery);
 
+      this.slotTitleMap = {};
       if (!queuePlanningSnap.empty) {
         const queuePlanningDoc = queuePlanningSnap.docs[0].data();
         this.queuePlanningSegments = queuePlanningDoc['segmentlist'] || [];
+
+        const planning = queuePlanningDoc['planning'] || [];
+        planning.forEach((v: any) => {
+          (v.segments || []).forEach((s: any) => {
+            (s.slots || []).forEach((slot: any) => {
+              if (!slot.title || !slot.startdate || !slot.enddate) return;
+              const sec = (d: any) => d?.seconds ? d.seconds * 1000 : d?.toDate?.().getTime() ?? 0;
+              this.slotTitleMap[`${slot.stagename}_${sec(slot.startdate)}_${sec(slot.enddate)}`] = slot.title;
+            });
+          });
+        });
       } else {
         this.queuePlanningSegments = [];
       }
@@ -2463,6 +2478,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     
     const stages = Array.from(stageSet).sort();
     return stages;
+  }
+
+  getBookedSlotTitle(token: any): string {
+    const slot = this.getBookedSlot(token);
+    if (!slot) return '';
+    const key = `${this.selectedStageSlot}_${slot.start.getTime()}_${slot.end.getTime()}`;
+    return this.slotTitleMap[key] || '';
   }
 
   getBookedSlot(token: any): { start: Date; end: Date } | null { //dharshan
