@@ -310,10 +310,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.pagedMode = this.isPagedView(this.selectedCoachId);
     this.applyPaginatorBinding();
 
-    // coach-set health states are keyed by profileid (independent of paging / coachedby) —
-    // load once here so BOTH the full and the paged row-build paths can populate every row.
-    await this.loadCoachHealthStates();
-
+    // Coach-set health states are keyed by profileid and loaded scoped to the participants
+    // actually shown: per-page (paged mode, in renderPage) or with the full base (loadFullPortfolio).
     if (this.pagedMode) {
       await this.loadServerCounts();
       await this.loadFirstPage();
@@ -339,6 +337,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     await this.loadTouchpoints();
     await this.loadContactEvents();
     await this.loadRecentEventRequests();
+    await this.loadCoachHealthStates();
 
     this.computeRows();
   }
@@ -442,6 +441,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         this.loadTouchpointsFor(profileIds),
         this.loadContactEventsFor(profileIds),
         this.loadRecentEventRequestsFor(profileIds),
+        this.loadCoachHealthStatesFor(profileIds),
       ]);
       this.pjpData = pjpForPage;       // computeRows reads this.pjpData (page-local matching + scoring)
       this.computeRows();
@@ -748,6 +748,31 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       out[pid] = { state: latest[pid].state, note: latest[pid].note, date: latest[pid].date };
     }
     this.coachHealthByProfile = out;
+  }
+
+  /** Page-scoped variant of loadCoachHealthStates — query healthtracker_healthstate by the
+   *  current page's profileids (batched 'in' of 30) and merge the MOST RECENT per participant
+   *  into coachHealthByProfile. Avoids the full-collection scan in paged (ALL / UNASSIGNED) views. */
+  private async loadCoachHealthStatesFor(profileIds: string[]): Promise<void> {
+    if (!profileIds.length) return;
+    try {
+      for (const batch of this.chunk30(profileIds)) {
+        const snap = await getDocs(query(collection(this.firestore, 'healthtracker_healthstate'), where('profileid', 'in', batch)));
+        snap.forEach(d => {
+          const data: any = d.data();
+          const pid = data['profileid'];
+          const state = data['state'] as HealthState;
+          if (!pid || !state) return;
+          const dt = this.toDate(data['date']);
+          const ms = dt ? dt.getTime() : 0;
+          const existing = this.coachHealthByProfile[pid];
+          const existingMs = existing?.date ? existing.date.getTime() : -1;
+          if (!existing || ms >= existingMs) {
+            this.coachHealthByProfile[pid] = { state, note: typeof data['note'] === 'string' ? data['note'] : '', date: dt };
+          }
+        });
+      }
+    } catch (e) { console.warn('coach health states (paged) failed', e); }
   }
 
   computeRows(): void {
