@@ -2,7 +2,7 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs,
+  Firestore, collection, query, where, getDocs, getDoc, doc,
 } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -162,7 +162,7 @@ type TimelineItem =
           <ng-container *ngIf="!ticketsLoading">
             <ul class="so-list" *ngIf="tickets.length; else noTickets">
               <li *ngFor="let t of tickets" class="so-list-row">
-                <span class="so-list-main">{{ t.subject || 'Issue' }}</span>
+                <span class="so-list-main">{{ t.subject || 'Support ticket' }}</span>
                 <span class="so-list-side">
                   <span class="so-status">{{ t.status }}</span>
                   <span class="so-sub" *ngIf="t.date">{{ t.date | date:'shortDate' }}</span>
@@ -334,6 +334,9 @@ export class ParticipantSlideoverComponent implements OnInit {
   timelineLoading = true;
   touchpointsBlocked = false;
 
+  /** Mirrors the parent dashboard's eventInfoCache: resolved event/queue id -> readable name. */
+  private eventInfoCache: Record<string, { name: string; start: Date | null }> = {};
+
   constructor(
     private firestore: Firestore,
     private dialog: MatDialog,
@@ -354,11 +357,15 @@ export class ParticipantSlideoverComponent implements OnInit {
       const items: TicketItem[] = [];
       snap.forEach(d => {
         const data: any = d.data();
-        if ((data['status']?.status ?? '').toLowerCase() !== 'open') return;
+        const status = data['status']?.status ?? 'open';
+        if ((status ?? '').toLowerCase() !== 'open') return;
+        // 'issue' is the human-readable subject on clientissue docs (same field the
+        // Customer Support screens display). Fall back to a clean label, never a raw id.
+        const issue = typeof data['issue'] === 'string' ? data['issue'].trim() : '';
         items.push({
-          subject: typeof data['subject'] === 'string' ? data['subject'] : (data['title'] ?? 'Issue'),
-          status: data['status']?.status ?? 'open',
-          date: this.toDate(data['doccreateddate']) ?? this.toDate(data['createddate']) ?? this.toDate(data['date']),
+          subject: issue || `Support ticket · ${status}`,
+          status,
+          date: this.toDate(data['reporteddate']) ?? this.toDate(data['doccreateddate']) ?? this.toDate(data['createddate']) ?? this.toDate(data['date']),
         });
       });
       items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
@@ -389,16 +396,36 @@ export class ParticipantSlideoverComponent implements OnInit {
   private async loadEvents(pid: string): Promise<void> {
     try {
       const snap = await getDocs(query(collection(this.firestore, 'event participation request'), where('profileid', '==', pid)));
+      const requests: any[] = [];
+      snap.forEach(d => requests.push(d.data()));
+
+      // Mirror the parent's resolution: turn the request's eventref/id into a readable
+      // name by reading 'event collection' (name/eventname) then 'queue generation' (queuename).
+      const eventIds = Array.from(new Set(requests.map(r => r['eventref']?.id).filter(Boolean)));
+      await Promise.all(eventIds.filter(id => !(id in this.eventInfoCache)).map(async (id) => {
+        try {
+          const ev = await getDoc(doc(this.firestore, 'event collection', id));
+          if (ev.exists()) { const dd: any = ev.data(); this.eventInfoCache[id] = { name: dd['name'] ?? dd['eventname'] ?? '', start: this.toDate(dd['start_date']) }; return; }
+        } catch { /* fall through */ }
+        try {
+          const qd = await getDoc(doc(this.firestore, 'queue generation', id));
+          if (qd.exists()) { const dd: any = qd.data(); this.eventInfoCache[id] = { name: dd['queuename'] ?? '', start: this.toDate(dd['queuestartdate']) }; return; }
+        } catch { /* leave unresolved */ }
+        // Unresolved: store an empty name so the UI shows a clean 'Event' label, never a raw id.
+        this.eventInfoCache[id] = { name: '', start: null };
+      }));
+
       const items: EventItem[] = [];
-      snap.forEach(d => {
-        const data: any = d.data();
+      for (const data of requests) {
+        const eventId = data['eventref']?.id ?? null;
+        const info = eventId ? this.eventInfoCache[eventId] : null;
+        const name = typeof info?.name === 'string' ? info.name.trim() : '';
         items.push({
-          eventName: typeof data['eventname'] === 'string' ? data['eventname']
-            : (typeof data['eventref']?.id === 'string' ? data['eventref'].id : '—'),
-          date: this.toDate(data['doccreateddate']),
+          eventName: name || 'Event',
+          date: this.toDate(data['doccreateddate']) ?? info?.start ?? null,
           status: typeof data['status'] === 'string' ? data['status'] : 'requested',
         });
-      });
+      }
       this.events = items;
     } catch (e) {
       console.warn('slideover events read failed', e);
