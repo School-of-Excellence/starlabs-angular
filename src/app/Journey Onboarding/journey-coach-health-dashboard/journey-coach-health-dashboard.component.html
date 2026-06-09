@@ -192,6 +192,7 @@
           matTooltip="Subscription ends within {{ RENEWAL_DAYS }} days">Renewal window</mat-checkbox>
         <mat-checkbox [(ngModel)]="goingQuietOnly" (ngModelChange)="applyFilters()"
           matTooltip="No coach contact in {{ QUIET_DAYS }}+ days">Going quiet</mat-checkbox>
+        <mat-checkbox [(ngModel)]="noEventRequestOnly" (ngModelChange)="applyFilters()">No recent event request</mat-checkbox>
         <span class="fp-spacer"></span>
         <button mat-stroked-button class="fp-clear" [disabled]="!hasActiveFilters" (click)="clearFilters()">
           <mat-icon>filter_alt_off</mat-icon> Clear filters
