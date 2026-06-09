@@ -15,6 +15,8 @@ _Last updated: 2026-06-09 (mobile-Flutter participant e2e)_ · **New session? Re
 ## ✅ DONE — full 9-variation walk GREEN (`9 passed`, 42.7m)
 All 9 variations walked entry→terminal: SELF hops by REAL Flutter taps, OP/AUTO by the REAL Angular board, every transition asserted by the oracle + guards (no-orphan / no-skip / every-move-logged{minNonSelf} / loop-bound / terminal / count-conserved), anti-circular (real Firestore writes). Includes B!G-Next-Cycle (the 24-stage in-person/Triple-ATC flow). Run: `cd e2e && SKIP_SEED=1 npx playwright test --config=playwright.mobile.config.ts`.
 
-## Pending / follow-ups
-- **Mobile screenshots:** real per-stage captures now work via `xcrun simctl` (iOS `binding.takeScreenshot` is blank for this app). They include the iOS notification-permission prompt the app raises on first launch — dismissing it for clean queue-card shots needs `idb` (a bounded follow-up). The PRIMARY mobile proof is the guards + real Firestore writes + the per-hop tap logs.
-- Optional: re-run all 9 with simctl to refresh the merged evidence report; adversarial evidence audit; push the Flutter `development` + `cicd` commits (operator-gated).
+## ✅ Mobile screenshots — CLEAN per-stage captures working
+`xcrun simctl io screenshot` (iOS `binding.takeScreenshot` is blank for this app) + `idb ui tap` to dismiss the first-launch notification prompt (rendered in-sim, unreachable by osascript/simctl). **All-9 clean-screenshot run COMPLETE — `9 passed (41.1m)`** (full walk reproduced exactly; same hop counts as the 42.7m run): **37 unique clean per-stage PNGs** showing the real queue card ("Click to Fill Form" at each stage) merged into `e2e/playwright-report-mobile/`. (idb = fb-idb 3.9 CLI; `IDB_BIN` override.)
+
+## Pending / follow-ups (optional)
+- Adversarial evidence audit (the guards are already self-tested, `@oracle`); scale from 1 representative participant/variation to all 50 (labelled STRETCH); push the Flutter `development` + `cicd` commits (operator-gated, currently local only).
