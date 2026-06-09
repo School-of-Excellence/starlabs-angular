@@ -181,6 +181,26 @@ export function bootedSimUdid(): string {
   return m[1];
 }
 
+// idb CLI (fb-idb) for tapping in-sim system dialogs that osascript/simctl can't reach. The Python
+// 3.14 install is broken (asyncio), so pin the 3.9 one; override via IDB_BIN.
+const IDB = process.env.IDB_BIN || path.join(os.homedir(), 'Library/Python/3.9/bin/idb');
+
+/** Dismiss the iOS first-launch "…Would Like to Send You Notifications" prompt (rendered in-sim by
+ *  SpringBoard) so the per-stage screenshots show the real queue card. Returns true once dismissed. */
+function dismissIosNotificationPrompt(udid: string): boolean {
+  try {
+    const raw = execFileSync(IDB, ['ui', 'describe-all', '--udid', udid], { encoding: 'utf8', timeout: 15_000 });
+    const els = JSON.parse(raw);
+    const btn = els.find((e: any) => e.role === 'AXButton' &&
+      ['Allow', "Don't Allow", 'Don’t Allow'].includes(e.AXLabel) && e.frame);
+    if (!btn) return false;
+    const cx = Math.round(btn.frame.x + btn.frame.width / 2);
+    const cy = Math.round(btn.frame.y + btn.frame.height / 2);
+    execFileSync(IDB, ['ui', 'tap', String(cx), String(cy), '--udid', udid], { stdio: 'ignore', timeout: 15_000 });
+    return true;
+  } catch { return false; }
+}
+
 /** Drive `count` contiguous form self-moves for one participant via a single `flutter drive`, and
  *  capture a REAL per-stage mobile screenshot via `xcrun simctl io screenshot` (the OS-level screen)
  *  each time the robot reaches a stage. (iOS integration_test `binding.takeScreenshot` returns a BLANK
@@ -206,8 +226,11 @@ export async function driveFlutterSelfRun(t: VariationTarget, count: number, lab
   const proc = spawn(FLUTTER_BIN, args, { cwd: FLUTTER_APP, env: flutterEnv(), stdio: ['ignore', logFd, logFd] });
   const seen = new Set<string>();
   let shotIdx = 0;
+  let promptDismissed = false;
   await new Promise<void>((resolve, reject) => {
     const poll = setInterval(() => {
+      // clear the iOS first-launch notification prompt (rendered in-sim) before any screenshot
+      if (!promptDismissed) promptDismissed = dismissIosNotificationPrompt(udid);
       let log = '';
       try { log = fs.readFileSync(logPath, 'utf8'); } catch { return; }
       for (const m of log.matchAll(/WALK\[[^\]]*\] hop \d+: at "([^"]+)"/g)) {
