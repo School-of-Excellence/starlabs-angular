@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { query, where, getDocs, collectionSnapshots, limit, orderBy, Firestore, collectionData, onSnapshot, deleteDoc, collection, doc, getDoc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from '@angular/fire/firestore';
+import { query, where, getDocs, collectionSnapshots, limit, orderBy, Firestore, collectionData, onSnapshot, deleteDoc, collection, doc, getDoc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, startAfter, getCountFromServer } from '@angular/fire/firestore';
 import { CollectionReference, writeBatch } from 'firebase/firestore';
 import { CreateGroupDialogComponent } from '../create-group-dialog/create-group-dialog.component';
 import { Storage } from '@angular/fire/storage';
@@ -26,6 +26,9 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { LinebreaksPipe, LinkPipe, EnhancedMessagePipe } from "../../../custompipe.pipe";
 import { AuthguardService } from '../../../authguard.service';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import * as XLSX from 'xlsx';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { ChannelCommunicationComponent } from '../../../Channel Communication/channel-communication/channel-communication.component';
 
 interface AttachedFile {
   filename: string;
@@ -58,7 +61,8 @@ interface MessageGroup {
     LinebreaksPipe,
     LinkPipe,
     EnhancedMessagePipe,
-    MatTooltipModule
+    MatTooltipModule,
+    MatFormFieldModule,
   ],
   templateUrl: './chat-screen.component.html',
   styleUrl: './chat-screen.component.css'
@@ -127,6 +131,54 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
 
   mentionMappings: Map<string, string> = new Map();
 
+    // Channel participants panel
+  showChannelParticipants: boolean = false;
+  selectedMessageForParticipants: any = null;
+
+  // Channel chat lists (mirror the group lists)
+  activeChannelList: any[] = [];
+  inactiveChannelList: any[] = [];
+  filteredActiveChannelList: any[] = [];
+  filteredInactiveChannelList: any[] = [];
+
+  // Channel send dialog
+showChannelSendDialog: boolean = false;
+channelDialogParticipants: any[] = [];  
+selectedChannelParticipantIds: Set<string> = new Set();
+selectedChannelParticipantsList: any[] = []; 
+selectedParticipantsModel: any[] = [];
+participantTab: 'seen' | 'unseen' | 'sent' = 'sent';
+allParticipants: any[] = [];
+activeChannelTotalCount: number = 0;
+csdOpen = false;
+csdQuery = '';
+csdOptions: any[] = [];
+
+// profile picture view and edit
+showProfileModal: boolean = false;
+profileModalChat: any = null;
+profileUploading: boolean = false;
+
+// total participants in the channel dialog open
+showParticipantsPanel: boolean = false;
+participantsPanelChat: any = null;
+participantsPanelList: any[] = [];
+
+// pagination variables
+  lastActiveChannelDoc: any = null;
+  lastInactiveChannelDoc: any = null;
+  hasMoreActiveChannels: boolean = false;
+  hasMoreInactiveChannels: boolean = false;
+  loadingMoreActiveChannels: boolean = false;
+  loadingMoreInactiveChannels: boolean = false;
+  private activeChannelPageSize = 10;
+  firstMessageDoc: any = null;
+  hasMoreMessages: boolean = false;
+  loadingMoreMessages: boolean = false;
+  private messagePageSize = 10;
+  private inactiveChannelPageSize = 10;
+
+
   private destroy$ = new Subject<void>();
 
   @ViewChild('messageContainer') messageContainer!: ElementRef;
@@ -134,6 +186,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   @ViewChild('fileInput') fileInput!: ElementRef;
   @ViewChild('previewContainer') previewContainer!: ElementRef;
   @ViewChild('messageSearchInput') messageSearchInput!: ElementRef;
+  @ViewChild('channelImportInput') channelImportInput!: ElementRef;
 
   constructor(
     public formbuilder: FormBuilder,
@@ -211,61 +264,433 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
     return !!this.selectedChat && this.selectedChat.isdelete === true;
   }
 
-  loadSupportChat() {
-    this.chatlistloading = true;
-    let activeQuery;
-    let inactiveQuery;
+ loadSupportChat() {
+  this.chatlistloading = true;
 
-    if (this.chatAdmin == true || this.adminRole == true) {
-      activeQuery = query(
+  const baseFilter = (this.chatAdmin || this.adminRole)
+    ? []
+    : [where('members', 'array-contains', this.currentuserData['user_ref'].id)];
+
+  const getGroupQuery = (isdelete: boolean) =>
+    query(
+      this.supportchatCollection,
+      ...baseFilter,
+      where('type', '==', 'group'),
+      where('isdelete', '==', isdelete)
+    );
+
+  collectionSnapshots(getGroupQuery(false)).pipe(takeUntil(this.destroy$)).subscribe({
+    next: (snap) => { this.activeChatList = this.mapChatList(snap); this.applySearchFilter(); this.chatlistloading = false; },
+    error: (e) => { console.error('active groups', e); this.chatlistloading = false; }
+  });
+  collectionSnapshots(getGroupQuery(true)).pipe(takeUntil(this.destroy$)).subscribe({
+    next: (snap) => { this.inactiveChatList = this.mapChatList(snap); this.applySearchFilter(); },
+    error: (e) => console.error('inactive groups', e)
+  });
+
+  this.loadInitialChannels(false, baseFilter);
+
+  this.loadInitialChannels(true, baseFilter);
+}
+
+parseChannelButtons(buttons: any): { url: string; label: string }[] {
+  if (!buttons) return [];
+  if (Array.isArray(buttons)) {
+    return buttons.filter(btn => btn?.url && btn?.label);
+  }
+  if (typeof buttons === 'object') {
+    return Object.values(buttons).filter((btn: any) => btn?.url && btn?.label) as any[];
+  }
+  try {
+    const parsed = JSON.parse(buttons);
+    return Array.isArray(parsed) ? parsed.filter(btn => btn?.url && btn?.label) : [];
+  } catch {
+    return [];
+  }
+}
+
+private async loadInitialChannels(isInactive: boolean, baseFilter: any[]) {
+  const q = query(
+    this.supportchatCollection,
+    ...baseFilter,
+    where('type', '==', 'channel'),
+    where('isdelete', '==', isInactive),
+    orderBy('last_modification', 'desc'),
+    limit(this.activeChannelPageSize)
+  );
+
+  try {
+    if (!isInactive) {
+      const countQuery = query(
         this.supportchatCollection,
-        where('isdelete', '==', false),
-        orderBy('last_modification', 'desc')
+        ...baseFilter,
+        where('type', '==', 'channel'),
+        where('isdelete', '==', false)
       );
-      inactiveQuery = query(
-        this.supportchatCollection,
-        where('isdelete', '==', true),
-        orderBy('last_modification', 'desc')
-      );
-    } else {
-      activeQuery = query(
-        this.supportchatCollection,
-        where('members', 'array-contains', this.currentuserData['user_ref'].id),
-        where('isdelete', '==', false),
-        orderBy('last_modification', 'desc')
-      );
-      inactiveQuery = query(
-        this.supportchatCollection,
-        where('members', 'array-contains', this.currentuserData['user_ref'].id),
-        where('isdelete', '==', true),
-        orderBy('last_modification', 'desc')
-      );
+      const countSnap = await getCountFromServer(countQuery);
+      this.activeChannelTotalCount = countSnap.data().count;
     }
 
-    // Subscribe to active chats
-    collectionSnapshots(activeQuery).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (chat) => {
-        this.activeChatList = this.mapChatList(chat);
-        this.applySearchFilter();
-        this.chatlistloading = false;
-      },
-      error: (error) => {
-        console.log("error while fetching active supportchat", error);
-        this.chatlistloading = false;
-      }
-    });
-
-    // Subscribe to inactive chats
-    collectionSnapshots(inactiveQuery).pipe(takeUntil(this.destroy$)).subscribe({
-      next: (chat) => {
-        this.inactiveChatList = this.mapChatList(chat);
-        this.applySearchFilter();
-      },
-      error: (error) => {
-        console.log("error while fetching inactive supportchat", error);
-      }
-    });
+    const snap = await getDocs(q);
+    const list = this.mapChatList(snap.docs);
+    if (isInactive) {
+      this.inactiveChannelList = list;
+      this.lastInactiveChannelDoc = snap.docs[snap.docs.length - 1] ?? null;
+      this.hasMoreInactiveChannels = snap.docs.length === this.inactiveChannelPageSize;
+    } else {
+      this.activeChannelList = list;
+      this.lastActiveChannelDoc = snap.docs[snap.docs.length - 1] ?? null;
+      this.hasMoreActiveChannels = snap.docs.length === this.activeChannelPageSize;
+    }
+    this.applySearchFilter();
+    this.chatlistloading = false;
+  } catch (e) {
+    console.error('load initial channels', e);
+    this.chatlistloading = false;
   }
+}
+
+openProfileModal(event: Event, chat: any): void {
+  event.stopPropagation();
+  this.profileModalChat = chat;
+  this.showProfileModal = true;
+}
+
+closeProfileModal(): void {
+  this.showProfileModal = false;
+  this.profileModalChat = null;
+}
+
+triggerProfileUpload(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file || !this.profileModalChat) return;
+    this.profileUploading = true;
+    try {
+      const path = `channel-images/${Date.now()}_${file.name}`;
+      const storageRef = ref(this.storage, path);
+      const snapshot = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      await updateDoc(
+        doc(this.firestore, 'supportchat', this.profileModalChat.docid),
+        { group_profile: url }
+      );
+      // Update local object so UI reflects immediately
+      this.profileModalChat.chatprofile = url;
+      // Also update in the list arrays
+      for (const list of [
+        this.activeChannelList, this.filteredActiveChannelList,
+        this.activeChatList,    this.filteredActiveChatList
+      ]) {
+        const item = list.find(c => c.docid === this.profileModalChat.docid);
+        if (item) item.chatprofile = url;
+      }
+      if (this.selectedChat?.docid === this.profileModalChat.docid) {
+        this.selectedChat.chatprofile = url;
+      }
+      this.snackBar.open('Profile picture updated', 'Close', { duration: 2000 });
+    } catch (err) {
+      console.error('Profile upload error', err);
+      this.snackBar.open('Error uploading image', 'Close', { duration: 2000 });
+    } finally {
+      this.profileUploading = false;
+    }
+  };
+  input.click();
+}
+
+openParticipantsPanel(event: Event, chat: any): void {
+  event.stopPropagation();
+  this.participantsPanelChat = chat;
+
+  const memberIds: string[] = chat.members || [];
+
+  this.participantsPanelList = memberIds
+    .map((profileDocId: string) => {
+      const idx = this.profileList.indexOf(profileDocId);
+      if (idx === -1) return null;
+
+      const uid = this.userListId[idx];
+      if (!uid) return null;
+
+      const profile = this.mapProfileuid[uid];
+      if (!profile) return null;
+
+      return { ...profile, profileDocId };
+    })
+    .filter((p: any) => p !== null);
+
+    console.log("participantslist :" ,this.participantsPanelList)
+
+  this.showParticipantsPanel = true;
+}
+
+closeParticipantsPanel(): void {
+  this.showParticipantsPanel = false;
+  this.participantsPanelChat = null;
+  this.participantsPanelList = [];
+}
+
+async loadMoreActiveChannels() {
+  if (!this.hasMoreActiveChannels || this.loadingMoreActiveChannels || !this.lastActiveChannelDoc) return;
+  this.loadingMoreActiveChannels = true;
+
+  const baseFilter = (this.chatAdmin || this.adminRole)
+    ? []
+    : [where('members', 'array-contains', this.currentuserData['user_ref'].id)];
+
+  const q = query(
+    this.supportchatCollection,
+    ...baseFilter,
+    where('type', '==', 'channel'),
+    where('isdelete', '==', false),
+    orderBy('last_modification', 'desc'),
+    startAfter(this.lastActiveChannelDoc),
+    limit(this.activeChannelPageSize)
+  );
+
+  try {
+    const snap = await getDocs(q);
+    const newList = this.mapChatList(snap.docs);
+    this.activeChannelList = [...this.activeChannelList, ...newList];
+    this.lastActiveChannelDoc = snap.docs[snap.docs.length - 1] ?? this.lastActiveChannelDoc;
+    this.hasMoreActiveChannels = snap.docs.length === this.activeChannelPageSize;
+    this.applySearchFilter();
+  } catch (e) {
+    console.error('load more active channels', e);
+  } finally {
+    this.loadingMoreActiveChannels = false;
+  }
+}
+
+async loadMoreInactiveChannels() {
+  if (!this.hasMoreInactiveChannels || this.loadingMoreInactiveChannels || !this.lastInactiveChannelDoc) return;
+  this.loadingMoreInactiveChannels = true;
+
+  const baseFilter = (this.chatAdmin || this.adminRole)
+    ? []
+    : [where('members', 'array-contains', this.currentuserData['user_ref'].id)];
+
+  const q = query(
+    this.supportchatCollection,
+    ...baseFilter,
+    where('type', '==', 'channel'),
+    where('isdelete', '==', true),
+    orderBy('last_modification', 'desc'),
+    startAfter(this.lastInactiveChannelDoc),
+    limit(this.inactiveChannelPageSize)
+  );
+
+  try {
+    const snap = await getDocs(q);
+    const newList = this.mapChatList(snap.docs);
+    this.inactiveChannelList = [...this.inactiveChannelList, ...newList];
+    this.lastInactiveChannelDoc = snap.docs[snap.docs.length - 1] ?? this.lastInactiveChannelDoc;
+    this.hasMoreInactiveChannels = snap.docs.length === this.inactiveChannelPageSize;
+    this.applySearchFilter();
+  } catch (e) {
+    console.error('load more inactive channels', e);
+  } finally {
+    this.loadingMoreInactiveChannels = false;
+  }
+}
+
+getParticipantTriggerText(): string {
+  const list = this.selectedChannelParticipantsList;
+  if (!list || list.length === 0) return 'Filter Participants';
+  if (list.length === 1) return list[0]?.name || '';
+  if (list.length === 2) return `${list[0]?.name}, ${list[1]?.name}`;
+  return `${list[0]?.name}, ${list[1]?.name} +${list.length - 2} more`;
+}
+
+filterCsdOptions() {
+  const q = this.csdQuery.trim().toLowerCase();
+  this.csdOptions = q
+    ? this.allParticipants.filter(p =>
+        p.name?.toLowerCase().includes(q) ||
+        p.email?.toLowerCase().includes(q))
+    : [...this.allParticipants];
+}
+
+openCsd() {
+  this.csdOpen = true;
+  this.csdQuery = '';
+  this.csdOptions = [...this.allParticipants];
+  setTimeout(() => {
+    const el = document.querySelector('.csd-search-input') as HTMLInputElement;
+    if (el) el.focus();
+  }, 50);
+}
+
+closeCsd() {
+  this.csdOpen = false;
+  this.csdQuery = '';
+}
+
+getChannelFileIcon(nameOrUrl: string): string {
+  if (!nameOrUrl) return 'attach_file';
+  const lower = nameOrUrl.toLowerCase();
+  if (lower.includes('.pdf'))  return 'picture_as_pdf';
+  if (lower.match(/\.(doc|docx)/)) return 'description';
+  if (lower.match(/\.(xls|xlsx)/)) return 'table_chart';
+  if (lower.match(/\.(ppt|pptx)/)) return 'slideshow';
+  if (lower.match(/\.(mp4|mov|avi|webm)/)) return 'videocam';
+  if (lower.match(/\.(mp3|wav|ogg)/)) return 'audiotrack';
+  if (lower.match(/\.(jpg|jpeg|png|gif|webp)/)) return 'image';
+  if (lower.match(/\.(zip|rar|7z)/)) return 'archive';
+  return 'attach_file';
+}
+
+getChannelFileExt(filename: string): string {
+  if (!filename) return 'FILE';
+  const parts = filename.split('.');
+  return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : 'FILE';
+}
+
+openChannelFile(file: any) {
+  const url = file.url || file.fileurl;
+  if (url) window.open(url, '_blank');
+}
+
+openChannelSendDialog() {
+  this.channelDialogParticipants = this.buildChannelParticipants();
+  this.selectedChannelParticipantIds = new Set();
+  this.selectedChannelParticipantsList = [];
+  this.selectedParticipantsModel = [];
+  this.selectedParticipantsModel = [];
+  this.allParticipants = [...this.channelDialogParticipants];
+  this.showChannelSendDialog = true;
+  this.csdOpen = false;
+  this.csdQuery = '';
+  this.csdOptions = [...this.channelDialogParticipants];
+}
+
+closeChannelSendDialog() {
+  this.showChannelSendDialog = false;
+  this.csdOpen = false;
+}
+buildChannelParticipants(): any[] {
+  const result: any[] = [];
+
+  for (let i = 0; i < this.profileList.length; i++) {
+    const profileDocId = this.profileList[i];
+    const uid = this.userListId[i];
+    const profile = uid ? this.mapProfileuid[uid] : null;
+
+    if (profile?.name) {
+      result.push({ ...profile, profileDocId });
+    }
+  }
+
+  return result;
+}
+
+toggleChannelParticipant(participant: any) {
+  const id = participant.profileDocId;
+  if (this.selectedChannelParticipantIds.has(id)) {
+    this.selectedChannelParticipantIds.delete(id);
+    this.selectedChannelParticipantsList = this.selectedChannelParticipantsList.filter(p => p.profileDocId !== id);
+    this.selectedParticipantsModel = this.selectedParticipantsModel.filter(p => p.profileDocId !== id);
+    this.selectedParticipantsModel = [...this.selectedParticipantsModel];
+  } else {
+    this.selectedChannelParticipantIds.add(id);
+    this.selectedChannelParticipantsList.push(participant);
+    this.selectedParticipantsModel = [...this.selectedParticipantsModel, participant];
+    this.selectedParticipantsModel = [...this.selectedParticipantsModel];
+  }
+}
+
+// ── Import Excel ─────────────────────────────────────────────
+
+handleChannelImportClick() {
+  const sampleDownload = confirm('Download sample import Excel format?');
+  if (sampleDownload) {
+    const data = [
+      { name: 'John Doe',    email: 'john@example.com' },
+      { name: 'Jane Smith',  email: 'jane@example.com' },
+    ];
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
+    const wb: XLSX.WorkBook  = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sample');
+    XLSX.writeFile(wb, 'channel_participants_sample.xlsx');
+    return;
+  }
+  this.channelImportInput.nativeElement.click();
+}
+
+onChannelImportChange(evt: Event) {
+  const target = evt.target as HTMLInputElement;
+  const file   = target.files?.[0];
+  if (!file) return;
+
+  const isExcel = /\.(xls|xlsx)$/i.test(file.name);
+  if (!isExcel) {
+    this.snackBar.open('Please upload an Excel file (.xls or .xlsx)', 'Close', { duration: 3000 });
+    target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e: ProgressEvent<FileReader>) => {
+    try {
+      const ab  = e.target?.result as ArrayBuffer;
+      const wb  = XLSX.read(ab, { type: 'array', cellDates: true });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws);
+
+      let matchedCount = 0;
+      rows.forEach((row: any) => {
+        const importName  = row['name']?.toString().trim().toLowerCase();
+        const importEmail = row['email']?.toString().trim().toLowerCase();
+
+        const match = this.channelDialogParticipants.find(p =>
+          (importEmail && p.email?.toLowerCase() === importEmail) ||
+          (importName  && p.name?.toLowerCase()  === importName)
+        );
+
+        if (match && !this.selectedChannelParticipantIds.has(match.profileDocId)) {
+          this.selectedChannelParticipantIds.add(match.profileDocId);
+          this.selectedChannelParticipantsList.push(match);
+          this.selectedParticipantsModel = [...this.selectedChannelParticipantsList];
+          matchedCount++;
+        }
+      });
+
+      this.snackBar.open(
+        `Import complete: ${matchedCount} participant(s) matched`,
+        'Close', { duration: 3000 }
+      );
+    } catch (err) {
+      console.error('Import error', err);
+      this.snackBar.open('Error reading file', 'Close', { duration: 3000 });
+    }
+  };
+  target.value = '';
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Proceed to one-way communication ─────────────────────────
+proceedChannelCommunication() {
+  if (this.selectedChannelParticipantsList.length === 0) {
+    this.snackBar.open('Please select at least one participant', 'Close', { duration: 2000 });
+    return;
+  }
+  const selectedParticipantsModel = this.selectedChannelParticipantsList.map(p => ({
+    profileid: p.profileDocId,
+    name: p.name || '',
+    email: p.email || '',
+  }));
+  this.dialog.open(ChannelCommunicationComponent, {
+    data: selectedParticipantsModel,
+    width: '860px',
+    maxHeight: '90vh',
+    panelClass: 'ow-dialog-panel'
+  });
+  this.closeChannelSendDialog(); 
+}
 
   /**
    * Common mapping logic shared by active and inactive chat subscriptions.
@@ -313,38 +738,51 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   }
 
   private applySearchFilter() {
-    const q = this.searchQuery.trim().toLowerCase();
+  const q = this.searchQuery.trim().toLowerCase();
 
-    if (!q) {
-      this.filteredActiveChatList = [...this.activeChatList];
-      this.filteredInactiveChatList = [...this.inactiveChatList];
-      return;
-    }
-
-    const matches = (chat: any) =>
-      (chat.chatname && chat.chatname.toLowerCase().includes(q)) ||
-      (chat.message && chat.message.toLowerCase().includes(q));
-
-    this.filteredActiveChatList = this.activeChatList.filter(matches);
-    this.filteredInactiveChatList = this.inactiveChatList.filter(matches);
+  if (!q) {
+    this.filteredActiveChatList    = [...this.activeChatList];
+    this.filteredInactiveChatList  = [...this.inactiveChatList];
+    this.filteredActiveChannelList   = [...this.activeChannelList];
+    this.filteredInactiveChannelList = [...this.inactiveChannelList];
+    return;
   }
+
+  const matches = (chat: any) =>
+    (chat.chatname && chat.chatname.toLowerCase().includes(q)) ||
+    (chat.message  && chat.message.toLowerCase().includes(q));
+
+  this.filteredActiveChatList    = this.activeChatList.filter(matches);
+  this.filteredInactiveChatList  = this.inactiveChatList.filter(matches);
+  this.filteredActiveChannelList   = this.activeChannelList.filter(matches);
+  this.filteredInactiveChannelList = this.inactiveChannelList.filter(matches);
+}
+
+clearselectedParticipants() {
+  this.selectedParticipantsModel = [];
+  this.selectedParticipantsModel = [];
+  this.selectedChannelParticipantIds = new Set();
+  this.selectedChannelParticipantsList = [];
+}
 
   /**
    * Tab change handler. When the user switches tabs we clear any
    * currently selected chat so the right pane reflects the active tab.
    */
   onTabChange(index: number) {
-    this.selectedTabIndex = index;
+  this.selectedTabIndex = index;
     // Clear selection when switching tabs to avoid showing a chat from the other list
-    this.selectedChat = {};
-    this.unsubscribe();
-    this.messages = [];
-    this.filteredMessages = [];
-    this.groupedMessages = [];
-    this.exitSelectionMode();
-    this.showMessageSearch = false;
-    this.messageSearchQuery = '';
-  }
+  this.selectedChat = {};
+  this.unsubscribe();
+  this.messages = [];
+  this.filteredMessages = [];
+  this.groupedMessages = [];
+  this.exitSelectionMode();
+  this.showMessageSearch = false;
+  this.messageSearchQuery = '';
+  this.showChannelParticipants = false;
+  this.selectedMessageForParticipants = null;
+}
 
   filterMessages() {
     if (!this.messageSearchQuery.trim()) {
@@ -394,6 +832,18 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
     this.messageSearchQuery = '';
 
     // Subscribe to messages collection
+    // Reset message pagination state
+    this.firstMessageDoc = null;
+    this.hasMoreMessages = false;
+    this.loadingMoreMessages = false;
+
+    if (selectedChat.type === 'channel') {
+      // Channel: paginated, load 10 most recent
+      this.loadInitialChannelMessages(selectedChat);
+      return;
+    }
+
+    // Group: unchanged real-time subscription
     this.subscription['messages'] = collectionSnapshots(
       query(
         collection(this.supportchatCollection, selectedChat['docid'], 'messages'),
@@ -405,19 +855,25 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
         for (let i = 0; i < chat.length; i++) {
           const element = chat[i].data();
 
-          element['docref'] = chat[i].ref
-          element['docid'] = element['messageid']
-          element['time'] = element['time']
-          element['senderuid'] = element['sender_uid']
-          element['files'] = element['files'] ?? []
-          element['originalmessage'] = element['message']
-          element['message'] = [null, undefined, ''].includes(element['message']) ? '' : element['message'].replace(/\n/g, '<br>')
-          element['chattype'] = 'groupchat'
-          element['read_by'] = element['read_by'] ?? []
-          element['pending'] = element['pending'] ?? []
-          element['links'] = element['links']
-          element['type'] = element['type']
-          element['isMyMessage'] = element['sender_uid'] === this.currentuserData['uid'];
+          element['docref'] = chat[i].ref;
+          element['docid'] = element['messageid'];
+          element['time'] = element['time'];
+          element['senderuid'] = element['sender_uid'];
+          element['files'] = element['files'] ?? [];
+
+          const rawText = this.isChannelChat(element, selectedChat)
+            ? (element['htmlbody'] ?? '')
+            : (element['message'] ?? '');
+
+          element['originalmessage'] = rawText;
+          element['message'] = rawText === '' ? '' : rawText.replace(/\n/g, '<br>');
+
+          element['chattype'] = 'groupchat';
+          element['read_by'] = element['read_by'] ?? [];
+          element['pending'] = element['pending'] ?? [];
+          element['links'] = element['links'];
+          element['type'] = element['type'];
+          element['isMyMessage'] = this.isChannelChat(element, selectedChat) ? '' : element['sender_uid'] === this.currentuserData['uid'];
 
           messages.push(element);
         }
@@ -441,6 +897,144 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
       }
     });
   }
+
+  private async loadInitialChannelMessages(selectedChat: any) {
+  this.messagesLoading = true;
+  const msgCol = collection(this.supportchatCollection, selectedChat['docid'], 'messages');
+
+  const q = query(
+    msgCol,
+    orderBy('time', 'desc'),
+    limit(this.messagePageSize)
+  );
+
+  try {
+    const snap = await getDocs(q);
+    const reversed = [...snap.docs].reverse();
+    this.firstMessageDoc = reversed[0] ?? null; 
+    this.hasMoreMessages = snap.docs.length === this.messagePageSize;
+
+    this.messages = reversed.map(d => this.mapMessageDoc(d, selectedChat));
+    this.filteredMessages = [...this.messages];
+    this.groupMessagesByDate();
+    this.messagesLoading = false;
+
+    if (!this.isInactiveChatSelected) {
+      this.markMessagesAsRead(selectedChat);
+    }
+    setTimeout(() => this.scrollToBottom(), 100);
+  } catch (e) {
+    console.error('load initial channel messages', e);
+    this.messagesLoading = false;
+  }
+}
+
+async loadMoreChannelMessages() {
+  if (!this.hasMoreMessages || this.loadingMoreMessages || !this.firstMessageDoc) return;
+  this.loadingMoreMessages = true;
+
+  const msgCol = collection(this.supportchatCollection, this.selectedChat['docid'], 'messages');
+
+  const q = query(
+    msgCol,
+    orderBy('time', 'desc'),
+    startAfter(this.firstMessageDoc),
+    limit(this.messagePageSize)
+  );
+
+  try {
+    const snap = await getDocs(q);
+    const reversed = [...snap.docs].reverse();
+    this.firstMessageDoc = reversed[0] ?? this.firstMessageDoc;
+    this.hasMoreMessages = snap.docs.length === this.messagePageSize;
+
+    const olderMessages = reversed.map(d => this.mapMessageDoc(d, this.selectedChat));
+    this.messages = [...olderMessages, ...this.messages];
+    this.filteredMessages = [...this.messages];
+    this.groupMessagesByDate();
+  } catch (e) {
+    console.error('load more channel messages', e);
+  } finally {
+    this.loadingMoreMessages = false;
+  }
+}
+
+private mapMessageDoc(docSnap: any, selectedChat: any): any {
+  const element = docSnap.data();
+  element['docref'] = docSnap.ref;
+  element['docid'] = element['messageid'];
+  element['time'] = element['time'];
+  element['senderuid'] = element['sender_uid'];
+  element['files'] = element['files'] ?? [];
+
+  const rawText = this.isChannelChat(element, selectedChat)
+    ? (element['htmlbody'] ?? '')
+    : (element['message'] ?? '');
+
+  element['originalmessage'] = rawText;
+  element['message'] = rawText === '' ? '' : rawText.replace(/\n/g, '<br>');
+  element['chattype'] = 'groupchat';
+  element['read_by'] = element['read_by'] ?? [];
+  element['pending'] = element['pending'] ?? [];
+  element['links'] = element['links'];
+  element['type'] = element['type'];
+  element['isMyMessage'] = this.isChannelChat(element, selectedChat)
+    ? ''
+    : element['sender_uid'] === this.currentuserData['uid'];
+
+  return element;
+}
+
+  isChannelChat(messageElement: any, chat: any): boolean {
+  return chat?.type === 'channel';
+}
+
+getChannelReadByUsers(message: any): any[] {
+  if (!message?.read_by) return [];
+  return message.read_by
+    .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
+    .filter((p: any) => !!p);
+}
+
+getChannelSentMessages(message: any): any[] {
+  if (!message?.members) return [];
+  return message.members
+    .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
+    .filter((p: any) => !!p);
+}
+
+getChannelPendingUsers(message: any): any[] {
+  if (!message?.pending) return [];
+  console.log("pendingList",message.pending)
+  return message.pending
+    .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
+    .filter((p: any) => !!p);
+}
+
+getProfileByDocId(profileDocId: string): any {
+  const byField = Object.values(this.mapProfileuid).find((p: any) =>
+    p['profileid'] === profileDocId ||
+    p['profile_id'] === profileDocId ||
+    p['id'] === profileDocId
+  );
+  if (byField) return byField;
+
+  const idx = this.profileList.indexOf(profileDocId);
+  if (idx !== -1) {
+    const uid = this.userListId[idx];
+    return uid ? this.mapProfileuid[uid] : null;
+  }
+  return null;
+}
+
+getTotalParticipantsCount(message: any): number {
+  if (!message) return 0;
+  return (message?.read_by?.length ?? 0) + (message?.pending?.length ?? 0);
+}
+
+getReadCount(message: any): number {
+  return message?.read_by?.length ?? 0;
+}
 
   groupMessagesByDate() {
     const groups: MessageGroup[] = [];
@@ -635,6 +1229,21 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
       message.pending.includes(memberId)
     );
   }
+
+openChannelParticipants(message: any) {
+  this.selectedMessageForParticipants = message;
+  this.participantTab = 'sent';   // always default to Seen
+  this.showChannelParticipants = true;
+}
+
+closeChannelParticipants() {
+  this.showChannelParticipants = false;
+  this.selectedMessageForParticipants = null;
+}
+
+get isChannelSelected(): boolean {
+  return this.selectedChat?.type === 'channel';
+}
 
   // File attachment methods
   onFileSelected(event: any) {
