@@ -32,6 +32,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
+import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
 
 /**
  * Journey Coach - Health Dashboard (Phase 1.5 + Phase-2 wiring prepped).
@@ -74,6 +75,8 @@ interface PortfolioRow {
   reason: string;
   pjpIds: string[];              // journey-product doc ids for this participant (for assignment writes)
   recentEventRequest: { eventName: string; date: Date | null; status: string } | null;
+  // Coach-set Health State (manual coach assessment, separate from customerstatus)
+  coachHealthState: { state: HealthState; note: string; date: Date | null } | null;
   // Phase-2 (gated)
   healthState: HealthState | null;
   healthCoverage: number;
@@ -202,6 +205,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private contactEventByProfile: Record<string, number> = {}; // raw attended-session recency
   // profileid -> most-recent event participation request {eventName, date, status}
   private recentEventByProfile: Record<string, { eventName: string; date: Date | null; status: string }> = {};
+  // profileid -> latest coach-set Health State (manual coach assessment)
+  private coachHealthByProfile: Record<string, { state: HealthState; note: string; date: Date | null }> = {};
   // eventref id -> {name, start} resolved on demand (paged mode), cached across pages
   private eventInfoCache: Record<string, { name: string; start: Date | null }> = {};
 
@@ -222,10 +227,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // assignment mode: checkbox + identity only (priority/levers don't apply to unassigned)
       return ['select', 'name', 'journey', 'tier', 'status', 'actions'];
     }
-    const cols = ['priority', 'name', 'reason', 'journey', 'recentEvent', 'tier', 'status', 'finance',
+    // 'health' now shows the real COACH-SET state, so it is always displayed (no longer gated).
+    const cols = ['priority', 'health', 'name', 'reason', 'journey', 'recentEvent', 'tier', 'status', 'finance',
       'renewal', 'lastcoach', 'tickets', 'actions'];
-    if (this.SHOW_HEALTH) cols.splice(1, 0, 'health');
-    if (this.selectedCoachId === this.ALL) cols.splice(this.SHOW_HEALTH ? 3 : 2, 0, 'coach');
+    if (this.selectedCoachId === this.ALL) cols.splice(3, 0, 'coach');
     return cols;
   }
 
@@ -304,6 +309,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       (this.coachId && this.coaches.some(c => c.id === this.coachId)) ? this.coachId : this.ALL;
     this.pagedMode = this.isPagedView(this.selectedCoachId);
     this.applyPaginatorBinding();
+
+    // coach-set health states are keyed by profileid (independent of paging / coachedby) —
+    // load once here so BOTH the full and the paged row-build paths can populate every row.
+    await this.loadCoachHealthStates();
 
     if (this.pagedMode) {
       await this.loadServerCounts();
@@ -711,6 +720,36 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.recentEventByProfile = out;
   }
 
+  /** Coach-set Health State: read the 'healthtracker_healthstate' audit collection once and keep
+   *  the MOST RECENT doc per participant (by date). Each save is a new doc (history preserved);
+   *  the latest is the current state. Degrades to none on failure. */
+  private async loadCoachHealthStates(): Promise<void> {
+    const latest: Record<string, { state: HealthState; note: string; date: Date | null; sortMs: number }> = {};
+    try {
+      const snap = await getDocs(collection(this.firestore, 'healthtracker_healthstate'));
+      snap.forEach(d => {
+        const data: any = d.data();
+        const pid = data['profileid'];
+        if (!pid) return;
+        const state = data['state'] as HealthState;
+        if (!state) return;
+        const dt = this.toDate(data['date']);
+        const sortMs = dt ? dt.getTime() : 0;
+        const existing = latest[pid];
+        if (!existing || sortMs >= existing.sortMs) {
+          latest[pid] = { state, note: typeof data['note'] === 'string' ? data['note'] : '', date: dt, sortMs };
+        }
+      });
+    } catch (e) {
+      console.warn('coach health state load failed (non-fatal)', e);
+    }
+    const out: Record<string, { state: HealthState; note: string; date: Date | null }> = {};
+    for (const pid of Object.keys(latest)) {
+      out[pid] = { state: latest[pid].state, note: latest[pid].note, date: latest[pid].date };
+    }
+    this.coachHealthByProfile = out;
+  }
+
   computeRows(): void {
     const now = Date.now();
     const byProfile = new Map<string, PortfolioRow>();
@@ -774,6 +813,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         priority: 0, priorityBand: 'Low', reason: '',
         pjpIds: [d['__id']],
         recentEventRequest: this.recentEventByProfile[profileid] ?? null,
+        coachHealthState: this.coachHealthByProfile[profileid] ?? null,
         healthState: null, healthCoverage: 0,
       };
       this.scoreRow(row);
@@ -909,6 +949,49 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         this.applyFilters();
       }
     });
+  }
+
+  /** Open the Set-health-state dialog; on save, append a new audit doc and reflect immediately.
+   *  This is the coach's MANUAL assessment — it never touches customerstatus / lifecycle. */
+  setHealthState(row: PortfolioRow): void {
+    const ref = this.dialog.open(SetHealthStateDialogComponent, {
+      data: { name: row.name, current: row.coachHealthState?.state ?? null },
+      autoFocus: false,
+    });
+    ref.afterClosed().subscribe(async (res: SetHealthStateResult | undefined) => {
+      if (!res) return;
+      const writer = this.coachId || this.selectedCoachId || '';
+      try {
+        await addDoc(collection(this.firestore, 'healthtracker_healthstate'), {
+          profileid: row.profileid,
+          state: res.state,
+          note: res.note,
+          coachid: writer,
+          date: serverTimestamp(),
+          source: 'health-dashboard',
+        });
+        this.guard.openSnackBar(`Health state set to ${this.healthLabel(res.state)} for ${row.name}`, 'Close');
+      } catch (e: any) {
+        console.error('setHealthState write failed', e);
+        this.guard.openSnackBar('Could not save health state: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+        return;
+      }
+      // optimistic: reflect on the row + the in-memory map so the Health column updates without reload
+      const entry = { state: res.state, note: res.note, date: new Date() };
+      row.coachHealthState = entry;
+      this.coachHealthByProfile[row.profileid] = entry;
+    });
+  }
+
+  /** Title-case label for a coach-set Health State (Happy / Neutral / Sad / Evangelist). */
+  healthLabel(s: HealthState | null | undefined): string {
+    switch (s) {
+      case 'HAPPY': return 'Happy';
+      case 'NEUTRAL': return 'Neutral';
+      case 'SAD': return 'Sad';
+      case 'EVANGELIST': return 'Evangelist';
+      default: return '—';
+    }
   }
 
   /** Per-row assign / change coach — works for any participant (assign or reassign).
