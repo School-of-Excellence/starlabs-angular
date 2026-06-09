@@ -1931,6 +1931,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     const exportData = allParticipants.map((p, index) => ({
       'No': index + 1,
       'Name': this.getProfileName(p.profileId),
+      'Email': this.getParticipantEmail(p.profileId) ?? 'N/A',
       'Profile ID': p.profileId,
       'Segment': p.segmentName || 'N/A',
       'Segment ID': p.segmentId || 'N/A',

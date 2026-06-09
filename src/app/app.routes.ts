@@ -218,6 +218,7 @@ export const routes: Routes = [
   {path: 'productinitiated-dashboard', loadComponent: () => import('./Journey Onboarding/product-initiation-dashboard/product-initiation-dashboard.component').then(m => m.ProductInitiationDashboardComponent), canActivate:[authGuard]},
   {path: 'delivery-dashboard', loadComponent: () => import('./Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component').then(m => m.DeliveryDashboardCloneComponent), canActivate:[authGuard]},
   {path: 'overall-dashboard', loadComponent: () => import('./Journey Onboarding/overall-dashboard/overall-dashboard.component').then(m => m.OverallDashboardComponent), canActivate:[authGuard]},
+  {path: 'journey-coach-health', loadComponent: () => import('./Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.component').then(m => m.JourneyCoachHealthDashboardComponent), canActivate:[authGuard]},
   {path: 'sales-report', loadComponent: () => import('./Journey Onboarding/sales-dashboard-clone/sales-dashboard-clone.component').then(m => m.SalesDashboardCloneComponent), canActivate:[authGuard]},
   {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
   {path: 'onboarding-pipeline', loadComponent: () => import('./Journey Onboarding/onboarding-pipeline/onboarding-pipeline.component').then(m => m.OnboardingPipelineComponent), canActivate: [authGuard]},
