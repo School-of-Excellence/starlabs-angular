@@ -1,4 +1,4 @@
-import { Component, HostListener, inject } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, Input, ViewChild } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -45,15 +45,31 @@ import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Par
 
 export class CohortManagementComponent {
 
+  @ViewChild('cohortsearch') cohortSearch !: ElementRef<HTMLInputElement>  
   // ==== Design B additions ====
   selectMode = false
   selectedCohortIds = new Set<string>()
   mobileSheetOpen = false
   private _sheetOpenedAt = 0
   unassignSearch = '';
-  filterUnassignParticipants = []
+  unassignCohortSearchQuery = ''
+  filterUnassignParticipants = [];
+  selectedUnassignParticipants : null | Set<any>= null;
   progressionSubscription : Subscription;
+  activityLogFilters = {};
 
+  @HostListener('document:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent) {
+    if (
+      event.ctrlKey &&
+      event.shiftKey &&
+      event.key.toLowerCase() === 's'
+    ) {
+      event.preventDefault();
+      this.cohortSearch.nativeElement.focus();
+    }
+  }
+  
   openMobileSheet(ev: Event): void {
     ev.stopPropagation()
     this.mobileSheetOpen = true
@@ -328,18 +344,27 @@ export class CohortManagementComponent {
     event.stopPropagation()
     const payload = this.dragPayload
     this.dragPayload = null
-    this.hoverDropTargetCohortId = null
+    this.hoverDropTargetCohortId = null;
     if (!payload || !targetCohort) return
 
     if (payload.kind === 'participant' && payload.participantId) {
       if (!payload.sourceCohortId) {
-        await this.assignUnassignedToCohort([payload.participantId], targetCohort)
+        const request = this.unassignedParticipants.find(({participantId})=>payload.participantId);
+        if(request?.['eventref']?.id === targetCohort['eventref']?.id){
+          await this.assignUnassignedToCohort([payload.participantId], targetCohort)
+        } else {
+          alert(`This Request Belongs to ${this.mapAcceleratorEvent[request?.['eventref']?.id]}`)
+        }
         return
       }
       if (payload.sourceCohortId === targetCohort['docid']) return
       const sourceCohort = this.cohortsList.find(c => c['docid'] === payload.sourceCohortId)
       if (sourceCohort) {
-        await this.moveParticipantToCohort(payload.participantId, sourceCohort, targetCohort)
+        if (sourceCohort['eventref']?.id === targetCohort['eventid']?.id) {
+          await this.moveParticipantToCohort(payload.participantId, sourceCohort, targetCohort)
+        } else{
+          alert(`Can not move participants between ${this.mapAcceleratorEvent[sourceCohort?.['eventref']?.id]} to ${this.mapAcceleratorEvent[targetCohort?.['eventref']?.id]}`)
+        }
       }
       return
     }
@@ -1920,7 +1945,7 @@ export class CohortManagementComponent {
     this.totalParticipantsInCohorts = Array.from(new Set(this.totalParticipantsInCohorts))
 
     this.calculateUnassignedParticipants();
-    this.filterProgressData()
+    this.filterActivityLog()
 
     return this.filteredCohortsList;
   }
@@ -3164,7 +3189,7 @@ export class CohortManagementComponent {
 
       this.progressionSubscription = collectionData(q).subscribe((log)=>{
         this.progressionData = log;
-        this.filterProgressData()
+        this.filterActivityLog()
         if (this.progressionLoading) {
           this.progressionLoading = false
         }
@@ -3186,6 +3211,102 @@ export class CohortManagementComponent {
     this.filteredProgressionProfiles = data;
   }
 
+  toggleUnassignedSelectMode(){
+    this.selectedUnassignParticipants = this.selectedUnassignParticipants? null : new Set();
+  }  
+
+  selectAllUnassignedParticipants(){
+    for(let {participantId} of this.filterUnassignParticipants){
+      this.selectedUnassignParticipants.add(participantId)
+    }
+  }
+
+  getCohortsForUnassign(){
+    return this.filteredCohortsList.filter((cohorts)=>cohorts?.name?.toLowerCase()?.trim()?.includes(this.unassignCohortSearchQuery.toLowerCase().trim()))
+  }
+  onUnassignCohortSearch(){
+    
+  }
+
+  isUnassignedParticipantChecked(pid){
+    return this.selectedUnassignParticipants?.has(pid);
+  }
+
+  toggleUnassignChecked(pid , event : Event){
+    event.stopPropagation();
+    if (this.selectedUnassignParticipants.has(pid)) {
+      this.selectedUnassignParticipants.delete(pid)
+    } else{
+      this.selectedUnassignParticipants.add(pid)
+    }
+  }
+
+  unassignToCohort(cohort : any){
+    const eventId = cohort['eventref']?.id;
+    const participants = Array.from(this.selectedUnassignParticipants.values())
+    const check = this.unassignedParticipants.filter((unassign)=>this.selectedUnassignParticipants.has(unassign?.participantId)).every((unassign)=>unassign['eventref']?.id === eventId);
+
+    if (!check) {
+      alert('Selected Participants does not belong to same Event');
+    } else {
+      const confirmCheck = confirm(`Do you want to move participants to  ${cohort.name}`)
+      if (confirmCheck) {
+        this.assignUnassignedToCohort(participants , cohort);
+      }
+    }
+  }
+
+  filterActivityLog(){
+    const keys = Object.keys(this.activityLogFilters);
+    const logs = [...this.progressionData];
+    const filteredLogs = [];
+  
+      for (let log of logs) {
+        let filterPassed = true;
+        if (this.selectedAcceleratorEvent.length > 0) {
+          const eventId = log['eventref']?.id;
+          if (!this.selectedAcceleratorEvent.includes(eventId)) {
+            filterPassed = false;
+          }
+        }
+
+        keys.forEach((type) => {
+          if (type === 'search') {
+            const participant =
+              (
+                this.mapProfile[log['profileid']] ||
+                this.mapProfile[log['participantid']]
+              )
+                ?.toLowerCase()
+                ?.trim() ?? '';
+            const search = this.activityLogFilters[type]?.toLowerCase()?.trim();
+            if (
+              ![null, undefined, ''].includes(search) &&
+              !participant.includes(search)
+            ) {
+              filterPassed = false;
+            }
+          } else if(type === 'assigntome' && this.activityLogFilters[type]){
+            const logedBy = log['addedby'] || log['removedby'] || '';
+            if (logedBy !== (this.loggedInProfile?.profileid || this.loggedInProfile?.uid) ) {
+              filterPassed = false;
+            }
+          }
+        });
+
+        if (filterPassed) {
+          filteredLogs.push(log);
+        }
+      }
+
+      this.filteredProgressionProfiles = filteredLogs; 
+  }
+
+  toggleLogedToMe(event : Event){
+    event.stopPropagation();
+    this.activityLogFilters['assigntome'] = !this.activityLogFilters['assigntome'];
+    this.filterActivityLog()
+  }
 
 }
 

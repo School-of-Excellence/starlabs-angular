@@ -25,9 +25,9 @@
         <circle cx="11" cy="11" r="8" />
         <path d="m21 21-4.35-4.35" />
       </svg>
-      <input type="text" placeholder="Search by cohort or participant" [(ngModel)]="participantSearchQuery"
+      <input type="text" placeholder="Search by cohort or participant" [(ngModel)]="participantSearchQuery" #cohortsearch
         (input)="onParticipantSearch()" />
-      <span class="kbd-hint">⌘K</span>
+      <span class="kbd-hint">Clrt + Shift + S</span>
     </div>
 
     <div class="topbar-actions">
@@ -227,11 +227,54 @@
           (input)="filterUnassignSearch()" />
       </div>
 
+      <div class="up-select-bar" *ngIf="filterUnassignParticipants.length > 0">
+        <div class="box" style="justify-content : flex-start;">
+          <button class="up-toggle" [class.on]="selectedUnassignParticipants" (click)="toggleUnassignedSelectMode()">
+            <mat-icon>{{selectedUnassignParticipants ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
+            {{selectedUnassignParticipants ? 'Cancel' : 'Select'}}
+          </button>
+          <button class="up-all" *ngIf="selectedUnassignParticipants" (click)="selectAllUnassignedParticipants()">
+            <mat-icon>select_all</mat-icon> All
+          </button>
+        </div>
+        <div class="box">
+          <span class="up-count" *ngIf="selectedUnassignParticipants && selectedUnassignParticipants.size > 0">
+            {{selectedUnassignParticipants.size}} selected
+          </span>
+          <span style="flex:1"></span>
+          <button class="up-assign" *ngIf="selectedUnassignParticipants && selectedUnassignParticipants.size > 0"
+            [matMenuTriggerFor]="cohortMenu">
+            <mat-icon>group_add</mat-icon> Assign to cohort…
+          </button>
+        </div>
+        <mat-menu #cohortMenu="matMenu" class="up-cohort-menu">
+          <div class="up-cohort-search" (click)="$event.stopPropagation()">
+            <mat-icon>search</mat-icon>
+            <input type="text" placeholder="Search cohort…" [(ngModel)]="unassignCohortSearchQuery"
+              (click)="$event.stopPropagation()">
+          </div>
+          <div class="up-cohort-list">
+            <button mat-menu-item *ngFor="let cohort of getCohortsForUnassign()" (click)="unassignToCohort(cohort)">
+              <span class="up-cohort-name">{{cohort.name}}</span>
+              <small class="up-cohort-sub">{{cohort.participantidlist?.length || 0}} ppl</small>
+            </button>
+            <div *ngIf="getCohortsForUnassign().length === 0" class="up-cohort-empty">No cohorts found</div>
+          </div>
+        </mat-menu>
+      </div>
+
       <div class="participant-list" *ngIf="selectedAcceleratorEvent.length > 0">
 
         <div class="participant-row" draggable="true"
           (dragstart)="onParticipantDragStart($event, unassign?.participantId, null)"
-          *ngFor="let unassign of this.filterUnassignParticipants ?? []">
+          *ngFor="let unassign of this.filterUnassignParticipants ?? []"
+           [class.selectable]="selectedUnassignParticipants"
+          [class.checked]="isUnassignedParticipantChecked(unassign?.participantId)"
+          (click)="selectedUnassignParticipants && toggleUnassignChecked(unassign?.participantId, $event)"
+        >
+        <span class="up-check" *ngIf="selectedUnassignParticipants">
+          <mat-icon>check</mat-icon>
+        </span>
           <svg class="ico sm drag-icon" viewBox="0 0 24 24">
             <circle cx="8" cy="6" r="1" fill="currentColor" />
             <circle cx="8" cy="12" r="1" fill="currentColor" />
@@ -667,9 +710,19 @@
           </button> -->
           <span class="activity-title">Activity</span>
           <span class="activity-count">{{filteredProgressionProfiles.length}}</span>
+          <span class="done-by-me" [class.active]="activityLogFilters['assigntome']" (click)="toggleLogedToMe($event)">Done By me</span>
           <span class="activity-spacer"></span>
           <button class="activity-collapse-btn" title="Expand log" (click)="toggleActivitySidenav();$event.stopPropagation()"><svg class="ico sm" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
         </div>
+
+        <div class="sidebar-search">
+          <svg class="ico sm" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input type="text" placeholder="Search by name…" [(ngModel)]="activityLogFilters['search']" (input)="filterActivityLog()" />
+        </div>
+
         <!-- <div class="activity-tabs">
           <button class="activity-tab" [class.active]="activityFilter === 'all'" (click)="activityFilter = 'all'">All</button>
           <button class="activity-tab" [class.active]="activityFilter === 'you'" (click)="activityFilter = 'you'">You</button>
@@ -732,7 +785,7 @@
               <div class="act-log-meta" *ngIf="log['level'] || log['cohortCategory'] || log['addedby']">
                 <span class="act-log-tag" *ngIf="log['level']">{{getLevelLabel(log['level'])}}</span>
                 <span class="act-log-tag" *ngIf="log['cohortCategory']">{{log['cohortCategory'] | titlecase}}</span>
-                <span class="act-log-by" *ngIf="log['addedby']">By {{mapProfile[log['addedby']] || 'System'}}</span>
+                <span class="act-log-by" *ngIf="log['addedby'] || log['removedby']">By {{mapProfile[log['addedby']] || mapProfile[log['removedby']] || 'System'}}</span>
               </div>
           </div>
           <div *ngIf="progressionLoading">Loading....</div>
