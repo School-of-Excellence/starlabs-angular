@@ -224,7 +224,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // ---- Intelligent filter panel (client-side, applied over the FULL base) ----
   filtersExpanded = false;                         // collapsible panel state
   // Product type defaults to ECOSYSTEM so the board opens scoped to ecosystem participants.
-  productTypeFilter: ProductType | '' = 'ecosystem';
+  productTypeFilters: ProductType[] = ['ecosystem'];
   tierFilters: string[] = [];                      // atcmodel: B!G / LYL / uP! / CPM (multi)
   bandFilters: Array<'High' | 'Medium' | 'Low'> = []; // priority band (multi)
   healthFilters: HealthState[] = [];               // coach-set health state (multi)
@@ -1427,7 +1427,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.statusFilter && (r.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${r.name} ${r.number ?? ''}`.toLowerCase().includes(term))) return false;
     // --- intelligent filter panel ---
-    if (this.productTypeFilter && r.productType !== this.productTypeFilter) return false;
+    if (this.productTypeFilters.length && !this.productTypeFilters.includes(r.productType)) return false;
     if (this.tierFilters.length && !this.tierFilters.includes(r.atcmodel ?? '')) return false;
     if (this.bandFilters.length && !this.bandFilters.includes(r.priorityBand)) return false;
     if (this.healthFilters.length && !this.healthFilters.includes(r.coachHealthState?.state as HealthState)) return false;
@@ -1453,7 +1453,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.isInactiveStatus(lite.customerstatus) !== wantInactive) return false;
     if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
-    if (this.productTypeFilter && lite.productType !== this.productTypeFilter) return false;
+    if (this.productTypeFilters.length && !this.productTypeFilters.includes(lite.productType)) return false;
     if (this.tierFilters.length && !this.tierFilters.includes(lite.atcmodel ?? '')) return false;
     if (this.financeFilters.length && !this.financeFilters.includes(lite.financialstatus ?? '')) return false;
     return true;
@@ -1529,7 +1529,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.journeyFilter = '';
     this.statusFilter = '';
     this.activeLever = 'all';
-    this.productTypeFilter = 'ecosystem';
+    this.productTypeFilters = ['ecosystem'];
     this.tierFilters = [];
     this.bandFilters = [];
     this.healthFilters = [];
@@ -1542,7 +1542,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** True when any filter differs from its default (drives the "Clear filters" affordance). */
   get hasActiveFilters(): boolean {
     return !!this.search || !!this.journeyFilter || !!this.statusFilter || this.activeLever !== 'all'
-      || this.productTypeFilter !== 'ecosystem' || this.tierFilters.length > 0 || this.bandFilters.length > 0
+      || !(this.productTypeFilters.length === 1 && this.productTypeFilters[0] === 'ecosystem') || this.tierFilters.length > 0 || this.bandFilters.length > 0
       || this.healthFilters.length > 0 || this.financeFilters.length > 0
       || this.renewalWindowOnly || this.goingQuietOnly;
   }

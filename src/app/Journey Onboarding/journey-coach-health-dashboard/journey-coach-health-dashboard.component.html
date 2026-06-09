@@ -94,11 +94,6 @@
       </div>
     </section>
 
-    <div class="jchd-phase-note" *ngIf="selectedCoachId !== UNASSIGNED">
-      <mat-icon>info</mat-icon>
-      <span><strong>Priority</strong> is a Phase-1 triage heuristic over live data (who to act on first). The calibrated <strong>Health Score</strong> (Sad / Neutral / Happy / Evangelist) is wired and turns on in Phase 2 once instrumentation &amp; calibration land.</span>
-    </div>
-
     <section class="jchd-levers" *ngIf="selectedCoachId !== UNASSIGNED">
       <button mat-stroked-button [class.active]="activeLever==='all'" (click)="setLever('all')">All</button>
       <button mat-stroked-button [class.active]="activeLever==='goingQuiet'" (click)="setLever('goingQuiet')"
@@ -151,8 +146,7 @@
       <div class="fp-grid">
         <mat-form-field appearance="outline" class="fp-field">
           <mat-label>Product type</mat-label>
-          <mat-select [(ngModel)]="productTypeFilter" (ngModelChange)="applyFilters()">
-            <mat-option value="">All products</mat-option>
+          <mat-select [(ngModel)]="productTypeFilters" (ngModelChange)="applyFilters()" multiple>
             <mat-option value="ecosystem">Ecosystem</mat-option>
             <mat-option value="dfu">DFU</mat-option>
             <mat-option value="gifts">Gifts</mat-option>
