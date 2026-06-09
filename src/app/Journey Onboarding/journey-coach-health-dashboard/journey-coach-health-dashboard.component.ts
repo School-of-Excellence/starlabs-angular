@@ -83,7 +83,7 @@ interface PortfolioRow {
   healthCoverage: number;
 }
 
-type Lever = 'all' | 'goingQuiet' | 'renewalWindow' | 'lapsed' | 'notStarted' | 'inactive';
+type Lever = 'all' | 'active' | 'goingQuiet' | 'renewalWindow' | 'lapsed' | 'notStarted' | 'inactive' | 'tickets';
 
 type DashboardView = 'base' | 'scoreboard';
 
@@ -1278,12 +1278,28 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
   }
 
-  /** Clickable KPI cards -> set the relevant lever. */
-  kpi(which: 'inactive' | 'renewalsSoon' | 'goingQuiet'): void {
+  /** Map a KPI card key to its lever. 'total' resets the board to 'all'. */
+  private kpiLever(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets'): Lever {
+    switch (which) {
+      case 'active': return 'active';
+      case 'inactive': return 'inactive';
+      case 'renewalsSoon': return 'renewalWindow';
+      case 'goingQuiet': return 'goingQuiet';
+      case 'tickets': return 'tickets';
+      default: return 'all';
+    }
+  }
+
+  /** Clickable KPI cards -> toggle the relevant lever (click again to clear back to 'all'). */
+  kpi(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets'): void {
     this.statusFilter = '';
-    if (which === 'goingQuiet') this.setLever('goingQuiet');
-    else if (which === 'renewalsSoon') this.setLever('renewalWindow');
-    else this.setLever('inactive');
+    const target = this.kpiLever(which);
+    this.setLever(this.activeLever === target ? 'all' : target);
+  }
+
+  /** Whether a given KPI card's lever is the currently active one (drives the selected highlight). */
+  kpiActive(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets'): boolean {
+    return this.activeLever === this.kpiLever(which);
   }
 
   exportCsv(): void {
@@ -1423,6 +1439,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
     if (this.activeLever === 'lapsed' && !r.lapsed) return false;
     if (this.activeLever === 'notStarted' && !r.notStarted) return false;
+    if (this.activeLever === 'active' && (r.customerstatus ?? '').toLowerCase() !== 'active') return false;
+    if (this.activeLever === 'tickets' && !(r.openTickets > 0)) return false;
     if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
     if (this.statusFilter && (r.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${r.name} ${r.number ?? ''}`.toLowerCase().includes(term))) return false;
@@ -1451,6 +1469,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (!this.isUnassigned(lite.coachedby)) return false;
     }
     if (this.isInactiveStatus(lite.customerstatus) !== wantInactive) return false;
+    if (this.activeLever === 'active' && (lite.customerstatus ?? '').toLowerCase() !== 'active') return false;
     if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(lite.productType)) return false;
