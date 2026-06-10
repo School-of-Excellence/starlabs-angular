@@ -1019,7 +1019,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  Hands the in-memory row to the panel, which runs its own scoped reads for the detail. */
   openSlideover(row: PortfolioRow): void {
     this.dialog.open(ParticipantSlideoverComponent, {
-      data: { row },
+      // Reuse the dashboard's full Log-call / Set-health flow (write + snackbar + table update);
+      // the slide-over's footer buttons invoke these so it never performs its own (no-op) writes.
+      data: { row, onLogCall: () => this.logCall(row), onSetHealth: () => this.setHealthState(row) },
       position: { right: '0', top: '0' },
       height: '100vh',
       width: 'min(520px, 100vw)',
@@ -1102,22 +1104,23 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
           source: 'health-dashboard',
         });
         this.guard.openSnackBar(`Call logged for ${row.name}`, 'Close');
+        // Optimistic UI runs ONLY after the write succeeds — on permission-denied the row must
+        // not visually clear its quiet flag. Only an actual contact (reached/scheduled) resets
+        // the going-quiet clock; a no-answer is still logged but does not clear the quiet flag.
+        if (res.outcome === 'reached' || res.outcome === 'scheduled') {
+          const now = Date.now();
+          this.touchpointByProfile[row.profileid] = now;
+          row.lastcoachdate = new Date(now);
+          row.daysSinceCoach = 0;
+          row.goingQuiet = false;
+          this.scoreRow(row);
+          this.allRows.sort((a, b) => b.priority - a.priority);
+          this.computeSummary();
+          this.applyFilters();
+        }
       } catch (e: any) {
         console.error('logCall write failed', e);
         this.guard.openSnackBar('Could not save call: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
-      }
-      // only an actual contact (reached/scheduled) resets the going-quiet clock; a no-answer
-      // is still logged (counts as activity) but does not clear the quiet flag.
-      if (res.outcome === 'reached' || res.outcome === 'scheduled') {
-        const now = Date.now();
-        this.touchpointByProfile[row.profileid] = now;
-        row.lastcoachdate = new Date(now);
-        row.daysSinceCoach = 0;
-        row.goingQuiet = false;
-        this.scoreRow(row);
-        this.allRows.sort((a, b) => b.priority - a.priority);
-        this.computeSummary();
-        this.applyFilters();
       }
     });
   }
@@ -1659,6 +1662,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       || !(this.productTypeFilters.length === 1 && this.productTypeFilters[0] === 'ecosystem') || this.tierFilters.length > 0 || this.bandFilters.length > 0
       || this.healthFilters.length > 0 || this.financeFilters.length > 0
       || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
+  }
+
+  /** True when a PAGE-LOCAL filter is active — band / coach-health / renewal-window / going-quiet.
+   *  These need per-row dependent data so they only refine the loaded pages (see liteMatches), unlike
+   *  search / product type / tier / status / finance which cover the full base via the lite index.
+   *  Drives the visible "filtering loaded pages only" caveat in paged (ALL / UNASSIGNED) mode. */
+  get pageLocalFilterActive(): boolean {
+    return this.bandFilters.length > 0 || this.healthFilters.length > 0
+      || this.renewalWindowOnly || this.goingQuietOnly;
   }
 
   get selectedCoachName(): string {
