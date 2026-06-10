@@ -93,6 +93,20 @@ export async function loginAsBigParticipant(page: Page, i = 0, opts: LoginOpts =
   return email;
 }
 
+/**
+ * Log in as a seeded EIS-ONLY specialist (`changeagent` role; NONE of developer/admin/ah) and land
+ * on /EISDashboard (the default route, always admitted by authGuard). This actor is deliberately
+ * non-privileged: it is ADMITTED past authGuard on staff screens (its role + profileid are granted in
+ * the dashboard route-config) but must be BOUNCED by the hardcoded roleGuard on sensitive screens like
+ * /arenastudioactivity. Used by the SS-15b negative role-gate test.
+ * @param i which eis-only actor (0-based; the seeder creates eisonly0..).
+ */
+export async function loginAsEisOnly(page: Page, i = 0, opts: LoginOpts = {}): Promise<string> {
+  const email = opts.email || actors.eisOnly(i);
+  await loginAndLand(page, email, opts.landingRoute || '/EISDashboard', opts.timeoutMs);
+  return email;
+}
+
 /** Seeded participant email convention (seed-test-project.js: `participant<idx>+<TESTRUNID>@example.com`). */
 export function participantEmail(i = 0): string {
   return `participant${i}+${TESTRUNID}@example.com`;

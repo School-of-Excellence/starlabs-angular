@@ -10,6 +10,9 @@ export const actors = {
   operatorMentor: `mentor+${TESTRUNID}@example.com`,
   specialist: (i = 0) => `specialist${i}+${TESTRUNID}@example.com`,
   big: (i = 0) => `big${i}+${TESTRUNID}@example.com`,
+  // EIS-ONLY specialist: `changeagent` role, NONE of developer/admin/ah (seed-test-project.js makeStaff
+  // eisOnly). Used by the SS-15b negative role-gate test to prove roleGuard denies a non-privileged actor.
+  eisOnly: (i = 0) => `eisonly${i}+${TESTRUNID}@example.com`,
 };
 
 export const QUEUE_NAME = process.env.QUEUE_NAME || 'TEST 30-stage L3rqCr';

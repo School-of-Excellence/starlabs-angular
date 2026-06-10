@@ -112,8 +112,14 @@ function makeStaff(testrunid) {
   ];
   const specialists = Array.from({ length: 10 }, (_, i) => mk('specialist', i, ['admin', 'changeagent']));
   const bigProviders = Array.from({ length: 4 }, (_, i) => mk('big', i, ['admin', 'eventcoordinator']));
-  const staff = [...operators, ...specialists, ...bigProviders];
-  return { operators, specialists, bigProviders, staff };
+  // EIS-ONLY specialist: holds the `changeagent` EIS role but NONE of developer/admin/ah. Used by the
+  // SS-15b negative role-gate test: authGuard ADMITS this actor (the `/arenastudioactivity` dashboard
+  // grant includes `changeagent` + every staff profileid), so the NEW roleGuard(['developer','admin','ah'])
+  // is provably the gate that denies it. The other seeded specialists carry `admin` and are (correctly)
+  // admitted to the monitor, so they cannot demonstrate the denial.
+  const eisOnly = Array.from({ length: 1 }, (_, i) => mk('eisonly', i, ['changeagent']));
+  const staff = [...operators, ...specialists, ...bigProviders, ...eisOnly];
+  return { operators, specialists, bigProviders, eisOnly, staff };
 }
 
 /** Build the full seed plan: oracle verdict + per-variation paths + participant roster. */

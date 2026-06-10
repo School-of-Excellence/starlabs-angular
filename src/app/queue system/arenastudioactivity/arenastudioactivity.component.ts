@@ -57,8 +57,14 @@ export class ArenastudioactivityComponent {
   constructor(public firestore: Firestore,private guard : AuthguardService,private dialog : MatDialog) { 
     guard.getRoles().then(async roles=>{
       this.developer = roles["developer"]
-      // roles["admin"] || roles["ah"] || roles["integrator"] ||
-      // if(this.developer){
+      // Privileged-only data gate (re-enabled — see security finding in
+      // specs/journals/2026-06-10-dynamic-studio-doc-vs-e2e-gaps.md §Direction-1 #1 and
+      // specs/validated/04-dynamic-studio.md §3a). The route is also guarded by
+      // roleGuard(['developer','admin','ah']) (app.routes.ts); this is defense in depth so the
+      // live-studio subscriptions (participant identities + Zoom host emails) never run for a
+      // non-privileged user even if they reach the component.
+      const privileged = roles["developer"] || roles["admin"] || roles["ah"] || roles["integrator"]
+      if(privileged){
         guard.getProfileMap().then(e => this.mapProfile = e.map)
         collectionData(query(collection(this.firestore,"queue generation"), orderBy('queueenddate','desc'),limit(5))).pipe(takeUntil(this.subscriptionHandle)).subscribe(snap =>{
           this.queuelist = snap;
@@ -69,9 +75,9 @@ export class ArenastudioactivityComponent {
           )
           this.zoomNotInUseEmails = snap.filter(e => e['inuse'] === false).map(e => e['email'])
           console.log(this.zoomNotInUseEmails);
-          
+
         })
-      // }
+      }
     })
   }
 

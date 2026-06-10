@@ -8,7 +8,7 @@
 //   SS-13  Move next (review path)          (cancel = no partial move; stale-studio after close)
 //   SS-14  Other Studio join               (bonus-activity buttons render; join routes; dead-click alert)
 //   SS-15  Arena Monitor                    (card count == seeded live-assignment count; close propagation; bijective map)
-//   SS-15b Arena Monitor — NEGATIVE role gate (plain eis-only specialist DENIED) — DOCUMENTED FINDING (see below)
+//   SS-15b Arena Monitor — NEGATIVE role gate (plain eis-only specialist DENIED) + POSITIVE admit (admin) — GAP CLOSED
 //   SS-16  No-studio empty state            (banner shows; no crash; empty subscriptions)
 //
 // ANTI-CIRCULARITY (the entire point of this rebuild — SHARED CONVENTIONS + assertions.ts header):
@@ -40,13 +40,13 @@
 //   Auth user. We still log in as a real seeded specialist (loginAsSpecialist) to pass authGuard,
 //   then thread the override so `studioList`/live-assignment resolve against the seeded pairing.
 //
-// DOCUMENTED FINDING — SS-15b (recon studio.md SS-15 ROLE GATE note, line 206-207 & 417; PLAN P0 #4):
-//   `/arenastudioactivity` has NO role gate beyond the generic authGuard — only the "Close Studio"
-//   button is dev-gated (arenastudioactivity.component.ts:59). A plain eis-only specialist is NOT
-//   denied the monitor; the data subscriptions run for ANY authed user. The negative test therefore
-//   CANNOT pass against current code. Per the recon ("flag this as a finding, not a passing
-//   assertion") SS-15b is marked test.fixme with the assertion the product SHOULD enforce, and a
-//   companion test documents the actual (leaky) behaviour so the gap is visible, not silently green.
+// CLOSED FINDING — SS-15b (recon studio.md SS-15 ROLE GATE note, line 206-207 & 417; PLAN P0 #4):
+//   `/arenastudioactivity` previously had NO role gate beyond the generic authGuard — only the
+//   "Close Studio" button was dev-gated — so the data subscriptions ran for ANY authed user. FIXED:
+//   the route now carries `roleGuard(['developer','admin','ah'])` (app.routes.ts) and the component
+//   re-gates its data subscriptions behind the same privileged set (arenastudioactivity.component.ts).
+//   SS-15b now runs as a real NEGATIVE test (a seeded eis-only `changeagent` actor is DENIED) plus a
+//   POSITIVE test (an admin specialist is admitted and the cards render).
 //
 // EXTERNALS: all stubbed in beforeEach via installAllExternalStubs (Zoom/OpenVidu/FCM/Wati/email) so
 // no real window opens; SS-11 installs Zoom separately in 'broken' mode for the broken-link guard.
@@ -55,7 +55,7 @@ import { test, expect } from '@playwright/test';
 import { StudioPage } from './pages/studio.page';
 import { ArenaMonitorPage } from './pages/arena-monitor.page';
 import { JoinRoomPage } from './pages/join-room.page';
-import { loginAsSpecialist } from './support/auth';
+import { loginAsSpecialist, loginAsEisOnly } from './support/auth';
 import { TESTRUNID } from './support/actors';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from './support/console-guard';
 import { installAllExternalStubs, installZoomStub, seedSyntheticZoomData, ExternalStubs } from './stubs';
@@ -735,34 +735,38 @@ test.describe('SS-09…SS-16 — Specialist / Studio session', () => {
   });
 
   // -----------------------------------------------------------------------------------------------
-  // SS-15b — NEGATIVE role gate (plain eis-only specialist DENIED the monitor) — DOCUMENTED FINDING.
+  // SS-15b — NEGATIVE role gate (plain eis-only specialist DENIED the monitor) — GAP CLOSED.
   //
-  // PLAN P0 #4 wants a plain eis-only specialist to be DENIED `/arenastudioactivity`. recon studio.md
-  // (SS-15 ROLE GATE note + cross-cutting "Known gaps to record (do not assert green)") establishes
-  // that the route has NO role gate beyond the generic authGuard — only Close-Studio is dev-gated —
-  // so the data subscriptions run for ANY authed user. The assertion the PRODUCT *should* enforce
-  // therefore CANNOT pass against current code. We split this honestly:
-  //   • a test.fixme carrying the INTENDED negative assertion (eis-only is bounced / sees a gated view)
-  //     so the unmet requirement is visible in the report, never silently green;
-  //   • a companion test that DOCUMENTS the actual leaky behaviour (a non-developer reaches the monitor
-  //     and its cards render) so a future tightening of the guard makes the fixme flip to green.
-  // No eis-ONLY actor is seeded (staff carry ['admin','changeagent']); the gap is at the route guard,
-  // not the actor — driving any non-developer is sufficient to demonstrate the missing denial.
+  // PLAN P0 #4 wants a plain eis-only specialist to be DENIED `/arenastudioactivity`. The gap is now
+  // closed: the route carries `roleGuard(['developer','admin','ah'])` (app.routes.ts) and the
+  // component re-gates its data subscriptions behind the same privileged set
+  // (arenastudioactivity.component.ts). See specs/validated/04-dynamic-studio.md §3a and the journal
+  // 2026-06-10-dynamic-studio-doc-vs-e2e-gaps.md (§Direction-1 #1).
+  //
+  // Two complementary assertions:
+  //   • NEGATIVE (the eis-only DENY this gate adds): a seeded EIS-ONLY actor (role `changeagent`, NONE
+  //     of developer/admin/ah) is ADMITTED past authGuard (its role + profileid are granted in the
+  //     dashboard route-config) but BOUNCED by roleGuard — so the NEW guard is provably what denies it.
+  //   • POSITIVE (the gate still admits privileged staff): an admin specialist reaches the monitor and
+  //     its cards render — confirming the guard tightens access without breaking the privileged path.
+  // The seeded ordinary specialists carry `admin`, so they (correctly) keep access; only the eis-only
+  // actor demonstrates the denial.
   // -----------------------------------------------------------------------------------------------
-  test.fixme('SS-15b a plain eis-only specialist is DENIED the arenastudioactivity monitor (negative role gate)', async ({ page }) => {
-    // INTENDED behaviour (currently UNIMPLEMENTED — see finding above): an eis-only specialist must be
-    // bounced from /arenastudioactivity (no `developer`/`admin`/`ah`) rather than seeing all studios.
-    await loginAsSpecialist(page, 0);
+  test('SS-15b a plain eis-only specialist is DENIED the arenastudioactivity monitor (negative role gate)', async ({ page }) => {
+    // An eis-only specialist (no developer/admin/ah) must be bounced from /arenastudioactivity rather
+    // than seeing all live studios. authGuard ADMITS this actor (changeagent + profileid are granted);
+    // roleGuard(['developer','admin','ah']) is the gate that denies it (app.routes.ts).
+    await loginAsEisOnly(page, 0);
     await page.goto('/arenastudioactivity', { waitUntil: 'domcontentloaded' });
-    // The product SHOULD redirect a non-privileged role away from the monitor route.
+    // The product redirects a non-privileged role away from the monitor route (roleGuard → /EISDashboard).
     await expect
-      .poll(() => page.url(), { timeout: 15_000, message: 'eis-only should be denied the monitor' })
+      .poll(() => page.url(), { timeout: 15_000, message: 'eis-only must be denied the monitor (roleGuard)' })
       .not.toContain('/arenastudioactivity');
   });
 
-  test('SS-15b (finding) the monitor has NO role gate today — a non-developer reaches it and cards render', async ({ page }) => {
-    // DOCUMENTS the actual behaviour: a non-developer specialist is NOT denied; the monitor mounts and
-    // its data subscriptions run. This proves the negative gate is MISSING (PLAN P0 #4 / recon SS-15).
+  test('SS-15b (positive) a privileged role (admin) is admitted and the monitor cards render', async ({ page }) => {
+    // The role gate must still ADMIT privileged staff. A seeded specialist carries `admin` (one of the
+    // allowed roles), so the monitor mounts and its data subscriptions run — the cards render.
     // Ensure there ARE live cohort studios to expose for the seeded queue. The monitor renders one card
     // per `live assignment` with status∈['live','recording'] AND queueid==<selected queue docid>
     // (arenastudioactivity onQueueSelect, aa.ts:91-99). Earlier cases in this serial file COMPLETE and
@@ -770,7 +774,7 @@ test.describe('SS-09…SS-16 — Specialist / Studio session', () => {
     // studioid to `_detached`), so we fully RESTORE all three here: status 'live' AND an explicit
     // queueid==QUEUE_GEN_DOCID (the field the monitor filters on — restore it in case a prior case left it
     // stale) AND a non-detached studioid, so exactly the seeded cohort surfaces. Precondition setup; the
-    // spec asserts the APP-rendered card count (the no-role-gate finding), never these values.
+    // spec asserts the APP-rendered card count, never these values.
     // FIRST purge orphaned/untagged `live assignment` rows for this queue (CF-created by studio-core SS-05/06,
     // teardown can't reap them) so the cohort count is clean and the card assertion is not skewed by pollution.
     await purgeOrphanLiveAssignmentsForQueue();
@@ -799,42 +803,32 @@ test.describe('SS-09…SS-16 — Specialist / Studio session', () => {
     // Select the EXACT seeded queue by docid (the visible name collides across runs on the shared emulator).
     await monitor.open({ login: true, specialistIndex: 0, queueId: QUEUE_GEN_DOCID });
 
-    // PRIMARY no-gate PROOF (anti-circular, environment-robust): a non-developer was NOT bounced from the
-    // monitor route — the URL still resolves /arenastudioactivity. authGuard admits any authed user because
-    // the route has no role gate beyond it (only Close-Studio is dev-gated). This is the assertion the
-    // PLAN P0 #4 finding rests on; it needs no card render and is immune to the shared-emulator queue picker.
-    expect(page.url(), 'today the monitor admits any authed user (no role gate) — documented finding').toContain(
+    // PRIMARY positive PROOF (environment-robust): the admin specialist was ADMITTED — the URL still
+    // resolves /arenastudioactivity (authGuard AND roleGuard both passed an `admin`). This is immune to
+    // the shared-emulator queue picker (needs no card render).
+    expect(page.url(), 'the role gate must admit a privileged (admin) role to the monitor').toContain(
       '/arenastudioactivity',
     );
-    // CORROBORATING (data-exposure): the live cards render for that non-privileged user. The monitor lists
-    // only the top-5 queues by enddate (aa.ts:63); on the SHARED emulator many foreign runs' queues exist,
-    // so the seeded run's queue can fall OUT of the top-5 and `selectQueueById` selects nothing → 0 cards —
-    // a shared-emulator artifact, NOT a role gate appearing. So we assert the cards-visible corroboration
-    // only WHEN the queue was actually selectable (>=1 card rendered); otherwise we record the top-5
-    // limitation as a finding. Either way the no-gate PROOF above already stands (the route admitted us).
+    // CORROBORATING (data render for a privileged user): the live cards render. The monitor lists only the
+    // top-5 queues by enddate (aa.ts:63); on the SHARED emulator many foreign runs' queues exist, so the
+    // seeded run's queue can fall OUT of the top-5 and `selectQueueById` selects nothing → 0 cards — a
+    // shared-emulator artifact, NOT a gate denial. So assert the cards only WHEN the queue was selectable
+    // (>=1 card); otherwise record the top-5 limitation. Either way the admitted PROOF above already stands.
     const monitorCards = await monitor.cardCount();
     if (monitorCards >= 1) {
       expect(
         monitorCards,
-        'a non-developer can see the live studios (no role gate) — FINDING: tighten the guard (PLAN P0 #4)',
+        'a privileged (admin) user sees the live studios — the gate admits privileged staff',
       ).toBeGreaterThanOrEqual(3);
     } else {
       test.info().annotations.push({
         type: 'finding',
         description:
-          'SS-15b corroboration skipped: the seeded queue was not in the monitor top-5 (aa.ts:63 orderBy ' +
-          'queueenddate limit 5) on the shared emulator, so no cards rendered to count — a harness artifact, ' +
-          'not a role gate. The no-gate PROOF (non-developer NOT bounced from /arenastudioactivity) holds above.',
+          'SS-15b positive corroboration skipped: the seeded queue was not in the monitor top-5 (aa.ts:63 ' +
+          'orderBy queueenddate limit 5) on the shared emulator, so no cards rendered to count — a harness ' +
+          'artifact. The admitted PROOF (admin reaches /arenastudioactivity) holds above.',
       });
     }
-
-    test.info().annotations.push({
-      type: 'finding',
-      description:
-        '/arenastudioactivity has no role gate beyond authGuard (arenastudioactivity.component.ts:59 only ' +
-        'toggles the developer button). A plain eis-only specialist is NOT denied — the SS-15b negative ' +
-        'assertion lives in the companion test.fixme. Close the gap by adding a developer/admin/ah route guard.',
-    });
   });
 
   // -----------------------------------------------------------------------------------------------
