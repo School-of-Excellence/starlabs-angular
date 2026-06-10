@@ -78,7 +78,7 @@ type TimelineItem =
       <!-- Header -->
       <header class="so-header">
         <div class="so-id">
-          <h2 class="so-name">{{ row.name }}</h2>
+          <h2 class="so-name" id="so-title">{{ row.name }}</h2>
           <div class="so-meta">
             <span class="so-num">{{ row.number || '—' }}</span>
             <span class="so-dot">·</span>
@@ -161,7 +161,7 @@ type TimelineItem =
         </section>
 
         <!-- Tickets -->
-        <section class="so-sec">
+        <section class="so-sec" aria-live="polite">
           <h3 class="so-sec-h">Tickets <span class="so-count">{{ row.openTickets }}</span></h3>
           <div *ngIf="ticketsLoading" class="so-skel-group">
             <div class="so-skel"></div><div class="so-skel"></div>
@@ -181,7 +181,7 @@ type TimelineItem =
         </section>
 
         <!-- Activity timeline -->
-        <section class="so-sec">
+        <section class="so-sec" aria-live="polite">
           <h3 class="so-sec-h">Activity timeline</h3>
           <div *ngIf="timelineLoading" class="so-skel-group">
             <div class="so-skel"></div><div class="so-skel"></div><div class="so-skel"></div>
@@ -215,7 +215,7 @@ type TimelineItem =
       <!-- Footer actions -->
       <footer class="so-footer">
         <a mat-stroked-button class="so-act" [routerLink]="['/userprofile', row.profileid]" (click)="close()">
-          Open full profile
+          Open profile
         </a>
         <button mat-stroked-button class="so-act" type="button" (click)="logCall()">Log call</button>
         <button mat-flat-button color="primary" class="so-act" type="button" (click)="setHealth()">Set health</button>
@@ -321,6 +321,9 @@ type TimelineItem =
     .so-skel:nth-child(2) { width: 70%; }
     .so-skel:nth-child(3) { width: 85%; }
     @keyframes so-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .so-skel { animation: none; }
+    }
 
     .so-footer {
       flex: 0 0 auto; display: flex; gap: 8px; padding: 12px 20px;

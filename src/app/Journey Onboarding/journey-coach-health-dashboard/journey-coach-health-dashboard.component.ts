@@ -166,6 +166,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   rangeTo: Date = new Date();
   scoreboard: ScoreboardRow[] = [];
   scoreboardComputed = false;
+  // True when the scoreboard's touchpoint / appointment reads were permission-denied. The reads
+  // still return empty, so without this flag everyone would render at 0% coverage/quality as if
+  // real. Drives an honest "data unavailable (permissions)" notice above the scoreboard.
+  scoreboardDataBlocked = false;
   // all touchpoints kept raw so the scoreboard can re-filter by range without re-reading Firestore
   private allTouchpoints: { profileid: string; coachid: string; date: Date | null; outcome: string | null; contacted: boolean }[] = [];
 
@@ -182,6 +186,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   coaches: { id: string; name: string }[] = [];
   selectedCoachId = '';
+
+  // True when we could not match the logged-in coach to a base and fell back to ALL at init.
+  // Drives a slim, dismissible info banner so the coach knows why they're seeing everyone.
+  coachFallback = false;
+  coachFallbackDismissed = false;
 
   scannedCount = 0;
   matchedCount = 0;
@@ -279,6 +288,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   // Read-only keyboard navigation for the base table (power-user triage). -1 = no focused row.
   focusedRowIndex = -1;
+
+  /** Name of the keyboard-focused row, bound to a visually-hidden aria-live region so screen
+   *  readers announce the participant as j/k moves the focus. Empty when no row is focused. */
+  get focusedRowName(): string {
+    const rows = this.dataSource.data;
+    return this.focusedRowIndex >= 0 && this.focusedRowIndex < rows.length
+      ? (rows[this.focusedRowIndex]?.name ?? '')
+      : '';
+  }
 
   constructor(
     private firestore: Firestore,
@@ -381,8 +399,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     await this.loadCoaches();
 
-    this.selectedCoachId =
-      (this.coachId && this.coaches.some(c => c.id === this.coachId)) ? this.coachId : this.ALL;
+    const matchedCoach = !!(this.coachId && this.coaches.some(c => c.id === this.coachId));
+    this.selectedCoachId = matchedCoach ? this.coachId! : this.ALL;
+    // Fell back to ALL because we couldn't match the logged-in coach to a base.
+    this.coachFallback = !matchedCoach;
     this.pagedMode = this.isPagedView(this.selectedCoachId);
     this.applyPaginatorBinding();
 
@@ -732,6 +752,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.coaches = list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
 
+  /** Firestore permission-denied detector (code `permission-denied` or a /permission/i message). */
+  private isPermissionDenied(e: any): boolean {
+    const code = (e?.code ?? '').toString();
+    return code.includes('permission-denied') || /permission/i.test(e?.message ?? '');
+  }
+
   private async loadTouchpoints(): Promise<void> {
     const map: Record<string, number> = {};
     const raw: typeof this.allTouchpoints = [];
@@ -752,6 +778,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         });
       });
     } catch (e) {
+      if (this.isPermissionDenied(e)) this.scoreboardDataBlocked = true;
       console.warn('touchpoint load failed (non-fatal)', e);
     }
     this.touchpointByProfile = map;
@@ -775,6 +802,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         if (pid && dt) map[pid] = Math.max(map[pid] ?? 0, dt.getTime());
       });
     } catch (e) {
+      if (this.isPermissionDenied(e)) this.scoreboardDataBlocked = true;
       console.warn('contact events load failed (non-fatal)', e);
     }
     this.contactEventByProfile = map;
@@ -1038,7 +1066,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       height: '100vh',
       width: 'min(520px, 100vw)',
       panelClass: 'jchd-slideover-panel',
-      autoFocus: false,
+      // a11y: label the dialog by the participant-name heading and move focus into the panel
+      // (the close button) on open, instead of leaving focus on the trigger outside the overlay.
+      ariaLabelledBy: 'so-title',
+      autoFocus: '.so-close',
     });
   }
 

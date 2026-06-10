@@ -53,6 +53,16 @@
     <ng-container *ngIf="view === 'base'">
     <div class="jchd-anim">
 
+    <!-- Fallback notice: logged-in coach couldn't be matched, so we're showing everyone. -->
+    <div class="jchd-fallback-banner" *ngIf="coachFallback && selectedCoachId === ALL && !coachFallbackDismissed">
+      <mat-icon>info</mat-icon>
+      <span>Showing all participants — we couldn't match your coach profile. Pick your name above to see just your base.</span>
+      <button mat-icon-button class="jchd-fallback-dismiss" matTooltip="Dismiss"
+        aria-label="Dismiss notice" (click)="coachFallbackDismissed = true">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
     <!-- Phase B: assignment bar (Unassigned view only) -->
     <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED">
       <mat-icon>person_add</mat-icon>
@@ -150,7 +160,8 @@
     <!-- Intelligent filter panel (collapsible). Product type defaults to Ecosystem. -->
     <section class="jchd-filter-panel" *ngIf="selectedCoachId !== UNASSIGNED && filtersExpanded">
       <div class="fp-grid">
-        <mat-form-field appearance="outline" class="fp-field">
+        <mat-form-field appearance="outline" class="fp-field"
+          matTooltip="Ecosystem = B!G/LYL/uP!/CPM journeys · DFU = Done-For-You · Gifts = FTO">
           <mat-label>Product type</mat-label>
           <mat-select [(ngModel)]="productTypeFilters" (ngModelChange)="applyFilters()" multiple>
             <mat-option value="ecosystem">Ecosystem</mat-option>
@@ -237,6 +248,11 @@
       <mat-spinner diameter="24"></mat-spinner><span>Loading page…</span>
     </div>
 
+    <div class="jchd-keys-hint" aria-hidden="true">Keys: / search · j/k move · o open · Esc clear</div>
+
+    <!-- Visually-hidden live region: announces the keyboard-focused participant to screen readers. -->
+    <div class="sr-only" aria-live="polite">{{ focusedRowName }}</div>
+
     <div class="jchd-table-wrap">
       <table mat-table [dataSource]="dataSource" matSort matSortActive="priority" matSortDirection="desc" class="jchd-table">
 
@@ -250,7 +266,8 @@
         </ng-container>
 
         <ng-container matColumnDef="health">
-          <th mat-header-cell *matHeaderCellDef>Health (coach)</th>
+          <th mat-header-cell *matHeaderCellDef
+              matTooltip="Coach-set sentiment: Sad → Neutral → Happy → Evangelist (actively refers others)">Health (coach)</th>
           <td mat-cell *matCellDef="let r">
             <span *ngIf="r.coachHealthState; else noHealth"
                   class="state health-clickable" [ngClass]="stateClass(r.coachHealthState.state)"
@@ -259,7 +276,7 @@
               {{ healthLabel(r.coachHealthState.state) }}
             </span>
             <ng-template #noHealth>
-              <span class="health-set-link" (click)="setHealthState(r)" matTooltip="Set health state">—</span>
+              <span class="health-set-link" (click)="setHealthState(r)" matTooltip="Set health">—</span>
             </ng-template>
           </td>
         </ng-container>
@@ -370,7 +387,7 @@
                 <mat-icon>add_task</mat-icon><span>Log call</span>
               </button>
               <button mat-menu-item (click)="setHealthState(r)">
-                <mat-icon>favorite</mat-icon><span>Set health state</span>
+                <mat-icon>favorite</mat-icon><span>Set health</span>
               </button>
               <button mat-menu-item [matMenuTriggerFor]="assignMenu">
                 <mat-icon>person_add</mat-icon><span>Assign coach</span>
@@ -391,7 +408,8 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns; let i = index"
             class="jchd-data-row" [ngClass]="bandClass(row.priorityBand)"
-            [class.jchd-row-focused]="i === focusedRowIndex"></tr>
+            [class.jchd-row-focused]="i === focusedRowIndex"
+            [attr.aria-current]="i === focusedRowIndex ? 'true' : null"></tr>
       </table>
 
       <div class="jchd-empty" *ngIf="dataSource.data.length === 0 && !pageLoading">
@@ -445,6 +463,11 @@
         <mat-icon>emoji_events</mat-icon>
         <span>This scoreboard rewards <strong>keeping the pipeline active</strong> (engagement &amp; coverage).
           Outcome metrics (renewals / referrals / wins) join the score later once instrumentation lands.</span>
+      </div>
+
+      <div class="jchd-scoreboard-blocked" *ngIf="scoreboardDataBlocked">
+        <mat-icon>report_problem</mat-icon>
+        <span>Touchpoint/appointment data unavailable (permissions) — coverage &amp; quality may be understated.</span>
       </div>
 
       <div class="jchd-table-wrap">
@@ -553,7 +576,7 @@
           </div>
 
           <div class="wl-actions">
-            <button mat-stroked-button class="wl-act" (click)="openSlideover(r)">Open</button>
+            <button mat-stroked-button class="wl-act" (click)="openSlideover(r)" matTooltip="Open participant panel">Details</button>
             <button mat-stroked-button class="wl-act" (click)="logCall(r)">Log call</button>
             <button mat-stroked-button class="wl-act" (click)="setHealthState(r)">Set health</button>
           </div>
