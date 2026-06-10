@@ -235,13 +235,14 @@ type TimelineItem =
   `,
   styles: [`
     :host {
-      --so-bg: #ffffff; --so-ink: #0f172a; --so-ink2: #475569; --so-muted: #64748b;
-      --so-border: #e7ecf3; --so-border-soft: #eef2f8; --so-accent: #2f66d6; --so-accent-soft: #eef4fd;
-      --so-mono: 'Geist Mono', ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+      --so-bg: #ffffff; --so-ink: #1c1c1e; --so-ink2: rgba(60,60,67,.6); --so-muted: rgba(60,60,67,.45);
+      --so-border: rgba(60,60,67,.12); --so-border-soft: rgba(60,60,67,.08);
+      --so-accent: #007aff; --so-accent-soft: rgba(0,122,255,.08);
+      --so-mono: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
       --so-tnum: 'tnum';
       display: block; height: 100%;
-      /* scoped premium UI font — applies to the slide-over panel only */
-      font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      /* scoped iOS / SF Pro font — applies to the slide-over panel only */
+      font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     .so-root {
@@ -257,14 +258,14 @@ type TimelineItem =
       display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
       padding: 18px 20px 12px; border-bottom: 1px solid var(--so-border);
     }
-    .so-name { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.2; letter-spacing: -0.018em; }
+    .so-name { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; }
     .so-meta { margin-top: 3px; color: var(--so-ink2); font-size: 12.5px; }
     .so-dot { margin: 0 6px; color: var(--so-muted); }
     .so-tier { text-transform: uppercase; letter-spacing: 0.02em; font-size: 11.5px; color: var(--so-ink2); }
 
     .so-close {
       flex: 0 0 auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
-      border: 1px solid var(--so-border); border-radius: 8px; background: #fff; color: var(--so-ink2);
+      border: none; border-radius: 999px; background: rgba(118,118,128,.12); color: var(--so-ink2);
       cursor: pointer; transition: background-color .12s ease, color .12s ease, transform .06s ease;
     }
     .so-close:hover { background: var(--so-border-soft); color: var(--so-ink); }
@@ -274,12 +275,12 @@ type TimelineItem =
     .so-head-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
     .so-flag {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
-      border: 1px solid var(--so-border); border-radius: 8px; background: #fff; color: var(--so-muted);
+      border: none; border-radius: 999px; background: rgba(118,118,128,.12); color: var(--so-muted);
       cursor: pointer; transition: background-color .12s ease, color .12s ease, border-color .12s ease, transform .06s ease;
     }
-    .so-flag:hover { background: var(--so-border-soft); color: var(--so-ink2); }
+    .so-flag:hover { background: rgba(118,118,128,.2); color: var(--so-ink2); }
     .so-flag:active { transform: scale(0.94); }
-    .so-flag.is-flagged { color: #b06410; border-color: #f4dca0; background: #fdf6ea; }
+    .so-flag.is-flagged { color: #c25e00; background: rgba(255,149,0,.16); }
     .so-flag.is-flagged mat-icon { animation: so-star-pop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
     .so-flag mat-icon { font-size: 18px; width: 18px; height: 18px; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
     @keyframes so-star-pop {
@@ -293,16 +294,16 @@ type TimelineItem =
       display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px;
       font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
     }
-    .so-pill.band-high { color: #c0334d; background: #fdf2f4; border: 1px solid #f3cdd5; }
-    .so-pill.band-med  { color: #b06410; background: #fdf6ea; border: 1px solid #f4dca0; }
-    .so-pill.band-low  { color: #475569; background: #f1f4f8; border: 1px solid #e2e8f0; }
-    .so-pill-health { color: #6741c4; background: #f3f0fb; border: 1px solid #dad0f4; }
+    .so-pill.band-high { color: #d70015; background: rgba(255,59,48,.12); border: none; }
+    .so-pill.band-med  { color: #c25e00; background: rgba(255,149,0,.14); border: none; }
+    .so-pill.band-low  { color: rgba(60,60,67,.6); background: rgba(120,120,128,.12); border: none; }
+    .so-pill-health { color: #4a48b8; background: rgba(88,86,214,.12); border: none; }
     .so-chip {
-      display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 6px;
+      display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px;
       font-size: 11.5px; font-weight: 600; text-transform: capitalize;
-      color: var(--so-ink2); background: var(--so-border-soft); border: 1px solid var(--so-border);
+      color: var(--so-ink2); background: rgba(120,120,128,.12); border: none;
     }
-    .so-chip-quiet { color: #b06410; background: #fdf6ea; border-color: #f4dca0; }
+    .so-chip-quiet { color: #c25e00; background: rgba(255,149,0,.14); }
 
     .so-reason { margin: 10px 20px 0; font-size: 12.5px; color: var(--so-ink2); }
 
@@ -344,13 +345,13 @@ type TimelineItem =
     .so-list-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
     .so-list-main { font-size: 12.5px; color: var(--so-ink); }
     .so-list-side { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
-    .so-status { font-size: 11.5px; font-weight: 600; color: #b06410; text-transform: capitalize; }
+    .so-status { font-size: 11.5px; font-weight: 600; color: #c25e00; text-transform: capitalize; }
 
     .so-tl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
     .so-tl-row { display: grid; grid-template-columns: 12px 1fr; gap: 10px; }
     .so-tl-dot { width: 8px; height: 8px; border-radius: 999px; margin-top: 5px; }
     .so-tl-dot.is-touch { background: var(--so-accent); }
-    .so-tl-dot.is-event { background: #6741c4; }
+    .so-tl-dot.is-event { background: #5856d6; }
     .so-tl-body { min-width: 0; }
     .so-tl-top { display: flex; align-items: baseline; gap: 8px; }
     .so-tl-date { font-size: 12px; font-weight: 600; color: var(--so-ink); }
