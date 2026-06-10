@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, HostListener } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -267,6 +267,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild('searchInput') searchInput?: ElementRef<HTMLInputElement>;
+
+  // Read-only keyboard navigation for the base table (power-user triage). -1 = no focused row.
+  focusedRowIndex = -1;
 
   constructor(
     private firestore: Firestore,
@@ -502,6 +506,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** mat-paginator (page) handler — only active in paged mode (full mode lets the dataSource slice). */
   onPageEvent(event: PageEvent): void {
+    // page changed — clear the keyboard highlight so it never points at a stale row
+    this.focusedRowIndex = -1;
     if (this.pagedMode) void this.onPjpPageChange(event);
   }
 
@@ -1022,6 +1028,61 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     });
   }
 
+  /** Read-only keyboard navigation for the base table — lets power users triage without a mouse.
+   *  Strict no-op while typing in a field, when any dialog/overlay is open, when not on the base
+   *  view, or with a modifier key held — so the slide-over and dialogs are never disrupted. */
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(e: KeyboardEvent): void {
+    if (this.view !== 'base') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    const target = (e.target as HTMLElement) ?? (document.activeElement as HTMLElement | null);
+    if (target) {
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+    }
+    // a slide-over / MatDialog is open — leave its own focus handling alone
+    if (document.querySelector('.cdk-overlay-container .mat-mdc-dialog-container')) return;
+
+    const lastIndex = this.dataSource.data.length - 1;
+
+    switch (e.key) {
+      case '/':
+        e.preventDefault();
+        this.searchInput?.nativeElement.focus();
+        break;
+      case 'j':
+      case 'ArrowDown':
+        e.preventDefault();
+        this.focusedRowIndex = Math.min(this.focusedRowIndex + 1, lastIndex);
+        this.scrollFocusedIntoView();
+        break;
+      case 'k':
+      case 'ArrowUp':
+        e.preventDefault();
+        this.focusedRowIndex = this.focusedRowIndex <= 0 ? 0 : this.focusedRowIndex - 1;
+        this.scrollFocusedIntoView();
+        break;
+      case 'o':
+      case 'Enter':
+        if (this.focusedRowIndex >= 0 && this.focusedRowIndex <= lastIndex) {
+          this.openSlideover(this.dataSource.data[this.focusedRowIndex]);
+        }
+        break;
+      case 'Escape':
+        this.focusedRowIndex = -1;
+        break;
+    }
+  }
+
+  /** Scroll the keyboard-focused base-table row into view after the class binding has applied. */
+  private scrollFocusedIntoView(): void {
+    setTimeout(() => {
+      const el = document.querySelector('tr.jchd-row-focused');
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }, 0);
+  }
+
   /** Open the Log-call dialog; on save, write the enriched touchpoint and close the loop. */
   logCall(row: PortfolioRow): void {
     const ref = this.dialog.open(LogCallDialogComponent, { data: { name: row.name }, autoFocus: false });
@@ -1456,6 +1517,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // cover EVERYONE (not just the loaded page). In full mode allRows is already the full base.
     if (this.pagedMode) this.recomputeFullBaseMatch();
     this.dataSource.data = this.allRows.filter(r => this.rowMatches(r));
+    // the visible rows just changed — drop the keyboard highlight so it never points at a stale row
+    this.focusedRowIndex = -1;
   }
 
   /** Full per-row predicate: levers + journey/status + search + the intelligent filter panel.
