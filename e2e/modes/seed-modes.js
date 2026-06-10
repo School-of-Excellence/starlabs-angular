@@ -42,6 +42,24 @@ const ID = {
   // evolution wishlist log docs
   EWL_INIT: `${TESTRUNID}_ewl_initiated`,   // status:initiated  → PM-07 cancels it
   EWL_CANCEL: `${TESTRUNID}_ewl_cancelled`, // status:cancelled  → PM-06 re-initiates from it
+  EWL_FORM: `${TESTRUNID}_ewl_form`,        // status:sended, 1 gmail contact submitted:false → PM-08 form submit
+  EWL_CFDONE: `${TESTRUNID}_ewl_cfdone`,    // status:sended, 1 contact already received → PM-09 CF auto-complete
+  // public wishlist form questions (one enabled textarea question + the knowmorelinks doc)
+  EWQ_Q1: `${TESTRUNID}_ewq_q1`,
+  EWQ_KNOWMORE: 'knowmorelinks',            // fixed doc id the form reads (NOT run-namespaced; tagged)
+  // ask AH submissions → PM-13 (render) + PM-14 (flag toggle)
+  ASKAH_FLAG: `${TESTRUNID}_askah_flag`,    // tagged:false → PM-14 flags it
+  ASKAH_RENDER: `${TESTRUNID}_askah_render`,// 2nd row so PM-13 sees >=2 rows for the subject
+  // interim report log docs → PM-15 (status counts oracle)
+  IRL_COMPLETED: `${TESTRUNID}_irl_completed`, // status:'completed'        → counts as completed
+  IRL_ONGOING: `${TESTRUNID}_irl_ongoing`,     // no status + reports[]!=[] → counts as ongoing
+  // recommended playlist → PM-16 (disable cascade)
+  BUF1: `${TESTRUNID}_buffermix1`,             // buffermix archive group (delete:false)
+  RMP1: `${TESTRUNID}_rmp1`,                   // linked recommended mix playlist doc 1 (delete:false)
+  RMP2: `${TESTRUNID}_rmp2`,                   // linked recommended mix playlist doc 2 (delete:false)
+  // app action pending → PM-17 (non-empty-action filter); docids MUST equal profileids
+  AAP_NONEMPTY: `${TESTRUNID}_pf_p0`,          // appactionpending/<p0 profileid> with formspending[] → renders
+  AAP_EMPTY: `${TESTRUNID}_pf_p1`,             // appactionpending/<p1 profileid> all-empty → filtered out
   // test clock
   ATESTDATE: 'date',
 };
@@ -202,9 +220,97 @@ async function seedModes() {
   //    doc path); tagged + idempotent.
   await db.collection('Atestdate').doc(ID.ATESTDATE).set({ date: T.now(), ...tag }, { merge: true });
 
+  // 10) PUBLIC EVOLUTION WISHLIST FORM (PM-08/09/19) — the form reads evolutionwishlistquestions
+  //     (enabled==true) + the fixed 'knowmorelinks' doc, and an evolutionwishlistlog doc by ?data.docid.
+  //     One enabled textarea question keeps the form valid after a single fill (controlName == doc id).
+  await db.collection('evolutionwishlistquestions').doc(ID.EWQ_Q1).set({
+    docid: ID.EWQ_Q1, enabled: true, sno: 1, type: 'textarea',
+    question: 'What do you wish for {{participantname}}?', ...tag,
+  });
+  // knowmorelinks: empty links so the form's "Know More" block stays hidden (no external favicon fetch).
+  await db.collection('evolutionwishlistquestions').doc(ID.EWQ_KNOWMORE).set({ links: [], ...tag }, { merge: true });
+  //   EWL_FORM — status:'sended' with ONE gmail contact (submitted:false). PM-08 opens the public form
+  //   via /evolutionwishlist?data=<{docid,contact,profilename}> and submits → the APP writes that
+  //   contact submitted:true + wishlistquestionmap. gmail type avoids any Wati path; we never set 'sent'
+  //   (the CF's external-send branch), so no real email is attempted. profilename is read by the form.
+  await db.collection('evolutionwishlistlog').doc(ID.EWL_FORM).set({
+    docid: ID.EWL_FORM, profileid: PF.p0, type: 'familyandpeers', status: 'sended',
+    contacts: [{ name: 'Form Tester', type: 'gmail', contact: 'formtester@example.com', submitted: false, status: 'sended' }],
+    created: T.now(), ...tag,
+  });
+  //   EWL_CFDONE — status:'sended' with ONE contact ALREADY status:'received'. PM-09 writes a trivial
+  //   re-trigger update; IF evolutionFamilyWishlistOnWrite (wishlist.js:91) is deployed it flips status
+  //   → 'completed' (all-contacts-received branch). PM-09 runtime-probes the CF and skip-guards if absent
+  //   (this CF is NOT in the deployed set — calculateParticipantMode + *_to_pmd + queue CFs only).
+  await db.collection('evolutionwishlistlog').doc(ID.EWL_CFDONE).set({
+    docid: ID.EWL_CFDONE, profileid: PF.p1, type: 'familyandpeers', status: 'sended',
+    contacts: [{ name: 'CF Tester', type: 'gmail', contact: 'cftester@example.com', submitted: true, status: 'received' }],
+    created: T.now(), ...tag,
+  });
+
+  // 11) ASK A&H submissions (PM-13/14). The interim-report-log "Ask A&H" tab streams `ask AH`
+  //     orderBy('created','desc'). Two docs for participant0: ASKAH_FLAG (tagged:false → PM-14 flags it)
+  //     and ASKAH_RENDER (so PM-13 sees ≥2 rows for the subject). profileid joins profile_data.name.
+  await db.collection('ask AH').doc(ID.ASKAH_FLAG).set({
+    docid: ID.ASKAH_FLAG, profileid: PF.p0, askah: `ASKAH flag subject ${TESTRUNID}`,
+    created: T.now(), liked: false, tagged: false, opportunity: false, critical: false, resolved: false, ...tag,
+  });
+  await db.collection('ask AH').doc(ID.ASKAH_RENDER).set({
+    docid: ID.ASKAH_RENDER, profileid: PF.p0, askah: `ASKAH render subject ${TESTRUNID}`,
+    created: T.fromMillis(Date.now() - 60e3), liked: false, tagged: false, opportunity: false, critical: false, resolved: false, ...tag,
+  });
+
+  // 12) INTERIM REPORT LOG (PM-15 status-count oracle). The "Interim Report Log" tab queries
+  //     `interimreport log` by createdon within [month-start … month-end] (default range), then
+  //     computes: completed = status=='completed'; ongoing = status∈{null,'',undefined} && reports.length>0.
+  //     Seed both within THIS month so the default date filter includes them. createdon = now.
+  await db.collection('interimreport log').doc(ID.IRL_COMPLETED).set({
+    docid: ID.IRL_COMPLETED, profileid: PF.p0, status: 'completed', reports: ['askah'],
+    lastupdate: T.now(), createdon: T.now(), ...tag,
+  });
+  await db.collection('interimreport log').doc(ID.IRL_ONGOING).set({
+    docid: ID.IRL_ONGOING, profileid: PF.p1, status: null, reports: ['askah', 'loveletter'],
+    lastupdate: T.now(), createdon: T.now(), ...tag,
+  });
+
+  // 13) RECOMMENDED PLAYLIST (PM-16 disable cascade). buffermix archive group (date within the screen's
+  //     default 3-month window) with delete:false, plus 2 recommended mix playlist docs whose
+  //     bufferdocref → this group. The Group-tab slide toggle calls onToggleGroupDelete → updateDoc the
+  //     buffermix doc delete:true AND batch-updates the linked playlist docs delete:true. NB: the group
+  //     row's `docid` is read from the doc DATA (groupSnap.docs.map(d=>d.data())), so docid MUST be set.
+  const bufRef = db.collection('buffermix archive').doc(ID.BUF1);
+  await bufRef.set({
+    docid: ID.BUF1, title: `TEST Mode Playlist Group ${TESTRUNID}`, type: 'eiflix', personalised: false,
+    delete: false, date: T.now(), eiflix: [], generalcontent: [], solarvoice: [], profileid: [PF.p0, PF.p1], ...tag,
+  });
+  await db.collection('recommended mix playlist').doc(ID.RMP1).set({
+    docid: ID.RMP1, profileid: PF.p0, type: 'eiflix', bufferdocref: bufRef, delete: false,
+    date: T.now(), completedplaylist: [], completedcontent: [], ...tag,
+  });
+  await db.collection('recommended mix playlist').doc(ID.RMP2).set({
+    docid: ID.RMP2, profileid: PF.p1, type: 'eiflix', bufferdocref: bufRef, delete: false,
+    date: T.now(), completedplaylist: [], completedcontent: [], ...tag,
+  });
+
+  // 14) APP ACTION PENDING (PM-17 non-empty-action filter). The component keys each row by the doc id
+  //     (== profileid) and ONLY renders docs with a non-empty formspending/videoaskpending/quiz/
+  //     mandatoryaction. AAP_NONEMPTY has formspending[] (renders); AAP_EMPTY has all-empty (filtered).
+  //     formspending entries need a `.id` (mapped via mapForm; length is what gates the row).
+  await db.collection('appactionpending').doc(ID.AAP_NONEMPTY).set({
+    formspending: [{ id: `${TESTRUNID}_form_x` }], videoaskpending: [], quiz: [], mandatoryaction: [],
+    lastupdate: T.now(), ...tag,
+  });
+  await db.collection('appactionpending').doc(ID.AAP_EMPTY).set({
+    formspending: [], videoaskpending: [], quiz: [], mandatoryaction: [], lastupdate: T.now(), ...tag,
+  });
+
   return {
     TESTRUNID, ID, PF, EMAIL,
-    counts: { products: 2, productModeConfig: 2, modes: 2, participantsproduct: 1, evolutionwishlistlog: 2 },
+    counts: {
+      products: 2, productModeConfig: 2, modes: 3, participantsproduct: 1, evolutionwishlistlog: 4,
+      evolutionwishlistquestions: 2, askAH: 2, interimreportlog: 2, buffermixArchive: 1,
+      recommendedMixPlaylist: 2, appactionpending: 2,
+    },
   };
 }
 
@@ -214,6 +320,9 @@ async function seedModes() {
 const SEEDED = [
   'products', 'product mode config', 'modes', 'participantsproduct', 'participant metadata',
   'evolutionwishlistlog', 'Atestdate',
+  // App-Engagement screen preconditions (PM-08/09/13/14/15/16/17). All testrunid-tagged.
+  'evolutionwishlistquestions', 'ask AH', 'interimreport log',
+  'buffermix archive', 'recommended mix playlist', 'appactionpending',
   // CF-written collections (PM-10/11): clean up so re-runs start from zero checklist/evolution-log rows.
   'participant mode checklist', 'evolution log',
   // auth-chain + dashboard (shared shape; testrunid-scoped so queue 'run1' is untouched)

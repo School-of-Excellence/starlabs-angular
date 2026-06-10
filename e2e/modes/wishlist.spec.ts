@@ -47,10 +47,15 @@ test.describe('Modes — Evolution Wishlist Log (real action → Firestore write
     // [REAL-UI] locate participant0's row (Profile Name cell == the participant email), click its
     // Cancel button, accept the confirm() dialog. The Cancel fab carries aria-label="delete icon"
     // (its mat-icon ligature is "cancel"; the accessible name is the aria-label — verified live).
-    const row = page.locator('tr.mat-mdc-row, tr[mat-row]').filter({ hasText: modeActors.participant0 });
-    await expect(row, 'PM-07: participant0 wishlist row must render').toBeVisible({ timeout: 30_000 });
+    // Scope to the INITIATED p0 row by requiring the Cancel ("delete icon") button — the new
+    // wishlist-FORM seed docs (PM-08/09) add other p0 rows (status 'sended') that would make a plain
+    // participant0 filter ambiguous; only an initiated row carries the cancel affordance.
+    const row = page.locator('tr.mat-mdc-row, tr[mat-row]')
+      .filter({ hasText: modeActors.participant0 })
+      .filter({ has: page.getByRole('button', { name: /delete icon/i }) });
+    await expect(row.first(), 'PM-07: participant0 initiated wishlist row must render').toBeVisible({ timeout: 30_000 });
     page.once('dialog', (d) => d.accept()); // cancelInitiated opens window.confirm
-    await row.getByRole('button', { name: /delete icon/i }).click();
+    await row.first().getByRole('button', { name: /delete icon/i }).click();
 
     // [ASSERT] the app's updateDoc wrote status:'cancelled' + closedbeforeshare:true. Polled — the value
     // the PRODUCT wrote (test seeded 'initiated').

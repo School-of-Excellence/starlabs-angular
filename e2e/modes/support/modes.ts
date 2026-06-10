@@ -38,6 +38,28 @@ export const modeIds = {
   PP1: `${RUN}_PP1`,
   EWL_INIT: `${RUN}_ewl_initiated`,
   EWL_CANCEL: `${RUN}_ewl_cancelled`,
+  // App-Engagement deep cases
+  EWL_FORM: `${RUN}_ewl_form`,
+  EWL_CFDONE: `${RUN}_ewl_cfdone`,
+  EWQ_Q1: `${RUN}_ewq_q1`,
+  ASKAH_FLAG: `${RUN}_askah_flag`,
+  ASKAH_RENDER: `${RUN}_askah_render`,
+  IRL_COMPLETED: `${RUN}_irl_completed`,
+  IRL_ONGOING: `${RUN}_irl_ongoing`,
+  BUF1: `${RUN}_buffermix1`,
+  RMP1: `${RUN}_rmp1`,
+  RMP2: `${RUN}_rmp2`,
+  AAP_NONEMPTY: `${RUN}_pf_p0`,
+  AAP_EMPTY: `${RUN}_pf_p1`,
+};
+
+/** Run-unique content strings the specs assert against (mirror of seed-modes.js). */
+export const modeContent = {
+  askahFlag: `ASKAH flag subject ${RUN}`,
+  askahRender: `ASKAH render subject ${RUN}`,
+  bufGroupTitle: `TEST Mode Playlist Group ${RUN}`,
+  formContact: 'formtester@example.com',
+  cfContact: 'cftester@example.com',
 };
 
 /** Searchable product names the config UI renders (must match seed-modes.js). */
@@ -163,4 +185,136 @@ export async function resetCfCompletionSubject(ppId: string, profileid: string):
   // clear the headline modes so the transition is observable
   await db.collection('profile_data').doc(profileid).set({ participantmode: null }, { merge: true });
   await db.collection('participant metadata').doc(profileid).set({ participantmode: null, customerstatus: 'active' }, { merge: true });
+}
+
+/**
+ * PM-14 precondition reset: restore the seeded `ask AH` row to tagged:false (no tagdetails) so the
+ * flag-click → tagged:true assertion is re-run-stable. PRECONDITION only — PM-14 asserts the value the
+ * APP writes on the real flag click (tagged:true + tagdetails.user), never this reset value.
+ */
+export async function resetAskAhUnflagged(docid: string, profileid: string, askah: string): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  await db.collection('ask AH').doc(docid).set(
+    { docid, profileid, askah, tagged: false, tagdetails: null, liked: false, created: admin.firestore.Timestamp.now() },
+    { merge: true },
+  );
+}
+
+/**
+ * PM-16 precondition reset: restore the buffermix-archive group + its 2 linked playlist docs to
+ * delete:false so the disable-cascade assertion (group→true, both linked→true) is re-run-stable.
+ * PRECONDITION only — PM-16 asserts the delete:true the APP's cascade writes. The buffermix `date` is
+ * refreshed to now() so it stays inside the screen's default 3-month load window on re-runs.
+ */
+export async function resetPlaylistGroupEnabled(bufId: string, rmpIds: string[]): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  const bufRef = db.collection('buffermix archive').doc(bufId);
+  await bufRef.set({ delete: false, date: admin.firestore.Timestamp.now() }, { merge: true });
+  for (const id of rmpIds) {
+    await db.collection('recommended mix playlist').doc(id).set(
+      { delete: false, bufferdocref: bufRef, date: admin.firestore.Timestamp.now() }, { merge: true },
+    );
+  }
+}
+
+/**
+ * PM-08 precondition reset: restore the public-form wishlist doc to status:'sended' with its single
+ * gmail contact submitted:false (and strip any prior-run wishlistquestionmap). PRECONDITION only —
+ * PM-08 asserts the contact.submitted:true + wishlistquestionmap the APP writes on the real form submit.
+ * The doc is reset to 'sended' (NEVER 'sent'), so no external Wati/Postmark send is ever triggered.
+ */
+export async function resetWishlistFormSubject(docid: string, profileid: string, contact: string): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  await db.collection('evolutionwishlistlog').doc(docid).set({
+    docid, profileid, type: 'familyandpeers', status: 'sended',
+    contacts: [{ name: 'Form Tester', type: 'gmail', contact, submitted: false, status: 'sended' }],
+    created: admin.firestore.Timestamp.now(),
+  }, { merge: false });
+}
+
+/**
+ * PM-09 precondition reset: restore the CF-subject wishlist doc to status:'sended' with its single
+ * contact already status:'received' (the all-received precondition the CF's :91 branch tallies).
+ * PRECONDITION only — PM-09 asserts the status:'completed' the CF writes. NEVER 'sent'.
+ */
+export async function resetWishlistCfDoneSubject(docid: string, profileid: string, contact: string): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  await db.collection('evolutionwishlistlog').doc(docid).set({
+    docid, profileid, type: 'familyandpeers', status: 'sended',
+    contacts: [{ name: 'CF Tester', type: 'gmail', contact, submitted: true, status: 'received' }],
+    created: admin.firestore.Timestamp.now(),
+  }, { merge: false });
+}
+
+/**
+ * Build the `?data=` query param the public form parses: `JSON.parse(decodeURIComponent(data))`.
+ * The form needs `docid` (to load the wishlist doc) + `contact` (to find the matching contact);
+ * `profilename` is shown in the form copy.
+ */
+export function encodeWishlistFormData(docid: string, contact: string, profilename: string): string {
+  return encodeURIComponent(JSON.stringify({ docid, contact, profilename }));
+}
+
+/**
+ * Runtime probe: does the `interimreport log` composite index (lastupdate DESC, createdon DESC) —
+ * required by fetchInterimLog()'s orderBy('lastupdate') + range(createdon) query — exist in the test
+ * project? We replicate the exact query; a missing index throws FAILED_PRECONDITION (code 9). Returns
+ * true iff the query succeeds. PM-15 skip-guards on this: the index is shared infra we must NOT add to
+ * firestore.indexes.json (it races other agents) — it is RETURNED in the deepening run's neededIndexes
+ * instead, and PM-15 becomes GREEN once it is deployed. Mirrors the CF skip-guard discipline.
+ */
+export async function isInterimLogIndexReady(): Promise<boolean> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  const T = admin.firestore.Timestamp;
+  const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
+  const end = new Date(); end.setMonth(end.getMonth() + 1); end.setDate(0); end.setHours(23, 59, 59, 999);
+  try {
+    await db.collection('interimreport log')
+      .orderBy('lastupdate', 'desc')
+      .where('createdon', '>=', T.fromDate(start))
+      .where('createdon', '<=', T.fromDate(end))
+      .limit(1)
+      .get();
+    return true;
+  } catch (e) {
+    const code = (e as { code?: number | string }).code;
+    if (code === 9 || code === 'failed-precondition' || /requires an index/i.test((e as Error).message)) return false;
+    throw e; // an unexpected error should surface, not silently skip
+  }
+}
+
+/**
+ * Runtime probe: is `evolutionFamilyWishlistOnWrite` (wishlist.js) DEPLOYED to the test project?
+ * This CF is NOT in the project's deployed set (only calculateParticipantMode + the *_to_pmd family +
+ * the queue CFs are), so PM-09 must skip-guard. We seed a disposable `status:'sended' + all-received`
+ * doc, write a trivial re-trigger, and watch for the CF's status→'completed'. Returns true iff it fires
+ * within the window. Cleans up its probe doc. Used by PM-09 to test.skip with a documented reason.
+ */
+export async function isWishlistCfDeployed(timeoutMs = 25_000): Promise<boolean> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  const probeId = `${RUN}_cfprobe_wishlist`;
+  const ref = db.collection('evolutionwishlistlog').doc(probeId);
+  try {
+    await ref.set({
+      docid: probeId, profileid: `${RUN}_pf_p0`, type: 'familyandpeers', status: 'sended',
+      contacts: [{ name: 'Probe', type: 'gmail', contact: 'probe@example.com', submitted: true, status: 'received' }],
+      _testdata: true, testrunid: RUN,
+    });
+    await ref.update({ _probe_touch: Date.now() }); // re-trigger the onWrite
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const snap = await ref.get();
+      if (snap.exists && (snap.data() as Record<string, unknown>).status === 'completed') return true;
+      if (Date.now() >= deadline) return false;
+    }
+  } finally {
+    await ref.delete().catch(() => {});
+  }
 }
