@@ -1,22 +1,33 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-06-10 (all-components e2e)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/plans/2026-06-10-all-components-e2e-plan.md` + `specs/journals/2026-06-10-allcomponents-e2e-COMPLETE.md`.
+_Last updated: 2026-06-10 (profiles e2e deepening)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/validated/README.md`.
 
 ## Current state
-- Angular 19 + Firebase PWA across 3 Firebase projects. The e2e app build targets the disposable cloud test project **`slabs-queue-e2e-exdcz`** (real Firestore + 16 deployed CFs).
-- **Queue Manager / Studio / B!G** e2e suite green (`e2e/queue/`, 188/194) + the mobile-Flutter participant walk.
-- **NEW: every non-ATC concept group now has its own GREEN, anti-circular Playwright suite** (branch `cicd`):
-  appointments 7/7 · events 6/6 · modes 8/8 · content 9(+1 skip) · workshops 8/8 · support 10/10 ·
-  profiles 12(+1 fixme) · comms 9(+1 skip) · evomap 8(+2 fixme) · authroles 11/11 · journey 8/8 · business 8/8.
-  ~96 passing cases. Each: own `testrunid`, custom roster, idempotent seed, serial `e2e/playwright.<group>.config.ts`.
-- Shared harness: `e2e/lib/seed-common.js` (dashboard route-grants on the proven seedAuthChain), `e2e/_shared/prod-firewall.ts` (blocks prod CF URLs), reusing queue `support/*` + `stubs/*`. Recon corpus: `e2e/recon-allcomp/*.md`.
+- Angular 19 + Firebase PWA across 3 Firebase projects. Two parallel workstreams: **(A) operator-validated documentation** (`specs/validated/`) and **(B) e2e testing** (`e2e/`, branch `cicd`, app build → disposable cloud test project `slabs-queue-e2e-exdcz`).
+- **(A) Documentation — the original 6-group roadmap is now fully drafted:** #1 Journey & Products ✅, #2 Product Modes ✅, #3 Queue Manager ✅, #4 Dynamic Studio ✅ (validated 2026-06-10), **#5 Appointment System 🟡 draft, #6 Events/Arena/Calendar 🟡 draft** (both awaiting operator sign-off). The 7 extra e2e groups (content, workshops, support, profiles, comms, evomap, authroles) are **undocumented** — candidate #7+.
+- **(B) e2e:** every non-ATC group has a GREEN anti-circular Playwright suite (appointments 7/7 · events 6/6 · modes 8/8 · content 9 · workshops 8/8 · support 10/10 · **profiles 23** · comms 9 · evomap 8 · authroles 11/11 · journey 8/8 · business 8/8; queue/studio/BIG 188/194). A **deepening pass** is bringing each group to full recon depth. ATC OFF-LIMITS throughout (`atcmodel:null`).
+- Harness restored on this machine: data probes at `~/solarcode/starlabs-svstats` (NOT `~/Downloads` — macOS TCC); GitHub auth via `gh` (`solar345` = StarLabs access). Production read verified.
 
 ## Last session changes (2026-06-10) — why
-- **Recon workflow** (12 agents) mapped every non-ATC group; **authoring workflow** (11 Opus agents) drafted each suite from recon + the appointments exemplar; orchestrator greened each serially + committed per group.
-- Composite indexes added + deployed: appointments `(cancelled,attended,starttime)`, delivery forms `(formfor,formname)`, supportchat `(isdelete,last_modification)`, expenseplanning `(delete,date)`.
-- Recurring fixes: bounded smoke wait (networkidle hangs on camera/iframe/stream); app-written docs asserted by natural key (no testrunid); `mat-select` force-click past the floating label; search/label scoping for polluted collections (notificationrecord 10.8k, dashboard 100s); modes CF reset must `FieldValue.delete()` statusdate; console-guard gained an optional `extraIgnorable` (userprofile mega-dashboard tolerates index/ResourcePath noise on auxiliary queries).
-- Honest skips/fixmes (documented in-file): CF-not-deployed cases (content buffermix, comms notifyMobileApp), complex multi-step/camera flows (events QR/initiate, evomap add-dialog), filter-builder screens (profiles analytics). ATC stayed OFF-LIMITS throughout (products seeded `atcmodel:null`).
+- **Profiles e2e deepened 12 → 23 cases** (recon `profiles-analytics.md`). Added 4 spec files + additive
+  seed/support extensions; the 12 existing cases untouched.
+  - **PA-07 un-fixmed (load-bearing).** The prior fixme misdiagnosed `/participants-analytics` as
+    "renders no table until a filter is built". In fact `fetchData()→onDataSearch()` runs with an EMPTY
+    filter so ALL `participant metadata` rows render on load (Total reached 203 live); the "Error checking
+    permissions" line is the auth-guard snackbar, not a no-table state. **No fixme remains in profiles.**
+  - New: PA-08 (customerstatus filter narrows), PA-18 (selection badge), PA-PS-01 (ProfileScreen body),
+    PA-EVO-01 (evolution-summary render via localStorage, NON-ATC name only), PA-FT-LL (Love Letter tab),
+    PA-FT-FILT (participant-select where-clause), PA-AFB-FILT (app-flow-breaks type-chip), PA-CF-04/05
+    (productsdata_to_pmd consumedproducts[] + productcount map), PA-14 (like toggle → forms-DB write).
+  - Key gotchas (journaled): MatTable Filter is `(keyup)`-bound → use `pressSequentially` not `fill()`;
+    poll `Total: N` text ≥ seeded floor as the loaded signal; direct-nav routes need a dashboard grant
+    (added `/participant-evolution-summary`); ngx-mat-select-search input is disabled-on-open → click the
+    option directly. See `specs/journals/2026-06-10-profiles-e2e-deepening.md`.
+- (prior, still current) #4 Dynamic Studio VALIDATED; #5 Appointment + #6 Events/Arena/Calendar drafts
+  awaiting operator sign-off; Karma harness pre-existingly broken (2 casing + missing `amazon-chime-sdk-js`).
 
 ## Pending / next
-- Deepen the deferred TODO cases when their fragile flows get testids/harnessing (events EVT-02/06-16, appointments booking, profiles analytics filter-builder, evomap add-dialog).
-- Push `cicd` to origin (operator-gated). Optionally add each `playwright.<group>.config.ts` to a CI matrix beside `queue-e2e.yml`.
+- **Operator sign-off** on `05` (§12) + `06` (§12) → flip both to VALIDATED.
+- Optional: **doc↔e2e reconciliation** passes for the appointments + events suites (as done for #4 §11).
+- Optional roadmap extension: document the 7 undocumented e2e groups (#7+).
+- Carry-overs: Karma-harness cleanup (casing + chime dep + ATC spec-exclude); tier-A lock; TD-006 secrets; push `cicd` to origin (operator-gated).

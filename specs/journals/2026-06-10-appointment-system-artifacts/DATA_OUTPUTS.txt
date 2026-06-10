@@ -1,0 +1,369 @@
+# DATA_OUTPUTS — #5 Appointment System probes (production fir-sample-aae4a, read-only, 2026-06-10)
+
+## appt_discover.js — collection discovery + schemas
+=== ALL root collections (323) ===
+0 atcinvolved issue
+3minuteshpc
+A&H journey
+A&H products
+A&H updates
+A&H-Space
+A&H_Space_Name
+A&H_Space_Type
+AHCRM_FCM_token
+AWS_System
+Achievements
+Add Path
+Add Role
+Add Team
+App Version
+AppointmentType-To-Roles
+Big Interview Summary
+EISzoomcontact
+EIT_levels
+EIT_levels_history
+Evolution Mapping Summary
+ExperienceLevel
+FCM_token
+Journey-To-AppointmentTypes
+Prescribers
+Product-To-AppointmentTypes
+Roles-To-EIS
+Surprise Content
+WiSH_journey
+accelerated evolution level
+action_group_profiles
+action_to_be_taken
+activesnippet
+activitylog
+ads
+adsinvestment
+adsplaylist
+aggregate_EITParticipant
+aggregate_ReviewParticipant
+aggregate_participant_timeline
+app exception log
+app_version
+appactionpending
+appflowbreaks
+appointment session
+appointments
+appointmenttype
+arena e-ticket
+arena e-ticket log
+arena events
+arena highlights
+arena participant
+arenalayers
+arenaspace
+arenavideoask
+ask AH
+assignment_atc_notes
+assignment_temporary_tripleatc
+atc assignment
+atc model
+atc taxonomy
+atc_initiated
+atcmodel level config
+authorisation_key_code
+availability
+big aggregate event level
+big aggregate event level archives
+big aggregate level
+big aggregate level archives
+big aggregate level archivesv2
+big aggregate levelv2
+big assignment
+big assignment manual
+big assignment_atc_notes
+big assignment_pick_for_mentoring
+big cohorts
+big cohorts log
+big marathon
+big participants assignments
+big participants notes
+big participants tags
+big tags
+big temporary_ATC
+big_temporary_forms
+bigactivity
+bigassist
+bigassist_data
+bigchat
+bigeventmentor
+bigeventparticipantsplan
+bigformassignment
+biginvitation
+biglevel
+buffermix archive
+bulk invitation
+category
+chat config
+chatgpt response
+classify
+clientissue
+clientissue_old
+clientissuelog
+cohorts queue planner
+community category
+community post
+community post tags
+content analytics
+content_urls
+counters
+customer_eismapping
+dashboard
+databuffer
+deliverables
+delivery events
+delivery fieldwork
+delivery forms
+delivery queue
+delivery report
+deliverytime
+demovideos
+did you know
+drafts
+eiflix enrolment
+eiflix participant enrolled
+eiflix participant workshop
+eiflix workshop
+eiflix workshop challenges
+eiflixbanner
+eisroles
+eit education
+email archive
+email logs
+email templates
+email validators
+emailOTPs
+engagement_snapshots
+enrollment section config
+episodes
+event collection
+event location
+event participant zones
+event participant zones logs
+event participation request
+event rsvp
+event users
+event zones
+event_token_user
+events_hosts
+events_profiles
+evolution log
+evolution progress draft
+evolution wishlist
+evolutionmappingvideo
+evolutionwishlistlog
+evolutionwishlistquestions
+expenseplanning
+filteredtimeline profile
+formsByClient
+formsByClient log
+generated_OTP
+genesis_review
+health stories
+heroTrailer
+interim crossover
+interimreport log
+issue status
+issue_tracker
+journey
+journey records
+journey-to-product
+journeylog
+journeyonboardingdetail
+journeyproductpurchase
+journeysales
+layout
+learning-materials
+levels_of_users
+live assignment
+livechangework
+liveevolutionmapping
+llmmodels
+loginlog
+love letter
+messages
+modes
+myoperator calls
+negligencemeter
+new_user_data
+notification templates
+notificationrecord
+notifications
+offtime
+openvidu event
+openviduCallQuality
+openviduroom
+package
+package design
+participant AEL
+participant content analytics
+participant list
+participant messages
+participant metadata
+participant mode checklist
+participant tag logs
+participant tag versions
+participant tags
+participant touchpoint
+participant videos
+participant workshop
+participantJourneySequence
+participant_reports
+participantdashboard
+participantdashboard exception
+participantdeliverysequence
+participantjourneyproduct
+participantmetadata exception
+participantpackage
+participantplanning
+participants ely
+participants message archive
+participantsproduct
+participantvideoask
+pick_for_mentoring
+post_categories
+procedure_recommend
+procedurecode
+procedures
+product mode config
+product mode playlist
+productRoadtime
+productToDeliverySequence
+productaddontype
+productconsumptionlog
+productenquirylog
+products
+profile_data
+profiledb
+questiontemplate
+queue activity log
+queue activity log backup
+queue avtest
+queue generation
+queue opportunity
+queue participant transfer
+queue planning
+queue stage log
+queue studio pairing
+queue tags
+queue variation
+queue_atc_generation
+queue_token
+queue_token_counter
+queuereminder
+quiz
+quiz of the day
+quizbyclients
+razorpay payments
+recommended mix playlist
+roadtime
+salesleads
+savednotifications
+screen_cast_devices
+searchquery
+segments
+selfinstallation
+series
+softwares
+solar voice audios
+solar voice playlist
+solarvoice contentanalytics
+solarvoice newuser
+stage opportunity count
+starlabs roles
+static meta data
+studio activity log
+studio checkin log
+studio conversation
+studioinvitation
+supportchat
+supportdesk
+survey
+tagsystem
+teams
+temporary function access
+temporary_ATC_transcribe
+temporary_forms
+ticketLogs
+ticket_categories
+ticket_statuses
+tickets
+tier
+tier access config
+timeline log
+to_transcript
+transcribed_atc_alpha
+transcribed_atc_to_validate
+triple atc
+tv_auth_sessions
+tv_devices
+tv_sessions
+uP Life Report Summary
+updashboard_logs
+upload atc
+user
+userAccessCounts
+user_data
+user_relevant_timeline
+users_roles
+usertiertest
+validatemember
+versioned_atc
+wati archive
+wati logs
+wati templates
+watson_user
+workshop images
+workshop participant enrolled
+workshop reward claimed
+workshopQA
+workshopcategory
+workshopconfiguration
+zoom activitylog
+zoomaccount
+
+=== appointment-related candidates ===
+
+### "AppointmentType-To-Roles" — 102 docs
+   keys: additional_role, assigned_appttype, assigned_appttype_ref, assigned_role, id, required_role
+
+### "Journey-To-AppointmentTypes" — 9 docs
+   keys: assigned_appttypes, id, journey, journeyend, journeystart
+
+### "Product-To-AppointmentTypes" — 20 docs
+   keys: assigned_appttypes, id, product
+
+### "appointment session" — 8 docs
+   keys: session
+
+### "appointments" — 10458 docs
+   keys: appointment, appointmentend, appointmentrole, appointmentstart, attended, bookedby, cancelled, cancelledon, cancelledreason, created, endtime, hostRole, hosts, participantproductid, slotdata, starttime, totalminutes
+
+### "appointmenttype" — 108 docs
+   keys: appointmenttype, duration, id
+
+### "availability" — 20959 docs
+   keys: 2kfKCJSqi9dVWgst0VBw, 2uhRxs9NUExgp4iWwE29, 3RgGr63F5ztGnk7qNMSV, 3yQ7vgbiAcrgSvVvfaqL, 5rNG8EFMomEooRn6s3cn, 6SGqOjv2ManENd7HxMNz, 9KSURURJwtKkd2wI1qy8, AkOr1WLFFq2ttBIQQKYe, E8G4mMLVF9FtGcUcUQ86, F36WRjDRXNCDP1Ox32ZN, GfcZNlNty9Z6szD8BOJu, Gn69Sq9ZfRwabCANMMZ6, JzFOvGIdsNfspGU7fhqu, M0xWNEtFMh1o7l2Baouy, M5I6AlpEGfQ8ynmi3gfl, QRb8RlmmEyr5Qn963scN, QU8sUJyuGWJbpKtJK7gY, QfkT9y7hSC0hVGGcqasu, RM9FIdA69wra8Tnajwt2, TtSPFwIhBW6uYv5nuAxl, VCQ5jwCNnIndK1cBUe48, Wo04Di4xY4L7ABfOpxDU, appointments, endtime, gQR1GKk9no7YQqk2yoCW, gfjkKtFPApMoWCdWUNF7, hpuworRbbhT4UwzmkorH, id, jas15I1t0ZzCV8Ff4QQ6, jnOF3oS1Hnd2UeC3uBM4, profileref, starttime, sytW53Q3XYlXse1UzyCY, tpmjVBtQXXXa3ks1mfIa, v0GP8nZLJItYJgUOnYGd, wNguwJMVj1eMAyKz19mt, weeklyhours, whoNsdLwl3YaMG0NsPH1
+
+## appt_runtime_probe.js — state machine, types, offtime, availability
+=== appointments (10458) ===
+ state: attended 7964 | cancelled 2436 | upcoming 33 | past-unmarked(no-show) 25
+ linkage: participantproductid present 7894 (75%)
+ journeycoach 961 | onboarding 438
+ platform field present 140 | zoom data present 8799 | slotdata present 10458
+ hosts/roles per appointment: {"1":9330,"2":1127,"3":1}
+
+=== appointmenttype (108) ===
+ durations: {"30min":42,"180min":14,"60min":15,"120min":25,"90min":5,"45min":2,"15min":1,"300min":1,"240min":2,"10min":1}
+ ischangeworkrequired: 20 | groupappointment: 3
+
+=== offtime (125) status: {"approved":81,"(pending)":43,"denied":1}
+
+=== availability sample (3u6vkd1xy45IkVaqaAVz) ===
+ top fields: appointments, endtime, id, starttime, profileref
+ appt-type slot keys: 2 0xKJEQgNEB2A9hMi9TvK, 3yQ7vgbiAcrgSvVvfaqL
+ sample slot array[0]: {"booked":false,"slotend":{"_seconds":1696590000,"_nanoseconds":0},"available":false,"slotstart":{"_seconds":1696579200,"_nanoseconds":0},"id":"0xKJEQgNEB2A9hMi9TvK"}

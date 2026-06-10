@@ -44,7 +44,9 @@ Join key = **email** (`profile_data.email` ↔ Watson `Participants.email`); exp
 | 1 | Journey & Products | ✅ validated → `validated/01` |
 | 2 | Product Modes | ✅ **fully mapped** → `validated/02` §7 (`participantmode.js` engine) + §7d (`participantmetadata.js` projection) |
 | 3 | Queue Manager | ✅ **validated** → `validated/03` (+ `specs/queue-flow-visualizer/`) |
-| 4 | Dynamic Studio | 🟡 **DRAFT** → `validated/04` (investigated 2026-06-05; awaiting operator sign-off). Studio runtime `/dynamicstudio`. **data-widgets vs action-widgets** + hybrids; boundary = `live assignment` create **confirmed**; **84% solo, video ~99% Zoom** (LiveKit dead), 100% manual pairing. Open Qs in §10 |
+| 4 | Dynamic Studio | ✅ **validated 2026-06-10** → `validated/04`. Studio runtime `/dynamicstudio`. **data-widgets vs action-widgets** + hybrids; boundary = `live assignment` create; **84% solo, video ~99% Zoom** (LiveKit dead), 100% manual pairing. Reconciled vs e2e (§11) + 🔴 monitor-authz finding (§3a, route-guard task spawned) |
+| 5 | Appointment System | 🟡 **DRAFT for sign-off 2026-06-10** → `validated/05`. Scheduled-delivery rail (sibling to Queue/Studio, **no `live assignment`**). Booking join-chain, `deliverytime`→`availability` slots, advances delivery sequence, `attended`/`cancelled`. **10,458 appts: 76% att/23% canc**, 89% solo-host, video ~99% Zoom. Open Qs §12 |
+| 6 | Events, Arena & Calendar | 🟡 **DRAFT for sign-off 2026-06-10** → `validated/06`. uP!-event venue (live event after queue). RSVP→request→approve→attend, e-tickets+QR check-in, arena zones/spaces, BIG-mode. Queue→Event = `initiate-event-product`+`arenaeventidlist`. **15,717 reqs: 45% att/24% no-show**; **no standalone calendar**. 🐞 bulk-approve commit commented out. Open Qs §12 |
 | 5 | Appointment System | ⏳ pending |
 | 6 | Events, Arena & Calendar | ⏳ pending |
 

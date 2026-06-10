@@ -1,0 +1,58 @@
+# DATA_OUTPUTS — #6 Events/Arena probes (production fir-sample-aae4a, read-only, 2026-06-10)
+
+## event_discover.js — collection discovery + schemas
+### "arena events" — 218 docs
+   keys: delete, deliveryref, docid, enddate, eventname, eventref, productref, startdate, type, venue
+### "arena e-ticket" — 2127 docs
+   keys: active, createddate, docid, eventenddate, eventparticipationref, eventref, eventstartdate, producteligible, profileid
+### "arena e-ticket log" — 9917 docs
+   keys: docid, eticketref, eventref, logdate, product, profileid
+### "arena highlights" — 62 docs
+   keys: consequence, created, eventref, from, name, paralleltrajectory, pinned, postcategory, postid, postimagelist, postmessage, private, profileid, significance, uid
+### "arenaspace" — 93 docs
+   keys: assignmentref, cohortsid, createddate, date, delete, docid, eventref, marathonref, mentor, participantslist, pivottype, spaceid, summary, validated
+### "arenalayers" — 17 docs
+   keys: attended, createddate, delete, description, docid, eventref, images, sequence, title
+### "arenavideoask" — 51 docs
+   keys: active, createddate, description, docid, eventref, questiontype, questionurl, title
+### "event collection" — 97 docs
+   keys: address, addtocalendar, arenaeventidlist, atcmodel, bigdescription, bigmarathonref, description, end_date, event_id, hosts, image, lastregistrationdate, name, notifyparticipants, start_date, venue
+### "event location" — 6 docs
+   keys: location
+### "event participant zones" — 637 docs
+   keys: addedby, addedflow, docid, eligiblezone, eligiliblecohorts, eventref, profileid, selectedzone
+### "event participant zones logs" — 19255 docs
+   keys: addedby, addedflow, docid, eligiblezone, eligiliblecohorts, eventref, logid, profileid, selectedzone
+### "event participation request" — 15717 docs
+   keys: doccreateddate, docid, eventdate, eventref, eventtyperef, journeyref, productref, profileid, status
+### "event rsvp" — 8766 docs
+   keys: arenaeventid, docid, eventref, eventtyperef, message, participantresponse, productref, profileid, teamresponse, type, updated
+### "event users" — 24 docs
+   keys: event_id, user_id
+### "event zones" — 10 docs
+   keys: cohorts, coordinators, created, docid, eventref, lastupdated, mentors, starttime, status, zonename
+### "event_token_user" — 102 docs
+   keys: name, token_id, user_ref
+### "events_hosts" — 9 docs
+   keys: event_ref, user_ref
+### "events_profiles" — 7845 docs
+   keys: event_ref, eventrequest, profile_ref, pseudo_name, token
+### "bigeventmentor" — 2 docs
+   keys: address, addtocalendar, arenaeventidlist, atcmodel, bigdescription, bigmarathonref, createdAt, description, end_date, event_id, hosts, image, lastregistrationdate, name, noteligible, notifyparticipants, notregistered, reached, registered, start_date, venue
+### "bigeventparticipantsplan" — 5 docs
+   keys: actions, createddate, eventid, profileid
+### "big aggregate event level" — 1145 docs
+   keys: atcmodel, boosteractivity, fasttrack, id, lastupdated, level, levelupcount, profileid, queueid, regular
+### "delivery events" — 42 docs
+   keys: eventname, events
+
+## event_runtime_probe.js — lifecycle state machines
+=== event participation request (15717) status: {"attended":7133,"unattended":3844,"approved":1673,"requested":3060,"initiated":4,"denied":3}
+=== event rsvp (8766) participantresponse: {"yes":8045,"no":596,"(null)":125}
+    rsvp type: {"queue":5194,"event":3572}
+=== arena e-ticket (2127) active:true 2102 (99%) | producteligible size: {"1":1352,"2":649,"3":124,"4":2}
+=== event collection (97) ===
+   with arenaeventidlist: 50 | with lastregistrationdate: 80 | with hosts: 96
+   past(ended): 93 | upcoming/ongoing: 4
+=== event participant zones (637) with selectedzone: 637
+=== arena e-ticket log (9917 scans) distinct profiles: 940 | distinct events: 8
