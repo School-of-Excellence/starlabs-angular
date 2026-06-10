@@ -225,7 +225,22 @@ function dismissIosNotificationPrompt(udid: string): boolean {
  *  image for this GPU/platform-view app, so we screenshot the simulator screen instead.) The robot
  *  prints `WALK[label] hop N: at "<stage>"` then pumps through dismiss+scroll before tapping, giving a
  *  window where the queue card (with the action button) is on screen — we shoot on that marker. */
+/** Shared-project defense: the test project's `adsplaylist` (a null-`adsthumbnail` doc) crashes the
+ *  home's HomeContent and erases the queue card (see setup-mobile-fixture). A CONCURRENT session can
+ *  re-enable it mid-suite, so re-neutralize right before every app boot. Best-effort. */
+export async function neutralizeAds(): Promise<void> {
+  try {
+    const db = sim.db();
+    const ads = await db.collection('adsplaylist').where('available', '==', true).get();
+    if (!ads.size) return;
+    const b = db.batch();
+    ads.docs.forEach((d: any) => b.update(d.ref, { available: false }));
+    await b.commit();
+  } catch { /* best-effort */ }
+}
+
 export async function driveFlutterSelfRun(t: VariationTarget, count: number, label: string): Promise<void> {
+  await neutralizeAds(); // shared-project defense: the home ads section must not crash this boot
   const udid = bootedSimUdid();
   const args = [
     'drive',
