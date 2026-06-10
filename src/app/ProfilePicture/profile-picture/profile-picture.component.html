@@ -1,0 +1,25 @@
+<img
+  class="profile-img"
+  [src]="photoUrl"
+  [alt]="name"
+  [style.width.px]="size"
+  [style.height.px]="size"
+  (error)="onImgError()"
+  (click)="openPreview($event)"
+/>
+
+<div class="preview-backdrop" *ngIf="showPreview" (click)="closePreview()">
+  <div class="preview-panel" (click)="$event.stopPropagation()">
+
+    <button class="preview-close-btn" (click)="closePreview()">✕</button>
+
+    <img
+      class="preview-image"
+      [src]="photoUrl"
+      [alt]="name"
+    />
+
+    <div class="preview-name" *ngIf="name">{{ name }}</div>
+
+  </div>
+</div>

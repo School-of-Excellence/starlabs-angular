@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { OnewayTemplatesComponent } from './oneway-templates.component';
+import { ProfilePictureComponent } from './profile-picture.component';
 
-describe('OnewayTemplatesComponent', () => {
-  let component: OnewayTemplatesComponent;
-  let fixture: ComponentFixture<OnewayTemplatesComponent>;
+describe('ProfilePictureComponent', () => {
+  let component: ProfilePictureComponent;
+  let fixture: ComponentFixture<ProfilePictureComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [OnewayTemplatesComponent]
+      imports: [ProfilePictureComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(OnewayTemplatesComponent);
+    fixture = TestBed.createComponent(ProfilePictureComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

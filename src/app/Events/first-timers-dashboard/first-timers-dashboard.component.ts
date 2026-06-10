@@ -6,6 +6,7 @@ import { MatInputModule } from '@angular/material/input';
 import { Subscription } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { environment } from '../../../environments/environment';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface Participant { name: string; cohort: string; initials: string; selected?: boolean; profileId?: string; displayText?: string; doerId?: string; beneficiaryId?: string; procedureName?: string; hours?: string; hourType?: string; sharedNotes?: string; count?: number}
 interface Selection { cwName: string; role: string; status: string; count: number; }
@@ -29,7 +30,7 @@ const EXCLUDED_PRODUCT_ID = getExcludedProductId();
 
 @Component({
   selector: 'app-first-timers-dashboard',
-  imports: [CommonModule, MatInputModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, MatInputModule, ReactiveFormsModule, FormsModule, ProfilePictureComponent],
   templateUrl: './first-timers-dashboard.component.html',
   styleUrl: './first-timers-dashboard.component.css'
 })

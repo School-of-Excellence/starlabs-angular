@@ -87,7 +87,6 @@
 .qwv-layout {
   display: flex;
   height: calc(100vh - 64px);
-  overflow: hidden;
 }
 
 /* ===== SIDEBAR ===== */
@@ -356,7 +355,7 @@
 
 .qwv-activity-card--evo {
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .qwv-activity-card-header {

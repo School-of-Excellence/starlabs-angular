@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, ViewChild, TemplateRef, OnInit, OnDestroy
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
-import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, documentId } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, serverTimestamp, arrayUnion, writeBatch, getFirestore, documentId } from '@angular/fire/firestore';
 import { Observable, Subscription, combineLatest } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -91,13 +91,15 @@ interface SlotByProduct {
 
 interface SpecialistRow {
     name: string;
+    eisId: string;
     role: string;
-    product: string;
+    appointmentTypeName: string;
+    appointmentTypeId: string;
+    productId: string;
     productClass: string;
     appointmentsGiven: number;
     booked: number;
     availableSlots: number;
-    slotDots: string[];  // 'booked' | 'open' | 'confirmed'
     utilizationPct: number;
     utilizationNote?: string;
     utilizationNoteColor?: string;
@@ -151,6 +153,7 @@ interface UtilizationRow {
 export class DeliveryDashboardCloneComponent {
     @ViewChild('tabGroup') tabGroup: any;
     filterForm: FormGroup;
+    firestoreForms = getFirestore('firestore-forms');
 
     // Outer mat-tab-group selectedIndex (Overview=0, Analytics=1, Participants=2)
     outerTabIndex: number = 0;
@@ -364,6 +367,14 @@ export class DeliveryDashboardCloneComponent {
     selectedProductType: string = '';
     selectedColumns: string[] = [];
 
+    filteredBookedAppointments: any[] = [];
+    // The specialist's booked appointments across ALL appointment types — used to
+    // resolve who/what occupies a slot (incl. "unavailable" slots that are blocked
+    // because the specialist is booked for a different appointment type).
+    specialistBookedAll: any[] = [];
+    expandedSpecialist: string | null = null;
+    minDate: Date = new Date();
+
     private appointmentsSubscription: Subscription | null = null;
     private participantsProductDataSubscription: Subscription;
     private formsSubscription: Subscription;
@@ -516,6 +527,36 @@ export class DeliveryDashboardCloneComponent {
 
     openAppointmentModal = false;
     participantLoading = false;
+
+    selectedSpecialistSlots: any;
+    availableDates: any[] = [];
+    selectedDate: string = '';
+    selectedEisProfile: string = '';
+    selectedEISId = null;
+    selectedAppointmentTypeId = null;
+    selectedActivity: string | null = null;
+    selectedView: string = 'booked';
+
+    profileList = [];
+    mapProfile = {};
+    selectedUser: string = null
+    filteredProfile = ""
+    slotSelected = false;
+    selectedSlotData: any;
+    loggedInPID: any;
+
+    // Profiles that actually have a ready appointment deliverable for the
+    // selected activity — used to pre-filter the booking profile picker.
+    eligibleProfileIds = new Set<string>();
+    eligibleProfilesLoading = false;
+
+    initiateProductOptions: any = {};
+    deliveryTypes: string[] = [];
+    participantData: any;
+    minimumPayment: number | null = null;
+    tentativeStartDate: Date | null = null;
+    selectedDeliveryType: string = '';
+    mergedSeatSlots: any[] = [];
 
     productData: any = {
         eiStarterPack: {
@@ -716,6 +757,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async onProductMultiFilterChange() {
+        const selectedProductIds: string[] = this.productFilterControl.value ?? [];
         if (!this.allMatchedProductsRaw || this.allMatchedProductsRaw.length === 0) return;
         // Filter changed → flush memoized getters (visibleCardIds, allProductIdsFromRaw, etc.)
         this.invalidateMemos();
@@ -733,6 +775,7 @@ export class DeliveryDashboardCloneComponent {
             this.clearStats();
         }
         // applyDateFilter rebuilds gated data and (when label is set) re-runs selectProduct
+        this.currentSelectedLabels = this.productFilterControl.value as string[] || [];
         await this.applyDateFilter();
     }
 
@@ -860,7 +903,14 @@ export class DeliveryDashboardCloneComponent {
 
             this.checkAllDataLoaded();
 
-            // this.initSpecialistDateRange();
+            // Specialist Appointment Slots section is always visible (no longer
+            // collapsible) — initialise the date range and load its base data.
+            if (!this.specialistSlotsInitialized) {
+                this.specialistSlotsInitialized = true;
+                this.initSpecialistDateRange();
+                this.loadSpecialistBaseData();
+            }
+
             // this.specialistRange.valueChanges.subscribe((val) => {
             //   if (val.start && val.end) {
             //     this.specialistStartDate = val.start;
@@ -1032,6 +1082,9 @@ export class DeliveryDashboardCloneComponent {
             this.groupedPurchased = groupedPurchased;
             this.groupedNotEligible = groupedNotEligible;
             this.funnelData = funnelData;
+
+            this.currentSelectedLabels = this.productFilterControl.value as string[] || [];
+            this.populateActionableCohorts(this.currentSelectedLabels);
         } catch (err) {
             console.log("error apply date filter", err);
         }
@@ -1044,7 +1097,7 @@ export class DeliveryDashboardCloneComponent {
         // Repopulate the actionable cohorts (Participants tab) from the
         // freshly gated participantsproduct data. Stage-based, not appointment-
         // based — so it works even when the appointments read is denied.
-        this.populateActionableCohorts();
+        this.populateActionableCohorts(this.productFilterControl.value as string[]);
     }
 
     getConversionRate(cardId: string): number {
@@ -1058,16 +1111,16 @@ export class DeliveryDashboardCloneComponent {
         this.participantLoading = true;
         // Clear previous product's data immediately so stale cards don't show while loading
         this.productData = {
-            eiStarterPack:    { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
-            eiCustomSolutions:{ totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
-            criticalSupport:  { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
+            eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
+            eiCustomSolutions: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
         };
         const productId = this.mapProductGroupId[product];
         this.selectedProductLabel = product;
         this.stages = this.stagesConfig[product] || [];
 
         if (this.allAppointments?.length === 0) {
-            await this.filterAppointmentsByType();
+            await this.filterAppointmentsByType('all', null);
             await this.FilterReportData(productId);
             if (product === 'Critical Support') await this.fetchTicketRiseParticipants();
         }
@@ -1089,7 +1142,7 @@ export class DeliveryDashboardCloneComponent {
         this.stagesLoading = false;
     }
 
-    async filterAppointmentsByType(): Promise<void> {
+    async filterAppointmentsByType(mode: string, appointmentTypeId: string): Promise<void> {
         this.journeyFlowLoading = true;
         this.cdr.detectChanges();
 
@@ -1115,22 +1168,35 @@ export class DeliveryDashboardCloneComponent {
                 const startTimestamp = Timestamp.fromDate(monthStart);
                 const endTimestamp = Timestamp.fromDate(monthEnd);
 
-                const q = query(
-                    collection(this.firestore, "appointments"),
-                    where("cancelled", "==", false),
-                    where("starttime", ">=", startTimestamp),
-                    where("starttime", "<=", endTimestamp)
-                );
+                let q: any;
+                if (mode === 'all') {
+                    q = query(
+                        collection(this.firestore, "appointments"),
+                        where("cancelled", "==", false),
+                        where("starttime", ">=", startTimestamp),
+                        where("starttime", "<=", endTimestamp)
+                    );
+                } else if (mode === 'custom') {
+                    q = query(
+                        collection(this.firestore, "appointments"),
+                        where("cancelled", "==", false),
+                        where("starttime", ">=", startTimestamp),
+                        where("starttime", "<=", endTimestamp),
+                        where(
+                            "appointment",
+                            "==",
+                            doc(this.firestore, `/appointmenttype/${appointmentTypeId}`)
+                        )
+                    );
+                }
 
                 const sub = collectionData(q, { idField: 'id' })
                     .subscribe({
                         next: async (appointmentsSnap: any[]) => {
-
                             let updatedAppointments = [...appointmentsSnap];
                             await Promise.all(
-                                updatedAppointments.map(async (appointment) => {
-                                    appointment.appointmentTypeName =
-                                        await this.resolveAppointmentType(appointment);
+                                updatedAppointments.map(async (appointment: any) => {
+                                    appointment.appointmentTypeName = await this.resolveAppointmentType(appointment);
                                 })
                             );
 
@@ -1140,8 +1206,8 @@ export class DeliveryDashboardCloneComponent {
                                         product.docid === app.participantproductid
                                 );
                                 return {
-                                    ...app,
-                                    ...matchedProduct
+                                    ...matchedProduct,
+                                    ...app
                                 };
                             });
 
@@ -1159,11 +1225,6 @@ export class DeliveryDashboardCloneComponent {
                             resolve();
                         },
                         error: (err) => {
-                            // Defensive degrade: a Firestore permission denial on
-                            // the 'appointments' collection means the user's role
-                            // can't read appointment-level detail. Keep the page
-                            // alive — Stages columns are sourced from
-                            // participantsproduct + funnelData and continue to work.
                             const denied = err?.code === 'permission-denied' ||
                                 /permission|insufficient/i.test(err?.message || '');
                             if (denied) {
@@ -1380,7 +1441,7 @@ export class DeliveryDashboardCloneComponent {
                             app.formname?.toLowerCase() === 'critical support pre form'
                         );
 
-                       
+
                         if (postprocessAppointment) {
                             productData.criticalSupport.postForm.push({
                                 ...mergedData,
@@ -1496,7 +1557,7 @@ export class DeliveryDashboardCloneComponent {
                 .slice(i, i + 10)
                 .map(item => item.docid);
             const q = query(
-                collection(this.firestore, 'formsByClient'),
+                collection(this.firestoreForms, 'formsByClient'),
                 where('participantproductid', 'in', chunk)
             );
             const obs$ = runInInjectionContext(this.injector, () =>
@@ -1647,10 +1708,13 @@ export class DeliveryDashboardCloneComponent {
             endOfTomorrow
         } = this.getTodayAndTomorrowRange();
 
-        const filteredAppointments = this.allAppointments.filter(app =>
-            app.appointmentTypeName === appointmentTypeName &&
-            app.attended === false
-        );
+        const filteredAppointments = this.allAppointments
+            .filter(app =>
+                app.appointmentTypeName === appointmentTypeName &&
+                app.attended === false
+            );
+        // no need to map/find matchedProduct again
+        // profileid is already merged in filterAppointmentsByType
 
         return {
             all: filteredAppointments,
@@ -1694,7 +1758,7 @@ export class DeliveryDashboardCloneComponent {
                 5: this.productData.eiStarterPack.preprocess || [],
                 6: this.productData.eiStarterPack.diagnostics || [],
                 7: this.productData.eiStarterPack.implementation || [],
-                8: this.productData.eiStarterPack.report || [],
+                8: this.productData.eiStarterPack.reports || [],
                 9: this.productData.eiStarterPack.celebrationCall || []
             };
         }
@@ -1738,7 +1802,6 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async fetchDFUProductData() {
-
         const dfuProducts = this.rawProductData.filter((e) => e['type']?.toLowerCase() == 'dfu');
         const dfuProductIds = Array.from(new Set(dfuProducts.map((p) => p['id'])));
         const rejectedStatuses = new Set(['cancelled', 'shifted']);
@@ -1793,73 +1856,97 @@ export class DeliveryDashboardCloneComponent {
         });
     };
 
-    onSpecialistExpandToggle() {
+    async onSpecialistExpandToggle() {
         this.specialistCollapsed = !this.specialistCollapsed;
         if (!this.specialistCollapsed && !this.specialistSlotsInitialized) {
             this.initSpecialistDateRange();
-            this.loadSpecialistBaseData();
-            // Re-wire the date-range subscription so changing the picker re-fetches data
-            this.specialistRange.valueChanges.subscribe((val) => {
-                if (val.start && val.end) {
-                    this.specialistStartDate = val.start;
-                    this.specialistEndDate = val.end;
-                    this.updateSpecialistDisplayMonth();
-                    if (this.specialistSlotsInitialized) {
-                        this.fetchSpecialistSlotsAndCompute();
-                    }
-                }
-            });
+            await this.loadSpecialistBaseData();
         }
     }
 
     initSpecialistDateRange() {
-        const now = new Date();
-        this.specialistStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        this.specialistEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+
+        this.specialistStartDate = today;
+        this.specialistEndDate = nextWeek;
+
         this.specialistRange.setValue({
-            start: this.specialistStartDate,
-            end: this.specialistEndDate,
+            start: today,
+            end: nextWeek,
         });
         this.updateSpecialistDisplayMonth();
     }
 
-    updateSpecialistDisplayMonth() {
-        if (!this.specialistStartDate || !this.specialistEndDate) return;
-
-        const monthNames = [
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December',
-        ];
-
-        const startMonth = this.specialistStartDate.getMonth();
-        const startYear = this.specialistStartDate.getFullYear();
-        const endMonth = this.specialistEndDate.getMonth();
-        const endYear = this.specialistEndDate.getFullYear();
-
-        if (startMonth === endMonth && startYear === endYear) {
-            this.specialistDisplayMonth = `${monthNames[startMonth]} ${startYear}`;
-        } else {
-            const startLabel = this.datepipe.transform(this.specialistStartDate, 'MMM d, yyyy');
-            const endLabel = this.datepipe.transform(this.specialistEndDate, 'MMM d, yyyy');
-            this.specialistDisplayMonth = `${startLabel} – ${endLabel}`;
-        }
+    // Native <input type="date"> emits a 'yyyy-MM-dd' string; parse to a
+    // local Date and delegate to the existing range logic.
+    onSpecialistStartInput(event: Event) {
+        const value = (event.target as HTMLInputElement)?.value;
+        if (!value) return;
+        const parsed = new Date(`${value}T00:00:00`);
+        if (isNaN(parsed.getTime())) return;
+        this.onSpecialistDateChange(parsed);
     }
 
-    async loadSpecialistBaseData(retryCount = 0) {
+    // WHEN USER CHANGES START DATE
+    async onSpecialistDateChange(selectedDate: Date) {
+        this.specialistLoading = true;
+        if (!selectedDate) return;
+
+        const start = new Date(selectedDate);
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(start);
+        end.setDate(start.getDate() + 7);
+
+        this.specialistStartDate = start;
+        this.specialistEndDate = end;
+
+        this.specialistRange.patchValue({
+            start,
+            end,
+        });
+
+        this.updateSpecialistDisplayMonth();
+        await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
+    }
+
+    updateSpecialistDisplayMonth() {
+        const start = this.specialistStartDate;
+        const end = this.specialistEndDate;
+
+        if (!start || !end) return;
+
+        this.specialistDisplayMonth =
+            `${start.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            })} - ${end.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            })}`;
+    }
+
+    async loadSpecialistBaseData() {
         this.specialistLoading = true;
         this.cdr.detectChanges();
+        this.specialistAllSlots = [];
+        this.specialistData = [];
+        this.filteredBookedAppointments = [];
+        this.availableDates = [];
 
         try {
-            console.log('[Specialist] Step 1: querying products (mode=Priority Mode)...');
             const productsSnap = await runInInjectionContext(this.injector, () =>
                 getDocs(query(
                     collection(this.firestore, 'products'),
-                    where('mode', '==', 'Priority Mode')
+                    where('mode', '==', 'Priority Mode'),
                 ))
             );
-
-            console.log(`[Specialist] Step 1 done: ${productsSnap.docs.length} Priority Mode products found`);
-            console.log('[Specialist] Step 2: querying productToDeliverySequence...');
 
             const deliveryPromises = productsSnap.docs.map((productDoc) =>
                 runInInjectionContext(this.injector, () =>
@@ -1881,7 +1968,7 @@ export class DeliveryDashboardCloneComponent {
                     const deliveryOptions = deliveryDoc.data()['deliveryoptions'];
                     if (!Array.isArray(deliveryOptions) || deliveryOptions.length === 0) continue;
 
-                    const lastOption = deliveryOptions.at(-1);
+                    const lastOption = deliveryOptions.at(0);
                     const deliverySequence = lastOption?.deliverysequence;
                     if (!Array.isArray(deliverySequence)) continue;
 
@@ -1897,9 +1984,6 @@ export class DeliveryDashboardCloneComponent {
                 }
             }
 
-            console.log(`[Specialist] Step 2 done: ${activityFetchList.length} activity refs to fetch`);
-            console.log('[Specialist] Step 3: fetching activity docs...');
-
             const activityResults: { productDoc: any; productName: string; activityRef: any; snap: any }[] = [];
             const actBatchSize = 15;
 
@@ -1914,8 +1998,6 @@ export class DeliveryDashboardCloneComponent {
                 );
                 activityResults.push(...batchResults);
             }
-
-            console.log(`[Specialist] Step 3 done: ${activityResults.length} activity docs fetched`);
 
             const seenTypeIds = new Set<string>();
             this.specialistSequences = [];
@@ -1938,65 +2020,11 @@ export class DeliveryDashboardCloneComponent {
                     appointmentTypeId,
                 });
             }
-
-            console.log(`[Specialist] Step 4: ${this.specialistSequences.length} unique appointment types → querying AppointmentType-To-Roles & Roles-To-EIS...`);
-
-            const roleBatchSize = 10;
-
-            for (let i = 0; i < this.specialistSequences.length; i += roleBatchSize) {
-                const batch = this.specialistSequences.slice(i, i + roleBatchSize);
-
-                await Promise.all(
-                    batch.map(async (sequence) => {
-                        const typeId = sequence.appointmentTypeId;
-
-                        const rolesSnap = await runInInjectionContext(this.injector, () =>
-                            getDocs(query(
-                                collection(this.firestore, 'AppointmentType-To-Roles'),
-                                where('assigned_appttype_ref', '==', doc(this.firestore, 'appointmenttype/' + typeId)),
-                                limit(1)
-                            ))
-                        );
-
-                        const roles: string[] = [];
-                        rolesSnap.forEach((roleDoc) => {
-                            const requiredRoles = roleDoc.data()['required_role'] ?? [];
-                            requiredRoles.forEach((element: any) => roles.push(element.path));
-                        });
-                        this.specialistRolesMap[typeId] = roles;
-
-                        const eisMap: { [role: string]: string[] } = {};
-
-                        await Promise.all(
-                            roles.map(async (rolePath) => {
-                                const eisSnap = await runInInjectionContext(this.injector, () =>
-                                    getDocs(query(
-                                        collection(this.firestore, 'Roles-To-EIS'),
-                                        where('assigned_role_ref', '==', doc(this.firestore, rolePath))
-                                    ))
-                                );
-
-                                const eisRefs: string[] = [];
-                                eisSnap.forEach((eisDoc) => {
-                                    const assignedEis = eisDoc.data()['assigned_eis'] ?? [];
-                                    assignedEis.forEach((element: any) => eisRefs.push(element.path));
-                                });
-                                eisMap[rolePath] = eisRefs;
-                            })
-                        );
-
-                        this.specialistEISMap[typeId] = eisMap;
-                    })
-                );
-            }
-
-            this.specialistSlotsInitialized = true;
-            // TODO: availability slot fetching disabled — too many Firestore queries (53 sequences).
-            // Uncomment when a more efficient query strategy is in place.
-            // await this.fetchSpecialistSlotsAndCompute();
+            // Show delivery activities alphabetically (ascending).
+            this.specialistSequences.sort((a: any, b: any) =>
+                (a.appointmentType || '').localeCompare(b.appointmentType || '')
+            );
             this.specialistLoading = false;
-            this.cdr.detectChanges();
-
         } catch (error) {
             console.error('Error loading specialist base data:', error);
             this.specialistLoading = false;
@@ -2004,14 +2032,18 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    async fetchSpecialistSlotsAndCompute() {
+    async fetchSpecialistSlotsAndCompute(appointmentTypeId: string) {
         if (!this.specialistStartDate || !this.specialistEndDate) return;
 
-        const total = this.specialistSequences.length;
-        console.log(`[Specialist] Step 5: fetching availability slots for ${total} sequences sequentially, range: ${this.specialistStartDate?.toDateString()} – ${this.specialistEndDate?.toDateString()}`);
+        const filteredSequences = appointmentTypeId
+            ? this.specialistSequences.filter(
+                (seq: any) => seq.appointmentTypeId === this.selectedAppointmentTypeId
+            )
+            : this.specialistSequences;
+        const total = filteredSequences.length;
+
         this.specialistLoading = true;
         this.cdr.detectChanges();
-
         try {
             const rangeStart = new Date(this.specialistStartDate);
             rangeStart.setHours(0, 0, 0, 0);
@@ -2021,10 +2053,8 @@ export class DeliveryDashboardCloneComponent {
 
             const results: any[] = [];
 
-            // Process sequences one at a time — firing all 50+ × roles × EIS queries in parallel
-            // overwhelms Firestore. Sequential is slower per-query but finishes reliably.
-            for (let i = 0; i < this.specialistSequences.length; i++) {
-                const seq = this.specialistSequences[i];
+            for (let i = 0; i < filteredSequences.length; i++) {
+                const seq = filteredSequences[i];
                 const typeId = seq.appointmentTypeId;
                 const roles = this.specialistRolesMap[typeId] || [];
                 const eisMap = this.specialistEISMap[typeId] || {};
@@ -2032,13 +2062,16 @@ export class DeliveryDashboardCloneComponent {
 
                 for (const role of roles) {
                     const eisProfiles = eisMap[role] || [];
-
                     for (const eisProfile of eisProfiles) {
                         const snapshot = await runInInjectionContext(this.injector, () =>
                             getDocs(query(
                                 collection(this.firestore, 'availability'),
                                 where('profileref', '==', doc(this.firestore, eisProfile)),
-                                where('appointments', 'array-contains', doc(this.firestore, 'appointmenttype/' + typeId)),
+                                where(
+                                    'appointments',
+                                    'array-contains',
+                                    doc(this.firestore, 'appointmenttype/' + typeId)
+                                ),
                                 where('starttime', '>=', rangeStart),
                                 where('starttime', '<=', rangeEnd)
                             ))
@@ -2048,14 +2081,28 @@ export class DeliveryDashboardCloneComponent {
                             const slotArray = slotDoc.data()[typeId];
                             if (!Array.isArray(slotArray)) return;
 
-                            for (const slot of slotArray) {
-                                const slotStart = slot.slotstart?.toDate?.() || (slot.slotstart ? new Date(slot.slotstart) : null);
-                                if (!slotStart || slotStart < rangeStart || slotStart > rangeEnd) continue;
+                            for (let a = 0; a < slotArray.length; a++) {
+                                const slot = slotArray[a];
+                                const slotStart =
+                                    slot.slotstart?.toDate?.()
+                                    || (slot.slotstart ? new Date(slot.slotstart) : null);
+                                if (
+                                    !slotStart
+                                    || slotStart < rangeStart
+                                    || slotStart > rangeEnd
+                                ) continue;
 
                                 matchedSlots.push({
+                                    slotStart: slot.slotstart,
+                                    slotEnd: slot.slotend,
                                     booked: slot.booked || false,
                                     available: slot.available || false,
                                     eisprofile: eisProfile,
+                                    // Identifiers needed to write the appointment's
+                                    // `slotdata` and to flip the slot to booked.
+                                    docid: slotDoc.id,
+                                    index: a,
+                                    appointmentrole: role,
                                 });
                             }
                         });
@@ -2063,17 +2110,16 @@ export class DeliveryDashboardCloneComponent {
                 }
 
                 results.push({
-                    appointmentType: typeId,
-                    appointmentLabel: seq.appointmentType,
+                    appointmentTypeId: typeId,
+                    appointmentTypeName: seq.appointmentType,
                     productName: seq.productName,
                     productId: seq.productId,
                     slots: matchedSlots,
                 });
 
-                // Update progress display every 5 sequences so the user sees movement
+                // progress update
                 if ((i + 1) % 5 === 0 || i === total - 1) {
                     this.specialistLoadProgress = `${i + 1} / ${total}`;
-                    console.log(`[Specialist] Step 5 progress: ${i + 1}/${total}`);
                     this.cdr.detectChanges();
                 }
             }
@@ -2081,13 +2127,8 @@ export class DeliveryDashboardCloneComponent {
             this.specialistAllSlots = results;
             this.specialistLoadProgress = '';
             const totalSlotsFetched = results.reduce((sum, r) => sum + r.slots.length, 0);
-            console.log(`[Specialist] Step 5 done: ${totalSlotsFetched} slots across ${results.length} sequences`);
             this.computeSpecialistDisplayData();
-            console.log(`[Specialist] Done: ${this.specialistData.length} specialists in table`);
-
         } catch (error) {
-            // Log but don't retry via setTimeout — delayed retries would set specialistLoading=true
-            // again after the analytics section has already rendered, causing a persistent spinner.
             console.error('Error fetching specialist slots:', error);
         } finally {
             this.specialistLoading = false;
@@ -2102,7 +2143,10 @@ export class DeliveryDashboardCloneComponent {
 
         const productMap = new Map<string, { name: string; booked: number; total: number }>();
         const specialistMap = new Map<string, {
+            productId: string;
             productNames: Set<string>;
+            appointmentTypeName: string;
+            appointmentTypeId: string;
             totalSlots: number;
             booked: number;
             available: number;
@@ -2116,12 +2160,13 @@ export class DeliveryDashboardCloneComponent {
         for (const appointmentSlot of this.specialistAllSlots) {
             const productName = appointmentSlot.productName || 'Unknown';
             const productId = appointmentSlot.productId;
+            const appointmentTypeName = appointmentSlot.appointmentTypeName;
+            const appointmentTypeId = appointmentSlot.appointmentTypeId;
 
             if (!productMap.has(productId)) {
                 productMap.set(productId, { name: productName, booked: 0, total: 0 });
             }
             const productEntry = productMap.get(productId)!;
-
             for (const slot of appointmentSlot.slots) {
                 totalSlots++;
                 productEntry.total++;
@@ -2130,14 +2175,19 @@ export class DeliveryDashboardCloneComponent {
 
                 if (!specialistMap.has(eisId)) {
                     specialistMap.set(eisId, {
+                        productId: '',
                         productNames: new Set(),
+                        appointmentTypeName: '',
+                        appointmentTypeId: '',
                         totalSlots: 0,
                         booked: 0,
                         available: 0,
                     });
                 }
-
                 const specialistEntry = specialistMap.get(eisId)!;
+                specialistEntry.productId = productId;
+                specialistEntry.appointmentTypeName = appointmentTypeName;
+                specialistEntry.appointmentTypeId = appointmentTypeId;
                 specialistEntry.productNames.add(productName);
                 specialistEntry.totalSlots++;
 
@@ -2178,20 +2228,10 @@ export class DeliveryDashboardCloneComponent {
 
         const productClassList = ['upi', 'wig', 'ftm', 'pto', 'ei', 'cs'];
         this.specialistData = [];
-
         for (const [eisId, entry] of specialistMap) {
             if (entry.totalSlots === 0) continue;
 
             const name = this.mapprofile[eisId] || this.mapMetaData[eisId]?.['name'] || eisId;
-            const productNamesArray = Array.from(entry.productNames);
-            const productDisplay = productNamesArray.length > 1
-                ? `${productNamesArray[0]} +${productNamesArray.length - 1}`
-                : (productNamesArray[0] || 'N/A');
-
-            const slotDots: string[] = [];
-            for (let i = 0; i < Math.min(entry.booked, 20); i++) slotDots.push('booked');
-            for (let i = 0; i < Math.min(entry.available, 20); i++) slotDots.push('open');
-
             const utilizationPct = Math.round((entry.booked / entry.totalSlots) * 100);
 
             let utilizationNote = '';
@@ -2206,20 +2246,372 @@ export class DeliveryDashboardCloneComponent {
 
             this.specialistData.push({
                 name,
+                eisId,
                 role: 'Specialist',
-                product: productDisplay,
+                appointmentTypeName: entry.appointmentTypeName,
+                appointmentTypeId: entry.appointmentTypeId,
+                productId: entry.productId,
                 productClass: productClassList[this.specialistData.length % productClassList.length],
                 appointmentsGiven: entry.totalSlots,
                 booked: entry.booked,
                 availableSlots: entry.available,
-                slotDots,
                 utilizationPct,
                 utilizationNote: utilizationNote || undefined,
                 utilizationNoteColor: utilizationNoteColor || undefined,
             });
         }
-
         this.specialistData.sort((a, b) => b.appointmentsGiven - a.appointmentsGiven);
+    }
+
+    async onActivityChange(appointmentTypeId: string) {
+        this.selectedAppointmentTypeId = appointmentTypeId;
+        if (!appointmentTypeId) return;
+
+        const rolesSnap = await runInInjectionContext(this.injector, () =>
+            getDocs(query(
+                collection(this.firestore, 'AppointmentType-To-Roles'),
+                where(
+                    'assigned_appttype_ref',
+                    '==',
+                    doc(this.firestore, `appointmenttype/${this.selectedAppointmentTypeId}`)
+                ),
+                limit(1)
+            ))
+        );
+
+        const roles: string[] = [];
+        rolesSnap.forEach((roleDoc) => {
+            const requiredRoles = roleDoc.data()['required_role'] ?? [];
+            const additionalRoles = roleDoc.data()['additional_role'] ?? [];
+            [...requiredRoles, ...additionalRoles].forEach((role: any) => {
+                if (role?.path) roles.push(role.path);
+            });
+        });
+        this.specialistRolesMap[this.selectedAppointmentTypeId] = roles;
+
+        const eisMap: { [role: string]: string[] } = {};
+        await Promise.all(
+            roles.map(async (rolePath) => {
+                const eisSnap = await runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'Roles-To-EIS'),
+                        where(
+                            'assigned_role_ref',
+                            '==',
+                            doc(this.firestore, rolePath)
+                        )
+                    ))
+                );
+                const eisRefs: string[] = [];
+                eisSnap.forEach((eisDoc) => {
+                    const assignedEis = eisDoc.data()['assigned_eis'] ?? [];
+                    assignedEis.forEach((eis: any) => {
+                        eisRefs.push(eis.path);
+                    });
+                });
+                eisMap[rolePath] = eisRefs;
+            })
+        );
+        this.specialistEISMap[this.selectedAppointmentTypeId] = eisMap;
+        await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
+    }
+
+    async openSpecialistSlots(eisId: string) {
+        if (this.expandedSpecialist === eisId) {
+            this.expandedSpecialist = null;
+            this.filteredBookedAppointments = [];
+            return;
+        }
+        this.selectedEISId = eisId;
+        this.filteredBookedAppointments = [];
+        this.specialistBookedAll = [];
+        this.expandedSpecialist = eisId;
+
+        // Load ALL appointments for the month (cancelled==false + starttime range —
+        // an index that already exists). We deliberately DON'T use the 'custom'
+        // mode here: adding `appointment ==` needs a separate composite index that
+        // isn't provisioned. Filtering by type/host client-side avoids that and
+        // also lets us label cross-type "busy" slots.
+        await this.filterAppointmentsByType('all', null);
+        // Appointment hosts are stored as profile_data/<eisId> refs, so the host
+        // path's last segment IS the specialist's eisId (NOT mapMetaData[eisId].profileid).
+        const hostIsThisSpecialist = (appointment: any) =>
+            appointment?.hosts?.some((host: any) => {
+                const hostPath = host?.path || host?.id || host || '';
+                return String(hostPath).split('/').pop() === eisId;
+            });
+
+        // All of this specialist's active bookings, regardless of appointment type
+        // (drives the "who/what occupies this slot" labels in the seat map).
+        this.specialistBookedAll = this.allAppointments.filter(
+            (appointment: any) => hostIsThisSpecialist(appointment) && !appointment?.attended
+        );
+
+        // Bookings for the currently selected appointment type only (booked-list).
+        this.filteredBookedAppointments = this.specialistBookedAll.filter(
+            (appointment: any) =>
+                appointment?.appointment?.id === this.selectedAppointmentTypeId
+        );
+
+        this.mergedSeatSlots = this.computeMergedSeatSlots();
+    }
+
+    // Extract the booked participant id from an appointment's stored reference.
+    private getBookedParticipantId(appointment: any): string | null {
+        return (
+            appointment?.bookedby?.id ||
+            appointment?.bookedby?.path?.split('/')?.pop() || null
+        );
+    }
+
+    getSpecialistAvailability(eisProfile: string) {
+        this.selectedEisProfile = eisProfile;
+        this.generateWeekDates();
+
+        // Auto-select the first day that actually has slots (skip empty days).
+        const firstWithSlots =
+            this.availableDates.find((d: any) => d.hasSlots) || this.availableDates[0];
+        if (firstWithSlots) {
+            this.onDateSelect(firstWithSlots);
+        }
+    }
+
+    setSpecialistView(view: string) {
+        this.selectedView = view;
+        if (
+            view === 'available' &&
+            this.availableDates.length > 0
+        ) {
+            this.onDateSelect(this.availableDates[0]);
+        }
+    }
+
+    // All slots (booked + available) for the selected specialist on a given day.
+    private getSlotsForDate(dateStr: string): any[] {
+        const appointmentData = this.specialistAllSlots.find(
+            (item: any) => item.appointmentTypeId === this.selectedAppointmentTypeId
+        );
+        if (!appointmentData) return [];
+        return (appointmentData.slots || []).filter(
+            (slot: any) =>
+                slot?.eisprofile?.split('/').pop() === this.selectedEisProfile &&
+                slot.slotStart?.toDate?.().toDateString() === dateStr
+        );
+    }
+
+    onDateSelect(date: any) {
+        this.selectedDate = date.fullDate.toDateString();
+
+        const raw = this.getSlotsForDate(this.selectedDate)
+            .sort((a: any, b: any) =>
+                (a.slotStart?.toDate?.()?.getTime() || 0) - (b.slotStart?.toDate?.()?.getTime() || 0)
+            );
+
+        // Deduplicate: same time + same booked/available state = duplicate
+        const seen = new Set<string>();
+        this.selectedSpecialistSlots = raw.filter((slot: any) => {
+            const key = `${slot.slotStart?.toDate?.()?.getTime()}_${slot.booked}_${slot.available}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+
+        this.mergedSeatSlots = this.computeMergedSeatSlots();
+    }
+
+    // Slot counts for the currently selected day (drive the seat-map summary).
+    get selectedDayAvailableCount(): number {
+        return (this.selectedSpecialistSlots || []).filter((s: any) => s.available && !s.booked).length;
+    }
+    get selectedDayBookedCount(): number {
+        return (this.selectedSpecialistSlots || []).filter((s: any) => s.booked).length;
+    }
+    // get selectedDayUnavailableCount(): number {
+    //     return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
+    // }
+
+    // Find the appointment occupying a slot's time for this specialist — works for
+    // both "booked" slots (this appointment type) and "unavailable" slots (the
+    // specialist is busy with a DIFFERENT appointment type that overlaps).
+    getSlotBookingInfo(slot: any): { name: string; type: string } | null {
+        const start: Date | null = slot?.slotStart?.toDate?.() ?? null;
+        const end: Date | null = slot?.slotEnd?.toDate?.() ?? null;
+        if (!start) return null;
+
+        const match = (this.specialistBookedAll || []).find((a: any) => {
+            const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
+            const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
+            if (!aStart) return false;
+            // Prefer a true time-overlap test; fall back to same-minute start.
+            if (aEnd && end) return aStart < end && aEnd > start;
+            return Math.floor(aStart.getTime() / 60000) === Math.floor(start.getTime() / 60000);
+        });
+        if (!match) return null;
+
+        return {
+            name: this.resolveBookedParticipantName(match),
+            type: this.resolveAppointmentType(match) || '',
+        };
+    }
+
+    // Merges consecutive booked slots for the same participant into one card.
+    private getAppointmentTypeId(appointment: any): string | null {
+        return (
+            appointment?.appointment?.id ||
+            appointment?.appointment?.path?.split('/')?.pop() ||
+            null
+        );
+    }
+
+    private computeMergedSeatSlots(): any[] {
+        const slots = [...(this.selectedSpecialistSlots || [])];
+        const result: any[] = [];
+
+        const findAppointmentForSlot = (s: any) => {
+            const start: Date | null = s?.slotStart?.toDate?.() ?? null;
+            const end: Date | null = s?.slotEnd?.toDate?.() ?? null;
+
+            if (!start) return null;
+
+            return (this.specialistBookedAll || []).find((a: any) => {
+                const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
+                const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
+
+                if (!aStart) return false;
+                if (aEnd && end) {
+                    return aStart < end && aEnd > start;
+                }
+                return (
+                    Math.floor(aStart.getTime() / 60000) ===
+                    Math.floor(start.getTime() / 60000)
+                );
+            });
+        };
+
+        const participantIds: (string | null)[] = slots.map((s: any) => {
+            if (s.available && !s.booked) return null;
+            const match = findAppointmentForSlot(s);
+            return this.getBookedParticipantId(match);
+        });
+
+        const appointmentTypeIds: (string | null)[] = slots.map((s: any) => {
+            if (s.available && !s.booked) return null;
+            const match = findAppointmentForSlot(s);
+            return this.getAppointmentTypeId(match);
+        });
+
+        const isOccupied = (s: any) => s.booked || (!s.available && !s.booked);
+
+        let i = 0;
+
+        while (i < slots.length) {
+            const slot = slots[i];
+
+            if (!isOccupied(slot)) {
+                result.push({
+                    ...slot,
+                    _merged: false,
+                    _mergedEnd: slot.slotEnd
+                });
+
+                i++;
+                continue;
+            }
+
+            const participantId = participantIds[i];
+            const appointmentTypeId = appointmentTypeIds[i];
+
+            if (!participantId) {
+                result.push({
+                    ...slot,
+                    _merged: false,
+                    _mergedEnd: slot.slotEnd
+                });
+
+                i++;
+                continue;
+            }
+
+            let j = i + 1;
+
+            while (
+                j < slots.length &&
+                isOccupied(slots[j]) &&
+                participantIds[j] === participantId &&
+                appointmentTypeIds[j] === appointmentTypeId
+            ) {
+                j++;
+            }
+
+            if (j > i + 1) {
+                result.push({
+                    ...slot,
+                    _merged: true,
+                    _mergedEnd:
+                        slots[j - 1]?.slotEnd ??
+                        slots[j - 1]?.slotStart,
+                    _mergeCount: j - i
+                });
+            } else {
+                result.push({
+                    ...slot,
+                    _merged: false,
+                    _mergedEnd: slot.slotEnd
+                });
+            }
+            i = j;
+        }
+        return result;
+    }
+    
+    // Resolve the participant a booking belongs to. Real appointment docs store
+    // the client in `bookedby` (a profile_data ref → has `.id`/`.path`); our
+    // optimistic local appointments use `profileid`. Handle both + a name map.
+    private resolveBookedParticipantName(appointment: any): string {
+        const participantId = this.getBookedParticipantId(appointment);
+        if (!participantId) return 'Booked';
+        // Resolve the display name straight from loaded metadata.
+        return (
+            this.mapMetaData[participantId]?.name ||
+            this.mapprofile[participantId] ||
+            'Booked'
+        );
+    }
+
+    // Convenience: just the participant name for a booked slot (used in tooltips).
+    getBookedProfileName(slot: any): string {
+        return this.getSlotBookingInfo(slot)?.name || '';
+    }
+
+    // Booked client appointments for the currently selected day.
+    get bookedForSelectedDate(): any[] {
+        if (!this.selectedDate) return [];
+        return (this.filteredBookedAppointments || []).filter(
+            (a: any) => a?.starttime?.toDate?.().toDateString() === this.selectedDate
+        );
+    }
+
+    generateWeekDates() {
+        this.availableDates = [];
+        const currentDate = new Date(this.specialistStartDate);
+        while (currentDate <= this.specialistEndDate) {
+            const dateStr = new Date(currentDate).toDateString();
+            const slots = this.getSlotsForDate(dateStr);
+            const availableCount = slots.filter((s: any) => s.available && !s.booked).length;
+            this.availableDates.push({
+                fullDate: new Date(currentDate),
+                date: currentDate.getDate(),
+                day: currentDate
+                    .toLocaleDateString('en-US', {
+                        weekday: 'short',
+                    })
+                    .toUpperCase(),
+                hasSlots: slots.length > 0,
+                slotCount: slots.length,
+                availableCount,
+            });
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
     }
 
     get visibleCardIds(): string[] {
@@ -2312,18 +2704,18 @@ export class DeliveryDashboardCloneComponent {
     stageColorClass(stage: string): string {
         if (!stage) return 'col--eligible';
         const s = stage.toLowerCase().trim();
-        if (s.includes('eligible'))      return 'col--eligible';
-        if (s.includes('request'))       return 'col--request';
+        if (s.includes('eligible')) return 'col--eligible';
+        if (s.includes('request')) return 'col--request';
         if (s.includes('pre-process')
-         || s.includes('preprocess')
-         || s.includes('welcome'))       return 'col--preprocess';
-        if (s.includes('diagnostic'))    return 'col--diagnostic';
-        if (s.includes('implement'))     return 'col--implement';
-        if (s.includes('review'))        return 'col--review';
+            || s.includes('preprocess')
+            || s.includes('welcome')) return 'col--preprocess';
+        if (s.includes('diagnostic')) return 'col--diagnostic';
+        if (s.includes('implement')) return 'col--implement';
+        if (s.includes('review')) return 'col--review';
         if (s.includes('complet')
-         || s.includes('post-process')
-         || s.includes('celebration')
-         || s.includes('check-in'))      return 'col--completion';
+            || s.includes('post-process')
+            || s.includes('celebration')
+            || s.includes('check-in')) return 'col--completion';
         return 'col--eligible';
     }
     // Dot color class for product rows (cycles through 5-color set by index)
@@ -2334,8 +2726,8 @@ export class DeliveryDashboardCloneComponent {
     // Participants tab count (sum across the 3 sub-cohorts)
     get participantsTotalCount(): number {
         return (this.originalData?.['awaitingInitiation']?.count || 0)
-             + (this.originalData?.['currentJourneyInitiated']?.count || 0)
-             + (this.originalData?.['stuckCases']?.count || 0);
+            + (this.originalData?.['currentJourneyInitiated']?.count || 0)
+            + (this.originalData?.['stuckCases']?.count || 0);
     }
 
     // ===== Action Center → Participants tab deep-links (Batch A) =====
@@ -2363,6 +2755,7 @@ export class DeliveryDashboardCloneComponent {
                 break;
         }
         if (this.tabGroup) this.tabGroup.selectedIndex = this.currentTabIndex;
+        this.populateActionableCohorts(this.currentSelectedLabels);
         // Re-trigger paginated data for the newly active sub-tab
         try { this.filterTableData?.(); } catch { /* ignore if not ready */ }
     }
@@ -2392,7 +2785,7 @@ export class DeliveryDashboardCloneComponent {
         if (!ok) return;
         // Surface intent — actual bulk logic is not yet implemented in the backend.
         alert(`Bulk-initiate triggered for ${readyCount} participant${readyCount === 1 ? '' : 's'}. ` +
-              `Backend wiring is pending — this is a UX-confirmed stub.`);
+            `Backend wiring is pending — this is a UX-confirmed stub.`);
     }
 
     // First-letter monogram for a product (replaces emoji icons in Completion History).
@@ -2413,10 +2806,10 @@ export class DeliveryDashboardCloneComponent {
     getCardPipelineTotal(cardId: string): number {
         const f = this.getCardFunnel(cardId);
         return (f?.initiated?.length || 0)
-             + (f?.awaiting?.length || 0)
-             + (f?.started?.length || 0)
-             + (f?.ongoing?.length || 0)
-             + (f?.completed?.length || 0);
+            + (f?.awaiting?.length || 0)
+            + (f?.started?.length || 0)
+            + (f?.ongoing?.length || 0)
+            + (f?.completed?.length || 0);
     }
 
     // Sparkline data: per-product counts for each KPI (cached per filter/visible set)
@@ -2448,8 +2841,8 @@ export class DeliveryDashboardCloneComponent {
         this._sparkCacheKey = key;
         return this._sparkCache;
     }
-    get sparkReady(): number[]     { return this.buildSparkData().ready; }
-    get sparkStuck(): number[]     { return this.buildSparkData().stuck; }
+    get sparkReady(): number[] { return this.buildSparkData().ready; }
+    get sparkStuck(): number[] { return this.buildSparkData().stuck; }
     get sparkCompleted(): number[] { return this.buildSparkData().completed; }
     sparkMax(arr: number[]): number { return Math.max(1, ...arr); }
 
@@ -2611,6 +3004,7 @@ export class DeliveryDashboardCloneComponent {
     openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible') {
         this.selectedProductId = cardId;
         this.modalType = type;
+        this.selectedStatus = 'all';
 
         let source;
         switch (type) {
@@ -2869,19 +3263,185 @@ export class DeliveryDashboardCloneComponent {
                 )
                 : data;
         }
-        // Awaiting
-        // else if (this.selectedStageFilter === 'Awaiting') {
-        //     const data =
-        //         stage.awaiting?.[selectedFilter] ||
-        //         stage.awaiting?.all ||
-        //         [];
+    }
 
-        //     this.groupedByStageProfileAll = this.selectedProductId
-        //         ? data.filter(
-        //               (item: any) => item.productId === this.selectedProductId
-        //           )
-        //         : data;
-        // }
+    async initiateProduct(pid: string) {
+        this.initiateProductOptions[pid] = true;
+
+        if (this.initiateProductOptions) {
+            this.participantData = this.currentGroupedByProfile[pid];
+            const product = this.participantData[0];
+            const productId = product?.productref?.id;
+            await this.getDeliveryTypes(productId);
+
+            // Patch the form like the participant-purchase screen does:
+            // pre-fill Minimum Payment from the product's existing value or,
+            // failing that, the product's configured minimum required amount.
+            this.tentativeStartDate = product?.tentativestart?.toDate
+                ? product.tentativestart.toDate()
+                : (product?.tentativestart ?? null);
+            this.selectedDeliveryType = product?.deliverytype ?? '';
+            this.minimumPayment =
+                product?.minimumpayment ??
+                (await this.getProductMinimumRequiredAmount(productId)) ??
+                null;
+            this.cdr.detectChanges();
+        }
+    }
+
+    // Reads a product's configured minimum required amount (the same source
+    // the participant-purchase screen uses to seed Minimum Payment).
+    private async getProductMinimumRequiredAmount(productId: string): Promise<number | null> {
+        if (!productId) return null;
+        try {
+            const snap = await runInInjectionContext(this.injector, () =>
+                getDoc(doc(this.firestore, 'products', productId))
+            );
+            const amt = (snap.data() as any)?.minimumrequiredamount;
+            return amt != null ? amt : null;
+        } catch (err) {
+            console.error('getProductMinimumRequiredAmount failed:', err);
+            return null;
+        }
+    }
+
+    async getDeliveryTypes(productId: string) {
+        try {
+            const snapshot = await runInInjectionContext(this.injector, () =>
+                getDocs(collection(this.firestore, 'productToDeliverySequence'))
+            );
+            const deliveryType: string[] = [];
+            snapshot.forEach((doc) => {
+                const data: any = doc.data();
+                // Match product, then collect its delivery options.
+                if (data.product?.id === productId) {
+                    const types = (data.deliveryoptions || []).map(
+                        (item: any) => item.deliverytype
+                    );
+                    deliveryType.push(...types);
+                }
+            });
+            // Assign ONCE after the loop (the old code reset it to [] every pass).
+            this.deliveryTypes = deliveryType;
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    async updateParticipantProductStatus(docid: string, profileid: string) {
+        // Guard: Minimum Payment and Delivery Option are mandatory (matches the
+        // participant-purchase initiate flow).
+        const missing: string[] = [];
+        if (this.minimumPayment == null || (this.minimumPayment as any) === '') {
+            missing.push('Minimum Payment');
+        }
+        if (!this.selectedDeliveryType) {
+            missing.push('Delivery Option');
+        }
+        if (missing.length) {
+            alert(`Please fill the required field(s): ${missing.join(', ')}.`);
+            return;
+        }
+
+        const participantsProductRef = collection(this.firestore, 'participantsproduct');
+        const q = query(
+            participantsProductRef,
+            where('docid', '==', docid),
+            where('profileid', '==', profileid)
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            const updatePromises = querySnapshot.docs.map((docSnap) =>
+                updateDoc(docSnap.ref, {
+                    status: 'initiated',
+                    minimumpayment: this.minimumPayment,
+                    tentativestart: this.tentativeStartDate,
+                    deliverytype: this.selectedDeliveryType,
+                    statusdate: {
+                        initiated: serverTimestamp()
+                    }
+                })
+            );
+            await Promise.all(updatePromises);
+
+            // Mirror the participant-purchase flow: after marking the product
+            // initiated, (re)build the participant's delivery sequence doc. We
+            // fetch ALL of the profile's products (not just this one) so the
+            // existing sequence isn't truncated/corrupted.
+            try {
+                await this.syncDeliverySequence(profileid);
+            } catch (err) {
+                console.error('updateDeliverySequence failed:', err);
+            }
+
+            this.initiateProductOptions[profileid] = false;
+
+            // Optimistically reflect the new status in the open dialog so the
+            // item flips to "Initiated" immediately (no refresh needed). The
+            // doc objects are shared across participantData / groupedByProfileAll
+            // / allFunnelModalProfiles, so mutating them updates every view.
+            this.applyInitiatedStatusLocally(docid, profileid);
+
+            alert('Product has been initiated. The participant can now proceed with their journey.');
+        } else {
+            console.log('No matching document found');
+        }
+    }
+
+    // Mutates the in-memory dialog data so a just-initiated product shows the
+    // new status without waiting for a page refresh/re-fetch.
+    private applyInitiatedStatusLocally(docid: string, profileid: string) {
+        const stamp = (item: any) => {
+            if (!item) return;
+            item.status = 'initiated';
+            item.minimumpayment = this.minimumPayment;
+            item.tentativestart = this.tentativeStartDate;
+            item.deliverytype = this.selectedDeliveryType;
+        };
+
+        const matches = (item: any) =>
+            item && (item.docid === docid || item.participantproductid === docid);
+
+        // Update every collection that may hold this product's row.
+        const buckets = [
+            this.groupedByProfileAll?.[profileid],
+            this.allFunnelModalProfiles?.[profileid],
+            this.participantData,
+        ];
+        buckets.forEach((arr: any) => {
+            if (Array.isArray(arr)) arr.filter(matches).forEach(stamp);
+        });
+
+        // Re-apply the active status filter so a now-"initiated" row drops out
+        // of a "Not Initiated" view (or appears under "Initiated").
+        this.filterCardProfiles();
+        this.cdr.detectChanges();
+    }
+
+    // Build the full ordered product list for a profile and hand it to the
+    // shared guard, which upserts participantdeliverysequence/<profileid>
+    // (preserving any existing per-product `delivery` arrays).
+    private async syncDeliverySequence(profileid: string) {
+        const snap = await runInInjectionContext(this.injector, () =>
+            getDocs(query(
+                collection(this.firestore, 'participantsproduct'),
+                where('profileid', '==', profileid)
+            ))
+        );
+        const products = snap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as any) }))
+            .sort((a, b) => (a.sequenceorder ?? 0) - (b.sequenceorder ?? 0))
+            .map((p) => ({
+                docid: p.docid ?? p.id,
+                participantproductid: p.docid ?? p.id,
+                // The guard expects productref as a product-id string.
+                productref: p.productref?.id ?? p.productref,
+            }))
+            .filter((p) => !!p.productref);
+
+        if (!products.length) return;
+        await this.guard.updateDeliverySequence(profileid, products);
     }
 
     get currentGroupedByProfile() {
@@ -3087,7 +3647,6 @@ export class DeliveryDashboardCloneComponent {
         await this.fetchDFUProductData();
     }
 
-
     applyProductFilter() {
         const productKeywordsMap: any = {
             "WISH": ["WiSH"],
@@ -3289,7 +3848,7 @@ export class DeliveryDashboardCloneComponent {
     getAppointmentStatus(stage: string, appointment: any) {
         const { attended } = appointment;
 
-        if (stage === 'Pre-Process' || stage === 'Post-Process Form' || stage === 'Post Session Check-in') return 'Submitted';
+        if (stage === 'Pre-Process' || stage === 'Post-Process Form' || stage === 'EI Starter Pack Post Session Check-in') return 'Submitted';
         else if (attended) return 'Completed';
         else if (!attended) return 'Scheduled';
         else return 'Cancelled';
@@ -3299,7 +3858,6 @@ export class DeliveryDashboardCloneComponent {
         this.searchText = event.target.value;
         this.updateFilteredCards();
     }
-
 
     async loadModes() {
         const now = new Date();
@@ -3652,7 +4210,6 @@ export class DeliveryDashboardCloneComponent {
         );
 
         this.monthyear = `${this.selectedMonth.getFullYear()}-${String(this.selectedMonth.getMonth() + 1).padStart(2, '0')}`;
-
         this.fetchData();
     }
 
@@ -3782,6 +4339,11 @@ export class DeliveryDashboardCloneComponent {
         if (this.currentPage > this.totalPages && this.totalPages > 0) {
             this.currentPage = this.totalPages;
         }
+
+        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+        const endIndex = startIndex + this.itemsPerPage;
+        this.paginatedData = allData.slice(startIndex, endIndex);
+        this.cdr.detectChanges();
     }
 
     updatePaginatedData(): void {
@@ -3884,15 +4446,20 @@ export class DeliveryDashboardCloneComponent {
     }
 
     refreshFilter(): void {
-        this.filterForm.reset({
+        // save product selection before reset
+        const savedProductLabels = this.productFilterControl.value as string[] || [];
+        // reset only search and journey, NOT product
+        this.filterForm.patchValue({
             search: '',
             journey: [],
-            product: []
         });
         this.searchText = '';
         this.filteredData = [];
         this.currentPage = 1;
-        this.updatePaginatedData();
+
+        // restore product selection
+        this.currentSelectedLabels = savedProductLabels;
+        this.populateActionableCohorts(this.currentSelectedLabels);
     }
 
     updatePaginatedDataWithSearch(): void {
@@ -4237,11 +4804,23 @@ export class DeliveryDashboardCloneComponent {
         this.calculatePagination();
     }
 
+    private currentSelectedLabels: string[] = [];
+
     onTabChange(event: any) {
         this.currentTabIndex = event.index;
         this.currentPage = 1;
         this.itemsPerPage = 10;
-        this.refreshFilter();
+
+        // save product selection before reset
+        const savedProductLabels = this.productFilterControl.value as string[] || [];
+
+        // reset only search and journey, NOT product
+        this.filterForm.patchValue({
+            search: '',
+            journey: [],
+        });
+        this.searchText = '';
+        this.filteredData = [];
 
         if (!this.isFilterButtonClick) {
             this.activeFilter = 'none';
@@ -4270,7 +4849,10 @@ export class DeliveryDashboardCloneComponent {
         }
 
         this.isFilterButtonClick = false;
-        this.updatePaginatedData();
+
+        // use saved labels to ensure product filter is preserved
+        this.currentSelectedLabels = savedProductLabels;
+        this.populateActionableCohorts(this.currentSelectedLabels);
     }
 
     onBulkInitiateClick() {
@@ -4470,7 +5052,7 @@ export class DeliveryDashboardCloneComponent {
         if (!selectedDate) return;
         this.selectedMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
         this.updateDisplayMonth();
-        this.filterAppointmentsByType();
+        this.filterAppointmentsByType('all', null);
     }
 
     onJourneyMonthSelected(event: Date, picker: any) {
@@ -4478,7 +5060,7 @@ export class DeliveryDashboardCloneComponent {
         this.journeyMonthPicker.setValue(this.selectedMonth);
         this.updateDisplayMonth();
         picker.close();
-        this.filterAppointmentsByType();
+        this.filterAppointmentsByType('all', null);
     }
 
     getCompletionSummary(): CompletionSummary {
@@ -4935,6 +5517,371 @@ export class DeliveryDashboardCloneComponent {
         this.selectedStageFilter = '';
     }
 
+    async goToBooking(selectedSlot: any) {
+        this.selectedUser = null;
+        this.filteredProfile = "";
+        this.selectedSlotData = selectedSlot;
+
+        // Open the picker IMMEDIATELY (with its loading state) so the click feels
+        // responsive — profile map + eligible profiles then stream in.
+        this.slotSelected = true;
+        this.eligibleProfilesLoading = true;
+        this.cdr.detectChanges();
+
+        // Load which profiles are eligible to book this activity (Option A).
+        this.loadEligibleProfiles(this.selectedAppointmentTypeId);
+
+        this.guard.getProfileMap().then(data => {
+            this.profileList = data.list;
+            this.mapProfile = data.map;
+            this.cdr.detectChanges();
+        });
+
+        const roles = await this.guard.getRoles();
+        this.loggedInPID = roles.profile_ref.id;
+    }
+
+    // Human-readable label for the slot currently being booked (shown in the
+    // picker header so the user knows exactly which slot they're filling).
+    get selectedSlotLabel(): string {
+        const slot = this.selectedSlotData;
+        if (!slot) return '';
+        const start = slot?.slotStart?.toDate?.();
+        const end = slot?.slotEnd?.toDate?.();
+        if (!start) return '';
+        const fmt = (d: Date) =>
+            d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const eisId = (slot?.eisprofile || '').split('/').pop();
+        const who = this.mapprofile[eisId] || this.mapMetaData[eisId]?.['name'] || '';
+        const day = start.toLocaleDateString([], { day: '2-digit', month: 'short' });
+        const time = end ? `${fmt(start)} – ${fmt(end)}` : fmt(start);
+        return who ? `${day} · ${time} · ${who}` : `${day} · ${time}`;
+    }
+
+    // Fetch the set of profiles that have a ready appointment deliverable for
+    // the given activity, so the picker only offers bookable profiles.
+    async loadEligibleProfiles(appointmentTypeId: string) {
+        this.eligibleProfileIds = new Set<string>();
+        if (!appointmentTypeId) return;
+        this.eligibleProfilesLoading = true;
+        this.cdr.detectChanges();
+        try {
+            const snap = await runInInjectionContext(this.injector, () =>
+                getDocs(query(
+                    collection(this.firestore, 'deliverables'),
+                    where('deliveryref', '==', doc(this.firestore, 'appointmenttype/' + appointmentTypeId)),
+                    where('type', '==', 'appointment'),
+                    where('status', '==', 'ready'),
+                ))
+            );
+            snap.forEach((d) => {
+                const pid = d.data()['profileid'];
+                if (pid) this.eligibleProfileIds.add(pid);
+            });
+        } catch (e) {
+            console.error('Error loading eligible profiles:', e);
+        } finally {
+            this.eligibleProfilesLoading = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    returnClient() {
+        const search = (this.filteredProfile || '').toLowerCase();
+        return this.profileList.filter(
+            (e: any) =>
+                this.eligibleProfileIds.has(e.id) &&
+                (e.name || '').toLowerCase().includes(search)
+        );
+    }
+
+    // Pick a profile from the custom searchable list and start the booking.
+    selectProfileForBooking(user: any) {
+        this.selectedUser = user.id;
+        this.onProfileSelect(user.id);
+    }
+
+    async directBookAppointment(appointmentTypeId: string, profileId: string) {
+        const injector = this.injector;
+        try {
+            const selectedSlotData = this.selectedSlotData;
+            await runInInjectionContext(injector, async () => {
+
+                const deliverableCollection = collection(this.firestore, "deliverables");
+                const deliverableQuery = query(
+                    deliverableCollection,
+                    where("profileid", "==", profileId),
+                    where("type", "==", "appointment"),
+                    where("deliveryref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId))
+                );
+
+                const deliverableDocs = await getDocs(deliverableQuery);
+                if (deliverableDocs.empty) {
+                    alert("No matching deliverable found for this appointment type.");
+                    return;
+                }
+
+                // ---- Item 4: honor the customer's per-role specialist mapping.
+                // book-appointment only offers EIS that are assigned to THIS
+                // customer (customer_eismapping.eisroles[role]); DDC fetches the
+                // whole role pool, so verify the chosen specialist is allowed for
+                // this customer before booking.
+                const chosenRole: string = selectedSlotData?.appointmentrole;
+                const chosenEis: string = selectedSlotData?.eisprofile;
+                if (chosenRole && chosenEis) {
+                    const custMapSnap = await getDoc(
+                        doc(this.firestore, "customer_eismapping/" + profileId)
+                    );
+                    if (custMapSnap.exists()) {
+                        const eisroles = custMapSnap.data()?.["eisroles"] || {};
+                        const assigned = (eisroles[chosenRole] || [])
+                            .map((e: any) => e?.path || e)
+                            .filter(Boolean);
+                        // Only enforce when the customer has an explicit mapping
+                        // for this role; otherwise fall back to the global pool.
+                        if (assigned.length > 0 && !assigned.includes(chosenEis)) {
+                            alert("The selected specialist is not assigned to this customer for this appointment role.");
+                            return;
+                        }
+                    }
+                }
+
+                const deliverableMap: { [path: string]: any } = {};
+                deliverableDocs.docs.forEach(d => {
+                    deliverableMap[d.ref.path] = d;
+                });
+
+                const deliverySequenceDoc = doc(this.firestore, "participantdeliverysequence/" + profileId);
+                const participantDelivery = await getDoc(deliverySequenceDoc);
+                if (!participantDelivery.exists()) {
+                    alert("No Delivery Sequence Found");
+                    return;
+                }
+
+                const products = participantDelivery.data()["products"];
+                let matchedProduct: any = null;
+                let matchedDelivery: any = null;
+                let deliverablePath: string = null;
+
+                for (const product of products) {
+                    if (!product.delivery) continue;
+                    for (const delivery of product.delivery) {
+                        if (
+                            delivery.type === "appointment" &&
+                            (delivery.status === "ready" || delivery.status == null) &&
+                            deliverableMap[delivery.sequenceref?.path] !== undefined
+                        ) {
+                            matchedProduct = product;
+                            matchedDelivery = delivery;
+                            deliverablePath = delivery.sequenceref.path;
+                            break;
+                        }
+                    }
+                    if (matchedProduct) break;
+                }
+
+                if (!matchedProduct || !matchedDelivery || !deliverablePath) {
+                    alert("No matching delivery sequence entry found.");
+                    return;
+                }
+
+                // Get appointment roles
+                const apptRoleCollection = collection(this.firestore, "AppointmentType-To-Roles");
+                const apptRoleQuery = query(
+                    apptRoleCollection,
+                    where("assigned_appttype_ref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId)),
+                    limit(1)
+                );
+
+                let appointmentRoles: string[] = [];
+                const rolesDocs = await getDocs(apptRoleQuery);
+                rolesDocs.forEach(d => {
+                    (d.data()["required_role"] ?? []).forEach((r: any) => appointmentRoles.push(r.path));
+                    (d.data()["additional_role"] ?? []).forEach((r: any) => appointmentRoles.push(r.path));
+                });
+
+                if (appointmentRoles.length === 0) {
+                    alert("No roles configured for this appointment type.");
+                    return;
+                }
+
+                const slotStart: Date = selectedSlotData.slotStart;
+                const slotEnd: Date = selectedSlotData.slotEnd;
+                const eisprofile: string = selectedSlotData.eisprofile;
+
+                const docdata: { id: string, index: number }[] = selectedSlotData.docdata ?? [
+                    { id: selectedSlotData.docid, index: selectedSlotData.index ?? 0 }
+                ];
+
+                // Map the chosen host to the role its slot actually fills (fall
+                // back to the first required role if the slot didn't carry one).
+                const slotRole: string = selectedSlotData.appointmentrole || appointmentRoles[0];
+                const hostRole: { [key: string]: any[] } = {};
+                hostRole[slotRole] = [doc(this.firestore, eisprofile)];
+
+                const availabilityDocRef = doc(this.firestore, "availability/" + docdata[0].id);
+                const availabilitySnap = await getDoc(availabilityDocRef);
+                const availabilityData: any = availabilitySnap.data() || {};
+
+                // ---- Item 2: flip the chosen slot to booked and mark any
+                // overlapping slots (across appointment types) unavailable, so
+                // the availability doc reflects the booking (mirrors book-appointment).
+                const toDate = (v: any): Date | null =>
+                    v?.toDate?.() ?? (v ? new Date(v) : null);
+                const targetStart = toDate(slotStart);
+                const targetEnd = toDate(slotEnd);
+                const apptTypeRefs: any[] = availabilityData["appointments"] ?? [];
+                for (const apptRef of apptTypeRefs) {
+                    const apptId = apptRef?.id;
+                    if (!apptId) continue;
+                    const computedSlots = availabilityData[apptId];
+                    if (!Array.isArray(computedSlots)) continue;
+                    for (let k = 0; k < computedSlots.length; k++) {
+                        const se = computedSlots[k];
+                        const sStart = toDate(se.slotstart);
+                        const sEnd = toDate(se.slotend);
+                        if (!sStart || !sEnd || !targetStart || !targetEnd) continue;
+                        const overlaps =
+                            (sStart >= targetStart && sStart < targetEnd) ||
+                            (sEnd > targetStart && sEnd < targetEnd) ||
+                            (targetStart >= sStart && targetStart < sEnd);
+                        if (!overlaps) continue;
+                        if (!se.booked) se.available = false;
+                        if (apptId === appointmentTypeId && k === docdata[0].index) {
+                            se.booked = true;
+                        }
+                    }
+                }
+
+                const requiredRoles = appointmentRoles.map(r => doc(this.firestore, r));
+                const hostRefs = [doc(this.firestore, eisprofile)];
+                const docid = doc(collection(this.firestore, "appointments")).id;
+                const appointmentDocRef = doc(this.firestore, "appointments/" + docid);
+                const appointmentData = {
+                    docid,
+                    starttime: slotStart,
+                    endtime: slotEnd,
+                    appointment: doc(this.firestore, "appointmenttype/" + appointmentTypeId),
+                    appointmentrole: requiredRoles,
+                    bookedby: doc(this.firestore, "profile_data/" + profileId),
+                    hosts: hostRefs,
+                    hostRole,
+                    slotdata: docdata,
+                    attended: false,
+                    cancelled: false,
+                    created: serverTimestamp(),
+                    loggedid: this.loggedInPID,
+                    productid: matchedProduct.productref.id
+                };
+
+                const batch = writeBatch(this.firestore);
+
+                batch.update(availabilityDocRef, availabilityData);
+                batch.set(appointmentDocRef, appointmentData);
+                await batch.commit();
+
+                const updatedProducts = products.map((p: any) => {
+                    if (p.participantproductid !== matchedProduct.participantproductid) return p;
+                    const updatedDelivery = (p.delivery ?? []).map((d: any) => {
+                        if (d.sequenceref?.path === deliverablePath) {
+                            return { ...d, status: "ongoing" };
+                        }
+                        return d;
+                    });
+                    return { ...p, delivery: updatedDelivery };
+                });
+
+                const sequenceDocRef = doc(this.firestore, "participantdeliverysequence/" + profileId);
+                await updateDoc(sequenceDocRef, { products: updatedProducts });
+
+                const deliverableDocRef = doc(this.firestore, deliverablePath);
+                await updateDoc(deliverableDocRef, {
+                    fileref: arrayUnion(doc(this.firestore, appointmentDocRef.path)),
+                    status: "ongoing"
+                });
+
+                const participantProductDocRef = doc(this.firestore, "participantsproduct/" + matchedProduct.participantproductid);
+                await updateDoc(participantProductDocRef, { status: "ongoing" });
+
+                alert("Appointment Booked Successfully!");
+
+                // ---- Reflect the booking immediately + clear the booking state.
+                // Optimistically lock the chosen slot so it shows as booked.
+                const wasAvailable = !!selectedSlotData?.available && !selectedSlotData?.booked;
+                if (selectedSlotData) {
+                    selectedSlotData.booked = true;
+                    selectedSlotData.available = false;
+                }
+                // Keep the aggregate counts (header "BOOKED / OPEN" badge + day
+                // pill) in sync with the slot we just flipped, without a re-fetch.
+                if (wasAvailable) {
+                    const slotEisId = (selectedSlotData?.eisprofile || '').split('/').pop();
+                    const spec = (this.specialistData || []).find((s: any) => s.eisId === slotEisId);
+                    if (spec) {
+                        spec.booked = (spec.booked || 0) + 1;
+                        spec.availableSlots = Math.max(0, (spec.availableSlots || 0) - 1);
+                        spec.utilizationPct = spec.appointmentsGiven
+                            ? Math.round((spec.booked / spec.appointmentsGiven) * 100)
+                            : 0;
+                        if (spec.availableSlots > 0 && spec.utilizationPct < 60) {
+                            spec.utilizationNote = 'needs bookings';
+                            spec.utilizationNoteColor = '#f59e0b';
+                        } else if (spec.availableSlots > 0) {
+                            spec.utilizationNote = `${spec.availableSlots} open`;
+                            spec.utilizationNoteColor = '#10b981';
+                        } else {
+                            spec.utilizationNote = '';
+                        }
+                    }
+                    // Decrement the "N OPEN" count on the matching day pill.
+                    const slotDay = selectedSlotData?.slotStart?.toDate?.()?.toDateString?.();
+                    const dayEntry = (this.availableDates || []).find(
+                        (d: any) => d.fullDate?.toDateString?.() === slotDay
+                    );
+                    if (dayEntry && dayEntry.availableCount > 0) {
+                        dayEntry.availableCount--;
+                    }
+                }
+                // Add the new appointment locally so the slot/booked-list show the
+                // profile name without needing a full re-fetch.
+                const newAppt = {
+                    starttime: slotStart,
+                    endtime: slotEnd,
+                    profileid: profileId,
+                    appointment: { id: appointmentTypeId },
+                };
+                this.filteredBookedAppointments = [
+                    ...(this.filteredBookedAppointments || []),
+                    newAppt,
+                ];
+                this.specialistBookedAll = [
+                    ...(this.specialistBookedAll || []),
+                    newAppt,
+                ];
+                // Clear the picker / selection state.
+                this.slotSelected = false;
+                this.selectedUser = null;
+                this.filteredProfile = "";
+                this.selectedSlotData = null;
+                this.cdr.detectChanges();
+            });
+
+        } catch (err) {
+            console.error("directBookAppointment error:", err);
+            alert("Error booking appointment. Please try again.");
+        }
+    }
+
+    async onProfileSelect(selectedprofile: string) {
+        const confirmed = confirm('Are you sure you want to book this appointment?');
+        if (confirmed) {
+            await this.directBookAppointment(
+                this.selectedAppointmentTypeId,
+                selectedprofile
+            );
+        }
+    }
+
     // ===== Analytics tab =================================================
 
     analyticsLoading = false;
@@ -5327,7 +6274,7 @@ export class DeliveryDashboardCloneComponent {
         return Math.max(0, Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000)));
     }
 
-    populateActionableCohorts(): void {
+    populateActionableCohorts(selectedLabels: string[] = []): void {
         const awaiting: any[] = [];
         const idle: any[] = [];
         const stuck: any[] = [];
@@ -5335,7 +6282,14 @@ export class DeliveryDashboardCloneComponent {
         const rejected = new Set(['rejected', 'cancelled', 'inactive']);
 
         for (const item of this.allMatchedProductsRaw || []) {
-            if (!this.itemPassesProductFilter(item)) continue;
+
+            // replace itemPassesProductFilter with direct label check
+            if (selectedLabels.length > 0) {
+                const pid = item?.productref?.id;
+                if (!pid) continue;
+                const label = this.cardLabelForProductId(pid);
+                if (!label || !selectedLabels.includes(label)) continue;
+            }
 
             const profileId = item?.profileid;
             if (!profileId) continue;
@@ -5367,8 +6321,6 @@ export class DeliveryDashboardCloneComponent {
             const daysSinceInitiated = this.daysSinceTs(initiated);
             const daysSinceActivity = this.daysSinceTs(lastActivity);
 
-            // --- Awaiting Initiation -------------------------------------
-            // Payment cleared (eligible), and status is null/empty (not yet initiated)
             if (!status && isEligible) {
                 awaiting.push({
                     profileid: profileId,
@@ -5382,8 +6334,6 @@ export class DeliveryDashboardCloneComponent {
                 continue;
             }
 
-            // --- Initiated · Not Consuming -------------------------------
-            // status='initiated' and idle > IDLE_DAYS
             if (status === 'initiated' && daysSinceInitiated >= this.IDLE_DAYS) {
                 idle.push({
                     profileid: profileId,
@@ -5394,8 +6344,6 @@ export class DeliveryDashboardCloneComponent {
                 });
             }
 
-            // --- Stuck Cases ----------------------------------------------
-            // In any active stage (initiated/ongoing) and no movement > STUCK_DAYS
             if ((status === 'initiated' || status === 'ongoing') && daysSinceActivity >= this.STUCK_DAYS) {
                 const days = daysSinceActivity;
                 const escalation = days > 30 ? 'HIGH' : days > 21 ? 'MEDIUM' : 'LOW';
@@ -5416,17 +6364,14 @@ export class DeliveryDashboardCloneComponent {
             }
         }
 
-        this.originalData['awaitingInitiation'].data  = awaiting;
+        this.originalData['awaitingInitiation'].data = awaiting;
         this.originalData['awaitingInitiation'].count = awaiting.length;
-        this.originalData['currentJourneyInitiated'].data  = idle;
+        this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
-        this.originalData['stuckCases'].data  = stuck;
+        this.originalData['stuckCases'].data = stuck;
         this.originalData['stuckCases'].count = stuck.length;
 
-        // Pagination depends on these arrays; recalc if a table is currently mounted.
-        if (typeof this.calculatePagination === 'function') {
-            this.calculatePagination();
-            this.updatePaginatedData?.();
-        }
+        this.currentPage = 1;
+        this.calculatePagination();
     }
 }

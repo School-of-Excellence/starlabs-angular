@@ -23,6 +23,7 @@ import { AuthguardService } from '../../authguard.service';
 import { MatInputModule } from '@angular/material/input';
 import { EvolutiomMappingAddComponent } from './evolutiom-mapping-add/evolutiom-mapping-add.component';
 import { MatButtonModule } from '@angular/material/button';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface LiveEvolutionMapping {
   profileid: string;
@@ -33,7 +34,7 @@ interface LiveEvolutionMapping {
 
 @Component({
   selector: 'app-evolution-mapping',
-  imports: [MatPaginatorModule, MatSort,MatFormFieldModule,CommonModule,FormsModule,MatTooltipModule,MatIconModule,MatTabsModule,MatSelectModule,MatTableModule,MatCheckboxModule,MatInputModule,MatButtonModule],
+  imports: [MatPaginatorModule, MatSort,MatFormFieldModule,CommonModule,FormsModule,MatTooltipModule,MatIconModule,MatTabsModule,MatSelectModule,MatTableModule,MatCheckboxModule,MatInputModule,MatButtonModule,ProfilePictureComponent],
   templateUrl: './evolution-mapping.component.html',
   styleUrl: './evolution-mapping.component.css'
 })

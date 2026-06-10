@@ -20,6 +20,7 @@ import { CallsRecordComponent } from "../calls-record/calls-record.component";
 import { WatiRecordComponent } from "../wati-record/wati-record.component";
 import { doc } from 'firebase/firestore';
 import { MatTooltip } from "@angular/material/tooltip";
+import { ChannelRecordComponent } from '../channel-record/channel-record.component';
 
 @Component({
   selector: 'app-notification-record',
@@ -39,7 +40,8 @@ import { MatTooltip } from "@angular/material/tooltip";
     EmailRecordComponent,
     CallsRecordComponent,
     WatiRecordComponent,
-    MatTooltip
+    MatTooltip,
+    ChannelRecordComponent
 ],
   templateUrl: './notification-record.component.html',
   styleUrl: './notification-record.component.css'
@@ -536,7 +538,9 @@ export class NotificationRecordComponent {
           logsLoading: false,
           logsChecked: false,
           read: false,
-          clicked: 'unknown'  // Default to 'unknown'
+          clicked: 'unknown',  // Default to 'unknown'
+          // Client-side deep-link tracking (written back by the app onto the record)
+          ...this.buildClientTracking(notificationData, profileId)
         };
       });
     }
@@ -567,7 +571,9 @@ export class NotificationRecordComponent {
           logsLoading: false,
           logsChecked: false,
           read: false,
-          clicked: 'unknown'
+          clicked: 'unknown',
+          // Client-side deep-link tracking (written back by the app onto the record)
+          ...this.buildClientTracking(notificationData, profileId)
         };
       });
     }
@@ -617,6 +623,65 @@ export class NotificationRecordComponent {
       }
     });
   }
+  // Derive the client-side deep-link outcome for a profile from the fields the
+  // app writes back onto the notificationrecord doc:
+  //   clientClicked[], clientLanded[], clientFailed[] (arrays of profileid)
+  //   clientFailures{profileid:{stage,reason,at}}, clientClickScenario{profileid:scenario}
+  //   clientevents{profileid:{clicked|landed|failed:{at,scenario,stage,reason}}}
+  // Outcome:
+  //   Landed              -> tap routed to its destination
+  //   Broke midway        -> routing failed (stage + reason)
+  //   Clicked, no landing  -> tapped but never landed/failed (silent midway break)
+  buildClientTracking(notificationData: any, profileId: string) {
+    const inArr = (a: any) => Array.isArray(a) && a.includes(profileId);
+    const landed = inArr(notificationData?.clientLanded);
+    const failed = inArr(notificationData?.clientFailed);
+    const appClicked = inArr(notificationData?.clientClicked);
+    const failure = notificationData?.clientFailures?.[profileId] || null;
+    const scenario = notificationData?.clientClickScenario?.[profileId]
+      || notificationData?.clientevents?.[profileId]?.clicked?.scenario
+      || null;
+
+    let outcome = '—';
+    let outcomeClass = 'none';
+    if (failed) { outcome = 'Broke midway'; outcomeClass = 'failed'; }
+    else if (landed) { outcome = 'Landed'; outcomeClass = 'landed'; }
+    else if (appClicked) { outcome = 'Clicked, no landing'; outcomeClass = 'partial'; }
+
+    return {
+      appClicked,
+      landed,
+      clientFailedFlag: failed,
+      scenario: scenario || '-',
+      failStage: failure?.stage || null,
+      failReason: failure?.reason || null,
+      failReadable: failed ? this.humanizeFailure(failure?.stage, failure?.reason) : null,
+      outcome,
+      outcomeClass
+    };
+  }
+
+  // Turn the app's internal stage/reason codes into a plain-English explanation
+  // a non-technical user can understand. The raw code stays available on hover.
+  humanizeFailure(stage: string | null | undefined, reason: string | null | undefined): string {
+    const s = (stage || '').toLowerCase();
+    const r = (reason || '').toLowerCase();
+    if (r.includes('doc_not_found')) return 'The linked content no longer exists — it may have been removed.';
+    if (r.includes('profile_mismatch')) return 'This content belongs to a different user account.';
+    if (r.includes('malformed_landingpage')) return 'The notification link was malformed, so the page could not open.';
+    if (r.includes('missing_content_segments') || r.includes('missing_contentid')) return 'The notification link was incomplete (missing the content reference).';
+    if (r.includes('cannot_launch')) return 'The external link could not be opened on this device.';
+    if (r.includes('no_handler')) return 'This notification type has no screen to open in the app.';
+    if (r.includes('missing_ticketid')) return 'The support-ticket reference was missing from the notification.';
+    if (r.includes('missing_aelid')) return 'A required reference was missing from the notification.';
+    if (r.includes('unavailable')) return 'Could not reach the server to load the page — check the connection.';
+    if (r.includes('permission-denied') || r.includes('permission_denied')) return 'The app was not allowed to open this content.';
+    if (r.startsWith('exception:') || s === 'navigation') return 'Something went wrong while opening the notification.';
+    if (s === 'parse') return 'The notification link could not be read.';
+    // Fallback: tidy up the raw reason so it is at least legible.
+    return reason ? reason.replace(/_/g, ' ').replace(/:/g, ': ') : 'The notification could not be opened.';
+  }
+
   async fetchRecipientLogs(profileId: string, docId: string, type: 'success' | 'failed') {
     const userRef = this.mapProfiledata[profileId]?.user_ref;
     if (!userRef) return;
@@ -804,6 +869,11 @@ export class NotificationRecordComponent {
         Channel: [r.appstatus, r.webstatus].filter(Boolean).join(', ') || '-',
         Read: r.read ? 'true' : 'false',
         Clicked: r.clicked,  // Will be 'Yes' or 'unknown'
+        'Tap Outcome': r.outcome || '—',
+        Landed: r.landed ? 'Yes' : (r.appClicked ? 'No' : '-'),
+        Scenario: r.scenario || '-',
+        'Fail Stage': r.failStage || '-',
+        'Fail Reason': r.failReason || '-',
         'Log Created': this.getLogStatusText(r)
       })),
       ...this.failedRecipients.map(r => ({
@@ -813,6 +883,11 @@ export class NotificationRecordComponent {
         Channel: [r.appstatus, r.webstatus].filter(Boolean).join(', ') || '-',
         Read: r.read ? 'true' : 'false',
         Clicked: r.clicked,  // Will be 'Yes' or 'unknown'
+        'Tap Outcome': r.outcome || '—',
+        Landed: r.landed ? 'Yes' : (r.appClicked ? 'No' : '-'),
+        Scenario: r.scenario || '-',
+        'Fail Stage': r.failStage || '-',
+        'Fail Reason': r.failReason || '-',
         'Log Created': this.getLogStatusText(r)
       }))
     ];
@@ -826,6 +901,11 @@ export class NotificationRecordComponent {
       { wch: 20 }, // Channel
       { wch: 10 }, // Read
       { wch: 10 }, // Clicked
+      { wch: 18 }, // Tap Outcome
+      { wch: 8 },  // Landed
+      { wch: 12 }, // Scenario
+      { wch: 22 }, // Fail Stage
+      { wch: 40 }, // Fail Reason
       { wch: 15 }  // Log Created
     ];
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
