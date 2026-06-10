@@ -33,10 +33,12 @@ const ID = {
   EVT: `${TESTRUNID}_bizevt_0`,        // event collection doc (zone management + viewquiz event name)
   COH1: `${TESTRUNID}_bizcoh_0`,        // big cohorts doc #1 (eventref → EVT)
   COH2: `${TESTRUNID}_bizcoh_1`,        // big cohorts doc #2 (eventref → EVT)
-  ZONE1: `${TESTRUNID}_bizzone_0`,      // event zones doc #1 (eventref → EVT)
-  ZONE2: `${TESTRUNID}_bizzone_1`,      // event zones doc #2 (eventref → EVT)
+  ZONE1: `${TESTRUNID}_bizzone_0`,      // event zones doc #1 (eventref → EVT) — BM-07 read baseline
+  ZONE2: `${TESTRUNID}_bizzone_1`,      // event zones doc #2 (eventref → EVT) — BM-07 read baseline
+  ZONE_W: `${TESTRUNID}_bizzone_w`,     // event zones WRITE target (eventref → EVT) → BM-08 assign + BM-09 submit
   EXP_PAST: `${TESTRUNID}_bizexp_past`, // expenseplanning doc in current month (NOT today) → BM-03 soft-delete
   ADS_PAST: `${TESTRUNID}_bizads_past`, // adsinvestment doc in current month (NOT today) → list baseline
+  ADS_EDIT: `${TESTRUNID}_bizads_edit`, // adsinvestment doc (current month, NOT today) w/ 1 seed log → BM-06 edit-appends-log
   HPC: (i) => `${TESTRUNID}_bizhpc_${i}`,
   QUIZ: `${TESTRUNID}_bizquiz_0`,       // quiz doc (type withoutResponse, active) → BM-14
   QRESP: (i) => `${TESTRUNID}_bizqresp_${i}`,
@@ -44,19 +46,24 @@ const ID = {
 };
 
 // Actors. profileids are run-prefixed; emails follow actors.ts convention `<role>+<run>@example.com`.
+// p1 was added for the deep zone-management cases (BM-08/09): COH1 holds p0, COH2 holds p1, so
+// assigning BOTH cohorts to one zone yields exactly 2 unique participants → the submitConfiguration
+// conservation count (event participant zones == unique participants) is > 1 and meaningful.
 const PF = {
   admin: `${TESTRUNID}_pf_admin`,
   p0: `${TESTRUNID}_pf_p0`,
+  p1: `${TESTRUNID}_pf_p1`,
 };
 const EMAIL = {
   admin: `admin+${TESTRUNID}@example.com`,
   p0: `participant0+${TESTRUNID}@example.com`,
+  p1: `participant1+${TESTRUNID}@example.com`,
 };
 
 function roster() {
   const mk = (key, roles, role) => ({ uid: `${TESTRUNID}_u_${key}`, profileid: PF[key], email: EMAIL[key], role: role || key, roles });
   const staff = [mk('admin', ['admin'], 'admin')];
-  const participants = [mk('p0', ['participant'], 'participant')];
+  const participants = [mk('p0', ['participant'], 'participant'), mk('p1', ['participant'], 'participant')];
   return { staff, operators: [], participants };
 }
 
@@ -103,10 +110,12 @@ async function seedBusiness() {
   // --- date helpers (seed-time Node Date — same machine/TZ as the test browser) ---
   const now = new Date();
   // A day in the CURRENT month that is NOT today (so the "add" dialog's dateExist() never collides with
-  // the seeded baseline doc, and the seeded doc still falls inside the month-filter window).
-  const otherDayThisMonth = () => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() === 15 ? 14 : 15, 12, 0, 0, 0);
-    return d;
+  // the seeded baseline doc, and the seeded doc still falls inside the month-filter window). An optional
+  // `pref` day lets a caller pin a specific (non-today) day; it falls back near the 15th when pref==today.
+  const otherDayThisMonth = (pref) => {
+    let day = pref || 15;
+    if (day === now.getDate()) day = day === 15 ? 14 : 15; // never collide with today
+    return new Date(now.getFullYear(), now.getMonth(), day, 12, 0, 0, 0);
   };
   const daysAgo = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); d.setHours(12, 0, 0, 0); return d; };
 
@@ -126,12 +135,19 @@ async function seedBusiness() {
   // big cohorts: name (for sort + viewquiz cohort name), cohortCategory (bucketing), participantidlist.
   // Only seeded profile ids appear in participantidlist (recon risk #5: zone-mgmt reads
   // mapProfileData[pid]['email'] without a null guard — keep every pid resolvable in profile_data).
+  // COH1 holds p0, COH2 holds p1 → two cohorts with DISTINCT single participants. Assigning both to one
+  // zone (BM-09) yields exactly 2 unique participants. Only seeded profile ids appear in participantidlist
+  // (recon risk #5: zone-mgmt reads mapProfileData[pid]['email'] WITHOUT a null guard — every pid here is
+  // a seeded participant present in profile_data, so analyzeParticipantAssignments() can't throw).
   await cohRef1.set({ docid: ID.COH1, name: `BIZ Cohort A ${TESTRUNID}`, cohortCategory: 'operational', eventref: eventRef, participantidlist: [PF.p0], ...tag });
-  await cohRef2.set({ docid: ID.COH2, name: `BIZ Cohort B ${TESTRUNID}`, cohortCategory: 'educational', eventref: eventRef, participantidlist: [PF.p0], ...tag });
-  // event zones: zonename (for sort + render), eventref ref, cohorts array (empty → unassigned baseline),
-  // status. zonesCreated == count of these docs (app renders eventZoneList.length).
+  await cohRef2.set({ docid: ID.COH2, name: `BIZ Cohort B ${TESTRUNID}`, cohortCategory: 'educational', eventref: eventRef, participantidlist: [PF.p1], ...tag });
+  // event zones: zonename (for sort + render), eventref ref, cohorts array, status. zonesCreated == count
+  // of these docs (app renders eventZoneList.length). ZONE1/ZONE2 are the BM-07 read baseline (empty cohorts).
+  // ZONE_W is the dedicated WRITE target for BM-08 (cohort assignment) and BM-09 (submit configuration); it
+  // starts with NO cohorts and the spec resets it to empty before each run so the write tests are idempotent.
   await db.collection('event zones').doc(ID.ZONE1).set({ docid: ID.ZONE1, zonename: `BIZ Zone One ${TESTRUNID}`, eventref: eventRef, cohorts: [], status: 'active', ...tag });
   await db.collection('event zones').doc(ID.ZONE2).set({ docid: ID.ZONE2, zonename: `BIZ Zone Two ${TESTRUNID}`, eventref: eventRef, cohorts: [], status: 'active', ...tag });
+  await db.collection('event zones').doc(ID.ZONE_W).set({ docid: ID.ZONE_W, zonename: `BIZ Zone Write ${TESTRUNID}`, eventref: eventRef, cohorts: [], status: 'open', ...tag });
 
   // 4) EXPENSE baseline (BM-03 soft-delete). One doc in the current month but NOT today, delete:false.
   //    Unique item name so the rendered row is uniquely selectable. lastupdatedby seeded as a sentinel
@@ -152,6 +168,52 @@ async function seedBusiness() {
   await adsRef.collection('logs').doc(`${ID.ADS_PAST}_log0`).set({
     docid: `${ID.ADS_PAST}_log0`, editedby: '__seed__', updatedtime: T.now(), campagins: 7, amount: 1500, ...tag,
   });
+
+  // 5b) ADS edit baseline (BM-06 edit-appends-a-log). A SECOND adsinvestment doc in the current month (a
+  //     different non-today day so both rows are visible in the month list) carrying EXACTLY ONE seed log.
+  //     The spec edits it via the real form → the writeBatch appends a new log (count 1 → 2) and the
+  //     app's viewLog modal renders that many timeline items. A reset helper restores the single-log
+  //     precondition before each run so the conservation assertion (logs == N+1 after one edit) is exact.
+  const adsEditRef = db.collection('adsinvestment').doc(ID.ADS_EDIT);
+  await adsEditRef.set({
+    docid: ID.ADS_EDIT, date: T.fromDate(otherDayThisMonth(10)), campaigns: 4, amount: 800,
+    entrytime: T.now(), lastupdated: T.now(), entryby: '__seed__', ...tag,
+  });
+  await adsEditRef.collection('logs').doc(`${ID.ADS_EDIT}_log0`).set({
+    docid: `${ID.ADS_EDIT}_log0`, editedby: '__seed__', updatedtime: T.now(), campagins: 4, amount: 800, ...tag,
+  });
+
+  // 5c) INFLOW financedata (BM-IN-* inflow-tab computations). The inflow tab streams `participant metadata`
+  //     where financedata != null, and computes per-day `paid` (from financedata.paymentmap) + the headline
+  //     totals (thisMonthReceived = Σ receipt; totalReceived getter = Σ all paymentmap values). We seed
+  //     financedata onto the two seeded participants with DETERMINISTIC receipts + paymentmaps dated in the
+  //     CURRENT month (the loop only counts entries whose date is in the target month). The Watson webhook is
+  //     dead on the test project (projectId matches neither starlabs-test nor prod → watsonurl1 stays empty),
+  //     so the inflow tab renders purely from this Firestore data — no stub needed. Reconciliation targets:
+  //       thisMonthReceived (Σ receipt) and totalReceived (Σ paymentmap values) are app-computed from the
+  //       app's OWN stream; the spec re-derives both independently from the same seeded financedata.
+  const mday = (d) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const inflowMonthDate = () => new Date(now.getFullYear(), now.getMonth(), 10, 12, 0, 0, 0);
+  // p0: customerstatus regular, receipt 5000, paymentmap two days summing 5000.
+  await db.collection('participant metadata').doc(PF.p0).set({
+    profileid: PF.p0,
+    financedata: {
+      customerstatus: 'regular', status: 'schedule', date: T.fromDate(inflowMonthDate()),
+      paymentday: 10, receipt: 5000, scheduleamount: 5000, computedamount: 5000,
+      paymentmap: { [mday(8)]: 2000, [mday(10)]: 3000 },
+    },
+    ...tag,
+  }, { merge: true });
+  // p1: customerstatus regular, receipt 3000, paymentmap one day = 3000.
+  await db.collection('participant metadata').doc(PF.p1).set({
+    profileid: PF.p1,
+    financedata: {
+      customerstatus: 'regular', status: 'schedule', date: T.fromDate(inflowMonthDate()),
+      paymentday: 12, receipt: 3000, scheduleamount: 3000, computedamount: 3000,
+      paymentmap: { [mday(12)]: 3000 },
+    },
+    ...tag,
+  }, { merge: true });
 
   // 6) HPC sessions (BM-10). getDocs orders by createdAt desc (single-field, no composite index). All
   //    owned by p0 → searchable by p0's mapped name. completedCount == status=='completed' count.
@@ -205,12 +267,15 @@ async function seedBusiness() {
   //    stream (calculateTimeDelay: dataSource.data = filterTouchPoint.includes(touchpoint)) down to
   //    EXACTLY our seeded rows, which it renders on page one. touchpointdate range is single-field
   //    (>= && <=, orderBy same field) → no composite index.
+  // Each of the 5 touchpoints is dated a DISTINCT whole number of days ago (1..5), so the sorted timeline
+  // of our unique-type rows has consecutive gaps of EXACTLY one day → the component's computed
+  // timeDelayAvg is deterministically "1d 0h 0m 0s" (BM-TP-DELAY reconciles that app-computed string).
   const TP_TYPE = `BIZ Touch ${TESTRUNID}`;
   for (let i = 0; i < TOUCHPOINTS; i++) {
     await db.collection('participant touchpoint').doc(ID.TP(i)).set({
       docid: ID.TP(i), profileid: PF.p0, touchpoint: TP_TYPE,
       label: `BIZ TP label ${i}`, notes: `BIZ_TP_NOTE_${TESTRUNID}_${i}`,
-      touchpointdate: T.fromDate(daysAgo((i % 5) + 1)), ...tag,
+      touchpointdate: T.fromDate(daysAgo(i + 1)), ...tag,
     });
   }
   // Make the unique type a selectable option in the touchpoint filter multi-select. arrayUnion is
@@ -223,9 +288,10 @@ async function seedBusiness() {
   return {
     TESTRUNID, ID, PF, EMAIL,
     counts: {
-      events: 1, cohorts: 2, zones: 2, expense: 1, ads: 1,
+      events: 1, cohorts: 2, zones: 3, expense: 1, ads: 2,
       hpc: HPC_COMPLETED + HPC_INPROGRESS, hpcCompleted: HPC_COMPLETED, hpcInProgress: HPC_INPROGRESS,
       quiz: 1, quizResponses: QUIZ_RESPONSES, touchpoints: TOUCHPOINTS,
+      financedata: 2, inflowReceipts: 8000, inflowPaymentmap: 8000,
     },
     QUESTION, TP_TYPE,
   };
@@ -240,6 +306,9 @@ const TP_TYPE = `BIZ Touch ${TESTRUNID}`;
 const SEEDED = [
   'event collection', 'big cohorts', 'event zones', 'expenseplanning', 'adsinvestment',
   '3minuteshpc', 'quiz', 'quizbyclients', 'participant touchpoint', 'classify',
+  'participant metadata',
+  // event participant zones + its logs are WRITTEN BY THE APP on submit (no testrunid) → cleaned by
+  // natural key (eventref) in teardownBusiness, not via teardownCollections. Listed here for documentation.
   // auth-chain + dashboard (shared shape; testrunid-scoped so other runs are untouched)
   'user_data', 'profile_data', 'users_roles', 'dashboard',
 ];
@@ -248,10 +317,21 @@ async function teardownBusiness() {
   const admin = seed.initAdmin();
   const db = admin.firestore();
   // Best-effort: delete the adsinvestment logs subcollection docs we seeded before sweeping parents.
+  for (const adsId of [ID.ADS_PAST, ID.ADS_EDIT]) {
+    try {
+      const logs = await db.collection('adsinvestment').doc(adsId).collection('logs').get();
+      for (const d of logs.docs) await d.ref.delete().catch(() => {});
+    } catch (_) { /* parent may not exist on a fresh project */ }
+  }
+  // The app writes `event participant zones` + `event participant zones logs` on submit (BM-09); these
+  // carry NO testrunid (app-written), so sweep them by their natural key = our event's eventref.
   try {
-    const logs = await db.collection('adsinvestment').doc(ID.ADS_PAST).collection('logs').get();
-    for (const d of logs.docs) await d.ref.delete().catch(() => {});
-  } catch (_) { /* parent may not exist on a fresh project */ }
+    const evtRef = db.collection('event collection').doc(ID.EVT);
+    for (const col of ['event participant zones', 'event participant zones logs']) {
+      const snap = await db.collection(col).where('eventref', '==', evtRef).get();
+      for (const d of snap.docs) await d.ref.delete().catch(() => {});
+    }
+  } catch (_) { /* may not exist yet */ }
   // Remove our run-unique touchpoint type from the SHARED classify/touchpoint.touchpointlist (additive
   // arrayUnion on seed → arrayRemove on teardown; leaves the stock types intact for other suites).
   try {
