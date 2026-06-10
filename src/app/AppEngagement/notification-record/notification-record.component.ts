@@ -69,6 +69,14 @@ export class NotificationRecordComponent {
 
   // Statistics
   totalNotifications: number;
+  // Engagement funnel aggregates (across the records currently shown).
+  totalAppDelivered: number = 0;
+  totalClicked: number = 0;
+  totalLanded: number = 0;
+  totalBroke: number = 0;
+  clickThroughRate: string = "0";
+  landingRate: string = "0";
+  breakRate: string = "0";
   newlyNotifications: any = [];
   notificationSentRate: string;
   newNotificationSentIncrease: number;
@@ -284,6 +292,22 @@ export class NotificationRecordComponent {
     this.newlysentnotificationRate = this.newlyNotifications.length > 0
       ? ((currentsuccessfulRate / totalNewlyNotifications) * 100).toFixed(2)
       : "0.00";
+
+    // ---- Engagement funnel (client-side tap tracking) ----
+    // Aggregated across the currently-shown records: delivered -> clicked ->
+    // landed, plus how many taps broke midway. Driven by the clientClicked /
+    // clientLanded / clientFailed arrays the app writes on each record.
+    const arrLen = (v: any) => (Array.isArray(v) ? v.length : 0);
+    this.totalAppDelivered = data.reduce((t, n) => t + arrLen(n?.appFCMSuccess), 0);
+    this.totalClicked = data.reduce((t, n) => t + arrLen(n?.clientClicked), 0);
+    this.totalLanded = data.reduce((t, n) => t + arrLen(n?.clientLanded), 0);
+    this.totalBroke = data.reduce((t, n) => t + arrLen(n?.clientFailed), 0);
+    this.clickThroughRate = this.totalAppDelivered > 0
+      ? ((this.totalClicked / this.totalAppDelivered) * 100).toFixed(1) : "0";
+    this.landingRate = this.totalClicked > 0
+      ? ((this.totalLanded / this.totalClicked) * 100).toFixed(1) : "0";
+    this.breakRate = this.totalClicked > 0
+      ? ((this.totalBroke / this.totalClicked) * 100).toFixed(1) : "0";
 
     // const successfulNotifications = data.reduce((total, item) => {
     //   return total + (item.profilesuccess?.length || 0);
