@@ -227,15 +227,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   currentMatchIndex: number = -1;
   isSearchActive: boolean = false;
   searchHighlightMap: { [tokenId: string]: boolean } = {};
-  stageHighlightMap: { [stageKey: string]: boolean } = {}; // NEW: Track stage name matches
+  stageHighlightMap: { [stageKey: string]: boolean } = {}; 
   currentHighlightTokenId: string | null = null;
-  currentHighlightStageKey: string | null = null; // NEW: Track current stage highlight
+  currentHighlightStageKey: string | null = null; 
   caseSensitiveSearch: boolean = false;
   segmentDropdownOpen: boolean = false;
   tagDropdownOpen: boolean = false;
   mapTagsName = {};
   mapTagsMetaData = {};
   preassignedFilter: 'all' | 'preassigned' | 'not-preassigned' = 'all';
+  slotTitleMap: { [key: string]: string } = {};
 
   roundRobbinformData = {
     howManyParticipantsNeeded:2,
@@ -245,7 +246,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   
   //dharshan
   availableStagesFromSlot: string[] = [];
-  availableTimeSlots: { timeRange: string; count: number }[] = [];
+  availableTimeSlots: { timeRange: string; count: number; title?: string }[] = [];
   quickLinks: Array<{ screenName: string; url: string; isInternal: boolean }> = [];
   activeStageCountFilter: string[] = []; 
   selectedTimeSlots: string[] = [];
@@ -358,6 +359,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   stageActivityCacheQueueId: string | null = null;
   stageActivityCacheLoading: boolean = false;
   participantSearchTerm: string = '';
+  //in evolution mapping
+  evolutionMappingLiveFilter: 'all' | 'live' | 'unlive' = 'all';
+  evolutionMappingLiveMap: { [profileId: string]: boolean } = {};
+  evolutionMappingLiveLoaded: boolean = false;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -920,6 +925,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.noAtcFilterActive = false;
     this.noAtcProfileIds = new Set();
     this.noAtcCount = 0;
+    this.evolutionMappingLiveFilter = 'all';
+    this.evolutionMappingLiveMap = {};
+    this.evolutionMappingLiveLoaded = false;
     this.clearSearch();
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -1193,9 +1201,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.showTimeSlotPicker = false;
       return;
     }
-
-    const timeMap = new Map<string, number>(); // key = "6:00 PM – 8:00 PM", value = count
-
+    const timeMap = new Map<string, { count: number; title?: string }>();
     this.allTokensData.forEach(token => {
       const slotData = token.selectedstageslot;
       if (!slotData) return;
@@ -1235,7 +1241,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           });
 
           const key = `${startTime} – ${endTime}`;
-          timeMap.set(key, (timeMap.get(key) || 0) + 1);
+          const existing = timeMap.get(key);
+          const titleKey = `${this.selectedStageSlot}_${startDate.getTime()}_${endDate.getTime()}`;
+          const title = this.slotTitleMap[titleKey] || '';
+          timeMap.set(key, { count: (existing?.count || 0) + 1, title });
         }
       });
     });
@@ -1247,12 +1256,12 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         const timeB = new Date(`1970/01/01 ${b[0].split(' – ')[0]}`).getTime();
         return timeA - timeB;
       })
-      .map(([timeRange, count]) => ({ timeRange, count }));
+      .map(([timeRange, data]) => ({ timeRange, count: data.count, title: data.title }));
 
     this.showTimeSlotPicker = this.availableTimeSlots.length > 0;
   }
 
-  selectTimeSlot(time: string | null) { //dharshan
+  selectTimeSlot(time: string | null) { 
     if (time === null) {
       // Clicking "All" clears all selections
       this.selectedTimeSlots = [];
@@ -1403,16 +1412,22 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       default: return status;
     }
   }
+
   get filteredStageQueue(): any[] {
-    if (this.activeStageCountFilter.length === 0) {
-      return this.stageQueue;
+    let queue = this.stageQueue;
+    if (this.evolutionMappingLiveFilter !== 'all') {
+      return queue.filter(
+        column => column.stagename === 'In Evolution Mapping Activity'
+      );
     }
-    const filtered = this.stageQueue.filter(column => {
-      const shouldShow = this.activeStageCountFilter.includes(column.stagename);
-      return shouldShow;
-    });
-    
-    return filtered;
+
+    if (this.activeStageCountFilter.length === 0) {
+      return queue;
+    }
+
+    return queue.filter(column =>
+      this.activeStageCountFilter.includes(column.stagename)
+    );
   }
   
 
@@ -1735,6 +1750,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.availableCustomerSupportCategories = [];
     this.selectedCustomerSupportCategories = [];
     this.atcDateRangeOnlyProfileIds = new Set();
+    this.evolutionMappingLiveFilter = 'all';
+    this.evolutionMappingLiveMap = {};
+    this.evolutionMappingLiveLoaded = false;
 
     let count = 0
     this.currentQueueParticipants = [];
@@ -1744,6 +1762,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       },
       disableClose: true
     })
+
 
     // Fetch segments for this queue
     await this.fetchQueueSegments();
@@ -2196,6 +2215,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       );
     }
 
+    if (this.evolutionMappingLiveFilter !== 'all') {
+      filteredTokens = filteredTokens.filter(token => {
+        if (token.currentstage !== 'In Evolution Mapping Activity') return true;
+        const isLive = this.evolutionMappingLiveMap[token.profile_id] === true;
+        if (this.evolutionMappingLiveFilter === 'live') return isLive;
+        if (this.evolutionMappingLiveFilter === 'unlive') return !isLive;
+        return true;
+      });
+    }
+
     return filteredTokens;
   }
 
@@ -2338,9 +2367,21 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       );
       const queuePlanningSnap = await getDocs(queuePlanningQuery);
 
+      this.slotTitleMap = {};
       if (!queuePlanningSnap.empty) {
         const queuePlanningDoc = queuePlanningSnap.docs[0].data();
         this.queuePlanningSegments = queuePlanningDoc['segmentlist'] || [];
+
+        const planning = queuePlanningDoc['planning'] || [];
+        planning.forEach((v: any) => {
+          (v.segments || []).forEach((s: any) => {
+            (s.slots || []).forEach((slot: any) => {
+              if (!slot.title || !slot.startdate || !slot.enddate) return;
+              const sec = (d: any) => d?.seconds ? d.seconds * 1000 : d?.toDate?.().getTime() ?? 0;
+              this.slotTitleMap[`${slot.stagename}_${sec(slot.startdate)}_${sec(slot.enddate)}`] = slot.title;
+            });
+          });
+        });
       } else {
         this.queuePlanningSegments = [];
       }
@@ -2437,6 +2478,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     
     const stages = Array.from(stageSet).sort();
     return stages;
+  }
+
+  getBookedSlotTitle(token: any): string {
+    const slot = this.getBookedSlot(token);
+    if (!slot) return '';
+    const key = `${this.selectedStageSlot}_${slot.start.getTime()}_${slot.end.getTime()}`;
+    return this.slotTitleMap[key] || '';
   }
 
   getBookedSlot(token: any): { start: Date; end: Date } | null { //dharshan
@@ -5055,6 +5103,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     if (this.noAtcFilterActive) count++;
     count += this.selectedCustomerSupportCategories.length;
     if (this.selectedArenaEventId) count++;
+    if (this.evolutionMappingLiveFilter !== 'all') count++;
     return count;
   }
 
@@ -6135,5 +6184,42 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       return name.includes(search) || email.includes(search);
     });
   }
+
+  async setEvolutionMappingFilter(filter: 'all' | 'live' | 'unlive') {
+    this.evolutionMappingLiveFilter = filter;
+
+    if (filter === 'all') {
+      this.processTokensIntoStages(this.allTokensData);
+      return;
+    }
+
+    // Always fetch fresh data on filter selection
+    const evolutionTokens = this.allTokensData.filter(
+      t => t.currentstage === 'In Evolution Mapping Activity'
+        && t.tokenstatus === 'Active'
+    );
+
+    await Promise.all(evolutionTokens.map(async token => {
+      try {
+        const snap = await getDoc(
+          doc(this.firestore, 'liveevolutionmapping', token.profile_id)
+        );
+        this.evolutionMappingLiveMap[token.profile_id] =
+          snap.exists() ? snap.data()['live'] === true : false;
+      } catch {
+        this.evolutionMappingLiveMap[token.profile_id] = false;
+      }
+    }));
+
+    this.evolutionMappingLiveLoaded = true;
+
+    this.processTokensIntoStages(this.allTokensData);
+  }
+  get hasEvolutionMappingParticipants(): boolean {
+  return this.stageQueue.some(
+    s => s.stagename === 'In Evolution Mapping Activity' 
+      && s.tokenlist?.length > 0
+  );
+}
 
 }
