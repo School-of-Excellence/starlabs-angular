@@ -14,6 +14,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatBadgeModule } from '@angular/material/badge';
 import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, getDoc, setDoc, where, orderBy, limit} from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, getDoc, setDoc, where, orderBy, limit} from '@angular/fire/firestore';
 import { MatOption, MatSelectModule } from "@angular/material/select";
 import { MatTabGroup, MatTab } from "@angular/material/tabs";
 import { CreateSegmentsDialogComponent } from "../create-segments-dialog/create-segments-dialog.component";
@@ -39,6 +40,7 @@ interface ParticipantList {
   profileids: string[];
   profiles?: Profile[];
   live?: boolean;
+  live?: boolean;
 }
 
 interface FilterCriteria {
@@ -46,6 +48,17 @@ interface FilterCriteria {
   filterType: 'all' | 'profileid' | 'name' | 'email' | 'phone';
 }
 
+interface SegmentConflict {
+  profileId: string;
+  profileName: string;
+  segmentIds: string[];
+  segmentNames: string[];
+}
+
+interface ListConflictSummary {
+  count: number;
+  conflicts: SegmentConflict[];
+}
 interface SegmentConflict {
   profileId: string;
   profileName: string;
@@ -112,9 +125,7 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   mapUsers: Record<string, string> = {};
   showParticipantsPopup = false;
   participantsPopupProfiles: { index: number; name: string }[] = [];
-
-
-
+  participantsPopupSearch = '';
 
   // Table columns
   displayedColumns: string[] = ['listname', 'participants', 'liveStatus', 'actions'];
@@ -255,26 +266,23 @@ onViewParticipants(event : any, log: any): void {
   this.showParticipantsPopup = true;
 }
 
-participantsPopupSearch = '';
+  get filteredParticipantsPopup() {
+    const term = this.participantsPopupSearch.trim().toLowerCase();
+    if (!term) return this.participantsPopupProfiles;
+    return this.participantsPopupProfiles.filter(p =>
+      p.name.toLowerCase().includes(term)
+    );
+  }
 
-get filteredParticipantsPopup() {
-  const term = this.participantsPopupSearch.trim().toLowerCase();
-  if (!term) return this.participantsPopupProfiles;
-  return this.participantsPopupProfiles.filter(p =>
-    p.name.toLowerCase().includes(term)
-  );
-}
-
-getLogProfiles(log: any): string[] {
-  const meta = log?.metadata || {};
-  const ids =
-    meta?.current?.added_profiles   ||
-    meta?.current?.profilelist       ||
-    meta?.previous?.profilelist      ||
-    [];
-  return Array.isArray(ids) ? ids.filter((id: string) => !!id) : [];
-}
-
+  getLogProfiles(log: any): string[] {
+    const meta = log?.metadata || {};
+    const ids =
+      meta?.current?.added_profiles ||
+      meta?.current?.profilelist ||
+      meta?.previous?.profilelist ||
+      [];
+    return Array.isArray(ids) ? ids.filter((id: string) => !!id) : [];
+  }
 
   get totalLogPages() {
     return Math.ceil(this.logs.length / this.logsPageSize);
@@ -289,33 +297,33 @@ getLogProfiles(log: any): string[] {
   }
 
   closeParticipantsPopup(): void {
-  this.showParticipantsPopup = false;
-  this.participantsPopupProfiles = [];
-  this.participantsPopupSearch = ''; 
-}
+    this.showParticipantsPopup = false;
+    this.participantsPopupProfiles = [];
+    this.participantsPopupSearch = '';
+  }
 
   async loadLogs() {
-  this.logsLoading = true;
-  this.logsPage = 0;
-  try {
-    const q = query(
-      collection(this.firestore, 'participant_list_log'),
-      orderBy('created_date', 'desc'),
-      limit(200)
-    );
-    console.log("log data console")
-    const snap = await getDocs(q);
-    this.logs = snap.docs
-      .map(d => d.data())
-      .filter(d => d?.['type'] === 'list');  
-    this.filteredLogs = [...this.logs];
-    console.log('Loaded logs:', this.logs.length);
-  } catch(e) {
-    console.error('loadLogs error:', e);
-  } finally {
-    this.logsLoading = false;
+    this.logsLoading = true;
+    this.logsPage = 0;
+    try {
+      const q = query(
+        collection(this.firestore, 'participant_list_log'),
+        orderBy('created_date', 'desc'),
+        limit(200)
+      );
+      console.log("log data console")
+      const snap = await getDocs(q);
+      this.logs = snap.docs
+        .map(d => d.data())
+        .filter(d => d?.['type'] === 'list');
+      this.filteredLogs = [...this.logs];
+      console.log('Loaded logs:', this.logs.length);
+    } catch (e) {
+      console.error('loadLogs error:', e);
+    } finally {
+      this.logsLoading = false;
+    }
   }
-}
 
 setHistoryFilter(f: string): void {
   this.historyFilter = f;

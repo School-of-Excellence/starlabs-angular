@@ -196,8 +196,7 @@
                           formControlName="searchTerm" 
                           placeholder="Enter profile ID, name, email, or phone..."
                           autocomplete="off">
-                        <mat-icon matPrefix>search</mat-icon>
-                        <button 
+                        <button
                           mat-icon-button 
                           matSuffix 
                           *ngIf="filterForm.get('searchTerm')?.value"
@@ -227,20 +226,34 @@
                   </div>
                 </div>
                 
-                <!-- Profile Selection Info Banner -->
-                <div class="profile-selection-banner" *ngIf="hasExternalProfiles()">
-                  <mat-icon class="banner-icon">info</mat-icon>
-                  <div class="banner-content">
-                    <strong>{{ externalProfileIds.length }} profile(s) selected</strong>
-                    <span>You can create a new list or merge these profiles into an existing list</span>
+                <!-- Selection + conflict banners on a single row -->
+                <div class="banners-row">
+                  <!-- Profile Selection Info Banner -->
+                  <div class="profile-selection-banner" *ngIf="hasExternalProfiles()">
+                    <mat-icon class="banner-icon">info</mat-icon>
+                    <div class="banner-content">
+                      <strong>{{ externalProfileIds.length }} profile(s) selected</strong>
+                      <span>You can create a new list or merge these profiles into an existing list</span>
+                    </div>
                   </div>
-                </div>
-                
-                <div class="profile-selection-banner warning" *ngIf="!hasExternalProfiles()">
-                  <mat-icon class="banner-icon">warning</mat-icon>
-                  <div class="banner-content">
-                    <strong>No profiles selected</strong>
-                    <span>Create lists will be empty. Merge is disabled.</span>
+
+                  <div class="profile-selection-banner warning" *ngIf="!hasExternalProfiles()">
+                    <mat-icon class="banner-icon">warning</mat-icon>
+                    <div class="banner-content">
+                      <strong>No profiles selected</strong>
+                      <span>Create lists will be empty. Merge is disabled.</span>
+                    </div>
+                  </div>
+
+                  <div class="conflict-global-banner"
+                      *ngIf="globalConflictMap.size > 0"
+                      (click)="openConflictDialog()"
+                      style="cursor: pointer;">
+                    <mat-icon class="conflict-banner-icon">warning</mat-icon>
+                    <div class="conflict-banner-text">
+                      <strong>Participants found in multiple lists — review &amp; resolve</strong>
+                      <span>{{ globalConflictMap.size }} participant(s) affected · Click to view</span>
+                    </div>
                   </div>
                 </div>
                 <div class="conflict-global-banner"

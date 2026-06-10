@@ -791,4 +791,29 @@
   padding: 12px 20px;
   border-top: 1px solid rgba(148,163,184,0.12);
   flex-shrink: 0;
+<<<<<<< HEAD
+=======
+}
+.mat-select-search-inner {
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+}
+
+.mat-select-search-no-entries-found {
+  padding: 8px 16px;
+}
+
+ngx-mat-select-search {
+  display: block;
+}
+
+.mat-option.ngx-mat-select-search-no-entries-found {
+  height: auto;
+}
+::ng-deep .mat-select-search-inner-row {
+  height: 40px !important;
+}
+
+::ng-deep .mat-select-panel .mat-option:first-child {
+  padding-top: 0 !important;
+>>>>>>> 589bbde41ae9bac6800902ef2277ab03f7bed84c
 }

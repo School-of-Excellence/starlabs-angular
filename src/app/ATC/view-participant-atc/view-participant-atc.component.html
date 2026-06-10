@@ -15,8 +15,9 @@
     </div>
   }
 
-  <!-- Product Groups -->
-  @for (group of productGroups(); track group.product; let groupIdx = $index) {
+  <!-- Product Groups — use $index in the track key so duplicate product
+       names (e.g. multiple "uP!" cycles) don't trigger NG0955. -->
+  @for (group of productGroups(); track groupIdx + '-' + group.product; let groupIdx = $index) {
     <div class="product-group">
       <!-- Product Header -->
       <div class="product-header">

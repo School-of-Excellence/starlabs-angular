@@ -96,7 +96,7 @@ export class CreateSegmentsDialogComponent implements OnInit {
   editSegmentForm!: FormGroup;
   addListForm!: FormGroup;
   addTagForm!: FormGroup;
-  tagSearchCtrl: FormControl
+  tagSearchCtrl: FormControl = new FormControl('');
   
   // Loading states
   loading = false;

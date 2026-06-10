@@ -46,7 +46,7 @@
       <section class="content-section">
         <h2 class="section-heading">ATC Data</h2>
         <div class="info-grid">
-          <div class="info-box">
+          <div class="info-box" id="atcfield-profile">
             <mat-form-field appearance="outline" class="flat-field">
               <mat-label>Participant's Name</mat-label>
               <mat-select [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity()" [required]="true">
@@ -62,7 +62,7 @@
             </div>
           </div>
   
-          <div class="info-box">
+          <div class="info-box" id="atcfield-product">
             <mat-form-field appearance="outline" class="flat-field">
               <mat-label>What is the ATC given for?</mat-label>
               <mat-select [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()" [required]="true">
@@ -71,7 +71,7 @@
             </mat-form-field>
           </div>
   
-          <div class="info-box">
+          <div class="info-box" id="atcfield-date">
             <mat-form-field appearance="outline" class="flat-field">
               <mat-label>Prescribed Date</mat-label>
               <input matInput [(ngModel)]="date" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY" (dateChange)="autoSave()" [disabled]="!transcriber || this.assignmentInitiated" [required]="true">
@@ -83,7 +83,7 @@
       </section>
       
       <!-- ATC Directive Section -->
-      <section class="content-section" *ngIf="product != null">
+      <section class="content-section" id="atcfield-directive" *ngIf="product != null">
         <h2 class="section-heading">ATC DIRECTIVE</h2>
         <div class="directive-container">
           <div class="directive-text" *ngIf="atcdirective">
@@ -94,7 +94,7 @@
       </section>
       
       <!-- Authors Section -->
-      <section class="content-section" *ngIf="!this.bigActivity()">
+      <section class="content-section" id="atcfield-author" *ngIf="!this.bigActivity()">
         <h2 class="section-heading">AUTHORS</h2>
         <div class="personnel-container">
           <div class="field-grid field-header">
@@ -248,10 +248,10 @@
       </section>
       
       <!-- Adjustments and Procedures Section -->
-      <section class="content-section">
+      <section class="content-section" id="atcfield-transcript">
         <h2 class="section-heading">ADJUSTMENTS & PROCEDURES</h2>
         <div class="adjustment-container" cdkDropList (cdkDropListDropped)="drop($event)">
-          <div *ngFor="let adjustment of transcript; let i=index" class="adjustment-item" cdkDrag>
+          <div *ngFor="let adjustment of transcript; let i=index" class="adjustment-item" cdkDrag [attr.id]="'atcfield-adjustment-' + i">
             <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
             
             <div class="adjustment-content">
@@ -393,14 +393,14 @@
             </mat-form-field>
           </div>
           
-          <div class="note-field">
+          <div class="note-field" id="atcfield-consultationpoint">
             <h3 class="field-label">Consultation Points*</h3>
             <mat-form-field appearance="outline" class="note-textarea">
               <textarea matInput rows="6" [(ngModel)]="consultationpoint" (focusout)="autoSave()" placeholder="Notes" [required]="true"></textarea>
             </mat-form-field>
           </div>
-          
-          <div class="note-field">
+
+          <div class="note-field" id="atcfield-casenotes">
             <h3 class="field-label">Case Notes*</h3>
             <mat-form-field appearance="outline" class="note-textarea">
               <textarea matInput rows="6" [(ngModel)]="casenotes" (focusout)="autoSave()" placeholder="Notes" [required]="true"></textarea>

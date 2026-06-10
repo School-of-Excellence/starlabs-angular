@@ -44,6 +44,10 @@ interface ProductGroup {
 })
 export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy {
   @Input() profileid?: string;
+  // When set, ATCs whose `queueid` matches will be excluded — used by the
+  // "Previous Cycle" step in dynamic-studio-v2 so the current queue's ATCs
+  // don't appear there (they already show in the View Submitted ATC step).
+  @Input() excludeQueueId?: string;
 
   // private firestore = inject(Firestore);
   firestoreDefault = getFirestore() // Default Firestore
@@ -61,9 +65,23 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
 
   private atcList = signal<ATCItem[]>([]);
 
-  // Computed: Group ATCs by consecutive products
+  // Filter signal: re-evaluates productGroups when the excludeQueueId
+  // @Input() changes (we update it via ngOnChanges).
+  private excludeQueueIdSignal = signal<string | null>(null);
+
+  // Computed: Group ATCs by consecutive products, excluding any whose
+  // queueid matches `excludeQueueId` (for the "Previous Cycle" view).
   productGroups = computed<ProductGroup[]>(() => {
-    const atcs = this.atcList();
+    const exclude = this.excludeQueueIdSignal();
+    const all = this.atcList();
+    const atcs = all.filter(a => !exclude || !this.atcMatchesQueue(a, exclude));
+    console.log('[view-participant-atc] excludeQueueId=', exclude,
+      'in=', all.length, 'out=', atcs.length,
+      'sample-queue-fields=', all.slice(0, 3).map(a => ({
+        queueid: a.data?.['queueid'],
+        queueref_id: a.data?.['queueref']?.id,
+        queueref_path: a.data?.['queueref']?.path,
+      })));
     if (atcs.length === 0) return [];
 
     const groups: ProductGroup[] = [];
@@ -83,7 +101,28 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
     return groups;
   });
 
-  totalATCs = computed(() => this.atcList().length);
+  totalATCs = computed(() => {
+    const exclude = this.excludeQueueIdSignal();
+    return this.atcList()
+      .filter(a => !exclude || !this.atcMatchesQueue(a, exclude))
+      .length;
+  });
+
+  /**
+   * Returns true when the ATC belongs to the given queue. Checks multiple
+   * possible field shapes since older ATCs may have stored a DocumentReference
+   * (`queueref`) instead of a flat string (`queueid`).
+   */
+  private atcMatchesQueue(atc: ATCItem, queueId: string): boolean {
+    const d: any = atc?.data || {};
+    if (d['queueid'] === queueId) return true;
+    if (d['queueref']?.id === queueId) return true;
+    if (d['queueref']?.path && typeof d['queueref'].path === 'string'
+        && d['queueref'].path.endsWith('/' + queueId)) return true;
+    // Tokens / live-assignment-linked fields some ATCs carry
+    if (d['liveassignment']?.['queueid'] === queueId) return true;
+    return false;
+  }
 
   // Lookup maps
   profileMap: Record<string, any> = {};
@@ -105,6 +144,9 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
   }
 
   ngOnInit(): void {
+    // Seed the exclusion signal from the @Input on first render
+    console.log('[view-participant-atc] ngOnInit excludeQueueId =', this.excludeQueueId);
+    this.excludeQueueIdSignal.set(this.excludeQueueId || null);
     if (this.profileid) {
       this.profileId.set(this.profileid);
       this.loadAllData(this.profileid);
@@ -128,6 +170,12 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
         this.profileId.set(next);
         this.loadAllData(next);
       }
+    }
+    if (changes['excludeQueueId']) {
+      const v = changes['excludeQueueId'].currentValue || null;
+      console.log('[view-participant-atc] @Input excludeQueueId changed →', v,
+        '(firstChange:', changes['excludeQueueId'].firstChange, ')');
+      this.excludeQueueIdSignal.set(v);
     }
   }
 
@@ -222,6 +270,8 @@ export class ViewParticipantAtcComponent implements OnInit, OnChanges, OnDestroy
     // Load all transcriptions in parallel
     await Promise.all(sortedATCs.map(atc => this.loadTranscription(atc)));
 
+    console.log('[view-participant-atc] loaded', sortedATCs.length, 'ATCs for profile',
+      profileId, '— excludeQueueId currently =', this.excludeQueueIdSignal());
     this.atcList.set(sortedATCs);
   }
 
