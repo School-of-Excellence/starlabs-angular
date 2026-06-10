@@ -43,8 +43,16 @@ const ID = {
   // email templates docs (CN-02 approved-vs-pending filter — render-only here).
   EMAIL_APPROVED: `${TESTRUNID}_email_approved`,
   EMAIL_PENDING: `${TESTRUNID}_email_pending`,
+  // CF-side-effect email-templates doc (CN-13 createPostMarkEmailTemplate — starts pending+unvalidated,
+  // the CF flips postmarkstatus->approved on the validate write). Distinct from EMAIL_PENDING so the
+  // CN-02 render assertion is never disturbed by a CF run.
+  EMAIL_CF: `${TESTRUNID}_email_cf`,
+  // email archive doc (CN-05 sendBatchEmailTest CF — profileid:[p0,p1], status:'created' so the CF fires).
+  EMAIL_ARCHIVE_CF: `${TESTRUNID}_email_archive_cf`,
   // notification templates doc (notification template list render).
   NOTIF_TEMPLATE: `${TESTRUNID}_notif_tmpl`,
+  // notifications/{uid}/logs/{logid} doc (CN-16 notification-log collectionGroup render).
+  NOTIF_LOG: `${TESTRUNID}_notif_log`,
 };
 
 // Actors. profileids run-prefixed; emails follow the actors.ts convention `<role>+<run>@example.com`.
@@ -254,6 +262,69 @@ async function seedComms() {
   await db.collection('email templates').doc(ID.EMAIL_PENDING).set(
     emailTmpl(ID.EMAIL_PENDING, `Pending Email ${TESTRUNID}`, 'pending', false),
   );
+  // CF-side-effect precondition (CN-13, skip-graceful). createPostMarkEmailTemplate (recon CF table)
+  // fires onUpdate email-templates when templatevalidated flips false->true AND templatestatus=='created',
+  // then calls Postmark externally and writes back postmarkstatus:'approved' (CF:1949-1952). It starts
+  // pending+unvalidated here so the flip is observable. A separate doc from EMAIL_PENDING so the CN-02
+  // render assertion is never perturbed by a CF run. (status MUST be 'created' for the CF guard.)
+  await db.collection('email templates').doc(ID.EMAIL_CF).set(
+    emailTmpl(ID.EMAIL_CF, `CF Email ${TESTRUNID}`, 'pending', false),
+  );
+
+  // 7b) EMAIL ARCHIVE — CF-side-effect precondition (CN-05 sendBatchEmailTest, skip-graceful). The CF
+  //    fires onCreate `email archive` when status != 'queued' (recon risk #2) and writes one `email logs`
+  //    row per recipient (CF:1496-1504) + postmark_msgid[]/mailstatus back on the archive doc. We seed
+  //    profileid:[p0,p1] (the KNOWN recipient set) with status:'created'; the CF computes the log fan-out.
+  //    `participant metadata` for p0/p1 carries the email the CF batch reads (sendBatchEmailArchive:1339).
+  await db.collection('participant metadata').doc(PF.p0).set(
+    { profileid: PF.p0, email: EMAIL.p0, name: `P0 ${TESTRUNID}`, customerstatus: 'active', ...tag }, { merge: true },
+  );
+  await db.collection('participant metadata').doc(PF.p1).set(
+    { profileid: PF.p1, email: EMAIL.p1, name: `P1 ${TESTRUNID}`, customerstatus: 'active', ...tag }, { merge: true },
+  );
+  await db.collection('email archive').doc(ID.EMAIL_ARCHIVE_CF).set({
+    docid: ID.EMAIL_ARCHIVE_CF,
+    broadcastname: `Seeded Broadcast ${TESTRUNID}`,
+    profileid: [PF.p0, PF.p1],
+    templateid: `Approved Email ${TESTRUNID}`,
+    subject: 'Test Subject', body: '<p>Hello</p>', notes: '',
+    status: 'created', createdby: UID.admin, date: hoursAgo(1),
+    ...tag,
+  });
+
+  // 7c) CONFIG for the create-email-template form (CN-04b) + communication notif-template form (CN-03):
+  //    - email validators/templateCategories: the category + subcategory option lists the create form's
+  //      mat-selects read (create-email-template.component.ts:556-559; communication reads :1194/1207).
+  //      Without these the Category/Sub-Category selects are empty → the reactive form never validates →
+  //      the Create button stays disabled. Merge so other runs' categories are not clobbered.
+  //    - classify/postmarkserver: the Server-Name option list the create form reads (:574). Same gating.
+  await db.collection('email validators').doc('templateCategories').set(
+    { categories: ['Test'], subcategories: ['Unit'] }, { merge: true },
+  );
+  await db.collection('classify').doc('postmarkserver').set(
+    { servername: ['POSTMARK_STARLABS_TEST'] }, { merge: true },
+  );
+
+  // 7d) NOTIFICATIONS LOG — CN-16. /notificationlog runs a collectionGroup('logs') query with
+  //    where(date>=start) where(date<=end) orderBy(date desc) (notifications-log.component.ts:157-164)
+  //    — a collectionGroup range+orderBy on `date`, which REQUIRES a collection-group single-field index
+  //    on logs.date (returned in neededIndexes). The default form range is today..today, so `date` MUST be
+  //    NOW (a Timestamp; the row renders {{row.date.toDate()|date}} so it MUST be a Timestamp or the cell
+  //    throws). The query has NO testrunid filter (reads ALL logs project-wide) so the spec scopes to the
+  //    run-unique message via the screen's "Filter Table" box. The parent path id (the {uid}) is mapped to
+  //    a name via user_data — our admin uid IS in user_data (seedAuthChain), so the Name cell resolves.
+  await db.collection('notifications').doc(UID.admin).set({ read: false, ...tag }, { merge: true });
+  await db.collection('notifications').doc(UID.admin).collection('logs').doc(ID.NOTIF_LOG).set({
+    message: `Seeded Log Notification ${TESTRUNID}`,
+    title: `Seeded Log ${TESTRUNID}`,
+    type: 'notification',
+    sticky: false,
+    read: true,
+    clicked: false,
+    landingpage: '',
+    date: now(),
+    ...tag,
+  });
 
   // 8) NOTIFICATION TEMPLATES — render-only precondition for the communication dashboard's template list.
   await db.collection('notification templates').doc(ID.NOTIF_TEMPLATE).set({
@@ -264,14 +335,18 @@ async function seedComms() {
 
   return {
     TESTRUNID, ID, PF, EMAIL, UID,
-    counts: { notificationrecord: 2, 'zoom recordings backup': 2, supportchat: 2, onewaytemplates: 1, 'email templates': 2, 'notification templates': 1 },
+    counts: {
+      notificationrecord: 2, 'zoom recordings backup': 2, supportchat: 2, onewaytemplates: 1,
+      'email templates': 3, 'notification templates': 1, 'email archive': 1, 'notifications/logs': 1,
+      'participant metadata': 2,
+    },
   };
 }
 
 // Collections this seed writes (for teardown). Spaced names are Firestore strings — pass verbatim.
 const SEEDED = [
   'notificationrecord', 'zoom recordings backup', 'supportchat', 'onewaytemplates',
-  'email templates', 'notification templates',
+  'email templates', 'notification templates', 'email archive', 'participant metadata', 'notifications',
   // auth-chain + dashboard (shared shape; testrunid-scoped so other runs are untouched).
   'user_data', 'profile_data', 'users_roles', 'dashboard',
 ];
@@ -279,7 +354,30 @@ const SEEDED = [
 async function teardownComms() {
   const admin = seed.initAdmin();
   const db = admin.firestore();
-  const n = await seed.teardownCollections(db, SEEDED, TESTRUNID);
+  let n = await seed.teardownCollections(db, SEEDED, TESTRUNID);
+
+  // teardownCollections is top-level-only; the notifications/{uid}/logs/{logid} subcollection doc is not
+  // reached by deleting the parent. Delete the seeded log subcollection explicitly (idempotent).
+  const logsSnap = await db.collection('notifications').doc(UID.admin).collection('logs')
+    .where('testrunid', '==', TESTRUNID).get().catch(() => ({ docs: [] }));
+  for (const d of logsSnap.docs) { await d.ref.delete().catch(() => {}); n++; }
+
+  // App/CF-written docs from the CF cases carry NO testrunid — clean them by their natural key (the
+  // seeded email-archive id) so a re-run starts clean even if a CF DID fire (skip-graceful cases).
+  const elSnap = await db.collection('email logs').where('emailarchiveid', '==', ID.EMAIL_ARCHIVE_CF)
+    .get().catch(() => ({ docs: [] }));
+  for (const d of elSnap.docs) { await d.ref.delete().catch(() => {}); n++; }
+  // The notification-template CREATE case (CN-03) writes a doc with NO testrunid keyed by its run-unique
+  // message — sweep it by that natural key (the app sets type:'notification').
+  const ntSnap = await db.collection('notification templates')
+    .where('message', '==', `CN-03 body ${TESTRUNID}`).get().catch(() => ({ docs: [] }));
+  for (const d of ntSnap.docs) { await d.ref.delete().catch(() => {}); n++; }
+  // The email-template CREATE case (CN-04b) writes a doc with NO testrunid keyed by its run-unique name —
+  // sweep by templatename (the app sets type:'email').
+  const etSnap = await db.collection('email templates')
+    .where('templatename', '==', `CN-04b Email ${TESTRUNID}`).get().catch(() => ({ docs: [] }));
+  for (const d of etSnap.docs) { await d.ref.delete().catch(() => {}); n++; }
+
   // Also delete the Auth users (uids carry the run id).
   const auth = admin.auth();
   for (const key of Object.keys(UID)) {

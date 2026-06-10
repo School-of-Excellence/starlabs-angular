@@ -52,6 +52,9 @@ export const commsIds = {
   OW_TEMPLATE: `${RUN}_oneway_tmpl`,
   EMAIL_APPROVED: `${RUN}_email_approved`,
   EMAIL_PENDING: `${RUN}_email_pending`,
+  EMAIL_CF: `${RUN}_email_cf`,
+  EMAIL_ARCHIVE_CF: `${RUN}_email_archive_cf`,
+  NOTIF_LOG: `${RUN}_notif_log`,
 };
 
 /** Install the prod firewall + all external stubs. Call in beforeEach BEFORE navigating. */
@@ -96,5 +99,45 @@ export async function resetNotificationCfDoc(): Promise<void> {
   const db = admin.firestore();
   await db.collection('notificationrecord').doc(commsIds.NR_CF).set(
     { success: false, profilesuccess: [], profilefailed: [] }, { merge: true },
+  );
+}
+
+const RUNID = RUN; // local alias for the doc shapes below
+
+/**
+ * (Re)create the EMAIL_ARCHIVE_CF doc to (re)fire the `sendBatchEmailTest` onCreate trigger (CN-05).
+ * Delete-then-set with the same precondition shape (status:'created', profileid:[p0,p1]). Also pre-clears
+ * any prior `email logs` rows for this archive so the count assertion starts from zero. PRECONDITION only —
+ * the test asserts the CF-COMPUTED `email logs` fan-out count, never a value the test wrote.
+ */
+export async function resetEmailArchiveCf(): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  const T = admin.firestore.Timestamp;
+  // clear prior CF output (natural key — these carry no testrunid)
+  const prior = await db.collection('email logs').where('emailarchiveid', '==', commsIds.EMAIL_ARCHIVE_CF)
+    .get().catch(() => ({ docs: [] as any[] }));
+  for (const d of prior.docs) await d.ref.delete().catch(() => {});
+  await db.collection('email archive').doc(commsIds.EMAIL_ARCHIVE_CF).delete().catch(() => {});
+  await db.collection('email archive').doc(commsIds.EMAIL_ARCHIVE_CF).set({
+    docid: commsIds.EMAIL_ARCHIVE_CF, broadcastname: `Seeded Broadcast ${RUNID}`,
+    profileid: [commsProfileIds.participant0, commsProfileIds.participant1],
+    templateid: `Approved Email ${RUNID}`, subject: 'Test Subject', body: '<p>Hello</p>', notes: '',
+    status: 'created', createdby: commsUids.admin, date: T.fromMillis(Date.now() - 3600e3),
+    testrunid: RUNID, _testdata: true,
+  });
+}
+
+/**
+ * Reset the EMAIL_CF email-templates doc to its pre-validate PRECONDITION (CN-13): pending+unvalidated,
+ * status 'created'. The test then flips templatevalidated:true (the validate action) and asserts the CF
+ * WROTE postmarkstatus:'approved'. Precondition only.
+ */
+export async function resetEmailTemplateCf(): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  await db.collection('email templates').doc(commsIds.EMAIL_CF).set(
+    { postmarkstatus: 'pending', templatevalidated: false, templatestatus: 'created', active: false },
+    { merge: true },
   );
 }
