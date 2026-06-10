@@ -1,11 +1,11 @@
   <div *ngIf="showCongrats" class="toast-notification">
-  <span class="toast-icon">🎉</span>
-  <div class="toast-text">
-    <strong>Congratulations!</strong>
-    <p>You've successfully finished your Evolution Mapping.</p>
+    <span class="toast-icon">🎉</span>
+    <div class="toast-text">
+      <strong>Congratulations!</strong>
+      <p>You've successfully finished your Evolution Mapping.</p>
+    </div>
+    <span class="toast-close" (click)="showCongrats = false; reload()">✕</span>
   </div>
-  <span class="toast-close" (click)="showCongrats = false; reload()">✕</span>
-</div>
   <div *ngIf="loading">
         <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     <!-- <app-loading-spinner></app-loading-spinner> -->
@@ -27,30 +27,55 @@
       <!-- <h4 *ngIf="![null, undefined, ''].includes(queueToken['queueposition'])" class="current-label">Queue Position : {{queueToken['queueposition']}}</h4> -->
     </div>
 
-    <div *ngIf="liveEvolutionMapping.length != 0 && liveEvolutionMapping[0].live;">
-      <div class="evolution-container">
-        <div class="evolution-header">
-          <h1>What is Evolution Mapping?</h1>
-          <p>
-            You'll witness the fine changes that has happened in your post uP! by watching your pre and post-videos. You'll
-            be mapping your evolution progress. This becomes an education for your unconscious in a way that it
-            generalises the impact of breakthroughs in your life across other aspects.
-          </p>
-          <p style="font-weight: bold;font-size: 18px;">Recommended: kindly watch on desktop 🖥️</p>
-        </div>
-        
-        <div class="video-grid">
-          <div *ngFor="let video of liveEvolutionMapping[0].videolist; let i = index" class="video-item">
-            <app-video-player 
-              [videoUrl]="video">
-            </app-video-player>
-            <!-- <p class="video-title">{{ i + 1 }}. {{ i === 0 ? 'POST VIDEO' : 'PRE VIDEO' }} ({{mapVideoTitle[video]}})</p> -->
-            <p class="video-title">{{ i + 1 }}. {{ i === 0 ? 'POST VIDEO' : 'PRE VIDEO' }}</p>
-            <!-- <p class="video-date">{{mapRecordedDate[video].toDate() | date}}</p> -->
+    <!-- Unlive Message -->
+    <div *ngIf="liveEvolutionMapping.length != 0 && !liveEvolutionMapping[0].live" 
+        class="expired-container">
+      <div class="expired-icon">🔒</div>
+      <h3 class="expired-title">Evolution Mapping Unavailable</h3>
+      <p class="expired-message">
+          This Evolution Mapping Activity recording is no longer available, 
+          as the 48-hour viewing period has ended. To regain access, please 
+          raise a support ticket, in <strong>Breakthroughs app</strong>
+      </p>
+    </div>
+      <div *ngIf="liveEvolutionMapping.length != 0 && liveEvolutionMapping[0].live;">
+        <!-- 48hr notice banner with countdown -->
+        <div class="availability-banner">
+          <div class="availability-text">
+            <p>
+              This Evolution Mapping Activity recording will be available 
+              for the next 48 hours. We recommend you to watch it and 
+              complete your Evolution Mapping Activity within this time.
+            </p>
+          </div>
+          <div class="availability-timer">
+            <span class="timer-label">Time Remaining</span>
+            <span class="timer-value">{{ timeRemaining$ | async }}</span>
           </div>
         </div>
-      </div>
-
+        <div class="evolution-container">
+          <div class="evolution-header">
+            <h1>What is Evolution Mapping?</h1>
+            <p>
+              You'll witness the fine changes that has happened in your post uP! by watching your pre and post-videos. You'll
+              be mapping your evolution progress. This becomes an education for your unconscious in a way that it
+              generalises the impact of breakthroughs in your life across other aspects.
+            </p>
+            <p style="font-weight: bold;font-size: 18px;">Recommended: kindly watch on desktop 🖥️</p>
+          </div>
+          
+          <div class="video-grid">
+            <div *ngFor="let video of liveEvolutionMapping[0].videolist; let i = index" class="video-item">
+              <app-video-player 
+                [videoUrl]="video">
+              </app-video-player>
+              <!-- <p class="video-title">{{ i + 1 }}. {{ i === 0 ? 'POST VIDEO' : 'PRE VIDEO' }} ({{mapVideoTitle[video]}})</p> -->
+              <p class="video-title">{{ i + 1 }}. {{ i === 0 ? 'POST VIDEO' : 'PRE VIDEO' }}</p>
+              <!-- <p class="video-date">{{mapRecordedDate[video].toDate() | date}}</p> -->
+            </div>
+          </div>
+        </div>
+      </div> 
       <br>
 
     <!-- <div *ngIf="liveEvolutionMapping.length != 0 && liveEvolutionMapping[0].live && profileJourneyProduct['queueData']['stages'][findNextElement(profileJourneyProduct['queuetoken']['currentstage'])]['calltoaction'] != 'form'" style="align-items: center;display: flex;justify-content: center;">
@@ -75,6 +100,8 @@
     </ng-template>
 
   </div>
+
+
 
 <!-- <div style="display: flex; flex-wrap: wrap; justify-content: center; margin-top: 30px; gap: 20px;">
     <div *ngFor="let video of liveEvolutionMapping[0].videolist; let i = index" 
