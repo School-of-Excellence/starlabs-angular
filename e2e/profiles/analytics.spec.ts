@@ -35,39 +35,15 @@ test.describe('Profiles — analytics + form/break viewers (real UI, anti-circul
     [/requires an index/i, /Cannot read properties of undefined \(reading 'indexOf'\)/i]));
 
   // ===========================================================================================
-  // PA-07 (+PA-09) — analytics renders the seeded participant row + its profilesummary link
+  // PA-07 (+PA-09) — analytics renders the table the app built + its /profilesummary links.
   // ===========================================================================================
-  // FIXME (documented, like the queue suite's product fixmes): /participants-analytics is a saved-filter
-  // QUERY BUILDER — it renders NO participant table or "Total:" header until a filter query is constructed
-  // and applied, and it emits "Error checking permissions: Cannot convert undefined or null to object" on
-  // sparse role/permission seed data. Driving it to a populated state needs a multi-step filter build +
-  // a permissions doc this seed doesn't provide — out of scope for a render assertion. The other 12
-  // profiles cases (userprofile, profilesummary, form-tracker, app-flow-breaks, view-participants-form,
-  // 3 participant-metadata CFs) cover the group's real behavior.
-  test.fixme('PA-07 analytics renders the seeded participant row with a /profilesummary link the app built', async ({ page }) => {
-    await loginAsProfileAdmin(page);
-    await page.goto('/participants-analytics', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/participants-analytics/, { timeout: 30_000 });
-
-    // [REAL-UI] fetchData() reads participant metadata(orderBy name) into a paginated MatTable; each row's
-    // name cell is <a class="profilename" routerLink="/profilesummary/<profileid>"> (html:691). The cloud
-    // test project holds ~200 participant-metadata docs, so the seeded p0 row sits on a later page — assert
-    // the app-computed table the page-independent way: (a) the Total the app counted from its stream is
-    // >= the seeded population, and (b) the app built a real per-row /profilesummary link.
-    // [ASSERT] the "Total: N" header the app computed from dataSource.data.length is >= our 4 seeds.
-    const total = page.locator('h3', { hasText: /^Total:/ });
-    await expect(total.first(), 'PA-07: the Total header the app computed must render').toBeVisible({ timeout: 60_000 });
-    const totalText = (await total.first().innerText()).replace(/\s+/g, ' ');
-    const n = Number((totalText.match(/Total:\s*(\d+)/) || [])[1]);
-    expect(n, `PA-07: Total participant count must be >= 4 seeded (was "${totalText}")`).toBeGreaterThanOrEqual(4);
-
-    // [ASSERT] (PA-09) the app rendered a real per-row name link whose href the app computed as
-    // /profilesummary/<profileid> — proves the analytics table built the summary routerLinks from its query.
-    const firstLink = page.locator('a.profilename').first();
-    await expect(firstLink, 'PA-07: at least one participant name link must render').toBeVisible({ timeout: 30_000 });
-    await expect(firstLink, 'PA-09: the name links to /profilesummary/<profileid> (app-built routerLink)')
-      .toHaveAttribute('href', /\/profilesummary\/.+/);
-  });
+  // UN-FIXMED — moved to profiles-deep.spec.ts (PA-07). The earlier fixme premise was wrong: the screen
+  // is NOT a "build-a-query-first" table. fetchData() calls onDataSearch() with an EMPTY filter on load,
+  // which passes EVERY `participant metadata` row through to dataSource.data (analytics.ts:610,1040-1320),
+  // so the "Total: N" header and the per-row <a class="profilename" routerLink="/profilesummary/.."> links
+  // render immediately. The "Error checking permissions" line is the auth guard's tolerable snackbar, not
+  // a "no table" state — route-mount.spec already proves the guard admits. See profiles-deep.spec.ts for
+  // the working PA-07/PA-09 + PA-08 (filter narrows) + PA-18 (selection badge).
 
   // ===========================================================================================
   // PA-11 — participant-form-tracker (Ask A&H tab) shows the seeded ask AH submission

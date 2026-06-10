@@ -35,11 +35,22 @@ const ID = {
   PKG1: `${TESTRUNID}_PKG1`,          // package reference doc
   PJP0: `${TESTRUNID}_PJP0`,          // participantjourneyproduct for p0 (ongoing -> customerstatus active)
   PP0: `${TESTRUNID}_PP0`,            // participantsproduct for p0 (ongoing -> activeproduct[])
-  ASK0: `${TESTRUNID}_ASK0`,          // ask AH submission (form-tracker tab 0)
+  ASK0: `${TESTRUNID}_ASK0`,          // ask AH submission for p0 (form-tracker tab 0)
+  ASK1: `${TESTRUNID}_ASK1`,          // ask AH submission for p1 (form-tracker participant-filter narrowing)
+  LL0: `${TESTRUNID}_LL0`,            // love letter submission for p0 (form-tracker tab 1)
   FBC0: `${TESTRUNID}_FBC0`,          // formsByClient row (forms DB) for view-participants-form + tracker tab 2
   AFB0: `${TESTRUNID}_AFB0`,          // appflowbreaks row (app-flow-breaks viewer)
+  AFB1: `${TESTRUNID}_AFB1`,          // a SECOND appflowbreaks row of a DIFFERENT type (chip-filter case)
+  // CF-only product: a participantsproduct we drive through statuses to assert productsdata_to_pmd
+  // projections (completed -> consumedproducts[], the productcount map) on a DEDICATED profile so the
+  // p0 render cases keep their single ongoing product.
+  PPCF: `${TESTRUNID}_PP_cf`,
+  P2: `${TESTRUNID}_P2`,             // a SECOND products ref doc (productcount-map case needs 2 product ids)
   // CF-only profile: a profile_data whose name we MUTATE at test time to assert the metadata sync CF
   CFPF: `${TESTRUNID}_cfprofile`,
+  // A dedicated profile for the productsdata_to_pmd projection cases (kept off p0/p1 so its
+  // activeproduct/consumedproducts arrays are fully owned by these CF cases).
+  PRODPF: `${TESTRUNID}_prodprofile`,
 };
 
 // The uP! Life Report formid the form-tracker tab-2 query filters by (participant-form-tracker.ts:144).
@@ -93,6 +104,9 @@ const ROUTES = [
   { route: '/view-participants-form', label: 'View Participants Form' },
   { route: '/app-flow-breaks', label: 'App Flow Breaks' },
   { route: '/ProfileScreen', label: 'Profile Screen' },
+  // deep cases reach the evolution-summary route directly (it is normally a menu-button navigation from
+  // analytics). The data-driven authGuard needs a dashboard grant or it shows "Contact Admin" and bounces.
+  { route: '/participant-evolution-summary', label: 'Participant Evolution Summary' },
 ];
 
 async function seedProfiles() {
@@ -133,6 +147,7 @@ async function seedProfiles() {
   // 3) REFERENCE DATA (non-ATC). journey + product + package the profile/analytics screens deref.
   await journeyRef(ID.J1).set({ id: ID.J1, docid: ID.J1, journey: `TEST Journey ${TESTRUNID}`, sequence: 1, originalfee: 1000, ...tag });
   await productRef(ID.P1).set({ id: ID.P1, docid: ID.P1, product: `TEST Product ${TESTRUNID}`, mode: 'Priority Mode', atcmodel: null, ...tag });
+  await productRef(ID.P2).set({ id: ID.P2, docid: ID.P2, product: `TEST Product Two ${TESTRUNID}`, mode: 'Priority Mode', atcmodel: null, ...tag });
   await packageRef(ID.PKG1).set({ docid: ID.PKG1, package: `TEST Package ${TESTRUNID}`, ...tag });
 
   // 4) PARTICIPANT PROFILES — overwrite the auth-chain profile_data with the fields the screens read.
@@ -190,6 +205,19 @@ async function seedProfiles() {
     docid: ID.ASK0, profileid: PF.p0, name: NAME.p0, askah: `TEST ask question ${TESTRUNID}`,
     installationaskah: null, created: nowTs(), ...tag,
   });
+  // A SECOND ask AH for p1 so the participant-select filter (where profileid==selected) has something to
+  // narrow AWAY: filtering to p0 must show p0's row and HIDE p1's row (the app's where-clause at work).
+  await db.collection('ask AH').doc(ID.ASK1).set({
+    docid: ID.ASK1, profileid: PF.p1, name: NAME.p1, askah: `TEST ask question one ${TESTRUNID}`,
+    installationaskah: null, created: nowTs(), ...tag,
+  });
+
+  // 6b) love letter submission (participant-form-tracker tab 1 — read from the DEFAULT db, orderBy
+  //     created desc). The Name column joins profile_data by profileid; loveletter is the content field.
+  await db.collection('love letter').doc(ID.LL0).set({
+    docid: ID.LL0, profileid: PF.p0, name: NAME.p0, loveletter: `TEST love letter ${TESTRUNID}`,
+    created: nowTs(), ...tag,
+  });
 
   // 7) formsByClient (FORMS DB) — one uP! Life Report submission within the last-30d window
   //    (view-participants-form default range; date > now-30d). formid == the tab-2 filter id so the
@@ -201,10 +229,16 @@ async function seedProfiles() {
     formarray: [{ fieldname: 'Notes', type: 'text', value: 'seeded answer' }], ...tag,
   });
 
-  // 8) appflowbreaks row (app-flow-breaks viewer — orderBy date desc; type chip 'navigation').
+  // 8) appflowbreaks rows (app-flow-breaks viewer — orderBy date desc; type chips derived from the set).
+  //    AFB0 = type 'navigation'; AFB1 = a DIFFERENT type ('playback') so the type-chip FILTER has two
+  //    classes to switch between (clicking the 'playback' chip must hide the 'navigation'-only card).
   await db.collection('appflowbreaks').doc(ID.AFB0).set({
     docid: ID.AFB0, profileid: PF.p0, date: nowTs(), log: ['step1', 'step2'],
     note: `TEST flow break ${TESTRUNID}`, type: 'navigation', ...tag,
+  });
+  await db.collection('appflowbreaks').doc(ID.AFB1).set({
+    docid: ID.AFB1, profileid: PF.p1, date: nowTs(), log: ['stepA'],
+    note: `TEST playback break ${TESTRUNID}`, type: 'playback', ...tag,
   });
 
   // 9) CF-only profile for the metadata-sync assertion (PA-CF-01). profile_data with an ORIGINAL name;
@@ -217,9 +251,34 @@ async function seedProfiles() {
     participantmode: 'Discovery Mode', ...tag,
   });
 
+  // 10) PRODUCT-CF profile (PA-CF-04/05): a dedicated profile whose participantsproduct we drive through
+  //     statuses to assert productsdata_to_pmd projections — completed -> consumedproducts[], and the
+  //     productcount map (one product seeded twice across two rows). participant metadata MUST exist for
+  //     the CF (it aborts with "no profile exist" otherwise — participantmetadata.js:514). The product
+  //     row (PPCF) starts ONGOING so the test's flip to 'completed' is a real status change the CF reacts
+  //     to (participantmetadata.js:495). atccount/atcmodel null (ATC branches dead).
+  await profileRef(ID.PRODPF).set({
+    docid: ID.PRODPF, profileid: ID.PRODPF, name: `Product CF Profile ${TESTRUNID}`,
+    email: `prodprofile+${TESTRUNID}@example.com`, number: '9999000077', countrycode: '+91',
+    participantmode: 'Discovery Mode', ...tag,
+  });
+  await db.collection('participant metadata').doc(ID.PRODPF).set({
+    docid: ID.PRODPF, profileid: ID.PRODPF, name: `Product CF Profile ${TESTRUNID}`,
+    email: `prodprofile+${TESTRUNID}@example.com`, customerstatus: 'active',
+    activeproduct: [], consumedproducts: [], unconsumedproducts: [], productcount: {},
+    atccount: null, atcmodel: null, ...tag,
+  });
+  await db.collection('participantsproduct').doc(ID.PPCF).set({
+    docid: ID.PPCF, profileid: ID.PRODPF, productref: productRef(ID.P1), packageref: packageRef(ID.PKG1),
+    status: 'ongoing', mode: 'Priority Mode', sequenceorder: 1, ...tag,
+  });
+
   return {
     TESTRUNID, ID, PF, EMAIL, NAME, UP_LIFE_REPORT_FORMID,
-    counts: { profiles: participants.length, journeys: 1, products: 1, askAH: 1, formsByClient: 1, appflowbreaks: 1 },
+    counts: {
+      profiles: participants.length, journeys: 1, products: 2, askAH: 2, loveLetter: 1,
+      formsByClient: 1, appflowbreaks: 2, productCfProducts: 1,
+    },
   };
 }
 
@@ -227,7 +286,7 @@ async function seedProfiles() {
 const SEEDED = [
   'journey', 'products', 'package',
   'profile_data', 'participant metadata', 'participantjourneyproduct', 'participantsproduct',
-  'ask AH', 'appflowbreaks',
+  'ask AH', 'love letter', 'appflowbreaks',
   // auth-chain + dashboard (shared shape; testrunid-scoped so other runs are untouched)
   'user_data', 'users_roles', 'dashboard',
 ];
