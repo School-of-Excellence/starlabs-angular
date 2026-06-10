@@ -74,15 +74,43 @@ To (re)build the bundle yourself:
 node_modules/.bin/ng build --configuration development   # development env → test project slabs-queue-e2e-exdcz
 ```
 
-### Run a suite (from `e2e/`)
+### Run it — bundled npm scripts (from `e2e/`)
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=4096 \
-  npx playwright test --config=playwright.<group>.config.ts --reporter=line
+npm run test:cloud          # queue suite vs the cloud test project (~188 cases)
+npm run test:emu            # queue suite vs the local Firebase emulator (hermetic, CI-gateable)
 
-SKIP_SEED=1  …                     # reuse the existing seed while iterating (skips teardown+reseed)
-BASE_URL=http://localhost:<port> … # point at a different served bundle (see caveat #2)
+npm run test:appointments   # any single component group:
+npm run test:events         #   events · modes · content · workshops · comms · support
+npm run test:profiles       #   profiles · evomap · authroles · journey · business
+npm run test:groups         # ALL 12 component groups in sequence (~40 min)
+
+npm run test:invariants     # hermetic oracle self-test (no app, no seed)
+npm run test:mobile         # REAL Flutter participant walk on the iOS simulator
+npm run seed:cloud          # (re)seed the cloud project manually
+npm run report:cloud        # isolated run + per-stage screenshots + HTML report
 ```
+
+Conferencing / video-tile tests are **root** scripts (run from the repo root): `npm run e2e:T1` … `npm run e2e:T10`
+(T1-grid, T2-join-leave, T3-camera, T4-mic, T5-network, T6-background, T7-screenshare, T8-blur, T9-sustained, T10-rejoin).
+
+Raw fallback (no npm script): `npx playwright test --config=playwright.<group>.config.ts --reporter=line`.
+
+### Variations & knobs (env vars prefixed on any command)
+
+| Knob | Applies to | Effect |
+|---|---|---|
+| `SKIP_SEED=1` | any suite | Reuse the existing seed (skip teardown+reseed) — fast iteration |
+| `BASE_URL=http://…` | any suite | Point at a different served bundle (fresh build on another port — caveat #2) |
+| `NODE_OPTIONS=--max-old-space-size=4096` | groups | Heap headroom (already baked into the `test:<group>` scripts) |
+| `VARIATIONS="LYL - First Cycle,…"` | `test:mobile` | Run only the named journey variation(s) of the 9 |
+| `ALL_PATHS=1` | `test:mobile` | Walk every forward path (72 paths / 50 users) instead of the 9 primary journeys |
+| `FLUTTER_BIN=/opt/homebrew/bin/flutter` | `test:mobile` | Path to the Flutter binary that drives the real participant app |
+| `EVIDENCE=1` · `TRACE=full` | `report:*` | Per-stage screenshots / full Playwright traces (baked into `report:*` / `report:*:full`) |
+| `<GROUP>_RUNID=foo` | a group | Override the seed's testrunid namespace (`APPT_RUNID`, `EVT_RUNID`, `MODE_RUNID`, …) |
+
+The 9 mobile journey variations: `LYL - First/Next Cycle` · `B!G - Next Cycle` · `Prodigies - First/Next Cycle` ·
+`uP! - First/Next/3rd Cycle` · `uP! - Prep Hold` (storyboards in [`test-map.html`](test-map.html)).
 
 ---
 

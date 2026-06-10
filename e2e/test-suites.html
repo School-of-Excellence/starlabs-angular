@@ -156,12 +156,43 @@ npm install --legacy-peer-deps
 cd e2e &amp;&amp; npm install</div>
   <p class="note">The app must be served on :4200 (test-project dev build). The configs auto-start it; to (re)build yourself:</p>
   <div class="cmd">node_modules/.bin/ng build --configuration <span class="v">development</span>   <span class="cm"># development env → test project</span></div>
-  <p class="note">Run a suite (from <code>e2e/</code>):</p>
-  <div class="cmd"><span class="fl">NODE_OPTIONS</span>=--max-old-space-size=4096 \
-  npx playwright test --config=playwright.<span class="v">&lt;group&gt;</span>.config.ts --reporter=line
+  <p class="note">Run it — <b>bundled npm scripts</b> (from <code>e2e/</code>):</p>
+  <div class="cmd"><span class="cm"># queue suite</span>
+npm run <span class="v">test:cloud</span>          <span class="cm"># queue vs the cloud test project (~188 cases)</span>
+npm run <span class="v">test:emu</span>            <span class="cm"># queue vs the local Firebase emulator (hermetic, CI-gateable)</span>
 
-<span class="fl">SKIP_SEED</span>=1  …                     <span class="cm"># reuse the existing seed while iterating</span>
-<span class="fl">BASE_URL</span>=http://localhost:&lt;port&gt; … <span class="cm"># point at a different served bundle (caveat #2)</span></div>
+<span class="cm"># any single component group</span>
+npm run <span class="v">test:appointments</span>   <span class="cm"># · events · modes · content · workshops · comms</span>
+npm run <span class="v">test:profiles</span>       <span class="cm"># · support · evomap · authroles · journey · business</span>
+
+npm run <span class="v">test:groups</span>         <span class="cm"># ALL 12 component groups in sequence (~40 min)</span>
+npm run <span class="v">test:invariants</span>     <span class="cm"># hermetic oracle self-test (no app, no seed)</span>
+npm run <span class="v">test:mobile</span>         <span class="cm"># REAL Flutter participant walk on the iOS simulator</span>
+
+<span class="cm"># seed / evidence</span>
+npm run <span class="v">seed:cloud</span>          <span class="cm"># (re)seed the cloud project manually</span>
+npm run <span class="v">report:cloud</span>        <span class="cm"># isolated run + per-stage screenshots + HTML report</span></div>
+  <p class="note">Conferencing / video tiles are <b>root</b> scripts (from the repo root):</p>
+  <div class="cmd">npm run <span class="v">e2e:T1</span>  <span class="cm"># grid</span>   …   npm run <span class="v">e2e:T10</span>  <span class="cm"># rejoin   (T1-grid, T2-join-leave, T3-camera, T4-mic, T5-network, T6-bg, T7-screenshare, T8-blur, T9-sustained, T10-rejoin)</span></div>
+
+  <h2><span class="n">⚙</span> Variations &amp; knobs <span style="font-size:12px;color:var(--dim);font-weight:400">— env vars prefixed on any command</span></h2>
+  <table>
+    <thead><tr><th>Knob</th><th>Applies to</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td class="cfg">SKIP_SEED=1</td><td class="cov">any suite</td><td class="cov">Reuse the existing seed (skip teardown+reseed) — fast iteration</td></tr>
+      <tr><td class="cfg">BASE_URL=http://…</td><td class="cov">any suite</td><td class="cov">Point at a different served bundle (e.g. a fresh build on another port — caveat #2)</td></tr>
+      <tr><td class="cfg">NODE_OPTIONS=--max-old-space-size=4096</td><td class="cov">groups</td><td class="cov">Heap headroom (already baked into the <code>test:&lt;group&gt;</code> scripts)</td></tr>
+      <tr><td class="cfg">VARIATIONS="LYL - First Cycle,…"</td><td class="cov">test:mobile</td><td class="cov">Run only the named journey variation(s) (of the 9)</td></tr>
+      <tr><td class="cfg">ALL_PATHS=1</td><td class="cov">test:mobile</td><td class="cov">Walk every forward path (72 paths / 50 users) instead of the 9 primary journeys</td></tr>
+      <tr><td class="cfg">FLUTTER_BIN=/opt/homebrew/bin/flutter</td><td class="cov">test:mobile</td><td class="cov">Path to the Flutter binary that drives the real participant app</td></tr>
+      <tr><td class="cfg">EVIDENCE=1 · TRACE=full</td><td class="cov">report:*</td><td class="cov">Capture per-stage screenshots / full Playwright traces (baked into <code>report:*</code>)</td></tr>
+      <tr><td class="cfg">&lt;GROUP&gt;_RUNID=foo</td><td class="cov">a group</td><td class="cov">Override the seed's testrunid namespace (APPT_RUNID, EVT_RUNID, MODE_RUNID, …)</td></tr>
+    </tbody>
+  </table>
+  <p class="note">The 9 mobile journey variations: <code>LYL - First/Next Cycle</code> · <code>B!G - Next Cycle</code> ·
+  <code>Prodigies - First/Next Cycle</code> · <code>uP! - First/Next/3rd Cycle</code> · <code>uP! - Prep Hold</code> —
+  storyboards in <a href="test-map.html">test-map.html</a>.</p>
+  <p class="note">Raw fallback (no npm script needed): <code>npx playwright test --config=playwright.&lt;group&gt;.config.ts --reporter=line</code>.</p>
 
   <h2><span class="n">✓</span> What to expect — per group (clean run)</h2>
   <table>
@@ -183,6 +214,7 @@ cd e2e &amp;&amp; npm install</div>
     </tbody>
     <tfoot><tr><td colspan="2">Totals</td><td class="num"><span class="b pass">~396</span></td><td class="num"><span class="b fixme">20</span></td><td class="num"><span class="b skip">~18</span></td><td class="cov">~208 component-group + ~188 queue (incl. modes 16-case engine)</td></tr></tfoot>
   </table>
+  <p class="note">Run any row: <code>npm run test:&lt;group&gt;</code> (queue → <code>npm run test:cloud</code>). The pass/fixme/skip counts are the clean-run expectation.</p>
   <p class="note"><span class="star">✦</span> journey product-delivery cases (JP-PD / JP-EDIT) <b>validate two real production source fixes</b> end-to-end
   (<code>delivery-sequence.component.ts</code> null-guard <code>16b578a</code>; <code>product-delivery.component.ts</code> fresh-per-emit view-model).</p>
 
