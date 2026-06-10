@@ -14,6 +14,13 @@ import { installProdFirewall } from '../../_shared/prod-firewall';
 const RUN = process.env.WSHOP_RUNID || 'wshop';
 export const PASSWORD = 'Test!1234';
 
+/** Seeded product-page products (seed-workshops.js Product Page doc). The product-page screen renders
+ *  one row per entry — the deep case asserts the app drew exactly these names from the doc it read. */
+export const wsProductNames = [
+  `WS Product Alpha ${RUN}`,
+  `WS Product Bravo ${RUN}`,
+];
+
 /** Seeded workshop actors (seed-workshops.js roster). */
 export const wsActors = {
   admin: `admin+${RUN}@example.com`,        // roles {admin, ah} — super-role (list/config/dashboard)
@@ -47,6 +54,18 @@ export const wsIds = {
 export async function installWshopStubs(page: Page): Promise<void> {
   await installProdFirewall(page);
   installAllExternalStubs(page);
+}
+
+/**
+ * Like installWshopStubs, but returns the live array of PRODUCTION endpoint URLs the firewall blocked.
+ * Used by the comms-safety case (WS-09/WS-14): after driving the workshop comms path, the array must
+ * stay empty for any *production* CF host (no real Wati/Postmark/sendBatchEmail escaped). The array is
+ * mutated in place as requests are intercepted, so read it AFTER the action.
+ */
+export async function installWshopStubsCapturingProdBlocks(page: Page): Promise<string[]> {
+  const blocked = await installProdFirewall(page);
+  installAllExternalStubs(page);
+  return blocked;
 }
 
 /** Log in via the real Angular login form as the seeded super-role admin. */
@@ -92,4 +111,56 @@ export async function resetParticipantWorkshopP0(): Promise<void> {
       },
     ],
   }, { merge: true });
+}
+
+/**
+ * Reset the INACTIVE workshop's challenges to a KNOWN single-curriculum array (WS-06 asserts the app
+ * grew the array by exactly 1 after adding a curriculum in the UI). Also clears triggerFunction so the
+ * settings-toggle test WS-10 starts from false. PRECONDITION write only.
+ */
+export async function resetWorkshopConfigBaseline(): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  await db.collection('workshopconfiguration').doc(wsIds.W_INACTIVE).set({
+    triggerFunction: false,
+    challenges: [
+      {
+        type: 'challenge', challengeid: `${RUN}_cfg_ch0`, heading: 'Config Module One', subheading: 'Baseline',
+        challenges: [{ type: 'video', challengeid: `${RUN}_cfg_ch0_s0`, heading: 'Baseline Video', status: '' }],
+      },
+    ],
+  }, { merge: true });
+}
+
+/**
+ * Delete any enrollment docs the WS-08 enroll flow created for p2 on the dashboard workshop, so the test
+ * is re-runnable (it asserts a +1 delta). App-written docs carry NO testrunid — we key them by their
+ * natural key (workshopref==W_DASH AND profileid==p2). PRECONDITION reset only.
+ */
+export async function cleanEnrollmentForP2(): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  const dashRef = db.collection('workshopconfiguration').doc(wsIds.W_DASH);
+  for (const col of ['workshop participant enrolled', 'participant workshop']) {
+    const snap = await db.collection(col).where('workshopref', '==', dashRef).where('profileid', '==', wsProfileIds.p2).get();
+    for (const d of snap.docs) await d.ref.delete();
+  }
+}
+
+/**
+ * Delete any duplicate workshopconfiguration docs the WS-13 duplicate flow created (a copy of the ACTIVE
+ * workshop with active:false and the SAME title). App-written → NO testrunid; key by the duplicated
+ * title + active:false. PRECONDITION reset only (the assertion reads the post-state count, not this).
+ */
+export async function cleanDuplicateWorkshops(title: string): Promise<void> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  // The duplicate copies detailpage wholesale, so detailpage.title === the source title. We can't query
+  // a nested field cheaply without an index, so scan the small active:false set and match in memory.
+  const snap = await db.collection('workshopconfiguration').where('active', '==', false).get();
+  for (const d of snap.docs) {
+    const data = d.data() || {};
+    const isDup = (data.detailpage && data.detailpage.title === title) && data.testrunid !== RUN;
+    if (isDup) await d.ref.delete();
+  }
 }

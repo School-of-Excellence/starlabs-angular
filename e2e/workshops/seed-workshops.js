@@ -86,6 +86,10 @@ const ROUTES = [
   { route: '/productpageworkshop', label: 'Workshop Products' },
   { route: '/formtemplateworkshop', label: 'Form Template Workshop' },
   { route: '/workshop_image_upload', label: 'Workshop Image Upload' },
+  // Legacy eiflix Workshop/* routes — granted so the deep-suite legacy route-mount smoke can reach them.
+  { route: '/workshopchallengecreation', label: 'Workshop Challenge Creation' },
+  { route: '/enrollment_config_view', label: 'Enrolment Config View' },
+  { route: '/workshopchallengeparticipantdashboard', label: 'Workshop Challenge Participant Dashboard' },
 ];
 
 // A two-curriculum challenge structure shared by the workshop-config doc AND the seeded participant
@@ -212,15 +216,31 @@ async function seedWorkshops() {
     challenges: workshopChallenges(), created: at(-4), ...tag,
   });
 
+  // 6) PRODUCT PAGE doc — the productpageworkshop screen reads the SINGLE fixed-id doc
+  //    `static meta data/Product Page` and renders products[] into a mat-table (product-page.component
+  //    .ts:194-198). It does NOT exist on the test project (verified), and no other e2e suite seeds it,
+  //    so we own it: seed a KNOWN products[] (run-tagged) and delete the doc in teardown. The product-page
+  //    deep case asserts the app rendered exactly these product names (app read → table rows).
+  await db.collection('static meta data').doc('Product Page').set({
+    docid: 'Product Page',
+    products: [
+      { productname: `WS Product Alpha ${TESTRUNID}`, shortdescription: 'seeded product one', claimlink: 'https://example.com/a', buttonname: 'Claim A', productimage: '' },
+      { productname: `WS Product Bravo ${TESTRUNID}`, shortdescription: 'seeded product two', claimlink: 'https://example.com/b', buttonname: 'Claim B', productimage: '' },
+    ],
+    ...tag,
+  });
+
   return {
     TESTRUNID, ID, PF, EMAIL,
-    counts: { workshops: 3, enrolled: 2, participantWorkshops: 2, participantMeta: 3 },
+    counts: { workshops: 3, enrolled: 2, participantWorkshops: 2, participantMeta: 3, products: 2 },
   };
 }
 
-// Collections this seed writes (for teardown).
+// Collections this seed writes (for teardown). The testrunid-scoped sweep catches our run-tagged docs
+// (including the fixed-id `static meta data/Product Page` we seeded with this run's tag).
 const SEEDED = [
   'workshopconfiguration', 'workshop participant enrolled', 'participant workshop', 'participant metadata',
+  'static meta data',
   // auth-chain + dashboard (shared shape; testrunid-scoped so other runs are untouched)
   'user_data', 'profile_data', 'users_roles', 'dashboard',
 ];
@@ -229,6 +249,20 @@ async function teardownWorkshops() {
   const admin = seed.initAdmin();
   const db = admin.firestore();
   const n = await seed.teardownCollections(db, SEEDED, TESTRUNID);
+  // Belt-and-suspenders: the Product Page doc is a single fixed-id doc WE own on the test project
+  // (verified absent before our run). Delete it explicitly so re-seeds start clean even if the
+  // testrunid-scoped sweep ever changes. Guarded: only delete if it still carries OUR run tag.
+  const pp = await db.collection('static meta data').doc('Product Page').get();
+  if (pp.exists && (pp.data() || {}).testrunid === TESTRUNID) {
+    await db.collection('static meta data').doc('Product Page').delete().catch(() => {});
+  }
+  // Clean any enrollment docs the WS-08 enroll test created (app-written → NO testrunid; key by the
+  // dashboard workshopref + the p2 profile that only the enroll test ever enrolls).
+  const dashRef = db.collection('workshopconfiguration').doc(ID.W_DASH);
+  for (const col of ['workshop participant enrolled', 'participant workshop']) {
+    const snap = await db.collection(col).where('workshopref', '==', dashRef).where('profileid', '==', PF.p2).get().catch(() => ({ docs: [] }));
+    for (const d of snap.docs) await d.ref.delete().catch(() => {});
+  }
   // Also delete the Auth users (emails carry the run id).
   const auth = admin.auth();
   for (const key of Object.keys(PF)) {
