@@ -34,6 +34,13 @@ const FLUTTER_APP = path.resolve(__dirname, '../../../breakthroughs-flutter');
 const FLUTTER_BIN = process.env.FLUTTER_BIN || '/opt/homebrew/bin/flutter';
 const E2E_BIN = path.join(os.homedir(), 'e2e-bin'); // holds the no-op `flutterfire` stub (crashlytics build phase)
 const EVIDENCE_DIR = path.join(FLUTTER_APP, 'mobile-evidence');
+// Blank-frame detection (L1): keep the screenshots a TRUSTWORTHY quick-scan — a silently blank/missing
+// capture must not slip through a green test. A real capture is hundreds of KB and has high grayscale
+// variance; a uniform/white/"loading" screen is tiny and ~0 stddev. ImageMagick gives the stddev; if it
+// is absent the check degrades to size-only (still catches the classic ~4KB blank). Override via MAGICK_BIN.
+const MAGICK = process.env.MAGICK_BIN || '/opt/homebrew/bin/magick';
+const MIN_FRAME_BYTES = 10_000; // a real capture is >>10KB; a truncated/empty file is tiny
+const MIN_FRAME_STDDEV = 0.01;  // normalized grayscale stddev; uniform/white ≈ 0, real frames > 0.1
 
 /** The iOS-simulator stub overrides (mlkit + ffmpeg ship no arm64-sim binary). LOCAL/gitignored —
  *  device/prod/CI builds must NOT have this file (they use the real plugins). */
@@ -274,4 +281,52 @@ export async function attachMobileScreenshots(testInfo: TestInfo, prefix: string
 export function clearMobileScreenshots(): void {
   if (!fs.existsSync(EVIDENCE_DIR)) return;
   for (const f of fs.readdirSync(EVIDENCE_DIR).filter((x) => x.endsWith('.png'))) fs.rmSync(path.join(EVIDENCE_DIR, f));
+}
+
+/** Normalized grayscale stddev of a PNG via ImageMagick (0 = uniform/blank). -1 if it can't be measured. */
+function frameStddev(absPath: string): number {
+  try {
+    const out = execFileSync(MAGICK, [absPath, '-colorspace', 'Gray', '-format', '%[fx:standard_deviation]', 'info:'],
+      { encoding: 'utf8', timeout: 15_000 }).trim();
+    const v = Number.parseFloat(out);
+    return Number.isFinite(v) ? v : -1;
+  } catch { return -1; } // magick absent/errored → caller falls back to the size-only check
+}
+
+/** A frame is "blank" if it is tiny OR (measurably) near-uniform (a white / still-loading screen). */
+function classifyFrame(absPath: string): { blank: boolean; bytes: number; stddev: number } {
+  let bytes = 0;
+  try { bytes = fs.statSync(absPath).size; } catch { /* missing */ }
+  const stddev = frameStddev(absPath);
+  const blank = bytes < MIN_FRAME_BYTES || (stddev >= 0 && stddev < MIN_FRAME_STDDEV);
+  return { blank, bytes, stddev };
+}
+
+/**
+ * Attach every captured frame to the report AND guard the imaging as a real signal (L1) — so a silently
+ * blank or missing capture cannot slip through a green test (the quick-scan stays trustworthy). Policy
+ * (operator directive): per test, badCount = missing + blank; 0 → clean (info annotation), 1-2 → report
+ * WARNING (stays green, transient-capture cushion), >=3 → HARD FAIL. `expected` = frames the walk should
+ * have produced (3 per self-move [card/form/after] + 1 per board hop; 1 for a 0-hop parked terminal).
+ */
+export async function attachAndAuditFrames(testInfo: TestInfo, prefix: string, expected: number): Promise<void> {
+  const files = fs.existsSync(EVIDENCE_DIR)
+    ? fs.readdirSync(EVIDENCE_DIR).filter((x) => x.endsWith('.png')).sort() : [];
+  const blanks: string[] = [];
+  for (const f of files) {
+    const p = path.join(EVIDENCE_DIR, f);
+    await testInfo.attach(`${prefix}/${f}`, { path: p, contentType: 'image/png' });
+    const { blank, bytes, stddev } = classifyFrame(p);
+    if (blank) blanks.push(`${f} (bytes=${bytes}, stddev=${stddev.toFixed(3)})`);
+  }
+  const missing = Math.max(0, expected - files.length);
+  const badCount = missing + blanks.length;
+  const summary = `imaging: ${files.length}/${expected} frames present, ${blanks.length} blank, ${missing} missing`;
+  if (badCount === 0) {
+    testInfo.annotations.push({ type: 'imaging', description: `${summary} — all present & non-blank` });
+  } else if (badCount < 3) {
+    testInfo.annotations.push({ type: 'warning', description: `IMAGING WARNING — ${summary}. blanks: [${blanks.join('; ')}]` });
+  } else {
+    throw new Error(`IMAGING FAIL — ${badCount} bad frames (>=3): ${summary}. blanks: [${blanks.join('; ')}]`);
+  }
 }

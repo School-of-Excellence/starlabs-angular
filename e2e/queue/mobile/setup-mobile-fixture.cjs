@@ -84,7 +84,16 @@ async function main() {
   const invBatch = db.batch();
   inv.docs.forEach(d => invBatch.update(d.ref, { clientresponse: 'deferred' }));
   if (inv.size) await invBatch.commit();
-  console.log(`✓ home-dashboard preconditions: applivestreaming + HPC Config + neutralized ${qp.size} queue planning + ${inv.size} studio invitation(s)`);
+  // The home's "ads playlist" (homeContent.dart:4586 → AppTheme.adsplaylist) loads async and sets
+  // adsPlaylist AFTER the first build; a doc with a null `adsthumbnail` then crashes the rebuild
+  // (CachedNetworkImage.imageUrl: 'Null' is not a 'String', Themes.dart:3387) — intermittently erasing
+  // the queue card (the card renders, then ~1s later the ads query lands and throws). Neutralize: mark
+  // every adsplaylist doc available:false so the query returns empty (→ SizedBox, no ads, card stays).
+  const ads = await db.collection('adsplaylist').where('available', '==', true).get();
+  const adsBatch = db.batch();
+  ads.docs.forEach(d => adsBatch.update(d.ref, { available: false }));
+  if (ads.size) await adsBatch.commit();
+  console.log(`✓ home-dashboard preconditions: applivestreaming + HPC Config + neutralized ${qp.size} queue planning + ${inv.size} studio invitation(s) + ${ads.size} ads`);
 
   // 4) Flutter-home queue-resolution chain. The Flutter Home renders the queue card (QueueControl)
   // only when it resolves: profile_data.participantmode (Event Mode) → participantsproduct(mode==

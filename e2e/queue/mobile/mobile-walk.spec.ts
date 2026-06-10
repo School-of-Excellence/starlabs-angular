@@ -15,7 +15,7 @@ import { loginAsOperator } from '../support/auth';
 import { QUEUE_NAME } from '../support/actors';
 import {
   buildTargets, driveBoardHop, driveFlutterSelfRun, resetToken, assertAfterHop,
-  attachMobileScreenshots, clearMobileScreenshots, ensureSimBuildPrereqs, TERMINAL, MODEL,
+  attachAndAuditFrames, clearMobileScreenshots, ensureSimBuildPrereqs, TERMINAL, MODEL,
 } from './walk-lib';
 const { assertTerminalReached } = require('../../lib/assertions');
 
@@ -41,7 +41,7 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
       if (t.hops.length === 0) {
         await assertTerminalReached(t.tokenId, t.vid, { terminal: t.terminal });
         await driveFlutterSelfRun(t, 0, `${t.vid}-p${t.participantIndex}`);
-        await attachMobileScreenshots(testInfo, `${t.vid}-p${t.participantIndex}`);
+        await attachAndAuditFrames(testInfo, `${t.vid}-p${t.participantIndex}`, 1); // 1 parked-terminal frame
         return;
       }
 
@@ -87,7 +87,9 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
       const { assertEveryMoveLogged } = require('../../lib/assertions');
       await assertEveryMoveLogged(t.tokenId, t.hops.length, { minNonSelf: expectedNonSelf });
 
-      await attachMobileScreenshots(testInfo, `${t.vid}-p${t.participantIndex}`);
+      // L1 guard: every walk should produce 3 mobile frames per self-move (card/form/after) + 1 board
+      // frame per operator hop. Missing/blank beyond the cushion fails (see attachAndAuditFrames).
+      await attachAndAuditFrames(testInfo, `${t.vid}-p${t.participantIndex}`, 3 * selfHops + opHops);
     });
   }
 });
