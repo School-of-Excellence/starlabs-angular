@@ -4,14 +4,12 @@ import { RouterLink } from '@angular/router';
 import {
   Firestore, collection, query, where, getDocs, getDoc, doc,
 } from '@angular/fire/firestore';
-import { MAT_DIALOG_DATA, MatDialogRef, MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { HealthState } from './health-score.engine';
-import { LogCallDialogComponent } from './log-call-dialog.component';
-import { SetHealthStateDialogComponent } from './set-health-state-dialog.component';
 
 /** Minimal shape of a portfolio row this panel reads. Mirrors the dashboard's PortfolioRow
  *  (kept structural so we don't need to export the dashboard's private interface). */
@@ -41,6 +39,15 @@ export interface SlideoverRow {
   notStarted: boolean;
   balance: number | null;
   totalpurchasevalue: number | null;
+}
+
+/** Dialog data for the slide-over. The footer Log-call / Set-health actions delegate to the
+ *  parent dashboard's full flow (open dialog -> write Firestore + snackbar + update table) via
+ *  these optional callbacks, so the slide-over never performs its own (previously no-op) writes. */
+export interface SlideoverData {
+  row: SlideoverRow;
+  onLogCall?: () => void;
+  onSetHealth?: () => void;
 }
 
 interface TicketItem { subject: string; status: string; date: Date | null; }
@@ -217,7 +224,7 @@ type TimelineItem =
   `,
   styles: [`
     :host {
-      --so-bg: #ffffff; --so-ink: #0f172a; --so-ink2: #475569; --so-muted: #94a3b8;
+      --so-bg: #ffffff; --so-ink: #0f172a; --so-ink2: #475569; --so-muted: #64748b;
       --so-border: #e8edf3; --so-border-soft: #f1f5f9; --so-accent: #2563eb; --so-accent-soft: #eff6ff;
       --so-tnum: 'tnum';
       display: block; height: 100%;
@@ -339,9 +346,8 @@ export class ParticipantSlideoverComponent implements OnInit {
 
   constructor(
     private firestore: Firestore,
-    private dialog: MatDialog,
     private ref: MatDialogRef<ParticipantSlideoverComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { row: SlideoverRow },
+    @Inject(MAT_DIALOG_DATA) public data: SlideoverData,
   ) {
     this.row = data.row;
   }
@@ -472,17 +478,16 @@ export class ParticipantSlideoverComponent implements OnInit {
     return band === 'High' ? 'band-high' : band === 'Medium' ? 'band-med' : 'band-low';
   }
 
-  /** Reuse the existing Log-call dialog the same way the parent does (write still depends on rules). */
+  /** Delegate to the parent dashboard's logCall flow (opens the dialog, then writes the touchpoint
+   *  + snackbar + updates the table). The slide-over stays open; the dialog stacks over it. */
   logCall(): void {
-    this.dialog.open(LogCallDialogComponent, { data: { name: this.row.name }, autoFocus: false });
+    this.data.onLogCall?.();
   }
 
-  /** Reuse the existing Set-health-state dialog the same way the parent does. */
+  /** Delegate to the parent dashboard's setHealthState flow (opens the dialog, writes the audit doc
+   *  + snackbar + updates the table). The slide-over stays open; the dialog stacks over it. */
   setHealth(): void {
-    this.dialog.open(SetHealthStateDialogComponent, {
-      data: { name: this.row.name, current: this.row.coachHealthState?.state ?? null },
-      autoFocus: false,
-    });
+    this.data.onSetHealth?.();
   }
 
   close(): void { this.ref.close(); }

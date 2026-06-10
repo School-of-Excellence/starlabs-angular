@@ -15,7 +15,7 @@ $border-soft:  #eef2f8;   // softest divider
 
 $ink:          #0f172a;   // primary text
 $ink-2:        #475569;   // secondary text
-$ink-muted:    #94a3b8;   // muted text
+$ink-muted:    #64748b;   // muted text (slate-500, ~4.6:1 on white — WCAG AA)
 
 $accent:       #2563eb;   // single interactive accent
 $accent-strong:#1d4ed8;
@@ -248,6 +248,15 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
   strong { color: $ink; }
 }
 
+/* Slim, always-visible honesty caveat for page-local filters in paged (ALL / UNASSIGNED) mode. */
+.jchd-page-caveat {
+  display: flex; align-items: center; gap: 7px; margin: 0 2px 10px;
+  padding: 7px 11px; border-radius: $radius-control;
+  background: $warn-bg; border: 1px solid $border;
+  font-size: 12px; color: $warn-fg; line-height: 1.4;
+  mat-icon { font-size: 16px; height: 16px; width: 16px; flex: none; }
+}
+
 /* =====================================================================
    FILTER TOOLBAR — sticky, modern toolbar with segmented lever pills
    ===================================================================== */
@@ -445,7 +454,7 @@ a.name-link {
 .evt-name { font-weight: 650; color: $ink; font-size: 12.5px; }
 .evt-none { color: $ink-muted; font-weight: 600; }
 .assign-current { font-weight: 700; color: $accent; }
-.health-pending { color: #cbd5e1; font-weight: 600; }
+.health-pending { color: #64748b; font-weight: 600; }
 
 .text-warn { color: $warn-fg; font-weight: 650; @include tabular; }
 
