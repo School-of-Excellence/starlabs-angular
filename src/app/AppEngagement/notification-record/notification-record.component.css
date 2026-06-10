@@ -798,3 +798,31 @@ button[mat-raised-button][disabled] {
 .engagement-row .stat-subtitle:not(.green):not(.red) {
   color: #3f51b5;
 }
+
+/* --- Compact stats + engagement funnel cards --- */
+.notification-log-container .stats-row {
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.notification-log-container .stats-row .stat-card {
+  min-width: 200px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+.notification-log-container .stats-row .stat-card .stat-title {
+  font-size: 12px;
+  margin: 0 0 4px 0;
+}
+.notification-log-container .stats-row .stat-card .stat-value {
+  font-size: 24px;
+  margin-bottom: 2px;
+}
+.notification-log-container .stats-row .stat-card .stat-value .warning-icon {
+  font-size: 22px;
+}
+.notification-log-container .stats-row .stat-card .stat-subtitle {
+  font-size: 12px;
+}
+.engagement-row {
+  margin-top: 8px;
+}
