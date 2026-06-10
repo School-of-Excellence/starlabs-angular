@@ -934,6 +934,66 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "availability",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "appointments",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "starttime",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "hosts",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "starttime",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "hosts",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "endtime",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cancelled",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "starttime",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
