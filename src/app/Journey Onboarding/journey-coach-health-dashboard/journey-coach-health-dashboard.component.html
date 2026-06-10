@@ -421,6 +421,7 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns; let i = index"
             class="jchd-data-row" [ngClass]="bandClass(row.priorityBand)"
+            [style.--i]="i"
             [class.jchd-row-focused]="i === focusedRowIndex"
             [attr.aria-current]="i === focusedRowIndex ? 'true' : null"></tr>
       </table>
@@ -552,7 +553,7 @@
       </div>
 
       <div class="wl-list" *ngIf="worklistTotal() > 0">
-        <article class="wl-card" *ngFor="let r of worklistRows()" [ngClass]="bandClass(r.priorityBand)">
+        <article class="wl-card" *ngFor="let r of worklistRows(); let i = index" [ngClass]="bandClass(r.priorityBand)" [style.--i]="i">
           <div class="wl-rail"></div>
 
           <div class="wl-body">

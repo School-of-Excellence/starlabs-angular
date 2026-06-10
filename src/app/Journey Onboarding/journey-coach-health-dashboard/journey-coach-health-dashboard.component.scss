@@ -6,62 +6,83 @@
    ===================================================================== */
 
 /* ---- design tokens ---- */
-$page-bg:      #f5f7fb;   // soft slate page canvas
+$page-bg:      #f6f8fc;   // soft slate page canvas (cooler, refined)
 $page-bg-2:    #eef2f9;   // deeper canvas tint (gradient floor)
 $surface:      #ffffff;
-$surface-2:    #fcfdff;   // faint elevated tint for inner panels
-$border:       #e7ecf3;   // hairline border
+$surface-2:    #fbfcfe;   // faint elevated tint for inner panels
+$border:       #e7ecf3;   // hairline border (slightly cooler)
 $border-soft:  #eef2f8;   // softest divider
 
-$ink:          #0f172a;   // primary text
+$ink:          #0f172a;   // primary text (zinc-ish ink, never pure black)
 $ink-2:        #475569;   // secondary text
 $ink-muted:    #64748b;   // muted text (slate-500, ~4.6:1 on white — WCAG AA)
 
-$accent:       #2563eb;   // single interactive accent
-$accent-strong:#1d4ed8;
-$accent-soft:  #eff5ff;
-$accent-tint:  #dbe7fe;
+$accent:       #2f66d6;   // single interactive accent — slightly desaturated (expensive, not "AI blue")
+$accent-strong:#2353be;
+$accent-soft:  #eef4fd;
+$accent-tint:  #d6e2f8;
 
-// semantic data colours (calibrated, harmonised)
-$pri-high-fg:  #be123c;  $pri-high-bg:  #fff1f3;
-$pri-med-fg:   #b45309;  $pri-med-bg:   #fff8eb;
-$pri-low-fg:   #64748b;  $pri-low-bg:   #f1f5f9;
+// semantic data colours (calibrated, harmonised — one slightly-muted set)
+$pri-high-fg:  #c0334d;  $pri-high-bg:  #fdf2f4;
+$pri-med-fg:   #b06410;  $pri-med-bg:   #fdf6ea;
+$pri-low-fg:   #64748b;  $pri-low-bg:   #f1f4f8;
 
-$good-fg:      #15803d;  $good-bg:      #effdf3;
-$warn-fg:      #b45309;  $warn-bg:      #fff8eb;
-$bad-fg:       #be123c;  $bad-bg:       #fff1f3;
-$evang-fg:     #6d28d9;  $evang-bg:     #f5f2ff;
+$good-fg:      #1d7a45;  $good-bg:      #eef9f1;
+$warn-fg:      #b06410;  $warn-bg:      #fdf6ea;
+$bad-fg:       #c0334d;  $bad-bg:       #fdf2f4;
+$evang-fg:     #6741c4;  $evang-bg:     #f3f0fb;
 
 $radius-surface: 14px;
 $radius-control: 10px;
 $radius-pill:    999px;
 
-// soft, wide, low-opacity shadows tinted to the page hue (never harsh black)
-$shadow-1: 0 1px 2px rgba(30, 41, 75, .04), 0 1px 1px rgba(30, 41, 75, .03);
-$shadow-2: 0 1px 2px rgba(30, 41, 75, .04), 0 12px 28px -16px rgba(30, 41, 75, .16);
-$shadow-3: 0 2px 4px rgba(30, 41, 75, .05), 0 20px 40px -22px rgba(30, 41, 75, .26);
-$shadow-pop: 0 1px 2px rgba(30, 41, 75, .05), 0 18px 36px -20px rgba(30, 41, 75, .28);
+// premium depth: soft, wide, low-opacity diffusion shadows tinted to the slate bg (never harsh black),
+// paired at point of use with an inset top highlight for a lit-from-above surface.
+$hairlite: inset 0 1px 0 rgba(255, 255, 255, .6);
+$shadow-1: #{$hairlite}, 0 1px 2px rgba(15, 23, 42, .04), 0 1px 1px rgba(15, 23, 42, .03);
+$shadow-2: #{$hairlite}, 0 1px 2px rgba(15, 23, 42, .04), 0 12px 28px -12px rgba(15, 23, 42, .10);
+$shadow-3: #{$hairlite}, 0 2px 4px rgba(15, 23, 42, .05), 0 20px 44px -18px rgba(15, 23, 42, .18);
+$shadow-pop: #{$hairlite}, 0 1px 2px rgba(15, 23, 42, .05), 0 18px 40px -16px rgba(15, 23, 42, .20);
 
-$mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
-$ease: cubic-bezier(.22, .68, .32, 1);   // custom tactile ease
-$ease-out: cubic-bezier(.16, .84, .3, 1);
+$mono: 'Geist Mono', ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+$ease: cubic-bezier(.2, .8, .2, 1);   // custom tactile ease
+$ease-out: cubic-bezier(.2, .8, .2, 1);
 
-@mixin tabular { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+@mixin tabular {
+  font-family: $mono;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.01em;
+}
 @mixin section-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
   color: $ink-muted; font-weight: 600;
 }
 
 :host {
   display: block;
   color: $ink;
+  // scoped premium UI font — does NOT affect the rest of the app
+  font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-feature-settings: 'tnum' 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* crafted, consistent keyboard focus ring scoped to the dashboard */
+.jchd-wrap {
+  a.name-link:focus-visible,
+  .kpi.clickable:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px $surface, 0 0 0 4px $accent-tint;
+    border-radius: 6px;
+  }
 }
 
 .jchd-wrap {
   padding: 22px 26px 48px;
   background:
-    radial-gradient(1200px 480px at 18% -8%, #ffffff 0%, rgba(255,255,255,0) 60%),
+    radial-gradient(1100px 460px at 16% -10%, #ffffff 0%, rgba(255,255,255,0) 62%),
     linear-gradient(180deg, $page-bg 0%, $page-bg-2 100%);
   background-attachment: local;
   min-height: 100%;
@@ -84,11 +105,11 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
   margin-bottom: 22px;
 
   h1 {
-    font-size: 21px; font-weight: 750; letter-spacing: -0.02em;
+    font-size: 21px; font-weight: 700; letter-spacing: -0.022em;
     margin: 0; color: $ink; line-height: 1.15;
   }
   .subtitle {
-    margin: 5px 0 0; color: $ink-2; font-size: 13px; @include tabular;
+    margin: 5px 0 0; color: $ink-2; font-size: 12.5px; @include tabular;
   }
   .coach-picker { min-width: 230px; font-size: 13px; }
 }
@@ -114,13 +135,16 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     color: $ink-2;
     font-weight: 600;
     letter-spacing: -0.005em;
+    transition: color .14s $ease, transform .08s $ease;
 
     & + .mat-button-toggle { border-left: 1px solid $border-soft; }
 
     .mat-button-toggle-label-content {
       line-height: 34px; padding: 0 16px; font-size: 13px;
+      transition: background-color .14s $ease;
     }
     &:hover .mat-button-toggle-label-content { background: $surface-2; }
+    &:active { transform: scale(.98); }
   }
   .mat-button-toggle-checked {
     background: $accent-soft;
@@ -135,11 +159,11 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
    ===================================================================== */
 .jchd-assign {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  background: linear-gradient(180deg, $accent-soft 0%, #f6f9ff 100%);
+  background: linear-gradient(180deg, $accent-soft 0%, #f5f9ff 100%);
   border: 1px solid $accent-tint; border-radius: $radius-surface;
   box-shadow: $shadow-1;
   padding: 14px 18px; margin: 0 0 18px;
-  .assign-text { font-size: 13px; color: #1e3a8a; @include tabular; }
+  .assign-text { font-size: 13px; color: $accent-strong; @include tabular; }
   .assign-coach { min-width: 230px; font-size: 13px; margin-bottom: -1.25em; }
   > mat-icon { color: $accent; }
 }
@@ -164,13 +188,19 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     box-shadow: $shadow-1;
     display: flex; flex-direction: column; gap: 8px;
     overflow: hidden;
-    transition: transform .18s $ease, box-shadow .18s $ease, border-color .18s $ease;
+    transition: transform .2s $ease, box-shadow .2s $ease, border-color .2s $ease;
     will-change: transform;
+    // staggered load-in (subtle fade + lift); 7 fixed cards keyed by :nth-child
+    animation: jchd-card-in .34s $ease both;
+
+    @for $n from 1 through 7 {
+      &:nth-child(#{$n}) { animation-delay: #{($n - 1) * 35}ms; }
+    }
 
     // top accent hairline for semantic cards (subtle)
     &::before {
       content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
-      background: transparent; opacity: 0; transition: opacity .18s $ease;
+      background: transparent; opacity: 0; transition: opacity .2s $ease;
     }
 
     .kpi-label {
@@ -183,8 +213,8 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
       padding: 1px 7px; border-radius: $radius-pill; background: $border-soft;
     }
     .kpi-num {
-      font-size: 30px; font-weight: 760; line-height: 1; color: $ink;
-      letter-spacing: -0.02em; @include tabular;
+      font-size: 29px; font-weight: 600; line-height: 1; color: $ink;
+      letter-spacing: -0.03em; @include tabular;
     }
 
     &.good .kpi-num { color: $good-fg; }
@@ -201,23 +231,29 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
       cursor: pointer;
       &:hover {
         transform: translateY(-2px);
-        box-shadow: $shadow-2;
+        box-shadow: $shadow-2, 0 18px 34px -18px rgba(15, 23, 42, .14);
         border-color: $border;
         &::before { opacity: .65; }
       }
-      &:active { transform: translateY(0); }
+      &:active { transform: scale(.98); }
     }
 
     // strong, legible selected (clickable-filter highlight)
     &.kpi-selected {
-      background: linear-gradient(180deg, $accent-soft 0%, #f6f9ff 100%);
+      background: linear-gradient(180deg, $accent-soft 0%, #f5f9ff 100%);
       border-color: $accent-tint;
-      box-shadow: 0 0 0 1px $accent-tint inset, 0 8px 22px -14px rgba(37, 99, 235, .5);
+      box-shadow: $hairlite, 0 0 0 1px $accent-tint inset, 0 10px 24px -14px rgba(47, 102, 214, .42);
       &::before { background: $accent; opacity: 1; }
       .kpi-label { color: $accent-strong; }
-      &:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px $accent-tint inset, 0 14px 28px -14px rgba(37, 99, 235, .55); }
+      &:hover { transform: translateY(-2px); box-shadow: $hairlite, 0 0 0 1px $accent-tint inset, 0 16px 30px -14px rgba(47, 102, 214, .46); }
+      &:active { transform: scale(.98); }
     }
   }
+}
+
+@keyframes jchd-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 1080px) {
@@ -229,7 +265,7 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 
 @media (prefers-reduced-motion: reduce) {
   .jchd-anim { animation: none; }
-  .jchd-summary .kpi { transition: none; }
+  .jchd-summary .kpi { transition: none; animation: none; }
   .jchd-summary .kpi.clickable:hover { transform: none; }
 }
 
@@ -330,7 +366,7 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
   }
   ::ng-deep .mat-mdc-outlined-button.active:not(:disabled) {
     background: $accent; border-color: $accent; color: #fff;
-    box-shadow: 0 6px 14px -8px rgba(37, 99, 235, .7);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 6px 14px -8px rgba(47, 102, 214, .55);
   }
   ::ng-deep .mat-mdc-outlined-button:disabled {
     border-style: dashed; border-color: $border; opacity: .65;
@@ -341,7 +377,9 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px;
   position: sticky; top: 0; z-index: 6;
   padding: 12px; margin-left: -2px; margin-right: -2px;
-  background: rgba(245, 247, 251, .9);
+  background: rgba(246, 248, 252, .82);
+  backdrop-filter: saturate(1.4) blur(8px);
+  -webkit-backdrop-filter: saturate(1.4) blur(8px);
   border: 1px solid $border;
   border-radius: $radius-control;
   box-shadow: $shadow-1;
@@ -403,6 +441,17 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
   position: relative;
   border: 1px solid $border; border-radius: $radius-surface; overflow: auto;
   background: $surface; box-shadow: $shadow-2;
+
+  // premium, unobtrusive scrollbars scoped to the table surface
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  &::-webkit-scrollbar { width: 9px; height: 9px; }
+  &::-webkit-scrollbar-thumb {
+    background: #cdd6e3; border-radius: $radius-pill;
+    border: 2px solid $surface; background-clip: padding-box;
+  }
+  &::-webkit-scrollbar-thumb:hover { background: #aebccd; background-clip: padding-box; }
+  &::-webkit-scrollbar-track { background: transparent; }
 }
 
 .jchd-table {
@@ -410,7 +459,7 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 
   th.mat-mdc-header-cell {
     @include section-label;
-    font-size: 11px; color: $ink-muted; font-weight: 650;
+    font-size: 11px; color: $ink-muted; font-weight: 600; letter-spacing: .07em;
     border-bottom: 1px solid $border;
     background: $surface;
     padding-top: 14px; padding-bottom: 14px;
@@ -424,14 +473,17 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     padding-top: 13px; padding-bottom: 13px;
   }
 
-  // sticky header gains a soft elevation shadow when scrolled
+  // sticky header gains a soft, slate-tinted elevation shadow when scrolled
   ::ng-deep .mat-mdc-header-row {
-    box-shadow: inset 0 -1px 0 $border, 0 4px 12px -8px rgba(30, 41, 75, .18);
+    box-shadow: inset 0 -1px 0 $border, 0 4px 12px -8px rgba(15, 23, 42, .12);
   }
 
   /* ---- card-like data rows with band-coloured priority rail ---- */
   .jchd-data-row {
     transition: background-color .16s $ease, box-shadow .16s $ease;
+    // quick, subtle staggered load-in keyed by row index (--i from the template)
+    animation: jchd-row-in .3s $ease both;
+    animation-delay: calc(min(var(--i, 0), 14) * 18ms);
 
     td.mat-mdc-cell:first-child { position: relative; }
     // priority rail: thin band-coloured bar at row's left edge
@@ -484,7 +536,10 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
    row-actions are dimmed at rest. Amber/accent when flagged. */
 .flag-btn {
   color: $ink-muted;
+  ::ng-deep .mat-icon, mat-icon { transition: transform .2s $ease, color .14s $ease; }
+  &:active ::ng-deep .mat-icon, &:active mat-icon { transform: scale(.86); }
   &.is-flagged { color: $warn-fg; }
+  &.is-flagged ::ng-deep .mat-icon, &.is-flagged mat-icon { animation: jchd-star-pop .28s $ease; }
 }
 .row-actions .flag-btn { opacity: 1; }
 .jchd-data-row .row-actions .flag-btn { opacity: 1; }
@@ -492,11 +547,28 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 /* worklist card flag toggle */
 .wl-flag {
   color: $ink-muted;
+  ::ng-deep .mat-icon, mat-icon { transition: transform .2s $ease, color .14s $ease; }
+  &:active ::ng-deep .mat-icon, &:active mat-icon { transform: scale(.86); }
   &.is-flagged { color: $warn-fg; }
+  &.is-flagged ::ng-deep .mat-icon, &.is-flagged mat-icon { animation: jchd-star-pop .28s $ease; }
 }
+
+@keyframes jchd-star-pop {
+  0% { transform: scale(.7); }
+  55% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes jchd-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .jchd-table .jchd-data-row,
   .row-actions { transition: none; }
+  .jchd-table .jchd-data-row { animation: none; }
+  .flag-btn ::ng-deep .mat-icon, .flag-btn mat-icon,
+  .wl-flag ::ng-deep .mat-icon, .wl-flag mat-icon { transition: none; animation: none; }
 }
 
 a.name-link {
@@ -723,6 +795,9 @@ $wl-ease: cubic-bezier(.2, .7, .3, 1);
   overflow: hidden;
   transition: transform .16s $wl-ease, box-shadow .16s $wl-ease;
   will-change: transform;
+  // staggered load-in keyed by card index (--i from the template)
+  animation: jchd-row-in .3s $wl-ease both;
+  animation-delay: calc(min(var(--i, 0), 12) * 24ms);
 
   &:hover {
     transform: translateY(-2px);
@@ -799,5 +874,6 @@ $wl-ease: cubic-bezier(.2, .7, .3, 1);
 
 @media (prefers-reduced-motion: reduce) {
   .wl-card, .wl-actions .wl-act.mat-mdc-outlined-button { transition: none; }
+  .wl-card { animation: none; }
   .wl-card:hover { transform: none; }
 }
