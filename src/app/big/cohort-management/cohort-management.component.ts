@@ -2591,7 +2591,8 @@ export class CohortManagementComponent {
         eventCollectionList: this.filteredAcceleratorEventList,
         mapEventCollection: this.mapAcceleratorEvent,
         participantTagsList: this.participantTagsList,
-        loggedInProfile: this.loggedInProfile
+        loggedInProfile: this.loggedInProfile,
+        queueList : this.searchableQueueList
       },
       disableClose: false
     });

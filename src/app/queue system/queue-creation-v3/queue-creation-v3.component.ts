@@ -1154,13 +1154,14 @@ addNextStage(mainIndex: number) {
 
         batch.commit().then((queue)=>{
           this.queueId = metadata['docid']
-          this.checkForCohortsToCreate()
+          this.checkForCohortsToCreate();
         }).catch(err =>{
           console.log(err)
+          this.dialogRef.close();
           alert(err)
         })
         
-        this.dialogRef.close()
+        // this.dialogRef.close()
         loadingref.close()
       } else {
         alert("No Delivery Queue Assigned to the product")
@@ -1403,11 +1404,12 @@ addNextStage(mainIndex: number) {
     if(openModel){
       this.cohortCreateModelData = eventsMap
       this.cohortCreateModelRef = this.dialog.open(this.cohortCreateModel , {
-        width: '560px',
         maxWidth: '95vw',
         maxHeight: '90vh',
         data : eventsMap
       });
+    } else {
+      this.dialogRef.close();
     }
   }
 
@@ -1415,6 +1417,7 @@ addNextStage(mainIndex: number) {
     if (this.cohortCreateModelRef) {
       this.cohortCreateModelData = null;
       this.cohortCreateModelRef.close(data);
+      this.dialogRef.close();
     }
   }
 

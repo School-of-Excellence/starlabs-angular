@@ -220,7 +220,7 @@ export class ManageCohertsComponent {
           team: this.data.doc['team'] || [],
           bigactivity: this.data.doc['bigactivity'] || null,
           description: this.data.doc['description'] || null,
-          queueref : this.data.doc['queueref'] || null
+          queueref : this.data.doc['queueref']?.id || null
         });
         
         this.selectedTags = this.data.doc['tags'] || [];
