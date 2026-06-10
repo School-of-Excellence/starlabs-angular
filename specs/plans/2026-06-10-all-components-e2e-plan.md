@@ -37,17 +37,17 @@
 |---|---|---|---|
 | Queue Manager / Studio / B!G | queue / run1 | `e2e/queue/` (+mobile) | ✅ pre-existing GREEN (188/194) |
 | Appointments & Scheduling | appointments / appt | `e2e/appointments/` | ✅ GREEN 7/7 (capacity, offtime ×2, status render, mark ×2, smoke) |
-| Events, Arena & Calendar | events / evt | `e2e/events/` | ⏳ authored → greening |
-| Content & Engagement | content / cont | `e2e/content/` | ⏳ authored → greening |
-| Product Modes & App Engagement | modes / mode | `e2e/modes/` | ⏳ authored → greening |
-| Workshops | workshops / wshop | `e2e/workshops/` | ⏳ authored → greening |
-| Comms / Notifications / Chat | comms / comm | `e2e/comms/` | ⏳ authored → greening |
-| Customer Support | support / sup | `e2e/support/` | ⏳ authored → greening |
-| Participant Profiles & Analytics | profiles / prof | `e2e/profiles/` | ⏳ authored → greening |
-| Evolution Mapping | evomap / evom | `e2e/evomap/` | ⏳ authored → greening |
-| Auth & Role-gated nav | authroles / auth | `e2e/authroles/` | ⏳ authored → greening |
-| Business Dashboard & Misc | business / biz | `e2e/business/` | ⏳ authored → greening |
-| Journey & Products | journey / jny | `e2e/journey/` | ⏳ authored → greening (Watson/salescrm-careful) |
+| Events, Arena & Calendar | events / evt | `e2e/events/` | ✅ GREEN |
+| Content & Engagement | content / cont | `e2e/content/` | ✅ GREEN |
+| Product Modes & App Engagement | modes / mode | `e2e/modes/` | ✅ GREEN |
+| Workshops | workshops / wshop | `e2e/workshops/` | ✅ GREEN |
+| Comms / Notifications / Chat | comms / comm | `e2e/comms/` | ✅ GREEN |
+| Customer Support | support / sup | `e2e/support/` | ✅ GREEN |
+| Participant Profiles & Analytics | profiles / prof | `e2e/profiles/` | ✅ GREEN |
+| Evolution Mapping | evomap / evom | `e2e/evomap/` | ✅ GREEN |
+| Auth & Role-gated nav | authroles / auth | `e2e/authroles/` | ✅ GREEN |
+| Business Dashboard & Misc | business / biz | `e2e/business/` | ✅ GREEN |
+| Journey & Products | journey / jny | `e2e/journey/` | ✅ GREEN (Watson/salescrm-careful) |
 
 ## Anti-circularity + gotchas (learned, reused by all groups)
 - Assert the value the APP computed (rendered count/%, dropdown it built) or WROTE (Firestore doc) — never a
@@ -58,6 +58,17 @@
   authGuard deny, not route blocks.
 - Composite indexes added to `firestore.indexes.json` + deployed per need (e.g. appointments
   `(cancelled,attended,starttime)`); single-field ranges need none.
+
+## Deployed Cloud Functions on the test project (determines CF-side-effect cases)
+16 CFs deployed on `slabs-queue-e2e-exdcz`: CreateQueueActivityLogV2, biginvitationAccepted,
+bulkReadyInvitation, **calculateParticipantMode**, createBigParticipantAssignment, invitationAccepted,
+inviteToStudio, **journey_to_pmd**, onQueueStageChange, onQueueTokenCreateUpdateProductMode,
+particpantFormSubmit_SlackIntegration, **productsdata_to_pmd**, **profiledata_to_participantmetadata**,
+queueParticipantPositionUpdate, studioZoomLink, studioZoomLinkDeactivate.
+- **CF-side-effect cases viable** for: modes (`calculateParticipantMode`, the `*_to_pmd` projection),
+  journey/profiles (the `*_to_pmd` projection family).
+- **NOT deployed** (→ assert the UI's own Firestore write, skip-guard the CF effect like queue OP-09b):
+  appointment*, event*, content (HLS/buffermix/generalContentUpdate), workshop, comms/email, ticket CFs.
 
 ## Run
 Per group: `cd e2e && NODE_OPTIONS=--max-old-space-size=4096 npx playwright test --config=playwright.<key>.config.ts`

@@ -1,22 +1,22 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-06-09 (mobile-Flutter participant e2e)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-06-09-mobile-flutter-participant-e2e-IMPL.md` + the memory `mobile-flutter-e2e-toolchain`.
+_Last updated: 2026-06-10 (all-components e2e)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/plans/2026-06-10-all-components-e2e-plan.md` + `specs/journals/2026-06-10-allcomponents-e2e-COMPLETE.md`.
 
 ## Current state
-- Angular 19 + Firebase PWA across 3 Firebase projects; queue e2e suite green on the disposable cloud test project `slabs-queue-e2e-exdcz` (Admin-SDK participant stand-in for the desktop suite).
-- **NEW: the participant half of the queue e2e now runs on the REAL native Flutter app** (`breakthroughs-flutter`) on an iOS simulator (stock Flutter 3.44 / Dart 3.12 + Xcode 26.5, via the 2026-06-09 migration: vendored `flutter_icons_null_safety`, `google_fonts` 6.3.3, pure-Dart `sim_stubs` for mlkit/ffmpeg behind a gitignored `pubspec_overrides.yaml`).
-- **SMOKE GREEN (committed):** participant0 tapped the real "Click to Fill Form" button; the app advanced its real `queue_token` (`Accelerated Evolution Level Form → uP! Life Aspiration Report`, `movedby=<none>` — a genuine self-move, asserted on the app's own write). Anti-circularity holds: the test taps; the app writes; the unchanged guards read the real trail.
-- Harness committed: `e2e/queue/mobile/` (walk-lib + mobile-walk + config + fixtures), Flutter `integration_test/` + `test_driver/` + the sanctioned widget keys (separate commit). Client writes are allowed on the test project (no rules deploy). Branch `cicd`; Flutter on `development` (commits local, not pushed).
+- Angular 19 + Firebase PWA across 3 Firebase projects. The e2e app build targets the disposable cloud test project **`slabs-queue-e2e-exdcz`** (real Firestore + 16 deployed CFs).
+- **Queue Manager / Studio / B!G** e2e suite green (`e2e/queue/`, 188/194) + the mobile-Flutter participant walk.
+- **NEW: every non-ATC concept group now has its own GREEN, anti-circular Playwright suite** (branch `cicd`):
+  appointments 7/7 · events 6/6 · modes 8/8 · content 9(+1 skip) · workshops 8/8 · support 10/10 ·
+  profiles 12(+1 fixme) · comms 9(+1 skip) · evomap 8(+2 fixme) · authroles 11/11 · journey 8/8 · business 8/8.
+  ~96 passing cases. Each: own `testrunid`, custom roster, idempotent seed, serial `e2e/playwright.<group>.config.ts`.
+- Shared harness: `e2e/lib/seed-common.js` (dashboard route-grants on the proven seedAuthChain), `e2e/_shared/prod-firewall.ts` (blocks prod CF URLs), reusing queue `support/*` + `stubs/*`. Recon corpus: `e2e/recon-allcomp/*.md`.
 
-## Last session changes (2026-06-09) — why
-- **Toolchain migration to stock 3.44 + Xcode 26.5** (the machine's defaults; the app's old deps were Dart-3-incompatible). My initial 3.29.3 + patched-flutter_tools gauntlet was RETIRED in favour of the operator's vendored-package migration.
-- **Seed-completeness (operator chose this over a test-mode app guard):** the participant Home is a full dashboard that errored on the queue-minimal seed. Fixed WITHOUT editing the app: ~30 composite Firestore indexes (the Home's dashboard queries), `fake-data.js` `stagecohort {}→[]`, and `setup-mobile-fixture.cjs` now seeds the **Flutter-home queue-resolution chain** (`profile_data.participantmode` + `participantsproduct`+`products` + `participantdeliverysequence`+`deliverables`→token), `applivestreaming`/`HPC Config` docs, `profileimg`, and neutralizes studio invitations + queue planning. The robot also dismisses the studio-invitation overlay + pops the ProfileImage ("Verify Your Profile") gate.
+## Last session changes (2026-06-10) — why
+- **Recon workflow** (12 agents) mapped every non-ATC group; **authoring workflow** (11 Opus agents) drafted each suite from recon + the appointments exemplar; orchestrator greened each serially + committed per group.
+- Composite indexes added + deployed: appointments `(cancelled,attended,starttime)`, delivery forms `(formfor,formname)`, supportchat `(isdelete,last_modification)`, expenseplanning `(delete,date)`.
+- Recurring fixes: bounded smoke wait (networkidle hangs on camera/iframe/stream); app-written docs asserted by natural key (no testrunid); `mat-select` force-click past the floating label; search/label scoping for polluted collections (notificationrecord 10.8k, dashboard 100s); modes CF reset must `FieldValue.delete()` statusdate; console-guard gained an optional `extraIgnorable` (userprofile mega-dashboard tolerates index/ResourcePath noise on auxiliary queries).
+- Honest skips/fixmes (documented in-file): CF-not-deployed cases (content buffermix, comms notifyMobileApp), complex multi-step/camera flows (events QR/initiate, evomap add-dialog), filter-builder screens (profiles analytics). ATC stayed OFF-LIMITS throughout (products seeded `atcmodel:null`).
 
-## ✅ DONE — full 9-variation walk GREEN (`9 passed`, 42.7m)
-All 9 variations walked entry→terminal: SELF hops by REAL Flutter taps, OP/AUTO by the REAL Angular board, every transition asserted by the oracle + guards (no-orphan / no-skip / every-move-logged{minNonSelf} / loop-bound / terminal / count-conserved), anti-circular (real Firestore writes). Includes B!G-Next-Cycle (the 24-stage in-person/Triple-ATC flow). Run: `cd e2e && SKIP_SEED=1 npx playwright test --config=playwright.mobile.config.ts`.
-
-## ✅ Mobile screenshots — CLEAN per-stage captures working
-`xcrun simctl io screenshot` (iOS `binding.takeScreenshot` is blank for this app) + `idb ui tap` to dismiss the first-launch notification prompt (rendered in-sim, unreachable by osascript/simctl). **All-9 clean-screenshot run COMPLETE — `9 passed (41.1m)`** (full walk reproduced exactly; same hop counts as the 42.7m run): **37 unique clean per-stage PNGs** showing the real queue card ("Click to Fill Form" at each stage) merged into `e2e/playwright-report-mobile/`. (idb = fb-idb 3.9 CLI; `IDB_BIN` override.)
-
-## Pending / follow-ups (optional)
-- Adversarial evidence audit (the guards are already self-tested, `@oracle`); scale from 1 representative participant/variation to all 50 (labelled STRETCH); push the Flutter `development` + `cicd` commits (operator-gated, currently local only).
+## Pending / next
+- Deepen the deferred TODO cases when their fragile flows get testids/harnessing (events EVT-02/06-16, appointments booking, profiles analytics filter-builder, evomap add-dialog).
+- Push `cicd` to origin (operator-gated). Optionally add each `playwright.<group>.config.ts` to a CI matrix beside `queue-e2e.yml`.
