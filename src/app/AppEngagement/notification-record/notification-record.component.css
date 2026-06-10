@@ -786,3 +786,15 @@ button[mat-raised-button][disabled] {
   background-color: #ECEFF1;
   color: #455A64;
 }
+/* Engagement funnel row (tap -> landing) — sits just below the send stats. */
+.engagement-row {
+  margin-top: 14px;
+}
+.engagement-row .stat-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.engagement-row .stat-subtitle:not(.green):not(.red) {
+  color: #3f51b5;
+}
