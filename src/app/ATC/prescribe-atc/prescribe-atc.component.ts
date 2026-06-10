@@ -1854,32 +1854,82 @@ async removeATCImage(index: number) {
   }
 }
 
+  /**
+   * Scrolls the page to the field with the given anchor id, flashes a brief
+   * red highlight on it, and shows the validation message in a snackbar
+   * (replacing the old blocking alert). Returns nothing — call and return.
+   */
+  private focusMissingField(anchorId: string, message: string) {
+    try {
+      // Prefer the explicit anchor. If it's missing (e.g. a newly added field
+      // without an anchor id), fall back to the FIRST invalid Material field
+      // in the form — so new required fields scroll automatically with no
+      // extra wiring.
+      let el: HTMLElement | null = anchorId ? document.getElementById(anchorId) : null;
+      if (!el) el = this.firstInvalidFieldElement();
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('atc-field-invalid-flash');
+        setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 1800);
+      }
+    } catch {}
+    this.snackbar.open(message, 'Dismiss', {
+      duration: 4000,
+      horizontalPosition: 'center',
+      verticalPosition: 'top',
+      panelClass: ['atc-validation-snack'],
+    });
+  }
+
+  /**
+   * Finds the first visible invalid form field in the ATC form. Angular marks
+   * a required-but-empty ngModel control as `.ng-invalid` immediately, so this
+   * dynamically locates whatever field is missing — including any newly added
+   * required field — without needing a hardcoded anchor id.
+   */
+  private firstInvalidFieldElement(): HTMLElement | null {
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.atc-main .ng-invalid, .atc-main mat-form-field.mat-form-field-invalid, ' +
+        '.atc-main textarea.ng-invalid, .atc-main input.ng-invalid, .atc-main mat-select.ng-invalid'
+      )
+    );
+    for (const c of candidates) {
+      // Skip hidden elements and the form wrapper itself.
+      if (c.tagName.toLowerCase() === 'form') continue;
+      const rect = c.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      return c;
+    }
+    return null;
+  }
+
   async submit(){
     this.alphaid = generateId(this.firestoreATC, 'atc_alpha');
 
     if(this.date == null || this.date == undefined){
-      alert("Enter the Date of Prescription")
+      this.focusMissingField('atcfield-date', 'Enter the Date of Prescription')
     }
     else if(this.participantProfileid == null){
-      alert("Select a Valid Profile Name")
+      this.focusMissingField('atcfield-profile', 'Select a Valid Profile Name')
     }
     else if(this.product == null){
-      alert("Select a Product")
+      this.focusMissingField('atcfield-product', 'Select a Product')
     }
     else if(!Object.keys(this.authorMap).some(e => (this.authorMap[e] ?? []).length != 0) && !this.bigActivity()){
-      alert("Choose the author names")
+      this.focusMissingField('atcfield-author', 'Choose the author names')
     }
     else if((this.atcdirective ?? "").trim().length == 0){
-      alert("provide ATC directive")
+      this.focusMissingField('atcfield-directive', 'Provide ATC directive')
     }
     else if((this.consultationpoint ?? "").trim().length == 0){
-      alert("Consultation points Required")
+      this.focusMissingField('atcfield-consultationpoint', 'Consultation points required')
     }
     else if((this.casenotes ?? "").trim().length == 0){
-      alert("Case notes Required")
+      this.focusMissingField('atcfield-casenotes', 'Case notes required')
     }
     else if(this.transcript[0].adjustment.length == 0 || this.transcript[0].procedure[0].name == null){
-      alert("Transcription first filed cannot be empty, Enter the adjustment and its procedure")
+      this.focusMissingField('atcfield-transcript', 'Transcription first field cannot be empty — enter the adjustment and its procedure')
     }
     else{
       var assignmentChecked = true
@@ -1906,14 +1956,14 @@ async removeATCImage(index: number) {
       for (let i = 0; i < this.transcript.length; i++) {
         if(this.transcript[i].adjustment.trim().length != 0){
           if(this.transcript[i].awareness == null || this.transcript[i].potentialyears == null){
-            alert("Empty fields are not allowed at submission, Fill Every Adjustment's Awareness Data")
+            this.focusMissingField('atcfield-adjustment-' + i, "Empty fields are not allowed at submission. Fill every adjustment's Awareness data.")
             break;
           }
         }
         for(let j = 0; j < this.transcript[i].procedure.length; j++){
           if(this.transcript[i].procedure[j].name == null){
             if(this.transcript[i].adjustment.trim().length > 0){
-              alert("Empty fields are not allowed at submission, Fill Every Adjustments Procedure Data or Remove the Empty Procedure")
+              this.focusMissingField('atcfield-adjustment-' + i, "Empty fields are not allowed at submission. Fill every adjustment's procedure data or remove the empty procedure.")
               i = 1000;
               j = 1000;
               break

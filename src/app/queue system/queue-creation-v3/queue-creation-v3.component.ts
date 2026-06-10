@@ -96,7 +96,8 @@ export class QueueCreationV3Component {
     { value: "movetonextqueue", name: "Move Participants to next month review" },
     { value: "validateael", name: "Validate Current AEL" },
     { value: "previousatc", name: "Previous ATC History" },
-    { value: "loveletters", name: "Love Letters" }
+    { value: "loveletters", name: "Love Letters" },
+    { value: "evolutionwishlist", name: "Evolution Wishlist" }
   ]
 
   //big activity
@@ -299,6 +300,10 @@ export class QueueCreationV3Component {
             maxwatingminutes: [property["maxwatingminutes"], { validators: [], updateOn: "change" }],
             stagemessage: [property["stagemessage"], { validators: [], updateOn: "change" }],
             stageexplanation: [property["stageexplanation"], { validators: [], updateOn: "change" }],
+            // stagenote is now a list of { stage, note } pairs (populated
+            // below from the saved map). The selected stage need NOT be the
+            // stage being configured.
+            stagenote: this.formbuilder.array([]),
             participantform: [property["participantform"] ?? [], { validators: [], updateOn: "change" }],
             //new studio property
             studiowidgets: [property["studiowidgets"] ?? [], { validators: [], updateOn: "change" }],
@@ -372,6 +377,26 @@ export class QueueCreationV3Component {
                   calltoaction: [obj['calltoaction'], { validators: [], updateOn: "change" }],
                   markascompleted: [obj['markascompleted'] ?? false, { validators: [], updateOn: "change" }],
                   variations: [obj['variations'] ?? [], { validators: [control => control.value?.length === 0 ? { required: true } : null], updateOn: "change" }]
+                })
+              )
+            })
+          }
+          // Stage notes — saved as an ARRAY [{ stage, note }] (new format) or
+          // a legacy MAP { [stage]: note }. Rebuild the FormArray rows from
+          // either shape so each can be edited / deleted.
+          if (property['stagenote'] != null) {
+            const sn = property['stagenote']
+            const rows: { stage: string; note: any }[] = Array.isArray(sn)
+              ? sn.map((r: any) => ({ stage: r?.['stage'], note: r?.['note'] }))
+              : (typeof sn === 'object'
+                  ? Object.keys(sn).map(k => ({ stage: k, note: sn[k] }))
+                  : [])
+            rows.forEach(r => {
+              if (!r.stage) return
+              this.getStageNoteArray(mainIndex).push(
+                this.formbuilder.group({
+                  stage: [r.stage, { validators: [], updateOn: "change" }],
+                  note: [r.note, { validators: [], updateOn: "change" }],
                 })
               )
             })
@@ -585,6 +610,7 @@ export class QueueCreationV3Component {
       maxwatingminutes: [null, { validators: [], updateOn: "change" }],
       stagemessage: [null, { validators: [], updateOn: "change" }],
       stageexplanation: [null, { validators: [], updateOn: "change" }],
+      stagenote: this.formbuilder.array([]),
       participantform: [[], { validators: [], updateOn: "change" }],
       // new studio property
       studiowidgets: [[], { validators: [], updateOn: "change" }],
@@ -783,6 +809,25 @@ addNextStage(mainIndex: number) {
     return this.getNextStageArray(mainIndex).removeAt(subArrayIndex)
   }
 
+  // ---- Stage notes (per-stage list of { stage, note }) ----
+  // Each note targets a SELECTED stage (not necessarily the stage being
+  // configured). In the studio it shows only when the participant's
+  // variation includes that selected stage.
+  getStageNoteArray(index: number): FormArray {
+    return this.stagePropertyArray.controls[index].get("stagenote") as FormArray
+  }
+  addStageNote(mainIndex: number) {
+    return this.getStageNoteArray(mainIndex).push(
+      this.formbuilder.group({
+        stage: [null, { validators: [], updateOn: "change" }],
+        note: [null, { validators: [], updateOn: "change" }],
+      })
+    )
+  }
+  removeStageNote(mainIndex: number, subArrayIndex: number) {
+    return this.getStageNoteArray(mainIndex).removeAt(subArrayIndex)
+  }
+
   // Queue Setup Variation
   get variationArray(): FormArray {
     return this.queueform.get('queuevariation') as FormArray
@@ -923,6 +968,21 @@ addNextStage(mainIndex: number) {
             maxwatingminutes: property["maxwatingminutes"] ?? null,
             stagemessage: (property["stagemessage"] ?? "").trim().length == 0 ? null : property["stagemessage"],
             stageexplanation: (property["stageexplanation"] ?? "").trim().length == 0 ? null : property["stageexplanation"],
+            // Serialize the { stage, note } rows into an ARRAY (not a map).
+            // Arrays are REPLACED wholesale by Firestore's set(merge:true),
+            // whereas a nested map would deep-merge and never drop deleted
+            // keys — which is why deletes weren't sticking. Skip rows with no
+            // stage or empty note.
+            stagenote: (() => {
+              const rows = property["stagenote"] ?? []
+              const out: any[] = []
+              for (const row of rows) {
+                const s = row?.["stage"]
+                const n = (row?.["note"] ?? "").trim()
+                if (s && n.length > 0) out.push({ stage: s, note: n })
+              }
+              return out.length === 0 ? null : out
+            })(),
             participantform: property["participantform"].length == 0 ? null : property["participantform"],
             // new studio property
             studiowidgets: property["studiowidgets"] ?? null,
