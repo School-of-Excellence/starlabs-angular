@@ -48,6 +48,17 @@ const VOCAB: Record<string, [string, string]> = {
   'sim.currentStage': ['Reads token stage', 'reads the token’s current stage — an app value, not a test input'],
   'sim.tokensForVariation': ['Lists seeded tokens', 'reads the seeded participants for the variation'],
   requireConsoleClean: ['Console-clean', 'no console errors surfaced during the flow'],
+  // shared scenario/walk helpers (the asserts live inside these, not inline in the test body)
+  driveOperatorHop: ['Operator move (real board)', 'drives one operator hop on the real board (move-dropdown + PeopleInvolved confirm); the APP writes the move'],
+  writeRow: ['Participant self-move (sim)', 'the participant stand-in writes the self-move log row — desktop analogue of a real form submit'],
+  openAsActor: ['Smoke render', 'opens the screen as the given actor and FAILS on any fatal console error (render-health check)'],
+  installDeliveryStatusSpy: ['CF side-effect spy', 'spies the delivery-status Cloud Function so its real calls can be asserted'],
+  waitForDeliveryStatusCalls: ['CF side-effect assert', 'asserts the delivery-status Cloud Function fired as expected (real CF, not mocked)'],
+  linkTokenIntoLiveSession: ['Studio link (setup)', 'links the token into a live studio session'],
+  ensurePairingCheckedIn: ['Studio pairing (setup)', 'ensures the specialist↔participant pairing is checked in'],
+  readLogRows: ['Reads the log', 'reads the app-written `queue stage log` rows'],
+  readCountsByStageName: ['Reads stage counts', 'reads the board’s app-computed counts by stage name'],
+  pollColumnCounts: ['Polls board counts', 'waits for the board’s recomputed column counts to settle'],
 };
 
 function listQueueSpecs(): string[] {
@@ -96,7 +107,10 @@ function parseSpec(file: string): { describe: string; tests: TestCard[] } {
     const start = m.index!;
     const end = k + 1 < ms.length ? ms[k + 1].index! : src.length;
     const body = src.slice(start, end);
-    const calls = Object.keys(VOCAB).filter((key) => body.includes(key));
+    const NOISE = new Set(['board.page', 'board.component', 'board.open', 'board.locator', 'board.tokenCard', 'board.stageKeysForName', 'board.resolveStageKeyPublic', 'sim.db', 'sim.js', 'sim.logCount']);
+    const regexCalls = [...new Set([...body.matchAll(/\b(assert[A-Z]\w*|board\.[a-zA-Z]\w*|sim\.[a-zA-Z]\w*|requireConsole\w*|observedTransitions)\b/g)].map((mm) => mm[1]))];
+    const vocabPresent = Object.keys(VOCAB).filter((k) => body.includes(k)); // catches bare-helper keys too
+    const calls = [...new Set([...vocabPresent, ...regexCalls])].filter((c) => !NOISE.has(c));
     tests.push({ title, objective: leadingComment(src, start), line: src.slice(0, start).split('\n').length, calls });
   });
   return { describe, tests };
@@ -125,18 +139,23 @@ const PREAMBLE_LINES = [
     const mdCards: string[] = [];
     for (const t of tests) {
       total++;
-      const asserts = t.calls.map((c) => VOCAB[c]);
-      const assertHtml = asserts.length
-        ? `<ul class="asserts">${asserts.map(([l, w]) => `<li><b>${esc(l)}</b> — ${esc(w)}</li>`).join('')}</ul>`
-        : '<p class="none">(no mapped guard/action detected — read the spec)</p>';
+      const mapped = t.calls.filter((c) => VOCAB[c]).map((c) => VOCAB[c]);
+      const raw = t.calls.filter((c) => !VOCAB[c]);
+      const hasAny = mapped.length || raw.length;
+      const assertHtml = hasAny
+        ? `<ul class="asserts">${mapped.map(([l, w]) => `<li><b>${esc(l)}</b> — ${esc(w)}</li>`).join('')}${raw.length ? `<li class="raw">also calls: ${raw.map((c) => `<code>${esc(c)}</code>`).join(', ')}</li>` : ''}</ul>`
+        : '<p class="none">(render / smoke check — no transition assertions; read the spec)</p>';
       cards.push(`<div class="card">
         <div class="t">${esc(t.title)}</div>
         ${t.objective ? `<div class="obj">${esc(t.objective)}</div>` : ''}
         ${assertHtml}
         <div class="ref"><code>${esc(rel)}:${t.line}</code></div>
       </div>`);
-      mdCards.push(`#### ${t.title}\n${t.objective ? `*Objective:* ${t.objective}\n` : ''}${asserts.length ? asserts.map(([l, w]) => `- **${l}** — ${w}`).join('\n') : '_(no mapped guard detected — read the spec)_'}\n\n\`${rel}:${t.line}\`\n`);
-      const labels = asserts.map(([l]) => l).join('; ');
+      const mdBody = hasAny
+        ? [...mapped.map(([l, w]) => `- **${l}** — ${w}`), ...(raw.length ? [`- also calls: ${raw.map((c) => `\`${c}\``).join(', ')}`] : [])].join('\n')
+        : '_(render / smoke check — no transition assertions; read the spec)_';
+      mdCards.push(`#### ${t.title}\n${t.objective ? `*Objective:* ${t.objective}\n` : ''}${mdBody}\n\n\`${rel}:${t.line}\`\n`);
+      const labels = [...mapped.map(([l]) => l), ...raw].join('; ');
       const cell = (s: string) => /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       csvRows.push([describe, rel, t.title, t.objective, labels, '', '', ''].map(cell).join(','));
     }
