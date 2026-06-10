@@ -7,10 +7,10 @@
 // Recon: e2e/recon-allcomp/evolution-mapping.md (EM-01/02/04/05/06/07).
 import { test, expect } from '@playwright/test';
 import {
-  evoActors, evoProfileIds, evoIds, evoTitles, evoUrls,
+  evoProfileIds, evoIds, evoTitles, evoUrls,
   installEvomapStubs, loginAsEvoAdmin,
   resetMakeLivePreconditions, resetDeleteVideoPreconditions, resetDeleteTargetRow,
-  countNonDeletedFor, countUrlliveTrueFor, hasNonDeletedTitleFor,
+  countNonDeletedFor, countUrlliveTrueFor,
 } from './support/evomap';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from '../queue/support/console-guard';
 import { getDoc, queryWhere, pollUntil } from '../queue/support/firestore-admin';
@@ -49,70 +49,9 @@ test.describe('Evolution Mapping — admin catalogue (real UI, anti-circular)', 
     expect(pLiveCount, 'EM-01: pLive has exactly its 2 seeded non-deleted catalogue rows').toBe(2);
   });
 
-  // ===========================================================================================
-  // EM-02 — Add a new mapping via the dialog: pick a seeded participant-video → save → count grows
-  // ===========================================================================================
-  // FIXME (documented): the add-evolution dialog is a 4-step flow — participant ngx-mat-select-search,
-  // a video-TYPE card, a SOURCE-video card, then Save Mapping — whose intermediate cards depend on the
-  // selected participant's seeded video set rendering through the search-filtered overlay. Too fragile to
-  // ship green on the first orchestrator pass; deferred. The 8 read-path/filter cases cover the catalogue.
-  test.fixme('EM-02 add-evolution dialog writes a new evolutionmappingvideo row (count increments by 1)', async ({ page }) => {
-    // Pre-state (anti-circular): count p0's current non-deleted catalogue rows (the app reads these too).
-    const before = await countNonDeletedFor(evoProfileIds.p0);
-
-    await loginAsEvoAdmin(page);
-    await page.goto('/evolutionmapping', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/evolutionmapping/, { timeout: 30_000 });
-    // Ensure the catalogue has loaded (so the add FAB and profile map are ready).
-    await expect(page.locator(ROW).filter({ hasText: evoTitles.D1 })).toBeVisible({ timeout: 30_000 });
-
-    // [REAL-UI] open the add dialog.
-    await page.locator('[aria-label="add evolution"]').click();
-    // Scope to the CDK dialog container so the participant combobox is the dialog's (not a background
-    // /evolutionmapping filter mat-select, which is also a combobox).
-    const dialog = page.locator('mat-dialog-container');
-    await expect(dialog, 'EM-02: the add dialog must open').toBeVisible({ timeout: 20_000 });
-    // Step 1 — open the participant mat-select and pick p0. The select hosts an ngx-mat-select-search
-    // input; type to filter then click the matching option (rendered in a body-level overlay panel).
-    const partSelect = dialog.getByRole('combobox').first();
-    await expect(partSelect, 'EM-02: participant select must render in the dialog').toBeVisible({ timeout: 20_000 });
-    await partSelect.click({ force: true });
-    // The dialog's profile map (getProfileMap) keys options on profile_data.name, which the seeder sets
-    // to the participant EMAIL — so type the email into the ngx-mat-select-search box to filter, then click.
-    const searchBox = page.locator('.mat-mdc-select-panel input, ngx-mat-select-search input, input[placeholderlabel], .mat-select-search-input').first();
-    await searchBox.fill(evoActors.participant0).catch(() => {});
-    const p0Option = page.locator('mat-option', { hasText: evoActors.participant0 });
-    await expect(p0Option.first(), 'EM-02: p0 must appear as a selectable participant').toBeVisible({ timeout: 15_000 });
-    await p0Option.first().click();
-
-    // Step 2 — pick a video TYPE card (run-unique type text from the seeded participant video).
-    const typeCard = dialog.locator('.video-title-card', { hasText: `EVOMInterview` });
-    await expect(typeCard.first(), 'EM-02: the seeded video-type card must appear').toBeVisible({ timeout: 15_000 });
-    await typeCard.first().click();
-
-    // Step 3 — pick the source video by its unique seeded title.
-    const videoCard = dialog.locator('.video-title-card', { hasText: evoTitles.PV1 });
-    await expect(videoCard.first(), 'EM-02: the seeded source video must be selectable').toBeVisible({ timeout: 15_000 });
-    await videoCard.first().click();
-
-    // Step 4 — Save Mapping (app batch-writes a new evolutionmappingvideo doc with deleted:false).
-    const saveBtn = dialog.getByRole('button', { name: /Save Mapping/i });
-    await expect(saveBtn, 'EM-02: Save Mapping button must enable after a video is selected').toBeVisible({ timeout: 15_000 });
-    await saveBtn.click();
-
-    // [ASSERT] the app's batch.set added exactly one non-deleted row for p0 — the count the ADMIN reads
-    // back grows by 1 (we assert the read-back count, never the value the form supplied). Index-free.
-    await pollUntil(
-      () => countNonDeletedFor(evoProfileIds.p0),
-      (n) => n === before + 1,
-      { label: `EM-02: p0 catalogue count ${before} -> ${before + 1}`, timeoutMs: 30_000 },
-    );
-    // And the app created a NON-deleted row titled from the picked source video (app-derived title).
-    expect(await hasNonDeletedTitleFor(evoProfileIds.p0, evoTitles.PV1),
-      'EM-02: a non-deleted row titled from the picked source video exists').toBe(true);
-    // Re-run-stable: `before` is recomputed live each run, so the +1 assertion holds regardless of rows
-    // a prior EM-02 run left behind (the seed teardown clears them between full suite runs).
-  });
+  // EM-02 (add-evolution 4-step dialog) + EM-03 (edit) now live in evomap-deep.spec.ts — implemented to
+  // full depth there (the recon's deferred dialog flow). This file keeps the read-path / soft-delete /
+  // make-live cases. Do not re-add EM-02 here.
 
   // ===========================================================================================
   // EM-04 — Soft-delete a row → it disappears from the table AND deleted==true in Firestore

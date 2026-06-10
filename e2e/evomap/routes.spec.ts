@@ -5,9 +5,8 @@
 //
 // Recon: e2e/recon-allcomp/evolution-mapping.md (EM-12 + route-mount smoke).
 import { test, expect } from '@playwright/test';
-import { installEvomapStubs, loginAsEvoAdmin } from './support/evomap';
+import { installEvomapStubs, loginAsEvoAdmin, countMetadataWithName, PVM_LASTVIDEO_INDEX_ERR } from './support/evomap';
 import { attachConsoleGuard, assertNoFatal, ConsoleGuard } from '../queue/support/console-guard';
-import { countWhere } from '../queue/support/firestore-admin';
 
 test.describe('Evolution Mapping — participant_videos_mapping summary (real UI, anti-circular)', () => {
   let guard: ConsoleGuard;
@@ -15,34 +14,43 @@ test.describe('Evolution Mapping — participant_videos_mapping summary (real UI
     guard = attachConsoleGuard(page);
     await installEvomapStubs(page);
   });
-  test.afterEach(() => assertNoFatal(guard, 'participant_videos_mapping: no fatal console errors / pageerrors'));
+  // The "Last Video" column query needs a composite index not provisioned on the test project (returned
+  // in neededIndexes) — an auxiliary query, not the asserted stat — so it is ignorable here.
+  test.afterEach(() => assertNoFatal(guard, 'participant_videos_mapping: no fatal console errors (last-video index aux query excepted)', [PVM_LASTVIDEO_INDEX_ERR]));
 
   // ===========================================================================================
   // EM-12 — the catalogue screen's "Participants" stat is the app-derived count of participant metadata
   // ===========================================================================================
-  // FIXME (documented): the rendered "Participants" summary stat is 0 on the test project while the raw
-  // `participant metadata` count is ~199 — the component's fetchParticipants() applies a filter the raw
-  // count does not mirror (the "== live count" premise is wrong). Re-derive the exact filtered population
-  // before re-enabling; deferred rather than ship a wrong or tautological assertion.
-  test.fixme('EM-12 /participant_videos_mapping Participants stat equals the live participant-metadata count', async ({ page }) => {
+  // RE-DERIVED (was fixme): the original premise `rendered == countWhere('participant metadata')` was
+  // wrong because the screen's fetchParticipants() runs query(collection('participant metadata'),
+  // orderBy('name')); Firestore's orderBy SILENTLY drops docs missing the `name` field, so the rendered
+  // stat (participantOptions.length) is the count of docs WITH a name — strictly <= the raw count. We now
+  // assert against countMetadataWithName(), which mirrors orderBy('name'). Anti-circular: the app computes
+  // the stat from its own query; the admin independently counts the same name-having population.
+  test('EM-12 /participant_videos_mapping Participants stat equals the name-having participant-metadata count', async ({ page }) => {
     await loginAsEvoAdmin(page);
     await page.goto('/participant_videos_mapping', { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/participant_videos_mapping/, { timeout: 30_000 });
 
-    // [REAL-UI] fetchParticipants() queries `participant metadata` (orderBy name) and fetchSummaryStats()
-    // sets summaryStats.totalParticipants = participantOptions.length, rendered in the "Participants" card.
-    const statCard = page.locator('.summary-card', { hasText: /Participants/i }).first();
+    // [REAL-UI] fetchParticipants() → participantOptions; fetchSummaryStats() sets
+    // summaryStats.totalParticipants = participantOptions.length, rendered in the FIRST "Participants" card.
+    const statCard = page.locator('.summary-card').first();
     await expect(statCard, 'EM-12: the Participants summary card must render').toBeVisible({ timeout: 30_000 });
-    const countText = (await statCard.locator('.summary-count').first().innerText()).trim();
-    const rendered = parseInt(countText, 10);
-    expect(Number.isFinite(rendered), `EM-12: the stat must be numeric (got "${countText}")`).toBe(true);
+    await expect(statCard.locator('.summary-label')).toHaveText(/Participants/i, { timeout: 10_000 });
+    // Poll the rendered number until it settles to a positive value (fetchSummaryStats resolves async).
+    let rendered = 0;
+    await expect(async () => {
+      const countText = (await statCard.locator('.summary-count').first().innerText()).trim();
+      rendered = parseInt(countText, 10);
+      expect(Number.isFinite(rendered) && rendered > 0, `EM-12: stat must be a positive number (got "${countText}")`).toBe(true);
+    }).toPass({ timeout: 30_000 });
 
-    // [ASSERT] the app-derived count equals the live admin count of `participant metadata` (both read the
-    // same collection independently — anti-circular: the app computed it from its own query, not the seed),
-    // and includes at least the 3 rows this run seeded.
-    const liveCount = await countWhere('participant metadata');
-    expect(rendered, 'EM-12: rendered Participants stat == live participant-metadata count').toBe(liveCount);
-    expect(rendered, 'EM-12: at least the 3 seeded metadata rows are counted').toBeGreaterThanOrEqual(3);
+    // [ASSERT] the app-derived stat equals the live name-having `participant metadata` count (the app
+    // computed participantOptions.length from orderBy('name'); the admin mirrors that filter independently).
+    const liveWithName = await countMetadataWithName();
+    expect(rendered, 'EM-12: rendered Participants stat == live name-having participant-metadata count').toBe(liveWithName);
+    // And it includes at least the 6 run-seeded metadata rows (all carry a name).
+    expect(rendered, 'EM-12: at least the 6 seeded metadata rows are counted').toBeGreaterThanOrEqual(6);
   });
 });
 

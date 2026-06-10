@@ -52,9 +52,22 @@ const ID = {
   EV_P2: `${TESTRUNID}_ev_P2`,
   EV_X1: `${TESTRUNID}_ev_X1`,
   EV_X2: `${TESTRUNID}_ev_X2`,
-  // participant videos source rows (the add/edit dialog selector reads these; EM-02 picks one).
-  PV_1: `${TESTRUNID}_pv_1`,
-  PV_2: `${TESTRUNID}_pv_2`,
+  // EV_E1 -> p0 catalogue EDIT target (EM-03 setDoc-merges a new title onto it; reset between runs).
+  EV_E1: `${TESTRUNID}_ev_E1`,
+  // EV_T1/EV_T2 -> pToggle catalogue rows backing its pre-seeded live videolist (EM-15 toggle-off).
+  EV_T1: `${TESTRUNID}_ev_T1`,
+  EV_T2: `${TESTRUNID}_ev_T2`,
+  // participant videos source rows (the add/edit dialog selector reads these).
+  PV_1: `${TESTRUNID}_pv_1`,  // p0 source (legacy; available to the add dialog for p0)
+  PV_2: `${TESTRUNID}_pv_2`,  // p0 source (legacy)
+  // PV_N -> pNew's SOLE source video; EM-02's add dialog filters to pNew and picks it.
+  PV_N: `${TESTRUNID}_pv_N`,
+  // PV_E -> p0 source video the EM-03 EDIT target (EV_E1) MIRRORS by title+url; the edit dialog
+  // pre-selects the matching source video only when the catalogue row's title equals a source title.
+  PV_E: `${TESTRUNID}_pv_E`,
+  // PV_DEL -> a standalone participant-video row for pVdel the /participant_videos_mapping log
+  // renders as a deletable card (EM-14 flips its delete:true). Reset to delete:false between runs.
+  PV_DEL: `${TESTRUNID}_pv_del`,
 };
 
 // Run-unique video urls (stable; never fetched — the firewall/player stubs block media).
@@ -69,6 +82,13 @@ const URL = {
   // EM-02 source video the admin picks from the add dialog (becomes a NEW evolutionmappingvideo row).
   PV1: `https://dl.dropboxusercontent.com/evomap/${TESTRUNID}/source-interview.mp4?raw=1`,
   PV2: `https://dl.dropboxusercontent.com/evomap/${TESTRUNID}/source-testimonial.mp4?raw=1`,
+  // EM-03 edit-target catalogue row url.
+  E1: `https://dl.dropboxusercontent.com/evomap/${TESTRUNID}/edit-me.mp4?raw=1`,
+  // EM-15 pToggle existing-live videolist urls.
+  T1: `https://dl.dropboxusercontent.com/evomap/${TESTRUNID}/toggle-1.mp4?raw=1`,
+  T2: `https://dl.dropboxusercontent.com/evomap/${TESTRUNID}/toggle-2.mp4?raw=1`,
+  // EM-14 standalone participant-video url for pVdel.
+  PVDEL: `https://dl.dropboxusercontent.com/evomap/${TESTRUNID}/pvdel.mp4?raw=1`,
 };
 
 // Run-unique titles (the specs select MatTable rows by this UNIQUE seeded text — no data-testid).
@@ -82,6 +102,13 @@ const TITLE = {
   X2: `EVOM DelVid Two ${TESTRUNID}`,
   PV1: `EVOM Source Interview ${TESTRUNID}`,
   PV2: `EVOM Source Testimonial ${TESTRUNID}`,
+  // EM-03 edit target: starts at E1_BEFORE; the spec edits the title to E1_AFTER and asserts the
+  // app-stored title. Reset to E1_BEFORE between runs (idempotent).
+  E1_BEFORE: `EVOM Edit Before ${TESTRUNID}`,
+  E1_AFTER: `EVOM Edit After ${TESTRUNID}`,
+  T1: `EVOM Toggle One ${TESTRUNID}`,
+  T2: `EVOM Toggle Two ${TESTRUNID}`,
+  PVDEL: `EVOM PVDel Standalone ${TESTRUNID}`,
 };
 
 // Actors. profileids run-prefixed; emails follow the actors.ts convention `<role>+<run>@example.com`.
@@ -90,12 +117,18 @@ const PF = {
   p0: `${TESTRUNID}_pf_p0`,    // logs in, self-completes
   pLive: `${TESTRUNID}_pf_pLive`,  // Make-Live target
   pDel: `${TESTRUNID}_pf_pDel`,   // deleteVideo target
+  pNew: `${TESTRUNID}_pf_pNew`,   // EM-13 add-video target (/participant_videos_mapping)
+  pVdel: `${TESTRUNID}_pf_pVdel`, // EM-14 delete-video target (/participant_videos_mapping log)
+  pToggle: `${TESTRUNID}_pf_pToggle`, // EM-15 live-toggle target (Update an existing live mapping)
 };
 const EMAIL = {
   admin: `admin+${TESTRUNID}@example.com`,
   p0: `participant-evo+${TESTRUNID}@example.com`,
   pLive: `participant-evo1+${TESTRUNID}@example.com`,
   pDel: `participant-evo2+${TESTRUNID}@example.com`,
+  pNew: `participant-evo3+${TESTRUNID}@example.com`,
+  pVdel: `participant-evo4+${TESTRUNID}@example.com`,
+  pToggle: `participant-evo5+${TESTRUNID}@example.com`,
 };
 
 function roster() {
@@ -105,6 +138,9 @@ function roster() {
     mk('p0', ['participant'], 'participant'),
     mk('pLive', ['participant'], 'participant'),
     mk('pDel', ['participant'], 'participant'),
+    mk('pNew', ['participant'], 'participant'),
+    mk('pVdel', ['participant'], 'participant'),
+    mk('pToggle', ['participant'], 'participant'),
   ];
   return { staff, operators: [], participants };
 }
@@ -158,6 +194,12 @@ async function seedEvomap() {
   // pDel catalogue: two rows already published live (urllive:true) — deleteVideo flips one to false (EM-07).
   await mkEvo(ID.EV_X1, PF.pDel, TITLE.X1, URL.X1, true, 5);
   await mkEvo(ID.EV_X2, PF.pDel, TITLE.X2, URL.X2, true, 4);
+  // p0 catalogue: the EM-03 EDIT target (urllive:false so its Edit FAB is available + it is not "Live").
+  // Starts titled E1_BEFORE; the spec edits it to E1_AFTER and asserts the app-stored title.
+  await mkEvo(ID.EV_E1, PF.p0, TITLE.E1_BEFORE, URL.E1, false, 7);
+  // pToggle catalogue: two rows whose urls back its pre-seeded live videolist (EM-15 toggle-off).
+  await mkEvo(ID.EV_T1, PF.pToggle, TITLE.T1, URL.T1, true, 5);
+  await mkEvo(ID.EV_T2, PF.pToggle, TITLE.T2, URL.T2, true, 4);
 
   // 4) liveevolutionmapping precondition docs.
   //    p0: live:true with the two P-urls (the participant view + completion gate, EM-08/09/10).
@@ -169,6 +211,11 @@ async function seedEvomap() {
   await db.collection('liveevolutionmapping').doc(PF.pDel).set({
     docid: PF.pDel, profileid: PF.pDel, title: `EVOM pDel Live ${TESTRUNID}`,
     live: true, videolist: [URL.X1, URL.X2], lastupdated: now(), ...tag,
+  });
+  //    pToggle: live:true with the two T-urls — EM-15 opens this in Update mode and toggles Live OFF.
+  await db.collection('liveevolutionmapping').doc(PF.pToggle).set({
+    docid: PF.pToggle, profileid: PF.pToggle, title: `EVOM pToggle Live ${TESTRUNID}`,
+    live: true, videolist: [URL.T1, URL.T2], lastupdated: now(), ...tag,
   });
   //    pLive: NO doc on purpose — EM-05 asserts the app CREATES it with videolist.length == 2 exactly
   //    (makeLive unions into an existing doc, so the asserted count is only clean when none pre-exists).
@@ -187,6 +234,26 @@ async function seedEvomap() {
     type: `EVOMTestimonial ${TESTRUNID}`, recordeddate: daysAgo(9), delete: false,
     uploadedon: now(), uploadedby: PF.admin, remarks: [], ...tag,
   });
+  // PV_N — pNew's sole source video (EM-02 add dialog filters to pNew, picks the Interview type, then this).
+  await pvRef(ID.PV_N).set({
+    docid: ID.PV_N, profileid: PF.pNew, title: TITLE.PV1, videourl: URL.PV1,
+    type: `EVOMInterview ${TESTRUNID}`, recordeddate: daysAgo(10), delete: false,
+    uploadedon: now(), uploadedby: PF.admin, remarks: [], ...tag,
+  });
+  // PV_E — p0's edit source the EM-03 catalogue row (EV_E1) mirrors by title+url (so the edit dialog
+  // pre-selects it). E1_BEFORE/URL.E1 are reused as BOTH this source row's title/url AND EV_E1's.
+  await pvRef(ID.PV_E).set({
+    docid: ID.PV_E, profileid: PF.p0, title: TITLE.E1_BEFORE, videourl: URL.E1,
+    type: `EVOMEdit ${TESTRUNID}`, recordeddate: daysAgo(7), delete: false,
+    uploadedon: now(), uploadedby: PF.admin, remarks: [], ...tag,
+  });
+  // EM-14 standalone video for pVdel — NO eventref so loadEventLog renders it as a standalone
+  // "video" card with a delete button (type 'Interview' is a real videoTypeKey so the row resolves).
+  await pvRef(ID.PV_DEL).set({
+    docid: ID.PV_DEL, profileid: PF.pVdel, title: TITLE.PVDEL, videourl: URL.PVDEL,
+    type: 'Interview', recordeddate: daysAgo(8), delete: false,
+    uploadedon: now(), uploadedby: PF.admin, remarks: [], ...tag,
+  });
 
   // 6) participant metadata rows (the /participant_videos_mapping list + summaryStats source). Three
   //    run-unique rows so the screen renders >= 3 and the stat is a real app-derived number (EM-12).
@@ -194,6 +261,11 @@ async function seedEvomap() {
   await pmRef(PF.p0).set({ docid: PF.p0, profileid: PF.p0, name: `EVOM Meta p0 ${TESTRUNID}`, ...tag });
   await pmRef(PF.pLive).set({ docid: PF.pLive, profileid: PF.pLive, name: `EVOM Meta pLive ${TESTRUNID}`, ...tag });
   await pmRef(PF.pDel).set({ docid: PF.pDel, profileid: PF.pDel, name: `EVOM Meta pDel ${TESTRUNID}`, ...tag });
+  // pNew (EM-13 add-video) + pVdel (EM-14 delete-video) — run-unique names so the /participant_videos_mapping
+  // Filter Participants search narrows to exactly one row deterministically.
+  await pmRef(PF.pNew).set({ docid: PF.pNew, profileid: PF.pNew, name: `EVOM Meta pNew ${TESTRUNID}`, ...tag });
+  await pmRef(PF.pVdel).set({ docid: PF.pVdel, profileid: PF.pVdel, name: `EVOM Meta pVdel ${TESTRUNID}`, ...tag });
+  await pmRef(PF.pToggle).set({ docid: PF.pToggle, profileid: PF.pToggle, name: `EVOM Meta pToggle ${TESTRUNID}`, ...tag });
 
   // 7) Participant completion preconditions (Flow 6): queue generation + variation + queue_token.
   const qgenRef = db.collection('queue generation').doc(ID.QGEN);
@@ -222,7 +294,7 @@ async function seedEvomap() {
 
   return {
     TESTRUNID, ID, PF, EMAIL, URL, TITLE, EVO_STAGE, NEXT_STAGE, VARIATION_STAGES,
-    counts: { evolutionmappingvideo: 7, liveevolutionmapping: 2, participantVideos: 2, participantMetadata: 3, queueToken: 1 },
+    counts: { evolutionmappingvideo: 10, liveevolutionmapping: 3, participantVideos: 5, participantMetadata: 6, queueToken: 1 },
   };
 }
 
@@ -238,6 +310,20 @@ async function teardownEvomap() {
   const admin = seed.initAdmin();
   const db = admin.firestore();
   const n = await seed.teardownCollections(db, SEEDED, TESTRUNID);
+
+  // NATURAL-KEY cleanup of APP-WRITTEN docs (recon note 3): EM-02 (add-evolution) and EM-13 (add-video)
+  // create docs through the real Angular UI, so they carry NO testrunid and the testrunid-scoped sweep
+  // above misses them. Delete them by their natural key — the run's profileids — so they don't accumulate
+  // across runs on the persistent test project. (The seeded ids are removed by the testrunid sweep; here
+  // we additionally remove any extra profileid-matching docs the product wrote.)
+  const runProfileIds = Object.values(PF);
+  for (const coll of ['evolutionmappingvideo', 'participant videos']) {
+    for (const pid of runProfileIds) {
+      const snap = await db.collection(coll).where('profileid', '==', pid).get().catch(() => ({ docs: [] }));
+      for (const d of snap.docs) await d.ref.delete().catch(() => {});
+    }
+  }
+
   // Also delete the Auth users (uids carry the run id).
   const auth = admin.auth();
   for (const key of Object.keys(PF)) {

@@ -25,6 +25,9 @@ export const evoActors = {
   participant0: `participant-evo+${RUN}@example.com`,  // p0 — self-completes
   participantLive: `participant-evo1+${RUN}@example.com`, // pLive — Make-Live target
   participantDel: `participant-evo2+${RUN}@example.com`,  // pDel — deleteVideo target
+  participantNew: `participant-evo3+${RUN}@example.com`,  // pNew — EM-13 add-video target
+  participantVdel: `participant-evo4+${RUN}@example.com`, // pVdel — EM-14 delete-video target
+  participantToggle: `participant-evo5+${RUN}@example.com`, // pToggle — EM-15 live-toggle target
 };
 
 /** Seeded profileids (for asserting app-written refs / scoping admin counts). */
@@ -33,6 +36,9 @@ export const evoProfileIds = {
   p0: `${RUN}_pf_p0`,
   pLive: `${RUN}_pf_pLive`,
   pDel: `${RUN}_pf_pDel`,
+  pNew: `${RUN}_pf_pNew`,
+  pVdel: `${RUN}_pf_pVdel`,
+  pToggle: `${RUN}_pf_pToggle`,
 };
 
 /** Seeded doc ids the specs assert against (mirror seed-evomap.js ID). */
@@ -47,8 +53,12 @@ export const evoIds = {
   EV_P2: `${RUN}_ev_P2`,
   EV_X1: `${RUN}_ev_X1`,
   EV_X2: `${RUN}_ev_X2`,
+  EV_E1: `${RUN}_ev_E1`,
+  EV_T1: `${RUN}_ev_T1`,
+  EV_T2: `${RUN}_ev_T2`,
   PV_1: `${RUN}_pv_1`,
   PV_2: `${RUN}_pv_2`,
+  PV_DEL: `${RUN}_pv_del`,
 };
 
 /** Seeded run-unique titles (the specs select MatTable rows by this UNIQUE text). */
@@ -62,6 +72,11 @@ export const evoTitles = {
   X2: `EVOM DelVid Two ${RUN}`,
   PV1: `EVOM Source Interview ${RUN}`,
   PV2: `EVOM Source Testimonial ${RUN}`,
+  E1_BEFORE: `EVOM Edit Before ${RUN}`,
+  E1_AFTER: `EVOM Edit After ${RUN}`,
+  T1: `EVOM Toggle One ${RUN}`,
+  T2: `EVOM Toggle Two ${RUN}`,
+  PVDEL: `EVOM PVDel Standalone ${RUN}`,
 };
 
 /** Seeded run-unique video urls. */
@@ -72,6 +87,26 @@ export const evoUrls = {
   P2: `https://dl.dropboxusercontent.com/evomap/${RUN}/part-post.mp4?raw=1`,
   X1: `https://dl.dropboxusercontent.com/evomap/${RUN}/del-vid-1.mp4?raw=1`,
   X2: `https://dl.dropboxusercontent.com/evomap/${RUN}/del-vid-2.mp4?raw=1`,
+  // EM-02 source video the add dialog converts (raw=1 already present → convertDropboxUrl is a no-op
+  // for dl.dropboxusercontent.com hosts, so the stored url equals this string).
+  PV1: `https://dl.dropboxusercontent.com/evomap/${RUN}/source-interview.mp4?raw=1`,
+  E1: `https://dl.dropboxusercontent.com/evomap/${RUN}/edit-me.mp4?raw=1`,
+  T1: `https://dl.dropboxusercontent.com/evomap/${RUN}/toggle-1.mp4?raw=1`,
+  T2: `https://dl.dropboxusercontent.com/evomap/${RUN}/toggle-2.mp4?raw=1`,
+  PVDEL: `https://dl.dropboxusercontent.com/evomap/${RUN}/pvdel.mp4?raw=1`,
+};
+
+/** Run-unique participant-video TYPE strings (the add dialog groups source videos by `type`). */
+export const evoVideoTypes = {
+  interview: `EVOMInterview ${RUN}`,
+  testimonial: `EVOMTestimonial ${RUN}`,
+};
+
+/** Run-unique `participant metadata` display names (the /participant_videos_mapping filter search). */
+export const evoMetaNames = {
+  pNew: `EVOM Meta pNew ${RUN}`,
+  pVdel: `EVOM Meta pVdel ${RUN}`,
+  pToggle: `EVOM Meta pToggle ${RUN}`,
 };
 
 /**
@@ -89,6 +124,17 @@ export async function installEvomapStubs(page: Page): Promise<void> {
   // Auto-close any popup tab a video-play button opens via window.open.
   page.context().on('page', (pg) => { pg.close().catch(() => {}); });
 }
+
+/**
+ * The /participant_videos_mapping screen's "Last Video" column query (fetchLastVideos:
+ * `where('profileid','in') + where('delete','==') + orderBy('recordeddate','desc')`) needs a composite
+ * index `participant videos (delete, profileid, recordeddate)` that is NOT provisioned on the disposable
+ * test project (we must not edit the shared firestore.indexes.json). It is an AUXILIARY column query, not
+ * the behavior any EM case asserts (EM-12 asserts the participant stat; EM-13/14 the video write). Pass
+ * this to assertNoFatal's extraIgnorable on the /participant_videos_mapping cases. The needed index is
+ * RETURNED in the structured result (neededIndexes) so the orchestrator can provision it.
+ */
+export const PVM_LASTVIDEO_INDEX_ERR = /requires an index|create_composite/i;
 
 /** Log in via the real Angular login form as the seeded admin operator. */
 export async function loginAsEvoAdmin(page: Page): Promise<void> {
@@ -179,6 +225,58 @@ export async function resetParticipantToken(): Promise<void> {
 export async function resetDeleteTargetRow(): Promise<void> {
   const { db } = adminHandles();
   await db.collection('evolutionmappingvideo').doc(evoIds.EV_D1).set({ deleted: false }, { merge: true });
+}
+
+/**
+ * Restore the EM-03 EDIT target row (EV_E1) to its BEFORE title + not-deleted + not-live, so the case
+ * is re-run-stable and its Edit FAB is available (a urllive:true row renders "Live" with no checkbox,
+ * but the Edit FAB is in a separate column and always present — we keep urllive:false for clarity).
+ * PRECONDITION only — the assertion is on the AFTER title the APP setDoc-merges on the Update click.
+ */
+export async function resetEditTargetRow(): Promise<void> {
+  const { db } = adminHandles();
+  await db.collection('evolutionmappingvideo').doc(evoIds.EV_E1).set({
+    title: evoTitles.E1_BEFORE, deleted: false, urllive: false,
+  }, { merge: true });
+}
+
+/**
+ * Restore the EM-14 standalone participant-video (PV_DEL) to delete:false so the log overlay renders it
+ * as a deletable card and the case is re-run-stable. PRECONDITION only — the assertion is on the
+ * delete:true the APP writes via updateDoc on the real Delete click.
+ */
+export async function resetPVdelTarget(): Promise<void> {
+  const { db } = adminHandles();
+  await db.collection('participant videos').doc(evoIds.PV_DEL).set({ delete: false }, { merge: true });
+}
+
+/**
+ * Restore pToggle's live mapping to live:true (EM-15 toggle-off precondition). Idempotent.
+ * PRECONDITION only — the assertion is on the live:false the APP writes on the toggle+Update click.
+ */
+export async function resetToggleLive(): Promise<void> {
+  const { db, T } = adminHandles();
+  await db.collection('liveevolutionmapping').doc(evoProfileIds.pToggle).set({
+    docid: evoProfileIds.pToggle, profileid: evoProfileIds.pToggle, title: `EVOM pToggle Live ${RUN}`,
+    live: true, videolist: [evoUrls.T1, evoUrls.T2], lastupdated: T.now(),
+    testrunid: RUN, _testdata: true,
+  });
+}
+
+/**
+ * EM-12 anti-circular basis: count `participant metadata` docs that have a non-empty `name`. The screen's
+ * fetchParticipants() runs `query(collection('participant metadata'), orderBy('name'))`; Firestore's
+ * orderBy('name') SILENTLY excludes docs missing the field, so participantOptions.length (and thus the
+ * rendered "Participants" stat) equals the name-having count — NOT the raw collection count. We mirror
+ * orderBy('name') here (count docs with a non-empty name) so the assertion is the app's true derivation.
+ */
+export async function countMetadataWithName(): Promise<number> {
+  const { db } = adminHandles();
+  const snap = await db.collection('participant metadata').get();
+  return snap.docs.filter((d) => {
+    const n = d.data().name;
+    return n != null && String(n).trim() !== '';
+  }).length;
 }
 
 // ---------------------------------------------------------------------------------------------------
