@@ -39,8 +39,8 @@ out-of-catalog mode (indexOf==−1) can't win a racing rollup.
 - **Camera/QR (zxing)** → inject via `ng.getComponent(el).onCodeResult(...)` through `page.evaluate`.
 - **Not-deployed CFs** (appointment/event/content/comms/workshop) → assert the UI's own write + skip-guard.
 
-## Final results — all 10 deepened groups committed GREEN (with documented fixmes)
-The deepening workflow (11 Opus agents) authored ~93 new cases; the orchestrator greened each serially,
+## Final results — all 12 deepened groups committed GREEN (with documented fixmes)
+The deepening workflow (Opus agents) authored ~110 new cases; the orchestrator greened each serially,
 fixing the cross-spec-isolation regressions and fixme-ing the genuinely-fragile cases. Per-group (committed):
 
 | Group | passed | fixme (documented) | CF/other skip | commit |
@@ -55,24 +55,32 @@ fixing the cross-spec-isolation regressions and fixme-ing the genuinely-fragile 
 | profiles | 22 | 1 (form-tracker filter) | 0 | f947f96 (PA-07 un-fixme'd→green) |
 | evomap | 13 | 1 (EM-02 4-step dialog) | 0 | ca30a85 (EM-12 un-fixme'd→green) |
 | authroles | 18 | 1 (AR-02b wrong premise) | 2 (CF gated) | 050f662 |
+| business | 20 | 1 (touchpoint filter race) | 0 | 3be098c |
+| journey | 16 | 0 | 0 | 7e39a30 (validates source fixes 16b578a + product-delivery) |
 
-**~152 passing deep cases** (vs ~111 before deepening) + modes 16-case engine. **No previously-green case
+**~188 passing deep cases** (vs ~111 before deepening) + modes 16-case engine. **No previously-green case
 left broken** — every regression from the agents' shared-seed extensions was fixed (full-doc resets, future-
 date/attended to exclude from existing queries, run-unique scoping, retry-until-option mat-select opens,
 out-of-window slot placement). The fixmes are honest + documented in-file: the recurring fragile class is
 **write-via-Material-dialog/stepper flows** (no testids, async validators) — authored but needing per-dialog
 selector reconciliation; plus CF cases for CFs not deployed to the test project (skip-guarded).
 
-**Not deepened:** `business` + `journey` — their deepening agents returned 0 new cases (workflow blocker);
-they remain at their first-turn committed green (8/8 each). Re-running their deepening agent is the follow-up.
+**Source fixes the e2e SURFACED + then VALIDATED end-to-end (journey group):** the deep product-delivery
+cases found two real production crashes — the `/deliverysequence?data=` EDIT path threw "Cannot read undefined
+(length)" and stranded the form when a mapping had a delivery option with no `deliverysequence` (fixed:
+`delivery-sequence.component.ts:72-79` null-guard, commit 16b578a), and the `/productdelivery` LIST collapsed
+to zero rows + emitted a fatal by mutating the snapshot in place (fixed: `product-delivery.component.ts`
+fresh-per-emit view-model). Both are now PROVEN by JP-EDIT/JP-PD — validated by rebuilding THIS repo's dev
+bundle and serving it on a fresh port (the `:4200` default served a STALE sibling-worktree bundle lacking the
+fix; see [[allcomponents-e2e-suites]] stale-build footgun). JP-05/06 tolerate ONE anchored benign class: the
+participantpurchase screen reads the Watson prod secondary app (uninitialized in the test env).
 
 ## Follow-ups (ranked)
 1. Isolate the appointments **booking keystone** (APPT-02/03/18) on a dedicated `p_book` participant so it
    stops polluting the status board, then un-fixme (the 4-write batch is specified in validated/05 §4).
 2. Reconcile the write-via-dialog selectors (content CN-04/11/12/14, workshops WS-06/08/10/13, support
-   CS-04/08, comms CN-03/04b) — mostly Material dialog/stepper open + submit selectors.
-3. Deepen `business` + `journey` (re-run the agent).
-4. Deploy the CF set to the test project to light up the gated CF cases.
+   CS-04/08, comms CN-03/04b, evomap EM-02, business BM-TP-DELAY) — Material dialog/stepper open + submit.
+3. Deploy the CF set to the test project to light up the gated CF cases (modes/content/comms/support/authroles).
 
 ---
 
