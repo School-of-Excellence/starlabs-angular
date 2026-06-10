@@ -70,6 +70,10 @@ interface PortfolioRow {
   onboarded: boolean;
   goingQuiet: boolean;
   renewalWindow: boolean;
+  // subscription-based active flag: the participant has >=1 journey-product whose subscriptionend
+  // is in the future (daysToRenewal >= 0). Active/Inactive counting + levers key off THIS, not
+  // customerstatus (which is empty on pjp — the prior bug). customerstatus stays for the Status pill.
+  subActive: boolean;
   lapsed: boolean;
   notStarted: boolean;
   priority: number;
@@ -106,6 +110,9 @@ interface LiteIndexRow {
   financialstatus: string | null;
   // base-wide (paged-mode) flags — computed in the lite index so renewal/tickets filter the WHOLE base
   renewalWindow: boolean;          // subscriptionend within RENEWAL_DAYS (same logic as computeRows)
+  // subscription-based active flag across ALL the participant's pjp records: true if ANY record's
+  // subscriptionend is in the future. Drives base-wide Active/Inactive counts + levers in paged mode.
+  subActive: boolean;
   openTickets: number;             // open clientissue count for this profile (from the full-base read)
 }
 
@@ -142,7 +149,7 @@ interface ScoreboardRow {
 })
 export class JourneyCoachHealthDashboardComponent implements OnInit {
 
-  readonly QUIET_DAYS = 45;
+  readonly QUIET_DAYS = 60;
   readonly RENEWAL_DAYS = 90;
   readonly LAPSED_DAYS = 90;       // show lapses up to this many days past end
   readonly ALL = '__all__';
@@ -470,23 +477,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  then falls back to the accumulate-over-loaded value). */
   private async loadServerCounts(): Promise<void> {
     const pjp = collection(this.firestore, 'participantjourneyproduct');
-    const now = new Date();
-    const in90 = new Date(now.getTime() + this.RENEWAL_DAYS * 86400000);
-    let totalOk = false, inactiveOk = false;
-    await Promise.all([
-      getCountFromServer(pjp)
-        .then(s => { this.serverCounts.total = s.data().count; totalOk = true; }).catch(() => {}),
-      getCountFromServer(query(pjp, where('subscriptionend', '>=', now), where('subscriptionend', '<=', in90)))
-        .then(s => { this.serverCounts.renewalsSoon = s.data().count; }).catch(() => {}),
-      getCountFromServer(query(pjp, where('journeystatus', 'in', ['Initiated', 'initiated']), where('onboarded', '==', true)))
-        .then(s => { this.serverCounts.notStarted = s.data().count; }).catch(() => {}),
-      // inactive = customerstatus in the gone-set (matches isInactiveStatus). Field lives on the
-      // pjp doc; <=10 values so a single Firestore `in` covers it. active is then total - inactive.
-      getCountFromServer(query(pjp, where('customerstatus', 'in', ['late', 'discontinued', 'banned'])))
-        .then(s => { this.serverCounts.inactive = s.data().count; inactiveOk = true; }).catch(() => {}),
-    ]);
-    this.serverActiveReady = totalOk && inactiveOk;
-    this.serverCounts.active = Math.max(0, this.serverCounts.total - this.serverCounts.inactive);
+    // NOTE: total / active / inactive / renewals are now derived PARTICIPANT-LEVEL from the lite
+    // index (distinct profileid, subscription-based) in accumulatePagedSummary. The old pjp-RECORD
+    // total and the customerstatus inactive query were both wrong (records != people; customerstatus
+    // is empty on pjp) and have been removed. Only `notStarted` — a real pjp-field count — remains,
+    // as the pre-index fallback.
+    await getCountFromServer(query(pjp, where('journeystatus', 'in', ['Initiated', 'initiated']), where('onboarded', '==', true)))
+      .then(s => { this.serverCounts.notStarted = s.data().count; }).catch(() => {});
+    this.serverActiveReady = false;
     this.serverCountsReady = true;
   }
 
@@ -587,8 +585,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     for (const r of this.allRows) {
       if (this.countedProfiles.has(r.profileid)) continue;
       this.countedProfiles.add(r.profileid);
-      if (this.isInactiveStatus(r.customerstatus)) { this.summary.inactive++; continue; }
-      if ((r.customerstatus ?? '').toLowerCase() === 'active') this.summary.active++;
+      // total / active / inactive / renewalsSoon are derived base-wide from the lite index once it
+      // builds (see below); until then these page-accumulated values are the fallback.
+      if (r.subActive) this.summary.active++; else this.summary.inactive++;
       if (r.renewalWindow) this.summary.renewalsSoon++;
       if (r.lapsed) this.summary.lapsed++;
       if (r.openTickets > 0) this.summary.withOpenTickets++;
@@ -601,17 +600,21 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // (from the cached full-base clientissue read, once the lite index has built). Falls back to the
     // page-accumulated value until then.
     if (this.fullIndexBuilt) this.summary.withOpenTickets = this.fullBaseWithOpenTickets;
-    // accurate server counts take precedence for the cards they can power
-    if (this.serverCountsReady) {
-      this.summary.total = this.serverCounts.total;
-      this.summary.renewalsSoon = this.serverCounts.renewalsSoon;
+    // Base-wide participant-level counts come from the lite index (one entry per DISTINCT
+    // participant). This replaces the pjp-RECORD total and the customerstatus inactive query
+    // (both wrong: total counted records, inactive read an empty field). notStarted still uses the
+    // server count (a pjp-field query) where available.
+    if (this.fullIndexBuilt) {
+      this.summary.total = this.fullIndex.length;                                   // distinct participants
+      this.summary.active = this.fullIndex.reduce((n, l) => n + (l.subActive ? 1 : 0), 0);
+      this.summary.inactive = this.fullIndex.reduce((n, l) => n + (l.subActive ? 0 : 1), 0);
+      this.summary.renewalsSoon = this.fullIndex.reduce((n, l) => n + (l.renewalWindow ? 1 : 0), 0);
+      if (this.serverCountsReady) this.summary.notStarted = this.serverCounts.notStarted;
+    } else if (this.serverCountsReady) {
+      // index not built yet — only notStarted is a reliable pjp-field server count; total/active/
+      // inactive/renewalsSoon stay on the page-accumulated values until the index lands.
       this.summary.notStarted = this.serverCounts.notStarted;
-      // active/inactive are base-wide via the customerstatus count query (not page-scoped) — only
-      // when BOTH total and inactive counts resolved; otherwise leave the page-accumulated values.
-      if (this.serverActiveReady) {
-        this.summary.inactive = this.serverCounts.inactive;
-        this.summary.active = this.serverCounts.active;
-      }
+      this.summary.total = this.loadedRowCount;
     } else {
       this.summary.total = this.loadedRowCount;
     }
@@ -920,8 +923,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         daysToRenewal,
         openTickets: this.openTicketCounts[profileid] ?? 0,
         onboarded,
-        goingQuiet: daysSinceCoach != null && daysSinceCoach > this.QUIET_DAYS,
+        // going-quiet only counts ACTIVE participants (subActive); set after the row is built (below).
+        goingQuiet: false,
         renewalWindow: daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS,
+        // subscription-based active: this product's subscriptionend is in the future. The
+        // per-participant subActive is the OR across products, finalised at merge time below.
+        subActive: daysToRenewal != null && daysToRenewal >= 0,
         lapsed: daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -this.LAPSED_DAYS
           && !this.isInactiveStatus(meta['customerstatus']),
         notStarted: ['Initiated', 'initiated', null, undefined].includes(jstatus) && onboarded,
@@ -931,6 +938,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         coachHealthState: this.coachHealthByProfile[profileid] ?? null,
         healthState: null, healthCoverage: 0,
       };
+      // going-quiet = ACTIVE participant with no coach contact in QUIET_DAYS+ days.
+      row.goingQuiet = row.subActive && daysSinceCoach != null && daysSinceCoach > this.QUIET_DAYS;
       this.scoreRow(row);
       if (this.SHOW_HEALTH) this.scoreHealth(row);
 
@@ -938,8 +947,19 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (!existing) { byProfile.set(profileid, row); }
       else {
         const mergedIds = [...existing.pjpIds, d['__id']];
-        if (row.priority > existing.priority) { row.pjpIds = mergedIds; byProfile.set(profileid, row); }
-        else { existing.pjpIds = mergedIds; }
+        // a participant is subActive if ANY of their journey-products has a future subscriptionend.
+        const mergedSubActive = existing.subActive || row.subActive;
+        if (row.priority > existing.priority) {
+          row.pjpIds = mergedIds;
+          row.subActive = mergedSubActive;
+          // re-evaluate going-quiet against the merged active flag (a later product may flip it active)
+          row.goingQuiet = row.subActive && row.daysSinceCoach != null && row.daysSinceCoach > this.QUIET_DAYS;
+          byProfile.set(profileid, row);
+        } else {
+          existing.pjpIds = mergedIds;
+          existing.subActive = mergedSubActive;
+          existing.goingQuiet = existing.subActive && existing.daysSinceCoach != null && existing.daysSinceCoach > this.QUIET_DAYS;
+        }
       }
     }
 
@@ -1543,12 +1563,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   private computeSummary(): void {
+    // allRows is already per-distinct-participant. Active/Inactive are SUBSCRIPTION-based
+    // (subActive), NOT customerstatus (empty on pjp — the prior bug). Total = distinct participants.
     const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0 };
     for (const r of this.allRows) {
       s.total++;
-      const cs = (r.customerstatus ?? '').toLowerCase();
-      if (this.isInactiveStatus(cs)) { s.inactive++; continue; } // gone — excluded from active counts
-      if (cs === 'active') s.active++;
+      if (r.subActive) s.active++; else s.inactive++;
       if (r.renewalWindow) s.renewalsSoon++;
       if (r.lapsed) s.lapsed++;
       if (r.openTickets > 0) s.withOpenTickets++;
@@ -1572,13 +1592,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private rowMatches(r: PortfolioRow): boolean {
     const term = this.search.trim().toLowerCase();
     const wantInactive = this.activeLever === 'inactive';
-    // inactive (gone) participants are hidden from the active board unless explicitly viewing them
-    if (this.isInactiveStatus(r.customerstatus) !== wantInactive) return false;
+    // Active/Inactive are SUBSCRIPTION-based: by default the board shows only subActive participants
+    // (those with a live subscription); the Inactive lever flips it to show only !subActive.
+    // The Lapsed / Not-started levers target lifecycle segments that legitimately include
+    // non-subActive people, so they bypass the default subActive gate.
+    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted';
+    if (!bypassActiveGate && r.subActive === wantInactive) return false;
     if (this.activeLever === 'goingQuiet' && !r.goingQuiet) return false;
     if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
     if (this.activeLever === 'lapsed' && !r.lapsed) return false;
     if (this.activeLever === 'notStarted' && !r.notStarted) return false;
-    if (this.activeLever === 'active' && (r.customerstatus ?? '').toLowerCase() !== 'active') return false;
+    if (this.activeLever === 'active' && !r.subActive) return false;
     if (this.activeLever === 'tickets' && !(r.openTickets > 0)) return false;
     if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
     if (this.statusFilter && (r.customerstatus ?? '') !== this.statusFilter) return false;
@@ -1608,8 +1632,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.selectedCoachId === this.UNASSIGNED) {
       if (!this.isUnassigned(lite.coachedby)) return false;
     }
-    if (this.isInactiveStatus(lite.customerstatus) !== wantInactive) return false;
-    if (this.activeLever === 'active' && (lite.customerstatus ?? '').toLowerCase() !== 'active') return false;
+    // subscription-based active/inactive (same as rowMatches): default board = subActive only.
+    // Lapsed / Not-started levers are page-local lifecycle segments that legitimately include
+    // non-subActive people, so they bypass the default subActive gate here too.
+    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted';
+    if (!bypassActiveGate && lite.subActive === wantInactive) return false;
+    if (this.activeLever === 'active' && !lite.subActive) return false;
     if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(lite.productType)) return false;
@@ -1665,6 +1693,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const subEnd = this.toDate(d['subscriptionend']) ?? this.toDate(meta['subscriptionend']);
       const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / 86400000) : null;
       const renewalWindow = daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS;
+      // subscription-based active: this pjp record's subscriptionend is in the future.
+      const subActive = daysToRenewal != null && daysToRenewal >= 0;
       const lite: LiteIndexRow = {
         profileid,
         name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
@@ -1675,6 +1705,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         customerstatus: meta['customerstatus'] ?? null,
         financialstatus: fin,
         renewalWindow,
+        subActive,
         openTickets: openByProfile[profileid] ?? 0,
       };
       const existing = byProfile.get(profileid);
@@ -1685,6 +1716,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         if (this.isUnassigned(existing.coachedby) && !this.isUnassigned(lite.coachedby)) existing.coachedby = lite.coachedby;
         // a participant is in the renewal window if ANY of their journey-products is
         if (renewalWindow) existing.renewalWindow = true;
+        // a participant is subActive if ANY of their journey-products has a future subscriptionend
+        if (subActive) existing.subActive = true;
       }
     }
     this.fullIndex = Array.from(byProfile.values());

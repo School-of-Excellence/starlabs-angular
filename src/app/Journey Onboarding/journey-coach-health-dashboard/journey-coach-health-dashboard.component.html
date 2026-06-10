@@ -85,16 +85,17 @@
         <div class="kpi-label">Participants</div>
         <div class="kpi-num">{{ summary.total }}</div>
       </div>
-      <div class="kpi good clickable" [class.kpi-selected]="kpiActive('active')" (click)="kpi('active')" matTooltip="Active only">
+      <div class="kpi good clickable" [class.kpi-selected]="kpiActive('active')" (click)="kpi('active')" matTooltip="Has at least one active subscription">
         <div class="kpi-label">Active</div>
         <div class="kpi-num">{{ summary.active }}</div>
       </div>
-      <div class="kpi bad clickable" [class.kpi-selected]="kpiActive('inactive')" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned">
-        <div class="kpi-label">Inactive (lost)</div>
+      <div class="kpi bad clickable" [class.kpi-selected]="kpiActive('inactive')" (click)="kpi('inactive')" matTooltip="No active subscription — all subscriptions have ended">
+        <div class="kpi-label">Inactive</div>
         <div class="kpi-num">{{ summary.inactive }}</div>
       </div>
-      <div class="kpi clickable" [class.kpi-selected]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')">
-        <div class="kpi-label">Renewals &le;90d</div>
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
+        matTooltip="Active subscription ending within the next 90 days">
+        <div class="kpi-label">Subscription ends in 90 days</div>
         <div class="kpi-num">{{ summary.renewalsSoon }}</div>
       </div>
       <div class="kpi clickable" [class.kpi-selected]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')">
@@ -111,15 +112,15 @@
     <section class="jchd-levers" *ngIf="selectedCoachId !== UNASSIGNED">
       <button mat-stroked-button [class.active]="activeLever==='all'" (click)="setLever('all')">All</button>
       <button mat-stroked-button [class.active]="activeLever==='goingQuiet'" (click)="setLever('goingQuiet')"
-        matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (attended sessions + logged touchpoints)">Going quiet ({{ summary.goingQuiet }})</button>
+        matTooltip="Active participant — no coach contact in {{ QUIET_DAYS }}+ days.">Going quiet ({{ summary.goingQuiet }})</button>
       <button mat-stroked-button [class.active]="activeLever==='renewalWindow'" (click)="setLever('renewalWindow')"
-        matTooltip="Subscription ends within {{ RENEWAL_DAYS }} days">Renewal window ({{ summary.renewalsSoon }})</button>
+        matTooltip="Active subscription ends within {{ RENEWAL_DAYS }} days">Ends in 90 days ({{ summary.renewalsSoon }})</button>
       <button mat-stroked-button [class.active]="activeLever==='lapsed'" (click)="setLever('lapsed')"
         matTooltip="Subscription ended within the last {{ LAPSED_DAYS }} days — win-back">Lapsed ({{ summary.lapsed }})</button>
       <button mat-stroked-button [class.active]="activeLever==='notStarted'" (click)="setLever('notStarted')"
         matTooltip="Onboarded but journey not started">Not started ({{ summary.notStarted }})</button>
       <button mat-stroked-button [class.active]="activeLever==='inactive'" (click)="setLever('inactive')"
-        matTooltip="Gone — late / discontinued / banned (unactionable)">Inactive ({{ summary.inactive }})</button>
+        matTooltip="No active subscription — all subscriptions have ended">Inactive ({{ summary.inactive }})</button>
       <button mat-stroked-button [class.active]="activeLever==='tickets'" (click)="setLever('tickets')"
         matTooltip="Participants with at least one open ticket">Open tickets ({{ summary.withOpenTickets }})</button>
       <button mat-stroked-button disabled matTooltip="Available in Phase 2 (needs Wins + Advocacy)">Referral-ready · Phase 2</button>
