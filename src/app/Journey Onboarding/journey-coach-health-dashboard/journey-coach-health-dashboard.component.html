@@ -117,7 +117,7 @@
     <section class="jchd-filters">
       <mat-form-field appearance="outline" class="f-search">
         <mat-label>Search name / number</mat-label>
-        <input matInput [(ngModel)]="search" (ngModelChange)="applyFilters()" />
+        <input matInput #searchInput [(ngModel)]="search" (ngModelChange)="applyFilters()" />
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Journey</mat-label>
@@ -380,8 +380,9 @@
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
-            class="jchd-data-row" [ngClass]="bandClass(row.priorityBand)"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns; let i = index"
+            class="jchd-data-row" [ngClass]="bandClass(row.priorityBand)"
+            [class.jchd-row-focused]="i === focusedRowIndex"></tr>
       </table>
 
       <div class="jchd-empty" *ngIf="dataSource.data.length === 0 && !pageLoading">

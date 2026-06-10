@@ -400,6 +400,15 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     }
     &:hover .row-actions { opacity: 1; transform: none; }
     &:focus-within .row-actions { opacity: 1; transform: none; }
+
+    // keyboard-navigation focus: a clear, deliberate indicator distinct from the hover tint —
+    // an inset accent ring + accent-tinted fill + a thicker left rail.
+    &.jchd-row-focused {
+      background: $accent-tint;
+      box-shadow: inset 3px 0 0 0 $accent, inset 0 0 0 1px rgba(37, 99, 235, .35);
+      td.mat-mdc-cell:first-child::before { opacity: 1; width: 5px; }
+      .row-actions { opacity: 1; transform: none; }
+    }
   }
 
   // last row: drop divider for a clean card edge
