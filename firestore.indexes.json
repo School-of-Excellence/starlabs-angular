@@ -906,6 +906,34 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "expenseplanning",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "delete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "expenseplanning",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "delete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
