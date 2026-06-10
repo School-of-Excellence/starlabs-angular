@@ -36,6 +36,7 @@ const ID = {
   // modes catalog (run-scoped; joins the shared `modes` collection, tagged for teardown)
   MODE_INTEG: `${TESTRUNID}_mode_integration`,
   MODE_PERF: `${TESTRUNID}_mode_performance`,
+  MODE_PRIORITY: `${TESTRUNID}_mode_priority`,
   // participantsproduct rows
   PP1: `${TESTRUNID}_PP1`,          // CF-completion subject (participant1): status ongoing → completed
   // evolution wishlist log docs
@@ -133,6 +134,10 @@ async function seedModes() {
   //    low-sequence modes. atcmodel-free; pure config.
   await db.collection('modes').doc(ID.MODE_INTEG).set({ docid: ID.MODE_INTEG, mode: 'Integration Mode', sequence: 900, info: null, ...tag });
   await db.collection('modes').doc(ID.MODE_PERF).set({ docid: ID.MODE_PERF, mode: 'Performance Mode', sequence: 901, info: null, ...tag });
+  // 'Priority Mode' must be in the catalog (sequence ABOVE Integration, per the production order
+  // Integration<Priority) so the engine's rollup never treats it as indexOf==-1 (which would sort it
+  // FIRST and let a transient Priority headline beat Integration in the multi-product rollup, PM-ROLLUP-MULTI).
+  await db.collection('modes').doc(ID.MODE_PRIORITY).set({ docid: ID.MODE_PRIORITY, mode: 'Priority Mode', sequence: 902, info: null, ...tag });
 
   // 5) PRODUCT MODE CONFIG.
   //    PMC_P1_INTEG — (P1, Integration Mode), 1 widget. REQUIRED by the CF: the checklist/evolution-log
