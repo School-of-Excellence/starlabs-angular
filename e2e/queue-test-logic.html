@@ -1,0 +1,612 @@
+<!doctype html><meta charset=utf8><title>Queue suite — test logic</title>
+<style>:root{color-scheme:dark}body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;margin:0;padding:28px;line-height:1.55;max-width:1100px}
+h1{margin:0 0 6px}h2{border-bottom:1px solid #30363d;padding-bottom:6px;margin-top:30px;font-size:17px}
+code{background:#161b22;border:1px solid #30363d;border-radius:5px;padding:1px 5px;font-size:12px}
+.sub{color:#8b949e}.meta{color:#8b949e;font-weight:400;font-size:13px}
+.pre{background:#11161d;border:1px solid #30363d;border-radius:10px;padding:12px 18px;margin:14px 0}.pre li{margin:5px 0}
+.card{border:1px solid #30363d;border-radius:9px;padding:11px 15px;margin:10px 0;background:#11161d}
+.card .t{font-weight:600;font-size:14px}.card .obj{color:#adbac7;margin:5px 0 8px;font-size:13.5px}
+.asserts{margin:6px 0 8px;padding-left:18px}.asserts li{margin:3px 0;font-size:13px}.asserts b{color:#7ee787}
+.none{color:#8b949e;font-style:italic;font-size:13px}.ref{font-size:11.5px;color:#6e7681}</style>
+<h1>Queue suite — test logic (for review)</h1>
+<p class="sub">One card per test: <b>objective</b> + the <b>assertions and why they hold</b>. Read the preamble once (the engine), then review each card; the anti-circular rationale is the key thing to scrutinize.</p>
+<div class="pre"><b>How the queue tests work</b><ul><li><b>The model (oracle)</b> — a flow-model defines, per variation, which stages exist and which transitions are legal. Tests are checked against it — a move that isn’t a legal edge fails.</li><li><b>Participant self-moves</b> — DESKTOP queue tests perform participant moves via the Admin-SDK participant-sim (`sim.advance`) — the stand-in for a real form submit; the MOBILE suite performs them through the real app. Both write the same `queue_token` + `queue stage log`.</li><li><b>Operator / auto moves</b> — driven on the REAL Angular board (`board.moveToken` etc.) — the app performs the write; the test only clicks.</li><li><b>The guards</b> — no-orphan · no-stage-skipped · every-move-logged{minNonSelf} · loop-bound · terminal-reached · count-conserved · no-fatal. Bundles (`assertTrailInvariants` / `assertUniversalAfterHop`) run several at once after each hop.</li><li><b>Anti-circularity</b> — every assertion reads a value the APP produced (the token, the log rows, the board’s recomputed counts) — never a value the test wrote. `minNonSelf` proves the operator moves on the trail genuinely happened.</li></ul></div>
+<p class="sub">115 tests across 23 specs. Code refs link each card to <code>spec:line</code>.</p>
+<section><h2>All actors — primary screens are usable (render without fatal error) <span class="meta">5 test(s) · <code>queue/actors-health.spec.ts</code></span></h2><div class="card">
+        <div class="t">OPERATOR — Queue Manager board</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/actors-health.spec.ts:30</code></div>
+      </div><div class="card">
+        <div class="t">SPECIALIST — Dynamic Studio</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/actors-health.spec.ts:37</code></div>
+      </div><div class="card">
+        <div class="t">SPECIALIST — Arena Studio Activity</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/actors-health.spec.ts:44</code></div>
+      </div><div class="card">
+        <div class="t">BIG — BIG Dashboard</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/actors-health.spec.ts:50</code></div>
+      </div><div class="card">
+        <div class="t">BIG — Participant Assignment Board</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/actors-health.spec.ts:57</code></div>
+      </div></section>
+<section><h2>Authoring — queue-creation-v3 stepper <span class="meta">1 test(s) · <code>queue/authoring.spec.ts</code></span></h2><div class="card">
+        <div class="t">AUTH-01 queue-creation-v3 smoke: create a queue → doc round-trips (queueadmin ARRAY + docid self-id)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/authoring.spec.ts:79</code></div>
+      </div></section>
+<section><h2>BIG-07 — Validate Participant Assignments <span class="meta">10 test(s) · <code>queue/big-analytics.spec.ts</code></span></h2><div class="card">
+        <div class="t">BIG-07a accept moves a card initiated → completed; counts re-render &amp; doc persists (conservation)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:83</code></div>
+      </div><div class="card">
+        <div class="t">BIG-07c reject/rework moves a card initiated → rework; count re-renders &amp; doc persists</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:153</code></div>
+      </div><div class="card">
+        <div class="t">BIG-07b empty-selection bulk move is a no-op (no write, counts stable)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:190</code></div>
+      </div><div class="card">
+        <div class="t">BIG-08 moving a participant updates both cohort sizes + writes one audit row (net-zero, no dup)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:227</code></div>
+      </div><div class="card">
+        <div class="t">BIG-09a biglevel renders the seeded rows with no fatal error</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:334</code></div>
+      </div><div class="card">
+        <div class="t">BIG-09b modellevelconfig renders the seeded rows with no fatal error</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:347</code></div>
+      </div><div class="card">
+        <div class="t">BIG-09c big_aggregate analytics screen mounts and renders a finite count (no fatal)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:357</code></div>
+      </div><div class="card">
+        <div class="t">BIG-10a AEL analytics count equals the Firestore collection size (no silent drop) and ≥ seeded floor</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:373</code></div>
+      </div><div class="card">
+        <div class="t">BIG-10b monitor "Participants" count equals the app-filtered live token count (no silent drop)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:405</code></div>
+      </div><div class="card">
+        <div class="t">BIG-11 zoom screen mounts gracefully for an assignment with no zoomdata (no fatal, no real window)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-analytics.spec.ts:454</code></div>
+      </div></section>
+<section><h2>BIG-00 — login &amp; role gate <span class="meta">11 test(s) · <code>queue/big-core.spec.ts</code></span></h2><div class="card">
+        <div class="t">BIG-00 the seeded BIG admin logs in and the guard admits them to the dashboard</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:167</code></div>
+      </div><div class="card">
+        <div class="t">BIG-00 a signed-out visitor is redirected to /login from a BIG route</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:183</code></div>
+      </div><div class="card">
+        <div class="t">BIG-00b a non-BIG participant is BLOCKED from ${route.path}</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:207</code></div>
+      </div><div class="card">
+        <div class="t">BIG-00b the PAB exposes ONLY the logged-in profile (no cross-participant picker / leak)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:233</code></div>
+      </div><div class="card">
+        <div class="t">BIG-01 Total/Filtered are app-computed, internally consistent, and free of NaN</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:267</code></div>
+      </div><div class="card">
+        <div class="t">BIG-02 zero-states render with no NaN/undefined and no fatal console error</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:301</code></div>
+      </div><div class="card">
+        <div class="t">BIG-03 Σ status badges is conserved and the active bucket badge == rendered cards</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:327</code></div>
+      </div><div class="card">
+        <div class="t">BIG-04 a real perform-action drives the app and the board re-renders the recomputed status</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:377</code></div>
+      </div><div class="card">
+        <div class="t">BIG-05 the manual screen role-gates correctly and renders its review controls for an admin</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:486</code></div>
+      </div><div class="card">
+        <div class="t">BIG-05 a non-self participant is DENIED the create/rework manual screen</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:529</code></div>
+      </div><div class="card">
+        <div class="t">BIG-06 the legacy form screen mounts for an admin and renders its dynamic form/submit</div>
+        <div class="obj">FIXME (product gap + missing precondition — see productFindings BIG-06 + seedRequests): This legacy screen CANNOT be exercised cleanly in the emulator today, for TWO independent reasons, one of which is a genuine product gap (not a test-wiring issue), so per the governing rule we fixme + report rather than massage it green: 1) PRODUCT GAP — unconditional crash on a missing `big participants assignments` doc. `ngAfterViewInit` runs `getDoc(doc(afs,'big participants assignments', participantAssignmentId)) .then(res =&gt; this.currentstatus = res.data()['status'])` (form-based-submission.component.ts:164-166) with NO existence guard. When the id does not resolve to a doc, `res.data()` is `undefined` and `res.data()['status']` throws `TypeError: Cannot read properties of undefined (reading 'status')` — the exact pageerror the console-guard caught. The live PAB/Validate nav always passes a REAL participantAssignmentId, so the gap is latent in production, but it makes a no-precondition smoke impossible to keep clean. 2) MISSING PRECONDITION — the whole body is `*ngIf="showcontent"` (html:1) and `showcontent` only flips true AFTER a real `delivery forms` template (with a non-empty `formarray`) resolves (ts:170-198). With no template the host renders zero-size, so `toBeVisible()` on the host fails (the component DID mount — `toBeAttached()` holds — but it is correctly empty). CRUCIALLY this legacy component reads `delivery forms` from the **DEFAULT** db (`this.afs`, ts:170), whereas the emulator seeds `delivery forms` only into the **firestore-forms** named DB (seed-emulator.js → seedReferenceData). So there is NO default-DB template to resolve, and `snap.data().formarray` (ts:177) would itself throw on the missing template. TO UN-FIXME (returned as a seedRequest): seed, in the DEFAULT db, one `delivery forms` template with a non-empty `formarray` (e.g. a single text field) AND one `big participants assignments` row, then drive `/formbasedsubmission?type=form&amp;id=&lt;templateId&gt;&amp;participantAssignmentId=&lt;paId&gt;&amp;profileid=&lt;pf&gt;`. With real ids: ts:164 reads an existing doc (no crash), ts:170-198 builds controls and sets `showcontent=true` (host visible), and `[data-testid="form-submit"]` renders — at which point the block below (already written for that path) asserts the real, app-rendered submittable form.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/big-core.spec.ts:585</code></div>
+      </div></section>
+<section><h2>CF side-effects after a stage move (deployed triggers) <span class="meta">2 test(s) · <code>queue/cf-sideeffects.spec.ts</code></span></h2><div class="card">
+        <div class="t">CF-01 a real board move fires onQueueStageChange → "Queue Stage Moved" touchpoint + a logged operator move</div>
+        <div class="obj">CF-01 (P2 #11) — onQueueStageChange touchpoint + the board's stage-log row, via a REAL UI move. CLOUD UPDATE (the emulator FieldValue-crash artifact no longer applies): on real cloud Firestore + deployed CFs, onQueueStageChange's touchpoint write SUCCEEDS — the move fires a "Queue Stage Moved" `participant touchpoint` with `label == "Moved to '&lt;currentstage&gt;' in &lt;queuename&gt;"` (queuesystem.js:339, service.js:942). The emulator-only `FieldValue undefined` crash described in earlier runs is gone, so this test asserts the CF's real output and stays a `test` (not fixme). The ONLY wiring subtlety the cloud surfaced: `participant touchpoint` carries no `testrunid` and is NOT in the seeder teardown set, and the token ids are deterministic (TESTRUNID='run1'), so "Queue Stage Moved" touchpoints from PRIOR runs persist with this same parentreference. The read-back therefore fences off the pre-move docset (touchpointsBefore) and accepts ONLY a NEW doc — the one the CF wrote for THIS move — so a stale earlier-run touchpoint (e.g. a previous "Moved to 'Diagnostics'") cannot masquerade as this move's.</div>
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/cf-sideeffects.spec.ts:113</code></div>
+      </div><div class="card">
+        <div class="t">CF-02 a stage-log create at an Activity stage fires queueParticipantPositionUpdate → ready tokens recompute to 1..M</div>
+        <div class="obj">CF-02 (P2 #12) — queueParticipantPositionUpdate recomputes queue_token.queueposition at an Activity stage. Asserts a CF-COMPUTED value (positions 1..M) vs a KNOWN SEEDED ready-count (anti-circular). FIXME (PRODUCT/CF-RUNTIME bug, not a test defect): `queueParticipantPositionUpdate` is REGISTERED in the emulator (its eventarc trigger for `queue stage log/{queueStageLogId}` is created at startup) but it NEVER EXECUTES on a `queue stage log` document CREATE — the functions log has zero "Beginning execution of us-central1-queueParticipantPositionUpdate" entries for the whole run, while sibling create-triggers on other collections (e.g. CreateQueueActivityLogV2, inviteToStudio) do fire. The ready tokens therefore keep their seeded scrambled positions (observed [900,901,902]) and never recompute to 1..M. Root cause is the Firestore-emulator NOT delivering onDocumentCreated events for a collection whose id contains SPACES ("queue stage log") to the registered path-pattern trigger — a deployed-CF/emulator-runtime gap, NOT this spec's wiring. The trigger doc IS created with a random id (participant-sim.advance → .doc().id), so a re-run is not the cause. See productFindings; tracked for a CF/emulator-side fix outside this category's owned files.</div>
+        <ul class="asserts"><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Lists seeded tokens</b> — reads the seeded participants for the variation</li></ul>
+        <div class="ref"><code>queue/cf-sideeffects.spec.ts:204</code></div>
+      </div></section>
+<section><h2>Cross-DB lower bound — SS-07 live-panel widget shows the EXACT seeded non-zero count (P2 #7) <span class="meta">1 test(s) · <code>queue/cross-db-lowerbound.spec.ts</code></span></h2><div class="card">
+        <div class="t">Forms widget renders the EXACT seeded non-zero count from firestore-forms (catches secondary-DB silent zero)</div>
+        <div class="obj">P2 #7 — POSITIVE lower bound on the FORMS widget (the in-scope secondary DB, firestore-forms). The "Forms submitted by the Participant" widget renders one button per `participantForm` entry, which the component builds by querying the firestore-forms named DB for this participant's submitted forms and KEEPING only those whose formid is in the stage's `participantform` list (ts:758-791). With SEEDED_FORM_COUNT known forms seeded for the in-studio participant, the widget MUST render &gt;= SEEDED_FORM_COUNT buttons. If the secondary DB failed to initialise (or the ref is mis-pathed) the count stays 0 and the poll TIMES OUT → the test FAILS, catching the silent zero. FIXME (TEST-INFRA gap, verified live 2026-06-07 — NOT a product defect, NOT weakened to pass): This positive lower bound legitimately CANNOT pass on the emulator today because the app never connects the `firestore-forms` NAMED database to the emulator. `src/main.ts` (the "HERMETIC EMULATOR WIRING" block) calls `connectFirestoreEmulator` ONLY on the `(default)` Firestore instance (main.ts:13/23); the component reaches the forms DB via `getFirestore(app, "firestore-forms")` (dynamic-studio.ts:758) which returns a SEPARATE instance that is NEVER emulator-connected, so in the demo project it resolves to no backend and the forms query returns EMPTY → the widget renders 0. PROVEN: with the live panel fully mounted (participant name hydrated), `mappedForm` correctly containing the seeded `run1_form_0`, and 2 matching `formsByClient` docs present in the emulator's firestore-forms DB (queueref + profileid both matching the app's query), the rendered widget count is still 0 — the query never reaches the seeded data because the named-DB handle escapes the emulator. This is exactly the "secondary DB not initialised" failure mode this spec was BUILT to catch — it caught a real harness gap. FIX (test-infra, out of THIS agent's owned files — returned as a seedRequest/finding): in `src/main.ts`, when `useEmulators`, also `connectFirestoreEmulator(getFirestore(app, "firestore-forms"), host, port)` (and declare the named DB in environment.emulator.ts) so the forms named DB is emulator-reachable; then flip this back to `test()` — the assertion is correct AS WRITTEN and must NOT be loosened. The ATC-zero contract below is unaffected (ATC is off-limits and reads 0 by design regardless).</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/cross-db-lowerbound.spec.ts:213</code></div>
+      </div></section>
+<section><h2>Invariants self-test — harness guards FIRE on a defect (test-the-test) <span class="meta">4 test(s) · <code>queue/invariants-selftest.spec.ts</code></span></h2><div class="card">
+        <div class="t">INV2 passes at exact count; throws on dropped row, duplicate row, and unmet minNonSelf</div>
+        
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li></ul>
+        <div class="ref"><code>queue/invariants-selftest.spec.ts:102</code></div>
+      </div><div class="card">
+        <div class="t">INV3 passes on a legal trail; throws on an illegal skip</div>
+        
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li></ul>
+        <div class="ref"><code>queue/invariants-selftest.spec.ts:138</code></div>
+      </div><div class="card">
+        <div class="t">INV-selfmv: flipping an operator gate to selfmovable:true is DETECTABLE by parity check 1b</div>
+        <div class="obj">flow-model — SELFMOVABLE parity DETECTOR (edge-vs-flag check 1b)</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/invariants-selftest.spec.ts:162</code></div>
+      </div><div class="card">
+        <div class="t">INV-scope: an edge scoped to one variation is EXCLUDED for another (outEdgesForVariation isolation)</div>
+        <div class="obj">flow-model — outEdgesForVariation SCOPING (variation isolation)</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/invariants-selftest.spec.ts:187</code></div>
+      </div></section>
+<section><h2>LOOP-BOUND self-test — the loop guard catches a stuck token (P3 #14) <span class="meta">2 test(s) · <code>queue/loop-bound-selftest.spec.ts</code></span></h2><div class="card">
+        <div class="t">LB-01 a 3rd traversal of a back-edge fails assertLoopBound (and 2 traversals pass)</div>
+        <div class="obj">LB-01 — drive a deliberately-UNBOUNDED back-edge path (a 3rd traversal of ONE edge) and prove assertLoopBound THROWS on the product-written audit trail. Also prove the SAME guard does NOT throw at exactly the bound (2 traversals), so it is not vacuously always-red.</div>
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/loop-bound-selftest.spec.ts:97</code></div>
+      </div><div class="card">
+        <div class="t">LB-02 a 3rd traversal of the Scope Enhancement self-loop also fails assertLoopBound</div>
+        <div class="obj">LB-02 — the guard fires on a SELF-LOOP too (the other LOOP-BOUND failure shape: to == from). flow-config.md §2 V1: `Scope Enhancement` carries a "Send Back" self-loop scoped to V1, bound ≤2. This is the second documented loop class (a self-edge, not a back-and-forth) — proving the guard catches BOTH shapes. Built entirely on the product's `queue stage log` rows; verdict asserted.</div>
+        <ul class="asserts"><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li></ul>
+        <div class="ref"><code>queue/loop-bound-selftest.spec.ts:189</code></div>
+      </div></section>
+<section><h2>Operator — Queue Manager board (OP-01…OP-13, OP-02b, OP-09b) <span class="meta">15 test(s) · <code>queue/operator.spec.ts</code></span></h2><div class="card">
+        <div class="t">OP-01 operator logs in and lands on the role-gated board (no bounce, no console error)</div>
+        <div class="obj">OP-01 — Login &amp; role-gated route</div>
+        <ul class="asserts"><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:154</code></div>
+      </div><div class="card">
+        <div class="t">OP-02 queue list renders the seeded queue, filters live, and links to the B!G Planner</div>
+        <div class="obj">OP-02 — Queue List (admin CRUD list + B!G Planner entry)</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/operator.spec.ts:171</code></div>
+      </div><div class="card">
+        <div class="t">OP-02b a non-admin operator sees ONLY queues where their profileid is in queueadmin (queue 2 ABSENT)</div>
+        <div class="obj">OP-02b — NEGATIVE queue visibility (a non-admin operator sees ONLY queues they administer)</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/operator.spec.ts:227</code></div>
+      </div><div class="card">
+        <div class="t">OP-03 board shows the right numbers: Total Participants == Σ per-stage column counts</div>
+        <div class="obj">OP-03 — Board load &amp; counts (Total == Σ columns; per-column parity)</div>
+        <ul class="asserts"><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reads Total Participants</b> — the board’s app-computed total</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:263</code></div>
+      </div><div class="card">
+        <div class="t">OP-04 operator moves a token to a NON-Activity stage: one new stage-log row, counts conserved, studio fields cleared</div>
+        <div class="obj">OP-04 — Move token → non-Activity target (writes the audit log) [+CF]</div>
+        <ul class="asserts"><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Stage-moved touchpoint</b> — the move wrote its expected touchpoint/side-effect</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:299</code></div>
+      </div><div class="card">
+        <div class="t">OP-05 operator moves a token INTO an Activity stage: one live-assignment, pairing live, one stage-log</div>
+        <div class="obj">OP-05 — Move token → Activity stage (opens a studio) [+CF]</div>
+        <ul class="asserts"><li><b>Zoom-link</b> — a studio zoom link, if present, is well-formed</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Studio/activity move</b> — opens a studio via the real AssignQueueStudio dialog (app writes the live assignment)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:365</code></div>
+      </div><div class="card">
+        <div class="t">OP-06 operator moves a token OUT of an Activity stage: live-assignment completed, pairing released, one stage-log</div>
+        <div class="obj">OP-06 — Drag a token OUT of an Activity stage (closes the studio) [+CF]</div>
+        <ul class="asserts"><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:417</code></div>
+      </div><div class="card">
+        <div class="t">OP-07 moving a token to the final stage calls updateDeliveryStatus("queue_token/{T}","completed",{eventRequestRef})</div>
+        <div class="obj">OP-07 — Final-stage move completes delivery (updateDeliveryStatus ARG CORRECTNESS) [+CF]</div>
+        <ul class="asserts"><li><b>Final completion</b> — operator moves the token into the terminal stage</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:463</code></div>
+      </div><div class="card">
+        <div class="t">OP-08 Complete-Queue fires updateDeliveryStatus once per token in the column, each with the correct path/status/ref</div>
+        <div class="obj">OP-08 — Complete Queue (bulk): one updateDeliveryStatus call PER token, all with correct args</div>
+        <ul class="asserts"><li><b>Bulk complete</b> — developer "complete column" action over the real board</li><li><b>Reads a board count</b> — an app-computed, stream-rendered column count the test asserts against (never a test-written value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:515</code></div>
+      </div><div class="card">
+        <div class="t">OP-09 comms sidebar: Send is disabled with no selection; recipient count matches the board column</div>
+        <div class="obj">OP-09 — Comms sidebar &amp; counts (recipient parity, disabled-on-empty-selection)</div>
+        <ul class="asserts"><li><b>Reads a board count</b> — an app-computed, stream-rendered column count the test asserts against (never a test-written value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:573</code></div>
+      </div><div class="card">
+        <div class="t">OP-09b bulk-invite fan-out conserves (N invitations == N selected, all tokens→invited) and totalaccepted ++1 per accept only</div>
+        <div class="obj">OP-09b — Bulk-invite fan-out conservation + totalaccepted counter [+CF] FIXME (CF-RUNTIME/emulator-infra gap, not a test defect): this case depends on the `bulkReadyInvitation` Cloud Function (onDocumentCreated "bulk invitation/{docid}") fanning out N `studioinvitation` docs. In this emulator runtime that trigger NEVER receives an event: the functions log shows ZERO RunCloudEvent deliveries for the `bulk invitation` collection and ZERO "Beginning execution of us-central1-bulkReadyInvitation" — even though the trigger is registered at startup and the spec creates a real `bulk invitation` doc (now with a unique id, ruling out the deterministic-id re-run case). The seeded cohort tokens stay `status:'queued'` and no `studioinvitation` is written, so the fan-out read-back cannot pass. The SAME non-delivery affects CF-02's queueParticipantPositionUpdate ("queue stage log" creates). This is an emulator/CF event-delivery gap (collections whose onCreate triggers got no events this run), NOT this spec's wiring — forcing it green would assert output the product never produced. See productFindings; tracked for a CF/emulator-side fix.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/operator.spec.ts:614</code></div>
+      </div><div class="card">
+        <div class="t">OP-10 applying a tag filter updates the active-filter badge and clearing restores the exact Total</div>
+        <div class="obj">OP-10 — Filters &amp; search (badge == distinct active groups; clear restores exact Total)</div>
+        <ul class="asserts"><li><b>Filter by tag</b> — the board re-filters live; assert the recomputed counts</li><li><b>Reads Total Participants</b> — the board’s app-computed total</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:698</code></div>
+      </div><div class="card">
+        <div class="t">OP-11 Export CSV produces a header and at least one data row per board token (no truncation)</div>
+        <div class="obj">OP-11 — Export CSV (header + one row per token; no truncation)</div>
+        <ul class="asserts"><li><b>Export CSV</b> — the app’s exported CSV is asserted against live board state</li><li><b>Reads Total Participants</b> — the board’s app-computed total</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:770</code></div>
+      </div><div class="card">
+        <div class="t">OP-12 B!G Planner: completedToken and stageTokenMap reconcile with the seeded Firestore population</div>
+        <div class="obj">OP-12 — B!G Planner (completedToken / stageTokenMap reconcile with Firestore)</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/operator.spec.ts:793</code></div>
+      </div><div class="card">
+        <div class="t">OP-13 health-negative: an empty queue renders 0 (not NaN) and a token with a missing profile is still counted</div>
+        <div class="obj">OP-13 — Empty / health-negative (0 not NaN; missing-profile token still counted)</div>
+        <ul class="asserts"><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li><li><b>Stage-moved touchpoint</b> — the move wrote its expected touchpoint/side-effect</li><li><b>Zoom-link</b> — a studio zoom link, if present, is well-formed</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reads Total Participants</b> — the board’s app-computed total</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/operator.spec.ts:856</code></div>
+      </div></section>
+<section><h2>Oracle self-test (the suite can detect breakage) <span class="meta">4 test(s) · <code>queue/oracle-selftest.spec.ts</code></span></h2><div class="card">
+        <div class="t">healthy config: oracle returns the known real issues only (2 documented orphans)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/oracle-selftest.spec.ts:10</code></div>
+      </div><div class="card">
+        <div class="t">detects a DANGLING nextstage edge (broken routing) → not ok</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/oracle-selftest.spec.ts:17</code></div>
+      </div><div class="card">
+        <div class="t">detects a NEW orphan stage (added but unrouted) → flagged</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/oracle-selftest.spec.ts:28</code></div>
+      </div><div class="card">
+        <div class="t">detects a variation that cannot reach a terminal (cycle with no exit)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/oracle-selftest.spec.ts:36</code></div>
+      </div></section>
+<section><h2>SELFMOVABLE-GATE (P1 #6) — self-movable flag parity + operator-gate cannot be skipped, all 9 variations <span class="meta">3 test(s) · <code>queue/selfmovable-gate.spec.ts</code></span></h2><div class="card">
+        <div class="t">V:${v.variationname} — every stage's selfmovable flag matches the flow-model oracle (config parity)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/selfmovable-gate.spec.ts:151</code></div>
+      </div><div class="card">
+        <div class="t">V:${v.variationname} — a participant cannot skip the "${gate.stage}" operator gate (REAL board: operator-only forward, no self-advance)</div>
+        
+        <ul class="asserts"><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li><li><b>Lists seeded tokens</b> — reads the seeded participants for the variation</li></ul>
+        <div class="ref"><code>queue/selfmovable-gate.spec.ts:201</code></div>
+      </div><div class="card">
+        <div class="t">V:${v.variationname} — single-stage parking terminal has no participant self-advance (no gate, no CTA)</div>
+        <div class="obj">V9 (uP! - Prep Hold): single-stage parking terminal — NO operator gate. Assert there is no participant CTA at all (non-self-movable, no self-move edge, ZERO scoped out-edges), and the seeded token sits on its sole stage with no self-move in its product log.</div>
+        <ul class="asserts"><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li><li><b>Lists seeded tokens</b> — reads the seeded participants for the variation</li></ul>
+        <div class="ref"><code>queue/selfmovable-gate.spec.ts:327</code></div>
+      </div></section>
+<section><h2>Studio core — SS-00 … SS-08 (real /dynamicstudio UI + CF/app side-effects) <span class="meta">9 test(s) · <code>queue/studio-core.spec.ts</code></span></h2><div class="card">
+        <div class="t">SS-00 My Arena loads for a seeded studio member; no false empty-state</div>
+        <div class="obj">SS-00 — Login + My Arena load (REAL-UI). queue-card count == app's queuesWithStudios; no false "No studios in any queue" banner when a checked-in pairing exists for the acting specialist.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-core.spec.ts:241</code></div>
+      </div><div class="card">
+        <div class="t">SS-01 studio buttons render for the acting member; select + live_tv are app-computed</div>
+        <div class="obj">SS-01 — Studio select / counts / live_tv (REAL-UI). button count == app's studioList filter (participants.includes(actingProfileId)); selecting flips the primary style; live_tv count is the app-computed mapStudioLiveAssignment population (read, not hardcoded — keying is data-dependent).</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-core.spec.ts:269</code></div>
+      </div><div class="card">
+        <div class="t">SS-02 check-in toggle flip writes exactly one studio checkin log row</div>
+        <div class="obj">SS-02 — Check-in toggle + log (REAL-UI). Driving the toggle writes EXACTLY ONE new `studio checkin log` row per flip (ts:854-864). Anti-circularity: we count the log population BEFORE the real toggle, drive the UI, then assert the APP wrote exactly +1 (a delta against the pre-action count — never a read-back of a value the test wrote). On-hold is NOT in play (the seeded pairing has no passed schedule), so the flip is honoured.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-core.spec.ts:304</code></div>
+      </div><div class="card">
+        <div class="t">SS-03 waiting list renders only the app-eligible token</div>
+        <div class="obj">SS-03 — Waiting-list (SIM seed precondition + REAL-UI). The app's eligibility filter (ts:804-811) shows a token ONLY if status=='ready' AND currentstage==&lt;studio stage&gt; AND liveassignmentid==null (+ atcmodel/preassign). We SEED one token to be eligible and one to be ineligible (PRECONDITIONS), then assert the APP's rendered waiting list contains the eligible token and EXCLUDES the ineligible one — the value the app COMPUTED from its filter, against the KNOWN seeded eligibility.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-core.spec.ts:349</code></div>
+      </div><div class="card">
+        <div class="t">SS-04 Bring To Studio creates exactly one studioinvitation (~+2min expiry, clientresponse null)</div>
+        <div class="obj">SS-04 — Bring To Studio → invite (REAL-UI). The real "Bring To Studio" click creates EXACTLY ONE `studioinvitation` with clientresponse:null and expirydate ≈ now+2min (ts:973-999). Anti-circularity: count the invitation population for the target token BEFORE the click, drive the real button, then assert the APP wrote exactly +1 with the expected shape — a delta against the pre-action count.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-core.spec.ts:419</code></div>
+      </div><div class="card">
+        <div class="t">SS-05 participant accept yields a live assignment (app/CF); deny yields none</div>
+        <div class="obj">SS-05 — Participant accept (overlay) + app/CF reaction. Driving the REAL specialist Bring-To-Studio (a 2nd browser context as the participant) then the REAL /queue-web Accept overlay must produce a NEW `live assignment` for that participant (the listener calls assignStudio(), studio.md §3e/§5). Deny must produce NONE. Anti-circularity: assert the live-assignment DELTA the APP/CF wrote against the pre-action population — never a value the test wrote.</div>
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li></ul>
+        <div class="ref"><code>queue/studio-core.spec.ts:475</code></div>
+      </div><div class="card">
+        <div class="t">SS-06 assign opens a session: token↔live-assignment↔pairing triangle + one studio stage-log</div>
+        <div class="obj">SS-06 — Assign studio → open session (REAL-UI + CF). Completing the Assign-Specialist dialog writes the §3a coupled cross-ref: token.liveassignmentid==live.docid, token.studioid==pairing.docid== live.studioid, pairing.status=='live', and EXACTLY ONE new `queue stage log` movedthrough 'studio'. Anti-circularity: the stage-log count is a DELTA the APP wrote (assertEveryMoveLogged reads the rows the product produced), and the cross-ref fields are read AFTER the real submit, never written by us.</div>
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li></ul>
+        <div class="ref"><code>queue/studio-core.spec.ts:584</code></div>
+      </div><div class="card">
+        <div class="t">SS-07 live-panel Forms widget shows the seeded non-zero count (cross-DB lower bound); ATC reads 0 by design</div>
+        <div class="obj">SS-07 — Live-panel widgets / numbers (REAL-UI cross-DB POSITIVE lower-bound). With a participant in studio, the "Forms submitted by the Participant" widget must render the KNOWN seeded non-zero count (&gt;= SEEDED_FORM_COUNT) — the silent-empty catch (PLAN P1 #7): if the firestore-forms handle failed to init, the widget reads 0 and a parity-with-also-empty-read would still pass. ATC widgets read the OFF-LIMITS firestore-atc (not provisioned) ⇒ 0 by design; we assert that contract, not ATC content. CLOUD NOTE (was emulator-fixme'd; runs as test() on cloud — verified against the baseline 2026-06-07): On the emulator this lower bound could not pass because `src/main.ts` connects ONLY the `(default)` Firestore to the emulator, so the `firestore-forms` named DB the widget queries via `getFirestore(app,"firestore-forms")` (dynamic-studio.ts:758) escaped the emulator and returned EMPTY. On the CLOUD test project firebase.test.json provisions BOTH `(default)` and `firestore-forms`, so the named-DB read works — the emulator artifact no longer applies. The remaining cloud cause of forms==0 was a SEED/CONFIG precondition, not a product defect: the seeded `formsByClient` carry formid==`${run}_form_0`, but the static stage config's `participantform` lists production form ids, so the app's own filter (ts:783) dropped them all. ensureStageAcceptsSeededForm() (below) adds the seeded id to the stage's participantform so the app's filter ADMITS the seeded forms — the assertion is the APP-computed count, never loosened. (The full P2 #7 invariant lives in cross-db-lowerbound.spec.ts.) NOTE: this case also tripped a BENIGN cross-DB SDK error-level log (the seeded `formsByClient.workshopref` points at the `(default)` DB while the doc lives in `firestore-forms`; the SDK logs "…contains a document reference within a different database … It will be treated as a reference in the current database" and the app never derefs `workshopref`). That noise is allowlisted via a shared console-guard change (see the sharedChangeRequests) so it stops failing afterEach in SS-05/06/07 + studio-session + cross-db-lowerbound.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-core.spec.ts:692</code></div>
+      </div><div class="card">
+        <div class="t">SS-08 validate AEL writes an interim crossover doc and flips the flag to validated</div>
+        <div class="obj">SS-08 — Validate AEL writes (REAL-UI). Driving the AEL Validate button writes an `interim crossover` doc and flips `participant AEL.flag='validated'` (batch ts:2253-2264). Anti-circularity: the interim-crossover count is a DELTA the APP wrote (vs the pre-action population), and the flag is read AFTER the real click (it was seeded NOT validated). The AEL widget is gated by stageproperty .validateael — if the seeded studio stage does not expose it, the validate button is absent and the case skips with a clear reason (no false green). FIXME (KNOWN PRODUCT FINDING — the brief's keep-as-fixme list; verified live 2026-06-07, do NOT patch src): Opening the AEL/live-panel for the in-studio participant trips the documented dynamic-studio null-guard CRASH — a real `CONSOLE.ERROR: TypeError: Cannot read properties of null (reading 'token')` (the live panel dereferences `this.liveAssignment["token"]` while `liveAssignment` is transiently null, dynamic-studio.ts ~698/761 + the html:50/190+ live-card block). The console-guard rightly fails the case on that uncaught product error, and the panel never settles, so SS-08 times out. This is one of the two null-guard crashes the operator chose NOT to fix (kept as a productFinding); the AEL validate write cannot be exercised through the UI until the product null-guards that access. Marked test.fixme (not faked green) and returned in productFindings; flip back to test() once the product guards `liveAssignment?.["token"]`.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-core.spec.ts:776</code></div>
+      </div></section>
+<section><h2>SS-09…SS-16 — Specialist / Studio session <span class="meta">11 test(s) · <code>queue/studio-session.spec.ts</code></span></h2><div class="card">
+        <div class="t">SS-09 mark-procedures widget renders from cross-DB without fatal (ATC off-limits ⇒ 0 procedures, documented)</div>
+        <div class="obj">SS-09 — Mark procedures complete Core (PLAN): status persists on reload. Gap: optimistic-only; row count; cross-DB hydrate errors. The "Mark Completed Procedures" widget renders one button per `cwATClist` entry, sourced from the `firestore-atc` secondary DB — which is OFF-LIMITS and is NOT provisioned for the test project (CLAUDE.md; studio.md SS-07/§ATC EXCLUSIONS). So `markProcedureButtons` is EMPTY by design. The honest, anti-circular assertion here is the APP-COMPUTED render: the live panel mounts for the in-studio participant with ZERO procedure buttons AND no fatal cross-DB hydrate error (the primary silent-gap this case guards: a firestore-atc read that throws would surface as a fatal). The "persists on reload" / row-count assertion is recorded as a FINDING requiring an ATC fixture (out of scope: firestore-atc off-limits) — not faked green.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:271</code></div>
+      </div><div class="card">
+        <div class="t">SS-10 invite-more opens the dialog without tearing the session down; cancel commits nothing</div>
+        <div class="obj">SS-10 — Invite More Participant Core: session NOT torn down. Gap: cancel = no commit. Drive the REAL "Invite More Participant in this Studio" button → opens the AssignQueueStudio dialog WITHOUT closing the session, then CANCEL (Escape). Anti-circular assertions: • app-computed: the live panel survives (liveParticipantName still visible) → session intact; • APP/CF OUTPUT (known seeded number): cancelling commits NOTHING — the live-assignment is still the SAME single live row and its bonusactivity was NOT written. We read the live-assignment the APP holds (status still 'live', no bonusactivity), a value the PRODUCT owns, after a real cancel.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:301</code></div>
+      </div><div class="card">
+        <div class="t">SS-11a Zoom Start-Meeting broken-link guard alerts and opens no window</div>
+        <div class="obj">SS-11 — Zoom / OpenVidu join Core: broken-link guard; /joinroom routes. Gap: regen feedback; joinroom resolves openviduroom. Split into the two product paths (recon studio.md SS-11): (a) Zoom path (selectedStudio.openvidu != true, which the seeded pairing satisfies): the Start-Meeting guard. We seed the broken-link sentinel as a PRECONDITION stand-in for the studioZoomLink CF (zoom.stub EMULATOR NOTE (b)) and install the Zoom stub in 'broken' mode, then assert the app's broken-link ALERT fires and NO real window opens (installNoRealWindowGuard). (b) /joinroom routing boundary: navigate directly to /joinroom/&lt;liveassignmentid&gt; with the openviduroom doc seeded (PRECONDITION stand-in) + the OpenVidu stub installed, and assert the APP's state machine RESOLVED the pre-join container and rendered its local-preview controls (values the app computed). Deep LiveKit grid/track state is explicitly NOT asserted (no media server) — routing/pre-join only.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:353</code></div>
+      </div><div class="card">
+        <div class="t">SS-11b /joinroom resolves the pre-join container + local-preview controls (routing only)</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:391</code></div>
+      </div><div class="card">
+        <div class="t">SS-12 move-next completes the stage: ONE studio stage-log, live-assignment completed, token detached</div>
+        <div class="obj">SS-12 — Move to next stage (complete) Core: token→next, close studio, stage-log, final delivery. Gap: missing stage-log; stale live/pairing; status drift; dangling refs. Drive the REAL move-next button for the legal Diagnostics→DRC edge. Anti-circular: we assert the APP/CF OUTPUT against the KNOWN pre-move log baseline — the PRODUCT wrote EXACTLY ONE new `queue stage log` row tagged movedthrough:"studio" for this transition (NOT a value we wrote; the sim baseline rows, if any, carry movedby 'self'/'operator', never the app's "studio" provenance), the live-assignment flipped to status:'completed', the pairing status cleared, and the token detached (liveassignmentid/studioid null) and advanced to the next stage.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:430</code></div>
+      </div><div class="card">
+        <div class="t">SS-13 cancelling the move-next confirmation performs NO partial move</div>
+        <div class="obj">SS-13 — Move next (review path) — cancel = no partial move Core: hold-confirm before close. Gap: cancel = no partial move; stale-studio after close. The review/markascompleted path opens a StageIncompleteConfirmation/HoldAlert dialog before closing (ts:1275-1283/1353-1406); CANCELLING it must leave NO partial move. Drive the move-next button, then DISMISS the confirmation, and assert the APP/CF OUTPUT is UNCHANGED from the seeded in-studio precondition: no new stage-log row, token still in studio, live-assignment still live. (We read product state AFTER a real cancel — not a value the test wrote.)</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:523</code></div>
+      </div><div class="card">
+        <div class="t">SS-14 other-studio block renders only the studios the member is invited to (no visibility leak)</div>
+        <div class="obj">SS-14 — Other Studio join (specialist↔specialist) Core: bonus-activity buttons render; join routes. Gap: visibility leak; dead-click alert. The "Other Studio that you are invited to Join" block renders one button per `outsideLiveAssignment` — live-assignments where `bonusactivityparticipant array-contains profileid` (ts:412). We seed (PRECONDITION) one of the OTHER seeded live-assignments with the acting member in its bonusactivityparticipant, then assert the APP-COMPUTED render: the other-studio block shows exactly that one button (visibility, no leak), and a dead-click (no join target) raises the documented "Unable to join" alert (ts:447). Routing to /joinroom is covered by SS-11b.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:583</code></div>
+      </div><div class="card">
+        <div class="t">SS-15 monitor renders a faithful, bijective card per seeded cohort live-assignment</div>
+        <div class="obj">SS-15 — Arena Studio Activity monitor Core: card count == live-assignment count. Gap: close propagation; dup-pairing flag; raw-id. The monitor renders one card per `live assignment` whose status ∈ ['live','recording'] for the selected queue (the APP's OWN filter, aa.ts:91-99). The seed places EXACTLY 3 such rows for this queue. Anti-circular assertions (all APP OUTPUT vs KNOWN seeded numbers): • cardCount == 3 (the app's filtered render == the seeded live count); • participant↔token map is BIJECTIVE — the 3 cards carry 3 DISTINCT participant ids (PLAN P2 #9: a duplicate/missing mapping shows the wrong person); • REAL CF/app side-effect: closeStudio(0) (developer) flips one live-assignment → 'completed', so the board re-renders with ONE FEWER card (close propagation) — a value the app/CF produced.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:653</code></div>
+      </div><div class="card">
+        <div class="t">SS-15b a plain eis-only specialist is DENIED the arenastudioactivity monitor (negative role gate)</div>
+        <div class="obj">SS-15b — NEGATIVE role gate (plain eis-only specialist DENIED the monitor) — GAP CLOSED. PLAN P0 #4 wants a plain eis-only specialist to be DENIED `/arenastudioactivity`. The gap is now closed: the route carries `roleGuard(['developer','admin','ah'])` (app.routes.ts) and the component re-gates its data subscriptions behind the same privileged set (arenastudioactivity.component.ts). See specs/validated/04-dynamic-studio.md §3a and the journal 2026-06-10-dynamic-studio-doc-vs-e2e-gaps.md (§Direction-1 #1). Two complementary assertions: • NEGATIVE (the eis-only DENY this gate adds): a seeded EIS-ONLY actor (role `changeagent`, NONE of developer/admin/ah) is ADMITTED past authGuard (its role + profileid are granted in the dashboard route-config) but BOUNCED by roleGuard — so the NEW guard is provably what denies it. • POSITIVE (the gate still admits privileged staff): an admin specialist reaches the monitor and its cards render — confirming the guard tightens access without breaking the privileged path. The seeded ordinary specialists carry `admin`, so they (correctly) keep access; only the eis-only actor demonstrates the denial.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:755</code></div>
+      </div><div class="card">
+        <div class="t">SS-15b (positive) a privileged role (admin) is admitted and the monitor cards render</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:767</code></div>
+      </div><div class="card">
+        <div class="t">SS-16 no-studio member sees the empty-state banner with zero ghost renders</div>
+        <div class="obj">SS-16 — No-studio empty state Core: banner shows; no crash. Gap: empty-state detection; ghost render; empty subscriptions. Act as a profileid that is in NO `queue studio pairing.participants` — the studio resolves zero studios across the member's ongoing queues, so the app sets noStudioInAnyQueue==true and renders the "No studios available…" banner (ts:204/349). Anti-circular assertions (APP OUTPUT): • the no-studio banner is shown (the app's computed empty-state flag); • ZERO studio buttons rendered (no ghost render of a studio the member isn't in); • ZERO waiting-list token cards (empty subscriptions, no ghost tokens); • no fatal console/pageerror (afterEach) — the empty path did not crash.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/studio-session.spec.ts:846</code></div>
+      </div></section>
+<section><h2>V3 · ${VARIATION_NAME} — closed-loop walk (BIGNC-00 … 06) <span class="meta">7 test(s) · <code>queue/variations/big-next-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">BIGNC-00 seed + board load: BIGNC token renders, board column count is app-computed</div>
+        <div class="obj">BIGNC-00 — Seed + board load. The seeded BIGNC cohort token renders on the board, and the board's APP-COMPUTED per-column count reflects the seeded population (read from the live board UI).</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>Reads a board count</b> — an app-computed, stream-rendered column count the test asserts against (never a test-written value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/big-next-cycle.spec.ts:319</code></div>
+      </div><div class="card">
+        <div class="t">BIGNC-01 [SIM] form self-move AEL → uP! Life Report is a legal scoped self-move, logged once</div>
+        <div class="obj">BIGNC-01 — [SIM] participant form self-move (Accelerated Evolution Level Form → uP! Life Report). The AEL form is `selfmovable:true` (flow-config.md §2 V3 row 2): the Flutter participant advances itself. We use the SIM self-move stand-in (allowed), then assert the PRODUCT's recorded transition is a LEGAL scoped self-move edge and produced exactly one log row — NEVER `read==X after writing X`.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li></ul>
+        <div class="ref"><code>queue/variations/big-next-cycle.spec.ts:352</code></div>
+      </div><div class="card">
+        <div class="t">BIGNC-02 [REAL-UI] operator Diagnostics → ATC Briefing: scoped target offered, board counts drift, logged</div>
+        <div class="obj">BIGNC-02 — [REAL-UI] operator board move Diagnostics → ATC Briefing. • The board move-dropdown for the BIGNC `Diagnostics` token OFFERS the scoped operator targets (incl. `ATC Briefing` and `Consultation`, the LYL/B!G-family edges) — APP-COMPUTED. • Driving the REAL move to `ATC Briefing` makes the PRODUCT write the queue_token + a `queue stage log` row; we assert the board re-rendered src−1/dst+1 (COUNT-CONSERVED), the new log row records Diagnostics→ATC Briefing as a non-`self` move, and the move is a legal edge.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/big-next-cycle.spec.ts:389</code></div>
+      </div><div class="card">
+        <div class="t">BIGNC-03 [REAL-UI] operator-into-Activity: a live studio session couples the token (live-assignment exists)</div>
+        <div class="obj">BIGNC-03 — [REAL-UI] operator into Activity (a live-assignment is created). The "open a studio" path couples a token to a live studio session (operator.md §3.2: a `live assignment` set live + pairing status:'live' + token status:'instudio'). We wire the seeded studio session as a PRECONDITION (the documented §3a link — studio-session.spec.ts linkTokenIntoLiveSession; allowed: preconditions only), then assert the APP/CF OUTPUT that the live session exists and the token is coupled to it (status:'instudio' + liveassignmentid + studioid) — values the PRODUCT owns. The REAL specialist close of this session is BIGNC-04.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/big-next-cycle.spec.ts:451</code></div>
+      </div><div class="card">
+        <div class="t">BIGNC-04 [REAL-UI] specialist close: one studio stage-log, live-assignment completed, token detached</div>
+        <div class="obj">BIGNC-04 — [REAL-UI] specialist close (move the in-studio participant out of the studio). Drive the REAL studio move-next (StudioPage.moveNext → moveStage). The PRODUCT performs the §3f close writes: ONE `queue stage log` row with movedthrough:'studio', the live-assignment flips to 'completed', the pairing status clears, and the token detaches (liveassignmentid/studioid null) and advances to a legal next stage. We assert each against the PRODUCT's output (never a write).</div>
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li></ul>
+        <div class="ref"><code>queue/variations/big-next-cycle.spec.ts:494</code></div>
+      </div><div class="card">
+        <div class="t">BIGNC-05 [REAL-UI] operator terminal + delivery completion: lands Completed, updateDeliveryStatus("completed")</div>
+        <div class="obj">BIGNC-05 — [REAL-UI] operator terminal + delivery completion. Drive the REAL operator final move to the terminal `Completed`. On the final stage the board additionally calls `guard.updateDeliveryStatus(&lt;token path&gt;, "completed", { eventRequestRef })` (operator.md §3.1.c). We capture that call's ARGUMENTS via the delivery-status spy (the value the APP derived) and assert TERMINAL-REACHED + the board count drift into Completed. The penultimate `Self Evolution Report → Completed` is itself a SELF form; the operator's final move is the board move INTO the terminal that fires the delivery-status completion.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Final completion</b> — operator moves the token into the terminal stage</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/big-next-cycle.spec.ts:583</code></div>
+      </div><div class="card">
+        <div class="t">BIGNC-06 bounded loop ≤2: Diagnostics ↔ DRC round-trip twice via REAL board, 3rd would be rejected (D1)</div>
+        <div class="obj">BIGNC-06 — bounded back-edge / self-loop ≤2 (NOT a SKIP — V3 defines loops/back-edges). V3 has the `Scope Enhancement` self-`[LOOP]` and the DRC→Diagnostics / Consultation→DRC / uP!RCW→Consultation / Review→uP!RCW back-edges (flow-config.md §2 V3). We drive the `Diagnostics ↔ Diagnostics Readiness Changework` round-trip through the REAL operator board TWICE (the max), asserting each hop is a legal scoped edge and the board counts drift, then assert LOOP-BOUND ≤2 holds and a 3rd traversal would be rejected (D1: DRC's ONLY forward edge is the BACK edge to Diagnostics — a DRC→ATC Preparation skip is illegal). (Documented SKIP branch, intentionally unused: if V3 had NO loop/back-edge, this case would be an explicit `test.skip` — but the oracle above proves it does, so we exercise the bounded loop.)</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Universal-after-hop (bundle)</b> — after each hop, the trail invariants hold for the moves so far</li><li><b>Universal-after-hop (journey)</b> — per-hop trail invariants, journey-indexed</li><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reads a board count</b> — an app-computed, stream-rendered column count the test asserts against (never a test-written value)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li><li><b>Lists seeded tokens</b> — reads the seeded participants for the variation</li></ul>
+        <div class="ref"><code>queue/variations/big-next-cycle.spec.ts:654</code></div>
+      </div></section>
+<section><h2>V1 · ${VARIATION_NAME} (${VID}) — closed-loop walk (LYL-FC-WF-01/02/03) <span class="meta">3 test(s) · <code>queue/variations/lyl-first-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">LYL-FC-WF-01 — walk entry→Completed mixing actors; every transition legal, logged, count-conserved</div>
+        <div class="obj">LYL-FC-WF-01 — the 16-transition happy path (oracle-walked, mixing actors), terminal Completed.</div>
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Universal-after-hop (bundle)</b> — after each hop, the trail invariants hold for the moves so far</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/lyl-first-cycle.spec.ts:377</code></div>
+      </div><div class="card">
+        <div class="t">LYL-FC-WF-02 — Scope Enhancement self-loop is bound ≤ 2 (real board "Send Back"); 3rd would fail loop-bound</div>
+        <div class="obj">LYL-FC-WF-02 — Scope Enhancement self-loop ("Send Back") bound ≤ 2 (a 3rd traversal FAILS).</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/lyl-first-cycle.spec.ts:435</code></div>
+      </div><div class="card">
+        <div class="t">LYL-FC-WF-03 — Diagnostics↔DRC round-trip ≤ 2; DRC→ATC Preparation is illegal (D1 dead-forward)</div>
+        <div class="obj">LYL-FC-WF-03 — Diagnostics ↔ DRC round-trip bound ≤ 2 + the backbone-divergence flag (D1): DRC is DEAD-FORWARD — its ONLY legal exit is the BACK-edge DRC→Diagnostics; the backbone-adjacent DRC→ATC Preparation is ILLEGAL and the board must NOT offer it.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Universal-after-hop (bundle)</b> — after each hop, the trail invariants hold for the moves so far</li><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li><li><b>Move-targets offered/absent</b> — the board’s move-dropdown offers exactly the oracle-legal operator targets and NOT illegal/backbone-only skips — read-only, commits nothing</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/lyl-first-cycle.spec.ts:525</code></div>
+      </div></section>
+<section><h2>V2 · LYL - Next Cycle — closed-loop walk to terminal (LYL-NC-WF-01) <span class="meta">3 test(s) · <code>queue/variations/lyl-next-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">walks first→terminal mixing actors; every transition holds the silent-data-gap invariants</div>
+        
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Trail invariants (bundle)</b> — no-orphan + no-skip + every-move-logged + loop-bound over the full trail</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/lyl-next-cycle.spec.ts:419</code></div>
+      </div><div class="card">
+        <div class="t">form-write integrity: each of the 4 self-movable stages self-moves to exactly its oracle edge, one log row</div>
+        <div class="obj">FORM-WRITE INTEGRITY (flow-config.md §5 V2) — the 4 self-movable FORM stages each write exactly ONE `queue stage log` row on the participant self-move, and that row's prev→curr equals the oracle's selfmove+selfmv:true edge. Reads the rows the PRODUCT/self-move wrote — never a value the test computed. (Driven via the participant-sim self-move stand-in, the allowed Flutter-self-move substitute; the integrity is proven against the PRODUCT log + the oracle, not against the write.)</div>
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/lyl-next-cycle.spec.ts:726</code></div>
+      </div><div class="card">
+        <div class="t">journey ${ji}/${FORWARD_JOURNEYS.length - 1} (→ ${terminal}, ${journey.length} stages) walks entry→terminal; invariants hold after every transition</div>
+        
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Trail invariants (bundle)</b> — no-orphan + no-skip + every-move-logged + loop-bound over the full trail</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/lyl-next-cycle.spec.ts:837</code></div>
+      </div></section>
+<section><h2>V5 · ${VARIATION_NAME} (${VID}) — forward-journey walk + Move-Back ≤2 + scoping <span class="meta">4 test(s) · <code>queue/variations/prodigies-first-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">PFC-WF-01 · ${label} — walk entry→${journey[journey.length - 1]}; invariants hold after every transition</div>
+        
+        <ul class="asserts"><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Universal-after-hop (bundle)</b> — after each hop, the trail invariants hold for the moves so far</li><li><b>Card-name</b> — the board card shows the participant name (not blank)</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-first-cycle.spec.ts:413</code></div>
+      </div><div class="card">
+        <div class="t">PFC-WF-01 · Scope Enhancement self-loop is bound ≤ 2 (real board "Send Back"); a 3rd fails loop-bound</div>
+        <div class="obj">BOUNDED LOOP ≤2 — the Scope Enhancement self-loop ("Send Back", to==from) is bound ≤ 2 on the REAL board; a 3rd traversal FAILS loop-bound (TEST-THE-TEST). flow-config §2 V5 row "Scope Enhancement".</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-first-cycle.spec.ts:503</code></div>
+      </div><div class="card">
+        <div class="t">PFC-WF-01 · Diagnostics move-dropdown is V5-scoped — offers V5 stages, omits a non-V5 queue stage</div>
+        <div class="obj">VARIATION SCOPING (flow-config §5 / §3 D2) — with the token's variationid resolving to the V5 variation doc, the board move-dropdown is scoped to V5's 13 backbone stages: it OFFERS V5 stages and does NOT offer a stage that is in the 30-stage queue but NOT in V5 (the namespace-fix proof). We use a SECOND cohort member positioned at Diagnostics (the walked token's run is untouched).</div>
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Move-targets offered/absent</b> — the board’s move-dropdown offers exactly the oracle-legal operator targets and NOT illegal/backbone-only skips — read-only, commits nothing</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-first-cycle.spec.ts:579</code></div>
+      </div><div class="card">
+        <div class="t">PFC-WF-01 · specialist studio move-next drives Diagnostics → ATC Preparation on the REAL studio surface</div>
+        <div class="obj">SPECIALIST STUDIO HOP — a Diagnostics → ATC Preparation forward decision driven through the REAL Dynamic Studio move-next button (the specialist surface), so the suite MIXES the operator board AND the specialist studio for V5's central studio-engine stage. Wires the in-studio link as a PRECONDITION (token instudio + a live-assignment + a live pairing the acting member belongs to), then drives the REAL moveNext and asserts the PRODUCT's stage-log row + token advance + the universal invariants. If the live panel / move-next button cannot render in this environment, the test records a FINDING and SKIPs — the sim is NEVER substituted for the real specialist move. WHY ATC Preparation (not ATC Briefing): the studio move-next handler `moveStage(stage, markascompleted)` (dynamic-studio.component.ts:1274) routes a `markascompleted:true` forward hop (ATC Briefing, "Send for ATC Briefing" — sample-queue-config Diagnostics.nextstage) through the `inviteMore(true)` + `HoldAlertDialogComponent` REVIEW branch (ts:1353-1406, recon studio.md SS-12 §181), which requires an Assign-Specialist submission the shared `StudioPage.moveNext` page object does not drive. A `markascompleted:false` forward hop instead routes through the `StageIncompleteConfirmationComponent` (ts:1274/1284) that `moveNext` DOES drive (fills the required reason + Submit). ATC Preparation is the V5 `markascompleted:false` forward operator edge from Diagnostics (flow-config.md §2 V5 row Diagnostics: `OP→ATC Preparation {¬done}`), so it exercises a REAL specialist studio forward move end-to-end without a page-object change. (On the emulator this case skipped via the finding hatch because the live panel never mounted; on real cloud Firestore it mounts, surfacing that the chosen ATC-Briefing target needs the un-drivable review branch — the retarget is the wiring fix, never a sim substitution.)</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-first-cycle.spec.ts:660</code></div>
+      </div></section>
+<section><h2>V4 · Prodigies - Next Cycle — closed-loop walk + every forward journey (PNC-WF-01/02/03 + PNC-FWD) <span class="meta">4 test(s) · <code>queue/variations/prodigies-next-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">PNC-WF-01 walks Evolution Prep Orientation → Completed mixing actors; invariants hold after every transition; the Review→Self-Evolution-Report operator move is driven on the REAL board with board-rendered count-drift</div>
+        <div class="obj">PNC-WF-01 — full mixed-actor walk entry→terminal (forward journey J4), invariants after EVERY transition, with the load-bearing operator move driven through the REAL board (count-drift).</div>
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>All-invariants-after-hop</b> — trail invariants + count-conservation after the hop</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-next-cycle.spec.ts:242</code></div>
+      </div><div class="card">
+        <div class="t">PNC-FWD ${label} — walk entry→terminal mixing actors; every transition legal, logged, oracle-scoped, count-conserved; &gt;=1 REAL operator/board move</div>
+        
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>All-invariants-after-hop</b> — trail invariants + count-conservation after the hop</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-next-cycle.spec.ts:313</code></div>
+      </div><div class="card">
+        <div class="t">PNC-WF-02 the Scope Enhancement and Diagnostics self-loops are bounded ≤2 (a 3rd traversal fails the loop guard)</div>
+        <div class="obj">PNC-WF-02 — bounded loops: the Scope Enhancement studio self-LOOP and the Diagnostics self-LOOP may be traversed ≤2 times; a 3rd traversal MUST fail assertLoopBound (flow-config.md §2 / risk 13).</div>
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-next-cycle.spec.ts:397</code></div>
+      </div><div class="card">
+        <div class="t">PNC-WF-03 the no-skip invariant rejects the V4 drift skips: DRC→ATC-Preparation (D1) and Diagnostics/ATC-Briefing→Consultation (D2) are illegal oracle edges</div>
+        <div class="obj">PNC-WF-03 — backbone↔oracle DRIFT negatives for V4 (flow-config.md §3): the no-skip invariant must reject backbone-adjacent-but-oracle-illegal moves (proves assertNoStageSkipped reads the ORACLE). D1: DRC is DEAD-FORWARD — only scoped out-edge is BACK→Diagnostics; DRC → ATC Preparation is ILLEGAL. D2: Consultation is OFF the forward happy path — Diagnostics → Consultation / ATC Briefing → Consultation are ILLEGAL for V4 (Consultation is reached only via self-LOOP or uP!RCW BACK-edge).</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>All-invariants-after-hop</b> — trail invariants + count-conservation after the hop</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/prodigies-next-cycle.spec.ts:438</code></div>
+      </div></section>
+<section><h2>V8 · ${VARIATION_NAME} (${VID}) — closed-loop walk (UP3-WF-01: happy + Diagnostics self-loop &amp; Diagnostics↔DRC ≤2 + scoping) <span class="meta">4 test(s) · <code>queue/variations/up-3rd-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">UP3-WF-01-HAPPY — walk entry→Completed mixing actors (SIM + REAL board + REAL studio); every transition legal, logged, count-conserved</div>
+        <div class="obj">UP3-WF-01-HAPPY — the canonical forward walk (oracle-walked, MIXING ALL THREE drivers), terminal Completed. 12 product-logged transitions = the V8 backbone MINUS DRC (D1) and Consultation (D2), on the short ATC Briefing→Self Evolution Report branch. Driver mix: sim self/auto hops + REAL operator board hops + ONE REAL specialist studio hop (Scope Enhancement→Evolution Mapping Activity).</div>
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Universal-after-hop (bundle)</b> — after each hop, the trail invariants hold for the moves so far</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/up-3rd-cycle.spec.ts:612</code></div>
+      </div><div class="card">
+        <div class="t">UP3-WF-01-LOOP — Diagnostics self-loop ≤ 2 AND Diagnostics↔DRC round-trip ≤ 2 (D1 dead-forward); a 3rd of either fails</div>
+        <div class="obj">UP3-WF-01-LOOP — the Diagnostics SELF-LOOP ≤ 2 AND the Diagnostics↔DRC round-trip ≤ 2 (the brief's "Diagnostics self-loop plus Diagnostics and DRC at most 2"). A 3rd traversal of EITHER edge FAILS. All driven on the REAL board.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Move-targets offered/absent</b> — the board’s move-dropdown offers exactly the oracle-legal operator targets and NOT illegal/backbone-only skips — read-only, commits nothing</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/up-3rd-cycle.spec.ts:702</code></div>
+      </div><div class="card">
+        <div class="t">UP3-WF-01-SCOPE — oracle parity + variation-scoped Diagnostics dropdown (EXACTLY 5 edges, no Consultation, no Self Evolution Report) + formref presence</div>
+        <div class="obj">UP3-WF-01-SCOPE — the oracle-parity sweep: the static build()/oracle() baseline + the variation-scoped Diagnostics move-dropdown on the REAL board (EXACTLY 4 distinct non-loop targets; →Consultation absent (D2) AND →Self Evolution Report absent (the V6/V7↔V8 discriminator — PLAN P1 #12)), plus the FORMREF PRESENCE fact (the V8 Diagnostics stage references participant forms).</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li><li><b>Move-targets offered/absent</b> — the board’s move-dropdown offers exactly the oracle-legal operator targets and NOT illegal/backbone-only skips — read-only, commits nothing</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/up-3rd-cycle.spec.ts:825</code></div>
+      </div><div class="card">
+        <div class="t">journey ${ji}/${FORWARD_JOURNEYS.length - 1} (→ ${terminal}, ${journey.length} stages) walks entry→terminal; invariants hold after every transition</div>
+        
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Trail invariants (bundle)</b> — no-orphan + no-skip + every-move-logged + loop-bound over the full trail</li><li><b>Universal-after-hop (bundle)</b> — after each hop, the trail invariants hold for the moves so far</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/up-3rd-cycle.spec.ts:983</code></div>
+      </div></section>
+<section><h2>V6 · ${VARIATION_NAME} (${VID}) — closed-loop walk (UPFC-HAPPY/LOOP/GAP) <span class="meta">3 test(s) · <code>queue/variations/up-first-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">UPFC-HAPPY — walk entry→Completed mixing actors; every transition legal, logged, count-conserved</div>
+        <div class="obj">UPFC-HAPPY — the canonical forward walk (oracle-walked, mixing actors), terminal Completed. 15 stages / 14 product-logged transitions = the V6 backbone MINUS DRC (D1) and Consultation (D2).</div>
+        <ul class="asserts"><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/up-first-cycle.spec.ts:454</code></div>
+      </div><div class="card">
+        <div class="t">UPFC-LOOP — Diagnostics↔DRC round-trip ≤ 2 (D1 dead-forward) AND Consultation back-loop ≤ 2; a 3rd of either fails</div>
+        <div class="obj">UPFC-LOOP — the two V6 back-loops are each bound ≤ 2 (a 3rd traversal FAILS). "DRC and Consultation back-loops twice" (the brief): the Diagnostics↔DRC round-trip AND the Consultation back-loop.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Move-targets offered/absent</b> — the board’s move-dropdown offers exactly the oracle-legal operator targets and NOT illegal/backbone-only skips — read-only, commits nothing</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/up-first-cycle.spec.ts:492</code></div>
+      </div><div class="card">
+        <div class="t">UPFC-GAP — oracle parity: known-orphan/dangling baseline, and the variation-scoped Diagnostics dropdown (6 targets, no Consultation, keeps Self Evolution Report)</div>
+        <div class="obj">UPFC-GAP — the oracle-parity sweep: the static build()/oracle() baseline + the variation-scoped Diagnostics move-dropdown on the REAL board (the V6↔V8 discriminator + the D2 no-Consultation fact).</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Universal-after-hop (bundle)</b> — after each hop, the trail invariants hold for the moves so far</li><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li><li><b>Move-targets offered/absent</b> — the board’s move-dropdown offers exactly the oracle-legal operator targets and NOT illegal/backbone-only skips — read-only, commits nothing</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/up-first-cycle.spec.ts:657</code></div>
+      </div></section>
+<section><h2>V7 · uP! - Next Cycle — closed-loop walk to terminal (WF-uPNextCycle-001) <span class="meta">4 test(s) · <code>queue/variations/up-next-cycle.spec.ts</code></span></h2><div class="card">
+        <div class="t">walks first→terminal mixing actors; every transition holds the silent-data-gap invariants; ATC Briefing never offers Consultation</div>
+        <div class="obj">WF-uPNextCycle-001 — the full mixed-actor walk entry→terminal, invariants after EVERY transition, with the next-cycle studio move and the terminal board spine driven through the REAL UI.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Trail invariants (bundle)</b> — no-orphan + no-skip + every-move-logged + loop-bound over the full trail</li><li><b>Move-targets offered/absent</b> — the board’s move-dropdown offers exactly the oracle-legal operator targets and NOT illegal/backbone-only skips — read-only, commits nothing</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/up-next-cycle.spec.ts:415</code></div>
+      </div><div class="card">
+        <div class="t">form-write integrity: each of the 4 self-movable stages self-moves to exactly its oracle edge, one log row</div>
+        <div class="obj">FORM-WRITE INTEGRITY (flow-config.md §5 V2/V7) — the 4 self-movable FORM stages each write exactly ONE `queue stage log` row on the participant self-move, and that row's prev→curr equals the oracle's selfmove+selfmv:true edge. Reads the rows the PRODUCT/self-move wrote — never a value the test computed. (Driven via the participant-sim self-move stand-in, the allowed Flutter-self-move substitute; the integrity is proven against the PRODUCT log + the oracle, not against the write.)</div>
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/up-next-cycle.spec.ts:830</code></div>
+      </div><div class="card">
+        <div class="t">no-skip invariant rejects the V7 drift skips: DRC→ATC-Preparation (D1) and Diagnostics/ATC-Briefing→Consultation (D2)</div>
+        <div class="obj">DRIFT NEGATIVES (flow-config.md §3 D1/D2) — assertNoStageSkipped must REJECT the V7 backbone-adjacent-but-oracle-illegal moves, proving it reads the ORACLE, not the stages[] array. D1: DRC → ATC Preparation (DRC is dead-forward; only legal exit is BACK→Diagnostics). D2: Diagnostics → Consultation AND ATC Briefing → Consultation (Consultation off the V7 happy path). We write the ILLEGAL hop via the stand-in (a real product `queue stage log` row the guard will read), then assert the guard's VERDICT (it throws) — the asserted value is the verdict, never a read-back.</div>
+        <ul class="asserts"><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>No-fatal</b> — no fatal console error / app crash during the flow (console guard)</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li></ul>
+        <div class="ref"><code>queue/variations/up-next-cycle.spec.ts:866</code></div>
+      </div><div class="card">
+        <div class="t">journey ${ji}/${FORWARD_JOURNEYS.length - 1} (→ ${terminal}, ${journey.length} stages) walks entry→terminal; invariants hold after every transition</div>
+        
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>No-stage-skipped</b> — each transition is an oracle-legal edge for this variation (checked vs the flow-model, not test input)</li><li><b>Every-move-logged {minNonSelf}</b> — every transition wrote a log row AND ≥minNonSelf have movedby≠self → operator moves really happened, not sim-only — the anti-circular core</li><li><b>Loop-bound</b> — no stage re-entered beyond the bound — catches runaway loops</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Count-conserved</b> — a board move shifts source −1 / dest +1 with Σ of all columns unchanged (the board’s own recomputed counts)</li><li><b>Trail invariants (bundle)</b> — no-orphan + no-skip + every-move-logged + loop-bound over the full trail</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Operator move (real board)</b> — drives the real move-dropdown + PeopleInvolved confirm; the APP performs the queue_token + log write</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads all board counts</b> — snapshots every column’s app-computed count (the before/after for count-conservation)</li><li><b>Reveals card</b> — pages the participant’s card into the board (read-only, no state change)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/up-next-cycle.spec.ts:991</code></div>
+      </div></section>
+<section><h2>V9 · ${VARIATION_NAME} (${VID}) — single-stage parking (UPH-00/01/02 + journey walk) <span class="meta">4 test(s) · <code>queue/variations/up-prep-hold.spec.ts</code></span></h2><div class="card">
+        <div class="t">UPH-00 — oracle: single stage IS the terminal (0 out-edges), selfmovable false, backbone len 1; orphan/dangling baseline; 1 forward journey</div>
+        <div class="obj">UPH-00 — STATIC ORACLE parity (no UI): entry==terminal, ZERO out-edges, selfmovable false, backbone length 1, the documented global-orphan / no-dangling baseline, AND the forward-journey enumerator yields exactly the singleton journey.</div>
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/variations/up-prep-hold.spec.ts:246</code></div>
+      </div><div class="card">
+        <div class="t">UPH-01 — board renders the parking column with the lone token, move-dropdown offers ZERO enabled targets, count stable</div>
+        <div class="obj">UPH-01 — THE REAL BOARD: one simple column holds the lone token; the move-dropdown is EMPTY (zero enabled targets); the board's column count is STABLE (no drift). APP-computed, no move written.</div>
+        <ul class="asserts"><li><b>No-orphan</b> — every logged move points at a real prior stage (reads the app-written `queue stage log`)</li><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>No-enabled-targets</b> — a terminal/parking token exposes zero pickable destinations</li><li><b>Reads the trail</b> — reads the app-written transition log — the value every guard asserts on (never a test-set value)</li><li><b>Reads a board count</b> — an app-computed, stream-rendered column count the test asserts against (never a test-written value)</li><li><b>Selects the queue</b> — loads the live queue_token stream onto the board (the suite’s setup)</li></ul>
+        <div class="ref"><code>queue/variations/up-prep-hold.spec.ts:291</code></div>
+      </div><div class="card">
+        <div class="t">UPH-02 — no-move/no-log: participant self-move never fires (selfmovable false), 0 stage-log rows, vacuous invariants hold</div>
+        <div class="obj">UPH-02 — THE NO-MOVE / NO-LOG INVARIANT: the participant-sim emits NO self-move (selfmovable:false negative gate); ZERO stage-log rows; the six invariants hold at zero transitions. PRODUCT-read.</div>
+        <ul class="asserts"><li><b>Zero-transition</b> — a parked/terminal token logged no spurious transitions</li><li><b>Participant self-move (sim)</b> — the Admin-SDK participant stand-in performs the self-move write — desktop analogue of a real form submit (the MOBILE suite does this through the real app)</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/up-prep-hold.spec.ts:360</code></div>
+      </div><div class="card">
+        <div class="t">UPH-WALK[${j}] — forward journey {${label}} holds at entry==terminal with zero transitions; six invariants hold</div>
+        
+        <ul class="asserts"><li><b>Terminal-reached</b> — the token rests on the terminal stage, which exposes zero scoped out-edges</li><li><b>Zero-transition</b> — a parked/terminal token logged no spurious transitions</li><li><b>Reads token stage</b> — reads the token’s current stage — an app value, not a test input</li></ul>
+        <div class="ref"><code>queue/variations/up-prep-hold.spec.ts:406</code></div>
+      </div></section>
+<section><h2>P3 #13 — WatchVideos BIG assignment crash-detectable smoke <span class="meta">1 test(s) · <code>queue/watch-videos.spec.ts</code></span></h2><div class="card">
+        <div class="t">the WatchVideos dialog opens from the PAB Video action and renders without a fatal error / console error</div>
+        
+        <p class="none">(no mapped guard/action detected — read the spec)</p>
+        <div class="ref"><code>queue/watch-videos.spec.ts:84</code></div>
+      </div></section>
