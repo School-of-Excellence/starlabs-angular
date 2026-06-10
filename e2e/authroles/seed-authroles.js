@@ -64,7 +64,53 @@ const ROUTES = [
   { route: '/profile-role-access', label: 'Profile Role Access', roles: ['admin', 'ah'] },
   { route: '/roster', label: 'Auth Roster' },
   { route: '/EISDashboard', label: 'EIS Dashboard' },
+  // /web-studio-invitation — a STAFF route the participant lacks (used by the deny-matrix AR-02b so the
+  // participant deny verdict is proven on a SECOND distinct staff route, not only /roster). Granted to the
+  // staff role-set (admin/ah/eis) + staff profileids only; participant has neither → guard denies.
+  { route: '/web-studio-invitation', label: 'Auth Studio Invite', roles: ['admin', 'ah'] },
 ];
+
+// ── NAV-TREE parent doc (the deepening fixture for AR-05/06/07) ────────────────────────────────────
+// The live sidenav (`app.component.ts:filterNavItems`, :536-551) role-gates ONLY the CHILDREN of a
+// dashboard parent — top-level docs are pushed unconditionally, and a child is kept iff
+//   child.roles ∩ profileEligibleRoles ≠ ∅   OR   child.profileid includes the logged profileid   (:542-543)
+// and added to the quick-access FAVOURITES iff child.favourites includes the logged profileid (:550).
+// The `seedDashboardRoutes` ROUTES above are all childless top-level grants (they drive the GUARD ACL),
+// so they cannot exercise the sidenav role-filter. This parent doc adds the missing depth: ONE run-
+// namespaced parent (`auth_dash_navtree`, NO route → a clickable category) whose children encode a
+// deterministic role × profileid matrix so the app's own nav computation is observable and anti-circular:
+//   • NAV admin-only   roles:[admin]                       → admin SEES,  participant DENIED (role miss)
+//   • NAV participant  roles:[participant]                 → admin DENIED, participant SEES (role miss for admin)
+//   • NAV developer    roles:[developer]                   → BOTH DENIED  (neither actor has developer)
+//   • NAV by-profile   roles:[] + profileid:[admin pf]     → admin SEES via the profileid OR-branch, participant DENIED
+//   • NAV admin-fav    roles:[admin] + favourites:[admin pf] → a known FAVOURITE for the admin (AR-07 count)
+// Labels are run-prefixed so the assertions are scoped to THIS run's children (never the live nav tree,
+// which other suites/devs may mutate — risk #2 in the recon). showInSidenav:true on every child (the
+// filter skips !showInSidenav children outright, :539). NO ATC routes (constraint).
+const NAVTREE_DOC = `${TESTRUNID}_dash_navtree`;
+const NAV = {
+  parentLabel: `Auth Nav ${TESTRUNID}`,
+  adminOnly: `Auth Nav Admin ${TESTRUNID}`,
+  participant: `Auth Nav Participant ${TESTRUNID}`,
+  developer: `Auth Nav Developer ${TESTRUNID}`,
+  byProfile: `Auth Nav ByProfile ${TESTRUNID}`,
+  adminFav: `Auth Nav Fav ${TESTRUNID}`,
+};
+
+function navChildren() {
+  // Child `route`s are run-namespaced harmless paths; they exist ONLY to be rendered/role-filtered in the
+  // sidenav (the specs assert presence/absence of the LABEL, they do not navigate to these child routes).
+  const mk = (label, route, roles, profileid = [], favourites = []) => ({
+    label, route, icon: 'star', showInSidenav: true, roles, profileid, favourites,
+  });
+  return [
+    mk(NAV.adminOnly, `/auth-nav-admin-${TESTRUNID}`, ['admin']),
+    mk(NAV.participant, `/auth-nav-participant-${TESTRUNID}`, ['participant']),
+    mk(NAV.developer, `/auth-nav-developer-${TESTRUNID}`, ['developer']),
+    mk(NAV.byProfile, `/auth-nav-byprofile-${TESTRUNID}`, [], [PF.admin]),
+    mk(NAV.adminFav, `/auth-nav-fav-${TESTRUNID}`, ['admin'], [], [PF.admin]),
+  ];
+}
 
 // classify/AHCRM_dashboard_access — the Business-Dashboard per-section access doc the
 // profile-role-access AHCRM table renders (docData live stream, profile-based-access.component.ts:537).
@@ -75,6 +121,40 @@ const ROUTES = [
 // our key on teardown (FieldValue.delete) so the doc is left exactly as we found it.
 const AHCRM_DOC = 'classify/AHCRM_dashboard_access';
 const AHCRM_KEY = `${TESTRUNID} test dashboard`; // unique, lower-case (table capitalises via CSS only)
+
+// ── LOGIN-EDGE profiles (the depth fixtures for the dologin() pre-auth gates) ──────────────────────
+// dologin() (login.component.ts:127-176) walks three gates BEFORE signInWithEmailAndPassword, each of
+// which alert()s and ABORTS without navigating. The happy path (AR-01) + the empty-profile path (AR-13)
+// are covered; the deepening adds the two middle gates as PRECONDITION-only `profile_data` docs (NO Auth
+// user, NO login success — the flow never reaches Firebase Auth):
+//   • NONUM  profile_data with number:null  → alert "…mobile number is required…" (:147), no nav (:148)
+//   • NOROLE profile_data with a valid number but a role_ref → a MISSING users_roles doc → roleDocSnap
+//            .exists()===false → alert "Role data not found…" (:165), no nav. (The doc the ref points at
+//            is intentionally never created.)
+// Both are queried by `where email == lower(email)` so the email must be stored lower-case (login lowers
+// the input). These docs are tagged + run-namespaced; the `profile_data` teardown sweep removes them.
+const EDGE = {
+  nonumEmail: `nonum+${TESTRUNID}@example.com`,
+  nonumPf: `${TESTRUNID}_pf_nonum`,
+  noroleEmail: `norole+${TESTRUNID}@example.com`,
+  norolePf: `${TESTRUNID}_pf_norole`,
+};
+
+async function seedLoginEdgeProfiles(db, tag) {
+  // NONUM — a profile that exists but carries no mobile number → the number-required gate.
+  await db.collection('profile_data').doc(EDGE.nonumPf).set({
+    docid: EDGE.nonumPf, profileid: EDGE.nonumPf, email: EDGE.nonumEmail.toLowerCase(), name: EDGE.nonumEmail,
+    number: null, countrycode: '+91',
+    // a role_ref is present but the number gate fires first, so it is never dereferenced here.
+    role_ref: db.collection('users_roles').doc(`${TESTRUNID}_role_nonum_missing`), ...tag,
+  });
+  // NOROLE — number present, but role_ref → a users_roles doc that does NOT exist → "Role data not found".
+  await db.collection('profile_data').doc(EDGE.norolePf).set({
+    docid: EDGE.norolePf, profileid: EDGE.norolePf, email: EDGE.noroleEmail.toLowerCase(), name: EDGE.noroleEmail,
+    number: '9999900000', countrycode: '+91',
+    role_ref: db.collection('users_roles').doc(`${TESTRUNID}_role_norole_missing`), ...tag,
+  });
+}
 
 async function seedAuthRoles() {
   const admin = seed.initAdmin();
@@ -100,10 +180,23 @@ async function seedAuthRoles() {
   //    profileids). Read-only render fixture for AR-08b; never overwritten via the UI.
   await db.doc(AHCRM_DOC).set({ [AHCRM_KEY]: staffProfileIds }, { merge: true });
 
+  // 4) NAV-TREE parent doc — the role × profileid child matrix the sidenav filter computes over (AR-05/06/07).
+  //    NO `route` on the parent (so it renders as a clickable category, not a link); children carry the ACL.
+  await db.collection('dashboard').doc(NAVTREE_DOC).set({
+    label: NAV.parentLabel, icon: 'folder', showInSidenav: true, order: 1, children: navChildren(),
+    roles: [], profileid: [], ...tag,
+  });
+
+  // 5) LOGIN-EDGE profiles — the number-required + role-not-found dologin gates (AR-LOGIN-NONUM/NOROLE).
+  await seedLoginEdgeProfiles(db, tag);
+
   return {
     TESTRUNID, PF, EMAIL, AHCRM_KEY,
     routes: ROUTES.map((r) => r.route),
-    counts: { staff: staff.length, participants: participants.length, routes: ROUTES.length, ahcrmKeys: 1 },
+    counts: {
+      staff: staff.length, participants: participants.length, routes: ROUTES.length,
+      ahcrmKeys: 1, navChildren: navChildren().length, edgeProfiles: 2,
+    },
   };
 }
 
@@ -129,7 +222,7 @@ async function teardownAuthRoles() {
   return n;
 }
 
-module.exports = { TESTRUNID, PF, EMAIL, ROUTES, SEEDED, AHCRM_KEY, seedAuthRoles, teardownAuthRoles };
+module.exports = { TESTRUNID, PF, EMAIL, ROUTES, SEEDED, AHCRM_KEY, NAV, NAVTREE_DOC, navChildren, EDGE, seedAuthRoles, teardownAuthRoles };
 
 if (require.main === module) {
   const mode = process.argv[2];
