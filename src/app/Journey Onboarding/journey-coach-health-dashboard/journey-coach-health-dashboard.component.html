@@ -4,16 +4,18 @@
     <div>
       <h1>Journey Coach — Health Dashboard</h1>
       <p class="subtitle" *ngIf="view === 'base' && selectedCoachName">{{ selectedCoachName }}'s base</p>
+      <p class="subtitle" *ngIf="view === 'worklist'">Today's worklist<span *ngIf="selectedCoachName"> · {{ selectedCoachName }}</span></p>
       <p class="subtitle" *ngIf="view === 'scoreboard'">Coach scoreboard</p>
     </div>
     <div class="jchd-header-controls" *ngIf="!loading && !loadError">
       <mat-button-toggle-group class="view-toggle" [value]="view" (change)="setView($event.value)"
         aria-label="Dashboard view">
         <mat-button-toggle value="base">Base</mat-button-toggle>
+        <mat-button-toggle value="worklist">Worklist</mat-button-toggle>
         <mat-button-toggle value="scoreboard">Scoreboard</mat-button-toggle>
       </mat-button-toggle-group>
 
-      <mat-form-field appearance="outline" class="coach-picker" *ngIf="view === 'base'">
+      <mat-form-field appearance="outline" class="coach-picker" *ngIf="view === 'base' || view === 'worklist'">
         <mat-label>Viewing</mat-label>
         <mat-select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)">
           <mat-option [value]="ALL">All participants</mat-option>
@@ -483,6 +485,77 @@
 
     </ng-container>
     <!-- ===== /Coach Scoreboard ===== -->
+
+    <!-- ===== Today's Worklist (triage queue) ===== -->
+    <ng-container *ngIf="view === 'worklist'">
+
+      <div class="wl-head" *ngIf="worklistTotal() > 0">
+        <div class="wl-head-main">
+          <h2>Today's focus</h2>
+          <p>Top {{ worklistRows().length }} of {{ worklistTotal() }} to act on, highest priority first.</p>
+        </div>
+        <div class="wl-diag" *ngIf="pagedMode">Showing loaded pages only — most precise in single-coach view.</div>
+      </div>
+
+      <div class="wl-list" *ngIf="worklistTotal() > 0">
+        <article class="wl-card" *ngFor="let r of worklistRows()" [ngClass]="bandClass(r.priorityBand)">
+          <div class="wl-rail"></div>
+
+          <div class="wl-body">
+            <div class="wl-row-top">
+              <span class="pri wl-pri" [ngClass]="bandClass(r.priorityBand)">{{ r.priorityBand }} · {{ r.priority }}</span>
+              <div class="wl-id">
+                <a class="wl-name name-link" role="button" tabindex="0"
+                   (click)="openSlideover(r)" (keydown.enter)="openSlideover(r)" (keydown.space)="openSlideover(r)"
+                   matTooltip="Open participant panel">{{ r.name }}</a>
+                <span class="wl-meta">
+                  <span>{{ r.number || '—' }}</span>
+                  <span *ngIf="r.atcmodel" class="wl-dot">·</span>
+                  <span *ngIf="r.atcmodel">{{ r.atcmodel }}</span>
+                  <span *ngIf="r.journeyname" class="wl-dot">·</span>
+                  <span *ngIf="r.journeyname">{{ r.journeyname }}<span *ngIf="r.journeystatus"> ({{ r.journeystatus }})</span></span>
+                </span>
+              </div>
+            </div>
+
+            <p class="wl-reason">{{ r.reason }}</p>
+
+            <div class="wl-signals">
+              <span class="chip chip-warn" *ngIf="r.renewalWindow">Renews in {{ r.daysToRenewal }}d</span>
+              <span class="chip chip-bad" *ngIf="r.lapsed">Lapsed</span>
+              <span class="chip chip-warn" *ngIf="r.goingQuiet">Quiet {{ r.daysSinceCoach }}d</span>
+              <span class="chip chip-warn" *ngIf="r.openTickets > 0">{{ r.openTickets }} open ticket<span *ngIf="r.openTickets > 1">s</span></span>
+              <span class="chip" *ngIf="r.recentEventRequest" [ngClass]="eventStatusClass(r.recentEventRequest.status)"
+                    [matTooltip]="r.recentEventRequest.eventName + (r.recentEventRequest.date ? ' · ' + fmtDate(r.recentEventRequest.date) : '')">{{ r.recentEventRequest.eventName }}: {{ r.recentEventRequest.status }}</span>
+              <span class="chip" *ngIf="r.coachHealthState" [ngClass]="stateClass(r.coachHealthState.state)"
+                    [matTooltip]="(r.coachHealthState.note || 'No note') + ' · ' + fmtDate(r.coachHealthState.date)">{{ healthLabel(r.coachHealthState.state) }}</span>
+              <span class="chip" *ngIf="r.customerstatus" [ngClass]="statusClass(r.customerstatus)">{{ r.customerstatus }}</span>
+              <span class="chip chip-bad" *ngIf="r.financialstatus === 'locked' || r.financialstatus === 'defaulted'">{{ r.financialstatus }}</span>
+            </div>
+          </div>
+
+          <div class="wl-actions">
+            <button mat-stroked-button class="wl-act" (click)="openSlideover(r)">Open</button>
+            <button mat-stroked-button class="wl-act" (click)="logCall(r)">Log call</button>
+            <button mat-stroked-button class="wl-act" (click)="setHealthState(r)">Set health</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="wl-more" *ngIf="worklistTotal() > 0 && worklistRows().length < worklistTotal()">
+        <button mat-stroked-button (click)="showMoreWorklist()">
+          Show more ({{ worklistTotal() - worklistRows().length }} remaining)
+        </button>
+      </div>
+
+      <div class="jchd-empty wl-empty" *ngIf="worklistTotal() === 0">
+        <mat-icon>task_alt</mat-icon>
+        <div class="wl-empty-title">Nothing in the queue</div>
+        <div class="wl-empty-sub">No participants match the current filters — clear a filter or switch coach to see your worklist.</div>
+      </div>
+
+    </ng-container>
+    <!-- ===== /Today's Worklist ===== -->
 
   </ng-container>
 </div>

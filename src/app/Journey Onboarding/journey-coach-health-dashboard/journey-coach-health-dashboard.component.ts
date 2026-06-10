@@ -86,7 +86,7 @@ interface PortfolioRow {
 
 type Lever = 'all' | 'active' | 'goingQuiet' | 'renewalWindow' | 'lapsed' | 'notStarted' | 'inactive' | 'tickets';
 
-type DashboardView = 'base' | 'scoreboard';
+type DashboardView = 'base' | 'scoreboard' | 'worklist';
 
 /** Product-type classification, derived from the `journey` collection's `type` field
  *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
@@ -156,6 +156,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   readonly COVERAGE_TARGET = 0.9;  // contact at least this share of the base each period
 
   view: DashboardView = 'base';
+  // Worklist view: a focused triage queue over the already-priority-sorted dataSource.data.
+  worklistLimit = 25;
   period: 'week' | 'month' | 'custom' = 'month';
   rangeFrom: Date = this.startOfMonth(new Date());
   rangeTo: Date = new Date();
@@ -1149,6 +1151,19 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   onRangeChange(): void {
     if (this.view === 'scoreboard') this.computeScoreboard();
+  }
+
+  // ---- Today's Worklist (read-only triage queue over dataSource.data) ----
+  // dataSource.data is already filtered and in priority order; the worklist is just a
+  // capped, card-based presentation of the top of that same queue. No extra loading.
+  worklistRows(): PortfolioRow[] {
+    return this.dataSource.data.slice(0, this.worklistLimit);
+  }
+  worklistTotal(): number {
+    return this.dataSource.data.length;
+  }
+  showMoreWorklist(): void {
+    this.worklistLimit = Math.min(this.worklistLimit + 25, this.dataSource.data.length);
   }
 
   /** Period toggle: week / month set the range from a cadence preset; custom reveals the pickers. */
