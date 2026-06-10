@@ -104,6 +104,9 @@ interface LiteIndexRow {
   atcmodel: string | null;
   customerstatus: string | null;
   financialstatus: string | null;
+  // base-wide (paged-mode) flags — computed in the lite index so renewal/tickets filter the WHOLE base
+  renewalWindow: boolean;          // subscriptionend within RENEWAL_DAYS (same logic as computeRows)
+  openTickets: number;             // open clientissue count for this profile (from the full-base read)
 }
 
 /** Phase C: one coach's gamified scoreboard row for the selected date range. */
@@ -245,6 +248,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private fullBaseMatchIds: Set<string> | null = null;
   private fullIndex: LiteIndexRow[] = [];           // lightweight full-base index (paged mode)
   private fullIndexBuilt = false;
+  // base-wide open-ticket counts (profileid -> open count), read ONCE per index build (paged mode).
+  // Powers both the lite-index openTickets flag and the base-wide Open-tickets KPI count.
+  private fullBaseOpenTickets: Record<string, number> | null = null;
+  // base-wide count of profiles with >0 open tickets (derived from the index after it builds)
+  private fullBaseWithOpenTickets = 0;
 
   summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0 };
 
@@ -569,6 +577,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     this.loadedRowCount = this.countedProfiles.size;
     if (this.selectedCoachId === this.UNASSIGNED) this.unassignedCount = this.loadedRowCount;
+    // base-wide Open-tickets count: distinct profiles with an open ticket across the WHOLE base
+    // (from the cached full-base clientissue read, once the lite index has built). Falls back to the
+    // page-accumulated value until then.
+    if (this.fullIndexBuilt) this.summary.withOpenTickets = this.fullBaseWithOpenTickets;
     // accurate server counts take precedence for the cards they can power
     if (this.serverCountsReady) {
       this.summary.total = this.serverCounts.total;
@@ -1572,6 +1584,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(lite.productType)) return false;
     if (this.tierFilters.length && !this.tierFilters.includes(lite.atcmodel ?? '')) return false;
     if (this.financeFilters.length && !this.financeFilters.includes(lite.financialstatus ?? '')) return false;
+    // renewal window + open-tickets lever now filter the FULL base (computed in the lite index)
+    if (this.renewalWindowOnly && !lite.renewalWindow) return false;
+    if (this.activeLever === 'tickets' && !(lite.openTickets > 0)) return false;
+    if (this.activeLever === 'renewalWindow' && !lite.renewalWindow) return false;
     return true;
   }
 
@@ -1597,6 +1613,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       pjp = snap.docs.map(d => ({ ...d.data(), __id: d.id }));
       this.fullPjpData = pjp;
     }
+    // base-wide open-ticket counts: ONE clientissue read (cached), so renewal/tickets can be
+    // evaluated across the whole base — not just the loaded page.
+    const openByProfile = await this.ensureFullBaseOpenTickets();
+    const now = Date.now();
     // one lite row per distinct participant (keep the highest-signal product type if a person has
     // several journey-products: ecosystem ranks above dfu above gifts above other).
     const rank: Record<ProductType, number> = { ecosystem: 3, dfu: 2, gifts: 1, other: 0 };
@@ -1610,6 +1630,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const productType: ProductType = journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other';
       const fin = meta['financialstatus'] ?? null;
       if (fin) finance.add(fin);
+      // renewal window: SAME logic as computeRows (subscriptionend from pjp doc, falling back to meta).
+      const subEnd = this.toDate(d['subscriptionend']) ?? this.toDate(meta['subscriptionend']);
+      const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / 86400000) : null;
+      const renewalWindow = daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS;
       const lite: LiteIndexRow = {
         profileid,
         name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
@@ -1619,6 +1643,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
         customerstatus: meta['customerstatus'] ?? null,
         financialstatus: fin,
+        renewalWindow,
+        openTickets: openByProfile[profileid] ?? 0,
       };
       const existing = byProfile.get(profileid);
       if (!existing) { byProfile.set(profileid, lite); }
@@ -1626,11 +1652,37 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         // keep the strongest product type; a coachedby on either doc means assigned
         if (rank[productType] > rank[existing.productType]) existing.productType = productType;
         if (this.isUnassigned(existing.coachedby) && !this.isUnassigned(lite.coachedby)) existing.coachedby = lite.coachedby;
+        // a participant is in the renewal window if ANY of their journey-products is
+        if (renewalWindow) existing.renewalWindow = true;
       }
     }
     this.fullIndex = Array.from(byProfile.values());
     this.financeOptions = Array.from(finance).sort();
+    // base-wide Open-tickets KPI count: distinct profiles with at least one open ticket
+    this.fullBaseWithOpenTickets = this.fullIndex.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
     this.fullIndexBuilt = true;
+  }
+
+  /** Full-base open-ticket counts via ONE read of the `clientissue` collection (cached for the
+   *  session). A single collection scan is far cheaper than ~N/30 batched `in`-queries over a
+   *  multi-thousand base, and clientissue reads are not rules-blocked. Returns profileid -> open
+   *  count, using the SAME "open" criterion as the per-page loader (status.status === 'open'),
+   *  keyed by clientid (which is the participant's profileid). */
+  private async ensureFullBaseOpenTickets(): Promise<Record<string, number>> {
+    if (this.fullBaseOpenTickets) return this.fullBaseOpenTickets;
+    const counts: Record<string, number> = {};
+    try {
+      const snap = await getDocs(collection(this.firestore, 'clientissue'));
+      snap.forEach(d => {
+        const data: any = d.data();
+        if ((data['status']?.status ?? '').toLowerCase() !== 'open') return;
+        const cid = data['clientid'];
+        const key = typeof cid === 'string' ? cid : cid?.id;
+        if (key) counts[key] = (counts[key] ?? 0) + 1;
+      });
+    } catch (e) { console.warn('full-base open tickets failed', e); }
+    this.fullBaseOpenTickets = counts;
+    return counts;
   }
 
   setLever(lever: Lever): void {
@@ -1664,13 +1716,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
   }
 
-  /** True when a PAGE-LOCAL filter is active — band / coach-health / renewal-window / going-quiet.
-   *  These need per-row dependent data so they only refine the loaded pages (see liteMatches), unlike
-   *  search / product type / tier / status / finance which cover the full base via the lite index.
-   *  Drives the visible "filtering loaded pages only" caveat in paged (ALL / UNASSIGNED) mode. */
+  /** True when a PAGE-LOCAL filter is active — priority band / coach-health / going-quiet.
+   *  These need per-row dependent data (touchpoints not yet read base-wide) so they only refine the
+   *  loaded pages (see liteMatches). Search / product type / tier / status / finance — and now
+   *  renewal-window + open-tickets — cover the full base via the lite index, so they do NOT trigger
+   *  the caveat. Drives the visible "filtering loaded pages only" caveat in paged (ALL/UNASSIGNED) mode. */
   get pageLocalFilterActive(): boolean {
     return this.bandFilters.length > 0 || this.healthFilters.length > 0
-      || this.renewalWindowOnly || this.goingQuietOnly;
+      || this.goingQuietOnly;
   }
 
   get selectedCoachName(): string {
