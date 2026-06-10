@@ -30,6 +30,10 @@
   </header>
 
   <div class="jchd-skeleton" *ngIf="loading" aria-busy="true" aria-label="Loading the base">
+    <div class="jchd-progress" role="progressbar" [attr.aria-valuenow]="loadProgress" aria-valuemin="0" aria-valuemax="100">
+      <div class="jchd-progress-head"><span>{{ loadProgressLabel }}</span><strong>{{ loadProgress }}%</strong></div>
+      <div class="jchd-progress-track"><div class="jchd-progress-fill" [style.width.%]="loadProgress"></div></div>
+    </div>
     <div class="sk-band">
       <div class="sk-stat" *ngFor="let s of [1,2,3,4,5,6]">
         <div class="sk-line sk-line-sm"></div>
@@ -51,6 +55,13 @@
   </div>
 
   <ng-container *ngIf="!loading && !loadError">
+
+    <!-- background finalize bar: first page is on screen; full base + activity still loading -->
+    <div class="jchd-progress slim" *ngIf="loadProgress < 100" role="progressbar"
+         [attr.aria-valuenow]="loadProgress" aria-valuemin="0" aria-valuemax="100">
+      <div class="jchd-progress-track"><div class="jchd-progress-fill" [style.width.%]="loadProgress"></div></div>
+      <div class="jchd-progress-head"><span>{{ loadProgressLabel }}</span><strong>{{ loadProgress }}%</strong></div>
+    </div>
 
     <!-- ===== Summary view (iOS cards) ===== -->
     <ng-container *ngIf="view === 'summary'">
@@ -140,7 +151,7 @@
         <section class="ios-card is-tappable" role="button" tabindex="0"
                  (click)="goToParticipantsWithLever('tickets')" (keydown.enter)="goToParticipantsWithLever('tickets')">
           <div class="ios-card-head"><span class="ios-card-title tint-teal">Open tickets</span></div>
-          <div class="ios-bignum sm">{{ summary.withOpenTickets }}<span class="unit">people with tickets</span></div>
+          <div class="ios-bignum sm">{{ summary.withOpenTickets }}<span class="unit">open tickets</span></div>
           <div class="ios-cluster" *ngIf="openTicketRows().length; else ticketEmpty">
             <span class="ios-row" *ngFor="let r of openTicketRows() | slice:0:3">
               <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
@@ -215,9 +226,9 @@
         <span class="mc-num">{{ needsAttentionCount }}</span>
       </button>
       <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
-        matTooltip="Active participant — no coach contact in {{ QUIET_DAYS }}+ days">
-        <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode"
-          matTooltip="Count over loaded pages only — page through or select your own name for the full base."> in view</span></span>
+        matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
+        <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded"
+          matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
         <span class="mc-num">{{ summary.goingQuiet }}</span>
       </button>
       <button type="button" class="ios-mini-card" [class.is-on]="financeFilters.includes('locked')"
@@ -395,9 +406,13 @@
       · matched {{ matchedCount }} of {{ scannedCount }} journey-product records · ranked by priority
       <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>coachedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
     </div>
-    <!-- paged views (ALL / UNASSIGNED) — priority is page-local; counts accumulate as you page -->
+    <!-- paged views (ALL / UNASSIGNED) — matched-set pagination; total = all matches across pages -->
     <div class="jchd-diag" *ngIf="pagedMode && selectedCoachId !== UNASSIGNED">
-      Showing {{ dataSource.data.length }} · ranked by priority<span *ngIf="!reachedEnd"> · loading more as you page</span><span *ngIf="reachedEnd"> · end of list</span>
+      Showing {{ dataSource.data.length }} of {{ pageLength }} matching · ranked by priority within the page.
+    </div>
+    <!-- per-card explainer: only the ACTIVE card's note, shown next to the table (not all at once) -->
+    <div class="jchd-filter-note" *ngIf="pagedMode && activeFilterNote">
+      <mat-icon>info</mat-icon><span>{{ activeFilterNote }}</span>
     </div>
     <div class="jchd-diag" *ngIf="pagedMode && selectedCoachId === UNASSIGNED">
       Page {{ currentPage + 1 }} · {{ dataSource.data.length }} unassigned on this page · {{ loadedRowCount }} loaded so far<span *ngIf="reachedEnd"> · end of list</span>.
