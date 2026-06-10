@@ -116,6 +116,33 @@ prove the operator/auto hops (those are proven by the count-drift assertion + th
   `cd e2e && SKIP_SEED=1 FLUTTER_BIN=/opt/homebrew/bin/flutter caffeinate -ims npx playwright test --config=playwright.mobile.config.ts`.
   (The coherent original all-9 report was restored to `e2e/playwright-report-mobile/`.)
 
+## Hardening — the imaging is now an ASSERTED signal (L1 + L2), not just attached
+Operator reframed (correctly): unasserted screenshots aren't "theater" — they're a fast human quick-scan
+to confirm a flow rendered and the test isn't broken. The real defect was that the scan could *silently
+lie* (a shot goes blank/stale/missing and nothing flags it). So the screenshots are now part of pass/fail.
+
+- **L1 — presence + non-blank** (`walk-lib.attachAndAuditFrames` + spec): every frame is attached AND
+  checked; per test `badCount = missing + blank`; **0 → clean annotation, 1–2 → report WARNING (stays
+  green), ≥3 → HARD FAIL** (operator policy — a cushion for transient capture hiccups, fail if pervasive).
+  Blank = `bytes < 10 KB OR grayscale stddev < 0.01` (ImageMagick `%[fx:standard_deviation]`; calibrated:
+  blank-white = 0.0, real = 0.13–0.22; size-only fallback if magick is absent). `expected = 3·selfHops +
+  boardHops` (1 for the 0-hop parked terminal). Board capture moved AFTER `waitForCardOnStage` so the
+  entry-stage frame isn't missed.
+- **L2 — content/copy** (`robot.assertOnStageCard` / `assertFormOpen`, called before each shot): hard-assert
+  the screen is the RIGHT one — the card shows the current stage (UI==token cross-check; `findRichText:true`
+  because the title is a styled RichText), and the FillForm is really open (Preview key + "Fill Form" copy).
+  **Copy is a tested contract** (update the asserted string if the app copy changes — operator's call).
+- **WHY this mattered immediately:** L2 caught a REAL pre-existing flake the screenshot-only flow had been
+  silently capturing-around. The home's ads playlist (`homeContent.dart:4586 → AppTheme.adsplaylist`) loads
+  async and sets `adsPlaylist` AFTER the first build; the test project's lone `adsplaylist` doc has a null
+  `adsthumbnail`, so a rebuild ~1 s later throws `CachedNetworkImage.imageUrl: 'Null' is not 'String'`
+  (Themes.dart:3387) and replaces HomeContent with an error widget — erasing the queue card. The OS
+  screenshot caught the card in the brief pre-crash window; the widget-tree assertion (running later) caught
+  the post-crash emptiness. Fixed the seed-completeness way (NO app edit): `setup-mobile-fixture` marks every
+  `adsplaylist` doc `available:false` so the query is empty → SizedBox → the card renders and STAYS.
+- **Validated** on Prodigies - First Cycle (1 passed, 9.2m): 14/14 frames, annotation "0 blank, 0 missing".
+  Commits: parent `fa931ae`, flutter `1d9fee1`. Full 9-variation run with the guards: in progress.
+
 ## Bottom line
 The previous session's "9 passed / 37 clean PNGs" is **substantively honest** for 8 of 9 variations —
 verified by reading the actual pixels, not the logs. The lone completion gap (Prep-Hold had no app
