@@ -93,8 +93,7 @@
         <div class="kpi-num">{{ summary.goingQuiet }}</div>
       </div>
       <div class="kpi clickable" [class.kpi-selected]="kpiActive('tickets')" (click)="kpi('tickets')" matTooltip="Only open tickets">
-        <div class="kpi-label">Open tickets <span class="kpi-scope" *ngIf="pagedMode"
-          matTooltip="Count over loaded pages only — page through or select your own name for the full base.">in view</span></div>
+        <div class="kpi-label">Open tickets</div>
         <div class="kpi-num">{{ summary.withOpenTickets }}</div>
       </div>
     </section>
@@ -206,9 +205,9 @@
 
       <div class="fp-note" *ngIf="pagedMode">
         <mat-icon>info</mat-icon>
-        <span>Search, product type, tier, status &amp; finance filters cover the
+        <span>Search, product type, tier, status, finance &amp; renewal-window filters cover the
           <strong>full base</strong> via a lightweight index. Priority band, coach-health &amp;
-          renewal/quiet refine within loaded pages — page through to apply them across everyone.</span>
+          going-quiet refine within loaded pages — page through to apply them across everyone.</span>
       </div>
     </section>
 
@@ -226,8 +225,9 @@
       Page {{ currentPage + 1 }} · {{ dataSource.data.length }} unassigned on this page · {{ loadedRowCount }} loaded so far<span *ngIf="reachedEnd"> · end of list</span>.
       Select rows and assign a coach above — this writes <code>coachedby</code>. Some pages may show fewer rows as participants get assigned.
     </div>
-    <!-- Honest, always-visible caveat: page-local filters (band / health / renewal / quiet) only
-         refine the loaded pages in paged mode. Shown above the table, not buried in the filter panel. -->
+    <!-- Honest, always-visible caveat: page-local filters (band / health / going-quiet) only
+         refine the loaded pages in paged mode. Renewal-window + open-tickets are now base-wide.
+         Shown above the table, not buried in the filter panel. -->
     <div class="jchd-page-caveat" *ngIf="pagedMode && pageLocalFilterActive">
       <mat-icon>info</mat-icon>
       <span>Filtering loaded pages only — page through, or pick your own name for the whole base.</span>
