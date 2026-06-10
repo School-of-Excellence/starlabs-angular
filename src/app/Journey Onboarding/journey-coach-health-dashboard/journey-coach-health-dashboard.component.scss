@@ -1,69 +1,96 @@
 /* =====================================================================
    Journey Coach — Health Dashboard
-   Design system: premium modern SaaS (Linear / Vercel feel).
-   Light, layered surfaces · soft diffused tinted shadows · one accent.
-   Hierarchy via weight + colour + depth. Tabular numerals throughout.
+   Design system: native iOS / Apple (Health-app feel).
+   systemGroupedBackground canvas · white rounded cards · very soft shadows.
+   SF Pro typography · iOS system colours used sparingly · tabular numerals.
    ===================================================================== */
 
-/* ---- design tokens ---- */
-$page-bg:      #f5f7fb;   // soft slate page canvas
-$page-bg-2:    #eef2f9;   // deeper canvas tint (gradient floor)
-$surface:      #ffffff;
-$surface-2:    #fcfdff;   // faint elevated tint for inner panels
-$border:       #e7ecf3;   // hairline border
-$border-soft:  #eef2f8;   // softest divider
+/* ---- design tokens (iOS) ---- */
+$page-bg:      #f2f2f7;   // iOS systemGroupedBackground
+$page-bg-2:    #f2f2f7;   // flat canvas (no gradient floor in iOS)
+$surface:      #ffffff;   // pure white cards
+$surface-2:    #f9f9fb;   // faint inner fill (iOS grouped inset)
+$border:       rgba(60, 60, 67, .12);   // iOS hairline separator
+$border-soft:  rgba(60, 60, 67, .08);   // softest divider
 
-$ink:          #0f172a;   // primary text
-$ink-2:        #475569;   // secondary text
-$ink-muted:    #64748b;   // muted text (slate-500, ~4.6:1 on white — WCAG AA)
+$ink:          #1c1c1e;   // iOS primary label
+$ink-2:        rgba(60, 60, 67, .6);    // iOS secondary label
+$ink-muted:    rgba(60, 60, 67, .45);   // iOS tertiary-ish (kept readable for AA on white)
 
-$accent:       #2563eb;   // single interactive accent
-$accent-strong:#1d4ed8;
-$accent-soft:  #eff5ff;
-$accent-tint:  #dbe7fe;
+$accent:       #007aff;   // iOS system blue
+$accent-strong:#0060df;
+$accent-soft:  rgba(0, 122, 255, .08);
+$accent-tint:  rgba(0, 122, 255, .22);
 
-// semantic data colours (calibrated, harmonised)
-$pri-high-fg:  #be123c;  $pri-high-bg:  #fff1f3;
-$pri-med-fg:   #b45309;  $pri-med-bg:   #fff8eb;
-$pri-low-fg:   #64748b;  $pri-low-bg:   #f1f5f9;
+// iOS system colours (used sparingly — one feel per element)
+$pri-high-fg:  #d70015;  $pri-high-bg:  rgba(255, 59, 48, .12);
+$pri-med-fg:   #c25e00;  $pri-med-bg:   rgba(255, 149, 0, .14);
+$pri-low-fg:   #6c6c70;  $pri-low-bg:   rgba(120, 120, 128, .12);
 
-$good-fg:      #15803d;  $good-bg:      #effdf3;
-$warn-fg:      #b45309;  $warn-bg:      #fff8eb;
-$bad-fg:       #be123c;  $bad-bg:       #fff1f3;
-$evang-fg:     #6d28d9;  $evang-bg:     #f5f2ff;
+$good-fg:      #1f8a3b;  $good-bg:      rgba(52, 199, 89, .14);
+$warn-fg:      #c25e00;  $warn-bg:      rgba(255, 149, 0, .14);
+$bad-fg:       #d70015;  $bad-bg:       rgba(255, 59, 48, .12);
+$evang-fg:     #4a48b8;  $evang-bg:     rgba(88, 86, 214, .12);
 
-$radius-surface: 14px;
-$radius-control: 10px;
+// iOS named system colours for the Summary tiles + avatars
+$ios-blue:   #007aff;
+$ios-green:  #34c759;
+$ios-red:    #ff3b30;
+$ios-orange: #ff9500;
+$ios-indigo: #5856d6;
+$ios-teal:   #30b0c7;
+$ios-pink:   #ff2d55;
+
+$radius-surface: 20px;   // iOS large card
+$radius-control: 12px;   // iOS inner control
 $radius-pill:    999px;
 
-// soft, wide, low-opacity shadows tinted to the page hue (never harsh black)
-$shadow-1: 0 1px 2px rgba(30, 41, 75, .04), 0 1px 1px rgba(30, 41, 75, .03);
-$shadow-2: 0 1px 2px rgba(30, 41, 75, .04), 0 12px 28px -16px rgba(30, 41, 75, .16);
-$shadow-3: 0 2px 4px rgba(30, 41, 75, .05), 0 20px 40px -22px rgba(30, 41, 75, .26);
-$shadow-pop: 0 1px 2px rgba(30, 41, 75, .05), 0 18px 36px -20px rgba(30, 41, 75, .28);
+// iOS depth: very soft and subtle — never harsh black.
+$hairlite: 0 0 0 0 transparent;
+$shadow-1: 0 1px 2px rgba(0, 0, 0, .04);
+$shadow-2: 0 1px 3px rgba(0, 0, 0, .04), 0 8px 24px -12px rgba(0, 0, 0, .08);
+$shadow-3: 0 1px 3px rgba(0, 0, 0, .05), 0 16px 40px -16px rgba(0, 0, 0, .12);
+$shadow-pop: 0 1px 3px rgba(0, 0, 0, .05), 0 18px 40px -16px rgba(0, 0, 0, .14);
 
-$mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
-$ease: cubic-bezier(.22, .68, .32, 1);   // custom tactile ease
-$ease-out: cubic-bezier(.16, .84, .3, 1);
+// keep native iOS numerals (no Geist Mono) — just tabular-nums on the system font
+$mono: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+$ease: cubic-bezier(.32, .72, 0, 1);   // iOS spring-ish ease
+$ease-out: cubic-bezier(.32, .72, 0, 1);
 
-@mixin tabular { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+@mixin tabular {
+  font-family: $mono;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.01em;
+}
 @mixin section-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
   color: $ink-muted; font-weight: 600;
 }
 
 :host {
   display: block;
   color: $ink;
+  // scoped iOS / SF Pro font — does NOT affect the rest of the app
+  font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
   font-feature-settings: 'tnum' 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* crafted, consistent keyboard focus ring scoped to the dashboard */
+.jchd-wrap {
+  a.name-link:focus-visible,
+  .kpi.clickable:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px $surface, 0 0 0 4px $accent-tint;
+    border-radius: 6px;
+  }
 }
 
 .jchd-wrap {
-  padding: 22px 26px 48px;
-  background:
-    radial-gradient(1200px 480px at 18% -8%, #ffffff 0%, rgba(255,255,255,0) 60%),
-    linear-gradient(180deg, $page-bg 0%, $page-bg-2 100%);
-  background-attachment: local;
+  padding: 14px 28px 72px;
+  background: $page-bg;
   min-height: 100%;
 }
 
@@ -81,51 +108,68 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
    ===================================================================== */
 .jchd-header {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-  margin-bottom: 22px;
+  padding: 18px 4px 16px;
+  margin-bottom: 4px;
 
+  .jchd-eyebrow {
+    font-size: 15px; font-weight: 600; color: $ink-2; letter-spacing: .2px; margin-bottom: 3px;
+  }
   h1 {
-    font-size: 21px; font-weight: 750; letter-spacing: -0.02em;
-    margin: 0; color: $ink; line-height: 1.15;
+    font-size: 34px; font-weight: 700; letter-spacing: -.5px;
+    margin: 0; color: $ink; line-height: 1.05;
   }
   .subtitle {
-    margin: 5px 0 0; color: $ink-2; font-size: 13px; @include tabular;
+    margin: 7px 0 0; color: $ink-2; font-size: 16px; font-weight: 400;
   }
-  .coach-picker { min-width: 230px; font-size: 13px; }
 }
 
 .jchd-header-controls {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   .view-toggle { font-size: 13px; }
+
+  // Viewing (scope) picker as an iOS pill, matching the toolbar pills
+  .coach-pill {
+    padding: 8px 14px;
+    .jchd-pill-label { font-weight: 600; display: inline-flex; align-items: baseline; }
+    .vk { color: $ink-muted; font-weight: 400; margin-right: 7px; }
+  }
 }
 
-/* ---- refined segmented control (view toggle / period toggle) ---- */
+/* ---- iOS segmented control (view toggle / period toggle) ---- */
 ::ng-deep .view-toggle.mat-button-toggle-group,
 ::ng-deep .period-toggle.mat-button-toggle-group {
-  border: 1px solid $border;
-  border-radius: $radius-control;
-  background: $surface;
-  box-shadow: $shadow-1;
+  border: none;
+  border-radius: 11px;
+  background: rgba(118, 118, 128, .12);   // iOS segmented track
+  box-shadow: none;
   overflow: hidden;
-  --mat-standard-button-toggle-height: 36px;
+  padding: 2px;
+  --mat-standard-button-toggle-height: 34px;
 
   .mat-button-toggle {
     border: none;
     background: transparent;
-    color: $ink-2;
-    font-weight: 600;
-    letter-spacing: -0.005em;
+    color: $ink;
+    font-weight: 500;
+    letter-spacing: -.1px;
+    border-radius: 9px;
+    transition: color .2s $ease, transform .08s $ease;
 
-    & + .mat-button-toggle { border-left: 1px solid $border-soft; }
+    & + .mat-button-toggle { border-left: none; }
 
     .mat-button-toggle-label-content {
-      line-height: 34px; padding: 0 16px; font-size: 13px;
+      line-height: 30px; padding: 0 18px; font-size: 14px;
+      transition: none;
     }
-    &:hover .mat-button-toggle-label-content { background: $surface-2; }
+    &:active { transform: scale(.98); }
   }
   .mat-button-toggle-checked {
-    background: $accent-soft;
-    color: $accent-strong;
-    .mat-button-toggle-label-content { background: $accent-soft; }
+    background: #fff;
+    color: $ink;
+    border-radius: 9px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 1px 1px rgba(0, 0, 0, .04);
+    font-weight: 600;
+    .mat-button-toggle-label-content { background: transparent; font-weight: 600; }
   }
   .mat-button-toggle-ripple, .mat-ripple { display: none; }
 }
@@ -135,11 +179,11 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
    ===================================================================== */
 .jchd-assign {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  background: linear-gradient(180deg, $accent-soft 0%, #f6f9ff 100%);
+  background: linear-gradient(180deg, $accent-soft 0%, #f5f9ff 100%);
   border: 1px solid $accent-tint; border-radius: $radius-surface;
   box-shadow: $shadow-1;
   padding: 14px 18px; margin: 0 0 18px;
-  .assign-text { font-size: 13px; color: #1e3a8a; @include tabular; }
+  .assign-text { font-size: 13px; color: $accent-strong; @include tabular; }
   .assign-coach { min-width: 230px; font-size: 13px; margin-bottom: -1.25em; }
   > mat-icon { color: $accent; }
 }
@@ -149,7 +193,7 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
    ===================================================================== */
 .jchd-summary {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   margin: 0 0 18px;
   background: transparent; border: none; box-shadow: none; overflow: visible;
@@ -164,13 +208,19 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     box-shadow: $shadow-1;
     display: flex; flex-direction: column; gap: 8px;
     overflow: hidden;
-    transition: transform .18s $ease, box-shadow .18s $ease, border-color .18s $ease;
+    transition: transform .2s $ease, box-shadow .2s $ease, border-color .2s $ease;
     will-change: transform;
+    // staggered load-in (subtle fade + lift); 7 fixed cards keyed by :nth-child
+    animation: jchd-card-in .34s $ease both;
+
+    @for $n from 1 through 7 {
+      &:nth-child(#{$n}) { animation-delay: #{($n - 1) * 35}ms; }
+    }
 
     // top accent hairline for semantic cards (subtle)
     &::before {
       content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
-      background: transparent; opacity: 0; transition: opacity .18s $ease;
+      background: transparent; opacity: 0; transition: opacity .2s $ease;
     }
 
     .kpi-label {
@@ -183,8 +233,8 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
       padding: 1px 7px; border-radius: $radius-pill; background: $border-soft;
     }
     .kpi-num {
-      font-size: 30px; font-weight: 760; line-height: 1; color: $ink;
-      letter-spacing: -0.02em; @include tabular;
+      font-size: 29px; font-weight: 600; line-height: 1; color: $ink;
+      letter-spacing: -0.03em; @include tabular;
     }
 
     &.good .kpi-num { color: $good-fg; }
@@ -193,28 +243,37 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     &.good::before { background: $good-fg; }
     &.warn::before { background: $warn-fg; }
     &.bad::before  { background: $bad-fg; }
+    // flagged card: amber accent (matches the star toggles)
+    &.kpi-flag .kpi-num { color: $warn-fg; }
+    &.kpi-flag::before { background: $warn-fg; }
 
     &.clickable {
       cursor: pointer;
       &:hover {
         transform: translateY(-2px);
-        box-shadow: $shadow-2;
+        box-shadow: $shadow-2, 0 18px 34px -18px rgba(15, 23, 42, .14);
         border-color: $border;
         &::before { opacity: .65; }
       }
-      &:active { transform: translateY(0); }
+      &:active { transform: scale(.98); }
     }
 
     // strong, legible selected (clickable-filter highlight)
     &.kpi-selected {
-      background: linear-gradient(180deg, $accent-soft 0%, #f6f9ff 100%);
+      background: linear-gradient(180deg, $accent-soft 0%, #f5f9ff 100%);
       border-color: $accent-tint;
-      box-shadow: 0 0 0 1px $accent-tint inset, 0 8px 22px -14px rgba(37, 99, 235, .5);
+      box-shadow: $hairlite, 0 0 0 1px $accent-tint inset, 0 10px 24px -14px rgba(47, 102, 214, .42);
       &::before { background: $accent; opacity: 1; }
       .kpi-label { color: $accent-strong; }
-      &:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px $accent-tint inset, 0 14px 28px -14px rgba(37, 99, 235, .55); }
+      &:hover { transform: translateY(-2px); box-shadow: $hairlite, 0 0 0 1px $accent-tint inset, 0 16px 30px -14px rgba(47, 102, 214, .46); }
+      &:active { transform: scale(.98); }
     }
   }
+}
+
+@keyframes jchd-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 1080px) {
@@ -226,7 +285,7 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 
 @media (prefers-reduced-motion: reduce) {
   .jchd-anim { animation: none; }
-  .jchd-summary .kpi { transition: none; }
+  .jchd-summary .kpi { transition: none; animation: none; }
   .jchd-summary .kpi.clickable:hover { transform: none; }
 }
 
@@ -252,15 +311,6 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
-
-/* Unobtrusive keyboard-navigation hint, right-aligned by the page-info line. Hidden on narrow viewports. */
-.jchd-keys-hint {
-  text-align: right; margin: -4px 2px 6px;
-  font-size: 11.5px; color: $ink-muted; @include tabular;
-}
-@media (max-width: 768px) {
-  .jchd-keys-hint { display: none; }
 }
 
 /* Slim, dismissible info banner: coach profile couldn't be matched, showing everyone. */
@@ -298,66 +348,85 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 /* =====================================================================
    FILTER TOOLBAR — sticky, modern toolbar with segmented lever pills
    ===================================================================== */
-.jchd-levers {
-  display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 12px;
-  padding: 6px;
-  background: $surface;
-  border: 1px solid $border;
-  border-radius: $radius-control;
-  box-shadow: $shadow-1;
-
-  ::ng-deep .mat-mdc-outlined-button {
-    --mdc-outlined-button-container-shape: #{$radius-pill};
-    --mdc-outlined-button-container-height: 30px;
-    height: 30px; min-width: 0; padding: 0 14px;
-    font-size: 12.5px; font-weight: 600; letter-spacing: -0.005em;
-    color: $ink-2;
-    transition: background-color .14s $ease, color .14s $ease, border-color .14s $ease, transform .08s $ease;
-    @include tabular;
-
-    .mdc-button__label { @include tabular; }
-    .mat-mdc-button-touch-target { height: 30px; }
-    &:active { transform: scale(.97); }
-  }
-  ::ng-deep .mat-mdc-outlined-button:not(:disabled) {
-    border-color: transparent; background: transparent;
-  }
-  ::ng-deep .mat-mdc-outlined-button:not(:disabled):hover {
-    background: $surface-2; border-color: $border;
-  }
-  ::ng-deep .mat-mdc-outlined-button.active:not(:disabled) {
-    background: $accent; border-color: $accent; color: #fff;
-    box-shadow: 0 6px 14px -8px rgba(37, 99, 235, .7);
-  }
-  ::ng-deep .mat-mdc-outlined-button:disabled {
-    border-style: dashed; border-color: $border; opacity: .65;
-  }
-}
-
 .jchd-filters {
-  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px;
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px;
   position: sticky; top: 0; z-index: 6;
   padding: 12px; margin-left: -2px; margin-right: -2px;
-  background: rgba(245, 247, 251, .9);
+  background: rgba(246, 248, 252, .82);
+  backdrop-filter: saturate(1.4) blur(8px);
+  -webkit-backdrop-filter: saturate(1.4) blur(8px);
   border: 1px solid $border;
   border-radius: $radius-control;
   box-shadow: $shadow-1;
-
-  .f-search { min-width: 250px; flex: 1 1 250px; }
-  mat-form-field { font-size: 13px; }
-  // tighten the outline-field footprint inside the toolbar
-  ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
 }
 
-.filter-toggle-btn,
-.export-btn {
-  align-self: center; height: 40px;
-  transition: transform .08s $ease, background-color .14s $ease;
-  &:active { transform: scale(.97); }
+/* iOS rounded gray-fill search — leading icon + borderless native input */
+.jchd-search {
+  flex: 1 1 250px; min-width: 240px;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(118, 118, 128, .12);
+  border-radius: 11px;
+  padding: 9px 12px;
+  color: $ink-2;
+
+  .jchd-search-icon { flex: none; }
+  input {
+    border: none; background: transparent; outline: none;
+    font: inherit; font-size: 16px; color: $ink; width: 100%;
+    &::placeholder { color: $ink-2; }
+  }
 }
-.filter-toggle-btn {
-  &.active { background: $accent-soft; border-color: $accent-tint; color: $accent-strong; }
-  .chevron { margin-left: -4px; }
+
+/* soft white dropdown / action pills (mockup .fpill) */
+.jchd-filter-pills {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+
+.jchd-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: $surface;
+  border: .5px solid rgba(60, 60, 67, .16);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  border-radius: $radius-pill;
+  padding: 7px 13px;
+  font: inherit; font-size: 14px; font-weight: 500; color: $ink;
+  cursor: pointer; white-space: nowrap;
+  transition: transform .1s $ease, background-color .15s $ease, border-color .15s $ease, color .15s $ease;
+  &:active { transform: scale(.96); }
+
+  .jchd-pill-ic {
+    font-size: 17px; height: 17px; width: 17px; color: $ink-2;
+  }
+  .jchd-pill-chev { color: $ink-muted; flex: none; }
+
+  // active (Filters open / filters applied)
+  &.is-on {
+    background: $accent-soft; border-color: $accent-tint; color: $accent-strong;
+    .jchd-pill-ic { color: $accent-strong; }
+  }
+}
+
+/* native select skinned as a pill: invisible select overlays the label + chevron */
+.jchd-pill-select {
+  position: relative;
+  .jchd-pill-label { pointer-events: none; }
+  select {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0; padding: 0;
+    opacity: 0; cursor: pointer;
+    border: none; background: transparent; font: inherit;
+    -webkit-appearance: none; appearance: none;
+  }
+}
+
+.jchd-pill-clear {
+  color: $accent-strong; border-color: $accent-tint;
+}
+
+/* disabled pill (e.g. Clear filters with no active filters) */
+.jchd-pill:disabled {
+  opacity: .45; cursor: default; pointer-events: none;
+  &:active { transform: none; }
 }
 
 .jchd-filter-panel {
@@ -368,16 +437,51 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 
   .fp-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 12px; align-items: start;
+    gap: 14px 12px; align-items: start;
   }
-  .fp-field { font-size: 13px; width: 100%; margin-bottom: -1.25em; }
+
+  /* iOS soft-fill multi-select: static label above + reskinned mat-form-field */
+  .fp-field {
+    display: flex; flex-direction: column; gap: 6px; width: 100%; margin: 0;
+  }
+  .fp-field-label {
+    @include section-label;
+    letter-spacing: .04em; padding-left: 2px;
+  }
 
   .fp-toggles {
-    display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 14px;
+    display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; margin-top: 16px;
     padding-top: 14px; border-top: 1px solid $border-soft;
     font-size: 13px;
     .fp-spacer { flex: 1 1 auto; }
-    .fp-clear { height: 36px; }
+    .fp-clear { height: auto; }
+  }
+
+  /* iOS rounded checkbox replacing mat-checkbox */
+  .fp-check {
+    display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+    font-size: 14px; color: $ink; user-select: none;
+    input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+
+    .fp-check-box {
+      display: inline-grid; place-items: center;
+      width: 21px; height: 21px; flex: none;
+      border-radius: 6px; background: $surface;
+      border: 1.5px solid rgba(60, 60, 67, .22);
+      box-shadow: 0 1px 1.5px rgba(0, 0, 0, .04);
+      transition: background-color .15s $ease, border-color .15s $ease, transform .08s $ease;
+      svg { opacity: 0; color: #fff; transition: opacity .12s $ease; }
+    }
+    &:active .fp-check-box { transform: scale(.92); }
+
+    input:checked + .fp-check-box {
+      background: $accent; border-color: $accent;
+      svg { opacity: 1; }
+    }
+    input:focus-visible + .fp-check-box {
+      box-shadow: 0 0 0 3px $accent-tint;
+    }
+    .fp-check-label { line-height: 1.2; }
   }
   .fp-note {
     display: flex; align-items: flex-start; gap: 8px; margin-top: 14px;
@@ -387,6 +491,89 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     mat-icon { font-size: 16px; height: 16px; width: 16px; margin-top: 1px; color: $accent; flex: none; }
     strong { color: $ink; }
   }
+}
+
+/* =====================================================================
+   iOS reskin of the advanced-filter mat-selects (closed field)
+   Strip the Material outline notch → calm soft-fill rounded control with
+   a hairline border + trailing chevron. Scoped to the filter panel.
+   ===================================================================== */
+::ng-deep .jchd-filter-panel .fp-mat.mat-mdc-form-field {
+  width: 100%;
+  font-family: inherit;
+
+  // collapse Material's reserved subscript/hint row
+  .mat-mdc-form-field-subscript-wrapper { display: none; }
+  .mat-mdc-form-field-bottom-align::before { display: none; }
+
+  // soft-fill rounded control
+  .mat-mdc-text-field-wrapper {
+    background: rgba(118, 118, 128, .08);
+    border: 1px solid $border;
+    border-radius: $radius-control;
+    padding: 0 10px 0 12px;
+    transition: background-color .15s $ease, border-color .15s $ease, box-shadow .15s $ease;
+  }
+
+  // kill the outline notch/gap chrome entirely
+  .mdc-notched-outline,
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing { border: none !important; }
+  .mdc-notched-outline { display: none; }
+
+  .mat-mdc-form-field-flex { align-items: center; }
+  .mat-mdc-form-field-infix {
+    min-height: 38px; padding: 8px 0; width: auto;
+    border-top: 0;
+  }
+
+  // the value text
+  .mat-mdc-select-value,
+  .mat-mdc-select-value-text {
+    font-size: 14px; color: $ink; letter-spacing: -.1px;
+  }
+  .mat-mdc-select-placeholder { color: $ink-muted; }
+
+  // trailing chevron → calm muted iOS chevron weight
+  .mat-mdc-select-arrow-wrapper .mat-mdc-select-arrow {
+    color: $ink-muted;
+  }
+
+  // focused / open: accent hairline + soft ring, no Material underline
+  &.mat-focused .mat-mdc-text-field-wrapper {
+    background: $surface;
+    border-color: $accent-tint;
+    box-shadow: 0 0 0 3px $accent-soft;
+  }
+  .mdc-line-ripple { display: none; }
+}
+
+/* dropdown overlay (rendered at document root) — calm iOS panel + accent checkmarks.
+   Scoped via the panelClass we set on each mat-select. */
+::ng-deep .jchd-fp-panel.mat-mdc-select-panel {
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: $shadow-pop;
+  border: 1px solid $border;
+  background: $surface;
+
+  .mat-mdc-option {
+    border-radius: 9px;
+    min-height: 38px;
+    font-size: 14px; color: $ink;
+    &:hover:not(.mdc-list-item--disabled) { background: rgba(118, 118, 128, .08); }
+    &.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+      background: $accent-soft;
+      .mdc-list-item__primary-text { color: $accent-strong; }
+    }
+  }
+  // selected-option checkbox tint → iOS accent
+  .mat-pseudo-checkbox-checked,
+  .mat-pseudo-checkbox-indeterminate {
+    background: $accent; border-color: $accent;
+  }
+  .mat-mdc-option .mat-pseudo-checkbox { color: $accent; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -400,6 +587,17 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
   position: relative;
   border: 1px solid $border; border-radius: $radius-surface; overflow: auto;
   background: $surface; box-shadow: $shadow-2;
+
+  // premium, unobtrusive scrollbars scoped to the table surface
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  &::-webkit-scrollbar { width: 9px; height: 9px; }
+  &::-webkit-scrollbar-thumb {
+    background: #cdd6e3; border-radius: $radius-pill;
+    border: 2px solid $surface; background-clip: padding-box;
+  }
+  &::-webkit-scrollbar-thumb:hover { background: #aebccd; background-clip: padding-box; }
+  &::-webkit-scrollbar-track { background: transparent; }
 }
 
 .jchd-table {
@@ -407,7 +605,7 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 
   th.mat-mdc-header-cell {
     @include section-label;
-    font-size: 11px; color: $ink-muted; font-weight: 650;
+    font-size: 11px; color: $ink-muted; font-weight: 600; letter-spacing: .07em;
     border-bottom: 1px solid $border;
     background: $surface;
     padding-top: 14px; padding-bottom: 14px;
@@ -421,14 +619,17 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     padding-top: 13px; padding-bottom: 13px;
   }
 
-  // sticky header gains a soft elevation shadow when scrolled
+  // sticky header gains a soft, slate-tinted elevation shadow when scrolled
   ::ng-deep .mat-mdc-header-row {
-    box-shadow: inset 0 -1px 0 $border, 0 4px 12px -8px rgba(30, 41, 75, .18);
+    box-shadow: inset 0 -1px 0 $border, 0 4px 12px -8px rgba(15, 23, 42, .12);
   }
 
   /* ---- card-like data rows with band-coloured priority rail ---- */
   .jchd-data-row {
     transition: background-color .16s $ease, box-shadow .16s $ease;
+    // quick, subtle staggered load-in keyed by row index (--i from the template)
+    animation: jchd-row-in .3s $ease both;
+    animation-delay: calc(min(var(--i, 0), 14) * 18ms);
 
     td.mat-mdc-cell:first-child { position: relative; }
     // priority rail: thin band-coloured bar at row's left edge
@@ -476,9 +677,44 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 @media (hover: none), (max-width: 768px) {
   .row-actions { opacity: 1; transform: none; }
 }
+
+/* flag (star) — a primary quick action: always fully visible even when the rest of the
+   row-actions are dimmed at rest. Amber/accent when flagged. */
+.flag-btn {
+  color: $ink-muted;
+  ::ng-deep .mat-icon, mat-icon { transition: transform .2s $ease, color .14s $ease; }
+  &:active ::ng-deep .mat-icon, &:active mat-icon { transform: scale(.86); }
+  &.is-flagged { color: $warn-fg; }
+  &.is-flagged ::ng-deep .mat-icon, &.is-flagged mat-icon { animation: jchd-star-pop .28s $ease; }
+}
+.row-actions .flag-btn { opacity: 1; }
+.jchd-data-row .row-actions .flag-btn { opacity: 1; }
+
+/* worklist card flag toggle */
+.wl-flag {
+  color: $ink-muted;
+  ::ng-deep .mat-icon, mat-icon { transition: transform .2s $ease, color .14s $ease; }
+  &:active ::ng-deep .mat-icon, &:active mat-icon { transform: scale(.86); }
+  &.is-flagged { color: $warn-fg; }
+  &.is-flagged ::ng-deep .mat-icon, &.is-flagged mat-icon { animation: jchd-star-pop .28s $ease; }
+}
+
+@keyframes jchd-star-pop {
+  0% { transform: scale(.7); }
+  55% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes jchd-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .jchd-table .jchd-data-row,
   .row-actions { transition: none; }
+  .jchd-table .jchd-data-row { animation: none; }
+  .flag-btn ::ng-deep .mat-icon, .flag-btn mat-icon,
+  .wl-flag ::ng-deep .mat-icon, .wl-flag mat-icon { transition: none; animation: none; }
 }
 
 a.name-link {
@@ -705,6 +941,9 @@ $wl-ease: cubic-bezier(.2, .7, .3, 1);
   overflow: hidden;
   transition: transform .16s $wl-ease, box-shadow .16s $wl-ease;
   will-change: transform;
+  // staggered load-in keyed by card index (--i from the template)
+  animation: jchd-row-in .3s $wl-ease both;
+  animation-delay: calc(min(var(--i, 0), 12) * 24ms);
 
   &:hover {
     transform: translateY(-2px);
@@ -781,5 +1020,368 @@ $wl-ease: cubic-bezier(.2, .7, .3, 1);
 
 @media (prefers-reduced-motion: reduce) {
   .wl-card, .wl-actions .wl-act.mat-mdc-outlined-button { transition: none; }
+  .wl-card { animation: none; }
   .wl-card:hover { transform: none; }
+}
+
+/* =====================================================================
+   iOS — shared avatars (initials in a soft system-colour tint)
+   ===================================================================== */
+.ios-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: inline-grid; place-items: center;
+  font-size: 15px; font-weight: 600; letter-spacing: .2px;
+  flex-shrink: 0;
+  &.av-sm { width: 34px; height: 34px; font-size: 13px; }
+  &.av-xs { width: 24px; height: 24px; font-size: 10px; }
+
+  &.av-red    { background: rgba(255, 59, 48, .14);  color: #d70015; }
+  &.av-orange { background: rgba(255, 149, 0, .16);  color: #c25e00; }
+  &.av-blue   { background: rgba(0, 122, 255, .14);  color: #0060df; }
+  &.av-green  { background: rgba(52, 199, 89, .16);  color: #1f8a3b; }
+  &.av-indigo { background: rgba(88, 86, 214, .14);  color: #4a48b8; }
+  &.av-teal   { background: rgba(48, 176, 199, .16); color: #1f7e8f; }
+  &.av-pink   { background: rgba(255, 45, 85, .13);  color: #d61c43; }
+}
+
+/* =====================================================================
+   iOS — SUMMARY view (Apple-Health-style category cards)
+   ===================================================================== */
+.ios-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+.ios-grid .span-2 { grid-column: 1 / -1; }
+
+.ios-card {
+  background: $surface;
+  border-radius: 22px;
+  box-shadow: $shadow-2;
+  padding: 20px 20px 18px;
+  display: flex; flex-direction: column;
+
+  .ios-card-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+  .ios-card-title {
+    font-size: 16px; font-weight: 600; letter-spacing: .1px; color: $ink;
+    &.tint-red    { color: $ios-red; }
+    &.tint-orange { color: $ios-orange; }
+    &.tint-blue   { color: $ios-blue; }
+    &.tint-indigo { color: $ios-indigo; }
+    &.tint-teal   { color: $ios-teal; }
+    &.tint-pink   { color: $ios-pink; }
+  }
+
+  .ios-bignum {
+    font-size: 40px; font-weight: 700; letter-spacing: -1px; line-height: 1;
+    font-variant-numeric: tabular-nums; color: $ink;
+    &.sm { font-size: 36px; }
+    .unit {
+      font-size: 15px; font-weight: 500; color: $ink-2; letter-spacing: 0; margin-left: 7px;
+    }
+  }
+
+  .ios-subline { font-size: 14px; color: $ink-2; margin-top: 8px; line-height: 1.35; }
+  .ios-empty { font-size: 14px; color: $ink-2; margin: 14px 0 0; }
+
+  .ios-cluster {
+    display: flex; flex-direction: column; gap: 6px; margin-top: 16px;
+  }
+  .ios-row {
+    display: flex; align-items: center; gap: 11px;
+    background: transparent; border: none; padding: 4px 0; margin: 0;
+    font: inherit; text-align: left; cursor: pointer; width: 100%;
+    border-radius: 10px;
+    transition: background-color .12s $ease, transform .1s $ease;
+    &:hover { background: rgba(118, 118, 128, .08); }
+    &:active { transform: scale(.99); }
+
+    .nm { font-size: 15px; font-weight: 500; color: $ink; }
+    .nm .tag { font-size: 13px; color: $ink-2; font-weight: 400; margin-left: 5px; font-variant-numeric: tabular-nums; }
+  }
+}
+
+.ios-hero {
+  padding: 24px 24px 20px;
+  border-radius: 26px;
+  .ios-card-title { font-size: 18px; }
+  .ios-bignum { font-size: 56px; }
+
+  .ios-hero-people { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  .ios-hero-chip {
+    display: flex; align-items: center; gap: 11px;
+    background: rgba(120, 120, 128, .12);
+    border: none; border-radius: 16px; padding: 11px 14px 11px 12px;
+    flex: 1; min-width: 240px; cursor: pointer; font: inherit; text-align: left;
+    transition: transform .1s $ease, opacity .12s $ease;
+    &:active { transform: scale(.985); opacity: .92; }
+
+    .meta { min-width: 0; flex: 1; }
+    .name { font-size: 15px; font-weight: 600; color: $ink; }
+    .reason { font-size: 13px; color: $ink-2; margin-top: 1px; line-height: 1.3; }
+  }
+}
+
+/* iOS soft-tinted pill (reuses band classes from the table) */
+.ios-pill {
+  font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 999px;
+  letter-spacing: .2px; flex-shrink: 0;
+  &.pri-high { background: $pri-high-bg; color: $pri-high-fg; }
+  &.pri-med  { background: $pri-med-bg;  color: $pri-med-fg; }
+  &.pri-low  { background: $pri-low-bg;  color: $pri-low-fg; }
+}
+
+@media (max-width: 760px) {
+  .ios-grid { grid-template-columns: 1fr; }
+  .ios-grid .span-2 { grid-column: auto; }
+  .ios-hero .ios-hero-chip { min-width: 100%; }
+}
+
+/* =====================================================================
+   iOS — compact summary strip (Participants view)
+   ===================================================================== */
+.ios-mini-summary {
+  display: flex; gap: 10px; margin: 18px 0 14px;
+  overflow-x: auto; padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+
+  .ios-mini-card {
+    flex: 1 1 0; min-width: 124px;
+    background: $surface; border: none; border-radius: 14px;
+    box-shadow: $shadow-2;
+    padding: 11px 14px 12px; cursor: pointer; text-align: left; font: inherit;
+    display: flex; flex-direction: column; gap: 7px;
+    transition: transform .1s $ease, box-shadow .15s $ease;
+    &:active { transform: scale(.97); }
+    &.is-on { box-shadow: 0 0 0 2px $accent inset, $shadow-2; }
+
+    .mc-label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: $ink-2; white-space: nowrap;
+    }
+    .mc-scope { font-weight: 500; color: $ink-muted; }
+    .mc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      &.dot-gray   { background: $pri-low-fg; }
+      &.dot-orange { background: $ios-orange; }
+      &.dot-red    { background: $ios-red; }
+      &.dot-blue   { background: $ios-blue; }
+      &.dot-teal   { background: $ios-teal; }
+      &.dot-pink   { background: $ios-pink; }
+    }
+    .mc-num {
+      font-size: 25px; font-weight: 700; letter-spacing: -.5px;
+      font-variant-numeric: tabular-nums; line-height: 1; color: $ink;
+    }
+  }
+}
+
+/* =====================================================================
+   iOS — Coaches (scoreboard) top-of-queue preview
+   ===================================================================== */
+.sb-queue { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sb-queue-person {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(118, 118, 128, .1); border: none; border-radius: 999px;
+  padding: 3px 10px 3px 3px; cursor: pointer; font: inherit;
+  transition: transform .1s $ease, background-color .12s $ease;
+  &:hover { background: rgba(118, 118, 128, .18); }
+  &:active { transform: scale(.97); }
+  .sb-q-name { font-size: 12px; font-weight: 500; color: $ink; }
+}
+
+/* =====================================================================
+   iOS — Summary cards: whole-card tap affordance (navigate + filter)
+   ===================================================================== */
+.ios-card.is-tappable {
+  cursor: pointer;
+  transition: transform .12s $ease, opacity .12s $ease;
+  outline: none;
+  &:active { transform: scale(.985); opacity: .92; }
+  &:focus-visible { box-shadow: $shadow-2, 0 0 0 3px $accent-tint; }
+}
+.ios-card.is-tappable .ios-row,
+.ios-card.is-tappable .ios-hero-chip {
+  // previews are now non-interactive inside a tappable card (the card navigates)
+  cursor: inherit;
+}
+
+/* =====================================================================
+   iOS — Participants table (mockup #panel-participants, pixel-faithful)
+   Re-skins the mat-table cells; sort / paginator / lazy-load untouched.
+   ===================================================================== */
+.jchd-table-wrap.ios-table-card {
+  border: none;
+  border-radius: 20px;
+  box-shadow: $shadow-2;
+}
+
+.jchd-table.ios-grid-t {
+  // header: uppercase, tracked, muted, faint fill (mockup thead)
+  th.mat-mdc-header-cell {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    color: $ink-2;
+    background: rgba(118, 118, 128, .04);
+    padding: 13px 14px 11px;
+    border-bottom: 1px solid $border;
+  }
+  thead, ::ng-deep .mat-mdc-header-row { background: rgba(118, 118, 128, .04); }
+  ::ng-deep .mat-mdc-header-row { box-shadow: inset 0 -1px 0 $border; }
+
+  td.mat-mdc-cell {
+    font-size: 14px; color: $ink;
+    padding: 12px 14px;
+    border-bottom: 1px solid $border;          // mockup hairline separators
+    vertical-align: middle;
+  }
+  ::ng-deep .mat-mdc-row:last-child td.mat-mdc-cell { border-bottom: none; }
+
+  // mockup rows: no band rail, full-row tap, soft press tint
+  .jchd-data-row.ios-row-t {
+    cursor: pointer;
+    td.mat-mdc-cell:first-child::before { content: none; }   // drop the priority rail
+    &:hover { background: rgba(118, 118, 128, .05); }
+    &:active { background: rgba(118, 118, 128, .09); }
+    &.no-tap { cursor: default; &:hover { background: transparent; } }
+  }
+
+  // Participant cell: avatar + bold name + masked mono id
+  .cell-person {
+    display: inline-flex; align-items: center; gap: 11px; min-width: 200px;
+    .cp-id-wrap { display: inline-flex; flex-direction: column; min-width: 0; }
+    .cp-name {
+      font-size: 15px; font-weight: 600; color: $ink;
+      display: inline-flex; align-items: center; gap: 6px; line-height: 1.2;
+    }
+    .cp-id {
+      font-size: 12px; color: $ink-2; letter-spacing: .3px; margin-top: 1px;
+      font-variant-numeric: tabular-nums;
+    }
+    .flag-icon {
+      display: inline-flex; color: $ios-pink;
+      mat-icon, ::ng-deep .mat-icon { font-size: 14px; width: 14px; height: 14px; }
+    }
+  }
+
+  .coach-cell { font-size: 14px; color: $ink; white-space: nowrap; }
+  .journey-cell { font-size: 14px; color: $ink; white-space: nowrap;
+    .muted { color: $ink-muted; } }
+
+  // Priority: coloured dot + label + score
+  .prio {
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      &.urgent { background: $ios-red; }
+      &.watch  { background: $ios-orange; }
+      &.calm   { background: $ink-muted; }
+    }
+    .plabel { font-size: 13px; font-weight: 500; }
+    .pscore { font-size: 12px; color: $ink-2; font-variant-numeric: tabular-nums; margin-left: 1px; }
+    &.urgent .plabel { color: $pri-high-fg; }
+    &.watch  .plabel { color: $pri-med-fg; }
+    &.calm   .plabel { color: $ink-2; }
+  }
+
+  // soft-tinted status / finance capsules
+  .capsule {
+    display: inline-block; font-size: 12px; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px; letter-spacing: .1px; white-space: nowrap;
+    &.cap-green  { background: rgba(52, 199, 89, .15);  color: #1f8a3b; }
+    &.cap-red    { background: rgba(255, 59, 48, .13);  color: #d70015; }
+    &.cap-orange { background: rgba(255, 149, 0, .16);  color: #c25e00; }
+    &.cap-gray   { background: rgba(120, 120, 128, .12); color: $ink-2; }
+  }
+
+  .renewal {
+    white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 14px;
+    &.muted { color: $ink-muted; }
+    .sub { font-size: 12px; color: $ink-2; margin-left: 5px; }
+  }
+
+  .tick-count {
+    font-variant-numeric: tabular-nums; font-weight: 500; font-size: 14px;
+    &.amber { color: #c25e00; }
+    &.zero  { color: $ink-muted; font-weight: 400; }
+  }
+
+  .lasttouch { color: $ink-2; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+}
+
+/* =====================================================================
+   iOS — Coaches view: coach cards (mockup #panel-coaches, pixel-faithful)
+   ===================================================================== */
+.coach-list { display: flex; flex-direction: column; gap: 14px; }
+
+.coach-card {
+  background: $surface; border-radius: 20px; box-shadow: $shadow-2;
+  padding: 18px 20px; cursor: pointer;
+  transition: transform .12s $ease, opacity .12s $ease;
+  &:active { transform: scale(.99); opacity: .95; }
+
+  .coach-top { display: flex; align-items: center; gap: 14px; }
+  .ios-avatar { width: 46px; height: 46px; font-size: 16px; }
+  .coach-id { flex: 1; min-width: 0; }
+  .coach-name { font-size: 17px; font-weight: 600; color: $ink; display: flex; align-items: center; gap: 8px; }
+  .coach-sub { font-size: 13px; color: $ink-2; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .coach-chev {
+    color: $ink-muted; display: inline-flex; transition: transform .25s $ease;
+    mat-icon, ::ng-deep .mat-icon { font-size: 22px; width: 22px; height: 22px; }
+  }
+  &.open .coach-chev { transform: rotate(90deg); }
+
+  .stat-row { display: flex; gap: 8px; margin-top: 16px; }
+  .stat {
+    flex: 1; background: rgba(118, 118, 128, .06); border-radius: 13px;
+    padding: 11px 12px; text-align: center;
+    .v {
+      font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums;
+      letter-spacing: -.3px; line-height: 1; color: $ink;
+      &.red { color: $ios-red; }
+      &.orange { color: $ios-orange; }
+      &.pink { color: $ios-pink; }
+      &.green { color: $ios-green; }
+    }
+    .k { font-size: 11px; color: $ink-2; margin-top: 6px; line-height: 1.2; font-weight: 500; }
+  }
+
+  .progress-wrap { margin-top: 16px; }
+  .progress-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; color: $ink-2; margin-bottom: 7px;
+    .strong { color: $ink; font-weight: 600; font-variant-numeric: tabular-nums; }
+  }
+  .bar {
+    height: 7px; background: rgba(118, 118, 128, .16); border-radius: 999px; overflow: hidden;
+    > i { display: block; height: 100%; border-radius: 999px; background: $ios-green; transition: width .3s $ease; }
+  }
+
+  .coach-expand {
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height .3s $ease, opacity .3s $ease;
+  }
+  &.open .coach-expand { max-height: 360px; opacity: 1; margin-top: 16px; }
+  .expand-inner { border-top: 1px solid $border; padding-top: 14px; }
+  .eh {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    color: $ink-2; font-weight: 600; margin-bottom: 10px;
+  }
+  .mini-person {
+    display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer;
+    border-radius: 8px;
+    transition: background-color .12s $ease;
+    &:hover { background: rgba(118, 118, 128, .06); }
+    .ios-avatar { width: 30px; height: 30px; font-size: 12px; }
+    .mp-name { font-size: 14px; font-weight: 500; flex: 1; color: $ink; }
+    .mp-reason { font-size: 12px; color: $ink-2; text-align: right; }
+  }
+  .mini-person-empty { font-size: 13px; color: $ink-muted; padding: 7px 0; }
+}
+
+@media (max-width: 760px) {
+  .jchd-table.ios-grid-t .stat .k { font-size: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-card, .coach-card .coach-chev, .coach-card .coach-expand, .coach-card .bar > i { transition: none; }
 }
