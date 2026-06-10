@@ -99,6 +99,9 @@ export interface VariationTarget {
   vid: string; name: string; firstStage: string; terminal: string;
   participantIndex: number; email: string; profileid: string; tokenId: string;
   journey: string[]; hops: Hop[];
+  label: string;        // frame/evidence prefix — `vid-pIDX` (primary) or `vid-pIDX-jN` (all-paths)
+  journeyIndex: number; // which forward journey of this variation (0 = primary)
+  journeyCount: number; // total forward journeys for this variation
 }
 
 /** Build the per-variation targets (1 representative participant each) from the seed distribution. */
@@ -119,8 +122,41 @@ export function buildTargets(only?: string[]): VariationTarget[] {
       email: `participant${idx}+${TESTRUNID}@example.com`,
       profileid: `${TESTRUNID}_profile_${idx}`,
       tokenId: `${TESTRUNID}_tok_${TESTRUNID}_profile_${idx}`,
-      journey, hops,
+      journey, hops, label: `${v.id}-p${idx}`, journeyIndex: 0, journeyCount: 1,
     });
+  }
+  return targets;
+}
+
+/** Build a target PER forward journey (the full 72 paths), assigning participants so EVERY path AND
+ *  EVERY seeded participant is covered: walks = max(participants, journeys) per variation. Frames are
+ *  namespaced by journey via `label` (vid-pIDX-jN). The spec uses these when ALL_PATHS=1. */
+export function buildAllJourneyTargets(only?: string[]): VariationTarget[] {
+  const plan = generatePlan(cfg, Number(process.env.TOTAL_PARTICIPANTS || 50));
+  const targets: VariationTarget[] = [];
+  let base = 0;
+  for (const v of plan.variations) {
+    const pStart = base; base += v.participants;
+    if (only && only.length && !only.includes(v.id) && !only.includes(v.variationname)) continue;
+    const journeys: string[][] = forwardJourneys(cfg, v.id);
+    if (!journeys.length) continue;
+    const walks = Math.max(v.participants, journeys.length); // cover all paths AND all participants
+    for (let k = 0; k < walks; k++) {
+      const jIdx = k % journeys.length;
+      const journey = journeys[jIdx];
+      const idx = pStart + (k % Math.max(1, v.participants));
+      const hops = journey.slice(0, -1).map((from, i) => classifyForwardHop(from, journey[i + 1], v.id));
+      targets.push({
+        vid: v.id, name: `${v.variationname} · path ${jIdx + 1}/${journeys.length}`,
+        firstStage: journey[0] || v.backbone?.[0] || cfg.stages[0],
+        terminal: journey[journey.length - 1] || (journey[0] ?? cfg.stages[0]),
+        participantIndex: idx,
+        email: `participant${idx}+${TESTRUNID}@example.com`,
+        profileid: `${TESTRUNID}_profile_${idx}`,
+        tokenId: `${TESTRUNID}_tok_${TESTRUNID}_profile_${idx}`,
+        journey, hops, label: `${v.id}-p${idx}-j${jIdx}`, journeyIndex: jIdx, journeyCount: journeys.length,
+      });
+    }
   }
   return targets;
 }

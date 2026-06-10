@@ -14,13 +14,15 @@ import { QueueBoardPage } from '../pages/queue-board.page';
 import { loginAsOperator } from '../support/auth';
 import { QUEUE_NAME } from '../support/actors';
 import {
-  buildTargets, driveBoardHop, driveFlutterSelfRun, resetToken, assertAfterHop,
+  buildTargets, buildAllJourneyTargets, driveBoardHop, driveFlutterSelfRun, resetToken, assertAfterHop,
   attachAndAuditFrames, clearMobileScreenshots, ensureSimBuildPrereqs, TERMINAL, MODEL,
 } from './walk-lib';
 const { assertTerminalReached } = require('../../lib/assertions');
 
 const ONLY = process.env.VARIATIONS ? process.env.VARIATIONS.split(',').map((s) => s.trim()) : undefined;
-const TARGETS = buildTargets(ONLY);
+// Default: 9 representative journeys (1 primary path/variation). ALL_PATHS=1 → every forward journey
+// (72 paths), participants assigned to cover all paths + all 50 seeded users (~82 walks).
+const TARGETS = process.env.ALL_PATHS === '1' ? buildAllJourneyTargets(ONLY) : buildTargets(ONLY);
 
 test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real Angular board)', () => {
   // One-time: apply the iOS-sim stub overrides + clear the stale Generated.xcconfig + pub get (stock 3.44).
@@ -40,8 +42,8 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
       // then boot the REAL app to capture the parked stage as imaging proof (parity with the other 8).
       if (t.hops.length === 0) {
         await assertTerminalReached(t.tokenId, t.vid, { terminal: t.terminal });
-        await driveFlutterSelfRun(t, 0, `${t.vid}-p${t.participantIndex}`);
-        await attachAndAuditFrames(testInfo, `${t.vid}-p${t.participantIndex}`, 1); // 1 parked-terminal frame
+        await driveFlutterSelfRun(t, 0, t.label);
+        await attachAndAuditFrames(testInfo, t.label, 1); // 1 parked-terminal frame
         return;
       }
 
@@ -62,7 +64,7 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
           let j = i;
           while (j < t.hops.length && t.hops[j].kind === 'SELF') j++;
           const runLen = j - i;
-          await driveFlutterSelfRun(t, runLen, `${t.vid}-p${t.participantIndex}`);
+          await driveFlutterSelfRun(t, runLen, t.label);
           logged += runLen;
           await assertAfterHop(t.tokenId, t.vid, logged, minNonSelf);
           i = j;
@@ -70,7 +72,7 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
           // OP / AUTO → REAL board move (movedby = operator profileid), board-computed count-drift.
           // The hop also captures the participant's REAL card on the REAL board at the source stage
           // (imaging proof of the operator hop; the count-drift assertion is the numeric proof).
-          await driveBoardHop(board, t.profileid, t.hops[i], { label: `${t.vid}-p${t.participantIndex}`, seq: i });
+          await driveBoardHop(board, t.profileid, t.hops[i], { label: t.label, seq: i });
           minNonSelf += 1;
           logged += 1;
           await assertAfterHop(t.tokenId, t.vid, logged, minNonSelf);
@@ -89,7 +91,7 @@ test.describe('REAL-mobile participant walk (Flutter taps for self-moves + real 
 
       // L1 guard: every walk should produce 3 mobile frames per self-move (card/form/after) + 1 board
       // frame per operator hop. Missing/blank beyond the cushion fails (see attachAndAuditFrames).
-      await attachAndAuditFrames(testInfo, `${t.vid}-p${t.participantIndex}`, 3 * selfHops + opHops);
+      await attachAndAuditFrames(testInfo, t.label, 3 * selfHops + opHops);
     });
   }
 });
