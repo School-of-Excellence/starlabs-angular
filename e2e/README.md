@@ -1,39 +1,164 @@
-# e2e/ — Tier-A emulator fixtures + Playwright happy-path specs (Phase 3 → D-002 bridge)
+# StarLabs E2E & Test Map
 
-Phase 3 of the documentation rollout turns each subsystem's **documented config + happy path** into **Firebase Emulator seed fixtures** and **Playwright specs**. This is the scaffold the test stack (decision **D-002**) will run; building/wiring the full stack is D-002's job, not this phase.
+> How every test suite is organized, how to run it, and what to expect.
+> Visual version of this per-suite detail: open [`test-suites.html`](test-suites.html).
+> For the broader landscape + the 9 mobile-journey storyboards, see [`test-map.html`](test-map.html).
+> Companion docs: `specs/journals/2026-06-10-allcomponents-e2e-DEEPENING.md` (WHY) ·
+> `specs/plans/2026-06-10-all-components-e2e-plan.md` (WHAT) · `e2e/recon-allcomp/*.md` (per-group recon).
+>
+> *(Supersedes the original "Phase 3 → D-002 emulator-fixtures" README; the emulator scaffold it described
+> still exists — see [Legacy / emulator scaffold](#legacy--emulator-scaffold) — but the cloud suites below are
+> now the primary path.)*
 
-## Hard safety rules (non-negotiable — CLAUDE.md)
-- **Production is never touched.** All test data targets the **emulator** (or `starlabs-test`), never `fir-sample-aae4a`.
-  - `seed-emulator.js` **refuses to run** unless `FIRESTORE_EMULATOR_HOST` is set and **aborts** if the project id is production.
-  - Emulator config lives in **`firebase.emulator.json`** (NOT `firebase.json`). Reason: the deploy workflow runs a bare `firebase deploy`, so a `firestore` block in `firebase.json` would deploy rules/indexes to prod. `firestore.rules` here is **emulator-only** — never wire it into `firebase.json`.
-- **ATC is excluded.** Fixtures contain **no ATC collections**; specs never navigate ATC-integrating routes (`e2e/_support/excluded-routes.ts`, from `specs/operator-screens.md §C`). `seed-emulator.js` has an ATC denylist guard as defence-in-depth.
-- **Tier-A only.** Seeded collections are the locked/trusted set (`specs/data-reliability.md`, `specs/DATA-MODEL.md`).
+---
 
-## What's here
-| File | Purpose |
-|---|---|
-| `fixtures/firestore-seed.json` | Synthetic Tier-A seed (no PII). CONFIG docs that make a queue run + a happy path per subsystem. Markers `{_ts}`/`{_ref}`. |
-| `fixtures/seed-emulator.js` | Loads the seed into the Firestore emulator (prod-safe guards). |
-| `playwright.config.ts` | Playwright config; `baseURL` = the emulator-wired app. |
-| `_support/app.ts` | `login()` / `goToRoute()` helpers + test users (match the seed). |
-| `_support/excluded-routes.ts` | The ATC-excluded route denylist + `assertNotExcluded()` guard. |
-| `*.spec.ts` | Happy-path smoke per subsystem: `auth-nav`, `queue`, `scheduling`, `journey`, `content`. |
-| `../firebase.emulator.json`, `../firestore.rules`, `../firestore.indexes.json` | Emulator runtime config (prod-safe, separate from `firebase.json`). |
+## The landscape
 
-## Run (once D-002 wires the app to the emulator)
+```
+StarLabs tests
+│
+├─ 1. E2E — Playwright  (real Angular UI + real Firestore/CFs)
+│  │   target: cloud test project  slabs-queue-e2e-exdcz   (NEVER production)
+│  │   model:  app served on :4200  ·  Playwright drives Chromium  ·  admin-SDK seeds/asserts
+│  │
+│  ├─ queue/                ← the original suite (24 spec files)
+│  │     playwright.queue.config.ts ............ cloud   (~188 cases green)
+│  │     playwright.queue.emulator.config.ts ... hermetic Firebase-emulator (CI-gateable)
+│  │     playwright.queue.evidence.config.ts ... + per-stage screenshots
+│  │     playwright.invariants.config.ts ....... 1 hermetic self-test (no app, no seed)
+│  │     playwright.mobile.config.ts ........... operator board + REAL Flutter participant on iOS sim
+│  │
+│  └─ 12 component groups   ← built by the all-components initiative
+│        (each group:  seed-<group>.js  +  support/  +  *.spec.ts  +  playwright.<group>.config.ts)
+│        appointments  events  modes  content  workshops  comms
+│        support  profiles  evomap  authroles  journey  business
+│
+└─ 2. Unit — Karma/Jasmine   (`ng test`)
+      403 spec files in src/ — ~398 are empty Angular-CLI stubs
+      + dynamic-studio.atc-list.render.smoke.spec.ts (real render-contract smoke, no Firestore/ATC)
+```
+
+---
+
+## Safety rules (non-negotiable — CLAUDE.md)
+
+- **Production is never touched.** All test data targets the cloud **test** project `slabs-queue-e2e-exdcz`
+  (or the emulator) — never `fir-sample-aae4a`. Test users live only there.
+- **ATC is off-limits.** No suite reads/writes/seeds ATC collections; products are seeded `atcmodel:null`.
+  The one ATC-named test (`queue/dynamic-studio/dynamic-studio.atc-list.render.smoke.spec.ts`) is a pure
+  template render against a *synthetic* array — no Firestore, no `src/app/ATC/**` import.
+- **Emulator config is segregated.** Emulator runtime lives in `firebase.emulator.json` / `firebase.test.json`,
+  NOT `firebase.json` — the deploy workflow runs a bare `firebase deploy`, so a `firestore` block in
+  `firebase.json` would push rules/indexes to prod. `seed-emulator.js` refuses to run unless
+  `FIRESTORE_EMULATOR_HOST` is set and aborts on a production project id.
+- **Watson / SalesCRM are separate prod apps** reached via `getApp(...)`; the test env wires no cross-project
+  writer. (An uninitialized Watson read on the purchase screen is a known, tolerated benign console error.)
+
+---
+
+## How to run
+
+### Prerequisites (one-time)
+
 ```bash
-npm i -D @playwright/test && npx playwright install chromium      # not yet in devDeps
-firebase emulators:start --config firebase.emulator.json          # terminal 1
-FIRESTORE_EMULATOR_HOST=localhost:8080 FIREBASE_PROJECT=demo-starlabs \
-  node e2e/fixtures/seed-emulator.js                              # terminal 2 — seed
+npm install --legacy-peer-deps     # repo deps (peer deps require the flag)
+cd e2e && npm install              # the e2e runner lives here (Playwright 1.60 — NOT the repo-root 1.59)
+```
+
+### The app must be served on :4200 (a test-project dev build)
+
+The configs auto-start `serve -s ../dist/atctranscription/browser -l 4200` if nothing is listening.
+To (re)build the bundle yourself:
+
+```bash
+node_modules/.bin/ng build --configuration development   # development env → test project slabs-queue-e2e-exdcz
+```
+
+### Run a suite (from `e2e/`)
+
+```bash
+NODE_OPTIONS=--max-old-space-size=4096 \
+  npx playwright test --config=playwright.<group>.config.ts --reporter=line
+
+SKIP_SEED=1  …                     # reuse the existing seed while iterating (skips teardown+reseed)
+BASE_URL=http://localhost:<port> … # point at a different served bundle (see caveat #2)
+```
+
+---
+
+## What to expect — per group (clean run)
+
+| Group | Config | pass | fixme | skip | Covers |
+|---|---|---:|---:|---:|---|
+| **queue** | `playwright.queue.config.ts` | ~188 | 2 | meta | Queue Manager: staging, stage-log, assignment, dashboards |
+| **appointments** | `playwright.appointments.config.ts` | 18 | 1 | 0 | Booking join-chain, slots, roster, team-hours, studio |
+| **events** | `playwright.events.config.ts` | 15 | 0 | 0 | RSVP→request→approve, e-tickets, arena zones |
+| **modes** | `playwright.modes.config.ts` | 23 +16 engine | 0 | 2 | Mode rollup/arc engine, wishlist, app-engagement |
+| **content** | `playwright.content.config.ts` | 11 | 4 | 4 | Series/episodes, tier access, playlists, HLS |
+| **workshops** | `playwright.workshops.config.ts` | 14 | 4 | 0 | Workshop authoring, scheduling, attendance |
+| **comms** | `playwright.comms.config.ts` | 10 | 2 | 7 | Notifications, templates, broadcasts |
+| **support** | `playwright.support.config.ts` | 12 | 3 | 3 | Tickets, support chat, blocked messages |
+| **profiles** | `playwright.profiles.config.ts` | 22 | 1 | 0 | Profile data, analytics, `*_to_pmd` CF effects |
+| **evomap** | `playwright.evomap.config.ts` | 13 | 1 | 0 | Evolution mapping authoring + render |
+| **authroles** | `playwright.authroles.config.ts` | 18 | 1 | 2 | Login gate, data-driven authGuard, nav visibility |
+| **journey** | `playwright.journey.config.ts` | 16 | 0 | 0 | Purchase/onboard, sales-lead, product-delivery* |
+| **business** | `playwright.business.config.ts` | 20 | 1 | 0 | Expense planner, zones, HPC, quizzes, touchpoints |
+
+\* the journey product-delivery cases (JP-PD/JP-EDIT) **validate two real production source fixes** end-to-end
+(`delivery-sequence.component.ts` null-guard `16b578a`; `product-delivery.component.ts` fresh-per-emit view-model).
+
+**Totals:** ~208 component-group cases (incl. the modes 16-case engine) + ~188 queue ≈ **~396 passing**, with **20 fixme** + **~18 CF-skip** documented in-file.
+
+### Legend
+
+- **pass** — real *anti-circular* assertions: the app **rendered** or **wrote** the asserted value; never a value the test itself wrote.
+- **fixme** — authored but parked, each with an in-file reason. Almost all are one fragile class: **writes through multi-step Material dialogs/steppers** (no testids, async validators) + the appointments booking keystone (follow-up #1).
+- **skip** — a Cloud Function not deployed to the test project: the UI write is asserted, the CF side-effect is skip-guarded.
+
+---
+
+## Caveats — read before trusting a run
+
+1. **Shared cloud project → occasional timing flake.** Every suite hits one reused project that accumulates
+   state. A capacity/auth-timing case (appointments booking, route-mount) can flake ~1/run on a busy day.
+   **Re-run before treating a single failure as real.** Each suite reseeds its own world on start.
+2. **`:4200` can serve a STALE bundle from a sibling worktree.** If you're testing *new/uncommitted app
+   source*, the default `:4200` server may be another worktree's old build (so your fix looks ineffective).
+   Build *this* repo, serve on a fresh port, and pass `BASE_URL=http://localhost:<port>`. A `serve -s` SPA
+   fallback returns `index.html` with HTTP 200 for any path — check `content_type` is `application/javascript`
+   to confirm a real chunk, not the fallback.
+3. **Serial by design.** Each config runs one worker (shared seed state) — don't add `--workers`.
+
+---
+
+## Shared harness (to add a new group)
+
+- `e2e/lib/seed-common.js` — `bootstrapGroup` / `seedDashboardRoutes` / `teardownGroup` on the proven
+  `seed-test-project` primitives. **Every driven route needs a `dashboard` route-grant doc** or the authGuard
+  redirects to root.
+- `e2e/_shared/prod-firewall.ts` — `installProdFirewall(page)` blocks hardcoded prod CF URLs.
+- Reuse the queue `support/{console-guard,firestore-admin}` + `stubs/*` + `actors.loginAs`.
+- `assertNoFatal(guard, ctx, extraIgnorable[])` — the optional 3rd arg tolerates a tightly-anchored benign
+  console class per screen (e.g. the userprofile `requires an index` quirk, the purchase-screen Watson read).
+- Composite indexes live in `firestore.indexes.json`
+  (deploy: `firebase deploy --only firestore:indexes --project slabs-queue-e2e-exdcz --config firebase.test.json`).
+
+---
+
+## Legacy / emulator scaffold
+
+The original Phase-3 / **D-002 bridge** turned each subsystem's documented happy path into Firebase-emulator
+seed fixtures + Playwright smokes. That scaffold still lives here and underpins the hermetic emulator configs:
+
+- `fixtures/firestore-seed.json` — synthetic Tier-A seed (no PII), `seed-emulator.js` loads it (prod-safe guards).
+- `playwright.config.ts` — the base, emulator-wired config (`baseURL` = the emulator app); without `BASE_URL`
+  its specs skip rather than falsely pass, so they were safe to commit pre-stack.
+- `playwright.queue.emulator.config.ts` / `*.evidence.config.ts` — the CI-gateable hermetic queue runs.
+
+Run the emulator path:
+
+```bash
+firebase emulators:start --config firebase.emulator.json                       # terminal 1
+FIRESTORE_EMULATOR_HOST=localhost:8080 node e2e/fixtures/seed-emulator.js        # terminal 2 — seed
 BASE_URL=http://localhost:4200 npx playwright test -c e2e/playwright.config.ts
 ```
-Without `BASE_URL` the specs **skip** (they don't falsely pass), so they're safe to commit pre-D-002.
-
-## The D-002 hand-off (what remains)
-1. **App ↔ emulator wiring:** add an `emulator` build configuration that calls `connectFirestoreEmulator`/`connectAuthEmulator` behind an env flag (`environment.useEmulator`). Today the app only talks to live Firebase.
-2. **Auth emulator users:** create the `admin@example.test` / `participant@example.test` users in the Auth emulator (extend `seed-emulator.js` to use the Auth Admin SDK) so `login()` works.
-3. **Selector hardening:** the specs use role/text selectors as documented happy paths; confirm against the real UI and add `data-testid`s where brittle (marked `TODO(D-002)`).
-4. **CI gate:** wire `emulators:exec → seed → ng serve(emulator) → playwright test` into a CI job, then gate the deploy (closes TD-005). Keep ATC screens out of the job.
-
-> These fixtures encode the **documented** Tier-A happy paths; if a subsystem doc's config shape changes, update `firestore-seed.json` with it.

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StarLabs · E2E Suites — run &amp; expect</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171c24; --panel2:#1d242e; --line:#2a323d;
+    --ink:#e6edf3; --mut:#9aa7b4; --dim:#6b7785;
+    --accent:#5db3ff; --accent2:#7c9cff;
+    --pass:#3fb950; --fixme:#d29922; --skip:#6b7785; --warn:#f0883e; --bad:#f85149;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;
+       -webkit-font-smoothing:antialiased;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px 80px}
+  header{background:linear-gradient(135deg,#1b2735 0%,#0f1419 70%);border-bottom:1px solid var(--line);
+         padding:38px 0 30px;margin-bottom:30px}
+  header .wrap{padding-bottom:0}
+  h1{margin:0 0 6px;font-size:30px;letter-spacing:-.4px}
+  h1 .em{color:var(--accent)}
+  .sub{color:var(--mut);font-size:15px;margin:0}
+  .sub a{color:var(--accent)}
+  .pills{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+        padding:5px 13px;font-size:12.5px;color:var(--mut)}
+  .pill b{color:var(--ink)}
+  .pill.warn{border-color:#5a3d1e;background:#2a1e10;color:#f0c089}
+  h2{font-size:19px;margin:38px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line);
+     display:flex;align-items:center;gap:9px}
+  h2 .n{color:var(--accent2);font-family:var(--mono);font-size:15px}
+  pre.tree{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+           padding:18px 20px;overflow:auto;font-family:var(--mono);font-size:12.8px;line-height:1.7;
+           color:#c4d0dc;margin:0}
+  pre.tree .c{color:var(--accent)}
+  pre.tree .g{color:#82e0aa}
+  pre.tree .m{color:var(--dim)}
+  pre.tree .hd{color:var(--ink);font-weight:600}
+  .cmd{background:#0b0e12;border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+       font-family:var(--mono);font-size:12.8px;color:#cfe3f5;overflow:auto;margin:12px 0}
+  .cmd .cm{color:var(--dim)}
+  .cmd .fl{color:var(--warn)}
+  .cmd .v{color:#82e0aa}
+  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13.5px;
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
+  thead th{background:var(--panel2);color:var(--mut);font-weight:600;font-size:12px;
+           text-transform:uppercase;letter-spacing:.5px}
+  tbody tr:nth-child(even){background:#141a22}
+  tbody tr:hover{background:#1a2129}
+  td.g{font-weight:600;color:var(--ink)}
+  td.cfg{font-family:var(--mono);font-size:11.8px;color:var(--mut)}
+  td.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .b{display:inline-block;min-width:30px;text-align:center;border-radius:6px;padding:2px 8px;
+     font-family:var(--mono);font-size:12px;font-weight:600}
+  .b.pass{background:rgba(63,185,80,.14);color:var(--pass)}
+  .b.fixme{background:rgba(210,153,34,.15);color:var(--fixme)}
+  .b.skip{background:rgba(107,119,133,.16);color:var(--skip)}
+  .b.zero{background:transparent;color:var(--dim);font-weight:400}
+  td.cov{color:var(--mut);font-size:12.8px}
+  tfoot td{background:var(--panel2);font-weight:600}
+  .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px}
+  .legend .item{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 14px}
+  .legend .k{font-family:var(--mono);font-weight:600;margin-bottom:3px}
+  .legend .k.pass{color:var(--pass)} .legend .k.fixme{color:var(--fixme)} .legend .k.skip{color:var(--skip)}
+  .legend .d{color:var(--mut);font-size:12.8px}
+  ol.cav{padding-left:0;list-style:none;counter-reset:c;margin:6px 0 0}
+  ol.cav li{counter-increment:c;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);
+            border-radius:8px;padding:11px 15px 11px 46px;position:relative;margin-bottom:9px}
+  ol.cav li::before{content:counter(c);position:absolute;left:14px;top:11px;color:var(--warn);
+                    font-family:var(--mono);font-weight:700}
+  ol.cav b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card h3{margin:0 0 8px;font-size:14px;color:var(--accent)}
+  .card ul{margin:0;padding-left:18px;color:var(--mut);font-size:13px}
+  .card li{margin-bottom:5px}
+  code{font-family:var(--mono);font-size:.9em;background:#0b0e12;border:1px solid var(--line);
+       border-radius:5px;padding:1px 5px;color:#cfe3f5}
+  .note{color:var(--dim);font-size:12.5px;margin-top:8px}
+  a{color:var(--accent)}
+  .star{color:var(--accent2)}
+  footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
+  footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>StarLabs · <span class="em">E2E Suites</span></h1>
+    <p class="sub">Per-suite <b>run &amp; expect</b> detail for the web Playwright suites. &nbsp;·&nbsp;
+       For the broader landscape + the 9 mobile-journey storyboards, see <a href="test-map.html">test-map.html</a>.</p>
+    <div class="pills">
+      <span class="pill">Target: <b>slabs-queue-e2e-exdcz</b> (cloud test project)</span>
+      <span class="pill"><b>13</b> Playwright suites</span>
+      <span class="pill">~<b>396</b> passing cases</span>
+      <span class="pill warn">Production never touched · ATC off-limits</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <h2><span class="n">▸</span> The landscape</h2>
+  <pre class="tree"><span class="hd">StarLabs tests</span>
+│
+├─ <span class="hd">1. E2E — Playwright</span>  (real Angular UI + real Firestore/CFs)
+│  │   target: cloud test project  <span class="g">slabs-queue-e2e-exdcz</span>   (<span class="m">NEVER production</span>)
+│  │   model:  app served on :4200  ·  Playwright drives Chromium  ·  admin-SDK seeds/asserts
+│  │
+│  ├─ <span class="g">queue/</span>                <span class="m">← the original suite (24 spec files)</span>
+│  │     <span class="c">playwright.queue.config.ts</span> ............ cloud   (~188 cases green)
+│  │     <span class="c">playwright.queue.emulator.config.ts</span> ... hermetic Firebase-emulator (CI-gateable)
+│  │     <span class="c">playwright.queue.evidence.config.ts</span> ... + per-stage screenshots
+│  │     <span class="c">playwright.invariants.config.ts</span> ....... 1 hermetic self-test (no app, no seed)
+│  │     <span class="c">playwright.mobile.config.ts</span> ........... operator board + REAL Flutter participant (iOS sim)
+│  │
+│  └─ <span class="g">12 component groups</span>   <span class="m">← built by the all-components initiative</span>
+│        <span class="m">(each:  seed-&lt;group&gt;.js + support/ + *.spec.ts + playwright.&lt;group&gt;.config.ts)</span>
+│        <span class="g">appointments  events  modes  content  workshops  comms</span>
+│        <span class="g">support  profiles  evomap  authroles  journey  business</span>
+│
+└─ <span class="hd">2. Unit — Karma/Jasmine</span>   (<span class="c">ng test</span>)
+      403 spec files in src/ — ~398 are empty Angular-CLI stubs
+      + dynamic-studio.atc-list.render.smoke.spec.ts <span class="m">(render-contract smoke, no Firestore/ATC)</span></pre>
+
+  <h2><span class="n">⚑</span> Safety rules <span style="font-size:12px;color:var(--dim);font-weight:400">— non-negotiable</span></h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>Data isolation</h3>
+      <ul>
+        <li><b>Production never touched.</b> All data → the cloud <b>test</b> project (or emulator), never <code>fir-sample-aae4a</code>.</li>
+        <li><b>Test users live only there</b> — never in production.</li>
+        <li><b>Watson / SalesCRM</b> are separate prod apps via <code>getApp()</code>; the test env wires no cross-project writer.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>ATC &amp; config segregation</h3>
+      <ul>
+        <li><b>ATC off-limits.</b> No suite reads/writes/seeds ATC collections; products seeded <code>atcmodel:null</code>.</li>
+        <li>The one ATC-named test is a pure render smoke over a <b>synthetic</b> array — no Firestore, no ATC import.</li>
+        <li>Emulator config lives in <code>firebase.emulator.json</code> / <code>firebase.test.json</code>, <b>not</b> <code>firebase.json</code> (a bare <code>firebase deploy</code> would push to prod).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2><span class="n">$</span> How to run</h2>
+  <p class="note">Prerequisites (one-time):</p>
+  <div class="cmd"><span class="cm"># repo deps (peer deps require the flag)</span>
+npm install --legacy-peer-deps
+<span class="cm"># the e2e runner lives here (Playwright 1.60 — NOT the repo-root 1.59)</span>
+cd e2e &amp;&amp; npm install</div>
+  <p class="note">The app must be served on :4200 (test-project dev build). The configs auto-start it; to (re)build yourself:</p>
+  <div class="cmd">node_modules/.bin/ng build --configuration <span class="v">development</span>   <span class="cm"># development env → test project</span></div>
+  <p class="note">Run a suite (from <code>e2e/</code>):</p>
+  <div class="cmd"><span class="fl">NODE_OPTIONS</span>=--max-old-space-size=4096 \
+  npx playwright test --config=playwright.<span class="v">&lt;group&gt;</span>.config.ts --reporter=line
+
+<span class="fl">SKIP_SEED</span>=1  …                     <span class="cm"># reuse the existing seed while iterating</span>
+<span class="fl">BASE_URL</span>=http://localhost:&lt;port&gt; … <span class="cm"># point at a different served bundle (caveat #2)</span></div>
+
+  <h2><span class="n">✓</span> What to expect — per group (clean run)</h2>
+  <table>
+    <thead><tr><th>Group</th><th>Config</th><th style="text-align:right">pass</th><th style="text-align:right">fixme</th><th style="text-align:right">skip</th><th>Covers</th></tr></thead>
+    <tbody>
+      <tr><td class="g">queue</td><td class="cfg">queue</td><td class="num"><span class="b pass">~188</span></td><td class="num"><span class="b fixme">2</span></td><td class="num"><span class="b skip">meta</span></td><td class="cov">Queue Manager: staging, stage-log, assignment, dashboards</td></tr>
+      <tr><td class="g">appointments</td><td class="cfg">appointments</td><td class="num"><span class="b pass">18</span></td><td class="num"><span class="b fixme">1</span></td><td class="num"><span class="b zero">0</span></td><td class="cov">Booking join-chain, slots, roster, team-hours, studio</td></tr>
+      <tr><td class="g">events</td><td class="cfg">events</td><td class="num"><span class="b pass">15</span></td><td class="num"><span class="b zero">0</span></td><td class="num"><span class="b zero">0</span></td><td class="cov">RSVP→request→approve, e-tickets, arena zones</td></tr>
+      <tr><td class="g">modes</td><td class="cfg">modes</td><td class="num"><span class="b pass">23+16</span></td><td class="num"><span class="b zero">0</span></td><td class="num"><span class="b skip">2</span></td><td class="cov">Mode rollup/arc <b>engine</b>, wishlist, app-engagement</td></tr>
+      <tr><td class="g">content</td><td class="cfg">content</td><td class="num"><span class="b pass">11</span></td><td class="num"><span class="b fixme">4</span></td><td class="num"><span class="b skip">4</span></td><td class="cov">Series/episodes, tier access, playlists, HLS</td></tr>
+      <tr><td class="g">workshops</td><td class="cfg">workshops</td><td class="num"><span class="b pass">14</span></td><td class="num"><span class="b fixme">4</span></td><td class="num"><span class="b zero">0</span></td><td class="cov">Workshop authoring, scheduling, attendance</td></tr>
+      <tr><td class="g">comms</td><td class="cfg">comms</td><td class="num"><span class="b pass">10</span></td><td class="num"><span class="b fixme">2</span></td><td class="num"><span class="b skip">7</span></td><td class="cov">Notifications, templates, broadcasts</td></tr>
+      <tr><td class="g">support</td><td class="cfg">support</td><td class="num"><span class="b pass">12</span></td><td class="num"><span class="b fixme">3</span></td><td class="num"><span class="b skip">3</span></td><td class="cov">Tickets, support chat, blocked messages</td></tr>
+      <tr><td class="g">profiles</td><td class="cfg">profiles</td><td class="num"><span class="b pass">22</span></td><td class="num"><span class="b fixme">1</span></td><td class="num"><span class="b zero">0</span></td><td class="cov">Profile data, analytics, <code>*_to_pmd</code> CF effects</td></tr>
+      <tr><td class="g">evomap</td><td class="cfg">evomap</td><td class="num"><span class="b pass">13</span></td><td class="num"><span class="b fixme">1</span></td><td class="num"><span class="b zero">0</span></td><td class="cov">Evolution mapping authoring + render</td></tr>
+      <tr><td class="g">authroles</td><td class="cfg">authroles</td><td class="num"><span class="b pass">18</span></td><td class="num"><span class="b fixme">1</span></td><td class="num"><span class="b skip">2</span></td><td class="cov">Login gate, data-driven authGuard, nav visibility</td></tr>
+      <tr><td class="g">journey</td><td class="cfg">journey</td><td class="num"><span class="b pass">16</span></td><td class="num"><span class="b zero">0</span></td><td class="num"><span class="b zero">0</span></td><td class="cov">Purchase/onboard, sales-lead, product-delivery <span class="star">✦</span></td></tr>
+      <tr><td class="g">business</td><td class="cfg">business</td><td class="num"><span class="b pass">20</span></td><td class="num"><span class="b fixme">1</span></td><td class="num"><span class="b zero">0</span></td><td class="cov">Expense planner, zones, HPC, quizzes, touchpoints</td></tr>
+    </tbody>
+    <tfoot><tr><td colspan="2">Totals</td><td class="num"><span class="b pass">~396</span></td><td class="num"><span class="b fixme">20</span></td><td class="num"><span class="b skip">~18</span></td><td class="cov">~208 component-group + ~188 queue (incl. modes 16-case engine)</td></tr></tfoot>
+  </table>
+  <p class="note"><span class="star">✦</span> journey product-delivery cases (JP-PD / JP-EDIT) <b>validate two real production source fixes</b> end-to-end
+  (<code>delivery-sequence.component.ts</code> null-guard <code>16b578a</code>; <code>product-delivery.component.ts</code> fresh-per-emit view-model).</p>
+
+  <div class="legend">
+    <div class="item"><div class="k pass">pass</div><div class="d">Real <b>anti-circular</b> assertions — the app <b>rendered</b> or <b>wrote</b> the asserted value; never one the test wrote.</div></div>
+    <div class="item"><div class="k fixme">fixme</div><div class="d">Authored but parked, each with an in-file reason. Mostly one class: <b>writes via multi-step Material dialogs/steppers</b> + the appointments booking keystone.</div></div>
+    <div class="item"><div class="k skip">skip</div><div class="d">A Cloud Function not deployed to the test project — the UI write is asserted, the CF side-effect is skip-guarded.</div></div>
+  </div>
+
+  <h2><span class="n">!</span> Caveats — read before trusting a run</h2>
+  <ol class="cav">
+    <li><b>Shared cloud project → occasional timing flake.</b> Every suite hits one reused project that accumulates state. A capacity/auth-timing case can flake ~1/run on a busy day. <b>Re-run before treating a single failure as real.</b> Each suite reseeds its own world on start.</li>
+    <li><b><code>:4200</code> can serve a STALE bundle from a sibling worktree.</b> Testing <i>new/uncommitted source</i>? The default server may be another worktree's old build. Build <i>this</i> repo, serve on a fresh port, pass <code>BASE_URL</code>. A <code>serve -s</code> SPA fallback returns 200 for any path — confirm <code>content_type: application/javascript</code>, not the HTML fallback.</li>
+    <li><b>Serial by design.</b> Each config runs one worker (shared seed state) — don't add <code>--workers</code>.</li>
+  </ol>
+
+  <h2><span class="n">⚙</span> Shared harness <span style="font-size:12px;color:var(--dim);font-weight:400">— to add a new group</span></h2>
+  <div class="card">
+    <ul>
+      <li><code>e2e/lib/seed-common.js</code> — <code>bootstrapGroup</code> / <code>seedDashboardRoutes</code> / <code>teardownGroup</code>. <b>Every driven route needs a <code>dashboard</code> route-grant doc</b> or the authGuard redirects to root.</li>
+      <li><code>e2e/_shared/prod-firewall.ts</code> — <code>installProdFirewall(page)</code> blocks hardcoded prod CF URLs.</li>
+      <li>Reuse queue <code>support/{console-guard,firestore-admin}</code> + <code>stubs/*</code> + <code>actors.loginAs</code>.</li>
+      <li><code>assertNoFatal(guard, ctx, extraIgnorable[])</code> — 3rd arg tolerates a tightly-anchored benign console class per screen.</li>
+      <li>Composite indexes → <code>firestore.indexes.json</code> (<code>firebase deploy --only firestore:indexes --config firebase.test.json</code>).</li>
+    </ul>
+  </div>
+
+  <footer>
+    Per-suite detail for the StarLabs all-components E2E initiative · branch <code>cicd</code> ·
+    broader map + mobile journeys → <a href="test-map.html">test-map.html</a> ·
+    full WHY → <code>specs/journals/2026-06-10-allcomponents-e2e-DEEPENING.md</code>.
+  </footer>
+
+</div>
+</body>
+</html>
