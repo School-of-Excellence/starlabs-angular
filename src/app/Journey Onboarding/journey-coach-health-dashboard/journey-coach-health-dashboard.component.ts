@@ -3,7 +3,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, serverTimestamp,
+  Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, setDoc, serverTimestamp,
   orderBy, startAfter, limit, documentId, getCountFromServer, QueryDocumentSnapshot
 } from '@angular/fire/firestore';
 import { Auth, authState } from '@angular/fire/auth';
@@ -69,6 +69,8 @@ interface PortfolioRow {
   openTickets: number;
   onboarded: boolean;
   goingQuiet: boolean;
+  // global participant flag (star) — mirrors the `flagged` set in healthtracker_flag
+  flagged: boolean;
   renewalWindow: boolean;
   // subscription-based active flag: the participant has >=1 journey-product whose subscriptionend
   // is in the future (daysToRenewal >= 0). Active/Inactive counting + levers key off THIS, not
@@ -88,7 +90,7 @@ interface PortfolioRow {
   healthCoverage: number;
 }
 
-type Lever = 'all' | 'active' | 'goingQuiet' | 'renewalWindow' | 'lapsed' | 'notStarted' | 'inactive' | 'tickets';
+type Lever = 'all' | 'active' | 'goingQuiet' | 'renewalWindow' | 'lapsed' | 'notStarted' | 'inactive' | 'tickets' | 'flagged';
 
 type DashboardView = 'base' | 'scoreboard' | 'worklist';
 
@@ -272,6 +274,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0 };
 
+  // Global participant flags (star). Loaded ONCE in loadPortfolio (both modes) from the
+  // healthtracker_flag collection where flagged == true. Base-wide by construction, so the
+  // Flagged count + filter are correct in paged mode too (no page-local caveat needed).
+  flaggedIds = new Set<string>();
+
   private pjpData: any[] = [];
   private profileMap: any = {};
   private metaMap: any = {};
@@ -405,6 +412,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.journeyNameMap = nameMap;
 
     await this.loadCoaches();
+    // Global flags (star) — loaded once, base-wide, before any row computation in EITHER mode so
+    // computeRows can read flaggedIds and the Flagged KPI/lever are correct from the first render.
+    await this.loadFlags();
 
     const matchedCoach = !!(this.coachId && this.coaches.some(c => c.id === this.coachId));
     this.selectedCoachId = matchedCoach ? this.coachId! : this.ALL;
@@ -742,9 +752,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     try {
       const snap = await getDocs(query(collection(this.firestore, 'users_roles'), where('journeycoach', '==', true)));
       snap.forEach(d => {
-        const ref: any = (d.data() as any)['profile_ref'];
+        const data: any = d.data();
+        // drop test/junk accounts: the role doc carries a `tester` boolean (e.g. "Admin Test").
+        if (data['tester'] === true) return;
+        const ref: any = data['profile_ref'];
         const id = ref?.id;
-        if (id) list.push({ id, name: this.profileMap.map?.[id] ?? (d.data() as any)['name'] ?? id });
+        if (id) list.push({ id, name: this.profileMap.map?.[id] ?? data['name'] ?? id });
       });
     } catch (e) {
       console.warn('could not load journey coaches', e);
@@ -753,6 +766,23 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       list.push({ id: this.coachId, name: this.coachName || this.coachId });
     }
     this.coaches = list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  /** Load the global participant flags ONCE: every healthtracker_flag doc with flagged == true.
+   *  Populates flaggedIds (keyed by profileid). Degrades gracefully on permission-denied — same
+   *  pattern as the other loaders — leaving the set empty so the rest of the board still renders. */
+  private async loadFlags(): Promise<void> {
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'healthtracker_flag'), where('flagged', '==', true)));
+      const ids = new Set<string>();
+      snap.forEach(d => {
+        const pid = (d.data() as any)['profileid'];
+        if (pid) ids.add(pid);
+      });
+      this.flaggedIds = ids;
+    } catch (e) {
+      console.warn('flags load failed (non-fatal)', e);
+    }
   }
 
   /** Firestore permission-denied detector (code `permission-denied` or a /permission/i message). */
@@ -925,6 +955,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         onboarded,
         // going-quiet only counts ACTIVE participants (subActive); set after the row is built (below).
         goingQuiet: false,
+        flagged: this.flaggedIds.has(profileid),
         renewalWindow: daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS,
         // subscription-based active: this product's subscriptionend is in the future. The
         // per-participant subActive is the OR across products, finalised at merge time below.
@@ -1081,7 +1112,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.dialog.open(ParticipantSlideoverComponent, {
       // Reuse the dashboard's full Log-call / Set-health flow (write + snackbar + table update);
       // the slide-over's footer buttons invoke these so it never performs its own (no-op) writes.
-      data: { row, onLogCall: () => this.logCall(row), onSetHealth: () => this.setHealthState(row) },
+      data: { row, onLogCall: () => this.logCall(row), onSetHealth: () => this.setHealthState(row), onToggleFlag: () => this.toggleFlag(row) },
       position: { right: '0', top: '0' },
       height: '100vh',
       width: 'min(520px, 100vw)',
@@ -1218,6 +1249,32 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       row.coachHealthState = entry;
       this.coachHealthByProfile[row.profileid] = entry;
     });
+  }
+
+  /** Toggle a participant's GLOBAL flag (star). Optimistic: flip row.flagged + flaggedIds, then
+   *  await the merge-write to healthtracker_flag (docId = profileid). Un-flag NEVER deletes the
+   *  doc — it sets flagged: false. On failure, REVERT the optimistic change and snackbar the
+   *  permission message. Recompute filters so the Flagged count + filter update immediately. */
+  async toggleFlag(row: PortfolioRow): Promise<void> {
+    const next = !row.flagged;
+    // optimistic flip (row + the base-wide set the count/filter read from)
+    row.flagged = next;
+    if (next) this.flaggedIds.add(row.profileid); else this.flaggedIds.delete(row.profileid);
+    this.applyFilters();
+    try {
+      await setDoc(
+        doc(this.firestore, 'healthtracker_flag', row.profileid),
+        { profileid: row.profileid, flagged: next, flaggedby: this.coachId ?? null, date: new Date() },
+        { merge: true },
+      );
+    } catch (e: any) {
+      console.error('toggleFlag write failed', e);
+      // revert the optimistic change
+      row.flagged = !next;
+      if (next) this.flaggedIds.delete(row.profileid); else this.flaggedIds.add(row.profileid);
+      this.applyFilters();
+      this.guard.openSnackBar('Could not update flag: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+    }
   }
 
   /** Title-case label for a coach-set Health State (Happy / Neutral / Sad / Evangelist). */
@@ -1436,26 +1493,27 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   /** Map a KPI card key to its lever. 'total' resets the board to 'all'. */
-  private kpiLever(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets'): Lever {
+  private kpiLever(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets' | 'flagged'): Lever {
     switch (which) {
       case 'active': return 'active';
       case 'inactive': return 'inactive';
       case 'renewalsSoon': return 'renewalWindow';
       case 'goingQuiet': return 'goingQuiet';
       case 'tickets': return 'tickets';
+      case 'flagged': return 'flagged';
       default: return 'all';
     }
   }
 
   /** Clickable KPI cards -> toggle the relevant lever (click again to clear back to 'all'). */
-  kpi(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets'): void {
+  kpi(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets' | 'flagged'): void {
     this.statusFilter = '';
     const target = this.kpiLever(which);
     this.setLever(this.activeLever === target ? 'all' : target);
   }
 
   /** Whether a given KPI card's lever is the currently active one (drives the selected highlight). */
-  kpiActive(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets'): boolean {
+  kpiActive(which: 'total' | 'active' | 'inactive' | 'renewalsSoon' | 'goingQuiet' | 'tickets' | 'flagged'): boolean {
     return this.activeLever === this.kpiLever(which);
   }
 
@@ -1596,8 +1654,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // (those with a live subscription); the Inactive lever flips it to show only !subActive.
     // The Lapsed / Not-started levers target lifecycle segments that legitimately include
     // non-subActive people, so they bypass the default subActive gate.
-    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted';
+    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted' || this.activeLever === 'flagged';
     if (!bypassActiveGate && r.subActive === wantInactive) return false;
+    if (this.activeLever === 'flagged' && !r.flagged) return false;
     if (this.activeLever === 'goingQuiet' && !r.goingQuiet) return false;
     if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
     if (this.activeLever === 'lapsed' && !r.lapsed) return false;
@@ -1635,8 +1694,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // subscription-based active/inactive (same as rowMatches): default board = subActive only.
     // Lapsed / Not-started levers are page-local lifecycle segments that legitimately include
     // non-subActive people, so they bypass the default subActive gate here too.
-    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted';
+    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted' || this.activeLever === 'flagged';
     if (!bypassActiveGate && lite.subActive === wantInactive) return false;
+    // flags are a base-wide global Set, so the flagged filter covers the WHOLE base in paged mode.
+    if (this.activeLever === 'flagged' && !this.flaggedIds.has(lite.profileid)) return false;
     if (this.activeLever === 'active' && !lite.subActive) return false;
     if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
