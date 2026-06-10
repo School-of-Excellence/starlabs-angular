@@ -248,6 +248,44 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
   strong { color: $ink; }
 }
 
+/* Visually-hidden content for screen readers (aria-live announcements). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Unobtrusive keyboard-navigation hint, right-aligned by the page-info line. Hidden on narrow viewports. */
+.jchd-keys-hint {
+  text-align: right; margin: -4px 2px 6px;
+  font-size: 11.5px; color: $ink-muted; @include tabular;
+}
+@media (max-width: 768px) {
+  .jchd-keys-hint { display: none; }
+}
+
+/* Slim, dismissible info banner: coach profile couldn't be matched, showing everyone. */
+.jchd-fallback-banner {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 14px;
+  padding: 9px 8px 9px 13px; border-radius: $radius-control;
+  background: $accent-soft; border: 1px solid $accent-tint;
+  font-size: 12.5px; color: $accent-strong; line-height: 1.4;
+  > mat-icon { font-size: 18px; height: 18px; width: 18px; flex: none; }
+  span { flex: 1 1 auto; }
+  .jchd-fallback-dismiss {
+    flex: none; width: 30px; height: 30px; line-height: 30px; color: $accent-strong;
+    ::ng-deep .mat-icon, mat-icon { font-size: 18px; height: 18px; width: 18px; }
+  }
+}
+
+/* Honest notice: scoreboard source reads were permission-denied (not genuinely empty). */
+.jchd-scoreboard-blocked {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 12px;
+  padding: 9px 13px; border-radius: $radius-control;
+  background: $warn-bg; border: 1px solid $border;
+  font-size: 12.5px; color: $warn-fg; line-height: 1.4;
+  mat-icon { font-size: 18px; height: 18px; width: 18px; flex: none; }
+}
+
 /* Slim, always-visible honesty caveat for page-local filters in paged (ALL / UNASSIGNED) mode. */
 .jchd-page-caveat {
   display: flex; align-items: center; gap: 7px; margin: 0 2px 10px;
