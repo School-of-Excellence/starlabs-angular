@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: './queue/mobile',
   testMatch: 'mobile-walk.spec.ts',
   globalSetup: require.resolve('./queue/mobile/global-setup.ts'),
+  // Snapshot each run's report into a rotating keep-last-10 archive so a new run doesn't wipe old
+  // screenshots (playwright-report-mobile-archive/<stamp>/). Tune with MOBILE_REPORT_KEEP, off with MOBILE_REPORT_ARCHIVE=0.
+  globalTeardown: require.resolve('./queue/mobile/archive-report.cjs'),
   timeout: 25 * 60_000,            // a full walk runs several flutter drives (app boots each time)
   expect: { timeout: 30_000 },
   fullyParallel: false,
