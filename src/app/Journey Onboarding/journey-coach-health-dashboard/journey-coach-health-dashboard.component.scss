@@ -149,7 +149,7 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
    ===================================================================== */
 .jchd-summary {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   margin: 0 0 18px;
   background: transparent; border: none; box-shadow: none; overflow: visible;
@@ -193,6 +193,9 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
     &.good::before { background: $good-fg; }
     &.warn::before { background: $warn-fg; }
     &.bad::before  { background: $bad-fg; }
+    // flagged card: amber accent (matches the star toggles)
+    &.kpi-flag .kpi-num { color: $warn-fg; }
+    &.kpi-flag::before { background: $warn-fg; }
 
     &.clickable {
       cursor: pointer;
@@ -475,6 +478,21 @@ $ease-out: cubic-bezier(.16, .84, .3, 1);
 }
 @media (hover: none), (max-width: 768px) {
   .row-actions { opacity: 1; transform: none; }
+}
+
+/* flag (star) — a primary quick action: always fully visible even when the rest of the
+   row-actions are dimmed at rest. Amber/accent when flagged. */
+.flag-btn {
+  color: $ink-muted;
+  &.is-flagged { color: $warn-fg; }
+}
+.row-actions .flag-btn { opacity: 1; }
+.jchd-data-row .row-actions .flag-btn { opacity: 1; }
+
+/* worklist card flag toggle */
+.wl-flag {
+  color: $ink-muted;
+  &.is-flagged { color: $warn-fg; }
 }
 @media (prefers-reduced-motion: reduce) {
   .jchd-table .jchd-data-row,

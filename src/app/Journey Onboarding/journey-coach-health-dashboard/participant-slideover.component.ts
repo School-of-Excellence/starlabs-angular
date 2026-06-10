@@ -34,6 +34,7 @@ export interface SlideoverRow {
   priorityBand: 'High' | 'Medium' | 'Low';
   reason: string;
   goingQuiet: boolean;
+  flagged: boolean;
   renewalWindow: boolean;
   lapsed: boolean;
   notStarted: boolean;
@@ -48,6 +49,9 @@ export interface SlideoverData {
   row: SlideoverRow;
   onLogCall?: () => void;
   onSetHealth?: () => void;
+  // toggle the participant's global flag (star). The parent owns the optimistic write + revert;
+  // the panel mirrors the new state locally so the header star reflects it without a reload.
+  onToggleFlag?: () => void;
 }
 
 interface TicketItem { subject: string; status: string; date: Date | null; }
@@ -85,9 +89,16 @@ type TimelineItem =
             <span class="so-tier">{{ row.atcmodel || 'No tier' }}</span>
           </div>
         </div>
-        <button class="so-close" type="button" matTooltip="Close" aria-label="Close panel" (click)="close()">
-          <mat-icon>close</mat-icon>
-        </button>
+        <div class="so-head-actions">
+          <button class="so-flag" type="button" [class.is-flagged]="row.flagged"
+                  [matTooltip]="row.flagged ? 'Unflag' : 'Flag'"
+                  [attr.aria-pressed]="row.flagged" aria-label="Flag participant" (click)="toggleFlag()">
+            <mat-icon>{{ row.flagged ? 'star' : 'star_border' }}</mat-icon>
+          </button>
+          <button class="so-close" type="button" matTooltip="Close" aria-label="Close panel" (click)="close()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
       </header>
 
       <div class="so-pills">
@@ -252,6 +263,17 @@ type TimelineItem =
     .so-close:hover { background: var(--so-border-soft); color: var(--so-ink); }
     .so-close:active { transform: scale(0.94); }
     .so-close mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    .so-head-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
+    .so-flag {
+      width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--so-border); border-radius: 8px; background: #fff; color: var(--so-muted);
+      cursor: pointer; transition: background-color .12s ease, color .12s ease, border-color .12s ease, transform .06s ease;
+    }
+    .so-flag:hover { background: var(--so-border-soft); color: var(--so-ink2); }
+    .so-flag:active { transform: scale(0.94); }
+    .so-flag.is-flagged { color: #b45309; border-color: #fde68a; background: #fffbeb; }
+    .so-flag mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
     .so-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 20px 0; }
     .so-pill {
@@ -491,6 +513,12 @@ export class ParticipantSlideoverComponent implements OnInit {
    *  + snackbar + updates the table). The slide-over stays open; the dialog stacks over it. */
   setHealth(): void {
     this.data.onSetHealth?.();
+  }
+
+  /** Toggle the participant's global flag. The parent owns the optimistic flip + write + revert
+   *  on the SAME row object, so the header star reflects the new state without flipping it here. */
+  toggleFlag(): void {
+    this.data.onToggleFlag?.();
   }
 
   close(): void { this.ref.close(); }
