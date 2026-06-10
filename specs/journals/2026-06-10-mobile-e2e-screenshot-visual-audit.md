@@ -76,7 +76,50 @@ participant 49 and captured a 628 KB real-app frame — the queue card reading "
 button (NOT "Click to Fill Form" — correct, a Hold terminal has no form action) and the Evolve/Legacy/
 Impact circles + bottom nav. So all 9 variations now have genuine real-app imaging proof.
 
+## Follow-up audit (operator, reviewing the report) — two imaging-coverage gaps
+The operator opened a test in the report and asked two pointed questions that the pixels (not the logs)
+exposed:
+
+**Q1 — "the shots show 'Click to Fill Form' but I don't see the form after."** Correct, by design: the
+harness captured ONE frame per self-move, at the instant *before* the tap (the queue card). The simctl
+capture fired only on the `WALK[...] hop N: at "<stage>"` marker; the FillForm screen, the fill, and the
+result were never imaged (the in-app `screenshot()` was a no-op; the "after" log line didn't match the
+trigger). The form-fill + advance WAS proven — but by the Firestore trail (token `currentstage` change +
+`queue stage log` row + the guards), NOT by an image.
+
+**Q2 — "what is the attached `screenshot` verifying?"** Essentially nothing. That attachment is Playwright's
+automatic page-shot (`screenshot: 'on'`) of the operator-desktop browser at test teardown — an empty board
+(all columns "- 0", byte-identical across variations because an empty board renders the same). It did NOT
+prove the operator/auto hops (those are proven by the count-drift assertion + the `movedby` log rows).
+
+### Correction — image the FULL flow (test harness only; no app lib/src change)
+- **Mobile, 3 frames per self-move** (`robot.screenshot()` now emits a `CAP marker` the orchestrator
+  shoots on, and holds the screen): **(a)** the queue card pre-tap, **(b)** the REAL FillForm screen
+  ("TEST Queue Form run1" / Notes field / Preview), **(c)** the card on the advanced stage. The
+  `driveFlutterSelfRun` poller keys on `CAP marker:` (was the single before-tap `WALK` marker).
+- **Board, per operator hop:** `driveBoardHop` now captures the participant's REAL card on the REAL
+  board at the hop's source stage (`queue-board.page.captureTokenCardShot` reveals the card past the
+  15-row "Load More" cap, scrolls it in, viewport-shoots). Verified frame shows the card in
+  **"uP! Readiness Changework (Queued) - 1"** — Token 23 / participant22+run1 / Prodigies - First Cycle.
+- **Config:** `screenshot: 'on' → 'only-on-failure'` (drops the misleading empty-board auto-shot).
+- **Verified** on Prodigies - First Cycle (1 passed, 8.7m): b-form shows the real form; the 7 board
+  frames (60-64 KB vs the 47 KB empty board) each show the card in its column (e.g. the participant's
+  card in "uP! Readiness Changework (Queued) - 1"). Commits: parent `2b7f9cf`, flutter `5288689`.
+- **Unified all-9 regen — NOT completed (operator chose to skip).** The first full re-run was killed by
+  a battery-to-zero power loss mid-suite (it still proved the enhancement at full-variation scale:
+  **LYL - First Cycle produced all 25 frames** = 5 card + 5 form + 5 after + 10 board, and the
+  entry-stage board card — previously missed — was captured by the robustness fix). The relaunch then
+  collided with a **competing `evomap` Playwright run in the same `e2e/` dir** (the parallel
+  all-components-e2e session) and died. Since the corrections were already verified on two full
+  variations and the change is committed, the operator accepted the verified proof and skipped
+  regenerating the single unified report. It can be produced anytime in a contention-free slot with
+  `cd e2e && SKIP_SEED=1 FLUTTER_BIN=/opt/homebrew/bin/flutter caffeinate -ims npx playwright test --config=playwright.mobile.config.ts`.
+  (The coherent original all-9 report was restored to `e2e/playwright-report-mobile/`.)
+
 ## Bottom line
 The previous session's "9 passed / 37 clean PNGs" is **substantively honest** for 8 of 9 variations —
-verified by reading the actual pixels, not the logs. The lone gap (Prep-Hold had no app capture) is a
-test-harness omission, now corrected. [[mobile-flutter-e2e-toolchain]]
+verified by reading the actual pixels, not the logs. The lone completion gap (Prep-Hold had no app
+capture) was a test-harness omission, now corrected. The imaging itself was thinner than the claim
+(card-only, plus a meaningless empty-board auto-shot); it now shows the full flow — queue card → real
+FillForm → advanced card on mobile, and the participant's card on the operator board for every hop.
+[[mobile-flutter-e2e-toolchain]]
