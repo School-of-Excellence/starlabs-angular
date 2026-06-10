@@ -33,6 +33,11 @@ export const supProfileIds = {
 /** Run-unique category seeded into `chat config` + every seeded ticket (the CS-02 count oracle). */
 export const SUP_CATEGORY = `TEST Support ${RUN}`;
 
+/** The CLIENT's display name (seed step 3 overrides profile_data.name to this). The AddIssue dialog's
+ *  Client-Name / Issue-Reported-By options render `profile_data.name` — so this, NOT the email, is the
+ *  option label to pick for the client. Staff option labels remain their email (seedAuthChain name=email). */
+export const SUP_CLIENT_NAME = `Client ${RUN}`;
+
 /** Install the prod firewall + all external stubs. Call in beforeEach BEFORE navigating. */
 export async function installSupportStubs(page: Page): Promise<void> {
   await installProdFirewall(page);
@@ -42,6 +47,13 @@ export async function installSupportStubs(page: Page): Promise<void> {
 /** Log in via the real Angular login form as the seeded primary chatxadmin agent. */
 export async function loginAsAgent(page: Page): Promise<void> {
   await loginAs(page, supActors.agent0, PASSWORD);
+}
+
+/** Log in as the seeded PARTICIPANT (the ticket client) — a NON-chatxadmin user NOT in any support
+ *  route grant. Used by CS-17 (access-denied). Auth succeeds (real user) so loginAs resolves off /login;
+ *  the route guard then denies in-page via the "Access denied" ConfirmComponent (auth.guard.ts:62). */
+export async function loginAsClient(page: Page): Promise<void> {
+  await loginAs(page, supActors.client, PASSWORD);
 }
 
 // CommonJS — reuse the allowlist-guarded admin init (only ever the test project).
@@ -68,4 +80,54 @@ export async function clearTicketMessages(ticketId: string): Promise<void> {
   const db = admin.firestore();
   const msgs = await db.collection('clientissue').doc(ticketId).collection('messages').get();
   for (const m of msgs.docs) await m.ref.delete().catch(() => {});
+}
+
+/** Read the `counters/ticketCounter.currentNumber` (the seeded COUNTER_START base; CS-04 oracle floor). */
+export async function getTicketCounter(): Promise<number> {
+  const admin = seed.initAdmin();
+  const snap = await admin.firestore().collection('counters').doc('ticketCounter').get();
+  return (snap.data() || {}).currentNumber ?? 0;
+}
+
+/** Count notification logs under notifications/{profileId}/logs (CS-15 ticketMsgNotification oracle). */
+export async function countNotificationLogs(profileId: string): Promise<number> {
+  const admin = seed.initAdmin();
+  const snap = await admin.firestore().collection('notifications').doc(profileId).collection('logs').get();
+  return snap.size;
+}
+
+/**
+ * Detect whether the `clientissue` create-trigger CFs (ticketCreated / ticketCreatedV2) are DEPLOYED on
+ * the cloud test project. The deployed-CF set on slabs-queue-e2e-exdcz is calculateParticipantMode + the
+ * *_to_pmd family + the queue CFs — the Customer-Support CFs in clientissue.js are NOT deployed there
+ * (operator directive). We confirm at RUNTIME (not by assumption): write a throwaway clientissue doc and
+ * watch for a CF-written side-effect (issueno set, or a `messages` subdoc created). Returns true iff a CF
+ * fired within the window. Used to skip-guard the CF cases (CS-05/CS-15) with a real, documented reason.
+ * Cleans up the probe doc + any CF-created messages so it never pollutes a count.
+ */
+export async function ticketCreateCFDeployed(timeoutMs = 12_000): Promise<boolean> {
+  const admin = seed.initAdmin();
+  const db = admin.firestore();
+  const T = admin.firestore.Timestamp;
+  const id = `${RUN}_cfprobe_${Date.now()}`;
+  await db.collection('clientissue').doc(id).set({
+    id, clientid: supProfileIds.client, name: 'CF probe', issue: 'cf probe',
+    category: SUP_CATEGORY, assign: [supProfileIds.agent0], peopleinvolved: [],
+    chatstatus: 'New', status: { status: 'Open', date: T.now(), editedBy: supProfileIds.agent0 },
+    reporteddate: T.now(), review: {}, mandatereview: {}, flag: false,
+    _testdata: true, testrunid: `${RUN}_probe`,
+  });
+  const deadline = Date.now() + timeoutMs;
+  let fired = false;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const d = (await db.collection('clientissue').doc(id).get()).data() || {};
+    const msgs = await db.collection('clientissue').doc(id).collection('messages').get();
+    if (d.issueno !== undefined || msgs.size > 0) { fired = true; break; }
+  }
+  // cleanup
+  const msgs = await db.collection('clientissue').doc(id).collection('messages').get();
+  for (const m of msgs.docs) await m.ref.delete().catch(() => {});
+  await db.collection('clientissue').doc(id).delete().catch(() => {});
+  return fired;
 }

@@ -217,6 +217,12 @@ async function seedSupport() {
     await db.collection('clientissue').doc(ID.T_UNREAD).collection('messages').doc(`${TESTRUNID}_m_unread_${i}`)
       .set(mkMsg(ID.T_UNREAD, `${TESTRUNID}_m_unread_${i}`, { pending: ['admin'], read_by: ['user'] }));
   }
+  // T_OTHER (assigned to agent1 ONLY) gets ONE inbound message so the chat-screen message-INPUT renders
+  // (chat HTML:396 gates it on currentIssueChat.length!=0) when agent0 opens it → CS-08 can attempt a send
+  // and hit the assign-gate alert. Additive: a message on the agent1 ticket does NOT change CS-12 (which
+  // asserts row presence by issueno) nor any agent0 count. pending:['user'] so it never inflates unread.
+  await db.collection('clientissue').doc(ID.T_OTHER).collection('messages').doc(`${TESTRUNID}_m_other_0`)
+    .set(mkMsg(ID.T_OTHER, `${TESTRUNID}_m_other_0`));
 
   return {
     TESTRUNID, ID, PF, EMAIL, CATEGORY, CHAT_CONFIG_ID, COUNTER_START,
