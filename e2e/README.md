@@ -112,6 +112,38 @@ Raw fallback (no npm script): `npx playwright test --config=playwright.<group>.c
 The 9 mobile journey variations: `LYL - First/Next Cycle` · `B!G - Next Cycle` · `Prodigies - First/Next Cycle` ·
 `uP! - First/Next/3rd Cycle` · `uP! - Prep Hold` (storyboards in [`test-map.html`](test-map.html)).
 
+### Playwright CLI — view reports, debug, capture
+
+Every suite auto-records on failure: **screenshots** (`screenshot: 'only-on-failure'`), a **trace** on the first
+retry (`trace: 'on-first-retry'`), and a self-contained **HTML report** at `playwright-report-<group>/`. Anything
+after `--` is forwarded to Playwright, so it composes with any `npm run test:<group>` (commands from `e2e/`):
+
+```bash
+# view results (screenshots embedded on failed steps)
+npx playwright show-report playwright-report-journey   # opens the web report on :9323
+npx playwright show-trace test-results/<dir>/trace.zip # DOM/network/console time-travel
+
+# watch it run / step through
+npm run test:journey -- --headed     # real browser, visible
+npm run test:journey -- --ui         # time-travel UI (watch + re-run + pick locators)
+npm run test:journey -- --debug      # Playwright Inspector, pause & step
+
+# force-capture artifacts even on green (or: npm run report:cloud:full)
+npm run test:journey -- --trace=on --screenshot=on --video=on
+
+# target / filter / flake-hunt
+npm run test:journey -- journey/catalog.spec.ts:132   # one test by file:line
+npm run test:journey -- -g "JP-04"                    # by title substring
+npm run test:journey -- --last-failed                 # re-run only last run's failures
+npm run test:journey -- --repeat-each=5               # run a case 5x to surface flake
+
+npx playwright install chromium      # one-time browser install
+```
+
+Reports live per group (`playwright-report-{appointments,…,business}/`); queue → `playwright-report/` (+ `results.xml`
+JUnit); mobile → `playwright-report-mobile/`. The `report:cloud` / `report:cloud:full` scripts wrap an isolated run
+with `EVIDENCE=1` (per-stage screenshots) / `TRACE=full`.
+
 ---
 
 ## What to expect — per group (clean run)

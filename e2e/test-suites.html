@@ -194,6 +194,36 @@ npm run <span class="v">report:cloud</span>        <span class="cm"># isolated r
   storyboards in <a href="test-map.html">test-map.html</a>.</p>
   <p class="note">Raw fallback (no npm script needed): <code>npx playwright test --config=playwright.&lt;group&gt;.config.ts --reporter=line</code>.</p>
 
+  <h2><span class="n">🔍</span> Playwright CLI <span style="font-size:12px;color:var(--dim);font-weight:400">— view reports, debug, capture screenshots</span></h2>
+  <p class="note">Every suite auto-records on failure: <b>screenshots</b> (<code>screenshot: 'only-on-failure'</code>),
+  a <b>trace</b> on the first retry (<code>trace: 'on-first-retry'</code>), and a self-contained <b>HTML report</b>
+  at <code>playwright-report-&lt;group&gt;/</code>. Anything after <code>--</code> is forwarded to Playwright, so it
+  composes with any <code>npm run test:&lt;group&gt;</code> (commands from <code>e2e/</code>):</p>
+  <div class="cmd"><span class="cm"># ── view results (screenshots embedded on failed steps) ──</span>
+npx playwright <span class="v">show-report</span> playwright-report-journey   <span class="cm"># opens the web report on :9323</span>
+npx playwright <span class="v">show-trace</span> test-results/&lt;dir&gt;/trace.zip    <span class="cm"># DOM/network/console time-travel</span>
+
+<span class="cm"># ── watch it run / step through ──</span>
+npm run test:journey -- <span class="fl">--headed</span>      <span class="cm"># real browser, visible</span>
+npm run test:journey -- <span class="fl">--ui</span>          <span class="cm"># time-travel UI (watch + re-run + pick locators)</span>
+npm run test:journey -- <span class="fl">--debug</span>       <span class="cm"># Playwright Inspector, pause &amp; step</span>
+
+<span class="cm"># ── force-capture artifacts even on green (or: npm run report:cloud:full) ──</span>
+npm run test:journey -- <span class="fl">--trace=on --screenshot=on --video=on</span>
+
+<span class="cm"># ── target / filter / flake-hunt ──</span>
+npm run test:journey -- journey/catalog.spec.ts:132   <span class="cm"># one test by file:line</span>
+npm run test:journey -- <span class="fl">-g</span> "JP-04"                     <span class="cm"># by title substring</span>
+npm run test:journey -- <span class="fl">--last-failed</span>                  <span class="cm"># re-run only last run's failures</span>
+npm run test:journey -- <span class="fl">--repeat-each=5</span>                <span class="cm"># run a case 5x to surface flake</span>
+
+<span class="cm"># ── one-time browser install ──</span>
+npx playwright <span class="v">install</span> chromium</div>
+  <p class="note">Reports live per group: <code>playwright-report-{appointments,events,modes,…,business}/</code>,
+  queue → <code>playwright-report/</code> (+ <code>results.xml</code> JUnit), mobile → <code>playwright-report-mobile/</code>.
+  The <code>report:cloud</code> / <code>report:cloud:full</code> npm scripts wrap an isolated run with
+  <code>EVIDENCE=1</code> (per-stage screenshots) / <code>TRACE=full</code>.</p>
+
   <h2><span class="n">✓</span> What to expect — per group (clean run)</h2>
   <table>
     <thead><tr><th>Group</th><th>Config</th><th style="text-align:right">pass</th><th style="text-align:right">fixme</th><th style="text-align:right">skip</th><th>Covers</th></tr></thead>
