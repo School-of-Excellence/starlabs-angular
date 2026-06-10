@@ -1,0 +1,361 @@
+Suite,Spec file,Test case
+Appointments,appointments/deep.spec.ts,APPT-01 appointmentavailability renders the seeded specialist slot row
+Appointments,appointments/deep.spec.ts,"APPT-07 roster shows today's appointment by default and the +10d one only after ""Get All"""
+Appointments,appointments/deep.spec.ts,APPT-11 teamdeliveryhours renders a row for each seeded specialist (eis0 + eis1)
+Appointments,appointments/deep.spec.ts,APPT-15 mapclienteis renders the seeded participant mapping (client + role-specialist join)
+Appointments,appointments/deep.spec.ts,APPT-16 EISzoom renders the seeded zoom-account row (email the app streamed)
+Appointments,appointments/deep.spec.ts,APPT-12 appointmentstudio renders the EIS host's upcoming appointment card (client + type joins)
+Appointments,appointments/deep.spec.ts,"APPT-13 studio regenerateZoomLink computes a feedback message (app-computed, not the CF body)"
+Appointments,appointments/deep.spec.ts,"APPT-17 mark-status shows the cancellation-reason select only after un-checking ""Happened"" (app-conditional UI)"
+Appointments,appointments/deep.spec.ts,APPT-14 appointment-dashboard shows the Priority-Mode product type with a non-zero slot count
+Appointments,appointments/deep.spec.ts,APPT-02 booking commits the appointment + slot flip + delivery-sequence + deliverable writes
+Appointments,appointments/deep.spec.ts,"APPT-03 after booking, re-opening the booking screen shows ZERO slots for the same date"
+Appointments,appointments/deep.spec.ts,APPT-18 2-role appointment merges to a single slot combining both specialists
+Appointments,appointments/scheduling.spec.ts,APPT-08 capacity utilization renders the app-computed utilisation (2h booked / 8h = 25%)
+Appointments,appointments/scheduling.spec.ts,"APPT-09 approving a pending offtime writes status:""approved"" + authorizedby (the admin pid)"
+Appointments,appointments/scheduling.spec.ts,"APPT-10 denying a pending offtime writes status:""denied"""
+Appointments,appointments/scheduling.spec.ts,every seeded appointment route mounts (no /login bounce)
+Appointments,appointments/status.spec.ts,APPT-04 status-pending renders the seeded unmarked appointments (both clients)
+Appointments,appointments/status.spec.ts,"APPT-05 marking an appointment attended flips appointment.attended and the deliverable to ""completed"""
+Appointments,appointments/status.spec.ts,"APPT-06 marking an appointment cancelled flips appointment.cancelled and the deliverable to ""ready"""
+Root / Conferencing,auth-nav.spec.ts,"participant sees role-permitted nav, not admin-only items"
+Root / Conferencing,auth-nav.spec.ts,admin reaches an admin-gated route
+Root / Conferencing,auth-nav.spec.ts,guardrail: ATC-excluded routes are never exercised here
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-05 admin sees admin-role + by-profile nav children; participant/developer children are filtered out
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-06 participant sees the participant nav child; admin/developer/by-profile children are filtered out
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-07 admin Quick-Access favourites contain exactly the child flagged for the admin profileid
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-02b participant is DENIED a second staff route (/web-studio-invitation) — Access-denied dialog
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-03b eis staff is admitted to /roster by role (the positive role-match the super-admin cannot isolate)
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-LOGIN-NONUM a profile with no mobile number is blocked at the number gate (stays on /login)
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-LOGIN-NOROLE a profile whose role_ref points at a missing users_roles doc stays on /login
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-11b a signed-out visitor redirected from a guarded route carries ?returnUrl= for that route
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-14 creating a user_data doc triggers the profile-bootstrap CF (participant:true) — skip if CF not deployed
+Auth & Roles,authroles/auth-roles-deep.spec.ts,AR-15 sendEmailOTPNewUsers writes an emailOTPs doc (onCall + not deployed on the test project)
+Auth & Roles,authroles/login-gate.spec.ts,"AR-01 admin logs in via the real form and lands on /EISDashboard (guard admits, no bounce)"
+Auth & Roles,authroles/login-gate.spec.ts,"AR-02 participant is DENIED a staff route — Access-denied dialog, URL stays off the staff route"
+Auth & Roles,authroles/login-gate.spec.ts,"AR-03 admin navigates to /profile-role-access — guard admits (no dialog, screen mounts)"
+Auth & Roles,authroles/login-gate.spec.ts,"AR-04 participant direct-nav to /profile-role-access — Access-denied dialog, screen absent"
+Auth & Roles,authroles/login-gate.spec.ts,AR-11 a signed-out visitor is redirected to /login from a guarded route
+Auth & Roles,authroles/login-gate.spec.ts,AR-12 login with a wrong password stays on /login (no navigation off the form)
+Auth & Roles,authroles/login-gate.spec.ts,AR-13 login with an unknown email (no profile_data) stays on /login
+Auth & Roles,authroles/profile-role-access.spec.ts,AR-08 the Screen Access table renders the seeded route rows the app filtered from `dashboard`
+Auth & Roles,authroles/profile-role-access.spec.ts,AR-09 the edit dialog writes the added profile into dashboard/{docid}.profileid
+Auth & Roles,authroles/profile-role-access.spec.ts,AR-10 the AHCRM Dashboard Access table renders the seeded classify key
+Auth & Roles,authroles/profile-role-access.spec.ts,the admin screen mounts (no /login bounce)
+Business,business/business-deep.spec.ts,BM-IN-RECEIVED inflow totalReceived + thisMonthReceived match the independent financedata sum
+Business,business/business-deep.spec.ts,BM-IN-DAILY inflow daily-breakdown paid cells sum to the independent paymentmap total
+Business,business/business-deep.spec.ts,BM-04 navigating one month back renders an entry count that matches the Firestore month count
+Business,business/business-deep.spec.ts,BM-06 editing an ads entry appends exactly one new log row and the log modal renders them
+Business,business/business-deep.spec.ts,BM-08 assigning a cohort to a zone writes the cohort id into the zone.cohorts array
+Business,business/business-deep.spec.ts,BM-09 submit-configuration writes one participant-zone doc + one log per unique participant
+Business,business/business-deep.spec.ts,"BM-11 HPC status filter ""completed"" narrows the rendered cards to the completed sessions"
+Business,business/business-deep.spec.ts,BM-HPC-DETAIL expanding a session card reveals the seeded achievement detail
+Business,business/business-deep.spec.ts,BM-HPC-DELETE deleting an individual session removes its Firestore doc and its card
+Business,business/business-deep.spec.ts,BM-12 creating a quiz via the dialog grows the quiz collection by exactly one
+Business,business/business-deep.spec.ts,BM-14b view-quiz option filter narrows the response count to a single option
+Business,business/business-deep.spec.ts,BM-TP-DELAY participant-touchpoint computes the deterministic 1-day average delay for the seeded rows
+Business,business/business-deep.spec.ts,BM-TP-DATE narrowing the date window past the seeded rows re-queries and clears them
+Business,business/dashboard.spec.ts,BM-02 adding an expense writes a doc with the typed description + the admin profileid
+Business,business/dashboard.spec.ts,BM-03 soft-deleting the seeded expense flips delete:true (written by the app) and drops the row
+Business,business/dashboard.spec.ts,BM-05 adding an ads entry creates the parent doc and exactly one initial log row
+Business,business/dashboard.spec.ts,every seeded business route mounts (guard admits; no access-denied dialog)
+Business,business/reporting.spec.ts,BM-07 zone management renders zonesCreated that matches the Firestore event-zone count
+Business,business/reporting.spec.ts,BM-10 HPC dashboard search narrows to the seeded sessions; completed/in-progress split reconciles
+Business,business/reporting.spec.ts,BM-14 view-quiz renders a filtered response count + breakdown that reconcile with Firestore
+Business,business/reporting.spec.ts,BM-15 participant-touchpoint filtered to the seeded type renders the app-computed row count
+Comms,comms/chat.spec.ts,CN-09 the seeded group renders in the active-chats sidebar
+Comms,comms/chat.spec.ts,CN-08 sending a message renders it back in the message list
+Comms,comms/chat.spec.ts,CN-17 chat-admin sees the create-group moderation control
+Comms,comms/comms-deep.spec.ts,CN-01 dashboard renders the channel tiles + the Create-Templates nav the app built
+Comms,comms/comms-deep.spec.ts,"CN-03 creating a notification template writes templatevalidated:false + type:""notification"""
+Comms,comms/comms-deep.spec.ts,"CN-04b creating an email template writes type:""email"" + postmarkstatus:""pending"" + templatevalidated:false"
+Comms,comms/comms-deep.spec.ts,CN-16 notification log renders the seeded log row after a today date-range
+Comms,comms/comms-deep.spec.ts,CN-05 a seeded email archive (2 recipients) fans out 2 email-logs rows (CF-computed)
+Comms,comms/comms-deep.spec.ts,CN-07 a new group-chat message updates supportchat.last_message (CF-computed)
+Comms,comms/comms-deep.spec.ts,"CN-13 validating a pending email template writes postmarkstatus:""approved"" (CF-computed)"
+Comms,comms/comms-deep.spec.ts,CN-15 one-way broadcast writes channelarchive + arrayUnions members (UNHARNESSABLE: OnewayChannelComponent has no opener / no route)
+Comms,comms/comms-deep.spec.ts,CN-LIKE/COMMENT notification CFs are gated until deployed
+Comms,comms/notifications.spec.ts,CN-12 notification record computes receivedRate 66.67 from a seeded 2/3 success ratio
+Comms,comms/notifications.spec.ts,CN-10 zoom dashboard renders the seeded meeting rows
+Comms,comms/notifications.spec.ts,"CN-11 zoom status filter ""Completed"" hides the failed row (app filterPredicate)"
+Comms,comms/notifications.spec.ts,CN-06 notifyMobileApp writes success:true back onto a seeded notificationrecord
+Comms,comms/notifications.spec.ts,every seeded comms route mounts (no /login bounce)
+Comms,comms/templates.spec.ts,"CN-02 email-templates list renders the approved template as ""Approved""/""Validated"""
+Comms,comms/templates.spec.ts,CN-14 onewaytemplates list renders the seeded template
+Root / Conferencing,content.spec.ts,series dashboard shows the seeded series
+Content,content/dashboards.spec.ts,"CN-01 admin login lands on /audiodashboard (guard admits, no /login bounce)"
+Content,content/dashboards.spec.ts,"CN-02 audio dashboard rows == countWhere(""solar voice audios"") (app stream vs admin count)"
+Content,content/dashboards.spec.ts,"CN-05 series tier filter ""free"" shows the free series and hides the exclusive one"
+Content,content/dashboards.spec.ts,"CN-08 analytics ""SolarVoice-only"" count >= 3 seeded solarvoice-only profiles (app-computed)"
+Content,content/dashboards.spec.ts,CN-13a health stories dashboard renders the seeded story row
+Content,content/dashboards.spec.ts,every seeded content route mounts (no /login bounce)
+Content,content/deep.spec.ts,CN-04 add-series writeBatch creates the series and arrayUnions it onto the picked episode
+Content,content/deep.spec.ts,CN-10 category-dashboard saveOrder() swaps the two series order values (component-computed updateDoc)
+Content,content/deep.spec.ts,"CN-11 add tier-access-config writes a new ""tier access config"" doc for the chosen tier"
+Content,content/deep.spec.ts,CN-12 learning-material add → edit → delete (each asserts the app-computed name/absence)
+Content,content/deep.spec.ts,CN-14 create playlist-ad writes a new adsplaylist doc with the entered title
+Content,content/deep.spec.ts,CN-17 viewparticipantstieraccess buckets the seeded members under their tier (app-grouped)
+Content,content/deep.spec.ts,CN-16 a recommended-mix doc merges its content id into participant metadata.solarvoice (CF-computed)
+Content,content/deep.spec.ts,CN-06 changing an episode videoUrl flips convertedtohls:true (ConvertUrltoHLS CF)
+Content,content/deep.spec.ts,"CN-07 changing a content_urls url flips hlsstatus to ""uploaded"" (generalContentUpdate CF chain)"
+Content,content/mutations.spec.ts,CN-03 create playlist writes a solar-voice-playlist doc with the app-derived sequence length
+Content,content/mutations.spec.ts,CN-09 add category writes a new category doc with the entered name
+Content,content/mutations.spec.ts,CN-13b editing a health story writes the new subject (app setDoc)
+Content,content/mutations.spec.ts,CN-15 a buffermix archive write fans out one recommended-mix-playlist doc per profile (CF-computed)
+Events,events/eticket.spec.ts,"EVT-05 approving a participant issues an arena e-ticket the app wrote (active:true, profileid, eventref)"
+Events,events/events-deep.spec.ts,EVT-02 creating an event writes event collection + an arena events sub-event the app saved
+Events,events/events-deep.spec.ts,"EVT-07 a valid QR scan writes an arena e-ticket log row the app committed (profileid, eventref)"
+Events,events/events-deep.spec.ts,EVT-08 a duplicate QR scan is blocked (usedticket) and writes no second log row
+Events,events/events-deep.spec.ts,EVT-06 deactivating an e-ticket (slide toggle) makes a subsequent QR scan denied
+Events,events/events-deep.spec.ts,"EVT-10/11 initiating the seeded cohort flips participantsproduct.status→""initiated"" (exactly N=3) and writes approved EPRs"
+Events,events/events-deep.spec.ts,EVT-13 creating an arena space manually writes arenaspace with the mapped participant + event ref
+Events,events/events-deep.spec.ts,EVT-14 adding a videoask tag writes the tag id to participantvideoask.tags + a participant tag log
+Events,events/events-deep.spec.ts,EVT-15 creating a custom stage count writes stage opportunity count with the selected queue + stagename
+Events,events/events-deep.spec.ts,EVT-16 the board's stage participant count equals the Firestore queue_token oracle
+Events,events/events.spec.ts,EVT-01 create_event list renders the app-streamed seeded event (name + venue)
+Events,events/events.spec.ts,"EVT-03/04 marking a participant attended flips the EPR to ""attended"", the deliverable to ""completed"", and writes events_profiles"
+Events,events/events.spec.ts,EVT-09 attendance log renders the app-computed unique-participant count (== Firestore log oracle)
+Events,events/events.spec.ts,EVT-12 layers-screen renders the seeded arenalayers row (title) after event selection
+Events,events/events.spec.ts,every seeded event route mounts (no /login bounce)
+Evolution Map,evomap/evolution-mapping.spec.ts,EM-01 /evolutionmapping renders the seeded catalogue rows (app-queried from Firestore)
+Evolution Map,evomap/evolution-mapping.spec.ts,EM-04 deleting a row writes deleted:true (app updateDoc) and drops it from the table
+Evolution Map,evomap/evolution-mapping.spec.ts,"EM-05/06 Make-Live publishes the live doc (live:true, videolist=2) and flips urllive on the selected rows"
+Evolution Map,evomap/evolution-mapping.spec.ts,EM-07 deleteVideo shrinks liveevolutionmapping.videolist by 1 and flips that row urllive:false
+Evolution Map,evomap/evomap-deep.spec.ts,EM-02 add-evolution dialog writes a new evolutionmappingvideo row (count increments by 1)
+Evolution Map,evomap/evomap-deep.spec.ts,EM-03 editing a mapping setDoc-merges the new title onto the row (app-written value)
+Evolution Map,evomap/evomap-deep.spec.ts,EM-15 toggling an existing live mapping OFF writes live:false (app setDoc on Update)
+Evolution Map,evomap/evomap-deep.spec.ts,EM-13 Add Video form creates a participant videos doc (count for pNew increments by 1)
+Evolution Map,evomap/evomap-deep.spec.ts,EM-14 deleting a video from the log writes delete:true on the participant videos doc
+Evolution Map,evomap/participant-evolution.spec.ts,EM-08 video grid renders when live:true and is absent when live:false (app *ngIf gate)
+Evolution Map,evomap/participant-evolution.spec.ts,"EM-11 ""Mark as Completed"" is absent when live:false (app gate, no Firestore assertion)"
+Evolution Map,evomap/participant-evolution.spec.ts,EM-09/10 completion writes a stage-log row (movedthrough=evolution mapping) and advances the token
+Evolution Map,evomap/routes.spec.ts,EM-12 /participant_videos_mapping Participants stat equals the name-having participant-metadata count
+Evolution Map,evomap/routes.spec.ts,every seeded Evolution Mapping admin route mounts (no /login bounce)
+Root / Conferencing,journey.spec.ts,participant purchase view shows the seeded ongoing journey
+Journey,journey/catalog.spec.ts,JP-01 addjourney renders the seeded journey catalog (both seeded journeys appear)
+Journey,journey/catalog.spec.ts,JP-02 adding a journey via the dialog increments the catalog and renders the new row
+Journey,journey/catalog.spec.ts,JP-03 addproduct renders the seeded products (name + mode columns)
+Journey,journey/catalog.spec.ts,JP-17 journeyproductmap renders the seeded journey-to-product mapping row
+Journey,journey/catalog.spec.ts,JP-04 mapping a journey to a product via the dialog creates a journey-to-product doc and renders it
+Journey,journey/journey-deep.spec.ts,JP-06 saving a new journey purchase creates participantjourneyproduct + journeyproductpurchase + participantsproduct (journeystatus initiated)
+Journey,journey/journey-deep.spec.ts,JP-08 marking onboarded flips participantjourneyproduct.onboarded to true
+Journey,journey/journey-deep.spec.ts,"JP-09 submitting with ""Send Onboarding Email"" creates an email archive doc for the participant"
+Journey,journey/journey-deep.spec.ts,JP-10 rejecting a pending sales lead writes salesleads.status = Rejected
+Journey,journey/journey-deep.spec.ts,"JP-PD product-delivery list renders one data row per productToDeliverySequence doc (app path->name, no fatal)"
+Journey,journey/journey-deep.spec.ts,JP-AUTH deliverysequence authoring writes a productToDeliverySequence doc the list then shows
+Journey,journey/journey-deep.spec.ts,"JP-EDIT editing a mapping with no deliverysequence mounts the authoring form (null-safe getDoc, no fatal)"
+Journey,journey/journey-deep.spec.ts,JP-16 formtemplate(?id) renders the form the app built from the seeded delivery-forms formarray
+Journey,journey/purchase.spec.ts,JP-05 participantpurchase renders the seeded participant name and journey purchases
+Journey,journey/purchase.spec.ts,JP-07 journeysupport renders the participant initiated journey and the not-yet-onboarded state
+Journey,journey/purchase.spec.ts,every seeded journey route mounts (no /login bounce)
+Product Modes,modes/app-action-pending.spec.ts,PM-17 the pending-actions table renders the non-empty participant and hides the all-empty one
+Product Modes,modes/cf-mode.spec.ts,"PM-10/11 completing a product writes a checklist doc + profile participantmode ""Integration Mode"""
+Product Modes,modes/config-widgetset.spec.ts,"PM-WIDGETSET the (P2, Integration Mode) edit dialog renders exactly the seeded per-mode widget set"
+Product Modes,modes/config.spec.ts,PM-04 saving a new product-mode config writes lastupdate + widgets.length==1
+Product Modes,modes/config.spec.ts,PM-05 adding a widget to an existing config writes widgets.length==3 (app-merged)
+Product Modes,modes/dashboard.spec.ts,PM-01 Mode Dashboard renders the modes catalog in sequence order (app-sorted == admin-read)
+Product Modes,modes/dashboard.spec.ts,PM-18 unauthenticated visit to /modedashboard does not stay on the screen (guard redirects)
+Product Modes,modes/dashboard.spec.ts,every seeded modes route mounts (no /login bounce)
+Product Modes,modes/engine.spec.ts,"PM-ARC-PERF completing 45d ago → Performance Mode (Table B rung [I, I+P))"
+Product Modes,modes/engine.spec.ts,"PM-ARC-EXT completing 75d ago → Extended Performance Mode (rung [I+P, I+P+E))"
+Product Modes,modes/engine.spec.ts,PM-ARC-AFTER completing 95d ago → After Extended Performance Mode (terminal rung)
+Product Modes,modes/engine.spec.ts,PM-ROLLUP-MULTI headline = lowest-sequence mode across two products (not the just-changed one)
+Product Modes,modes/engine.spec.ts,"PM-ROLLUP-EXPLORE customerstatus ""non active"" overrides the headline to Exploration Mode"
+Product Modes,modes/engine.spec.ts,"PM-SEED a new participantsproduct seeds the mode from deliveryplanning (normal→Journey Planning, priority→Journey Priority Planning)"
+Product Modes,modes/engine.spec.ts,PM-CANCEL cancelling an ongoing product clears mode/nextmode/nextmodedate to null
+Product Modes,modes/engine.spec.ts,PM-RAMP setting a tentative date ≥30d out enters Early Preparation Mode
+Product Modes,modes/interim-report.spec.ts,PM-13 Ask A&H tab renders the seeded ask-AH submissions
+Product Modes,modes/interim-report.spec.ts,PM-14 flagging an Ask A&H row writes tagged:true + tagdetails.user==loggedInProfileId
+Product Modes,modes/interim-report.spec.ts,PM-15 Interim Report Log tab shows app-computed Completed/Ongoing counts from the seeded log
+Product Modes,modes/playlist.spec.ts,PM-16 disabling a group cascades delete:true to the buffermix archive doc and its linked playlist docs
+Product Modes,modes/wishlist-form.spec.ts,PM-19 an invalid/expired wishlist link renders the Invalid-link error state
+Product Modes,modes/wishlist-form.spec.ts,PM-08 submitting the public form marks the contact submitted:true with a wishlistquestionmap
+Product Modes,modes/wishlist-form.spec.ts,"PM-09 all-contacts-received triggers the wishlist CF to write status:""completed"""
+Product Modes,modes/wishlist.spec.ts,"PM-07 cancelling an initiated wishlist row writes status:""cancelled"""
+Product Modes,modes/wishlist.spec.ts,"PM-06 re-initiating a cancelled row creates a new status:""initiated"" doc"
+Profiles,profiles/analytics.spec.ts,PA-11 form-tracker Ask A&H tab renders the seeded ask AH row the app queried + name-joined
+Profiles,profiles/analytics.spec.ts,PA-12 form-tracker uP! Life Report tab applies the formid filter (only matching row shows)
+Profiles,profiles/analytics.spec.ts,PA-13 view-participants-form renders the seeded formsByClient row the app queried (forms DB)
+Profiles,profiles/analytics.spec.ts,PA-15 app-flow-breaks renders the seeded break + the navigation type chip the app derived
+Profiles,profiles/form-tracker-deep.spec.ts,PA-FT-LL form-tracker Love Letter tab renders the seeded love letter row the app queried + name-joined
+Profiles,profiles/form-tracker-deep.spec.ts,PA-FT-FILT selecting a participant + Apply narrows the Ask A&H rows via the app where-clause
+Profiles,profiles/form-tracker-deep.spec.ts,PA-AFB-FILT clicking the playback type chip keeps the playback break and hides the navigation break
+Profiles,profiles/metadata-cf-deep.spec.ts,PA-CF-04 completing the product moves its id from activeproduct[] to consumedproducts[]
+Profiles,profiles/metadata-cf-deep.spec.ts,PA-CF-05 a second row for the same product makes the CF productcount map read 2
+Profiles,profiles/metadata-cf.spec.ts,PA-CF-01 mutating profile_data.name propagates to participant metadata.name
+Profiles,profiles/metadata-cf.spec.ts,"PA-CF-02 the seeded ongoing journey drives participant metadata.customerstatus -> ""active"""
+Profiles,profiles/metadata-cf.spec.ts,PA-CF-03 the seeded ongoing product is added to participant metadata.activeproduct[]
+Profiles,profiles/profile.spec.ts,PA-01 userprofile renders name & email the app read from participant metadata
+Profiles,profiles/profile.spec.ts,PA-02 userprofile Journey tab renders the journey-status badge the app computed
+Profiles,profiles/profile.spec.ts,PA-03 admin updates customer status -> the app writes participant metadata.customerstatus
+Profiles,profiles/profile.spec.ts,PA-10 profilesummary renders the participant name the app read from profile_data
+Profiles,profiles/profiles-deep.spec.ts,PA-07 analytics builds the participant table on load (Total header + /profilesummary link the app rendered)
+Profiles,profiles/profiles-deep.spec.ts,"PA-08 filtering Customer Status to ""active"" hides the seeded non-active participant"
+Profiles,profiles/profiles-deep.spec.ts,"PA-18 ticking a row checkbox updates the ""Selected Participants - N"" badge the app computes"
+Profiles,profiles/profiles-deep.spec.ts,PA-PS-01 ProfileScreen renders the month/engagement dashboard the app built from participant metadata
+Profiles,profiles/profiles-deep.spec.ts,PA-EVO-01 participant-evolution-summary renders the seeded row name from its localStorage payload
+Profiles,profiles/route-mount.spec.ts,every seeded profiles route mounts (no /login bounce)
+Profiles,profiles/view-form-deep.spec.ts,PA-14 clicking the like button writes liked:true to formsByClient (the app wrote to the forms DB)
+Root / Conferencing,queue.spec.ts,seeded queue config appears in the queue list
+Root / Conferencing,queue.spec.ts,participant queue-web shows the config-resolved stages for their token
+Queue (desktop),queue/actors-health.spec.ts,OPERATOR — Queue Manager board
+Queue (desktop),queue/actors-health.spec.ts,SPECIALIST — Dynamic Studio
+Queue (desktop),queue/actors-health.spec.ts,SPECIALIST — Arena Studio Activity
+Queue (desktop),queue/actors-health.spec.ts,BIG — BIG Dashboard
+Queue (desktop),queue/actors-health.spec.ts,BIG — Participant Assignment Board
+Queue (desktop),queue/authoring.spec.ts,AUTH-01 queue-creation-v3 smoke: create a queue → doc round-trips (queueadmin ARRAY + docid self-id)
+Queue (desktop),queue/big-analytics.spec.ts,BIG-07a accept moves a card initiated → completed; counts re-render & doc persists (conservation)
+Queue (desktop),queue/big-analytics.spec.ts,BIG-07c reject/rework moves a card initiated → rework; count re-renders & doc persists
+Queue (desktop),queue/big-analytics.spec.ts,"BIG-07b empty-selection bulk move is a no-op (no write, counts stable)"
+Queue (desktop),queue/big-analytics.spec.ts,"BIG-08 moving a participant updates both cohort sizes + writes one audit row (net-zero, no dup)"
+Queue (desktop),queue/big-analytics.spec.ts,BIG-09a biglevel renders the seeded rows with no fatal error
+Queue (desktop),queue/big-analytics.spec.ts,BIG-09b modellevelconfig renders the seeded rows with no fatal error
+Queue (desktop),queue/big-analytics.spec.ts,BIG-09c big_aggregate analytics screen mounts and renders a finite count (no fatal)
+Queue (desktop),queue/big-analytics.spec.ts,BIG-10a AEL analytics count equals the Firestore collection size (no silent drop) and ≥ seeded floor
+Queue (desktop),queue/big-analytics.spec.ts,"BIG-10b monitor ""Participants"" count equals the app-filtered live token count (no silent drop)"
+Queue (desktop),queue/big-analytics.spec.ts,"BIG-11 zoom screen mounts gracefully for an assignment with no zoomdata (no fatal, no real window)"
+Queue (desktop),queue/big-core.spec.ts,BIG-00 the seeded BIG admin logs in and the guard admits them to the dashboard
+Queue (desktop),queue/big-core.spec.ts,BIG-00 a signed-out visitor is redirected to /login from a BIG route
+Queue (desktop),queue/big-core.spec.ts,BIG-00b a non-BIG participant is BLOCKED from ${route.path}
+Queue (desktop),queue/big-core.spec.ts,BIG-00b the PAB exposes ONLY the logged-in profile (no cross-participant picker / leak)
+Queue (desktop),queue/big-core.spec.ts,"BIG-01 Total/Filtered are app-computed, internally consistent, and free of NaN"
+Queue (desktop),queue/big-core.spec.ts,BIG-02 zero-states render with no NaN/undefined and no fatal console error
+Queue (desktop),queue/big-core.spec.ts,BIG-03 Σ status badges is conserved and the active bucket badge == rendered cards
+Queue (desktop),queue/big-core.spec.ts,BIG-04 a real perform-action drives the app and the board re-renders the recomputed status
+Queue (desktop),queue/big-core.spec.ts,BIG-05 the manual screen role-gates correctly and renders its review controls for an admin
+Queue (desktop),queue/big-core.spec.ts,BIG-05 a non-self participant is DENIED the create/rework manual screen
+Queue (desktop),queue/big-core.spec.ts,BIG-06 the legacy form screen mounts for an admin and renders its dynamic form/submit
+Queue (desktop),queue/cf-sideeffects.spec.ts,"CF-01 a real board move fires onQueueStageChange → ""Queue Stage Moved"" touchpoint + a logged operator move"
+Queue (desktop),queue/cf-sideeffects.spec.ts,CF-02 a stage-log create at an Activity stage fires queueParticipantPositionUpdate → ready tokens recompute to 1..M
+Queue (desktop),queue/cross-db-lowerbound.spec.ts,Forms widget renders the EXACT seeded non-zero count from firestore-forms (catches secondary-DB silent zero)
+Queue (desktop),queue/invariants-selftest.spec.ts,"INV2 passes at exact count; throws on dropped row, duplicate row, and unmet minNonSelf"
+Queue (desktop),queue/invariants-selftest.spec.ts,INV3 passes on a legal trail; throws on an illegal skip
+Queue (desktop),queue/invariants-selftest.spec.ts,INV-selfmv: flipping an operator gate to selfmovable:true is DETECTABLE by parity check 1b
+Queue (desktop),queue/invariants-selftest.spec.ts,INV-scope: an edge scoped to one variation is EXCLUDED for another (outEdgesForVariation isolation)
+Queue (desktop),queue/loop-bound-selftest.spec.ts,LB-01 a 3rd traversal of a back-edge fails assertLoopBound (and 2 traversals pass)
+Queue (desktop),queue/loop-bound-selftest.spec.ts,LB-02 a 3rd traversal of the Scope Enhancement self-loop also fails assertLoopBound
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,LYL - First Cycle — entry→Completed: 5 REAL Flutter self-move(s) + 10 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,LYL - Next Cycle — entry→Completed: 5 REAL Flutter self-move(s) + 11 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,B!G - Next Cycle — entry→Completed: 5 REAL Flutter self-move(s) + 11 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,Prodigies - Next Cycle — entry→Completed: 3 REAL Flutter self-move(s) + 10 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,Prodigies - First Cycle — entry→Completed: 2 REAL Flutter self-move(s) + 8 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,uP! - First Cycle — entry→Completed: 5 REAL Flutter self-move(s) + 9 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,uP! - Next Cycle — entry→Completed: 5 REAL Flutter self-move(s) + 10 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,uP! - 3rd Cycle — entry→Completed: 5 REAL Flutter self-move(s) + 10 board hop(s)
+Mobile (real app),queue/mobile/mobile-walk.spec.ts,uP! - Prep Hold — entry→uP! Prep Process - Hold: 0 REAL Flutter self-move(s) + 0 board hop(s)
+Queue (desktop),queue/operator.spec.ts,"OP-01 operator logs in and lands on the role-gated board (no bounce, no console error)"
+Queue (desktop),queue/operator.spec.ts,"OP-02 queue list renders the seeded queue, filters live, and links to the B!G Planner"
+Queue (desktop),queue/operator.spec.ts,OP-02b a non-admin operator sees ONLY queues where their profileid is in queueadmin (queue 2 ABSENT)
+Queue (desktop),queue/operator.spec.ts,OP-03 board shows the right numbers: Total Participants == Σ per-stage column counts
+Queue (desktop),queue/operator.spec.ts,"OP-04 operator moves a token to a NON-Activity stage: one new stage-log row, counts conserved, studio fields cleared"
+Queue (desktop),queue/operator.spec.ts,"OP-05 operator moves a token INTO an Activity stage: one live-assignment, pairing live, one stage-log"
+Queue (desktop),queue/operator.spec.ts,"OP-06 operator moves a token OUT of an Activity stage: live-assignment completed, pairing released, one stage-log"
+Queue (desktop),queue/operator.spec.ts,"OP-07 moving a token to the final stage calls updateDeliveryStatus(""queue_token/{T}"",""completed"",{eventRequestRef})"
+Queue (desktop),queue/operator.spec.ts,"OP-08 Complete-Queue fires updateDeliveryStatus once per token in the column, each with the correct path/status/ref"
+Queue (desktop),queue/operator.spec.ts,OP-09 comms sidebar: Send is disabled with no selection; recipient count matches the board column
+Queue (desktop),queue/operator.spec.ts,"OP-09b bulk-invite fan-out conserves (N invitations == N selected, all tokens→invited) and totalaccepted ++1 per accept only"
+Queue (desktop),queue/operator.spec.ts,OP-10 applying a tag filter updates the active-filter badge and clearing restores the exact Total
+Queue (desktop),queue/operator.spec.ts,OP-11 Export CSV produces a header and at least one data row per board token (no truncation)
+Queue (desktop),queue/operator.spec.ts,OP-12 B!G Planner: completedToken and stageTokenMap reconcile with the seeded Firestore population
+Queue (desktop),queue/operator.spec.ts,OP-13 health-negative: an empty queue renders 0 (not NaN) and a token with a missing profile is still counted
+Queue (desktop),queue/oracle-selftest.spec.ts,healthy config: oracle returns the known real issues only (2 documented orphans)
+Queue (desktop),queue/oracle-selftest.spec.ts,detects a DANGLING nextstage edge (broken routing) → not ok
+Queue (desktop),queue/oracle-selftest.spec.ts,detects a NEW orphan stage (added but unrouted) → flagged
+Queue (desktop),queue/oracle-selftest.spec.ts,detects a variation that cannot reach a terminal (cycle with no exit)
+Queue (desktop),queue/selfmovable-gate.spec.ts,V:${v.variationname} — every stage's selfmovable flag matches the flow-model oracle (config parity)
+Queue (desktop),queue/selfmovable-gate.spec.ts,"V:${v.variationname} — a participant cannot skip the ""${gate.stage}"" operator gate (REAL board: operator-only forward, no self-advance)"
+Queue (desktop),queue/selfmovable-gate.spec.ts,"V:${v.variationname} — single-stage parking terminal has no participant self-advance (no gate, no CTA)"
+Queue (desktop),queue/studio-core.spec.ts,SS-00 My Arena loads for a seeded studio member; no false empty-state
+Queue (desktop),queue/studio-core.spec.ts,SS-01 studio buttons render for the acting member; select + live_tv are app-computed
+Queue (desktop),queue/studio-core.spec.ts,SS-02 check-in toggle flip writes exactly one studio checkin log row
+Queue (desktop),queue/studio-core.spec.ts,SS-03 waiting list renders only the app-eligible token
+Queue (desktop),queue/studio-core.spec.ts,"SS-04 Bring To Studio creates exactly one studioinvitation (~+2min expiry, clientresponse null)"
+Queue (desktop),queue/studio-core.spec.ts,SS-05 participant accept yields a live assignment (app/CF); deny yields none
+Queue (desktop),queue/studio-core.spec.ts,SS-06 assign opens a session: token↔live-assignment↔pairing triangle + one studio stage-log
+Queue (desktop),queue/studio-core.spec.ts,SS-07 live-panel Forms widget shows the seeded non-zero count (cross-DB lower bound); ATC reads 0 by design
+Queue (desktop),queue/studio-core.spec.ts,SS-08 validate AEL writes an interim crossover doc and flips the flag to validated
+Queue (desktop),queue/studio-session.spec.ts,"SS-09 mark-procedures widget renders from cross-DB without fatal (ATC off-limits ⇒ 0 procedures, documented)"
+Queue (desktop),queue/studio-session.spec.ts,SS-10 invite-more opens the dialog without tearing the session down; cancel commits nothing
+Queue (desktop),queue/studio-session.spec.ts,SS-11a Zoom Start-Meeting broken-link guard alerts and opens no window
+Queue (desktop),queue/studio-session.spec.ts,SS-11b /joinroom resolves the pre-join container + local-preview controls (routing only)
+Queue (desktop),queue/studio-session.spec.ts,"SS-12 move-next completes the stage: ONE studio stage-log, live-assignment completed, token detached"
+Queue (desktop),queue/studio-session.spec.ts,SS-13 cancelling the move-next confirmation performs NO partial move
+Queue (desktop),queue/studio-session.spec.ts,SS-14 other-studio block renders only the studios the member is invited to (no visibility leak)
+Queue (desktop),queue/studio-session.spec.ts,"SS-15 monitor renders a faithful, bijective card per seeded cohort live-assignment"
+Queue (desktop),queue/studio-session.spec.ts,SS-15b a plain eis-only specialist is DENIED the arenastudioactivity monitor (negative role gate)
+Queue (desktop),queue/studio-session.spec.ts,SS-15b (positive) a privileged role (admin) is admitted and the monitor cards render
+Queue (desktop),queue/studio-session.spec.ts,SS-16 no-studio member sees the empty-state banner with zero ghost renders
+Queue · variations,queue/variations/big-next-cycle.spec.ts,"BIGNC-00 seed + board load: BIGNC token renders, board column count is app-computed"
+Queue · variations,queue/variations/big-next-cycle.spec.ts,"BIGNC-01 [SIM] form self-move AEL → uP! Life Report is a legal scoped self-move, logged once"
+Queue · variations,queue/variations/big-next-cycle.spec.ts,"BIGNC-02 [REAL-UI] operator Diagnostics → ATC Briefing: scoped target offered, board counts drift, logged"
+Queue · variations,queue/variations/big-next-cycle.spec.ts,BIGNC-03 [REAL-UI] operator-into-Activity: a live studio session couples the token (live-assignment exists)
+Queue · variations,queue/variations/big-next-cycle.spec.ts,"BIGNC-04 [REAL-UI] specialist close: one studio stage-log, live-assignment completed, token detached"
+Queue · variations,queue/variations/big-next-cycle.spec.ts,"BIGNC-05 [REAL-UI] operator terminal + delivery completion: lands Completed, updateDeliveryStatus(""completed"")"
+Queue · variations,queue/variations/big-next-cycle.spec.ts,"BIGNC-06 bounded loop ≤2: Diagnostics ↔ DRC round-trip twice via REAL board, 3rd would be rejected (D1)"
+Queue · variations,queue/variations/lyl-first-cycle.spec.ts,"LYL-FC-WF-01 — walk entry→Completed mixing actors; every transition legal, logged, count-conserved"
+Queue · variations,queue/variations/lyl-first-cycle.spec.ts,"LYL-FC-WF-02 — Scope Enhancement self-loop is bound ≤ 2 (real board ""Send Back""); 3rd would fail loop-bound"
+Queue · variations,queue/variations/lyl-first-cycle.spec.ts,LYL-FC-WF-03 — Diagnostics↔DRC round-trip ≤ 2; DRC→ATC Preparation is illegal (D1 dead-forward)
+Queue · variations,queue/variations/lyl-next-cycle.spec.ts,walks first→terminal mixing actors; every transition holds the silent-data-gap invariants
+Queue · variations,queue/variations/lyl-next-cycle.spec.ts,"form-write integrity: each of the 4 self-movable stages self-moves to exactly its oracle edge, one log row"
+Queue · variations,queue/variations/lyl-next-cycle.spec.ts,"journey ${ji}/${FORWARD_JOURNEYS.length - 1} (→ ${terminal}, ${journey.length} stages) walks entry→terminal; invariants hold after every transition"
+Queue · variations,queue/variations/prodigies-first-cycle.spec.ts,PFC-WF-01 · ${label} — walk entry→${journey[journey.length - 1]}; invariants hold after every transition
+Queue · variations,queue/variations/prodigies-first-cycle.spec.ts,"PFC-WF-01 · Scope Enhancement self-loop is bound ≤ 2 (real board ""Send Back""); a 3rd fails loop-bound"
+Queue · variations,queue/variations/prodigies-first-cycle.spec.ts,"PFC-WF-01 · Diagnostics move-dropdown is V5-scoped — offers V5 stages, omits a non-V5 queue stage"
+Queue · variations,queue/variations/prodigies-first-cycle.spec.ts,PFC-WF-01 · specialist studio move-next drives Diagnostics → ATC Preparation on the REAL studio surface
+Queue · variations,queue/variations/prodigies-next-cycle.spec.ts,PNC-WF-01 walks Evolution Prep Orientation → Completed mixing actors; invariants hold after every transition; the Review→Self-Evolution-Report operator move is driven on the REAL board with board-rendered count-drift
+Queue · variations,queue/variations/prodigies-next-cycle.spec.ts,"PNC-FWD ${label} — walk entry→terminal mixing actors; every transition legal, logged, oracle-scoped, count-conserved; >=1 REAL operator/board move"
+Queue · variations,queue/variations/prodigies-next-cycle.spec.ts,PNC-WF-02 the Scope Enhancement and Diagnostics self-loops are bounded ≤2 (a 3rd traversal fails the loop guard)
+Queue · variations,queue/variations/prodigies-next-cycle.spec.ts,PNC-WF-03 the no-skip invariant rejects the V4 drift skips: DRC→ATC-Preparation (D1) and Diagnostics/ATC-Briefing→Consultation (D2) are illegal oracle edges
+Queue · variations,queue/variations/up-3rd-cycle.spec.ts,"UP3-WF-01-HAPPY — walk entry→Completed mixing actors (SIM + REAL board + REAL studio); every transition legal, logged, count-conserved"
+Queue · variations,queue/variations/up-3rd-cycle.spec.ts,UP3-WF-01-LOOP — Diagnostics self-loop ≤ 2 AND Diagnostics↔DRC round-trip ≤ 2 (D1 dead-forward); a 3rd of either fails
+Queue · variations,queue/variations/up-3rd-cycle.spec.ts,"UP3-WF-01-SCOPE — oracle parity + variation-scoped Diagnostics dropdown (EXACTLY 5 edges, no Consultation, no Self Evolution Report) + formref presence"
+Queue · variations,queue/variations/up-3rd-cycle.spec.ts,"journey ${ji}/${FORWARD_JOURNEYS.length - 1} (→ ${terminal}, ${journey.length} stages) walks entry→terminal; invariants hold after every transition"
+Queue · variations,queue/variations/up-first-cycle.spec.ts,"UPFC-HAPPY — walk entry→Completed mixing actors; every transition legal, logged, count-conserved"
+Queue · variations,queue/variations/up-first-cycle.spec.ts,UPFC-LOOP — Diagnostics↔DRC round-trip ≤ 2 (D1 dead-forward) AND Consultation back-loop ≤ 2; a 3rd of either fails
+Queue · variations,queue/variations/up-first-cycle.spec.ts,"UPFC-GAP — oracle parity: known-orphan/dangling baseline, and the variation-scoped Diagnostics dropdown (6 targets, no Consultation, keeps Self Evolution Report)"
+Queue · variations,queue/variations/up-next-cycle.spec.ts,walks first→terminal mixing actors; every transition holds the silent-data-gap invariants; ATC Briefing never offers Consultation
+Queue · variations,queue/variations/up-next-cycle.spec.ts,"form-write integrity: each of the 4 self-movable stages self-moves to exactly its oracle edge, one log row"
+Queue · variations,queue/variations/up-next-cycle.spec.ts,no-skip invariant rejects the V7 drift skips: DRC→ATC-Preparation (D1) and Diagnostics/ATC-Briefing→Consultation (D2)
+Queue · variations,queue/variations/up-next-cycle.spec.ts,"journey ${ji}/${FORWARD_JOURNEYS.length - 1} (→ ${terminal}, ${journey.length} stages) walks entry→terminal; invariants hold after every transition"
+Queue · variations,queue/variations/up-prep-hold.spec.ts,"UPH-00 — oracle: single stage IS the terminal (0 out-edges), selfmovable false, backbone len 1; orphan/dangling baseline; 1 forward journey"
+Queue · variations,queue/variations/up-prep-hold.spec.ts,"UPH-01 — board renders the parking column with the lone token, move-dropdown offers ZERO enabled targets, count stable"
+Queue · variations,queue/variations/up-prep-hold.spec.ts,"UPH-02 — no-move/no-log: participant self-move never fires (selfmovable false), 0 stage-log rows, vacuous invariants hold"
+Queue · variations,queue/variations/up-prep-hold.spec.ts,UPH-WALK[${j}] — forward journey {${label}} holds at entry==terminal with zero transitions; six invariants hold
+Queue (desktop),queue/watch-videos.spec.ts,the WatchVideos dialog opens from the PAB Video action and renders without a fatal error / console error
+Root / Conferencing,scheduling.spec.ts,book-appointment surfaces the seeded appointment type and a free slot
+Support,support/chat.spec.ts,CS-06 chat screen shows the app-computed unread count for seeded admin-pending messages
+Support,support/chat.spec.ts,"CS-07 sending a message writes a new message doc and sets chatstatus ""Responded"""
+Support,support/chat.spec.ts,"CS-09 closing an open ticket writes status.status ""Closed"""
+Support,support/chat.spec.ts,CS-10 flagging a ticket writes flag:true and the chosen severity
+Support,support/chat.spec.ts,CS-11 unflagging a flagged ticket writes flag:false
+Support,support/dashboard.spec.ts,"CS-01 chatxadmin lands on the dashboard and it renders (no bounce, no console error)"
+Support,support/dashboard.spec.ts,CS-02 dashboard category table shows the app-computed open/close counts for the seeded category
+Support,support/dashboard.spec.ts,CS-03 the Open filter card renders only open-status rows (no closed row visible)
+Support,support/dashboard.spec.ts,"CS-12 the ""Assigned To"" filter excludes a ticket assigned to a different agent"
+Support,support/dashboard.spec.ts,every seeded support route mounts (no guard-denied dialog)
+Support,support/deep.spec.ts,CS-04 creating a ticket via the AddIssue dialog writes a clientissue doc with the app-computed issueno
+Support,support/deep.spec.ts,"CS-08 sending a message on a ticket assigned to another agent is blocked (alert, no message written)"
+Support,support/deep.spec.ts,"CS-16 no dashboard metric card shows NaN or ""undefined"" (all finite, app-computed)"
+Support,support/deep.spec.ts,"CS-17 a non-chatxadmin participant is denied the dashboard (Access denied dialog, no Total card)"
+Support,support/deep.spec.ts,CS-18 typing issue text in Search narrows the table to the matching ticket
+Support,support/deep.spec.ts,CS-05 ticketCreated CF writes the automated second message on a new ticket (if deployed)
+Support,support/deep.spec.ts,CS-15 ticketMsgNotification CF writes a notification log for a message with sender_uid (if deployed)
+Support,support/deep.spec.ts,CS-14 autoCloseTickets closes a long-Responded ticket (scheduled CF — no test trigger / not deployed)
+Workshops,workshops/workshop-dashboard.spec.ts,WS-07 dashboard Total Enrolled equals the Firestore count of enrolled docs (app-computed)
+Workshops,workshops/workshop-dashboard.spec.ts,WS-11 the participant progress row renders the app-computed 50% (1 of 2 sub-challenges)
+Workshops,workshops/workshop-dashboard.spec.ts,"WS-12 manual ""Move Next"" writes manualcompletion:true + status ""completed"" to participant workshop"
+Workshops,workshops/workshop-dashboard.spec.ts,every seeded workshop route mounts (no /login bounce)
+Workshops,workshops/workshops-deep.spec.ts,WS-02 create-workshop writes a new workshopconfiguration doc and navigates to its config page
+Workshops,workshops/workshops-deep.spec.ts,WS-06 adding a curriculum and saving grows workshopconfiguration.challenges by 1
+Workshops,workshops/workshops-deep.spec.ts,WS-10 toggling triggerFunction in Settings and saving writes triggerFunction:true
+Workshops,workshops/workshops-deep.spec.ts,WS-08 enrolling a participant writes one enrolled doc + one participant-workshop doc
+Workshops,workshops/workshops-deep.spec.ts,WS-DASH-SPLIT dashboard renders Total Started=1 / Not Started=1 / Active=1 from the seeded split
+Workshops,workshops/workshops-deep.spec.ts,WS-09/WS-14 the dashboard Send-Email flow never reaches a production cloud function
+Workshops,workshops/workshops-deep.spec.ts,WS-15 engagement dashboard active-participant count is bounded by the live active pool
+Workshops,workshops/workshops-deep.spec.ts,WS-PRODUCT productpageworkshop renders the seeded product rows from static meta data
+Workshops,workshops/workshops-deep.spec.ts,WS-13 duplicating the active workshop creates an active:false copy with the same title
+Workshops,workshops/workshops-deep.spec.ts,legacy eiflix workshop routes mount for the admin (no /login bounce)
+Workshops,workshops/workshops-list.spec.ts,WS-01 /workshops renders the live workshopconfiguration stream (seeded workshop appears)
+Workshops,workshops/workshops-list.spec.ts,WS-03 active-status filter never shows more rows than the live count of active workshops
+Workshops,workshops/workshops-list.spec.ts,WS-04 activating a workshop via the slide-toggle writes active:true to Firestore
+Workshops,workshops/workshops-list.spec.ts,WS-05 workshopconfig detail-page save writes the typed title to Firestore
