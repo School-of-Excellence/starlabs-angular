@@ -1,7 +1,7 @@
 import {Component, inject, OnInit, OnDestroy, Inject, ChangeDetectorRef} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule} from '@angular/forms';
-import {collection, doc, Firestore, getDocs, setDoc, updateDoc,serverTimestamp, query, where, arrayUnion, limit} from '@angular/fire/firestore';
+import {collection, doc, Firestore, getDocs, setDoc, updateDoc, serverTimestamp, query, where, arrayUnion, limit, getDoc} from '@angular/fire/firestore';
 import { Storage, ref as sref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subject } from 'rxjs';
@@ -22,7 +22,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
-import { AuthguardService } from '../../../authguard.service';
+import { AuthguardService } from '../../authguard.service';
 
 export interface ParamConfig {
   name: string;
@@ -32,7 +32,7 @@ export interface ParamConfig {
 }
 
 @Component({
-  selector: 'app-oneway-channel',
+  selector: 'app-channel-communication',
   standalone: true,
   imports: [
     CommonModule,
@@ -55,20 +55,20 @@ export interface ParamConfig {
     NgxMatSelectSearchModule,
     MatAutocompleteModule,
   ],
-  templateUrl: './oneway-channel.component.html',
-  styleUrls: ['./oneway-channel.component.css'],
+  templateUrl: './channel-communication.component.html',
+  styleUrls: ['./channel-communication.component.css'],
 })
-export class OnewayChannelComponent implements OnInit, OnDestroy {
+export class ChannelCommunicationComponent implements OnInit, OnDestroy {
 
   private firestore = inject(Firestore);
   private storage   = inject(Storage);
   private snackBar  = inject(MatSnackBar);
   private destroy$  = new Subject<void>();
 
-  // ── Step tracking ──────────────────────────────────────────────
-  currentStep = 1; // 1=channel, 2=template, 3=variables, 4=review
+  // Step tracking 
+  currentStep = 1;
 
-  // ── Step 1 — Channel ───────────────────────────────────────────
+  // Channel
   channels: any[]         = [];
   filteredChannels: any[] = [];
   channelSearch           = '';
@@ -79,40 +79,42 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
   isUploadingChannelImage = false;
   channelImageUrl         = '';
   channelForm: FormGroup;
-  adminOptions:      any[]   = [];
-  selectedAdmins:    any[]   = [];
-  adminSearchFilter: string  = '';
+  adminOptions:      any[]  = [];
+  selectedAdmins:    any[]  = [];
+  adminSearchFilter: string = '';
 
-  // ── Step 2 — Template ──────────────────────────────────────────
+  // Template 
   templates: any[]         = [];
   filteredTemplates: any[] = [];
   templateSearch           = '';
   selectedCategoryFilter   = '';
   categories: string[]     = [];
+  categoryItems: { id: string; name: string }[] = [];
   selectedTemplate: any    = null;
   isLoadingTemplates       = false;
 
-  // ── Step 3 — Variables ─────────────────────────────────────────
+  //  Variables
   parameterConfig: ParamConfig[] = [];
   metadataFields: string[]       = [];
   isLoadingMetadata              = false;
 
-  // ── Step 4 — Review ────────────────────────────────────────────
-  isSending = false;
+  // Review 
+  isSending           = false;
+  showParticipantList = false;
+  showChannelMemberList = false;
 
-  // ── Participants ───────────────────────────────────────────────
+  // Participants 
   participants: any[] = [];
 
-  // ── Preview cache ──────────────────────────────────────────────
-  private _cachedHtml: SafeHtml | null = null;
-  private _cachedSrc  = '';
+  // Preview 
+  previewHtml: SafeHtml = '';
 
   constructor(
     private fb: FormBuilder,
     private authguard: AuthguardService,
     private sanitizer: DomSanitizer,
     private cdr: ChangeDetectorRef,
-    public dialogRef: MatDialogRef<OnewayChannelComponent>,
+    public dialogRef: MatDialogRef<ChannelCommunicationComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {
     this.participants = data?.participants || data || [];
@@ -135,8 +137,7 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // ── Loaders ────────────────────────────────────────────────────
-
+  // Loaders
   async loadChannels(): Promise<void> {
     this.isLoadingChannels = true;
     try {
@@ -163,18 +164,20 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
   async loadTemplates(): Promise<void> {
     this.isLoadingTemplates = true;
     try {
-    const snap = await getDocs(
-      query(collection(this.firestore, 'onewaytemplates'),
-        where('status', '==', 'approved'),
-        where('delete', '==', false))
-    );
-    this.templates = snap.docs
-      .map(d => ({ docid: d.id, ...d.data() }))
-      .sort((a: any, b: any) => {
-        const aTime = a.createddate?.toDate?.() ?? new Date(0);
-        const bTime = b.createddate?.toDate?.() ?? new Date(0);
-        return bTime.getTime() - aTime.getTime();
-      });
+      const catSnap = await getDoc(doc(this.firestore, 'classify', 'channelcategories'));
+      this.categoryItems = catSnap.exists() ? (catSnap.data()?.['categories'] || []) : [];
+      const snap = await getDocs(
+        query(collection(this.firestore, 'channeltemplates'),
+          where('status', '==', 'approved'),
+          where('delete', '==', false))
+      );
+      this.templates = snap.docs
+        .map(d => ({ docid: d.id, ...d.data() }))
+        .sort((a: any, b: any) => {
+          const aTime = a.createddate?.toDate?.() ?? new Date(0);
+          const bTime = b.createddate?.toDate?.() ?? new Date(0);
+          return bTime.getTime() - aTime.getTime();
+        });
       this.filteredTemplates = [...this.templates];
       const cats = new Set<string>(this.templates.map(t => t.category).filter(Boolean));
       this.categories = Array.from(cats).sort();
@@ -204,10 +207,10 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
   async loadAdminOptions(): Promise<void> {
     try {
       const data = await this.authguard.getProfileMap();
-      const map = data.docdata || {}; 
+      const map  = data.docdata || {};
       this.adminOptions = Object.entries(map)
         .map(([id, profile]: any) => ({
-          profileid: id,               
+          profileid: id,
           name:      profile.name  || 'Unknown',
           email:     profile.email || '',
         }))
@@ -217,27 +220,17 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Step 1 helpers ─────────────────────────────────────────────
-
   onChannelSearch(): void {
     const s = this.channelSearch.toLowerCase();
     this.filteredChannels = s
       ? this.channels.filter(c =>
-          (c.group_name || '').toLowerCase().includes(s) ||
+          (c.group_name  || '').toLowerCase().includes(s) ||
           (c.description || '').toLowerCase().includes(s))
       : [...this.channels];
   }
 
   selectChannel(ch: any): void {
     this.selectedChannel = ch;
-  }
-
-  toggleCreateChannel(): void {
-    this.showCreateChannel = !this.showCreateChannel;
-    this.selectedChannel   = null;
-    this.channelForm.reset();
-    this.selectedAdmins    = [];
-    this.channelImageUrl   = '';
   }
 
   getFilteredAdminOptions(): any[] {
@@ -284,9 +277,9 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
     }
     this.isCreatingChannel = true;
     try {
-      const f         = this.channelForm.value;
-      const newRef    = doc(collection(this.firestore, 'supportchat'));
-      const adminIds  = this.selectedAdmins.map(a => a.profileid);
+      const f        = this.channelForm.value;
+      const newRef   = doc(collection(this.firestore, 'supportchat'));
+      const adminIds = this.selectedAdmins.map(a => a.profileid);
       const channelData = {
         id:                newRef.id,
         group_name:        f.channelName,
@@ -304,8 +297,11 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
       await setDoc(newRef, channelData);
       this.selectedChannel = { ...channelData, id: newRef.id };
       this.channels.unshift(this.selectedChannel);
-      this.filteredChannels = [...this.channels];
+      this.filteredChannels  = [...this.channels];
       this.showCreateChannel = false;
+      this.channelForm.reset();
+      this.selectedAdmins  = [];
+      this.channelImageUrl = '';
       this.showSnackBar('Channel created successfully');
     } catch (e) {
       console.error(e);
@@ -314,12 +310,6 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
       this.isCreatingChannel = false;
     }
   }
-
-  canProceedStep1(): boolean {
-    return !!this.selectedChannel;
-  }
-
-  // ── Step 2 helpers ─────────────────────────────────────────────
 
   onTemplateSearch(): void {
     const s = this.templateSearch.toLowerCase();
@@ -337,11 +327,8 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
 
   selectTemplate(t: any): void {
     this.selectedTemplate = t;
-    this.initParamConfig(t.templatemodel || []);
-  }
-
-  initParamConfig(vars: string[]): void {
-    this.parameterConfig = vars.map(v => ({
+    this.previewHtml = this.sanitizer.bypassSecurityTrustHtml(t.htmlbody || '');
+    this.parameterConfig = (t.templatemodel || []).map((v: string) => ({
       name:          v,
       fillType:      'static' as const,
       staticValue:   '',
@@ -349,11 +336,10 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
     }));
   }
 
-  canProceedStep2(): boolean {
-    return !!this.selectedTemplate;
+  getCategoryName(id: string): string {
+    return this.categoryItems.find(c => c.id === id)?.name || id;
   }
 
-  // ── Step 3 helpers ─────────────────────────────────────────────
 
   setFillType(param: ParamConfig, type: 'static' | 'metadata'): void {
     param.fillType      = type;
@@ -372,19 +358,25 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
     return this.parameterConfig.every(p => this.isParamConfigured(p));
   }
 
-  canProceedStep3(): boolean {
-    return this.allParamsConfigured();
+
+  getChannelAdmins(): any[] {
+    const adminIds: string[] = this.selectedChannel?.admins || [];
+    return adminIds.map(id => {
+      const profile = this.adminOptions.find(a => a.profileid === id);
+      return profile ?? { name: id };
+    });
   }
 
-  // ── Preview ────────────────────────────────────────────────────
+  getChannelMembers(): any[] {
+    const memberIds: string[] = this.selectedChannel?.members || [];
+    return memberIds.map(id => {
+      const profile = this.adminOptions.find(a => a.profileid === id);
+      return { id, name: profile?.name || id };
+    });
+  }
 
-  getPreviewHtml(): SafeHtml {
-    let src = this.selectedTemplate?.htmlbody || '';
-    if (src !== this._cachedSrc) {
-      this._cachedSrc  = src;
-      this._cachedHtml = this.sanitizer.bypassSecurityTrustHtml(src);
-    }
-    return this._cachedHtml!;
+  isChannelAdmin(id: string): boolean {
+    return (this.selectedChannel?.admins || []).includes(id);
   }
 
   async onSend(): Promise<void> {
@@ -395,34 +387,34 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
     try {
       const participantIds = this.participants.map((p: any) => p.profileid);
       const adminIds       = this.selectedChannel.admins || [];
-
-      // message.members = selected participants + admins
       const messageMembers = [...new Set([...participantIds, ...adminIds])];
 
-      // Write 1 — channelarchive (CF trigger)
       const archiveRef = doc(collection(this.firestore, 'channelarchive'));
       await setDoc(archiveRef, {
         docid:           archiveRef.id,
         channelid:       this.selectedChannel.id,
         channelname:     this.selectedChannel.group_name,
+        category:        this.selectedTemplate.category || '',
         templateid:      this.selectedTemplate.docid,
         templatename:    this.selectedTemplate.templatename,
         htmlbody:        this.selectedTemplate.htmlbody,
         textbody:        this.selectedTemplate.textbody,
+        headertype:      this.selectedTemplate.headertype  ?? null,
+        headervalue:     this.selectedTemplate.headervalue ?? null,
+        footer:          this.selectedTemplate.footer      ?? null,
         templatemodel:   this.selectedTemplate.templatemodel || [],
         parameterConfig: this.parameterConfig,
-        profileid:       messageMembers,   
+        profileid:       messageMembers,
         createdby:       this.authguard.uid,
         createdat:       serverTimestamp(),
         status:          'created',
-        files:           this.selectedTemplate.files  || [],
-        links:           this.selectedTemplate.links  || [],
+        files:           this.selectedTemplate.files   || [],
+        links:           this.selectedTemplate.links   || [],
+        buttons:         this.selectedTemplate.buttons || [],
       });
 
-      // Write 2 — update supportchat.members with participants ONLY (not admins)
-      const channelRef = doc(this.firestore, 'supportchat', this.selectedChannel.id);
-      await updateDoc(channelRef, {
-        members:           arrayUnion(...participantIds),  // ← participants only
+      await updateDoc(doc(this.firestore, 'supportchat', this.selectedChannel.id), {
+        members:           arrayUnion(...participantIds),
         last_modification: serverTimestamp(),
       });
 
@@ -436,28 +428,10 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Navigation ─────────────────────────────────────────────────
-
   goToStep(step: number): void {
-    this.currentStep = step;
-  }
-
-  nextStep(): void {
-    if (this.currentStep < 4) this.currentStep++;
-  }
-
-  prevStep(): void {
-    if (this.currentStep > 1) this.currentStep--;
-  }
-
-  // ── Utilities ──────────────────────────────────────────────────
-
-  getMembersCount(ch: any): number {
-    return (ch.members || []).length;
-  }
-
-  getAdminsCount(ch: any): number {
-    return (ch.admins || []).length;
+    this.currentStep          = step;
+    this.showParticipantList  = false;
+    this.showChannelMemberList = false;
   }
 
   showSnackBar(msg: string): void {
@@ -471,12 +445,13 @@ export class OnewayChannelComponent implements OnInit, OnDestroy {
   onCancel(): void {
     this.dialogRef.close();
   }
-  getConfiguredCount(): number {
-  return this.parameterConfig.filter(p => this.isParamConfigured(p)).length;
-}
 
-getConfiguredPercent(): number {
-  if (this.parameterConfig.length === 0) return 0;
-  return (this.getConfiguredCount() / this.parameterConfig.length) * 100;
-}
+  getConfiguredCount(): number {
+    return this.parameterConfig.filter(p => this.isParamConfigured(p)).length;
+  }
+
+  getConfiguredPercent(): number {
+    if (this.parameterConfig.length === 0) return 0;
+    return (this.getConfiguredCount() / this.parameterConfig.length) * 100;
+  }
 }

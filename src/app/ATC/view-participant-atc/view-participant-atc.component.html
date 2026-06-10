@@ -7,25 +7,6 @@
 }
 
 <div class="participant-atc-container" *ngIf="!loading()">
-  <!-- Header -->
-  <div class="header">
-    <div class="header-content">
-      @if (participantProfile()?.profile || participantProfile()?.profileimg) {
-        <img class="profile-img"
-             [src]="participantProfile()?.profile || participantProfile()?.profileimg"
-             alt="Profile">
-      } @else {
-        <div class="profile-placeholder">
-          <mat-icon>person</mat-icon>
-        </div>
-      }
-      <div class="header-info">
-        <h1>{{ participantName() }}</h1>
-        <p>Total ATCs: {{ totalATCs() }} | Product Groups: {{ productGroups().length }}</p>
-      </div>
-    </div>
-  </div>
-
   <!-- No Data -->
   @if (productGroups().length === 0) {
     <div class="no-data">
@@ -34,8 +15,9 @@
     </div>
   }
 
-  <!-- Product Groups -->
-  @for (group of productGroups(); track group.product; let groupIdx = $index) {
+  <!-- Product Groups — use $index in the track key so duplicate product
+       names (e.g. multiple "uP!" cycles) don't trigger NG0955. -->
+  @for (group of productGroups(); track groupIdx + '-' + group.product; let groupIdx = $index) {
     <div class="product-group">
       <!-- Product Header -->
       <div class="product-header">
@@ -47,145 +29,161 @@
       <!-- ATCs under this product -->
       @for (atc of group.atcItems; track atc.id; let atcIdx = $index) {
         <div class="atc-card">
-          <!-- ATC Header -->
-          <div class="atc-header">
-            <div class="atc-title">
-              <span class="atc-number">{{ atcIdx + 1 }}.</span>
-              <span class="atc-date">{{ atc.data['prescription_date']?.toDate() | date:'medium' }}</span>
-              @if (atc.data['status'] === 'validated') {
-                <span class="status-badge validated">Validated</span>
-              } @else if (atc.data['status'] === 'atc given') {
-                <span class="status-badge pending">Pending</span>
-              }
-            </div>
+          <!-- Header row: number + underlined date + status pill -->
+          <div class="atc-card__head">
+            <span class="atc-card__num">{{ atcIdx + 1 }}.</span>
+            <span class="atc-card__date">{{ atc.data['prescription_date']?.toDate() | date:'medium' }}</span>
+            @if (atc.data['status'] === 'validated') {
+              <span class="pill pill-green">
+                <mat-icon>verified</mat-icon>
+                Validated
+              </span>
+            } @else if (atc.data['status'] === 'atc given') {
+              <span class="pill pill-amber">
+                <mat-icon>schedule</mat-icon>
+                Pending
+              </span>
+            }
             @if (atc.data['lasteditedon']) {
-              <div class="last-edit">
+              <span class="atc-card__lastedit">
                 Last Edit: {{ atc.data['lasteditedon']?.toDate() | date:'medium' }}
-              </div>
+              </span>
             }
           </div>
 
-          <!-- ATC Meta Info -->
-          <div class="atc-meta">
-            <!-- Authors -->
-            @if (atc.data['bigactivity'] == null) {
-              @if (atc.data['author']?.length) {
-                <div class="meta-row">
-                  <span class="meta-label">Author(s):</span>
-                  <span class="meta-value">{{ getAuthorNames(atc.data['author']) }}</span>
-                </div>
-              }
-              @if (atc.data['observer']?.length) {
-                <div class="meta-row">
-                  <span class="meta-label">Observer(s):</span>
-                  <span class="meta-value">{{ getAuthorNames(atc.data['observer']) }}</span>
-                </div>
+          <!-- Field grid: italic labels + teal values -->
+          <div class="field-grid">
+            <span class="field-label">Participant Name</span>
+            <span class="field-val">{{ participantName() }}</span>
+
+            <!-- Big Activity (Scope Enhancer / ATC Mentor / Diagnostics) -->
+            @if (atc.data['bigactivity']) {
+              @for (activity of getBigActivityEntries(atc.data['bigactivity']); track activity.key) {
+                <span class="field-label">{{ mapBigActivity[activity.key] }}</span>
+                <span class="field-val">
+                  @for (author of activity.value; track author; let isLast = $last) {
+                    {{ getProfileName(author) }}{{ isLast ? '' : ', ' }}
+                  }
+                </span>
               }
             }
 
-            <!-- Big Activity -->
-            @if (atc.data['bigactivity']) {
-              @for (activity of getBigActivityEntries(atc.data['bigactivity']); track activity.key) {
-                <div class="meta-row">
-                  <span class="meta-label">{{ mapBigActivity[activity.key] }}:</span>
-                  <span class="meta-value">
-                    @for (author of activity.value; track author; let isLast = $last) {
-                      {{ getProfileName(author) }}{{ isLast ? '' : ', ' }}
-                    }
-                  </span>
-                </div>
+            <!-- Authors / Observers fallback when no bigactivity -->
+            @if (atc.data['bigactivity'] == null) {
+              @if (atc.data['author']?.length) {
+                <span class="field-label">Author(s)</span>
+                <span class="field-val">{{ getAuthorNames(atc.data['author']) }}</span>
+              }
+              @if (atc.data['observer']?.length) {
+                <span class="field-label">Observer(s)</span>
+                <span class="field-val">{{ getAuthorNames(atc.data['observer']) }}</span>
               }
             }
 
             <!-- Directive -->
-            <div class="meta-row directive">
-              <span class="meta-label">ATC Directive:</span>
-              <span class="meta-value">{{ atc.data['directive'] || '-' }}</span>
-            </div>
+            <span class="field-label">ATC Directive</span>
+            <span class="field-val">{{ atc.data['directive'] || '-' }}</span>
           </div>
 
-          <!-- Adjustments & Procedures -->
-          @if (atc.transcription.length > 0) {
-            <div class="transcription-section">
-              <div class="section-title">Adjustments & Procedures</div>
+          <!-- Note line shown for validated ATCs -->
+          @if (atc.data['status'] === 'validated') {
+            <div class="atc-card__note">
+              <mat-icon>visibility</mat-icon>
+              This ATC is directly visible to the Participant.
+            </div>
+          }
 
-              @for (item of atc.transcription; track item.adjustment.id; let adjIdx = $index) {
-                <div class="adjustment-block" [class.deleted]="item.adjustment.data['isdelete']">
-                  <!-- Adjustment Header -->
-                  <div class="adjustment-header">
-                    <span class="adj-number">{{ adjIdx + 1 }}.</span>
-                    <span class="adj-name">{{ item.adjustment.data['name'] }}</span>
-                    @if (item.adjustment.data['newlyadded']) {
-                      <span class="new-tag">New</span>
-                    }
-                    @if (item.adjustment.data['isdelete']) {
-                      <span class="deleted-tag">Deleted</span>
-                    }
-                  </div>
+          <!-- Single CTA: View Full ATC toggle -->
+          <div class="atc-card__actions">
+            <button type="button" class="vp-btn vp-btn--soft" (click)="toggleATC(atc.id)">
+              <mat-icon>{{ isATCExpanded(atc.id) ? 'visibility_off' : 'visibility' }}</mat-icon>
+              {{ isATCExpanded(atc.id) ? 'Hide Details' : 'View Full ATC' }}
+            </button>
+          </div>
 
-                  <!-- Adjustment Details -->
-                  <div class="adjustment-details">
-                    @if (item.adjustment.data['comment']) {
-                      <div class="detail-row">
-                        <span class="detail-label">Comment:</span>
-                        <span class="detail-value italic">{{ item.adjustment.data['comment'] }}</span>
+          <!-- Expanded details: adjustments + procedures -->
+          @if (isATCExpanded(atc.id)) {
+            <div class="atc-card__details">
+              @if (atc.transcription.length > 0) {
+                <div class="transcription-section">
+                  <div class="section-title">Adjustments &amp; Procedures</div>
+
+                  @for (item of atc.transcription; track item.adjustment.id; let adjIdx = $index) {
+                    <div class="adjustment-block" [class.deleted]="item.adjustment.data['isdelete']">
+                      <div class="adjustment-header">
+                        <span class="adj-number">{{ adjIdx + 1 }}.</span>
+                        <span class="adj-name">{{ item.adjustment.data['name'] }}</span>
+                        @if (item.adjustment.data['newlyadded']) {
+                          <span class="new-tag">New</span>
+                        }
+                        @if (item.adjustment.data['isdelete']) {
+                          <span class="deleted-tag">Deleted</span>
+                        }
                       </div>
-                    }
-                    <div class="detail-row">
-                      <span class="detail-label">Awareness:</span>
-                      <span class="detail-value">{{ item.adjustment.data['awarenessdetail'] || 'Not Updated' }}</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">Potential Years:</span>
-                      <span class="detail-value">{{ item.adjustment.data['potentialyears'] || 'Not Updated' }}</span>
-                    </div>
-                    @if (item.adjustment.data['editedby']) {
-                      <div class="detail-row edited-info">
-                        <span class="detail-value">* Edited by {{ getProfileName(item.adjustment.data['editedby']?.id) }}</span>
-                      </div>
-                    }
-                  </div>
 
-                  <!-- Procedures -->
-                  @if (item.procedures.length > 0) {
-                    <div class="procedures-container">
-                      <div class="procedures-title">Procedures:</div>
-                      @for (proc of item.procedures; track proc.id; let procIdx = $index) {
-                        <div class="procedure-block" [class.deleted]="proc.data['isdelete']">
-                          <div class="procedure-row">
-                            <span class="proc-number">{{ procIdx + 1 }}.</span>
-                            <span class="proc-name">{{ getProcedureName(proc.data['name']) }}</span>
-
-                            @if (proc.data['mandatory']) {
-                              <span class="mandatory-tag">Mandatory</span>
-                            }
-
-                            @if (proc.data['autogeneralized']) {
-                              <mat-icon class="status-icon autogeneralized">auto_awesome</mat-icon>
-                            } @else if (proc.data['status'] === 'completed') {
-                              <mat-icon class="status-icon completed">check_circle</mat-icon>
-                            } @else {
-                              <mat-icon class="status-icon pending">radio_button_unchecked</mat-icon>
-                            }
-
-                            @if (proc.data['assigned_to']?.length) {
-                              <span class="assigned-info">
-                                (Assigned: {{ getAssignedNames(proc.data['assigned_to']) }})
-                              </span>
-                            }
-
-                            @if (proc.data['isdelete']) {
-                              <span class="deleted-tag">Deleted</span>
-                            }
+                      <div class="adjustment-details">
+                        @if (item.adjustment.data['comment']) {
+                          <div class="detail-row">
+                            <span class="detail-label">Comment:</span>
+                            <span class="detail-value italic">{{ item.adjustment.data['comment'] }}</span>
                           </div>
+                        }
+                        <div class="detail-row">
+                          <span class="detail-label">Awareness:</span>
+                          <span class="detail-value">{{ item.adjustment.data['awarenessdetail'] || 'Not Updated' }}</span>
+                        </div>
+                        <div class="detail-row">
+                          <span class="detail-label">Potential Years:</span>
+                          <span class="detail-value">{{ item.adjustment.data['potentialyears'] || 'Not Updated' }}</span>
+                        </div>
+                        @if (item.adjustment.data['editedby']) {
+                          <div class="detail-row edited-info">
+                            <span class="detail-value">* Edited by {{ getProfileName(item.adjustment.data['editedby']?.id) }}</span>
+                          </div>
+                        }
+                      </div>
 
-                          @if (!proc.data['isdelete']) {
-                            @let status = getProcedureStatus(proc.data);
-                            <div class="procedure-status-text" [class.status-pending]="status === null" [class.status-completed]="status === 'completed'" [class.status-autogeneralized]="status === 'autogeneralized'">
-                              <span class="procedure-status-label">Status:</span>
-                              <span class="procedure-status-value">
-                                {{ status === 'completed' ? 'Completed' : status === 'autogeneralized' ? 'Auto Generalized' : 'Still Pending' }}
-                              </span>
+                      @if (item.procedures.length > 0) {
+                        <div class="procedures-container">
+                          <div class="procedures-title">Procedures:</div>
+                          @for (proc of item.procedures; track proc.id; let procIdx = $index) {
+                            <div class="procedure-block" [class.deleted]="proc.data['isdelete']">
+                              <div class="procedure-row">
+                                <span class="proc-number">{{ procIdx + 1 }}.</span>
+                                <span class="proc-name">{{ getProcedureName(proc.data['name']) }}</span>
+
+                                @if (proc.data['mandatory']) {
+                                  <span class="mandatory-tag">Mandatory</span>
+                                }
+
+                                @if (proc.data['autogeneralized']) {
+                                  <mat-icon class="status-icon autogeneralized">auto_awesome</mat-icon>
+                                } @else if (proc.data['status'] === 'completed') {
+                                  <mat-icon class="status-icon completed">check_circle</mat-icon>
+                                } @else {
+                                  <mat-icon class="status-icon pending">radio_button_unchecked</mat-icon>
+                                }
+
+                                @if (proc.data['assigned_to']?.length) {
+                                  <span class="assigned-info">
+                                    (Assigned: {{ getAssignedNames(proc.data['assigned_to']) }})
+                                  </span>
+                                }
+
+                                @if (proc.data['isdelete']) {
+                                  <span class="deleted-tag">Deleted</span>
+                                }
+                              </div>
+
+                              @if (!proc.data['isdelete']) {
+                                @let status = getProcedureStatus(proc.data);
+                                <div class="procedure-status-text" [class.status-pending]="status === null" [class.status-completed]="status === 'completed'" [class.status-autogeneralized]="status === 'autogeneralized'">
+                                  <span class="procedure-status-label">Status:</span>
+                                  <span class="procedure-status-value">
+                                    {{ status === 'completed' ? 'Completed' : status === 'autogeneralized' ? 'Auto Generalized' : 'Still Pending' }}
+                                  </span>
+                                </div>
+                              }
                             </div>
                           }
                         </div>
@@ -193,11 +191,11 @@
                     </div>
                   }
                 </div>
+              } @else {
+                <div class="no-transcription">
+                  No adjustments recorded
+                </div>
               }
-            </div>
-          } @else {
-            <div class="no-transcription">
-              No adjustments recorded
             </div>
           }
         </div>

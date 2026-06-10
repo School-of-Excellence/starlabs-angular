@@ -1,19 +1,21 @@
-<div class="jchd-wrap">
+<div class="jchd-wrap" [ngClass]="'jchd-view-' + view">
 
   <header class="jchd-header">
     <div>
       <h1>Journey Coach — Health Dashboard</h1>
       <p class="subtitle" *ngIf="view === 'base' && selectedCoachName">{{ selectedCoachName }}'s base</p>
+      <p class="subtitle" *ngIf="view === 'worklist'">Today's worklist<span *ngIf="selectedCoachName"> · {{ selectedCoachName }}</span></p>
       <p class="subtitle" *ngIf="view === 'scoreboard'">Coach scoreboard</p>
     </div>
     <div class="jchd-header-controls" *ngIf="!loading && !loadError">
       <mat-button-toggle-group class="view-toggle" [value]="view" (change)="setView($event.value)"
         aria-label="Dashboard view">
         <mat-button-toggle value="base">Base</mat-button-toggle>
+        <mat-button-toggle value="worklist">Worklist</mat-button-toggle>
         <mat-button-toggle value="scoreboard">Scoreboard</mat-button-toggle>
       </mat-button-toggle-group>
 
-      <mat-form-field appearance="outline" class="coach-picker" *ngIf="view === 'base'">
+      <mat-form-field appearance="outline" class="coach-picker" *ngIf="view === 'base' || view === 'worklist'">
         <mat-label>Viewing</mat-label>
         <mat-select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)">
           <mat-option [value]="ALL">All participants</mat-option>
@@ -24,9 +26,21 @@
     </div>
   </header>
 
-  <div class="jchd-state" *ngIf="loading">
-    <mat-spinner diameter="36"></mat-spinner>
-    <span>Loading the base…</span>
+  <div class="jchd-skeleton" *ngIf="loading" aria-busy="true" aria-label="Loading the base">
+    <div class="sk-band">
+      <div class="sk-stat" *ngFor="let s of [1,2,3,4,5,6]">
+        <div class="sk-line sk-line-sm"></div>
+        <div class="sk-line sk-line-lg"></div>
+      </div>
+    </div>
+    <div class="sk-table">
+      <div class="sk-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+        <div class="sk-line sk-cell-a"></div>
+        <div class="sk-line sk-cell-b"></div>
+        <div class="sk-line sk-cell-c"></div>
+        <div class="sk-line sk-cell-d"></div>
+      </div>
+    </div>
   </div>
   <div class="jchd-state error" *ngIf="!loading && loadError">
     <mat-icon>error_outline</mat-icon>
@@ -37,6 +51,17 @@
 
     <!-- ===== Base view (existing dashboard) ===== -->
     <ng-container *ngIf="view === 'base'">
+    <div class="jchd-anim">
+
+    <!-- Fallback notice: logged-in coach couldn't be matched, so we're showing everyone. -->
+    <div class="jchd-fallback-banner" *ngIf="coachFallback && selectedCoachId === ALL && !coachFallbackDismissed">
+      <mat-icon>info</mat-icon>
+      <span>Showing all participants — we couldn't match your coach profile. Pick your name above to see just your base.</span>
+      <button mat-icon-button class="jchd-fallback-dismiss" matTooltip="Dismiss"
+        aria-label="Dismiss notice" (click)="coachFallbackDismissed = true">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
 
     <!-- Phase B: assignment bar (Unassigned view only) -->
     <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED">
@@ -56,18 +81,32 @@
     </section>
 
     <section class="jchd-summary" *ngIf="selectedCoachId !== UNASSIGNED">
-      <mat-card class="kpi"><div class="kpi-num">{{ summary.total }}</div><div class="kpi-label">Participants</div></mat-card>
-      <mat-card class="kpi good"><div class="kpi-num">{{ summary.active }}</div><div class="kpi-label">Active</div></mat-card>
-      <mat-card class="kpi bad clickable" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned"><div class="kpi-num">{{ summary.inactive }}</div><div class="kpi-label">Inactive (lost)</div></mat-card>
-      <mat-card class="kpi clickable" (click)="kpi('renewalsSoon')"><div class="kpi-num">{{ summary.renewalsSoon }}</div><div class="kpi-label">Renewals &le;90d</div></mat-card>
-      <mat-card class="kpi clickable" (click)="kpi('goingQuiet')"><div class="kpi-num">{{ summary.goingQuiet }}</div><div class="kpi-label">Going quiet</div></mat-card>
-      <mat-card class="kpi"><div class="kpi-num">{{ summary.withOpenTickets }}</div><div class="kpi-label">Open tickets</div></mat-card>
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('total')" (click)="kpi('total')" matTooltip="Show all">
+        <div class="kpi-label">Participants</div>
+        <div class="kpi-num">{{ summary.total }}</div>
+      </div>
+      <div class="kpi good clickable" [class.kpi-selected]="kpiActive('active')" (click)="kpi('active')" matTooltip="Active only">
+        <div class="kpi-label">Active</div>
+        <div class="kpi-num">{{ summary.active }}</div>
+      </div>
+      <div class="kpi bad clickable" [class.kpi-selected]="kpiActive('inactive')" (click)="kpi('inactive')" matTooltip="Gone — late / discontinued / banned">
+        <div class="kpi-label">Inactive (lost)</div>
+        <div class="kpi-num">{{ summary.inactive }}</div>
+      </div>
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')">
+        <div class="kpi-label">Renewals &le;90d</div>
+        <div class="kpi-num">{{ summary.renewalsSoon }}</div>
+      </div>
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')">
+        <div class="kpi-label">Going quiet <span class="kpi-scope" *ngIf="pagedMode"
+          matTooltip="Count over loaded pages only — page through or select your own name for the full base.">in view</span></div>
+        <div class="kpi-num">{{ summary.goingQuiet }}</div>
+      </div>
+      <div class="kpi clickable" [class.kpi-selected]="kpiActive('tickets')" (click)="kpi('tickets')" matTooltip="Only open tickets">
+        <div class="kpi-label">Open tickets</div>
+        <div class="kpi-num">{{ summary.withOpenTickets }}</div>
+      </div>
     </section>
-
-    <div class="jchd-phase-note" *ngIf="selectedCoachId !== UNASSIGNED">
-      <mat-icon>info</mat-icon>
-      <span><strong>Priority</strong> is a Phase-1 triage heuristic over live data (who to act on first). The calibrated <strong>Health Score</strong> (Sad / Neutral / Happy / Evangelist) is wired and turns on in Phase 2 once instrumentation &amp; calibration land.</span>
-    </div>
 
     <section class="jchd-levers" *ngIf="selectedCoachId !== UNASSIGNED">
       <button mat-stroked-button [class.active]="activeLever==='all'" (click)="setLever('all')">All</button>
@@ -81,13 +120,15 @@
         matTooltip="Onboarded but journey not started">Not started ({{ summary.notStarted }})</button>
       <button mat-stroked-button [class.active]="activeLever==='inactive'" (click)="setLever('inactive')"
         matTooltip="Gone — late / discontinued / banned (unactionable)">Inactive ({{ summary.inactive }})</button>
+      <button mat-stroked-button [class.active]="activeLever==='tickets'" (click)="setLever('tickets')"
+        matTooltip="Participants with at least one open ticket">Open tickets ({{ summary.withOpenTickets }})</button>
       <button mat-stroked-button disabled matTooltip="Available in Phase 2 (needs Wins + Advocacy)">Referral-ready · Phase 2</button>
     </section>
 
     <section class="jchd-filters">
       <mat-form-field appearance="outline" class="f-search">
         <mat-label>Search name / number</mat-label>
-        <input matInput [(ngModel)]="search" (ngModelChange)="applyFilters()" />
+        <input matInput #searchInput [(ngModel)]="search" (ngModelChange)="applyFilters()" />
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Journey</mat-label>
@@ -105,9 +146,80 @@
           <mat-option value="discontinued">Discontinued</mat-option>
         </mat-select>
       </mat-form-field>
+      <button mat-stroked-button class="filter-toggle-btn" [class.active]="filtersExpanded || hasActiveFilters"
+        (click)="filtersExpanded = !filtersExpanded"
+        matTooltip="Product type, tier, priority, health, finance, renewal & quiet filters">
+        <mat-icon>tune</mat-icon> Filters
+        <mat-icon class="chevron">{{ filtersExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
       <button mat-stroked-button class="export-btn" (click)="exportCsv()" matTooltip="Export the current list as CSV">
         <mat-icon>download</mat-icon> Export
       </button>
+    </section>
+
+    <!-- Intelligent filter panel (collapsible). Product type defaults to Ecosystem. -->
+    <section class="jchd-filter-panel" *ngIf="selectedCoachId !== UNASSIGNED && filtersExpanded">
+      <div class="fp-grid">
+        <mat-form-field appearance="outline" class="fp-field"
+          matTooltip="Ecosystem = B!G/LYL/uP!/CPM journeys · DFU = Done-For-You · Gifts = FTO">
+          <mat-label>Product type</mat-label>
+          <mat-select [(ngModel)]="productTypeFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option value="ecosystem">Ecosystem</mat-option>
+            <mat-option value="dfu">DFU</mat-option>
+            <mat-option value="gifts">Gifts</mat-option>
+            <mat-option value="other">Other</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field">
+          <mat-label>Tier</mat-label>
+          <mat-select [(ngModel)]="tierFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option *ngFor="let t of tierOptions" [value]="t">{{ t }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field">
+          <mat-label>Priority band</mat-label>
+          <mat-select [(ngModel)]="bandFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option value="High">High</mat-option>
+            <mat-option value="Medium">Medium</mat-option>
+            <mat-option value="Low">Low</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field">
+          <mat-label>Coach health</mat-label>
+          <mat-select [(ngModel)]="healthFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option *ngFor="let h of healthOptions" [value]="h">{{ healthLabel(h) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="fp-field" *ngIf="financeOptions.length">
+          <mat-label>Financial status</mat-label>
+          <mat-select [(ngModel)]="financeFilters" (ngModelChange)="applyFilters()" multiple>
+            <mat-option *ngFor="let f of financeOptions" [value]="f">{{ f }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="fp-toggles">
+        <mat-checkbox [(ngModel)]="renewalWindowOnly" (ngModelChange)="applyFilters()"
+          matTooltip="Subscription ends within {{ RENEWAL_DAYS }} days">Renewal window</mat-checkbox>
+        <mat-checkbox [(ngModel)]="goingQuietOnly" (ngModelChange)="applyFilters()"
+          matTooltip="No coach contact in {{ QUIET_DAYS }}+ days">Going quiet</mat-checkbox>
+        <mat-checkbox [(ngModel)]="noEventRequestOnly" (ngModelChange)="applyFilters()">No recent event request</mat-checkbox>
+        <span class="fp-spacer"></span>
+        <button mat-stroked-button class="fp-clear" [disabled]="!hasActiveFilters" (click)="clearFilters()">
+          <mat-icon>filter_alt_off</mat-icon> Clear filters
+        </button>
+      </div>
+
+      <div class="fp-note" *ngIf="pagedMode">
+        <mat-icon>info</mat-icon>
+        <span>Search, product type, tier, status, finance &amp; renewal-window filters cover the
+          <strong>full base</strong> via a lightweight index. Priority band, coach-health &amp;
+          going-quiet refine within loaded pages — page through to apply them across everyone.</span>
+      </div>
     </section>
 
     <div class="jchd-diag" *ngIf="!pagedMode && selectedCoachId !== UNASSIGNED">
@@ -124,9 +236,22 @@
       Page {{ currentPage + 1 }} · {{ dataSource.data.length }} unassigned on this page · {{ loadedRowCount }} loaded so far<span *ngIf="reachedEnd"> · end of list</span>.
       Select rows and assign a coach above — this writes <code>coachedby</code>. Some pages may show fewer rows as participants get assigned.
     </div>
+    <!-- Honest, always-visible caveat: page-local filters (band / health / going-quiet) only
+         refine the loaded pages in paged mode. Renewal-window + open-tickets are now base-wide.
+         Shown above the table, not buried in the filter panel. -->
+    <div class="jchd-page-caveat" *ngIf="pagedMode && pageLocalFilterActive">
+      <mat-icon>info</mat-icon>
+      <span>Filtering loaded pages only — page through, or pick your own name for the whole base.</span>
+    </div>
+
     <div class="jchd-state" *ngIf="pageLoading">
       <mat-spinner diameter="24"></mat-spinner><span>Loading page…</span>
     </div>
+
+    <div class="jchd-keys-hint" aria-hidden="true">Keys: / search · j/k move · o open · Esc clear</div>
+
+    <!-- Visually-hidden live region: announces the keyboard-focused participant to screen readers. -->
+    <div class="sr-only" aria-live="polite">{{ focusedRowName }}</div>
 
     <div class="jchd-table-wrap">
       <table mat-table [dataSource]="dataSource" matSort matSortActive="priority" matSortDirection="desc" class="jchd-table">
@@ -141,7 +266,8 @@
         </ng-container>
 
         <ng-container matColumnDef="health">
-          <th mat-header-cell *matHeaderCellDef>Health (coach)</th>
+          <th mat-header-cell *matHeaderCellDef
+              matTooltip="Coach-set sentiment: Sad → Neutral → Happy → Evangelist (actively refers others)">Health (coach)</th>
           <td mat-cell *matCellDef="let r">
             <span *ngIf="r.coachHealthState; else noHealth"
                   class="state health-clickable" [ngClass]="stateClass(r.coachHealthState.state)"
@@ -150,7 +276,7 @@
               {{ healthLabel(r.coachHealthState.state) }}
             </span>
             <ng-template #noHealth>
-              <span class="health-set-link" (click)="setHealthState(r)" matTooltip="Set health state">—</span>
+              <span class="health-set-link" (click)="setHealthState(r)" matTooltip="Set health">—</span>
             </ng-template>
           </td>
         </ng-container>
@@ -167,8 +293,9 @@
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
           <td mat-cell *matCellDef="let r">
-            <a class="cell-name name-link" [routerLink]="['/userprofile', r.profileid]"
-               matTooltip="Open profile">{{ r.name }}</a>
+            <a class="cell-name name-link" role="button" tabindex="0"
+               (click)="openSlideover(r)" (keydown.enter)="openSlideover(r)" (keydown.space)="openSlideover(r)"
+               matTooltip="Open participant panel">{{ r.name }}</a>
             <div class="cell-sub">{{ r.number || '—' }}</div>
           </td>
         </ng-container>
@@ -249,16 +376,18 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
+            <span class="row-actions">
             <button mat-icon-button [routerLink]="['/userprofile', r.profileid]" matTooltip="Open profile">
               <mat-icon>open_in_new</mat-icon>
             </button>
             <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Actions"><mat-icon>more_vert</mat-icon></button>
+            </span>
             <mat-menu #rowMenu="matMenu">
               <button mat-menu-item (click)="logCall(r)">
                 <mat-icon>add_task</mat-icon><span>Log call</span>
               </button>
               <button mat-menu-item (click)="setHealthState(r)">
-                <mat-icon>favorite</mat-icon><span>Set health state</span>
+                <mat-icon>favorite</mat-icon><span>Set health</span>
               </button>
               <button mat-menu-item [matMenuTriggerFor]="assignMenu">
                 <mat-icon>person_add</mat-icon><span>Assign coach</span>
@@ -277,7 +406,10 @@
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns; let i = index"
+            class="jchd-data-row" [ngClass]="bandClass(row.priorityBand)"
+            [class.jchd-row-focused]="i === focusedRowIndex"
+            [attr.aria-current]="i === focusedRowIndex ? 'true' : null"></tr>
       </table>
 
       <div class="jchd-empty" *ngIf="dataSource.data.length === 0 && !pageLoading">
@@ -291,11 +423,13 @@
         (page)="onPageEvent($event)" showFirstLastButtons></mat-paginator>
     </div>
 
+    </div>
     </ng-container>
     <!-- ===== /Base view ===== -->
 
     <!-- ===== Phase C: Coach Scoreboard ===== -->
     <ng-container *ngIf="view === 'scoreboard'">
+    <div class="jchd-anim">
 
       <section class="jchd-range">
         <mat-button-toggle-group class="period-toggle" [value]="period" (change)="setPeriod($event.value)"
@@ -329,6 +463,11 @@
         <mat-icon>emoji_events</mat-icon>
         <span>This scoreboard rewards <strong>keeping the pipeline active</strong> (engagement &amp; coverage).
           Outcome metrics (renewals / referrals / wins) join the score later once instrumentation lands.</span>
+      </div>
+
+      <div class="jchd-scoreboard-blocked" *ngIf="scoreboardDataBlocked">
+        <mat-icon>report_problem</mat-icon>
+        <span>Touchpoint/appointment data unavailable (permissions) — coverage &amp; quality may be understated.</span>
       </div>
 
       <div class="jchd-table-wrap">
@@ -383,8 +522,82 @@
         </div>
       </div>
 
+    </div>
     </ng-container>
     <!-- ===== /Coach Scoreboard ===== -->
+
+    <!-- ===== Today's Worklist (triage queue) ===== -->
+    <ng-container *ngIf="view === 'worklist'">
+    <div class="jchd-anim">
+
+      <div class="wl-head" *ngIf="worklistTotal() > 0">
+        <div class="wl-head-main">
+          <h2>Today's focus</h2>
+          <p>Top {{ worklistRows().length }} of {{ worklistTotal() }} to act on, highest priority first.</p>
+        </div>
+        <div class="wl-diag" *ngIf="pagedMode">Showing loaded pages only — most precise in single-coach view.</div>
+      </div>
+
+      <div class="wl-list" *ngIf="worklistTotal() > 0">
+        <article class="wl-card" *ngFor="let r of worklistRows()" [ngClass]="bandClass(r.priorityBand)">
+          <div class="wl-rail"></div>
+
+          <div class="wl-body">
+            <div class="wl-row-top">
+              <span class="pri wl-pri" [ngClass]="bandClass(r.priorityBand)">{{ r.priorityBand }} · {{ r.priority }}</span>
+              <div class="wl-id">
+                <a class="wl-name name-link" role="button" tabindex="0"
+                   (click)="openSlideover(r)" (keydown.enter)="openSlideover(r)" (keydown.space)="openSlideover(r)"
+                   matTooltip="Open participant panel">{{ r.name }}</a>
+                <span class="wl-meta">
+                  <span>{{ r.number || '—' }}</span>
+                  <span *ngIf="r.atcmodel" class="wl-dot">·</span>
+                  <span *ngIf="r.atcmodel">{{ r.atcmodel }}</span>
+                  <span *ngIf="r.journeyname" class="wl-dot">·</span>
+                  <span *ngIf="r.journeyname">{{ r.journeyname }}<span *ngIf="r.journeystatus"> ({{ r.journeystatus }})</span></span>
+                </span>
+              </div>
+            </div>
+
+            <p class="wl-reason">{{ r.reason }}</p>
+
+            <div class="wl-signals">
+              <span class="chip chip-warn" *ngIf="r.renewalWindow">Renews in {{ r.daysToRenewal }}d</span>
+              <span class="chip chip-bad" *ngIf="r.lapsed">Lapsed</span>
+              <span class="chip chip-warn" *ngIf="r.goingQuiet">Quiet {{ r.daysSinceCoach }}d</span>
+              <span class="chip chip-warn" *ngIf="r.openTickets > 0">{{ r.openTickets }} open ticket<span *ngIf="r.openTickets > 1">s</span></span>
+              <span class="chip" *ngIf="r.recentEventRequest" [ngClass]="eventStatusClass(r.recentEventRequest.status)"
+                    [matTooltip]="r.recentEventRequest.eventName + (r.recentEventRequest.date ? ' · ' + fmtDate(r.recentEventRequest.date) : '')">{{ r.recentEventRequest.eventName }}: {{ r.recentEventRequest.status }}</span>
+              <span class="chip" *ngIf="r.coachHealthState" [ngClass]="stateClass(r.coachHealthState.state)"
+                    [matTooltip]="(r.coachHealthState.note || 'No note') + ' · ' + fmtDate(r.coachHealthState.date)">{{ healthLabel(r.coachHealthState.state) }}</span>
+              <span class="chip" *ngIf="r.customerstatus" [ngClass]="statusClass(r.customerstatus)">{{ r.customerstatus }}</span>
+              <span class="chip chip-bad" *ngIf="r.financialstatus === 'locked' || r.financialstatus === 'defaulted'">{{ r.financialstatus }}</span>
+            </div>
+          </div>
+
+          <div class="wl-actions">
+            <button mat-stroked-button class="wl-act" (click)="openSlideover(r)" matTooltip="Open participant panel">Details</button>
+            <button mat-stroked-button class="wl-act" (click)="logCall(r)">Log call</button>
+            <button mat-stroked-button class="wl-act" (click)="setHealthState(r)">Set health</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="wl-more" *ngIf="worklistTotal() > 0 && worklistRows().length < worklistTotal()">
+        <button mat-stroked-button (click)="showMoreWorklist()">
+          Show more ({{ worklistTotal() - worklistRows().length }} remaining)
+        </button>
+      </div>
+
+      <div class="jchd-empty wl-empty" *ngIf="worklistTotal() === 0">
+        <mat-icon>task_alt</mat-icon>
+        <div class="wl-empty-title">Nothing in the queue</div>
+        <div class="wl-empty-sub">No participants match the current filters — clear a filter or switch coach to see your worklist.</div>
+      </div>
+
+    </div>
+    </ng-container>
+    <!-- ===== /Today's Worklist ===== -->
 
   </ng-container>
 </div>

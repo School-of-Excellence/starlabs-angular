@@ -29,6 +29,7 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 
 interface ImportPreviewParticipant {
@@ -59,6 +60,7 @@ interface ImportPreviewData {
     MatButtonModule,
     MatTooltipModule,
     NgxMatSelectSearchModule,
+    ProfilePictureComponent,
     MatDialogModule
   ],
   templateUrl: './initiate-event-product.component.html',
@@ -749,9 +751,9 @@ export class InitiateEventProductComponent {
     })).filter(p => p.profileid);
 
     this.dialog.open(BulkAddProductsComponent, {
-      data: selectedParticipants,
-      width: '70vw',
-      disableClose: true
+        data: { participants: selectedParticipants, productrefId: this.selectedArena['productref'].id },
+        width: '70vw',
+        disableClose: true
       }).afterClosed().subscribe(async () => {
       if (!this.selectedArena) return;
 
@@ -858,7 +860,7 @@ export class InitiateEventProductComponent {
     if (selectedParticipants.length === 0) return;
 
     this.dialog.open(BulkAddProductsComponent, {
-      data: selectedParticipants,
+      data: { participants: selectedParticipants, productrefId: this.selectedArena['productref'].id },
       width: '70vw',
       disableClose: true
     }).afterClosed().subscribe(async () => {

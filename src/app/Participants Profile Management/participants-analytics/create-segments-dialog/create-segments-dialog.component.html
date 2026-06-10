@@ -15,24 +15,34 @@
           <h1 class="page-title">Segments Management</h1>
           <span class="segment-count">{{ segments.length }} segment(s)</span>
         </div>
-        <button 
-          mat-raised-button 
-          color="primary" 
-          (click)="toggleCreateForm()"
-          [disabled]="loading">
-          <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
-          {{ showCreateForm ? 'Cancel' : 'Create Segment' }}
-        </button>
+        <div class="header-actions">
+          <button
+            mat-stroked-button
+            class="history-btn"
+            (click)="toggleHistoryPanel()"
+            [disabled]="loading">
+            <mat-icon>history</mat-icon>
+            History
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="toggleCreateForm()"
+            [disabled]="loading">
+            <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
+            {{ showCreateForm ? 'Cancel' : 'Create Segment' }}
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Create Segment Form -->
     <mat-card class="create-form-card" *ngIf="showCreateForm">
     
-        <mat-card-title>
-          <mat-icon class="form-icon">add_circle</mat-icon>
-          Create New Segment
-        </mat-card-title>
+      <mat-card-title>
+        <mat-icon class="form-icon">add_circle</mat-icon>
+        Create New Segment
+      </mat-card-title>
       
       <mat-card-content>
         <form [formGroup]="createSegmentForm" class="create-form">
@@ -79,7 +89,7 @@
                 </mat-chip-set>
               </mat-select-trigger>
               <mat-option>
-                <ngx-mat-select-search 
+                <ngx-mat-select-search
                   [formControl]="tagSearchCtrl"
                   placeholderLabel="Search tags..."
                   noEntriesFoundLabel="No tags found">
@@ -103,9 +113,9 @@
                 <span>{{ createSegmentForm.get('tagids')?.value?.length }} tag(s) selected</span>
               </div>
             </div>
-            <button 
-              mat-raised-button 
-              color="primary" 
+            <button
+              mat-raised-button
+              color="primary"
               (click)="onCreateSegment()"
               [disabled]="createSegmentForm.invalid || submitting">
               <mat-spinner diameter="20" *ngIf="submitting" class="button-spinner"></mat-spinner>
@@ -206,15 +216,15 @@
                 </div>
               </th>
               <td mat-cell *matCellDef="let segment" class="actions-cell">
-                <button 
-                  mat-icon-button 
+                <button
+                  mat-icon-button
                   color="primary"
                   (click)="onSelectSegment(segment)"
                   matTooltip="Edit segment">
                   <mat-icon>edit</mat-icon>
                 </button>
-                <button 
-                  mat-icon-button 
+                <button
+                  mat-icon-button
                   color="warn"
                   (click)="deleteSegment(segment, $event)"
                   matTooltip="Delete segment">
@@ -224,8 +234,8 @@
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr 
-              mat-row 
+            <tr
+              mat-row
               *matRowDef="let row; columns: displayedColumns;"
               [class.selected-row]="selectedSegment?.docid === row.docid"
               (click)="onSelectSegment(row)">
@@ -460,7 +470,6 @@
             <span>{{ updatingSegment ? 'Adding...' : 'Add to Segment' }}</span>
           </button>
         </form>
-
         <div class="empty-state" *ngIf="availableTagsForSelected.length === 0">
           <mat-icon class="empty-icon">check_circle</mat-icon>
           <p>All tags are already added to this segment</p>
@@ -469,6 +478,148 @@
     </div>
   </div>
 
-  <!-- Backdrop -->
+  <!-- Edit Side Panel Backdrop -->
   <div class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+
+  <!-- history panel -->
+  <div class="history-panel" [class.open]="historyPanelOpen">
+
+    <div class="hp-header">
+      <div class="hp-header-left">
+        <mat-icon class="hp-icon">history</mat-icon>
+        <h2 class="hp-title">History Log</h2>
+        <span class="hp-badge">{{ logs.length }} entries</span>
+      </div>
+      <button mat-icon-button (click)="toggleHistoryPanel()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <mat-divider></mat-divider>
+    <div class="hp-filters">
+      <mat-form-field appearance="outline" class="hp-search-field">
+        <mat-label>Search by segment, list or participant name</mat-label>
+        <input matInput [(ngModel)]="historySearchTerm" (ngModelChange)="applyHistoryFilter()" autocomplete="off">
+        <mat-icon matPrefix>search</mat-icon>
+        <button mat-icon-button matSuffix *ngIf="historySearchTerm" (click)="historySearchTerm=''; applyHistoryFilter()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="hp-date-field">
+        <mat-label>Filter by date range</mat-label>
+        <mat-date-range-input [rangePicker]="historyDatePicker">
+          <input matStartDate [(ngModel)]="historyDateStart" (ngModelChange)="applyHistoryFilter()" placeholder="Start date">
+          <input matEndDate   [(ngModel)]="historyDateEnd"   (ngModelChange)="applyHistoryFilter()" placeholder="End date">
+        </mat-date-range-input>
+        <mat-hint>MM/DD/YYYY – MM/DD/YYYY</mat-hint>
+        <mat-datepicker-toggle matIconSuffix [for]="historyDatePicker"></mat-datepicker-toggle>
+        <mat-date-range-picker #historyDatePicker></mat-date-range-picker>
+        <button mat-icon-button matSuffix *ngIf="historyDateStart || historyDateEnd"
+          (click)="historyDateStart=null; historyDateEnd=null; applyHistoryFilter()" style="margin-right:36px">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
+      <p class="hp-chips-label">Filter by activity</p>
+      <div class="hp-chips">
+        <span class="hp-chip" [class.chip-all]="historyFilter==='all'" (click)="setHistoryFilter('all')">
+          <mat-icon>list</mat-icon> All
+          <span class="hp-chip-count">{{ logs.length }}</span>
+        </span>
+        <span class="hp-chip" [class.chip-created]="historyFilter==='create'" (click)="setHistoryFilter('create')">
+          <mat-icon>create_new_folder</mat-icon> Created
+          <span class="hp-chip-count">{{ getLogCountByType('create') }}</span>
+        </span>
+        <span class="hp-chip" [class.chip-deleted]="historyFilter==='delete'" (click)="setHistoryFilter('delete')">
+          <mat-icon>delete</mat-icon> Deleted
+          <span class="hp-chip-count">{{ getLogCountByType('delete') }}</span>
+        </span>
+        <span class="hp-chip" [class.chip-added]="historyFilter==='edit'" (click)="setHistoryFilter('edit')">
+          <mat-icon>edit</mat-icon> Edited
+          <span class="hp-chip-count">{{ getLogCountByType('edit') }}</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="hp-loading" *ngIf="logsLoading">
+      <mat-spinner diameter="28"></mat-spinner>
+      <span>Loading activity...</span>
+    </div>
+
+    <div class="hp-empty" *ngIf="!logsLoading && filteredLogs.length === 0">
+      <mat-icon class="hp-empty-icon">history_toggle_off</mat-icon>
+      <p>No activity recorded yet</p>
+    </div>
+
+    <div class="hp-body" *ngIf="!logsLoading && filteredLogs.length > 0">
+      <ng-container *ngFor="let group of groupedPagedLogs">
+        <p class="hp-date-label">{{ group.date }}</p>
+
+        <div *ngFor="let log of group.logs"
+             class="hp-log-item"
+             [ngClass]="getLogItemClass(log.action_type)">
+
+          <div class="hp-log-main">
+            <div class="hp-log-top">
+              <mat-icon class="hp-log-icon" [ngClass]="getLogIconClass(log.action_type)">
+                {{ getLogIcon(log.action_type) }}
+              </mat-icon>
+              <span class="hp-log-badge" [ngClass]="getLogBadgeClass(log.action_type)">
+                {{ getLogLabel(log.action_type) }}
+              </span>
+              <span class="hp-log-time">{{ log.created_date.toDate() | date:'shortTime' }}</span>
+            </div>
+            <p class="hp-log-desc">{{ log.metadata?.description || log.metadata?.current?.description }}</p>
+            <p class="hp-log-by">
+              <mat-icon style="font-size:13px;width:13px;height:13px;vertical-align:-2px">account_circle</mat-icon>
+              By: {{ getUserName(log.edited_by) }}
+            </p>
+          </div>
+          <ng-container *ngIf="getLogProfiles(log) as profiles">
+            <div *ngIf="profiles.length > 0"
+                 class="hp-expand-row"
+                 [ngClass]="getLogExpandClass(log.action_type)"
+                 (click)="toggleLogExpand(log.doc_id)">
+              <span class="hp-expand-label" [ngClass]="getLogExpandLabelClass(log.action_type)">
+  <mat-icon style="font-size:15px;width:15px;height:15px;vertical-align:-3px">folder</mat-icon>
+  {{ profiles.length }} list(s) affected
+</span>
+              <mat-icon class="hp-expand-chevron"
+                [style.transform]="expandedLogIds.has(log.doc_id) ? 'rotate(180deg)' : 'none'">
+                expand_more
+              </mat-icon>
+            </div>
+
+            <div class="hp-participants-list"
+                 [ngClass]="getLogParticipantsClass(log.action_type)"
+                 *ngIf="expandedLogIds.has(log.doc_id) && profiles.length > 0">
+              <div class="hp-participant-row" *ngFor="let pid of profiles; let i = index">
+  <span class="hp-p-num">{{ i + 1 }}</span>
+  <mat-icon style="font-size:14px;width:14px;height:14px;color:#666">list</mat-icon>
+  <span class="hp-p-name">{{ getListName(pid) }}</span>
+  <span class="hp-p-id" *ngIf="mapParticipantList[pid]?.profilelist?.length != null">
+    {{ mapParticipantList[pid]?.profilelist?.length }} participant(s)
+  </span>
+</div>
+            </div>
+          </ng-container>
+
+        </div>
+      </ng-container>
+    </div>
+    <div class="hp-footer" *ngIf="!logsLoading && filteredLogs.length > 0">
+      <span>Showing {{ pagedFilteredLogs.length }} of {{ filteredLogs.length }} entries</span>
+      <div class="hp-pagination">
+        <button mat-stroked-button [disabled]="logsPage === 0" (click)="logsPage = logsPage - 1; scrollLogTop()">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <span>{{ logsPage + 1 }} / {{ totalLogPages }}</span>
+        <button mat-stroked-button [disabled]="logsPage >= totalLogPages - 1" (click)="logsPage = logsPage + 1; scrollLogTop()">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="history-backdrop" *ngIf="historyPanelOpen" (click)="toggleHistoryPanel()"></div>
 </div>
