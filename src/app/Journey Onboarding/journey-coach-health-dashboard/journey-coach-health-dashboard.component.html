@@ -1,4 +1,4 @@
-<div class="jchd-wrap">
+<div class="jchd-wrap" [ngClass]="'jchd-view-' + view">
 
   <header class="jchd-header">
     <div>
@@ -51,6 +51,7 @@
 
     <!-- ===== Base view (existing dashboard) ===== -->
     <ng-container *ngIf="view === 'base'">
+    <div class="jchd-anim">
 
     <!-- Phase B: assignment bar (Unassigned view only) -->
     <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED">
@@ -349,10 +350,12 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
+            <span class="row-actions">
             <button mat-icon-button [routerLink]="['/userprofile', r.profileid]" matTooltip="Open profile">
               <mat-icon>open_in_new</mat-icon>
             </button>
             <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Actions"><mat-icon>more_vert</mat-icon></button>
+            </span>
             <mat-menu #rowMenu="matMenu">
               <button mat-menu-item (click)="logCall(r)">
                 <mat-icon>add_task</mat-icon><span>Log call</span>
@@ -377,7 +380,8 @@
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            class="jchd-data-row" [ngClass]="bandClass(row.priorityBand)"></tr>
       </table>
 
       <div class="jchd-empty" *ngIf="dataSource.data.length === 0 && !pageLoading">
@@ -391,11 +395,13 @@
         (page)="onPageEvent($event)" showFirstLastButtons></mat-paginator>
     </div>
 
+    </div>
     </ng-container>
     <!-- ===== /Base view ===== -->
 
     <!-- ===== Phase C: Coach Scoreboard ===== -->
     <ng-container *ngIf="view === 'scoreboard'">
+    <div class="jchd-anim">
 
       <section class="jchd-range">
         <mat-button-toggle-group class="period-toggle" [value]="period" (change)="setPeriod($event.value)"
@@ -483,11 +489,13 @@
         </div>
       </div>
 
+    </div>
     </ng-container>
     <!-- ===== /Coach Scoreboard ===== -->
 
     <!-- ===== Today's Worklist (triage queue) ===== -->
     <ng-container *ngIf="view === 'worklist'">
+    <div class="jchd-anim">
 
       <div class="wl-head" *ngIf="worklistTotal() > 0">
         <div class="wl-head-main">
@@ -554,6 +562,7 @@
         <div class="wl-empty-sub">No participants match the current filters — clear a filter or switch coach to see your worklist.</div>
       </div>
 
+    </div>
     </ng-container>
     <!-- ===== /Today's Worklist ===== -->
 
