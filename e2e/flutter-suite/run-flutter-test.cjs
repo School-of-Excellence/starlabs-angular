@@ -77,9 +77,14 @@ function dismissIosNotificationPrompt(udid) {
   } catch { return false; }
 }
 
+const APP_BUNDLE_ID = process.env.APP_BUNDLE_ID || 'com.app.launchyourlegacy';
+
 async function main() {
   ensurePrereqs();
   const udid = bootedUdid();
+  // Clean sim state: terminate any stale app instance (e.g. a previous/killed run left it running) so
+  // flutter drive launches FRESH and the vmservice connects to THIS run's isolate, not a zombie one.
+  try { execFileSync('xcrun', ['simctl', 'terminate', udid, APP_BUNDLE_ID], { stdio: 'ignore', timeout: 15_000 }); } catch { /* not running — fine */ }
   fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
   // clear prior frames for this label
   for (const f of fs.readdirSync(EVIDENCE_DIR).filter((x) => x.endsWith('.png'))) fs.rmSync(path.join(EVIDENCE_DIR, f));
