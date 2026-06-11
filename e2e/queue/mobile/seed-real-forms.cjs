@@ -25,10 +25,12 @@ function defaultValueFor(field) {
   if (['dropdown', 'radio'].includes(t)) return opts.length ? optVal(opts[0]) : 'E2E';
   if (['multiselect', 'multicheckbox'].includes(t)) return opts.length ? [optVal(opts[0])] : ['E2E'];
   if (t === 'checkbox') return true;
-  // date/time are NOT pre-seeded: a Firestore Timestamp crashes the date field's DateFormat hint
-  // (FillForm.dart:1496, template-load doesn't convert Timestamp→DateTime). The robot fills required
-  // date fields via the REAL picker instead (robot.completeForm), so field["value"] becomes a DateTime.
-  return undefined; // date/time/video/audio/array/label/slider → leave untouched
+  // date/time: pre-seed a valid past Timestamp (top-level date validator checks field["value"] != null).
+  // The real DateTimeField picker does NOT open under flutter_test's tap, so — exactly like every other
+  // required field — we pre-seed the value. FillForm now renders a Timestamp date safely (the hint at
+  // FillForm.dart:1496 was fixed to convert Timestamp→DateTime, matching the draft-load + preview paths).
+  if (['date', 'time'].includes(t)) return admin.firestore.Timestamp.fromDate(new Date('2000-06-01T09:00:00Z'));
+  return undefined; // video/audio/array/label/slider → leave untouched
 
 }
 
