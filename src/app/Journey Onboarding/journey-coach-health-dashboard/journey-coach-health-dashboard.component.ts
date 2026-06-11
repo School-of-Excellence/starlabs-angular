@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
   Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, setDoc, serverTimestamp,
-  orderBy, startAfter, limit, documentId, getCountFromServer, QueryDocumentSnapshot
+  orderBy, startAfter, limit, documentId, getCountFromServer, QueryDocumentSnapshot, writeBatch
 } from '@angular/fire/firestore';
 import { Auth, authState } from '@angular/fire/auth';
 import { firstValueFrom } from 'rxjs';
@@ -371,7 +371,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // Participant · Coach · Priority · Journey · Status · Finance · Renewal · Tickets · Last touch.
     // The dropped intel (health / reason / recent event / tier / inline actions) lives in the
     // slide-over, which opens on row tap. Coach is always shown (the mockup always has a Coach column).
-    return ['name', 'coach', 'priority', 'journey', 'status', 'finance', 'renewal', 'tickets', 'lastcoach'];
+    const cols = ['name', 'coach', 'priority', 'journey', 'status', 'finance', 'renewal', 'tickets', 'lastcoach'];
+    // All-participants view also supports bulk select + assign/reassign (prepend the checkbox column).
+    return this.selectedCoachId === this.ALL ? ['select', ...cols] : cols;
   }
 
   async ngOnInit(): Promise<void> {
@@ -1588,17 +1590,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const fromCoachId = this.coaches.find(c => c.name === fromCoachName)?.id ?? null;
     const wasUnassigned = !fromCoachName;
     const action: 'assign' | 'reassign' = wasUnassigned ? 'assign' : 'reassign';
-    let fail = 0;
-    for (const pjpId of row.pjpIds) {
-      try {
-        await updateDoc(doc(this.firestore, 'participantjourneyproduct', pjpId), { coachedby: [coachRef] });
-        const d = this.pjpData.find(x => x['__id'] === pjpId);
-        if (d) d['coachedby'] = [coachRef]; // reflect locally
-      } catch (e: any) {
-        console.error('assignCoachToRow write failed', pjpId, e);
-        fail++;
-      }
-    }
+    const fail = await this.writeCoachForProfile(row.profileid, [coachRef]);
     if (fail > 0) {
       this.guard.openSnackBar(`Could not assign ${row.name}: ${fail} write(s) failed (permission denied?)`, 'Close', 5000);
       return;
@@ -1624,17 +1616,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   async unassignCoach(row: PortfolioRow, note = ''): Promise<void> {
     const fromCoachName = row.coachname && row.coachname !== '—' ? row.coachname : null;
     const fromCoachId = this.coaches.find(c => c.name === fromCoachName)?.id ?? null;
-    let fail = 0;
-    for (const pjpId of row.pjpIds) {
-      try {
-        await updateDoc(doc(this.firestore, 'participantjourneyproduct', pjpId), { coachedby: [] });
-        const d = this.pjpData.find(x => x['__id'] === pjpId);
-        if (d) d['coachedby'] = []; // reflect locally
-      } catch (e: any) {
-        console.error('unassignCoach write failed', pjpId, e);
-        fail++;
-      }
-    }
+    const fail = await this.writeCoachForProfile(row.profileid, []);
     if (fail > 0) {
       this.guard.openSnackBar(`Could not unassign ${row.name}: ${fail} write(s) failed (permission denied?)`, 'Close', 5000);
       return;
@@ -2134,6 +2116,41 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   /** Bulk-assign the selected unassigned participants to a coach — writes real coachedby. */
+  /** Write `value` to coachedby on EVERY participantjourneyproduct doc of a participant — queried
+   *  fresh by profileid, NOT the partially-loaded row.pjpIds — so the assignment is complete and
+   *  survives a refresh even when the participant's journey-products span multiple pages. Batched.
+   *  Returns the number of docs that failed to write (0 = fully written). */
+  private async writeCoachForProfile(profileid: string, value: any[]): Promise<number> {
+    let docs: QueryDocumentSnapshot[];
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'participantjourneyproduct'),
+        where('profileid', '==', profileid),
+      ));
+      docs = snap.docs;
+    } catch (e) {
+      console.error('assign: could not load pjp docs for', profileid, e);
+      return 1;
+    }
+    let fail = 0;
+    for (let i = 0; i < docs.length; i += 400) {
+      const chunk = docs.slice(i, i + 400);
+      const batch = writeBatch(this.firestore);
+      chunk.forEach(d => batch.update(d.ref, { coachedby: value }));
+      try {
+        await batch.commit();
+        chunk.forEach(d => {
+          const local = this.pjpData.find(x => x['__id'] === d.id);
+          if (local) local['coachedby'] = value;   // reflect locally for any loaded docs
+        });
+      } catch (e) {
+        console.error('assign: batch write failed for', profileid, e);
+        fail += chunk.length;
+      }
+    }
+    return fail;
+  }
+
   async assignSelected(): Promise<void> {
     if (!this.assignTargetCoachId || this.selectedProfiles.size === 0) return;
     this.assigning = true;
@@ -2142,34 +2159,28 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const targetCoachName = this.coaches.find(c => c.id === targetCoachId)?.name ?? targetCoachId;
     const rowsById = new Map(this.allRows.map(r => [r.profileid, r]));
     const ids = Array.from(this.selectedProfiles);
-    let fail = 0;
-    for (const pid of ids) {
-      const row = rowsById.get(pid);
-      if (!row) continue;
-      let rowFailed = false;
-      for (const pjpId of row.pjpIds) {
-        try {
-          await updateDoc(doc(this.firestore, 'participantjourneyproduct', pjpId), { coachedby: [coachRef] });
-          const d = this.pjpData.find(x => x['__id'] === pjpId);
-          if (d) d['coachedby'] = [coachRef]; // reflect locally so they leave the unassigned view
-        } catch (e: any) {
-          console.error('assign write failed', pjpId, e);
-          fail++;
-          rowFailed = true;
-        }
-      }
-      // unified activity event per participant (bulk assignment of unassigned rows -> action 'assign').
-      if (!rowFailed) {
+    const failed = new Set<string>();
+    // Write coachedby to EVERY pjp doc of each participant (queried by profileid, not the loaded
+    // page) so the assignment is complete and survives a refresh — including selections made on
+    // earlier pages/searches that aren't in allRows. Run in small parallel chunks.
+    for (let i = 0; i < ids.length; i += 8) {
+      await Promise.all(ids.slice(i, i + 8).map(async pid => {
+        const fail = await this.writeCoachForProfile(pid, [coachRef]);
+        if (fail > 0) { failed.add(pid); return; }
+        const row = rowsById.get(pid);
+        const fromCoachName = row && row.coachname && row.coachname !== '—' ? row.coachname : null;
+        const fromCoachId = this.coaches.find(c => c.name === fromCoachName)?.id ?? null;
+        if (row) row.coachname = targetCoachName;
         void this.logActivity(pid, 'coach_change', {
-          action: 'assign', fromCoachId: null, fromCoachName: null,
-          toCoachId: targetCoachId, toCoachName: targetCoachName, note: '',
+          action: fromCoachName ? 'reassign' : 'assign',
+          fromCoachId, fromCoachName, toCoachId: targetCoachId, toCoachName: targetCoachName, note: '',
         });
-      }
+      }));
     }
     this.assigning = false;
-    const coachName = targetCoachName;
+    const okCount = ids.length - failed.size;
     this.guard.openSnackBar(
-      `Assigned ${ids.length} participant(s) to ${coachName}${fail ? ` — ${fail} write(s) failed` : ''}`,
+      `Assigned ${okCount} participant(s) to ${targetCoachName}${failed.size ? ` — ${failed.size} failed (permission denied?)` : ''}`,
       'Close', 5000);
     const unassignedProfiles = new Set<string>();
     for (const d of this.pjpData) {
@@ -2177,16 +2188,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     this.unassignedCount = unassignedProfiles.size;
     this.assignTargetCoachId = '';
-    // clear ONLY the participants we actually assigned (those still unassigned after a partial
-    // failure stay selected so the coach can retry). This is the only place selection is cleared.
-    for (const pid of ids) {
-      const row = rowsById.get(pid);
-      const stillUnassigned = row ? row.pjpIds.some(pjpId => {
-        const d = this.pjpData.find(x => x['__id'] === pjpId);
-        return d && this.isUnassigned(d['coachedby']);
-      }) : false;
-      if (!stillUnassigned) this.deselect(pid);
-    }
+    // clear ONLY the participants we actually assigned; any that failed stay selected for retry.
+    for (const pid of ids) { if (!failed.has(pid)) this.deselect(pid); }
     this.computeRows();
   }
 
