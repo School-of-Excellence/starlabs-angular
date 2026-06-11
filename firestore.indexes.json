@@ -633,6 +633,31 @@
       ]
     },
     {
+      "collectionGroup": "queue studio pairing",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "queueref", "order": "ASCENDING" },
+        { "fieldPath": "checkin", "order": "ASCENDING" },
+        { "fieldPath": "studioin", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "recommended mix playlist",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileid", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "stagechat",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "stage", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "logs",
       "queryScope": "COLLECTION",
       "fields": [
