@@ -110,6 +110,39 @@
         </div>
       </div>
 
+      <!-- App engagement funnel: notification tap -> landing (from client tracking) -->
+      <div class="stats-row engagement-row">
+        <div class="stat-card">
+          <h3 class="stat-title">App Delivered → Tapped</h3>
+          <div class="stat-value">{{totalClicked}}</div>
+          <div class="stat-subtitle">
+            <mat-icon class="trend-icon">ads_click</mat-icon>
+            {{clickThroughRate}}% click-through · {{totalAppDelivered}} delivered
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <h3 class="stat-title">Landed on Page</h3>
+          <div class="stat-value green">{{totalLanded}}</div>
+          <div class="stat-subtitle green">
+            <mat-icon class="trend-icon">check_circle</mat-icon>
+            {{landingRate}}% of taps reached the screen
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <h3 class="stat-title">Broke Midway</h3>
+          <div class="stat-value failure">
+            <mat-icon class="warning-icon">link_off</mat-icon>
+            {{totalBroke}}
+          </div>
+          <div class="stat-subtitle red">
+            <mat-icon class="trend-icon">trending_down</mat-icon>
+            {{breakRate}}% of taps failed to land
+          </div>
+        </div>
+      </div>
+
       <!-- Data Table -->
       <div class="table-container">
         <table mat-table [dataSource]="notificationDataSource" matSort class="notification-table">
