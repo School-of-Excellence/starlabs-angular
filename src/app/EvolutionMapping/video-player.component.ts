@@ -6,40 +6,48 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 @Component({
   selector: 'app-video-player',
   template: `
-    <div *ngIf="videoUrl" class="video-container">
-      <ng-container [ngSwitch]="videoType">
-        <video *ngSwitchCase="'direct'" controls>
-          <source [src]="videoUrl" type="video/mp4">
+    <div *ngIf="videoUrl" class="video-wrapper">
+      <p *ngIf="isLoading" class="loading-text">🎬 Getting your video ready! Large videos can take a few moments to load.</p>
+      <div class="video-container">
+        <ng-container [ngSwitch]="videoType">
+        <video *ngSwitchCase="'direct'" controls preload="metadata" (loadeddata)="isLoading = false" (error)="isLoading = false">           
+         <source [src]="videoUrl" type="video/mp4">
         </video>
-        <iframe *ngSwitchCase="'drive'"
-           [src]="safeUrl"
-           frameborder="0"
-           allowfullscreen>
-        </iframe>
-        <div *ngSwitchCase="'dropbox'" class="dropbox-fallback">
-          <video
-            [src]="getDropboxDirectUrl(videoUrl)"
-            controls
-            controlsList="nodownload noplaybackrate"
-            disablePictureInPicture
-            preload="metadata"
-            (contextmenu)="$event.preventDefault()"
-            width="100%"
-            height="500">
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      </ng-container>
+          <iframe *ngSwitchCase="'drive'"
+             [src]="safeUrl"
+             frameborder="0"
+             allowfullscreen
+             (load)="isLoading = false">
+          </iframe>
+          <div *ngSwitchCase="'dropbox'" class="dropbox-fallback">
+            <video
+              [src]="getDropboxDirectUrl(videoUrl)"
+              controls
+              controlsList="nodownload noplaybackrate"
+              disablePictureInPicture
+              preload="metadata"
+              (contextmenu)="$event.preventDefault()"
+              (loadeddata)="isLoading = false"
+              (error)="isLoading = false"
+              width="100%"
+              height="500">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </ng-container>
+      </div>
     </div>
   `,
   imports: [CommonModule],
   styles: [`
+    .video-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
     .video-container {
       width: 320px;
       height: 180px;
-      /* max-width: 640px; */
-     /* aspect-ratio: 16 / 9; */
-
       border-radius: 15px;
     }
     video, iframe {
@@ -70,6 +78,13 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
     .play-link:hover {
       background-color: #0051d5;
     }
+    .loading-text {
+      color: #111010;
+      font-size: 14px;
+      text-align: center;
+      margin: 0 0 6px 0;
+      padding: 0 8px;
+    }
   `]
 })
 export class VideoPlayerComponent implements OnInit {
@@ -77,6 +92,7 @@ export class VideoPlayerComponent implements OnInit {
   videoType: 'direct' | 'drive' | 'dropbox' = 'direct';
   safeUrl: SafeResourceUrl;
   dropboxDirectUrl: string;
+  isLoading: boolean = true;
 
   constructor(private sanitizer: DomSanitizer) {}
 
@@ -101,7 +117,7 @@ export class VideoPlayerComponent implements OnInit {
       this.dropboxDirectUrl = directUrl;
       this.safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(directUrl);
     }
-     else {
+    else {
       this.videoType = 'direct';
     }
   }

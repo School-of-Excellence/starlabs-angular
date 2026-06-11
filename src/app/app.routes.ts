@@ -28,7 +28,8 @@ export const routes: Routes = [
   //userprofile_old
   {path: 'userprofile_old', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
   {path: 'deliveryactivities', loadComponent: () => import('./Product Designer/delivery-set/delivery-set.component').then(m => m.DeliverySetComponent), canActivate:[authGuard]},
-  {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard-v2/event-opportunity-dashboard-v2.component').then(m => m.EventOpportunityDashboardV2Component), canActivate:[authGuard]},
+  {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
+  {path: 'arena/:queueid/:stage', loadComponent: () => import('./queue system/arena-board/arena-board.component').then(m => m.ArenaBoardComponent), canActivate:[authGuard]},
   {path: 'formtemplate', loadComponent: () => import('./Product Designer/delivery-set/formtemplate/formtemplate.component').then(m => m.FormtemplateComponent), canActivate:[authGuard]},
   {path: 'queuelist', loadComponent: () => import('./queue system/queue-list/queue-list.component').then(m => m.QueueListComponent), canActivate:[authGuard]},
   // {path: 'content-upload-v2', loadComponent: () => import('./content-upload-version2/content-upload-version2.component').then(m => m.ContentUploadVersion2Component)},
@@ -307,7 +308,7 @@ export const routes: Routes = [
 
   {path: 'eventzonemanagement',loadComponent: () => import('./Zone Management/event-zone-management/event-zone-management.component').then(m => m.EventZoneManagementComponent), canActivate: [authGuard] },
 
-  {path: 'onewaytemplates',loadComponent: () => import('./OneWayAppCommunication/onewaytemplates/oneway-templates.component').then(m => m.OnewayTemplatesComponent), canActivate: [authGuard]},
+  {path: 'channel-templates',loadComponent: () => import('./Channel Communication/channeltemplates/channeltemplates.component').then(m => m.ChannelTemplatesComponent), canActivate: [authGuard]},
 
   // ai generated atc view screen
   {path: 'viewaigeneratedatc', loadComponent: () => import('./view-ai-generated-atc/view-ai-generated-atc.component').then(m => m.ViewAiGeneratedAtcComponent), canActivate: [authGuard]},

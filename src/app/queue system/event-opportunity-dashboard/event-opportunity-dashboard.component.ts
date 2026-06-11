@@ -19,6 +19,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 @Component({
   selector: 'app-event-opportunity-dashboard',
@@ -37,7 +38,9 @@ import { MatChipsModule } from '@angular/material/chips';
     MatButtonModule,
     DragDropModule,
     MatMenuModule,
-    MatChipsModule
+    MatChipsModule,
+    NgxMatSelectSearchModule,
+
   ],
   templateUrl: './event-opportunity-dashboard.component.html',
   styleUrl: './event-opportunity-dashboard.component.css'
@@ -59,18 +62,27 @@ export class EventOpportunityDashboardComponent {
 
   // Group by Studio
   groupByStudio: boolean = false;
+  groupByActivity: boolean = false;
+  expandedActivityGroups: { [key: string]: boolean } = {};
 
   expandedStudioGroups: { [key: string]: boolean } = {};
   isLiveExpanded: boolean = true;
   isIdleExpanded: boolean = false;
+  isShadowingExpanded: boolean = false;
+  isNotShadowingExpanded: boolean = false;
+  isNoStudioShadowingExpanded: boolean = false;
+  eventCohorts: { [eventId: string]: Array<{ bigactivity: string, participantidlist: string[] }> } = {};
 
   // Custom Stage Panel
   showCustomStagePanel: boolean = false;
   selectedCustomStage: any = null;
   customStageSearchText: string = '';
 
-  selectedQueueList: string[] = []
-  queueList: any[]
+  selectedQueueList: string[] = [];
+  queueList: any[] = [];
+  selectedEvent : string = null;
+  filterEvent : string = '';
+  liveEventList : string[] = []
   mapQueue = {}
   showQueueSelect: boolean = true
   mapData = {}
@@ -105,6 +117,47 @@ export class EventOpportunityDashboardComponent {
   filteredProfileIds: Set<string> = new Set();
   selectedEventName: string = '';
 
+  selectedStages: string[] = [];
+  showStageConfig: boolean = false;
+  hideParticipants: boolean = false;
+  private initializedStagesPerQueue: Set<string> = new Set();
+  private seenStageKeys: Set<string> = new Set();
+
+  isStageVisibleOnScreen(queueid: string, stage: string): boolean {
+    const opp = this.getStageTokenCount(queueid, stage, 'waiting') + this.getStageTokenCount(queueid, stage, 'queued');
+    const studio = this.getStageTokenCount(queueid, stage, 'instudio') + this.getStageStudioIdleLength(queueid, stage);
+    return opp > 0 || studio > 0;
+  }
+
+  toggleStageSelection(queueid: string, stage: string): void {
+    const key = this.stageKey(queueid, stage);
+    const idx = this.selectedStages.indexOf(key);
+    if (idx >= 0) this.selectedStages.splice(idx, 1);
+    else this.selectedStages.push(key);
+  }
+
+  getAvailableStages(): { queueid: string, queuename: string, stage: string }[] {
+    const out: { queueid: string, queuename: string, stage: string }[] = [];
+    for (const queueid of this.selectedQueueList) {
+      const stages = this.mapData[queueid]?.['stages'] || [];
+      for (const stage of stages) {
+        const opp = this.getStageTokenCount(queueid, stage, 'waiting') + this.getStageTokenCount(queueid, stage, 'queued');
+        const studio = this.getStageTokenCount(queueid, stage, 'instudio') + this.getStageStudioIdleLength(queueid, stage);
+        if (opp === 0 && studio === 0) continue;
+        out.push({ queueid, queuename: this.mapQueue[queueid]?.['queuename'] ?? queueid, stage });
+      }
+    }
+    return out;
+  }
+
+  stageKey(queueid: string, stage: string): string {
+    return `${queueid}::${stage}`;
+  }
+
+  isStageSelected(queueid: string, stage: string): boolean {
+    return this.selectedStages.length === 0 || this.selectedStages.includes(this.stageKey(queueid, stage));
+  }
+
   constructor(
     private firestore: Firestore,
     public guard: AuthguardService,
@@ -129,7 +182,20 @@ export class EventOpportunityDashboardComponent {
         if (roleData["developer"]) {
           this.developerRole = true;
         }
-        this.getQueueData()
+
+        this.loadEventCohorts();
+        // this.getQueueData();
+        getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
+        this.eventList = snap.docs.map(e => {
+        let element = e.data()
+        element["id"] = e.id 
+        element["ref"] = e.ref 
+        this.mapEvent[e.id] = e.data()['name'];
+        return element
+      })
+      this.liveEventList = this.eventList.filter(e => e["start_date"].toDate() <= new Date() && e["end_date"].toDate() >= new Date());
+    })
+        // this.getQueueData()
       // } else {
       //   this.router.navigateByUrl("/")
       // }
@@ -241,8 +307,59 @@ export class EventOpportunityDashboardComponent {
     this.selectedEventName = '';
     this.arenaeticket = [];
   }
+
+  async loadEventCohorts() {
+    const now = new Date();
+    const marathons = await getDocs(query(
+      collection(this.firestore, 'big marathon'),
+      where('startdate', '<=', now)
+    ));
+    const activeMarathonRefs = marathons.docs
+      .filter(d => {
+        const end = d.data()['enddate'];
+        const endDate = end?.toDate ? end.toDate() : (end ? new Date(end) : null);
+        return endDate && endDate >= now;
+      })
+      .map(d => d.ref);
+
+    if (!activeMarathonRefs.length) return;
+
+    const cohortsSnap = await getDocs(query(
+      collection(this.firestore, 'big cohorts'),
+      where('marathonref', 'in', activeMarathonRefs),
+      where('cohortType', '==', 'event'),
+      where('status', '==', 'active')
+    ));
+
+    const map: { [eventId: string]: Array<{ bigactivity: string, participantidlist: string[] }> } = {};
+    cohortsSnap.docs.forEach(d => {
+      const data: any = d.data();
+      const eventRef = data['eventref'];
+      const eventId = typeof eventRef === 'string' ? eventRef : eventRef?.id;
+      if (!eventId || !data['bigactivity']) return;
+      map[eventId] = map[eventId] || [];
+      map[eventId].push({
+        bigactivity: data['bigactivity'],
+        participantidlist: data['participantidlist'] || [],
+      });
+    });
+    this.eventCohorts = map;
+  }
+
+  onEventSelectForQueue(){
+    if(this.selectedEvent){
+      this.ngOnDestroy();
+      this.selectedQueueList = [];
+      // this.isContainerOpen = false;
+      this.getselectedStages();
+      this.fetchQueueTokens();
+      this.getQueueData();
+    }
+  }
+
   getQueueData() {
-    getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()))).then(async queueData => {
+    // this.loadEventCohorts();
+    getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()), where('eventid' , 'array-contains' , this.selectedEvent))).then(async queueData => {
       this.queueList = queueData.docs.map(e => e.data())
       for (let i = 0; i < this.queueList.length; i++) {
         const element = this.queueList[i];
@@ -250,67 +367,30 @@ export class EventOpportunityDashboardComponent {
         this.mapQueue[element['docid']] = element
       }
     })
-    getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
-        this.eventList = snap.docs.map(e => {
-        let element = e.data()
-        element["id"] = e.id 
-        element["ref"] = e.ref 
-        this.mapEvent[e.id] = e.data()['name']
-        return element
-      })
-    })
+    // getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
+    //     this.eventList = snap.docs.map(e => {
+    //     let element = e.data()
+    //     element["id"] = e.id 
+    //     element["ref"] = e.ref 
+    //     this.mapEvent[e.id] = e.data()['name']
+    //     return element
+    //   })
+    // })
   }
+
+  getFilteredEvents(){
+    const search = this.filterEvent.toLowerCase().trim();
+    return [null , undefined , ''].includes(search) ? this.eventList : this.eventList.filter((event)=>(event?.name ?? '').toLowerCase().trim().includes(search))
+  }
+
 
   getselectedStages() {
     if (this.selectedQueueList.length !== 0) {
 
-      collectionData(query(collection(this.firestore, "stage opportunity count"), where("queuelist", "array-contains-any", this.selectedQueueList))).subscribe((queueData) => {
+      collectionData(query(collection(this.firestore, "stage opportunity count"), where("queuelist", "array-contains-any", this.selectedQueueList))).pipe(takeUntil(this.subscription)).subscribe((queueData) => {
         this.customValuesFromSelectedQueues = queueData.filter(e => e['queuelist'].every((item: string) => this.selectedQueueList.includes(item))).sort((a, b) => (a['sequence'] ?? 999) - (b['sequence'] ?? 999));
       })
 
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-
-      collectionData(query(collection(this.firestore, 'queue activity log'),
-        where('queueid', 'in', this.selectedQueueList)
-      )).pipe(takeUntil(this.subscription)).subscribe(async snap => {
-
-        const tempCompletedStageCount: any = {};
-        const tempAllCompletedStageCount: any = {};
-
-        const fetchPromises = snap.map(async (element) => {
-          const queryref = getDoc(doc(this.firestore, element['sourceref'].path));
-          let document = (await queryref).data();
-          document['activitydate'] = element['activitydate'];
-
-          if (!document) return;
-
-          const queueid = element['source'] === "queue stage log" ? document['queueref'].id : document['queueid'];
-          const stagename = element['source'] === "queue stage log" ? document['currentstage'] : document['stagename'];
-
-          // Today's completed
-          if (element['activitydate']?.toDate() >= startOfDay && element['activitydate']?.toDate() <= endOfDay) {
-            tempCompletedStageCount[queueid] = tempCompletedStageCount[queueid] || {};
-            tempCompletedStageCount[queueid][stagename] = tempCompletedStageCount[queueid][stagename] || {};
-            tempCompletedStageCount[queueid][stagename][element['sourceref'].path] = tempCompletedStageCount[queueid][stagename][element['sourceref'].path] || [];
-            tempCompletedStageCount[queueid][stagename][element['sourceref'].path].push(document);
-          }
-
-          // All completed
-          tempAllCompletedStageCount[queueid] = tempAllCompletedStageCount[queueid] || {};
-          tempAllCompletedStageCount[queueid][stagename] = tempAllCompletedStageCount[queueid][stagename] || {};
-          tempAllCompletedStageCount[queueid][stagename][element['sourceref'].path] = tempAllCompletedStageCount[queueid][stagename][element['sourceref'].path] || [];
-          tempAllCompletedStageCount[queueid][stagename][element['sourceref'].path].push(document);
-        });
-
-        await Promise.all(fetchPromises);
-
-        this.completedStageCount = tempCompletedStageCount;
-        this.allCompletedStageCount = tempAllCompletedStageCount;
-      });
 
     } else {
       console.log('No queues selected, skipping stage fetch');
@@ -332,9 +412,68 @@ export class EventOpportunityDashboardComponent {
     }
   }
 
+  private rebuildCompletedMaps(queueId: string, liveAssignmentList: any[]): void {
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+
+    const today: any = { ...this.completedStageCount };
+    const all: any = { ...this.allCompletedStageCount };
+    today[queueId] = {};
+    all[queueId] = {};
+
+    for (const element of liveAssignmentList) {
+      if (element['status'] !== 'completed' || element['isactivitydone'] !== true) continue;
+      const stagename = element['stagename'];
+      if (!stagename) continue;
+
+      const tsRaw = element['created'];
+      const ts = tsRaw?.toDate ? tsRaw.toDate() : (tsRaw ? new Date(tsRaw) : null);
+      const inToday = !!(ts && ts >= startOfDay && ts <= endOfDay);
+
+      const bigPid = element['participantid'];
+      if (!bigPid) continue;
+      const pa = element['participantsactivity'] || {};
+      const ba = element['bonusactivity'] || {};
+      const activityid = pa[bigPid] || ba[bigPid] || Object.values(pa)[0] || Object.values(ba)[0];
+      const document: any = {
+        ...element,
+        participantid: bigPid,
+        profile_id: bigPid,
+        activity: activityid,
+        activitydate: tsRaw,
+      };
+      const key = element['id'] || element['docid'];
+
+      all[queueId][stagename] = all[queueId][stagename] || {};
+      all[queueId][stagename][key] = [document];
+
+      if (inToday) {
+        today[queueId][stagename] = today[queueId][stagename] || {};
+        today[queueId][stagename][key] = [document];
+      }
+    }
+
+    this.completedStageCount = today;
+    this.allCompletedStageCount = all;
+  }
+
   handleEventData(eventData: any, queueId: string): void {
     this.mapData[queueId] = eventData;
     this.mapLiveAssignmentData = eventData["mapLiveStudioToData"];
+    this.rebuildCompletedMaps(queueId, eventData["liveAssignmentList"] || []);
+    const stages: string[] = eventData["stages"] || [];
+    const isFirstLoad = !this.initializedStagesPerQueue.has(queueId);
+    for (const stage of stages) {
+      const key = this.stageKey(queueId, stage);
+      const isNewStage = !this.seenStageKeys.has(key);
+      if (isFirstLoad || isNewStage) {
+        if (!this.selectedStages.includes(key)) {
+          this.selectedStages.push(key);
+        }
+      }
+      this.seenStageKeys.add(key);
+    }
+    this.initializedStagesPerQueue.add(queueId);
   }
 
   getStageTokenCount(queueid: string, stage: string, type: string): number {
@@ -344,6 +483,28 @@ export class EventOpportunityDashboardComponent {
       return 0;
     }
     return this.mapData[queueid]['stageTokenMap'][stage][type] || 0;
+  }
+
+  getPotentialTooltip(queueid: string, stage: string): string {
+    if (!this.mapData[queueid] ||
+        !this.mapData[queueid]['stageTokenMap'] ||
+        !this.mapData[queueid]['stageTokenMap'][stage]) {
+      return 'NA';
+    }
+    const tokenlist = this.mapData[queueid]['stageTokenMap'][stage]['tokenlist'] || [];
+    const waiting: string[] = [];
+    const queued: string[] = [];
+    for (const t of tokenlist) {
+      const name = this.mapProfile[t['profile_id']] || t['profile_name'] || '—';
+      if (t['status'] === 'ready') {
+        waiting.push(name);
+      } else if (t['status'] == null || t['status'] === 'queued' || t['status'] === 'invited') {
+        queued.push(name);
+      }
+    }
+    const waitingBlock = `WAITING (${waiting.length})\n${waiting.length ? waiting.join('\n') : '—'}`;
+    const queuedBlock = `QUEUED (${queued.length})\n${queued.length ? queued.join('\n') : '—'}`;
+    return `${waitingBlock}\n\n${queuedBlock}`;
   }
 
   getStageName(queueid: string, stage: string, type: string): string {
@@ -446,10 +607,59 @@ export class EventOpportunityDashboardComponent {
     return participantIds.map(id => this.mapProfile[id] || id).filter(name => name);
   }
 
+  getGroupActivities(participants: any[]): string {
+    const names = new Set<string>();
+    participants.forEach(p => names.add(this.getActivityName(p)));
+    return Array.from(names).join(', ');
+  }
+
+  getActivityName(doc: any): string {
+    const map = this.mapData[this.selectedPanelQueueId]?.['mapBigActivity'] ?? {};
+    const pid = doc['participantid'] || doc['profile_id'];
+    const id = doc['activity'] || doc['bigactivity'] || doc['participantsactivity']?.[pid];
+    return map[id] || doc['activityname'] || doc['bigactivityname'] || 'Unknown';
+  }
+
+  getGroupedByActivity(type: 'today' | 'all'): Array<{ activity: string, participants: any[] }> {
+    const documents = type === 'today'
+      ? this.getFilteredCompletedTodayParticipants(this.selectedPanelQueueId, this.selectedPanelStage)
+      : this.getFilteredCompletedAllParticipants(this.selectedPanelQueueId, this.selectedPanelStage);
+
+    const groups = new Map<string, { activity: string, participants: any[] }>();
+    documents.forEach(doc => {
+      const activity = this.getActivityName(doc);
+      if (!groups.has(activity)) groups.set(activity, { activity, participants: [] });
+      groups.get(activity)!.participants.push(doc);
+    });
+    return Array.from(groups.values()).sort((a, b) => b.participants.length - a.participants.length);
+  }
+
+  onGroupByActivityChange(): void {
+    this.expandedActivityGroups = {};
+    if (this.groupByActivity) {
+      this.groupByStudio = false;
+      const type = this.panelFilter === 'completed-today' ? 'today' : 'all';
+      const groups = this.getGroupedByActivity(type);
+      if (groups.length > 0) {
+        this.expandedActivityGroups[`${type}_${groups[0].activity}`] = true;
+      }
+    }
+  }
+
+  isActivityGroupExpanded(activity: string, type: 'today' | 'all'): boolean {
+    return this.expandedActivityGroups[`${type}_${activity}`] === true;
+  }
+
+  toggleActivityGroupExpansion(activity: string, type: 'today' | 'all'): void {
+    const key = `${type}_${activity}`;
+    this.expandedActivityGroups[key] = !this.expandedActivityGroups[key];
+  }
+
   onGroupByStudioChange(): void {
     this.expandedStudioGroups = {};
 
     if (this.groupByStudio) {
+      this.groupByActivity = false;
       // Auto-expand first group
       const type = this.panelFilter === 'completed-today' ? 'today' : 'all';
       const groups = this.getGroupedByStudio(type);
@@ -517,7 +727,8 @@ export class EventOpportunityDashboardComponent {
         data.push(obj)
       }
     }
-    return data
+    const nameOf = (s: any) => (s?.participants || []).map((p: string) => this.mapProfile[p] || p).join(', ').toLowerCase();
+    return data.sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   }
 
   getStageStudioIdle(queueid: string, stage: string): any[] {
@@ -527,7 +738,9 @@ export class EventOpportunityDashboardComponent {
       !this.mapData[queueid]['newStageStudioMap'][stage]['idle']) {
       return [];
     }
-    return this.mapData[queueid]['newStageStudioMap'][stage]['idle'];
+    const idle = [...this.mapData[queueid]['newStageStudioMap'][stage]['idle']];
+    const nameOf = (s: any) => (s?.participants || []).map((p: string) => this.mapProfile[p] || p).join(', ').toLowerCase();
+    return idle.sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   }
 
   getMapLiveAssignmentActivity(queueid, studio, participant) {
@@ -575,14 +788,143 @@ export class EventOpportunityDashboardComponent {
     return this.mapData[queueid]['studioPreAssign'][studio['docid']];
   }
 
-  getStudioAssignmentLength(queueid: string, studio: any): number {
-    if (!this.mapData[queueid] ||
-      !this.mapData[queueid]['studioAssignmentMap'] ||
-      !studio['docid'] ||
-      !this.mapData[queueid]['studioAssignmentMap'][studio['docid']]) {
-      return 0;
+  private getShadowCohortParticipants(queueid: string, stage: string): Array<{ profileid: string, bigactivity: string }> {
+    const eventId = this.selectedEvent;
+    const cohorts = eventId ? this.eventCohorts[eventId] : null;
+    if (!cohorts?.length) return [];
+    const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
+    const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
+    const stageActivityIds = new Set<string>();
+    Object.values(compulsory).forEach((combo: any) => (combo || []).forEach((id: string) => stageActivityIds.add(id)));
+
+    const out: Array<{ profileid: string, bigactivity: string }> = [];
+    const seen = new Set<string>();
+    for (const c of cohorts) {
+      if (!shadowSet.has(c.bigactivity) || !stageActivityIds.has(c.bigactivity)) continue;
+      for (const pid of c.participantidlist) {
+        if (seen.has(pid)) continue;
+        seen.add(pid);
+        out.push({ profileid: pid, bigactivity: c.bigactivity });
+      }
     }
-    return this.mapData[queueid]['studioAssignmentMap'][studio['docid']].length;
+    return out;
+  }
+
+  private findLiveShadowAssignment(queueid: string, profileid: string, bigactivity: string): any | null {
+    const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+    return liveList.find(e => {
+      if (e['status'] !== 'live') return false;
+      const pa = e['participantsactivity'] || {};
+      const ba = e['bonusactivity'] || {};
+      return pa[profileid] === bigactivity || ba[profileid] === bigactivity;
+    }) || null;
+  }
+
+  private isProfileInLiveShadow(queueid: string, stage: string, profileid: string, bigactivity: string): boolean {
+    return !!this.findLiveShadowAssignment(queueid, profileid, bigactivity);
+  }
+
+  getShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
+    const map = this.mapData[queueid]?.['mapBigActivity'] ?? {};
+    const out: Array<{ profileid: string, activity: string }> = [];
+    for (const p of this.getShadowCohortParticipants(queueid, stage)) {
+      const assignment = this.findLiveShadowAssignment(queueid, p.profileid, p.bigactivity);
+      if (!assignment) continue;
+      const mainPid = assignment['participantid'];
+      const mainActivityId = assignment['participantsactivity']?.[mainPid];
+      const activity = map[mainActivityId] || mainActivityId || map[p.bigactivity] || p.bigactivity;
+      out.push({ profileid: p.profileid, activity });
+    }
+    return out.sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
+  }
+
+  getNotShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
+    const map = this.mapData[queueid]?.['mapBigActivity'] ?? {};
+    return this.getShadowCohortParticipants(queueid, stage)
+      .filter(p => !this.isProfileInLiveShadow(queueid, stage, p.profileid, p.bigactivity))
+      .map(p => ({ profileid: p.profileid, activity: map[p.bigactivity] || p.bigactivity }))
+      .sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
+  }
+
+  getNoStudioShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
+    const eventId = this.mapQueue[queueid]?.['eventid'];
+    const cohorts = eventId ? this.eventCohorts[eventId] : null;
+    if (!cohorts?.length) return [];
+
+    const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
+    const mapBigActivity = this.mapData[queueid]?.['mapBigActivity'] ?? {};
+    const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
+    const stageActivityIds = new Set<string>();
+    Object.values(compulsory).forEach((combo: any) => (combo || []).forEach((id: string) => stageActivityIds.add(id)));
+
+    const inStudioProfiles = new Set<string>();
+    const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+    liveList.forEach(e => {
+      if (e['stagename'] === stage && e['status'] === 'live') {
+        Object.keys(e['participantsactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        Object.keys(e['bonusactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        if (e['participantid']) inStudioProfiles.add(e['participantid']);
+      }
+    });
+
+    const seen = new Set<string>();
+    const out: Array<{ profileid: string, activity: string }> = [];
+    for (const cohort of cohorts) {
+      if (!shadowSet.has(cohort.bigactivity)) continue;
+      if (!stageActivityIds.has(cohort.bigactivity)) continue;
+      for (const pid of cohort.participantidlist) {
+        if (inStudioProfiles.has(pid) || seen.has(pid)) continue;
+        seen.add(pid);
+        out.push({ profileid: pid, activity: mapBigActivity[cohort.bigactivity] || cohort.bigactivity });
+      }
+    }
+    return out.sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
+  }
+
+  getNoStudioShadowingCount(queueid: string, stage: string): number {
+    const eventId = this.mapQueue[queueid]?.['eventid'];
+    const cohorts = eventId ? this.eventCohorts[eventId] : null;
+    if (!cohorts?.length) return 0;
+
+    const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
+    const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
+    const stageActivityIds = new Set<string>();
+    Object.values(compulsory).forEach((combo: any) => (combo || []).forEach((id: string) => stageActivityIds.add(id)));
+
+    const inStudioProfiles = new Set<string>();
+    const liveList: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+    liveList.forEach(e => {
+      if (e['stagename'] === stage && e['status'] === 'live') {
+        Object.keys(e['participantsactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        Object.keys(e['bonusactivity'] || {}).forEach(p => inStudioProfiles.add(p));
+        if (e['participantid']) inStudioProfiles.add(e['participantid']);
+      }
+    });
+
+    const counted = new Set<string>();
+    for (const cohort of cohorts) {
+      if (!shadowSet.has(cohort.bigactivity)) continue;
+      if (!stageActivityIds.has(cohort.bigactivity)) continue;
+      for (const pid of cohort.participantidlist) {
+        if (!inStudioProfiles.has(pid)) counted.add(pid);
+      }
+    }
+    return counted.size;
+  }
+
+  getStudioAssignmentLength(queueid: string, studio: any): number {
+    const studioid = studio?.['docid'];
+    if (!studioid) return 0;
+    const stages = this.allCompletedStageCount[queueid] || {};
+    let count = 0;
+    for (const stage in stages) {
+      const entries = stages[stage];
+      for (const key in entries) {
+        const docs = entries[key] || [];
+        if (docs[0]?.['studioid'] === studioid) count++;
+      }
+    }
+    return count;
   }
 
   getStudioAssignmentParticipant(queueid: string, studio: any) {
@@ -616,6 +958,14 @@ export class EventOpportunityDashboardComponent {
   }
 
   openStagePanel(queueId: string, stage: string): void {
+    // The expand button opens the full-screen Arena coordinator board in a
+    // new browser tab so the dashboard stays put.
+    const url = this.router.serializeUrl(
+      this.router.createUrlTree(['/arena', queueId, stage])
+    );
+    window.open(url, '_blank');
+    return;
+    // (legacy side panel logic preserved below — currently unreachable)
     this.selectedPanelQueueId = queueId;
     this.selectedPanelStage = stage;
     this.selectedPanelQueue = this.mapQueue[queueId];
@@ -833,7 +1183,7 @@ export class EventOpportunityDashboardComponent {
       studioMap.get(studioId)!.participants.push(doc);
     });
 
-    return Array.from(studioMap.values()).sort((a, b) => b.participants.length - a.participants.length);
+    return Array.from(studioMap.values()).sort((a, b) => (a.studioName ?? '').localeCompare(b.studioName ?? ''));
   }
 
   getStudioName(studioId: string, queueid: string): string {

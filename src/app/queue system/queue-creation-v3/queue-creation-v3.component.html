@@ -456,6 +456,39 @@
                           <mat-label>Stage Description</mat-label>
                           <input matInput type="text" formControlName="stageexplanation">
                         </mat-form-field>
+                        <!-- Stage Notes — each note targets a SELECTED stage
+                             (need not be this stage). In the studio it shows
+                             only when the participant's variation includes the
+                             selected stage. -->
+                        <div class="stage-note-block ml-3" style="margin-right:10px; width:100%;" [formArrayName]="'stagenote'">
+                          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                            <span style="font-weight:600; font-size:13px;">Stage Notes</span>
+                            <button mat-stroked-button type="button" color="primary"
+                                    (click)="addStageNote(i)">
+                              <mat-icon>add</mat-icon> Add Stage Note
+                            </button>
+                          </div>
+                          <div *ngFor="let noteCtrl of getStageNoteArray(i).controls; let ni = index"
+                               [formGroupName]="ni"
+                               style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                            <mat-form-field appearance="outline" style="width:220px;">
+                              <mat-label>Stage</mat-label>
+                              <mat-select formControlName="stage">
+                                <mat-option *ngFor="let st of queueform.get('stages').value" [value]="st">{{ st }}</mat-option>
+                              </mat-select>
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" style="flex:1; min-width:240px;">
+                              <mat-label>Note</mat-label>
+                              <input matInput type="text" formControlName="note"
+                                     placeholder="Shown to the specialist in the studio topbar">
+                            </mat-form-field>
+                            <button mat-icon-button type="button" color="warn"
+                                    (click)="removeStageNote(i, ni)"
+                                    title="Delete stage note" aria-label="Delete stage note">
+                              <mat-icon>delete</mat-icon>
+                            </button>
+                          </div>
+                        </div>
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Forms To Display</mat-label>
                           <mat-select formControlName="participantform" multiple>

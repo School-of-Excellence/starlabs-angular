@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, ViewChild, TemplateRef, ChangeDetectionStrategy } from '@angular/core';
 import { and, collection, collectionData, Firestore, or, query, where, getDocs, getCountFromServer, doc, updateDoc, setDoc, getDoc, limit, writeBatch } from '@angular/fire/firestore';
-import { getFirestore, orderBy, Timestamp } from 'firebase/firestore';
+import { orderBy, Timestamp } from 'firebase/firestore';
 import { takeUntil, Subject, Subscription, take, combineLatest } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, KeyValue } from '@angular/common';
@@ -28,6 +28,7 @@ import { environment } from '../../../environments/environment';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { CrossOverMetricsDialogComponent } from '../cross-over-metrics-dialog/cross-over-metrics-dialog.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface ColumnConfig {
   key: string;
@@ -144,7 +145,8 @@ export interface DialogContext {
     MatMenuModule,
     MatButtonToggleModule,
     MatTabsModule,
-    MatTableModule
+    MatTableModule,
+    ProfilePictureComponent
   ],
   templateUrl: './journeycoach-dashboard.component.html',
   styleUrl: './journeycoach-dashboard.component.css',
@@ -4095,17 +4097,16 @@ export class JourneycoachDashboardComponent {
   getAtcAlpha() {
     let atcQuery: any;
     let unvalidatedATCQuery: any;
-    const firestoreATC = getFirestore("firestore-atc")
 
     if (this.filterMode === 'queue' && this.selectedQueueIds.length > 0) {
       // Queue mode — no date filter
       atcQuery = query(
-        collection(firestoreATC, "atc_alpha"),
+        collection(this.firestore, "atc_alpha"),
         where('queueid', 'in', this.selectedQueueIds),
         where("isdelete", "==", false)
       );
       unvalidatedATCQuery = query(
-        collection(firestoreATC, "atc_to_validate"),
+        collection(this.firestore, "atc_to_validate"),
         where('queueid', 'in', this.selectedQueueIds),
         where("isdelete", "==", false)
       );
@@ -4129,13 +4130,13 @@ export class JourneycoachDashboardComponent {
       if (!startdate || !enddate) return;
 
       atcQuery = query(
-        collection(firestoreATC, "atc_alpha"),
+        collection(this.firestore, "atc_alpha"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)
       );
       unvalidatedATCQuery = query(
-        collection(firestoreATC, "atc_to_validate"),
+        collection(this.firestore, "atc_to_validate"),
         where('prescription_date', '>=', startdate),
         where('prescription_date', '<=', enddate),
         where("isdelete", "==", false)

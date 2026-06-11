@@ -35,7 +35,7 @@
 }
 
 /* === BASE === */
-.oneway-template-container {
+.channeltemplate-container {
   padding: 24px 28px;
   background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 50%, #f0f4f8 100%);
   min-height: 100vh;
@@ -802,7 +802,7 @@
 }
 
 @media (max-width: 768px) {
-  .oneway-template-container { padding: 12px; }
+  .channeltemplate-container { padding: 12px; }
   .form-row { flex-direction: column; gap: 10px; }
   .form-field { min-width: 100%; }
   .nav-buttons { flex-direction: column; align-items: stretch; }

@@ -1,0 +1,585 @@
+<div class="ow-dialog">
+
+  <!-- HEADER-->
+  <div class="ow-header">
+    <div class="ow-header-left">
+      <div class="ow-header-icon">
+        <mat-icon>campaign</mat-icon>
+      </div>
+      <div>
+        <h2 class="ow-title">Channel Broadcast</h2>
+        <p class="ow-subtitle">{{ participants.length }} participant{{ participants.length !== 1 ? 's' : '' }} selected</p>
+      </div>
+    </div>
+    <button mat-icon-button (click)="onCancel()" class="ow-close-btn">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- STEPPER  -->
+  <div class="ow-stepper">
+    <div class="ow-step" [class.active]="currentStep === 1" [class.done]="currentStep > 1"
+      (click)="currentStep > 1 && goToStep(1)">
+      <div class="ow-step-num">
+        <mat-icon *ngIf="currentStep > 1">check</mat-icon>
+        <span *ngIf="currentStep <= 1">1</span>
+      </div>
+      <span class="ow-step-label">Channel</span>
+    </div>
+    <div class="ow-step-line" [class.done]="currentStep > 1"></div>
+
+    <div class="ow-step" [class.active]="currentStep === 2" [class.done]="currentStep > 2"
+      (click)="currentStep > 2 && goToStep(2)">
+      <div class="ow-step-num">
+        <mat-icon *ngIf="currentStep > 2">check</mat-icon>
+        <span *ngIf="currentStep <= 2">2</span>
+      </div>
+      <span class="ow-step-label">Template</span>
+    </div>
+    <div class="ow-step-line" [class.done]="currentStep > 2"></div>
+
+    <div class="ow-step" [class.active]="currentStep === 3" [class.done]="currentStep > 3"
+      (click)="currentStep > 3 && goToStep(3)">
+      <div class="ow-step-num">
+        <mat-icon *ngIf="currentStep > 3">check</mat-icon>
+        <span *ngIf="currentStep <= 3">3</span>
+      </div>
+      <span class="ow-step-label">Variables</span>
+    </div>
+    <div class="ow-step-line" [class.done]="currentStep > 3"></div>
+
+    <div class="ow-step" [class.active]="currentStep === 4">
+      <div class="ow-step-num">4</div>
+      <span class="ow-step-label">Review</span>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="ow-content">
+
+    <!--CHANNEL-->
+    <div *ngIf="currentStep === 1" class="ow-step-content">
+
+      <div class="ow-section-title">
+        <mat-icon>campaign</mat-icon>
+        Select Channel
+      </div>
+
+      <div class="ow-channel-search-row">
+        <mat-form-field appearance="outline" class="ow-search-field">
+          <mat-label>Search channels...</mat-label>
+          <input matInput [(ngModel)]="channelSearch" (input)="onChannelSearch()" placeholder="Search by name...">
+          <mat-icon matPrefix>search</mat-icon>
+          <button matSuffix mat-icon-button *ngIf="channelSearch" (click)="channelSearch=''; onChannelSearch()">
+            <mat-icon>clear</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" class="ow-inline-create-btn" (click)="showCreateChannel = true">
+          <mat-icon>add</mat-icon>
+          New Channel
+        </button>
+      </div>
+
+      <div class="ow-loading" *ngIf="isLoadingChannels">
+        <mat-spinner diameter="32"></mat-spinner>
+        <span>Loading channels...</span>
+      </div>
+
+      <div class="ow-channel-list" *ngIf="!isLoadingChannels">
+        <div class="ow-channel-card"
+          *ngFor="let ch of filteredChannels"
+          [class.selected]="selectedChannel?.id === ch.id"
+          (click)="selectChannel(ch)">
+          <div class="ow-channel-avatar"
+            [style.backgroundImage]="ch.group_profile ? 'url(' + ch.group_profile + ')' : 'none'">
+            <mat-icon *ngIf="!ch.group_profile">campaign</mat-icon>
+          </div>
+          <div class="ow-channel-info">
+            <div class="ow-channel-name">{{ ch.group_name }}</div>
+            <div class="ow-channel-meta">
+              <span><mat-icon>people</mat-icon>{{ (ch.members || []).length }} members</span>
+              <span><mat-icon>admin_panel_settings</mat-icon>{{ (ch.admins || []).length }} admins</span>
+            </div>
+            <div class="ow-channel-desc" *ngIf="ch.description">{{ ch.description }}</div>
+          </div>
+          <mat-icon class="ow-channel-check" *ngIf="selectedChannel?.id === ch.id">check_circle</mat-icon>
+        </div>
+
+        <div class="ow-empty" *ngIf="filteredChannels.length === 0">
+          <mat-icon>inbox</mat-icon>
+          <p>No channels found</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEMPLATE -->
+    <div *ngIf="currentStep === 2" class="ow-step-content">
+
+      <div class="ow-section-title">
+        <mat-icon>description</mat-icon>
+        Select Template
+      </div>
+
+      <div class="ow-template-filters">
+        <mat-form-field appearance="outline" class="ow-search-field">
+          <mat-label>Search templates...</mat-label>
+          <input matInput [(ngModel)]="templateSearch" (input)="onTemplateSearch()" placeholder="Search by name...">
+          <mat-icon matPrefix>search</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="ow-category-field">
+          <mat-label>Category</mat-label>
+          <mat-select [(value)]="selectedCategoryFilter" (selectionChange)="onTemplateSearch()">
+            <mat-option value="">All Categories</mat-option>
+            <mat-option *ngFor="let c of categories" [value]="c">{{ getCategoryName(c) }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="ow-loading" *ngIf="isLoadingTemplates">
+        <mat-spinner diameter="32"></mat-spinner>
+        <span>Loading templates...</span>
+      </div>
+
+      <div class="ow-template-grid" *ngIf="!isLoadingTemplates">
+        <div class="ow-template-card"
+          *ngFor="let t of filteredTemplates"
+          [class.selected]="selectedTemplate?.docid === t.docid"
+          (click)="selectTemplate(t)">
+
+          <div class="ow-template-header">
+            <div class="ow-template-name">{{ t.templatename }}</div>
+            <mat-icon class="ow-template-check" *ngIf="selectedTemplate?.docid === t.docid">check_circle</mat-icon>
+          </div>
+
+          <div class="ow-template-category">
+            <mat-icon>category</mat-icon>
+            {{ getCategoryName(t.category) }}
+          </div>
+
+          <div class="ow-template-vars" *ngIf="t.templatemodel?.length > 0">
+            <span class="ow-var-chip" *ngFor="let v of t.templatemodel">{{ '{{' + v + '}}' }}</span>
+          </div>
+
+          <div class="ow-template-preview"
+            [innerHTML]="sanitizer.bypassSecurityTrustHtml(t.htmlbody || '')"></div>
+        </div>
+
+        <div class="ow-empty" *ngIf="filteredTemplates.length === 0">
+          <mat-icon>inbox</mat-icon>
+          <p>No approved templates found</p>
+        </div>
+      </div>
+    </div>
+
+    <!--VARIABLES-->
+    <div *ngIf="currentStep === 3" class="ow-step-content">
+
+      <div class="ow-section-title">
+        <mat-icon>tune</mat-icon>
+        Configure Variables
+      </div>
+
+      <div class="ow-no-vars" *ngIf="parameterConfig.length === 0">
+        <mat-icon>check_circle</mat-icon>
+        <p>This template has no variables. You can proceed.</p>
+      </div>
+
+      <div class="ow-var-list" *ngIf="parameterConfig.length > 0">
+        <div class="ow-var-row" *ngFor="let param of parameterConfig"
+          [class.configured]="isParamConfigured(param)">
+
+          <div class="ow-var-name">
+            <span class="ow-var-tag">{{ '{{' + param.name + '}}' }}</span>
+            <mat-icon class="ow-var-status ok"     *ngIf="isParamConfigured(param)">check_circle</mat-icon>
+            <mat-icon class="ow-var-status pending" *ngIf="!isParamConfigured(param)">radio_button_unchecked</mat-icon>
+          </div>
+
+          <div class="ow-var-toggle">
+            <button class="ow-toggle-btn" [class.active]="param.fillType === 'static'"
+              (click)="setFillType(param, 'static')">
+              <mat-icon>edit</mat-icon> Static
+            </button>
+            <button class="ow-toggle-btn" [class.active]="param.fillType === 'metadata'"
+              (click)="setFillType(param, 'metadata')">
+              <mat-icon>analytics</mat-icon> Metadata
+            </button>
+          </div>
+
+          <div class="ow-var-input" *ngIf="param.fillType === 'static'">
+            <mat-form-field appearance="outline" class="ow-full">
+              <mat-label>Value for {{ '{{' + param.name + '}}' }}</mat-label>
+              <input matInput [(ngModel)]="param.staticValue" placeholder="Enter value...">
+            </mat-form-field>
+          </div>
+
+          <div class="ow-var-input" *ngIf="param.fillType === 'metadata'">
+            <mat-form-field appearance="outline" class="ow-full">
+              <mat-label>Participant metadata field</mat-label>
+              <mat-select [(ngModel)]="param.metadataField">
+              <mat-option>   
+                <ngx-mat-select-search
+                  [(ngModel)]="param['metadataSearch']"
+                  [ngModelOptions]="{standalone: true}"
+                  placeholderLabel="Search fields..."
+                  noEntriesFoundLabel="No fields found"
+                  ngDefaultControl>
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option
+                *ngFor="let f of getFilteredMetadataFields(param['metadataSearch'] || '')"
+                [value]="f">
+                {{ f }}
+              </mat-option>
+            </mat-select>
+              <mat-icon matSuffix>person</mat-icon>
+            </mat-form-field>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="ow-var-progress" *ngIf="parameterConfig.length > 0">
+        <span>{{ getConfiguredCount() }} / {{ parameterConfig.length }} configured</span>
+        <div class="ow-progress-bar">
+          <div class="ow-progress-fill" [style.width.%]="getConfiguredPercent()"></div>
+        </div>
+      </div>
+    </div>
+
+    <!--REVIEW-->
+    <div *ngIf="currentStep === 4" class="ow-step-content">
+
+      <div class="ow-section-title">
+        <mat-icon>fact_check</mat-icon>
+        Review & Send
+      </div>
+
+      <div class="ow-review-grid">
+
+        <!-- Channel -->
+        <div class="ow-review-card ow-review-card--clickable" (click)="showChannelMemberList = true">
+          <div class="ow-review-label"><mat-icon>campaign</mat-icon> Channel</div>
+          <div class="ow-review-value">{{ selectedChannel?.group_name }}</div>
+          <div class="ow-review-meta">
+            {{ (selectedChannel?.members || []).length }} existing members ·
+            {{ (selectedChannel?.admins  || []).length }} admins
+          </div>
+          <button mat-button class="ow-review-edit" (click)="$event.stopPropagation(); goToStep(1)">
+            <mat-icon>edit</mat-icon> Change
+          </button>
+        </div>
+
+        <!-- Template -->
+        <div class="ow-review-card">
+          <div class="ow-review-label"><mat-icon>description</mat-icon> Template</div>
+          <div class="ow-review-value">{{ selectedTemplate?.templatename }}</div>
+          <div class="ow-review-meta">{{ getCategoryName(selectedTemplate?.category) }}</div>
+          <button mat-button class="ow-review-edit" (click)="goToStep(2)">
+            <mat-icon>edit</mat-icon> Change
+          </button>
+        </div>
+
+        <!-- Recipients -->
+        <div class="ow-review-card ow-review-card--clickable" (click)="showParticipantList = true">
+          <div class="ow-review-label"><mat-icon>people</mat-icon> Recipients</div>
+          <div class="ow-review-value">
+            {{ participants.length }} participant{{ participants.length !== 1 ? 's' : '' }}
+          </div>
+          <div class="ow-review-meta">
+            + {{ (selectedChannel?.admins || []).length }}
+            admin{{ (selectedChannel?.admins || []).length !== 1 ? 's' : '' }}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Variables summary -->
+      <div class="ow-review-vars" *ngIf="parameterConfig.length > 0">
+        <div class="ow-review-label" style="margin-bottom:10px;">
+          <mat-icon>tune</mat-icon> Variables
+        </div>
+        <div class="ow-review-var-row" *ngFor="let p of parameterConfig">
+          <span class="ow-var-tag">{{ '{{' + p.name + '}}' }}</span>
+          <mat-icon>arrow_forward</mat-icon>
+          <span class="ow-review-var-type"
+            [class.static]="p.fillType === 'static'"
+            [class.meta]="p.fillType === 'metadata'">
+            {{ p.fillType === 'static' ? 'Static' : 'Metadata' }}
+          </span>
+          <mat-icon>arrow_forward</mat-icon>
+          <span class="ow-review-var-val">
+            {{ p.fillType === 'static' ? '"' + p.staticValue + '"' : p.metadataField }}
+          </span>
+        </div>
+        <button mat-button class="ow-review-edit" (click)="goToStep(3)">
+          <mat-icon>edit</mat-icon> Change Variables
+        </button>
+      </div>
+
+      <!-- Message Preview -->
+      <div class="ow-preview-section">
+        <div class="ow-review-label" style="margin-bottom:10px;">
+          <mat-icon>visibility</mat-icon> Message Preview
+        </div>
+        <div class="ow-phone-wrap">
+          <div class="ow-phone">
+            <div class="ow-phone-header">
+              <div class="ow-phone-avatar">A</div>
+              <div>
+                <div class="ow-phone-name">{{ selectedChannel?.group_name }}</div>
+                <div class="ow-phone-sub">Broadcast</div>
+              </div>
+            </div>
+            <div class="ow-phone-body">
+              <div class="ow-bubble">
+                <!-- Video header -->
+                <div class="ow-bubble-header-video" *ngIf="selectedTemplate?.headertype === 'video' && selectedTemplate?.headervalue">
+                  <video [src]="selectedTemplate.headervalue"
+                    style="width:100%;border-radius:8px 8px 0 0;object-fit:cover;max-height:160px;"
+                    muted playsinline controls></video>
+                </div>
+                <!-- Image header -->
+                <div class="ow-bubble-header-img" *ngIf="selectedTemplate?.headertype === 'image' && selectedTemplate?.headervalue">
+                  <img [src]="selectedTemplate.headervalue"
+                    style="width:100%;border-radius:8px 8px 0 0;object-fit:cover;max-height:160px;">
+                </div>
+                <!-- Document header -->
+                <div class="ow-bubble-header-doc" *ngIf="selectedTemplate?.headertype === 'document' && selectedTemplate?.headervalue"
+                  style="padding:10px;display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:8px 8px 0 0;">
+                  <mat-icon>description</mat-icon>
+                  <span style="font-size:11px;">Document attached</span>
+                </div>
+                <!-- Text header -->
+                <div class="ow-bubble-header-text" *ngIf="selectedTemplate?.headertype === 'text' && selectedTemplate?.headervalue"
+                  style="padding:10px 12px 0;font-weight:bold;font-size:14px;">
+                  {{ selectedTemplate.headervalue }}
+                </div>
+                <div class="ow-bubble-body" [innerHTML]="previewHtml"></div>
+                <div class="ow-bubble-footer" *ngIf="selectedTemplate?.footer">
+                  {{ selectedTemplate.footer }}
+                </div>
+                <div class="ow-bubble-files" *ngIf="selectedTemplate?.files?.length > 0">
+                  <a *ngFor="let f of selectedTemplate.files" [href]="f.url" target="_blank"
+                    style="display:block;color:#60a5fa;font-size:11px;text-decoration:underline;margin-top:4px;">
+                    {{ f.name }}
+                  </a>
+                </div>
+                <div class="ow-bubble-btns" *ngIf="selectedTemplate?.buttons?.length > 0">
+                  <div class="ow-bubble-btn" *ngFor="let b of selectedTemplate.buttons">
+                    <mat-icon>open_in_new</mat-icon>{{ b.label }}
+                  </div>
+                </div>
+              </div>
+              <div class="ow-bubble-time">Now · Broadcast</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RECIPIENTS POPUP -->
+    <div class="ow-recipients-overlay" *ngIf="showParticipantList" (click)="showParticipantList = false">
+      <div class="ow-recipients-popup" (click)="$event.stopPropagation()">
+
+        <div class="ow-recipients-popup-header">
+          <div class="ow-recipients-popup-title">
+            <mat-icon>people</mat-icon> Recipients
+          </div>
+          <button mat-icon-button (click)="showParticipantList = false">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="ow-recipients-section-label">
+          <mat-icon>person</mat-icon>
+          Participants ({{ participants.length }})
+        </div>
+        <div class="ow-recipients-list">
+          <div class="ow-recipients-item" *ngFor="let p of participants">
+            <div class="ow-recipients-avatar">{{ (p.name || p.profileid || '?')[0].toUpperCase() }}</div>
+            <span>{{ p.name || p.profileid }}</span>
+            <span class="ow-recipients-badge participant">Participant</span>
+          </div>
+        </div>
+
+        <mat-divider style="margin: 10px 0;"></mat-divider>
+
+        <div class="ow-recipients-section-label">
+          <mat-icon>admin_panel_settings</mat-icon>
+          Admins ({{ getChannelAdmins().length }})
+        </div>
+        <div class="ow-recipients-list">
+          <div class="ow-recipients-item" *ngFor="let a of getChannelAdmins()">
+            <div class="ow-recipients-avatar admin">{{ (a.name || a)[0].toUpperCase() }}</div>
+            <span>{{ a.name || a }}</span>
+            <span class="ow-recipients-badge admin">Admin</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!--CHANNEL MEMBERS POPUP -->
+    <div class="ow-recipients-overlay" *ngIf="showChannelMemberList" (click)="showChannelMemberList = false">
+      <div class="ow-recipients-popup" (click)="$event.stopPropagation()">
+
+        <div class="ow-recipients-popup-header">
+          <div class="ow-recipients-popup-title">
+            <mat-icon>campaign</mat-icon>
+            {{ selectedChannel?.group_name }}
+          </div>
+          <button mat-icon-button (click)="showChannelMemberList = false">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="ow-recipients-section-label">
+          <mat-icon>people</mat-icon>
+          Members ({{ (selectedChannel?.members || []).length }})
+        </div>
+        <div class="ow-recipients-list">
+          <div class="ow-recipients-item" *ngFor="let m of getChannelMembers()">
+            <div class="ow-recipients-avatar" [class.admin]="isChannelAdmin(m.id)">
+              {{ (m.name || m.id || '?')[0].toUpperCase() }}
+            </div>
+            <span>{{ m.name || m.id }}</span>
+            <span class="ow-recipients-badge admin"       *ngIf="isChannelAdmin(m.id)">Admin</span>
+            <span class="ow-recipients-badge participant" *ngIf="!isChannelAdmin(m.id)">Member</span>
+          </div>
+          <div class="ow-recipients-item" *ngIf="(selectedChannel?.members || []).length === 0">
+            <span style="color: var(--text-muted, #94a3b8); font-size: 12px;">No members yet</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- CREATE CHANNEL DIALOG -->
+    <div class="ow-create-overlay" *ngIf="showCreateChannel" (click)="showCreateChannel = false">
+      <div class="ow-create-dialog" (click)="$event.stopPropagation()" [formGroup]="channelForm">
+
+        <div class="ow-create-dialog-header">
+          <div class="ow-create-dialog-title">
+            <mat-icon>campaign</mat-icon>
+            Create New Channel
+          </div>
+          <button mat-icon-button (click)="showCreateChannel = false">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="ow-create-dialog-body">
+
+          <mat-form-field appearance="outline" class="ow-full">
+            <mat-label>Channel Name *</mat-label>
+            <input matInput formControlName="channelName" placeholder="e.g. ME Team Updates">
+            <mat-icon matSuffix>campaign</mat-icon>
+            <mat-error *ngIf="channelForm.get('channelName')?.hasError('required')">Required</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="ow-full">
+            <mat-label>Description</mat-label>
+            <textarea matInput formControlName="description" rows="2"
+              placeholder="Brief description..."></textarea>
+          </mat-form-field>
+
+          <div class="ow-img-upload">
+            <div class="ow-img-preview" *ngIf="channelImageUrl">
+              <img [src]="channelImageUrl" alt="channel image">
+              <button mat-icon-button class="ow-img-remove" (click)="channelImageUrl=''">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="ow-img-placeholder" *ngIf="!channelImageUrl">
+              <input type="file" #imgInput accept="image/*"
+                (change)="uploadChannelImage($event)" style="display:none">
+              <button mat-stroked-button (click)="imgInput.click()" [disabled]="isUploadingChannelImage">
+                <mat-spinner *ngIf="isUploadingChannelImage" diameter="16"></mat-spinner>
+                <mat-icon *ngIf="!isUploadingChannelImage">add_photo_alternate</mat-icon>
+                {{ isUploadingChannelImage ? 'Uploading...' : 'Upload Image' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="ow-admins-section">
+            <div class="ow-field-label">Admins *</div>
+            <mat-form-field appearance="outline" class="ow-full">
+              <mat-label>Select Admins</mat-label>
+              <mat-select [(ngModel)]="selectedAdmins" [ngModelOptions]="{standalone:true}"
+                multiple [compareWith]="compareAdmin">
+                <mat-option>
+                  <ngx-mat-select-search
+                    [(ngModel)]="adminSearchFilter"
+                    [ngModelOptions]="{standalone: true}"
+                    placeholderLabel="Search admins..."
+                    noEntriesFoundLabel="No admins found"
+                    ngDefaultControl>
+                  </ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let a of getFilteredAdminOptions()" [value]="a">
+                  {{ a.name }}
+                </mat-option>
+              </mat-select>
+              <mat-icon matSuffix>admin_panel_settings</mat-icon>
+            </mat-form-field>
+
+            <div class="ow-admin-chips" *ngIf="selectedAdmins.length > 0">
+              <div class="ow-admin-chip" *ngFor="let a of selectedAdmins">
+                <mat-icon>person</mat-icon>
+                <span>{{ a.name }}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="ow-create-dialog-footer">
+          <button mat-stroked-button (click)="showCreateChannel = false">Cancel</button>
+          <button mat-raised-button color="primary"
+            (click)="createChannel()" [disabled]="isCreatingChannel">
+            <mat-spinner *ngIf="isCreatingChannel" diameter="16"></mat-spinner>
+            <mat-icon *ngIf="!isCreatingChannel">add_circle</mat-icon>
+            {{ isCreatingChannel ? 'Creating...' : 'Create Channel' }}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ow-footer">
+    <button mat-stroked-button (click)="currentStep === 1 ? onCancel() : goToStep(currentStep - 1)">
+      <mat-icon>{{ currentStep === 1 ? 'close' : 'arrow_back' }}</mat-icon>
+      {{ currentStep === 1 ? 'Cancel' : 'Back' }}
+    </button>
+
+    <div class="ow-footer-right">
+      <button mat-raised-button color="primary" *ngIf="currentStep === 1"
+        [disabled]="!selectedChannel" (click)="goToStep(2)">
+        Next <mat-icon>arrow_forward</mat-icon>
+      </button>
+
+      <button mat-raised-button color="primary" *ngIf="currentStep === 2"
+        [disabled]="!selectedTemplate" (click)="goToStep(3)">
+        Next <mat-icon>arrow_forward</mat-icon>
+      </button>
+
+      <button mat-raised-button color="primary" *ngIf="currentStep === 3"
+        [disabled]="!allParamsConfigured()" (click)="goToStep(4)">
+        Review <mat-icon>arrow_forward</mat-icon>
+      </button>
+
+      <button mat-raised-button color="primary" *ngIf="currentStep === 4"
+        [disabled]="isSending" (click)="onSend()">
+        <mat-spinner *ngIf="isSending" diameter="16"></mat-spinner>
+        <mat-icon *ngIf="!isSending">send</mat-icon>
+        {{ isSending ? 'Sending...' : 'Send Broadcast' }}
+      </button>
+    </div>
+  </div>
+
+</div>
