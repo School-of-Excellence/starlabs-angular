@@ -41,7 +41,8 @@ async function seedBucket() {
   const ref = (c, id) => db.collection(c).doc(id);
   const past = (d) => T.fromMillis(Date.now() - d * 86400e3);
   const future = (d) => T.fromMillis(Date.now() + d * 86400e3);
-  const W = (r, d, o) => r.set(d, o || {});
+  const writes = [];
+  const W = (r, d, o) => writes.push(r.set(d, o || {})); // collect — MUST await before process.exit or writes are dropped
 
   // 1) FLIP idx-170 to onboarding-locked: exactly 1 PJP (delete the cohort's 2nd), initiated, orientationstatus null.
   await ref('participantjourneyproduct', ID.pjp2).delete().catch(() => {});
@@ -92,6 +93,7 @@ async function seedBucket() {
   // 5) chat config (the change-request / support paths read chat config.categories).
   W(ref('chat config', `${RUN}_jf_chatconfig`), { docid: `${RUN}_jf_chatconfig`, categories: ['In-App Support', 'Events & Process'], ...tag });
 
+  await Promise.all(writes); // flush ALL writes before the caller process.exit()s (the flip must persist)
   console.log(`[seed-journeyflow] seeded ${PID} → onboarding-locked on ${J} (${admin.app().options.projectId})`);
   return { RUN, PID, journey: J };
 }
