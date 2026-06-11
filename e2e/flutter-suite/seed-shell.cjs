@@ -165,10 +165,15 @@ async function seedBucket() {
 
   // ── 3) RECOMMENDED MIX: ≥1 future, non-deleted doc per type → the Home recommended row renders ────
   //    loadRecommendedMix() reads where profileid==PID & date>now-2mo, skips delete==true / expired.
+  // recommenedmixplaylist.dart:59 reads doc['bufferdocref'].id UNGUARDED (group key) + doc['list'] (refs
+  // it .get()s). The bufferdocref doc itself is NEVER fetched — only its .id is used — so a valid ref
+  // suffices; list:[] means no item fetches. Without bufferdocref the Home recommended-mix initState crashes.
+  const bufferRef = ref('recommended mix playlist', `${RUN}_shell_recmix_buf_${IDX}`);
   for (const [id, type] of [[ID.recMixGeneral, 'generalcontent'], [ID.recMixSolar, 'solarvoice']]) {
     await ref('recommended mix playlist', id).set({
       docid: id, profileid: PID, type, delete: false,
       date: past(1), expiredate: future(30),
+      bufferdocref: bufferRef, list: [], completedcontent: [], completedplaylist: [],
       videoname: `Shell Rec ${type} ${RUN}`, videoid: `${RUN}_recvid_${type}_${IDX}`,
       playlistid: `${RUN}_recplay_${IDX}`, ...tag,
     });
