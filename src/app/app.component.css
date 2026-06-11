@@ -245,4 +245,36 @@
     padding: 8px 12px;
   }
 }
+.user-pill {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 6px;
+}
 
+.profile-name {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 6px;
+}
+
+.menuicon {
+  padding: 0 !important;
+  align-items: center !important;
+  font-size: 36px !important;
+  width: max-content !important;
+  height: max-content !important;
+  margin-left: 8px;
+  margin-right: 4px;
+  color: white;
+}
