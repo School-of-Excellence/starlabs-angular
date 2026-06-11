@@ -658,6 +658,22 @@
       ]
     },
     {
+      "collectionGroup": "postcollection",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileid", "order": "ASCENDING" },
+        { "fieldPath": "created", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "participantplanning",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileid", "order": "ASCENDING" },
+        { "fieldPath": "monthstartdate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "logs",
       "queryScope": "COLLECTION",
       "fields": [
