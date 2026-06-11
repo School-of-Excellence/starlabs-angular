@@ -1,0 +1,30 @@
+# Flutter e2e suite — RESULTS (live)
+
+> Driven on the booted iPhone-17-Pro simulator against the disposable test project `slabs-queue-e2e-exdcz`.
+> Real-screen screenshots (`xcrun simctl io screenshot`) per step under `breakthroughs-flutter/mobile-evidence/<label>/`.
+> Anti-circular: every PASS asserts the doc the APP wrote (not the seed). Updated as each bucket greens.
+> Run one: `cd e2e/flutter-suite && node seed-<bucket>.cjs --seed && SKIP_PUBGET=1 TEST_TARGET=integration_test/features/<bucket>_test.dart E2E_EMAIL=participant<idx>+jrny@example.com E2E_LABEL=<bucket> E2E_EVIDENCE=<bucket> node run-flutter-test.cjs`
+
+## Status
+
+| # | Test | User | Status | Screens | Notes |
+|---|---|---|---:|---:|---|
+| — | **journey-flow** (marquee end-to-end) | participant170 | ✅ **GREEN** | 7 | login → onboarding-locked → intro write (`orientationstatus:initiated`) → booking surface → 8 attended events + 10 content + projection |
+| U4 | **queue** delivery | participant93 | ✅ **GREEN** | 15 | F3 support-nav · F4 stage-chat read · **F5 stage-chat send (app-write 1→2)** · F7 contact-support surface · **F8 fill-form self-move (Performance→Integration, log)** · **F9 plain self-move (Integration→Onboarded, log)**. F6 slot-booking honestly recorded not-surfaced. |
+| U5 | forms | participant94 | ⏳ running | — | — |
+| U1 | auth & onboarding | participant90 | ⏳ pending | — | onboarding-lock + intro write proven in journey-flow; auth-login needs the Login UI (programmatic signIn bypasses it) |
+| U2 | shell & home feed | participant91 | ⏳ pending | — | — |
+| U3 | journey dashboard & mode | participant92 | ⏳ pending | — | — |
+| U6 | appointments & calendar | participant95 | ⏳ pending | — | `ScheduleOnboarding.onAppointmentSelect` has a String-as-int slot-index app bug to work around |
+| U7 | events & arena | participant96 | ⏳ pending | — | — |
+| U8 | content (eiflix+solarvoice+hpc) | participant97 | ⏳ pending | — | — |
+| U9 | workshops | participant150 | ⏳ pending | — | — |
+| U10 | social/big/shadow/reports/profile | participant151 | ⏳ pending | — | — |
+
+## Infra fixed en route (shared across buckets)
+- Killed a conflicting 17h headless session (d969021e) running the old queue-mobile-walk on the same sim/build dir (was serving its `walk_test.dart` for every run).
+- Deployed 4 home-listener composite indexes (`supportchat`, `queue studio pairing`, `recommended mix playlist`, `stagechat`) — the full post-onboarded Home boots clean now.
+- Tests fail-fast on genuine `TestFailure` (re-throw in the boot zone); re-seed before every run (the app mutates data).
+
+## Coverage model (no scope cut)
+The suite's 11 tests cover all **235 e2e-testable features** in `specs/flutter-app/FEATURE-CATALOG.md`. Each feature is driven to its anti-circular assertion where automatable; sim-blocked legs (camera/QR/CallKit/video-completion/push/OpenAI/external-link) are drive-to-screen + assert-render and labelled honestly (never fake-green). ATC OFF-LIMITS throughout.
