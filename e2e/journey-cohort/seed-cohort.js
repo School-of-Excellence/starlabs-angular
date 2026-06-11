@@ -112,8 +112,16 @@ async function seedCohort() {
   cat.set(ref('appointmenttype', CAT.appttype), { docid: CAT.appttype, appointmenttype: `Cohort Coaching ${RUN}`, totalminutes: 60, ...tag });
   cat.set(ref('eisroles', CAT.eisrole), { docid: CAT.eisrole, role: `Cohort Coach ${RUN}`, ...tag });
   cat.set(ref('availability', CAT.availability), { docid: CAT.availability, profileref: ref('profile_data', CAT.eisProfile), starttime: past(30), endtime: future(30), appointments: [], weeklyhours: 20, ...tag });
-  // a minimal queue generation (queue_token.queueref target; full stage machinery is Phase-3 driving)
-  cat.set(ref('queue generation', CAT.queueGen), { id: CAT.queueGen, queuename: `Cohort Queue ${RUN}`, stages: ['Preparation', 'Performance', 'Integration', 'Completed'], queuevariation: [], arenaeventidlist: [], ...tag });
+  // a minimal queue generation (queue_token.queueref target; full stage machinery is Phase-3 driving).
+  // The Flutter Home reads these UNGUARDED when building the queue card:
+  //   home.dart:897/963/964 → queueenddate(.toDate, future) / queuestartdate(.toDate, past) / docid
+  //   queueControl.dart:350/386 → stageproperty[currentstage].compulsoryactivity  (NoSuchMethodError [] if absent)
+  // A 'default' action type (selfmovable:false, compulsoryactivity:[]) renders a benign "View All Stages"
+  // card (no form/link/videoask resource, no driving) so EVERY cohort user's Home renders clean.
+  const QSTAGES = ['Preparation', 'Performance', 'Integration', 'Completed'];
+  const qStageProperty = {};
+  QSTAGES.forEach((s) => { qStageProperty[s] = { compulsoryactivity: [], selfmovable: false, actiontype: 'default', calltoaction: 'View All Stages', stageexplanation: `${s} — cohort delivery stage`, minwatingminutes: '0', maxwatingminutes: '0' }; });
+  cat.set(ref('queue generation', CAT.queueGen), { id: CAT.queueGen, docid: CAT.queueGen, queuename: `Cohort Queue ${RUN}`, stages: QSTAGES, stageproperty: qStageProperty, queuestartdate: past(7), queueenddate: future(60), queuevariation: [], arenaeventidlist: [], ...tag });
   // event delivery type + the shared event pool
   cat.set(ref('delivery events', CAT.deliveryEvent), { docid: CAT.deliveryEvent, eventname: `Cohort Event Type ${RUN}`, atcmodel: null, ...tag });
   for (let k = 0; k < EVENT_POOL; k++) {
@@ -152,7 +160,10 @@ async function seedCohort() {
 
     // (1) identity — e2e users already have profile_data from seedAuthChain (merge journey fields);
     //     data-only users get a full profile_data here (verify keys cohort off profile_data.testrunid).
-    const profileFields = { participantmode: mode, profileimg: 'https://example.com/e2e.png', profile: 'https://example.com/e2e.png' };
+    // participantmode is the Flutter-home QUEUE-CARD render gate: it must match the active
+    // participantsproduct.mode (=ppA, 'Event Mode') and products.mode, or the card never resolves.
+    // (the rotated `mode` is kept only as cosmetic analytics realism on participant metadata.)
+    const profileFields = { participantmode: 'Event Mode', profileimg: 'https://example.com/e2e.png', profile: 'https://example.com/e2e.png' };
     if (isE2E.has(i)) {
       W(ref('profile_data', P), profileFields, { merge: true });
     } else {
@@ -168,11 +179,11 @@ async function seedCohort() {
     W(ref('participantsproduct', ppB), { docid: ppB, profileid: P, productref: ref('products', PB), packageref: ref('package', CAT.package), status: 'ongoing', mode: 'Priority Mode', deliverymode: 'Priority Mode', sequenceorder: 1, ...tag });
 
     // (4) mode / journey assignment
-    W(ref('participant mode checklist', `${RUN}_pmc_${i}`), { profileid: P, mode, productref: ref('products', PA), participantproductid: ppA, aelid: null, widget: [], createddate: past(40), ...tag });
-    W(ref('participant metadata', P), { docid: P, profileid: P, name: `Cohort User ${i} ${RUN}`, email: email.toLowerCase(), participantmode: mode, activejourney: J1, customerstatus: 'active', financialstatus: 'regular', pp_totalpaid: '50000', pp_totalpurchasevalue: '100000', activeproduct: [PA, PB], consumedproducts: [], unconsumedproducts: [], productmode: [mode], ...tag });
+    W(ref('participant mode checklist', `${RUN}_pmc_${i}`), { profileid: P, mode: 'Event Mode', productref: ref('products', PA), participantproductid: ppA, aelid: null, widget: [], createddate: past(40), ...tag });
+    W(ref('participant metadata', P), { docid: P, profileid: P, name: `Cohort User ${i} ${RUN}`, email: email.toLowerCase(), participantmode: 'Event Mode', activejourney: J1, customerstatus: 'active', financialstatus: 'regular', pp_totalpaid: '50000', pp_totalpurchasevalue: '100000', activeproduct: [PA, PB], consumedproducts: [], unconsumedproducts: [], productmode: ['Event Mode'], cosmeticmode: mode, ...tag });
 
     // (5) queue delivery + appointment delivery (the Flutter-home render chain + a completed appt)
-    W(ref('queue_token', `${RUN}_tok_${P}`), { profile_id: P, profileid: P, queueref: ref('queue generation', CAT.queueGen), productref: ref('products', PA), currentstage: 'Performance', previousstage: 'Preparation', stagestatus: 'Yet to Start', tokenstatus: 'Active', tokennumber: i + 1, queueposition: i + 1, variationid: `${RUN}_var`, deliveryRef: ref('deliverables', seqQ), participantproductid: ppA, people_involved: [], ...tag });
+    W(ref('queue_token', `${RUN}_tok_${P}`), { profile_id: P, profileid: P, queueref: ref('queue generation', CAT.queueGen), productref: ref('products', PA), currentstage: 'Performance', previousstage: 'Preparation', stagestatus: 'Yet to Start', tokenstatus: 'Active', tokennumber: i + 1, queueposition: i + 1, variationid: null, deliveryRef: ref('deliverables', seqQ), participantproductid: ppA, people_involved: [], ...tag });
     W(ref('deliverables', seqQ), { docid: seqQ, profileid: P, type: 'queue', status: 'ongoing', fileref: [ref('queue_token', `${RUN}_tok_${P}`)], participantproductid: ppA, participantjourneyid: `${RUN}_pjp_${i}`, ...tag });
     W(ref('appointments', `${RUN}_apt_${i}`), { docid: `${RUN}_apt_${i}`, appointment: ref('appointmenttype', CAT.appttype), hostRole: { [`eisroles/${CAT.eisrole}`]: [ref('profile_data', CAT.eisProfile)] }, hosts: [ref('profile_data', CAT.eisProfile)], bookedby: ref('profile_data', P), starttime: past(20), endtime: past(20), attended: true, cancelled: false, totalminutes: 60, participantproductid: ppB, slotdata: [], created: past(25), ...tag });
     W(ref('deliverables', seqA), { docid: seqA, profileid: P, type: 'appointment', status: 'completed', fileref: [ref('appointments', `${RUN}_apt_${i}`)], participantproductid: ppB, participantjourneyid: `${RUN}_pjp_${i}`, ...tag });

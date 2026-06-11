@@ -72,6 +72,19 @@ functionality + the 200-user dataset + a full Flutter e2e suite is largely new w
 Production READ-ONLY (svstats harness, prod SA). Test users + all seeding on `slabs-queue-e2e-exdcz` only. ATC never
 read/seeded/tested. Evidence discipline: every claim cites a probe output or code `file:line`.
 
-## Status at journal write
-Phase 1A workflow + Phase 1B recon agent launched and running. Grounding (above) done directly. Awaiting both to
-assemble the catalog and seed blueprint.
+## Progress log
+
+### Phase 1 — COMPLETE ✅
+- **1A (code map):** 18 evidence-backed cluster maps written by a 17-agent dynamic workflow (`specs/flutter-app/clusters/*.md`).
+- **1B (data blueprint):** read-only prod recon → `JOURNEY-DATA-BLUEPRINT.md` (purchase/shift/events/delivery/content models + join keys; probes verified read-only).
+- **Synthesis:** `specs/flutter-app/FEATURE-CATALOG.md` (**265 features · 235 e2e-testable [179 clean-Yes + 56 Partial] · 18 ATC-excluded · 30 non-testable**), `00-overview.md` (app shell + render chain + the load-resolution: `UserData` resolves pid via `profile_data` email+`user_ref==user_data/{uid}` → **real login required**), `README.md`. Each catalog row carries a **seed precondition + an anti-circular assertion target** (the doc the app writes).
+- Commit `1467b1d`.
+
+### Phase 2 — COMPLETE ✅ (verified)
+- `e2e/journey-cohort/seed-cohort.js` + `verify-cohort.js`: **N=200**, 10,243 docs on the test project. **median 5 events/user (≥4, 80% ≥4) · median 1 shift/upgrade (≥1, 55%) · 200/200 delivery seqs · 100% watson-join.** Evidence: `…-artifacts/COHORT_VERIFY_OUTPUT.txt`. 12 e2e Auth users (cohort indices 90-97,150,151,170,171). Fixed the render-gate: `participantmode='Event Mode'` must match the product chain. Commit `41bcdcd`.
+
+### Phase 3 — IN PROGRESS
+Plan (from the synthesis): a **journey-flow** test (15-step backbone purchase→login→onboarding→queue→appt→≥4 events→content→social→progression→shift) + **10 individual-functionality user buckets** (U1 Auth · U2 Shell/Home · U3 Journey/Mode · U4 Queue · U5 Forms · U6 Appts · U7 Events/Arena · U8 Content · U9 Workshops · U10 Social/BIG/Shadow/Reports) covering all 235 e2e-testable features; sim-blocked legs (camera/QR/CallKit/video-completion/push/OpenAI) honestly = drive-to-screen+assert-render.
+- **Harness built:** `e2e/flutter-suite/run-flutter-test.cjs` (generalized CAP-marker→`xcrun simctl io screenshot` driver), `e2e/journey-cohort/mobile-guards.cjs` (home crash-guards), `breakthroughs-flutter/integration_test/render_test.dart` (foundation render test).
+- **Render de-risk RUNNING:** building + driving participant90 on the booted iPhone-17-Pro sim to prove a seeded cohort user renders the real Home (the gate for all bucket tests). Toolchain pre-verified green (Flutter 3.44.1, idb, ImageMagick).
+- Anti-circular throughout (assert the app's write, never the seed). ATC OFF-LIMITS (18 features mapped existence-only).
