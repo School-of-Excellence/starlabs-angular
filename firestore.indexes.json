@@ -624,6 +624,15 @@
       ]
     },
     {
+      "collectionGroup": "supportchat",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "members", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "isdelete", "order": "ASCENDING" },
+        { "fieldPath": "last_modification", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "logs",
       "queryScope": "COLLECTION",
       "fields": [
