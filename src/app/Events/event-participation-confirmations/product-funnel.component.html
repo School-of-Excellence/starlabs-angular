@@ -20,7 +20,7 @@
     <!-- Segment cards -->
     <div class="sx-cards">
       <button *ngFor="let c of cards" class="sx-card {{ c.cls }}" [class.on]="segment===c.key"
-        [attr.aria-pressed]="segment===c.key" [matTooltip]="c.tip || ''" (click)="setSegment(c.key)">
+        [attr.aria-pressed]="segment===c.key" [matTooltip]="c.tip || ''" matTooltipClass="sx-tip" (click)="setSegment(c.key)">
         <span class="sx-lab">{{ c.label }}</span>
         <span class="sx-num">{{ counts[c.key] | number }}</span>
         <span class="sx-desc">{{ c.desc }}</span>
@@ -31,8 +31,8 @@
     <div class="sx-bar">
       <ng-container *ngIf="selectionMode==='approve'">
         <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
-          <mat-label>Delivery sequence (required)</mat-label>
-          <mat-select [(ngModel)]="selectedDeliverySet">
+          <mat-label>Delivery sequence</mat-label>
+          <mat-select [(ngModel)]="selectedDeliverySet" required [panelClass]="'sx-select-panel'">
             <mat-option *ngFor="let set of deliverySetList" [value]="set['deliverytype']">{{ set['deliverytype'] }}</mat-option>
             <mat-option *ngIf="!deliverySetList.length" disabled>No sequence configured for this product</mat-option>
           </mat-select>
@@ -40,12 +40,12 @@
         <mat-form-field appearance="outline" class="sx-seq"
           *ngIf="arena?.type === 'queue' && queueVariationList.length" subscriptSizing="dynamic">
           <mat-label>Queue variation</mat-label>
-          <mat-select [(ngModel)]="selectedQueueVariation">
+          <mat-select [(ngModel)]="selectedQueueVariation" [panelClass]="'sx-select-panel'">
             <mat-option *ngFor="let v of queueVariationList" [value]="v.id">{{ v.data['variationname'] }}</mat-option>
           </mat-select>
         </mat-form-field>
         <button mat-flat-button class="sx-approve" [disabled]="!canApprove()"
-          [matTooltip]="approveDisabledReason()" (click)="approveSelected()">
+          [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
           <mat-icon>check</mat-icon> Approve {{ readyCount }}
         </button>
         <span class="sx-hint" *ngIf="approveDisabledReason()">{{ approveDisabledReason() }}</span>
@@ -59,7 +59,7 @@
 
       <mat-form-field appearance="outline" class="sx-finance" subscriptSizing="dynamic">
         <mat-label>Finance</mat-label>
-        <mat-select [(ngModel)]="financeFilter" (ngModelChange)="onFinance()">
+        <mat-select [(ngModel)]="financeFilter" (ngModelChange)="onFinance()" [panelClass]="'sx-select-panel'">
           <mat-option *ngFor="let f of financeOptions" [value]="f.value">{{ f.label }}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -95,7 +95,8 @@
           <tr *ngFor="let row of pagedRows">
             <td class="sx-c-check" *ngIf="showSelect">
               <mat-checkbox [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
-                (change)="toggleRow(row)" [attr.aria-label]="'Select ' + row.name"></mat-checkbox>
+                (change)="toggleRow(row)"
+                [attr.aria-label]="isSelectable(row) ? ('Select ' + row.name) : ('Cannot select ' + row.name + (row.reason ? ' — ' + row.reason : ''))"></mat-checkbox>
             </td>
             <td>
               <div class="sx-nmcell">
@@ -111,12 +112,12 @@
             </td>
             <td>
               <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load"><mat-icon>warning</mat-icon></span>
+              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
               <span *ngIf="row.metaLoaded && !row.metaError">{{ row.journey || '—' }}</span>
             </td>
             <td>
               <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load"><mat-icon>warning</mat-icon></span>
+              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
               <ng-container *ngIf="row.metaLoaded && !row.metaError">
                 <ng-container *ngIf="row.subEnd; else dashSub">
                   <span class="dot" [ngClass]="row.subActive ? 'd-ok' : 'd-bad'"></span>{{ row.subActive ? 'Active' : 'Expired' }}
@@ -127,7 +128,7 @@
             </td>
             <td>
               <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load"><mat-icon>warning</mat-icon></span>
+              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
               <span *ngIf="row.metaLoaded && !row.metaError">
                 <span class="dot" [ngClass]="financeDotClass(row.finance)" *ngIf="row.finance"></span>{{ row.finance || '—' }}
               </span>
@@ -154,7 +155,7 @@
           </tr>
           <tr *ngIf="segmentRows.length === 0">
             <td [attr.colspan]="showSelect ? 6 : 5" class="sx-empty">
-              {{ isFiltered ? 'No participants match the current filter' : 'No participants in this segment' }}
+              {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
               <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; onFinance()">Clear filter</button>
             </td>
           </tr>

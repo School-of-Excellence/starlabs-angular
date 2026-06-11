@@ -35,7 +35,9 @@
 :host ::ng-deep .mdc-notched-outline__leading { border-radius: 10px 0 0 10px; border-color: rgba(60,60,67,.2); }
 :host ::ng-deep .mdc-notched-outline__trailing { border-radius: 0 10px 10px 0; border-color: rgba(60,60,67,.2); }
 :host ::ng-deep .mdc-notched-outline__notch { border-color: rgba(60,60,67,.2); }
-:host ::ng-deep .mdc-text-field--outlined .mdc-floating-label--float-above { transform: translateY(-20px) scale(.75) !important; }
+:host ::ng-deep .mat-mdc-paginator { font-family: inherit; background: transparent; }
+:host ::ng-deep .mat-mdc-form-field-icon-suffix .mat-icon { font-size: 18px; width: 18px; height: 18px; color: rgba(60,60,67,.45); }
+:host ::ng-deep .ov-empty .mdc-button { --mdc-text-button-label-text-color: #007aff; }
 
 .ov-error { display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: #fff; border: .5px solid rgba(215,0,21,.25); border-radius: 14px; padding: 14px 18px;
@@ -73,9 +75,9 @@
 .ov-elig { color: #1f8a3b; font-weight: 700; }
 .ov-ne { color: #c25e00; font-weight: 700; }
 .ov-app { color: #0060df; font-weight: 700; }
-.ov-zero { color: rgba(60,60,67,.3); }
-.ov-mut { color: rgba(60,60,67,.3); }
+.ov-zero { color: rgba(60,60,67,.6); }
+.ov-mut { color: rgba(60,60,67,.6); }
 .ov-warn mat-icon { font-size: 16px; height: 16px; width: 16px; color: #c25e00; vertical-align: -3px; }
 .ov-c-go { width: 36px; text-align: right; }
-.ov-chev { color: rgba(60,60,67,.25); font-size: 20px; }
+.ov-chev { color: rgba(60,60,67,.45); font-size: 20px; }
 .ov-empty { text-align: center; color: rgba(60,60,67,.5); font-style: italic; padding: 26px; }

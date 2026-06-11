@@ -429,7 +429,7 @@ export class ProductFunnelComponent implements OnInit {
       (r.finance || '').toLowerCase().replace(/\s+/g, ' ').trim()));
 
     const ref = this.dialog.open(this.confirmTpl, {
-      width: '420px', autoFocus: false,
+      width: '420px', autoFocus: false, panelClass: 'sx-dialog',
       data: {
         title: 'Approve participants',
         body: `Approve ${selected.length} eligible participant(s) with delivery sequence “${this.selectedDeliverySet}”.`,
@@ -448,7 +448,7 @@ export class ProductFunnelComponent implements OnInit {
     for (let i = 0; i < total; i += this.INITIATE_CHUNK_SIZE) chunks.push(selected.slice(i, i + this.INITIATE_CHUNK_SIZE));
 
     this.progress = { msg: 'Approving...', value: 0, total, eta: this.etaText(chunks.length - 1) };
-    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false });
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
     let success = 0;
     const failed: PRow[] = [];
 
@@ -504,7 +504,7 @@ export class ProductFunnelComponent implements OnInit {
       this.selection.clear();
       failed.forEach(r => this.selection.select(r));
       this.dialog.open(this.failuresTpl, {
-        width: '420px', autoFocus: false,
+        width: '420px', autoFocus: false, panelClass: 'sx-dialog',
         data: { success, total, failed: failed.map(f => f.name) }
       }).afterClosed().subscribe(res => { if (res === 'retry') this.runApprove(failed); });
     } else {
@@ -518,7 +518,7 @@ export class ProductFunnelComponent implements OnInit {
     const targets = rows.filter(r => r.approvedRequestId && !r.attended);
     if (!targets.length) return;
     this.progress = { msg: 'Marking attended...', value: 0, total: targets.length, eta: '' };
-    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false });
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
     try {
       const refList = targets.map(r => doc(this.firestore, 'event participation request', r.approvedRequestId!));
       const batch = writeBatch(this.firestore);
