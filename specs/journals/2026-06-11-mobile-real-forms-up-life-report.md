@@ -56,3 +56,26 @@ How to complete the 3 uP!-Life-Report variations:
 - flutter: `robot.dart` (programmatic scroll, `_scrollUntilHittable`, enabled-retry `_activateButton`),
   `FillForm.dart` (Timestamp date-hint fix).
 - angular: `seed-real-forms.cjs` (pre-seed dates as Timestamp).
+
+## RESOLVED — 9/9 GREEN (same day)
+The Preview-button blocker (#4) was the deepest: ~26 runs ruled out date/scroll/hittability/loading/audio/
+relayout/max-extent. ROOT CAUSE: the Preview button was buried deep in the `CustomScrollView`; at max-scroll
+the scroll's gesture claims the tap pointer and the framework delivers **PointerCancel instead of Up**, so
+even an additive Listener's `onPointerUp` never fired (Down reached it; Up→Cancel). The less-nested Confirm
+button (in a `bottomNavigationBar`) always tapped fine — that was the tell.
+
+**FIX (real product improvement):** moved the Preview button out of the scroll into the Scaffold's
+`bottomNavigationBar` (mirroring Confirm) — always visible, outside the scroll's gesture interception. This
+is a genuine UX fix: on long forms the submit button was effectively un-tappable for real users too.
+
+Result: **9/9 variations pass with the REAL end-user forms** (genuine self-move taps, anti-circular guards
+green). Audited via imaging — per-variation storyboards (`breakthroughs-flutter/mobile-review/`) + the real
+uP! Life Report `b-form` frame confirm the actual forms rendered + each flow completed. Committed
+FillForm.dart bottom-bar relocation + robot.dart robustness.
+
+Gotcha learned: the resilient loop's *sequential* runs intermittently left the home card showing a stale
+stage (the card reads the latest `queue stage log` entry); single clean runs + retries pass. The home-card
+`assertOnStageCard` got a patience bump (35s) for slow heavy homes.
+
+## Pending
+- 72-path (ALL_PATHS=1) coverage run to flip paths-map ☐→✅ for every forward path (~overnight).
