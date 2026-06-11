@@ -1,0 +1,14 @@
+# COHORT VERIFICATION — Phase 2 stored test result
+# Generated 2026-06-11T10:09:03Z · run=jrny · project=slabs-queue-e2e-exdcz (test, never prod)
+# Seed: node e2e/journey-cohort/seed-cohort.js --seed  (N=200, 10243 docs, 1206 attended EPRs, 110 second-journey, 12 e2e Auth users)
+# Reproduce: node e2e/journey-cohort/verify-cohort.js
+#
+
+[verify-cohort] run=jrny project=slabs-queue-e2e-exdcz
+  cohort size                 : 200
+  median events attended/user : 5   (>=4 ? PASS) | users>=4: 160 (80%)
+  median shift/upgrade count  : 1   (>=1 ? PASS) | users w/ shift: 110 (55%)
+  delivery sequences          : 200/200 profiles
+  watsonpurchaseid on JPP     : 310/310 (100%)
+
+  RESULT: ✅ COHORT VALID
