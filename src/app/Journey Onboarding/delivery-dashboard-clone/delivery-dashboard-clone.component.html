@@ -736,11 +736,8 @@
                   <tbody>
                     <tr *ngFor="let p of selectedUPConfirmedParticipants; let i=index">
                       <td>{{ i + 1 }}</td>
-                      <td>
-                        <a href="javascript:void(0)" (click)="openParticipant(p.profileid)"
-                          style="cursor: pointer; color: #2563eb; text-decoration: underline;">
-                          {{ mapMetaData[p.profileid]?.['name'] }}
-                        </a>
+                      <td style="cursor: pointer; text-decoration: underline;" (click)="openParticipant(p.profileid)">
+                        {{ mapMetaData[p.profileid]?.['name'] }}
                       </td>
                       <td>
                         <span *ngFor="let productId of p.matchedDFUProducts; let last = last">
