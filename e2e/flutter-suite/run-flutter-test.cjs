@@ -45,12 +45,14 @@ const flutterEnv = () => ({ ...process.env, PATH: `${E2E_BIN}:${process.env.PATH
 function ensurePrereqs() {
   const overrides = path.join(FLUTTER_APP, 'pubspec_overrides.yaml');
   if (!fs.existsSync(overrides)) fs.writeFileSync(overrides, PUBSPEC_OVERRIDES);
-  // clean does NOT rewrite Generated.xcconfig; a stale EXCLUDED_ARCHS forces x86_64 → remove it.
-  for (const f of ['ios/Flutter/Generated.xcconfig', '.flutter-plugins', '.flutter-plugins-dependencies']) {
-    const p = path.join(FLUTTER_APP, f);
-    if (fs.existsSync(p)) fs.rmSync(p);
-  }
+  // SKIP_PUBGET=1 → fast incremental re-run (the project is already built): skip the xcconfig/plugins
+  // clear + pub get so only the changed --target recompiles. First build (no SKIP_PUBGET) clears the
+  // stale Generated.xcconfig (a stale EXCLUDED_ARCHS forces x86_64; clean does NOT rewrite it) + pub get.
   if (process.env.SKIP_PUBGET !== '1') {
+    for (const f of ['ios/Flutter/Generated.xcconfig', '.flutter-plugins', '.flutter-plugins-dependencies']) {
+      const p = path.join(FLUTTER_APP, f);
+      if (fs.existsSync(p)) fs.rmSync(p);
+    }
     execFileSync(FLUTTER_BIN, ['pub', 'get'], { cwd: FLUTTER_APP, stdio: 'inherit', timeout: 5 * 60_000, env: flutterEnv() });
   }
 }
