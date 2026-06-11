@@ -14,7 +14,7 @@ _Last updated: 2026-06-11 (Flutter map + 200-user journey + e2e suite)_ · **New
 - 1st full-suite run was killed (tests hung on the swallow bug). Now fixed; re-running individually.
 
 ## Pending / next (RESUME HERE)
-1. **Confirm `journey_flow_test.dart` GREEN** (was re-running at laptop-close; just re-run it).
+1. **Confirm `journey_flow_test.dart` GREEN** (now compiles; last run was killed by a CONCURRENT XCODE BUILD — 8.5min of "concurrent builds, will retry" backoff blew the 15-min kill, NOT a test bug). Just re-run it with NO other `flutter`/`xcodebuild`/`flutter analyze` process running. If builds are slow, bump the kill timeout in `run-flutter-test.cjs` (currently `15 * 60_000`).
 2. **Iterate each bucket to green** — serial on the sim, one at a time (proven order: queue, forms, shell first):
    `cd e2e/flutter-suite && node seed-<bucket>.cjs --seed && SKIP_PUBGET=1 TEST_TARGET=integration_test/features/<bucket>_test.dart E2E_EMAIL=participant<idx>+jrny@example.com E2E_LABEL=<bucket> E2E_EVIDENCE=<bucket> node run-flutter-test.cjs`
    (idx map in `SUITE-PLAN.md`: auth=90 shell=91 journey=92 queue=93 forms=94 appointments=95 events=96 content=97 workshops=150 social=151, journeyflow=170). Read `/var/folders/.../T/flutterdrive-<bucket>.log` tail for the failure; fix seed-shape/nav/assertion; re-run.
