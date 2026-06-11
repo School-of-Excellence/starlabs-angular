@@ -14,7 +14,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatBadgeModule } from '@angular/material/badge';
 import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, getDoc, setDoc, where, orderBy, limit} from '@angular/fire/firestore';
-import { Firestore, collection, addDoc, getDocs, query, updateDoc, arrayUnion, arrayRemove, doc, deleteDoc, getDoc, setDoc, where, orderBy, limit} from '@angular/fire/firestore';
 import { MatOption, MatSelectModule } from "@angular/material/select";
 import { MatTabGroup, MatTab } from "@angular/material/tabs";
 import { CreateSegmentsDialogComponent } from "../create-segments-dialog/create-segments-dialog.component";
@@ -39,7 +38,6 @@ interface ParticipantList {
   name: string;
   profileids: string[];
   profiles?: Profile[];
-  live?: boolean;
   live?: boolean;
 }
 
@@ -264,7 +262,7 @@ onViewParticipants(event : any, log: any): void {
   }));
 
   this.showParticipantsPopup = true;
-}
+  }
 
   get filteredParticipantsPopup() {
     const term = this.participantsPopupSearch.trim().toLowerCase();
@@ -311,13 +309,11 @@ onViewParticipants(event : any, log: any): void {
         orderBy('created_date', 'desc'),
         limit(200)
       );
-      console.log("log data console")
       const snap = await getDocs(q);
       this.logs = snap.docs
         .map(d => d.data())
         .filter(d => d?.['type'] === 'list');
       this.filteredLogs = [...this.logs];
-      console.log('Loaded logs:', this.logs.length);
     } catch (e) {
       console.error('loadLogs error:', e);
     } finally {
