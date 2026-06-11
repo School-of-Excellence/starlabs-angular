@@ -674,6 +674,15 @@
       ]
     },
     {
+      "collectionGroup": "content analytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "from", "order": "ASCENDING" },
+        { "fieldPath": "profileid", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "logs",
       "queryScope": "COLLECTION",
       "fields": [
