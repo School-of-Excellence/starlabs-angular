@@ -266,7 +266,7 @@ export class DeliveryDashboardCloneComponent {
             'CTD Platinum',
             'CTD Diagnostics And Implementation'
         ],
-        'EI Solution': [
+        'EI Custom Solutions': [
             'EI Solution',
             'EI Solution for Wife',
             'EI Solution for Husband',
@@ -417,7 +417,7 @@ export class DeliveryDashboardCloneComponent {
     products = [
         { label: 'WiSH', value: 'WiSH' },
         { label: 'A&H Light', value: 'A&H Light' },
-        { label: 'EI Solution', value: 'EI Solution' },
+        { label: 'EI Solution', value: 'EI Custom Solutions' },
         { label: 'EI Starter Pack', value: 'EI Starter Pack' },
         {
             label: 'Critical Support',
@@ -557,6 +557,14 @@ export class DeliveryDashboardCloneComponent {
     tentativeStartDate: Date | null = null;
     selectedDeliveryType: string = '';
     mergedSeatSlots: any[] = [];
+
+    upConfirmedMap: any = {};
+    upConfirmedModalOpen = false;
+    selectedUPConfirmedParticipants: any[] = [];
+    selectedUPConfirmedProduct = '';
+    approvedDFUParticipants: any[] = [];
+    dfuProductIds: string[] = [];
+    dfuProducts: any[] = [];
 
     productData: any = {
         eiStarterPack: {
@@ -892,6 +900,8 @@ export class DeliveryDashboardCloneComponent {
                     return acc;
                 }, {} as Record<string, string>);
 
+            await this.getApprovedDFUParticipants();
+
             // Process users (depends on mapprofile from metadata)
             this.coachesList = usersSnap.docs
                 .map((e) => e.data())
@@ -1112,7 +1122,7 @@ export class DeliveryDashboardCloneComponent {
         // Clear previous product's data immediately so stale cards don't show while loading
         this.productData = {
             eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
-            eiCustomSolutions: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            eiCustomSolutions: { totalEligible: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
             criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
         };
         const productId = this.mapProductGroupId[product];
@@ -1268,9 +1278,6 @@ export class DeliveryDashboardCloneComponent {
 
             eiCustomSolutions: {
                 totalEligible: [],
-                pastMonth: [],
-                thisMonth: [],
-                nextMonth: [],
                 diagnostics: [],
                 implementation: [],
                 review: [],
@@ -1311,6 +1318,9 @@ export class DeliveryDashboardCloneComponent {
                     }
                 };
             }
+            else if (this.selectedProductType === 'eiCustomSolutions') {
+                productData.eiCustomSolutions.totalEligible = [...totalEligible];
+            }
 
             // Total Eligible
             const ongoingData = this.funnelData[productId]?.ongoing || [];
@@ -1348,11 +1358,6 @@ export class DeliveryDashboardCloneComponent {
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
                         if (!data.tentativestart) {
                             productData.eiCustomSolutions.totalEligible.push(mergedData);
-                        } else {
-                            const date = data.tentativestart.toDate();
-                            const itemMonth = date.getMonth();
-                            const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, this.selectedProductType);
                         }
                     }
                 }
@@ -1485,10 +1490,10 @@ export class DeliveryDashboardCloneComponent {
 
                 if (productType === 'eiStarterPack') {
                     productData.eiStarterPack.celebrationCall.push(data);
-                }
-
-                if (productType === 'criticalSupport') {
+                } else if (productType === 'criticalSupport') {
                     productData.criticalSupport.completion.push(data);
+                } else if (productType === 'eiCustomSolutions') {
+                    productData.eiCustomSolutions.celebrationCall.push(data);
                 }
             }
             Object.assign(this.productData, productData);
@@ -1801,9 +1806,109 @@ export class DeliveryDashboardCloneComponent {
         });
     }
 
+
+    async getApprovedDFUParticipants() {
+        try {
+            const eventRef = doc(
+                this.firestore,
+                'event collection/E3UNqXFyW477MdmLBkhg'
+            );
+
+            const dfuProductSet = new Set(this.dfuProductIds);
+
+            const approvedRequestsSnap = await getDocs(
+                query(
+                    collection(this.firestore, 'event participation request'),
+                    where('eventref', '==', eventRef),
+                    where('status', '==', 'approved')
+                )
+            );
+
+            const filteredParticipants: any[] = [];
+            approvedRequestsSnap.forEach((requestDoc) => {
+                const requestData: any = requestDoc.data();
+                const participantMeta =
+                    this.mapMetaData?.[requestData.profileid];
+
+                if (!participantMeta) {
+                    return;
+                }
+
+                const activeProducts =
+                    participantMeta.activeproduct || [];
+                const matchedDFUProducts = activeProducts.filter(
+                    (productId: string) =>
+                        dfuProductSet.has(productId)
+                );
+                if (matchedDFUProducts.length > 0) {
+                    filteredParticipants.push({
+                        requestId: requestDoc.id,
+                        ...requestData,
+                        participantMeta,
+                        matchedDFUProducts
+                    });
+                }
+            });
+            this.approvedDFUParticipants = filteredParticipants;
+
+            // Product-wise grouping
+            this.upConfirmedMap = {};
+            this.approvedDFUParticipants.forEach(
+                (participant: any) => {
+                    participant.matchedDFUProducts.forEach(
+                        (productId: string) => {
+                            if (!this.upConfirmedMap[productId]) {
+                                this.upConfirmedMap[productId] = [];
+                            }
+                            this.upConfirmedMap[productId].push(
+                                participant
+                            );
+                        }
+                    );
+                }
+            );
+
+        } catch (error) {
+            console.error(
+                'Error fetching approved DFU participants:',
+                error
+            );
+
+            this.approvedDFUParticipants = [];
+            this.upConfirmedMap = {};
+        }
+    }
+
+    getUPConfirmedCount(productId: string): number {
+        return this.upConfirmedMap?.[productId]?.length || 0;
+    }
+
+    openUPConfirmedModal(productId: string) {
+
+        this.selectedUPConfirmedProduct =
+            this.mapProductName?.[productId] ||
+            this.mapProduct?.[productId] ||
+            productId;
+
+        this.selectedUPConfirmedParticipants =
+            this.upConfirmedMap?.[productId] || [];
+
+        this.upConfirmedModalOpen = true;
+    }
+
+    closeUPConfirmedModal() {
+        this.upConfirmedModalOpen = false;
+        this.selectedUPConfirmedParticipants = [];
+    }
+
     async fetchDFUProductData() {
         const dfuProducts = this.rawProductData.filter((e) => e['type']?.toLowerCase() == 'dfu');
+        this.dfuProducts = dfuProducts;
+        this.rawProductData.forEach((product: any) => {
+            this.mapProduct[product.id] = product.product;
+        });
         const dfuProductIds = Array.from(new Set(dfuProducts.map((p) => p['id'])));
+        this.dfuProductIds = dfuProductIds;
         const rejectedStatuses = new Set(['cancelled', 'shifted']);
         const activeProfileIds = new Set(
             Object.keys(this.mapMetaData).filter((pid) => {
@@ -2426,9 +2531,9 @@ export class DeliveryDashboardCloneComponent {
     get selectedDayBookedCount(): number {
         return (this.selectedSpecialistSlots || []).filter((s: any) => s.booked).length;
     }
-    // get selectedDayUnavailableCount(): number {
-    //     return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
-    // }
+    get selectedDayUnavailableCount(): number {
+        return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
+    }
 
     // Find the appointment occupying a slot's time for this specialist — works for
     // both "booked" slots (this appointment type) and "unavailable" slots (the
@@ -2563,7 +2668,7 @@ export class DeliveryDashboardCloneComponent {
         }
         return result;
     }
-    
+
     // Resolve the participant a booking belongs to. Real appointment docs store
     // the client in `bookedby` (a profile_data ref → has `.id`/`.path`); our
     // optimistic local appointments use `profileid`. Handle both + a name map.
@@ -4994,16 +5099,6 @@ export class DeliveryDashboardCloneComponent {
         return this.activeFilter !== 'none';
     }
 
-    openParticipantPurchase(participant: any): void {
-        const participantId = participant['profileid'];
-        if (participantId) {
-            const url = this.router.createUrlTree(['/participantpurchase', participantId]).toString();
-            window.open(url, '_blank');
-        } else {
-            console.error('Participant ID not found', participant);
-        }
-    }
-
     onKanbanColumnClick(filterType: string) {
         this.isFilterButtonClick = true;
 
@@ -5263,6 +5358,30 @@ export class DeliveryDashboardCloneComponent {
         }
 
         this.downloadExcel(rows, `${this.getCardName(this.funnelModalProductId!)}_${this.funnelModalType}`);
+    }
+
+    exportUPConfirmedParticipants(): void {
+
+        const rows: any[] = [];
+
+        this.selectedUPConfirmedParticipants.forEach((p: any, index: number) => {
+
+            rows.push({
+                '#': index + 1,
+                'Profile ID': p.profileid,
+                'Participant': this.mapMetaData[p.profileid]?.['name'] || '',
+                'Product(s)': p.matchedDFUProducts
+                    ?.map((productId: string) => this.mapProductName[productId] || productId)
+                    .join(', '),
+                'uP! Event': 'Approved'
+            });
+
+        });
+
+        this.downloadExcel(
+            rows,
+            `${this.selectedUPConfirmedProduct}_UP_Confirmed`
+        );
     }
 
     getCompletionProductsVisible(): CompletionProduct[] {
@@ -6373,5 +6492,9 @@ export class DeliveryDashboardCloneComponent {
 
         this.currentPage = 1;
         this.calculatePagination();
+    }
+
+    openParticipant(profileId: string) {
+        this.router.navigate(['/profilesummary', profileId]);
     }
 }

@@ -92,6 +92,7 @@ export class ProfileSummaryComponent {
   privateNotes = []
 
   journeySequenceList = []
+  consumedProduct = []
   // client profile search
   myControl = new FormControl();
   filteredOptions: Observable<any>;
@@ -125,10 +126,10 @@ export class ProfileSummaryComponent {
     // this.loading = true
     guard.getRoles().then(async roles => {
       // if (roles["admin"] || roles["ah"] || roles["developer"]) {
-        this.route.params.subscribe(async param => {
-          await this.mapData()
-          this.onScreenLoading(param['profileid'])
-        });
+      this.route.params.subscribe(async param => {
+        await this.mapData()
+        this.onScreenLoading(param['profileid'])
+      });
       // } else {
       //   router.navigateByUrl('/')
       // }
@@ -170,6 +171,8 @@ export class ProfileSummaryComponent {
   }
 
   // on screen loading
+  showActiveProducts = false;
+  showCompletedProducts: boolean = false;
   async onScreenLoading(id) {
     const loadingref = this.dialog.open(LoadingProgressComponent, { data: { msg: "Fetching Data please wait ..." } })
     this.profileId = id;
@@ -209,9 +212,13 @@ export class ProfileSummaryComponent {
         var res = value.data()
         this.journey = res['activejourney']
         this.product = res['activeproduct']
+        this.consumedProduct = res['consumedproducts'];
       }
+      console.log("consumed products", this.consumedProduct, this.product);
     })
     var profileref = doc(this.firestore, "profile_data", this.profileId)
+    let appointmentData = [];
+
     getDocs(query(
       collection(this.firestore, 'appointments'),
       where("attended", "==", true),
@@ -219,18 +226,32 @@ export class ProfileSummaryComponent {
       orderBy("starttime", "desc"),
       limit(3)
     )).then(res => {
-      const appointmentID = res.docs.map(e => e.data()["appointment"].id);
+
+      appointmentData = res.docs.map(e => ({
+        appointmentId: e.data()["appointment"].id,
+        endtime: e.data()["endtime"]
+      }));
+
+      const appointmentID = appointmentData.map(e => e.appointmentId);
+
       if (appointmentID.length != 0) {
         return getDocs(query(
           collection(this.firestore, "appointmenttype"),
           where("id", "in", appointmentID)
         ));
       }
-      return null
+      return null;
+
     }).then(value => {
       if (value) {
-        this.appoinmentList = value.docs.map(e => e.data()["appointmenttype"]);
+        this.appoinmentList = value.docs.map(e => ({
+          appointmenttype: e.data()["appointmenttype"],
+          endtime: appointmentData.find(
+            a => a.appointmentId === e.data()["id"]
+          )?.endtime
+        }));
       }
+
     }).catch(error => {
       console.error("Error fetching appointments:", error);
     });
@@ -319,6 +340,8 @@ export class ProfileSummaryComponent {
         }
       }
       this.ahMember = memberList
+    });
+    getDocs(query(collection(this.firestore, "participantsproduct"), where("profileid", "==", this.selectedProfileid))).then(participantProduct => {
     });
   }
 

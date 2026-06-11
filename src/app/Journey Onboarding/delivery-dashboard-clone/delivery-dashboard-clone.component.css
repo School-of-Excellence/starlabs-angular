@@ -17494,3 +17494,174 @@ i.seat-chip {
   .spec-card-counts .scc-lbl { display: none; }
   .scc-item { min-width: 42px; }
 }
+
+
+/* ============================================================
+   PRODUCTS ROW — 7-column grid fix (UP Confirmed added)
+   Placed at the END of the file to win all cascade conflicts
+   ============================================================ */
+
+:host .dd-app .dd-prow-colhead,
+:host .dd-app .dd-prow {
+  display: grid !important;
+  grid-template-columns:
+    minmax(160px, 1.8fr)
+    minmax(56px, 0.55fr)
+    minmax(64px, 0.6fr)
+    minmax(0, 2.2fr)
+    minmax(0, 2.6fr)
+    minmax(0, 1.3fr)
+    minmax(0, 1.1fr) !important;
+  gap: 0 !important;
+  align-items: center !important;
+}
+
+/* Colhead cells */
+:host .dd-app .dd-prow-colhead {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px 10px 0 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+:host .dd-app .dd-prow-colhead__cell {
+  padding: 7px 14px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+:host .dd-app .dd-prow-colhead__cell:last-child {
+  border-right: none;
+}
+
+:host .dd-app .dd-prow-colhead__cell--group {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 0 4px;
+}
+
+:host .dd-app .dd-colhead__grp-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #334155;
+  padding-left: 14px;
+}
+
+:host .dd-app .dd-colhead__grp-tags {
+  display: flex;
+  width: 100%;
+  gap: 0;
+}
+
+:host .dd-app .dd-colhead__grp-tags span {
+  flex: 1;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 2px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Data row cells */
+:host .dd-app .dd-prow {
+  border-bottom: 1px solid #f1f5f9;
+  min-height: 68px;
+  transition: background 0.14s;
+  cursor: pointer;
+}
+
+:host .dd-app .dd-prow:last-child {
+  border-bottom: none;
+}
+
+:host .dd-app .dd-prow:hover {
+  background: #f8faff;
+}
+
+:host .dd-app .dd-prow > * {
+  padding: 12px 14px;
+  border-right: 1px solid #f1f5f9;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+:host .dd-app .dd-prow > *:last-child {
+  border-right: none;
+}
+
+/* UP Confirmed cell */
+:host .dd-app .dd-prow__upconfirmed {
+  justify-content: center !important;
+  padding: 0 8px !important;
+}
+
+:host .dd-app .dd-upconfirmed-count {
+  cursor: pointer;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: underline;
+  text-decoration-color: #bfdbfe;
+  text-underline-offset: 2px;
+}
+
+:host .dd-app .dd-upconfirmed-count:hover {
+  color: #1d4ed8;
+}
+
+/* Chips sub-grid */
+:host .dd-app .dd-prow > .dd-prow__chips {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  align-items: stretch !important;
+  height: 100% !important;
+  padding: 0 !important;
+}
+
+/* Funnel sub-grid */
+:host .dd-app .dd-prow > .dd-prow__funnel {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  align-items: stretch !important;
+  height: 100% !important;
+  padding: 0 !important;
+  position: relative !important;
+}
+
+/* Time cell */
+:host .dd-app .dd-prow > .dd-prow__time {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+}
+
+/* Status cell */
+:host .dd-app .dd-prow > .dd-prow__status {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+}
