@@ -143,7 +143,16 @@ async function seedBucket() {
     queuestartdate: past(30), queueenddate: future(60),
     ...tag,
   }, { merge: true });
-  console.log(`  ✓ stageproperty on ${QG}: ${FORM_STAGE}(form), ${SELFMOVE_STAGE}(selfmove), ${ACTIVITY_STAGE}(activity)`);
+  // The token carries variationid VAR (non-null) → home.dart queueMode (home.dart:905) resolves
+  // queuestages from `queue variation/{VAR}.stages`, NOT queueGen.stages. Without this doc queuestages
+  // is empty → queueControl.dart:71 stageList.indexOf(currentstage) == -1 → stageList[-1] RangeError.
+  // Stages MUST include every stage used in stageproperty (currentstage + the self-move/activity/book
+  // stages), in order, so the slot-booking window (currentIndex..end) and the stage timeline resolve.
+  await ref('queue variation', VAR).set({
+    id: VAR, docid: VAR, variationname: `Cohort Variation ${RUN}`,
+    stages: ['Preparation', FORM_STAGE, SELFMOVE_STAGE, ACTIVITY_STAGE, 'Completed'], ...tag,
+  }, { merge: true });
+  console.log(`  ✓ stageproperty on ${QG}: ${FORM_STAGE}(form), ${SELFMOVE_STAGE}(selfmove), ${ACTIVITY_STAGE}(activity); queue variation ${VAR} stages set`);
 
   // 3) queue_token — MERGE add `docid` (slot-booking writes queue_token/{tokenid==tokendata.docid}; the
   //    cohort token omits docid) + mirror queuestartdate. Keep currentstage 'Performance' (cohort value).
@@ -219,7 +228,7 @@ async function seedBucket() {
 
 // Collections this seeder writes (run-scoped teardown). The stagechat subcollection is swept by parent.
 const SEEDED = [
-  'delivery forms', 'queue generation', 'queue_token', 'queue planning', 'participant list',
+  'delivery forms', 'queue generation', 'queue variation', 'queue_token', 'queue planning', 'participant list',
   'queue studio pairing', 'chat config',
 ];
 // firestore-forms named-DB collections this seeder writes.
