@@ -224,7 +224,7 @@
 
     <!-- Persistent selection tray (Unassigned view) — survives search/filter/paging because selection
          is now persistent. Chips read from selectedMeta so off-page picks still show; ✕ deselects. -->
-    <section class="jchd-tray" *ngIf="selectedCoachId === UNASSIGNED && selectedCount > 0">
+    <section class="jchd-tray" *ngIf="(selectedCoachId === UNASSIGNED || selectedCoachId === ALL) && selectedCount > 0">
       <div class="jchd-tray-head">
         <strong>{{ selectedCount }}</strong> selected
         <button type="button" class="jchd-tray-clear" (click)="clearSelection()">Clear all</button>
@@ -238,21 +238,25 @@
       </div>
     </section>
 
-    <!-- Phase B: assignment bar (Unassigned view only) -->
-    <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED">
+    <!-- Assignment bar: Unassigned view (always), or All view once something is selected (bulk assign/reassign) -->
+    <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED || (selectedCoachId === ALL && selectedCount > 0)">
       <mat-icon>person_add</mat-icon>
-      <span class="assign-text"><strong>{{ selectedCount }}</strong> of {{ dataSource.data.length }} selected · these participants have no journey coach</span>
-      <mat-form-field appearance="outline" class="assign-coach">
-        <mat-label>Assign to coach</mat-label>
-        <mat-select [(ngModel)]="assignTargetCoachId">
-          <mat-option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <button mat-flat-button color="primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
+      <span class="assign-text" *ngIf="selectedCoachId === UNASSIGNED"><strong>{{ selectedCount }}</strong> of {{ dataSource.data.length }} selected · these participants have no journey coach</span>
+      <span class="assign-text" *ngIf="selectedCoachId === ALL"><strong>{{ selectedCount }}</strong> selected · assign or reassign to a coach</span>
+      <span class="jchd-assign-spacer"></span>
+      <label class="jchd-assign-pick">
+        <select class="jchd-assign-select" [(ngModel)]="assignTargetCoachId" aria-label="Assign to coach">
+          <option value="">Assign to coach</option>
+          <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
+        </select>
+        <svg class="jchd-assign-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </label>
+      <button type="button" class="jchd-btn-primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
         (click)="assignSelected()">
         <mat-icon>how_to_reg</mat-icon> Assign {{ selectedCount }}
       </button>
-      <mat-spinner *ngIf="assigning" diameter="22"></mat-spinner>
+      <mat-spinner *ngIf="assigning" diameter="20"></mat-spinner>
     </section>
 
     <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
