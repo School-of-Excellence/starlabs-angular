@@ -1,0 +1,839 @@
+<!-- Event Planning Dashboard — ported markup (static; logic wired later) -->
+<div class="ep-root">
+<!-- ══ LAYOUT ═══════════════════════════════════════════════════════════════ -->
+<div class="ep-layout">
+
+  <!-- LEFT: FILTER RAIL -->
+  <aside class="filter-rail" id="filterRail">
+    <div class="rail-count">
+      <div class="rail-count-num" id="railCountNum">0</div>
+      <div class="rail-count-label">participants match<br>your current filters</div>
+    </div>
+    <div class="filter-rail-head">
+      <div class="filter-search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="filterSearch" class="filter-search-input" placeholder="Find a filter…">
+        <button class="filter-search-clear" id="filterSearchClear" style="display:none;">×</button>
+      </div>
+      <button class="link-btn" id="resetAll">Reset</button>
+    </div>
+    <div class="rail-helper">Within a filter, <b>any</b> selected value matches · across filters, <b>all</b> must match.</div>
+    <div class="filter-rail-body" id="filterBody">
+<div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Queue</span>
+        <span class="fgroup-count ">1</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button><div class="fgroup-summary"><span class="sum-pill ">A&amp;H Evolution Preparation Ev…</span></div>
+      <div class="fgroup-body">
+        <div class="ck " style="align-items:flex-start;">
+    <span class="ck-box" style="margin-top:1px;"></span>
+    <span class="ck-text">A&amp;H Evolution Preparation for First cycle - Apr 2026<span style="display:block;font-size:10.5px;color:var(--t3);font-weight:600;margin-top:1px;">496 customers</span></span>
+  </div><div class="ck inc" style="align-items:flex-start;">
+    <span class="ck-box" style="margin-top:1px;"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+    <span class="ck-text">A&amp;H Evolution Preparation Event - June 2026<span style="display:block;font-size:10.5px;color:var(--t3);font-weight:600;margin-top:1px;">521 customers</span></span>
+  </div><div class="ck " style="align-items:flex-start;">
+    <span class="ck-box" style="margin-top:1px;"></span>
+    <span class="ck-text">uP!/Legacy Diagnostics &amp; Consultation - (Apr 2026-July 2026)<span style="display:block;font-size:10.5px;color:var(--t3);font-weight:600;margin-top:1px;">483 customers</span></span>
+  </div>
+      </div>
+    </div><div class="fgroup sub collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Current Stage</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        
+        <div class="ck " data-v="Evolution Prep Orientation">
+    <span class="ck-box"></span>
+    <span class="ck-text">Evolution Prep Orientation</span>
+  </div><div class="ck " data-v="uP! Preparation Hold">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP! Preparation Hold</span>
+  </div><div class="ck " data-v="Accelerated Evolution Level Form">
+    <span class="ck-box"></span>
+    <span class="ck-text">Accelerated Evolution Level Form</span>
+  </div><div class="ck " data-v="uP! Life Aspiration Report">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP! Life Aspiration Report</span>
+  </div><div class="ck " data-v="ATC Orientation Form">
+    <span class="ck-box"></span>
+    <span class="ck-text">ATC Orientation Form</span>
+  </div><div class="ck " data-v="Prodigies Preparation Form">
+    <span class="ck-box"></span>
+    <span class="ck-text">Prodigies Preparation Form</span>
+  </div><div class="ck " data-v="Scope Enhancement Review">
+    <span class="ck-box"></span>
+    <span class="ck-text">Scope Enhancement Review</span>
+  </div><div class="ck " data-v="Changework Scheduling">
+    <span class="ck-box"></span>
+    <span class="ck-text">Changework Scheduling</span>
+  </div>
+      </div>
+    </div><div class="fgroup sub collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Stage Slot</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        
+        <label class="rk">
+          <input type="radio" name="slotStageRadio" checked="">
+          <span class="rk-dot"></span><span class="rk-text">All stages</span>
+        </label>
+        
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">Evolution Prep Orientation</span>
+          </label>
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">uP! Preparation Hold</span>
+          </label>
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">Accelerated Evolution Level Form</span>
+          </label>
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">uP! Life Aspiration Report</span>
+          </label>
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">ATC Orientation Form</span>
+          </label>
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">Prodigies Preparation Form</span>
+          </label>
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">Scope Enhancement Review</span>
+          </label>
+          <label class="rk">
+            <input type="radio" name="slotStageRadio">
+            <span class="rk-dot"></span><span class="rk-text">Changework Scheduling</span>
+          </label>
+        
+        
+      </div>
+    </div><div class="fgroup sub collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Stage Counts</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="ck " style="">
+    <span class="ck-box" style="margin-top:1px;"></span>
+    <span class="ck-text">Orientation in progress</span>
+                <span class="fgroup-count zero" style="margin-left:auto;">135</span>
+  </div><div class="ck " style="">
+    <span class="ck-box" style="margin-top:1px;"></span>
+    <span class="ck-text">Awaiting preparation forms</span>
+                <span class="fgroup-count zero" style="margin-left:auto;">209</span>
+  </div>
+        <button class="btn-blue ghost" style="width:100%;justify-content:center;margin-top:9px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Add stage count
+        </button>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Tags</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="ck " style="align-items:center;">
+    <span class="ck-box" style="margin-top:1px;"></span>
+    <span class="tag-pill" style="background:#8E1CA81F;color:#8E1CA8;border-color:#8E1CA855;">
+                <span class="tag-dot" style="background:#8E1CA8;"></span>Communication Hold
+              </span>
+              <span class="ck-text" style="flex:1;"></span>
+              <span class="fgroup-count zero" title="376 tagged">126</span>
+              <button class="tag-arch" title="Archive — keep for history, stop using as a filter">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+              </button>
+              <button class="tag-del" title="Delete tag">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+  </div><div class="ck " style="align-items:center;">
+    <span class="ck-box" style="margin-top:1px;"></span>
+    <span class="tag-pill" style="background:#2563EB1F;color:#2563EB;border-color:#2563EB55;">
+                <span class="tag-dot" style="background:#2563EB;"></span>Need to Validate
+              </span>
+              <span class="ck-text" style="flex:1;"></span>
+              <span class="fgroup-count zero" title="302 tagged">113</span>
+              <button class="tag-arch" title="Archive — keep for history, stop using as a filter">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+              </button>
+              <button class="tag-del" title="Delete tag">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+  </div><div class="ck " style="align-items:center;">
+    <span class="ck-box" style="margin-top:1px;"></span>
+    <span class="tag-pill" style="background:#0E74901F;color:#0E7490;border-color:#0E749055;">
+                <span class="tag-dot" style="background:#0E7490;"></span>VIP
+              </span>
+              <span class="ck-text" style="flex:1;"></span>
+              <span class="fgroup-count zero" title="167 tagged">57</span>
+              <button class="tag-arch" title="Archive — keep for history, stop using as a filter">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+              </button>
+              <button class="tag-del" title="Delete tag">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+  </div>
+        <button class="btn-blue ghost" style="width:100%;justify-content:center;margin-top:9px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+          Import list &amp; add tag
+        </button>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Event Participation</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="event-parent">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          uP! Live Event July 2026
+        </div>
+        <label class="rk">
+          <input type="radio" name="eventRadio" checked="">
+          <span class="rk-dot"></span>
+          <span class="rk-text">All Events</span>
+        </label>
+        <label class="rk">
+            <input type="radio" name="eventRadio">
+            <span class="rk-dot"></span>
+            <span class="rk-text">uP! Live Event July 2026 - B!G Opportunities</span>
+            <span class="fgroup-count zero" style="margin-left:auto;">34</span>
+          </label><label class="rk">
+            <input type="radio" name="eventRadio">
+            <span class="rk-dot"></span>
+            <span class="rk-text">uP! Live Event July 2026 - Conversational Programming Mastery</span>
+            <span class="fgroup-count zero" style="margin-left:auto;">210</span>
+          </label><label class="rk">
+            <input type="radio" name="eventRadio">
+            <span class="rk-dot"></span>
+            <span class="rk-text">uP! Live Event July 2026 - uP! Live Event</span>
+            <span class="fgroup-count zero" style="margin-left:auto;">277</span>
+          </label>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Customer Status</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="ck " data-v="Active">
+    <span class="ck-box"></span>
+    <span class="ck-text">Active</span>
+  </div><div class="ck " data-v="Non-active">
+    <span class="ck-box"></span>
+    <span class="ck-text">Non-active</span>
+  </div><div class="ck " data-v="Discontinued">
+    <span class="ck-box"></span>
+    <span class="ck-text">Discontinued</span>
+  </div><div class="ck " data-v="None">
+    <span class="ck-box"></span>
+    <span class="ck-text">None</span>
+  </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Finance Status</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="ck " data-v="None">
+    <span class="ck-box"></span>
+    <span class="ck-text">None</span>
+  </div><div class="ck " data-v="Null">
+    <span class="ck-box"></span>
+    <span class="ck-text">Null</span>
+  </div><div class="ck " data-v="Regular">
+    <span class="ck-box"></span>
+    <span class="ck-text">Regular</span>
+  </div><div class="ck " data-v="Default">
+    <span class="ck-box"></span>
+    <span class="ck-text">Default</span>
+  </div><div class="ck " data-v="Locked">
+    <span class="ck-box"></span>
+    <span class="ck-text">Locked</span>
+  </div><div class="ck " data-v="Banned">
+    <span class="ck-box"></span>
+    <span class="ck-text">Banned</span>
+  </div><div class="ck " data-v="Discontinued">
+    <span class="ck-box"></span>
+    <span class="ck-text">Discontinued</span>
+  </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Active Journey</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="ck " data-v="uP!">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP!</span>
+  </div><div class="ck " data-v="CPM upgrade">
+    <span class="ck-box"></span>
+    <span class="ck-text">CPM upgrade</span>
+  </div><div class="ck " data-v="uP! For Prodigies">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP! For Prodigies</span>
+  </div><div class="ck " data-v="uP! Continuity">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP! Continuity</span>
+  </div><div class="ck " data-v="B!G">
+    <span class="ck-box"></span>
+    <span class="ck-text">B!G</span>
+  </div><div class="ck " data-v="B!G Continuity">
+    <span class="ck-box"></span>
+    <span class="ck-text">B!G Continuity</span>
+  </div><div class="ck " data-v="FTM">
+    <span class="ck-box"></span>
+    <span class="ck-text">FTM</span>
+  </div><div class="ck " data-v="CPM">
+    <span class="ck-box"></span>
+    <span class="ck-text">CPM</span>
+  </div><div class="ck " data-v="CPM Continuity">
+    <span class="ck-box"></span>
+    <span class="ck-text">CPM Continuity</span>
+  </div><div class="ck " data-v="FTM Continuity">
+    <span class="ck-box"></span>
+    <span class="ck-text">FTM Continuity</span>
+  </div><div class="ck " data-v="B!G with SLD CI">
+    <span class="ck-box"></span>
+    <span class="ck-text">B!G with SLD CI</span>
+  </div><div class="ck " data-v="FTM with SLD CI">
+    <span class="ck-box"></span>
+    <span class="ck-text">FTM with SLD CI</span>
+  </div><div class="ck " data-v="FTO">
+    <span class="ck-box"></span>
+    <span class="ck-text">FTO</span>
+  </div><div class="ck " data-v="A&amp;H Legend">
+    <span class="ck-box"></span>
+    <span class="ck-text">A&amp;H Legend</span>
+  </div><div class="ck " data-v="Launch Your Legacy L2">
+    <span class="ck-box"></span>
+    <span class="ck-text">Launch Your Legacy L2</span>
+  </div><div class="ck " data-v="uP! Lite">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP! Lite</span>
+  </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Active Products</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="ck " data-v="EI Starter Pack">
+    <span class="ck-box"></span>
+    <span class="ck-text">EI Starter Pack</span>
+  </div><div class="ck " data-v="WiSH Diagnostics And Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">WiSH Diagnostics And Implementation</span>
+  </div><div class="ck " data-v="EI Solution">
+    <span class="ck-box"></span>
+    <span class="ck-text">EI Solution</span>
+  </div><div class="ck " data-v="EI Custom Solutions">
+    <span class="ck-box"></span>
+    <span class="ck-text">EI Custom Solutions</span>
+  </div><div class="ck " data-v="Critical Support Diagnostics And Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">Critical Support Diagnostics And Implementation</span>
+  </div><div class="ck " data-v="A&amp;H Light Diagnostics And Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">A&amp;H Light Diagnostics And Implementation</span>
+  </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Products</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="ck " data-v="EI Solution">
+    <span class="ck-box"></span>
+    <span class="ck-text">EI Solution</span>
+  </div><div class="ck " data-v="Evolution Prep">
+    <span class="ck-box"></span>
+    <span class="ck-text">Evolution Prep</span>
+  </div><div class="ck " data-v="EI Starter Pack">
+    <span class="ck-box"></span>
+    <span class="ck-text">EI Starter Pack</span>
+  </div><div class="ck " data-v="WiSH Diagnostics And Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">WiSH Diagnostics And Implementation</span>
+  </div><div class="ck " data-v="Critical Support Diagnostics And Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">Critical Support Diagnostics And Implementation</span>
+  </div><div class="ck " data-v="EI Custom Solutions">
+    <span class="ck-box"></span>
+    <span class="ck-text">EI Custom Solutions</span>
+  </div><div class="ck " data-v="A&amp;H Light Diagnostics And Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">A&amp;H Light Diagnostics And Implementation</span>
+  </div><div class="ck " data-v="Custom Solutions Diagnostics &amp; Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">Custom Solutions Diagnostics &amp; Implementation</span>
+  </div><div class="ck " data-v="Scope Enhancement Workshop">
+    <span class="ck-box"></span>
+    <span class="ck-text">Scope Enhancement Workshop</span>
+  </div><div class="ck " data-v="A&amp;H Expanding Horizon Part 2">
+    <span class="ck-box"></span>
+    <span class="ck-text">A&amp;H Expanding Horizon Part 2</span>
+  </div><div class="ck " data-v="EI Solutions for Health">
+    <span class="ck-box"></span>
+    <span class="ck-text">EI Solutions for Health</span>
+  </div><div class="ck " data-v="Legacy Consultation">
+    <span class="ck-box"></span>
+    <span class="ck-text">Legacy Consultation</span>
+  </div><div class="ck " data-v="uP! Diagnostics And Implementation">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP! Diagnostics And Implementation</span>
+  </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Activity</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="fsub-label" style="margin-top:2px;">Activity Type</div>
+        <div class="ck " data-v="Scope Enhancement">
+    <span class="ck-box"></span>
+    <span class="ck-text">Scope Enhancement</span>
+  </div><div class="ck " data-v="Diagnostic">
+    <span class="ck-box"></span>
+    <span class="ck-text">Diagnostic</span>
+  </div><div class="ck " data-v="Diagnostic Readiness">
+    <span class="ck-box"></span>
+    <span class="ck-text">Diagnostic Readiness</span>
+  </div><div class="ck " data-v="Changework">
+    <span class="ck-box"></span>
+    <span class="ck-text">Changework</span>
+  </div><div class="ck " data-v="Consultation">
+    <span class="ck-box"></span>
+    <span class="ck-text">Consultation</span>
+  </div>
+
+        <div class="fsub-label">Participant Name</div>
+        <input type="text" class="text-search" id="participantInput" placeholder="Search participant…" value="">
+
+        <div class="fsub-label">Activity Date Range</div>
+        <div class="date-presets">
+    <button class="date-preset">Last 30d</button>
+    <button class="date-preset">Last 90d</button>
+    <button class="date-preset">This year</button>
+    <button class="date-preset">Clear</button>
+  </div>
+        <div class="date-pair">
+          <input type="date" class="date-in" value="">
+          <span class="date-dash">–</span>
+          <input type="date" class="date-in" value="">
+        </div>
+
+        <div class="fsub-label">ATC Model</div>
+        <div class="ck " data-v="uP!">
+    <span class="ck-box"></span>
+    <span class="ck-text">uP!</span>
+  </div><div class="ck " data-v="LYL">
+    <span class="ck-box"></span>
+    <span class="ck-text">LYL</span>
+  </div><div class="ck " data-v="B!G">
+    <span class="ck-box"></span>
+    <span class="ck-text">B!G</span>
+  </div><div class="ck " data-v="Scope enhancement">
+    <span class="ck-box"></span>
+    <span class="ck-text">Scope enhancement</span>
+  </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Min. Payment Clear Status</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        
+          <div class="ck " data-v="Clear">
+    <span class="ck-box"></span>
+    <span class="ck-text">Clear</span>
+  </div><div class="ck " data-v="Not Clear">
+    <span class="ck-box"></span>
+    <span class="ck-text">Not Clear</span>
+  </div>
+          <div class="import-status">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Imported · min_payment.xlsx · 1500 customers
+          </div>
+          <button class="link-btn" style="margin-top:6px;">Re-import sheet</button>
+        
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Attended uP! Count</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="fhint">0 to many</div>
+        
+        <div class="op-row">
+          <select class="op-sel">
+            <option value="any" selected="">Any</option>
+            <option value="eq">Equal to</option>
+            <option value="gt">Greater than</option>
+            <option value="lt">Less than</option>
+          </select>
+          <input type="number" min="0" class="num-in" placeholder="0" value="">
+        </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Products Consumed Count</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        
+        
+          <div class="fsub-label" style="margin-top:0;">Product</div>
+          <select class="op-sel" style="width:100%;margin-bottom:10px;">
+            <option value="" selected="">Any product (total)</option>
+            <option value="EI Starter Pack">EI Starter Pack</option><option value="WiSH Diagnostics And Implementation">WiSH Diagnostics And Implementation</option><option value="EI Solution">EI Solution</option><option value="EI Custom Solutions">EI Custom Solutions</option><option value="Critical Support Diagnostics And Implementation">Critical Support Diagnostics And Implementation</option><option value="A&amp;H Light Diagnostics And Implementation">A&amp;H Light Diagnostics And Implementation</option>
+          </select>
+          <div class="fsub-label">Count </div>
+        
+        <div class="op-row">
+          <select class="op-sel">
+            <option value="any" selected="">Any</option>
+            <option value="eq">Equal to</option>
+            <option value="gt">Greater than</option>
+            <option value="lt">Less than</option>
+          </select>
+          <input type="number" min="0" class="num-in" placeholder="0" value="">
+        </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Unconsumed Product Count</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        
+        
+          <div class="fsub-label" style="margin-top:0;">Product</div>
+          <select class="op-sel" style="width:100%;margin-bottom:10px;">
+            <option value="" selected="">Any product (total)</option>
+            <option value="EI Starter Pack">EI Starter Pack</option><option value="WiSH Diagnostics And Implementation">WiSH Diagnostics And Implementation</option><option value="EI Solution">EI Solution</option><option value="EI Custom Solutions">EI Custom Solutions</option><option value="Critical Support Diagnostics And Implementation">Critical Support Diagnostics And Implementation</option><option value="A&amp;H Light Diagnostics And Implementation">A&amp;H Light Diagnostics And Implementation</option>
+          </select>
+          <div class="fsub-label">Count </div>
+        
+        <div class="op-row">
+          <select class="op-sel">
+            <option value="any" selected="">Any</option>
+            <option value="eq">Equal to</option>
+            <option value="gt">Greater than</option>
+            <option value="lt">Less than</option>
+          </select>
+          <input type="number" min="0" class="num-in" placeholder="0" value="">
+        </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Subscription Start Date</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="date-presets">
+    <button class="date-preset">Last 30d</button>
+    <button class="date-preset">Last 90d</button>
+    <button class="date-preset">This year</button>
+    <button class="date-preset">Clear</button>
+  </div>
+        <div class="date-row">
+          <div class="date-pair">
+            <input type="date" class="date-in" value="">
+            <span class="date-dash">–</span>
+            <input type="date" class="date-in" value="">
+          </div>
+        </div>
+      </div>
+    </div><div class="fgroup collapsed">
+      <button class="fgroup-head">
+        <span class="fgroup-label">Subscription End Date</span>
+        <span class="fgroup-count zero">0</span>
+        <svg class="fgroup-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="fgroup-body">
+        <div class="date-presets">
+    <button class="date-preset">Last 30d</button>
+    <button class="date-preset">Last 90d</button>
+    <button class="date-preset">This year</button>
+    <button class="date-preset">Clear</button>
+  </div>
+        <div class="date-row">
+          <div class="date-pair">
+            <input type="date" class="date-in" value="">
+            <span class="date-dash">–</span>
+            <input type="date" class="date-in" value="">
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+  </aside>
+
+  <!-- RIGHT: MAIN -->
+  <div class="ep-main">
+
+    <div class="ep-main-scroll">
+      <!-- active filter chips -->
+      <div class="chip-bar" id="chipBar"></div>
+      <!-- overview: matching count + saved lists -->
+      <!-- daily attention counts (saved lists as live KPI cards) -->
+      <div class="counts-head">
+        <div class="sec-spacer"></div>
+        <button class="btn-blue ghost sl-save-btn" title="Freeze all counts as a titled set">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+          Freeze all
+        </button>
+        <button class="btn-blue sl-save-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Save current view
+        </button>
+      </div>
+      <div class="counts-grid" id="savedListBody"></div>
+      <!-- frozen snapshot sets -->
+      <div id="frozenSetsWrap"></div>
+      <!-- results table -->
+      <div class="sec-head" style="margin-top:6px;">
+        <span class="sec-title">Matching Participants</span>
+        <span class="fgroup-count" id="resTotal" style="font-size:11px;height:20px;">0</span>
+        <div class="sec-spacer"></div>
+        <button class="btn-blue ghost" style="padding:7px 13px;font-size:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Export CSV
+        </button>
+        <button class="btn-blue ghost" style="padding:7px 13px;font-size:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+          Tag these results
+        </button>
+      </div>
+      <div class="table-wrap">
+        <div class="tbl-scroll">
+          <table class="rt">
+            <thead id="resHead"><tr><th><div class="th-wrap"><span class="th-label">Customer </span>
+    <button class="hdr-funnel " data-col="customer" title="Filter Customer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Cust. Status </span>
+    <button class="hdr-funnel " data-col="customerStatus" title="Filter Cust. Status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Finance </span>
+    <button class="hdr-funnel " data-col="financeStatus" title="Filter Finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Min. Pay </span>
+    <button class="hdr-funnel " data-col="minPayment" title="Filter Min. Pay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Active Journey </span>
+    <button class="hdr-funnel " data-col="journey" title="Filter Active Journey"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Att. uP! </span>
+    <button class="hdr-funnel " data-col="attendedUp" title="Filter Att. uP!"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Consumed </span>
+    <button class="hdr-funnel " data-col="consumed" title="Filter Consumed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Unconsumed </span>
+    <button class="hdr-funnel " data-col="unconsumed" title="Filter Unconsumed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Activity </span>
+    <button class="hdr-funnel " data-col="activity" title="Filter Activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th><th><div class="th-wrap"><span class="th-label">Stage </span>
+    <button class="hdr-funnel " data-col="currentStage" title="Filter Stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+  </div></th></tr></thead>
+            <tbody id="resBody"></tbody>
+          </table>
+        </div>
+        <div class="tbl-foot" id="tblFoot"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- header-filter popover (positioned via JS) -->
+<div id="hdrPop" class="hdr-pop" style="display:none;"></div>
+
+<!-- ══ ADD STAGE COUNT MODAL ════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="stageModal" style="display:none;">
+  <div class="modal-box sc-modal-box">
+    <div class="sc-modal-head">
+      <div class="sc-modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      </div>
+      <div>
+        <div class="sc-modal-title">Add Stage Count</div>
+        <div class="sc-modal-sub">Create New Configuration</div>
+      </div>
+      <button class="sc-modal-x">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="sc-modal-body">
+      <div>
+        <label class="field-label">Stage Count Name <span class="req">*</span></label>
+        <input type="text" class="text-in" id="scNameInput" placeholder="e.g. Orientation in progress">
+      </div>
+      <div>
+        <label class="field-label">Select stages from selected queues <span class="req">*</span>
+          <span class="sel-pill" id="scSelPill" style="display:none;margin-left:8px;text-transform:none;letter-spacing:0;">0 selected</span>
+        </label>
+        <div class="stage-picker" id="stagePicker"></div>
+      </div>
+    </div>
+    <div class="sc-modal-foot">
+      <button class="btn btn-outline">Cancel</button>
+      <button class="btn-blue">Save Stage Count</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SAVE LIST MODAL ══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="freezeSetModal" style="display:none;">
+  <div class="modal-box sc-modal-box" style="width:420px;">
+    <div class="sc-modal-head">
+      <div class="sc-modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+      <div>
+        <div class="sc-modal-title">Freeze All Counts</div>
+        <div class="sc-modal-sub">Save a titled snapshot of every count</div>
+      </div>
+      <button class="sc-modal-x">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="sc-modal-body">
+      <div>
+        <label class="field-label">Snapshot Title <span class="req">*</span></label>
+        <input type="text" class="text-in" id="freezeSetTitle" placeholder="e.g. Week 23 · Mon review">
+      </div>
+      <div class="save-summary" id="freezeSetSummary"></div>
+    </div>
+    <div class="sc-modal-foot">
+      <button class="btn btn-outline">Cancel</button>
+      <button class="btn-blue">Freeze Snapshot</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SAVE LIST MODAL ══════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="saveListModal" style="display:none;">
+  <div class="modal-box sc-modal-box" style="width:420px;">
+    <div class="sc-modal-head">
+      <div class="sc-modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+      </div>
+      <div>
+        <div class="sc-modal-title">Save Matching List</div>
+        <div class="sc-modal-sub">Keep this filter set for planning</div>
+      </div>
+      <button class="sc-modal-x">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="sc-modal-body">
+      <div>
+        <label class="field-label">List Title <span class="req">*</span></label>
+        <input type="text" class="text-in" id="saveListName" placeholder="e.g. June uP! first-timers">
+      </div>
+      <div class="save-summary" id="saveSummary"></div>
+    </div>
+    <div class="sc-modal-foot">
+      <button class="btn btn-outline">Cancel</button>
+      <button class="btn-blue">Save List</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ IMPORT MIN-PAYMENT MODAL ═════════════════════════════════════════════ -->
+<div class="modal-overlay" id="importModal" style="display:none;">
+  <div class="modal-box sc-modal-box" style="width:460px;">
+    <div class="sc-modal-head">
+      <div class="sc-modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      </div>
+      <div>
+        <div class="sc-modal-title">Import Minimum Payment Data</div>
+        <div class="sc-modal-sub">Upload an Excel or CSV sheet</div>
+      </div>
+      <button class="sc-modal-x">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="sc-modal-body">
+      <div class="save-summary">Expected columns: <b>Participant Name</b> and <b>Minimum Payment Status</b> (values: Clear / Not Clear). <button class="link-btn">Download CSV template</button></div>
+      <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none;">
+      <button class="dropzone">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <span class="dz-title">Choose Excel / CSV file</span>
+        <span class="dz-sub">.xlsx, .xls or .csv</span>
+      </button>
+      <div id="importStatus"></div>
+    </div>
+    <div class="sc-modal-foot">
+      <button class="btn btn-outline">Cancel</button>
+      <button class="btn-blue" id="importApplyBtn" disabled="">Apply Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAG IMPORT MODAL ═════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="tagModal" style="display:none;">
+  <div class="modal-box sc-modal-box" style="width:460px;">
+    <div class="sc-modal-head">
+      <div class="sc-modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+      </div>
+      <div>
+        <div class="sc-modal-title">Import List &amp; Add Tag</div>
+        <div class="sc-modal-sub">Label an imported set of participants</div>
+      </div>
+      <button class="sc-modal-x">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="sc-modal-body">
+      <div>
+        <label class="field-label">Tag Name <span class="req">*</span></label>
+        <input type="text" class="text-in" id="tagNameInput" placeholder="e.g. VIP, Priority follow-up, Bus A">
+      </div>
+      <div id="tagResultsNote" class="save-summary" style="display:none;"></div>
+      <div id="tagFileSection">
+        <label class="field-label">Participant List <span class="req">*</span></label>
+        <input type="file" id="tagFile" accept=".xlsx,.xls,.csv" style="display:none;">
+        <button class="dropzone">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span class="dz-title">Choose Excel / CSV file</span>
+          <span class="dz-sub">One participant name per row</span>
+        </button>
+        <div id="tagStatus"></div>
+      </div>
+    </div>
+    <div class="sc-modal-foot">
+      <button class="btn btn-outline">Cancel</button>
+      <button class="btn-blue" id="tagApplyBtn" disabled="">Create Tag</button>
+    </div>
+  </div>
+</div>

@@ -137,10 +137,13 @@
       </p>
       <div class="rec-prompt-card__hint">
         <mat-icon>info</mat-icon>
-        Use the Zoom toolbar at the bottom of your screen to
-        {{ recordingPromptKind === 'paused' ? 'resume' : 'start' }} recording.
+        Use the <strong>Record</strong> control at the <strong>top-left</strong> of the
+        Zoom window to {{ recordingPromptKind === 'paused' ? 'resume' : 'start' }} recording.
       </div>
-      <button class="rec-prompt-card__btn" (click)="dismissRecordingPrompt()">Dismiss for 30s</button>
+      <div class="rec-prompt-card__actions">
+        <button class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="confirmRecordingOn()">Recording is on — stop reminding me</button>
+        <button class="rec-prompt-card__btn" (click)="dismissRecordingPrompt()">Dismiss for 30s</button>
+      </div>
     </div>
   </div>
 

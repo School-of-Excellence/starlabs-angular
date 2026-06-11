@@ -352,6 +352,13 @@ position: fixed;
   line-height: 16px;
   color: #b45309;
 }
+.rec-prompt-card__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+}
 .rec-prompt-card__btn {
   display: inline-flex;
   align-items: center;
@@ -368,3 +375,7 @@ position: fixed;
   transition: background 0.15s ease;
 }
 .rec-prompt-card__btn:hover { background: #1e293b; }
+.rec-prompt-card__btn--primary {
+  background: #047857;
+}
+.rec-prompt-card__btn--primary:hover { background: #065f46; }

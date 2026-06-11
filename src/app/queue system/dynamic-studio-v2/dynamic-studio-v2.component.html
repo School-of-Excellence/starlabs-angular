@@ -183,7 +183,15 @@
                         class="wait-token__chip"
                         [title]="(inv.studioName ? 'by ' + inv.studioName : 'Already being invited by another studio') + (inv.specialistNames?.length ? ' · ' + inv.specialistNames.join(', ') : '')">
                     <mat-icon class="ic">record_voice_over</mat-icon>
-                    Already being invited
+                    <span class="wait-token__chip-text">
+                      Already being invited
+                      <small class="wait-token__chip-by" *ngIf="inv.studioName || inv.specialistNames?.length">
+                        <ng-container *ngIf="inv.specialistNames?.length; else byStudioOnly">
+                          by {{ inv.specialistNames.join(', ') }}<ng-container *ngIf="inv.studioName"> ({{ inv.studioName }})</ng-container>
+                        </ng-container>
+                        <ng-template #byStudioOnly>by {{ inv.studioName }}</ng-template>
+                      </small>
+                    </span>
                   </span>
                   <button *ngIf="!tokenInvitedByOther[token.docid]"
                           type="button"
@@ -602,26 +610,9 @@
           <!-- ========================= STEP 5: Prescribe ATC ========================= -->
           <ng-container *ngIf="activeStepId === 'prescribe-atc'">
             <div class="step-compact">
-            <!-- Highlight: ATC already submitted for THIS queue/activity -->
-            <div class="card" *ngIf="atcInThisQueueCount > 0">
-              <div class="card-head tint-green">
-                <div class="card-head-title">
-                  <mat-icon class="ic">task_alt</mat-icon>
-                  ATC has been submitted for this activity
-                  <span class="count-badge count-green">{{ atcInThisQueueCount }}</span>
-                </div>
-              </div>
-              <div class="card-pad">
-                <ng-container *ngFor="let atc of currentQueueValidatedATCList; let i = index">
-                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'validated', editColl: 'alpha' }"></ng-container>
-                </ng-container>
-                <ng-container *ngFor="let atc of currentQueueUnvalidatedATCList; let i = index">
-                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: currentQueueValidatedATCList.length + i, kind: 'pending', editColl: 'validation' }"></ng-container>
-                </ng-container>
-              </div>
-            </div>
-
-            <!-- Prescribe new ATC -->
+            <!-- Prescribe new ATC — kept FIRST so the button is always in the
+                 same place regardless of how many ATCs are already listed
+                 below (Scope Enhancement / Diagnostics / Consultation). -->
             <div class="card"
               *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc') || ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')">
               <div class="card-head tint-slate">
@@ -648,6 +639,25 @@
                     Prescribe ATC — Requires Validation
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <!-- Highlight: ATC already submitted for THIS queue/activity -->
+            <div class="card" *ngIf="atcInThisQueueCount > 0">
+              <div class="card-head tint-green">
+                <div class="card-head-title">
+                  <mat-icon class="ic">task_alt</mat-icon>
+                  ATC has been submitted for this activity
+                  <span class="count-badge count-green">{{ atcInThisQueueCount }}</span>
+                </div>
+              </div>
+              <div class="card-pad">
+                <ng-container *ngFor="let atc of currentQueueValidatedATCList; let i = index">
+                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'validated', editColl: 'alpha' }"></ng-container>
+                </ng-container>
+                <ng-container *ngFor="let atc of currentQueueUnvalidatedATCList; let i = index">
+                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: currentQueueValidatedATCList.length + i, kind: 'pending', editColl: 'validation' }"></ng-container>
+                </ng-container>
               </div>
             </div>
 
@@ -731,10 +741,18 @@
                 </div>
               </div>
               <div class="card-pad">
-                <button type="button" class="btn btn-ghost btn-lg" (click)="movetoNextMonthReview()">
-                  <mat-icon class="ic">arrow_forward</mat-icon>
-                  Mark participant for next month review
+                <button type="button" class="btn btn-lg"
+                        [class.btn-ghost]="!nextMonthReviewMarked"
+                        [class.btn-green]="nextMonthReviewMarked"
+                        [disabled]="nextMonthReviewSaving || nextMonthReviewMarked"
+                        (click)="movetoNextMonthReview()">
+                  <mat-icon class="ic">{{ nextMonthReviewMarked ? 'check_circle' : 'arrow_forward' }}</mat-icon>
+                  {{ nextMonthReviewSaving ? 'Marking…' : nextMonthReviewMarked ? 'Marked for next month review' : 'Mark participant for next month review' }}
                 </button>
+                <div class="ael-validated-note" *ngIf="nextMonthReviewMarked" style="margin-top:12px;">
+                  <mat-icon class="ic">check</mat-icon>
+                  This participant has been added to next month&rsquo;s review list.
+                </div>
               </div>
             </div>
 

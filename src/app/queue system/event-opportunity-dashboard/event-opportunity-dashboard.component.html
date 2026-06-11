@@ -1,6 +1,22 @@
 <div class="main-container" [class.panel-open]="showDetailPanel || showCustomStagePanel">
   <!-- Main Content Area -->
   <div class="content-area">
+
+    <!-- Top-level tabs -->
+    <div class="eod-tabs">
+      <button class="eod-tab" [class.active]="activeTab === 'arena'" (click)="activeTab = 'arena'">
+        Arena Opportunities
+      </button>
+      <button class="eod-tab" [class.active]="activeTab === 'planning'" (click)="activeTab = 'planning'">
+        Event Planning
+      </button>
+    </div>
+
+    <!-- Tab: Event Planning (ported HTML/CSS UI) -->
+    <app-event-planning *ngIf="activeTab === 'planning'"></app-event-planning>
+
+    <!-- Tab: Arena Opportunities (existing dashboard) -->
+    <ng-container *ngIf="activeTab === 'arena'">
     <span class="d-flex flex-row justify-content-center mt-2 mb-2">
       <h4 class="text-center" (click)="showQueueSelect = !showQueueSelect">
         Arena Opportunities
@@ -293,6 +309,7 @@
         </ng-container>
       </div>
     </div>
+    </ng-container>
   </div>
 
   <!-- Side Panel for Stage Details -->

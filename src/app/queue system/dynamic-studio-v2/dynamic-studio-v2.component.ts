@@ -114,6 +114,10 @@ export class DynamicStudioV2Component {
   loveLetterList: any[] = []
   loveLetterLoading: boolean = false
   loveLetterLoadedFor: string | null = null
+  // Next-month-review action state (drives the inline confirmation in the
+  // Mark-as-Completed step so the specialist sees the action succeeded).
+  nextMonthReviewMarked: boolean = false
+  nextMonthReviewSaving: boolean = false
   // Evolution Wishlist
   evolutionWishlist: any[] = []
   evolutionWishlistLoaded: string = ''
@@ -211,6 +215,11 @@ export class DynamicStudioV2Component {
     const sig = la['docid'] + '|' + la['stagename']
     if (sig === this.widgetFetchSignature) return  // already loaded this combination
     this.widgetFetchSignature = sig
+
+    // New assignment/stage → reset per-session action state so confirmations
+    // from a previous participant don't carry over.
+    this.nextMonthReviewMarked = false
+    this.nextMonthReviewSaving = false
 
     const studioWidget: string[] =
       this.ongoingQueue?.['stageproperty']?.[la['stagename']]?.studiowidgets ?? []
@@ -2589,7 +2598,7 @@ export class DynamicStudioV2Component {
     console.log(additionalActivities)
     var inviteParticipant = this.dialog.open(AssignQueueStudioComponent, {
       data: {
-        title: reviewSpecialist ? "Assign Other Specialist if attended in this Studio" : "Update Additional Specialist and Activity in the Studio",
+        title: reviewSpecialist ? "Confirm Specialist(s) who attended this Studio" : "Update Additional Specialist and Activity in the Studio",
         studiolist: reviewSpecialist ? [this.selectedStudio] : null,
         mapprofile: this.mapProfile,
         mapactivity: this.mapActivity,
@@ -3115,13 +3124,26 @@ export class DynamicStudioV2Component {
     }
     this.loveLetterLoading = true
     try {
+      // NOTE: we deliberately do NOT add `orderBy('created')` to the Firestore
+      // query. Combining `where('profileid')` with `orderBy('created')` requires
+      // a composite index — when that index is missing the whole query throws and
+      // the list ends up empty ("Love Letters not displayed"). `orderBy` would
+      // also silently drop any love-letter doc that lacks a `created` field.
+      // Fetch by profile only, then sort newest-first on the client.
       const q = query(
         collection(this.firestore, "love letter"),
-        where("profileid", "==", profileid),
-        orderBy("created", "desc")
+        where("profileid", "==", profileid)
       )
       const snap = await getDocs(q)
-      this.loveLetterList = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const toMillis = (v: any): number => {
+        if (!v) return 0
+        if (typeof v?.toDate === 'function') return v.toDate().getTime()
+        const t = new Date(v).getTime()
+        return isNaN(t) ? 0 : t
+      }
+      this.loveLetterList = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => toMillis(b['created']) - toMillis(a['created']))
       this.loveLetterLoadedFor = profileid
     } catch (error) {
       console.error('Error fetching love letters:', error)
@@ -3572,12 +3594,20 @@ export class DynamicStudioV2Component {
   async movetoNextMonthReview(){
     console.log(this.liveAssignment);
     var token = this.liveAssignment["token"]
-    
+
     if(window.confirm('Are you sure want to move participants to the next month review?')){
+      this.nextMonthReviewSaving = true
       try {
         await setDoc(doc(this.firestore, "review participants", token['docid']), token);
+        this.nextMonthReviewMarked = true
+        this.snackBar.open('Participant marked for next month review.', 'OK',
+          { duration: 4000, horizontalPosition: 'center', verticalPosition: 'top' })
       } catch (error) {
         console.error('Error moving to next month review:', error);
+        this.snackBar.open('Could not mark for next month review. Please try again.', 'Dismiss',
+          { duration: 5000, horizontalPosition: 'center', verticalPosition: 'top' })
+      } finally {
+        this.nextMonthReviewSaving = false
       }
     }
   }

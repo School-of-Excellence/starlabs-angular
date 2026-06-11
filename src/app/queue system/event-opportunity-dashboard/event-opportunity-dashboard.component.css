@@ -1902,3 +1902,30 @@
 .compact-list-body::-webkit-scrollbar-thumb:hover {
   background: #bbb;
 }
+/* ── Top-level tabs (Arena Opportunities / Event Planning) ── */
+.eod-tabs {
+  display: flex;
+  gap: 4px;
+  /* pull full-bleed to cancel .content-area padding so the bar sits flush under the app header */
+  margin: -20px -20px 0;
+  padding: 4px 12px 0;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+.eod-tab {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b7280;
+  padding: 7px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.eod-tab:hover { color: #0d0f12; }
+.eod-tab.active {
+  color: #8e1ca8;
+  border-bottom-color: #8e1ca8;
+}

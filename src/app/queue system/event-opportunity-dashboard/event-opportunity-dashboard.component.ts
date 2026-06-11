@@ -19,6 +19,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
+import { EventPlanningComponent } from './event-planning/event-planning.component';
 
 @Component({
   selector: 'app-event-opportunity-dashboard',
@@ -37,12 +38,16 @@ import { MatChipsModule } from '@angular/material/chips';
     MatButtonModule,
     DragDropModule,
     MatMenuModule,
-    MatChipsModule
+    MatChipsModule,
+    EventPlanningComponent
   ],
   templateUrl: './event-opportunity-dashboard.component.html',
   styleUrl: './event-opportunity-dashboard.component.css'
 })
 export class EventOpportunityDashboardComponent {
+
+  // Top-level tab: existing Arena dashboard vs. ported Event Planning UI
+  activeTab: 'arena' | 'planning' = 'arena';
 
   showDetailPanel: boolean = false;
   selectedPanelQueueId: string = '';

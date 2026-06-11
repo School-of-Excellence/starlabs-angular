@@ -104,6 +104,12 @@ export class ZoomClientviewComponent {
   // Big-center recording overlay (host only). Replaces the older snackbar.
   recordingPromptVisible: boolean = false;
   recordingPromptKind: 'paused' | 'stopped' = 'stopped';
+  // Set when the host explicitly confirms recording is running. Suppresses the
+  // prompt for good — needed because some Zoom SDK builds never fire
+  // `onRecordingStatusChange`, so we can't detect the started state ourselves
+  // and would otherwise nag forever even while recording IS on. A genuine later
+  // 'stopped'/'paused' event resets this so a real stop still re-prompts.
+  private recordingConfirmedByHost: boolean = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -437,6 +443,11 @@ export class ZoomClientviewComponent {
           if (newStatus === 'started') {
             this.ngZone.run(() => { this.recordingPromptVisible = false; });
           }
+          // A genuine later stop/pause means the host's earlier "recording is
+          // on" confirmation no longer holds — allow the prompt to re-appear.
+          if (newStatus === 'stopped' || newStatus === 'paused') {
+            this.recordingConfirmedByHost = false;
+          }
         }
         this.evaluateRecordingPrompt();
       };
@@ -484,6 +495,15 @@ export class ZoomClientviewComponent {
   }
 
   private evaluateRecordingPrompt() {
+    // Host explicitly confirmed recording is running → never nag. This is the
+    // escape hatch for SDK builds that don't emit recording-status events.
+    if (this.recordingConfirmedByHost) {
+      if (this.recordingPromptVisible) {
+        this.ngZone.run(() => { this.recordingPromptVisible = false; });
+      }
+      return;
+    }
+
     // Recording is on → close any open prompt and exit. This handles the
     // "paused → started" or "stopped → started" transition mid-call.
     if (this.recordingStatus === 'started') {
@@ -533,6 +553,17 @@ export class ZoomClientviewComponent {
   dismissRecordingPrompt() {
     this.recordingPromptVisible = false;
     this.recordingPromptDismissedAt = Date.now();
+  }
+
+  // Called from the overlay's "Recording is on — stop reminding me" button.
+  // The host asserts recording is running; suppress the prompt until a real
+  // stop/pause event proves otherwise. Fixes the loop where the SDK never
+  // reports the 'started' state and the prompt nags even while recording.
+  confirmRecordingOn() {
+    this.recordingConfirmedByHost = true;
+    this.recordingStatus = 'started';
+    this.recordingPromptVisible = false;
+    this.recordingPromptDismissedAt = 0;
   }
 
   private stopRecordingListeners() {
