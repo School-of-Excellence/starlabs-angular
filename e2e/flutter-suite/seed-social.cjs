@@ -120,6 +120,16 @@ async function seedBucket() {
 
   console.log(`\n[seed-social] run=${RUN} user=${PID} (${EMAIL}) uid=${UID} → extend cohort with social/BIG/shadow/reports/profile fixtures`);
 
+  // Reset the APP-WRITTEN, untagged docs a PRIOR run created so each --seed restores the anti-circular
+  // pre-state (publish/report/ticket targets must NOT exist before the test drives them). Mirrors
+  // teardownBucket (1)-(3): published post, blacklistrows(reportedby me), clientissue(profileid me).
+  await db.collection('Achievements').doc('posts').collection('postcollection').doc(ID.draft).delete().catch(() => {});
+  const _blPrev = await db.collection('Achievements').doc('blacklist').collection('blacklistrows')
+    .where('reportedby', '==', db.collection('user_data').doc(UID)).get().catch(() => ({ docs: [] }));
+  for (const d of _blPrev.docs) { await d.ref.delete().catch(() => {}); }
+  const _ciPrev = await db.collection('clientissue').where('profileid', '==', PID).get().catch(() => ({ docs: [] }));
+  for (const d of _ciPrev.docs) { const _m = await d.ref.collection('messages').get().catch(() => ({ docs: [] })); for (const mm of _m.docs) { await mm.ref.delete().catch(() => {}); } await d.ref.delete().catch(() => {}); }
+
   const bw = db.bulkWriter();
   bw.onWriteError((err) => err.failedAttempts < 5);
   let n = 0;
