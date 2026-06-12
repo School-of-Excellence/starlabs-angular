@@ -126,7 +126,9 @@ async function seedCohort() {
   cat.set(ref('delivery events', CAT.deliveryEvent), { docid: CAT.deliveryEvent, eventname: `Cohort Event Type ${RUN}`, atcmodel: null, ...tag });
   for (let k = 0; k < EVENT_POOL; k++) {
     cat.set(ref('event collection', CAT.event(k)),
-      { id: CAT.event(k), eventname: `Cohort Event ${k} ${RUN}`, eventtyperef: ref('delivery events', CAT.deliveryEvent), eventdate: past(60 - k), arenaeventid: `${RUN}_arena_${k}`, atcmodel: null, ...tag });
+      // delete:false + atcmodel:'' (not null): the calendar screens (Mastercalendar:1203 getATCModelColor,
+      // MastercalendarClone:169 if(element['delete'])) query events GLOBALLY and crash on null bool/String.
+      { id: CAT.event(k), eventname: `Cohort Event ${k} ${RUN}`, eventtyperef: ref('delivery events', CAT.deliveryEvent), eventdate: past(60 - k), arenaeventid: `${RUN}_arena_${k}`, delete: false, atcmodel: '', ...tag });
     cat.set(ref('arena events', `${RUN}_ae_${k}`), { id: `${RUN}_ae_${k}`, eventref: ref('event collection', CAT.event(k)), eventname: `Cohort Arena ${k} ${RUN}`, ...tag });
   }
   // a host EIS profile (appointment hostRole / availability owner)
