@@ -450,14 +450,11 @@ export class ChannelCommunicationComponent implements OnInit, OnDestroy {
     return this.parameterConfig.filter(p => this.isParamConfigured(p)).length;
   }
 
-<<<<<<< HEAD
-=======
   getFilteredMetadataFields(search: string): string[] {
     if (!search) return this.metadataFields;
     return this.metadataFields.filter(f => f.toLowerCase().includes(search.toLowerCase()));
   }
 
->>>>>>> 589bbde41ae9bac6800902ef2277ab03f7bed84c
   getConfiguredPercent(): number {
     if (this.parameterConfig.length === 0) return 0;
     return (this.getConfiguredCount() / this.parameterConfig.length) * 100;

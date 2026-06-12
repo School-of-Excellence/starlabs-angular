@@ -407,12 +407,8 @@ export class ChannelTemplatesComponent implements OnInit, AfterViewInit, OnDestr
     this.templateForm.get('templatename')?.setValidators([
       Validators.required,
       Validators.pattern(/^[a-zA-Z0-9\s._&!()-]+$/),
-<<<<<<< HEAD
-      (control) => control.value === this.originalTemplateName ? { nameUnchanged: true } : null
-=======
       (control) => (t.status === 'approved' && control.value === this.originalTemplateName)
         ? { nameUnchanged: true } : null
->>>>>>> 589bbde41ae9bac6800902ef2277ab03f7bed84c
     ]);
     this.templateForm.get('templatename')?.setAsyncValidators(this.templateNameAsyncValidator.bind(this));
     this.templateForm.get('templatename')?.updateValueAndValidity();
@@ -530,27 +526,6 @@ export class ChannelTemplatesComponent implements OnInit, AfterViewInit, OnDestr
       };
 
       if (this.isEditMode && this.currentEditingTemplate) {
-<<<<<<< HEAD
-        await updateDoc(doc(this.firestore, 'channeltemplates', this.currentEditingTemplate.docid), {
-          templatename:  f.templatename,
-          templateid:    tplId,
-          category:      f.category,
-          headertype:    f.headertype,
-          headervalue:   f.headervalue || '',
-          htmlbody:      this.htmlBodyContent,
-          textbody:      textbody,
-          footer:        f.footer || '',
-          status:        'pending',
-          updatedby:     this.authguard.uid,
-          updateddate:   serverTimestamp(),
-          templatemodel: variables,
-          timeline:      arrayUnion(tlEntry),
-          buttons:       this.buttons.value,
-          links:         this.extractedLinks,
-          files:         this.templateFiles,
-        });
-        this.showSnackBar('Template updated successfully');
-=======
         if (this.currentEditingTemplate.status === 'approved') {
           // Approved — create new doc, original untouched
           const newRef = doc(collection(this.firestore, 'channeltemplates'));
@@ -599,7 +574,6 @@ export class ChannelTemplatesComponent implements OnInit, AfterViewInit, OnDestr
           });
           this.showSnackBar('Template updated successfully');
         }
->>>>>>> 589bbde41ae9bac6800902ef2277ab03f7bed84c
       } else {
         const newRef = doc(collection(this.firestore, 'channeltemplates'));
         await setDoc(newRef, {

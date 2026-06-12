@@ -218,10 +218,6 @@
             <mat-form-field appearance="outline" class="ow-full">
               <mat-label>Participant metadata field</mat-label>
               <mat-select [(ngModel)]="param.metadataField">
-<<<<<<< HEAD
-                <mat-option *ngFor="let f of metadataFields" [value]="f">{{ f }}</mat-option>
-              </mat-select>
-=======
               <mat-option>   
                 <ngx-mat-select-search
                   [(ngModel)]="param['metadataSearch']"
@@ -237,7 +233,6 @@
                 {{ f }}
               </mat-option>
             </mat-select>
->>>>>>> 589bbde41ae9bac6800902ef2277ab03f7bed84c
               <mat-icon matSuffix>person</mat-icon>
             </mat-form-field>
           </div>
@@ -339,8 +334,6 @@
             </div>
             <div class="ow-phone-body">
               <div class="ow-bubble">
-<<<<<<< HEAD
-=======
                 <!-- Video header -->
                 <div class="ow-bubble-header-video" *ngIf="selectedTemplate?.headertype === 'video' && selectedTemplate?.headervalue">
                   <video [src]="selectedTemplate.headervalue"
@@ -363,7 +356,6 @@
                   style="padding:10px 12px 0;font-weight:bold;font-size:14px;">
                   {{ selectedTemplate.headervalue }}
                 </div>
->>>>>>> 589bbde41ae9bac6800902ef2277ab03f7bed84c
                 <div class="ow-bubble-body" [innerHTML]="previewHtml"></div>
                 <div class="ow-bubble-footer" *ngIf="selectedTemplate?.footer">
                   {{ selectedTemplate.footer }}
