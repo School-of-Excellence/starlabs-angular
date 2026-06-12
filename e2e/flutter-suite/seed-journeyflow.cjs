@@ -57,7 +57,10 @@ async function seedBucket() {
   W(ref('journeyonboardingdetail', ID.jod), {
     docid: ID.jod, journeyref: ref('journey', J), title: `Welcome to your CTD journey`,
     description: 'Your guided onboarding.', queuedescripition: { atcmodel: 'Reference copy (config only).' },
-    overviewvideo: {}, participantproducts: [], ...tag,
+    // overviewvideo null (not {}): JourneyOnboardingDetail._loadData (:88) does overviewvideo!=null ? .id —
+    // a Map passes the guard then throws "Map has no getter id". This jod shares journeyref jrny_J_2 with the
+    // auth bucket's user, so its query returns THIS doc too; a Map here crashes the auth F12 render.
+    overviewvideo: null, participantproducts: [], ...tag,
   });
   W(ref('atc model', ID.atcModel), { docid: ID.atcModel, atcmodel: `CTD ${RUN}`, model: 'CTD reference model', levels: [], ...tag });
 
