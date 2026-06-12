@@ -164,7 +164,9 @@ async function seedBucket() {
     docid: B.ael, aelid: B.ael, profileid: P, atcmodel: null, flag: 'validated', status: 'ongoing',
     evolutiontype: 'uP!', evolutionyearsaved: 0, mywishlist: [], participantresponse: null,
     crossovermetric: crossoverNull, productref: ref('products', PA), participantproductid: PPA,
-    createddate: past(40), ...tag,
+    // AELVersion.build (aelVersion.dart:302) renders "Updated on ${participantAEL["created"].toDate()}"
+    // UNGUARDED — it reads `created`, NOT `createddate`; without it the build throws .toDate()-on-null.
+    created: past(40), createddate: past(40), ...tag,
   }, { merge: true });
 
   // ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -201,7 +203,11 @@ async function seedBucket() {
     ...trailer, quizurl: 'https://example.com/legacy-quiz', latestupdates: [],
     'before&after': [ref('content_urls', B.contentUrl)], ...tag,
   }, { merge: true });
-  await ref('static meta data', FIXED.smBigImpact).set({ ...trailer, learnmore: 'https://example.com/big-impact', videoquestion: B.arenaVideoAsk, humansofexcellence: [ref('community post', B.communityPost)], ...tag }, { merge: true });
+  // ImpactScreen.initState (impact.dart:70) does impactVideo["videoquestion"]?.id — `?.` guards null but
+  // NOT a String, so a docid-string throws "String has no getter id"; it must be a DocumentReference. And
+  // impact.dart:68/74 maps videoask→.id then queries `community post where docid whereIn postIds`, which
+  // throws on an EMPTY array — so videoask must be a non-empty list of refs whose .id is a community-post docid.
+  await ref('static meta data', FIXED.smBigImpact).set({ ...trailer, learnmore: 'https://example.com/big-impact', videoquestion: ref('arenavideoask', B.arenaVideoAsk), videoask: [ref('community post', B.communityPost)], humansofexcellence: [ref('community post', B.communityPost)], ...tag }, { merge: true });
   await ref('static meta data', FIXED.smBigProgram).set({ ...trailer, ...tag }, { merge: true });
 
   // ──────────────────────────────────────────────────────────────────────────────────────────────

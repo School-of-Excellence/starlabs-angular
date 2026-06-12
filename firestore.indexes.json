@@ -1176,6 +1176,24 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "arenaspace",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "participantslist",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "delete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createddate",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
