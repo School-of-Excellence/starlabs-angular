@@ -190,6 +190,13 @@ async function seedBucket() {
     docid: B.pjsDeliverable, profileid: P, participantjourneyid: B.pjsDoc, type: 'queue', status: 'ongoing',
     fileref: [], participantproductid: PPA, ...tag,
   }, { merge: true });
+  // ParticipantDeliverySequence (F16) renders product["subscriptionstart"/"end"].toDate() per
+  // participantsproduct (participantDeliverySequence.dart:270) UNGUARDED — the cohort's ppA/ppB carry no
+  // subscription dates → null.toDate() crash. Merge them onto THIS user's two products (journey-bucket-scoped
+  // so the cohort baseline is untouched; only the journey bucket drives DeliverySequence).
+  const PPB = `${RUN}_pp_${IDX}_b`;
+  await ref('participantsproduct', PPA).set({ subscriptionstart: past(90), subscriptionend: future(90) }, { merge: true });
+  await ref('participantsproduct', PPB).set({ subscriptionstart: past(90), subscriptionend: future(90) }, { merge: true });
 
   // ──────────────────────────────────────────────────────────────────────────────────────────────
   // 4) STATIC META DATA — wishlist (family + self trailer), evolve (video), Launch Your Legacy,
@@ -238,19 +245,27 @@ async function seedBucket() {
   //    Big Interview Summary/{profileid}, queue generation (count read — cohort already seeds jrny_QG;
   //    we add one extra so the count is non-zero regardless). + A&H Space sources.
   // ──────────────────────────────────────────────────────────────────────────────────────────────
-  await ref('community post', B.communityPost).set({ docid: B.communityPost, profileid: P, title: `Human of Excellence ${RUN}`, ...trailer, ...tag }, { merge: true });
+  // ImpactScreen "Humans of Excellence" ListView (impact.dart:932) reads doc["videos"][0]["thumbnail"]
+  // UNGUARDED → a community post without a videos[] list throws Null['[]']. Seed a non-empty videos[].
+  await ref('community post', B.communityPost).set({ docid: B.communityPost, profileid: P, title: `Human of Excellence ${RUN}`, videos: [{ thumbnail: 'https://example.com/e2e-thumb.png', responsepublitio: { id: 'e2e-journey-trailer' }, thumbnailhls: { responsepublitio: { id: 'e2e-journey-trailer' } } }], ...trailer, ...tag }, { merge: true });
   await ref('arenavideoask', B.arenaVideoAsk).set({ docid: B.arenaVideoAsk, title: `BiG Impact Video Ask ${RUN}`, ...tag }, { merge: true });
   await ref('Big Interview Summary', P).set({ docid: P, profileid: P, summary: `BiG interview summary ${RUN}.`, ...tag }, { merge: true });
 
   // A&H Space — arenaspace MUST have delete==false & participantslist arrayContains the profileid.
+  // AHSpace.build looks up spaceName/spaceType/eventCollection maps (keyed by docid) and reads sub-fields
+  // the seed didn't write: spaceName[..]["spacename"](:373)/["shortname"](:538), spaceType[..]["typename"](:468),
+  // eventCollection[..]["name"](:438) — and it keys those lookups off arenaspace["spaceid"]/["pivottype"]/
+  // ["queue"] which were ALSO missing (→ map[null] → null["x"] NoSuchMethodError). Seed all of them.
   await ref('event collection', B.ahEvent).set({
-    id: B.ahEvent, docid: B.ahEvent, eventname: `A&H Touchpoint Event ${RUN}`, atcmodel: null,
+    id: B.ahEvent, docid: B.ahEvent, eventname: `A&H Touchpoint Event ${RUN}`, name: `A&H Touchpoint Event ${RUN}`, atcmodel: null,
     start_date: future(7), eventdate: future(7), ...tag,
   }, { merge: true });
-  await ref('A&H_Space_Name', B.ahSpaceName).set({ docid: B.ahSpaceName, name: `Excellence Space ${RUN}`, ...tag }, { merge: true });
-  await ref('A&H_Space_Type', B.ahSpaceType).set({ docid: B.ahSpaceType, type: `Coaching ${RUN}`, ...tag }, { merge: true });
+  await ref('A&H_Space_Name', B.ahSpaceName).set({ docid: B.ahSpaceName, name: `Excellence Space ${RUN}`, spacename: `Excellence Space ${RUN}`, shortname: 'EX', ...tag }, { merge: true });
+  await ref('A&H_Space_Type', B.ahSpaceType).set({ docid: B.ahSpaceType, type: `Coaching ${RUN}`, typename: `Coaching ${RUN}`, ...tag }, { merge: true });
   await ref('arenaspace', B.ahSpace).set({
     docid: B.ahSpace, delete: false, participantslist: [P],
+    // spaceid/pivottype/queue are the docid keys AHSpace indexes the name/type/event maps by.
+    spaceid: B.ahSpaceName, pivottype: B.ahSpaceType, queue: B.ahEvent,
     spacename: ref('A&H_Space_Name', B.ahSpaceName), spacetype: ref('A&H_Space_Type', B.ahSpaceType),
     eventref: ref('event collection', B.ahEvent), createddate: past(15),
     summary: `Your A&H touchpoint summary ${RUN}.`, disclaimer: 'Auto-generated summary.', ...tag,
