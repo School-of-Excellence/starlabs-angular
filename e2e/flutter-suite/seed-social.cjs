@@ -175,9 +175,12 @@ async function seedBucket() {
   });
   // demovideos/bigdashboard: BIGVideo intro text + (empty) video URL. videoholder '' → the controller is
   // built but never reaches a real network video in CI (we assert the intro text + the screen render).
+  // NO ...tag (and merge:false to REPLACE any prior _testdata-polluted doc): BIGVideo.initState does
+  // content.data()!.cast<dynamic,String>() then print()s the map (BIGVideo.dart:43-45) — a non-String value
+  // (the tag's _testdata:true bool) throws "bool is not String in type cast". Strings only (+ testrunid string).
   W(ref('demovideos', 'bigdashboard'), {
-    docid: 'bigdashboard', textholder: `E2E B!G intro ${RUN}`, videoholder: '', ...tag,
-  }, { merge: true });
+    docid: 'bigdashboard', textholder: `E2E B!G intro ${RUN}`, videoholder: '', testrunid: RUN,
+  }, { merge: false });
 
   // ════════════════════════════════════════════════════════════════════════════════════════════
   // SHADOW (§15) — the reference-join + a requestable future appointment + an accepted-badge one.
