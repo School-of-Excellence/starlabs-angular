@@ -170,7 +170,9 @@ async function seedBucket() {
   await ref('event collection', ID.calEvent).set({
     id: ID.calEvent, docid: ID.calEvent, name: `Calendar Online Event ${RUN}`,
     end_date: future(14), start_date: future(12), venue: 'online', image: 'https://example.com/e2e-event.png',
-    atcmodel: null, ...tag,
+    // getATCModelColor(eventData['atcmodel']) (mastercalendar.dart:1203) wants a non-null String — '' takes
+    // the safe default-color else-branch; null throws "Null is not a String" in the upcoming-events card build.
+    atcmodel: '', ...tag,
   }, { merge: true });
 
   //    arena events — read by where enddate>=startDate; needs eventref(→event collection), productref(→products),
@@ -192,7 +194,12 @@ async function seedBucket() {
     ...tag,
   }, { merge: true });
 
-  console.log(`  ✓ role graph (ATR + RTE + eis2) · bookable future slot · ready deliverable`);
+  // Book Appointment.onAppointmentSelect (Book Appointment.dart:171) does customer_eismapping/{PID}.eisroles
+  // [rolesOfAppt] — it expects eisroles to be a MAP keyed by role-path Strings, but seed-journeyflow/seed-auth
+  // wrote it as a LIST → "String is not int of index". Delete this user's doc so priorAssigned.exists==false
+  // and onAppointmentSelect takes the safe Roles-To-EIS fallback (which IS seeded). (Idempotent; ok if absent.)
+  await ref('customer_eismapping', PID).delete().catch(() => {});
+  console.log(`  ✓ role graph (ATR + RTE + eis2) · bookable future slot · ready deliverable · cleared customer_eismapping/${PID}`);
   console.log(`  ✓ future appointment (Upcoming) for ${PID}`);
   console.log(`  ✓ calendar: event collection + arena events + workshopconfiguration + product (all future)`);
   console.log(`[seed-appointments] done. Teardown: node flutter-suite/seed-appointments.cjs --teardown`);

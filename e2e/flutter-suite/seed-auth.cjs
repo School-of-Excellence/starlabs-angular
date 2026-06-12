@@ -112,7 +112,10 @@ async function seedBucket() {
     title: `Welcome to your ${J} journey`,
     description: 'Your guided onboarding for the Excellence Installation.',
     queuedescripition: { atcmodel: 'Reference model copy (config text only — not ATC data).' },
-    overviewvideo: {}, participantproducts: [], ...tag,
+    // overviewvideo MUST be null (not {}): JourneyOnboardingDetail._loadData (journeyOnboardingDetail.dart:88)
+    // does `overviewvideo != null ? overviewvideo.id` — an empty Map passes the !=null guard then throws
+    // "Map has no getter id" (it expects a content_urls DocumentReference). null skips the content-load branch.
+    overviewvideo: null, participantproducts: [], ...tag,
   });
 
   // SAFE reference `atc model` doc (journeyOnboardingDetail.dart:77 reads `atc model` where
