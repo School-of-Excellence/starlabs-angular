@@ -176,6 +176,9 @@ async function seedBucket() {
   await ref('participantJourneySequence', B.pjsDoc).set({
     docid: B.pjsDoc, profileid: P, journeyref: ref('journey', J1), journeystatus: 'ongoing',
     subscriptionstart: past(90), subscriptionend: future(90),
+    // getMyJourney (participantJourneySequence.dart:176) iterates doc['products'] UNGUARDED (.length) and
+    // reads each products[j].productref(.path)/tentativestart — without a products[] list it crashes.
+    products: [{ productref: ref('products', PA), tentativestart: past(80), tentativeend: future(80), productstatus: 'ongoing' }],
     participantproducts: [PPA], productref: [ref('products', PA)], ...tag,
   }, { merge: true });
   await ref('deliverables', B.pjsDeliverable).set({
