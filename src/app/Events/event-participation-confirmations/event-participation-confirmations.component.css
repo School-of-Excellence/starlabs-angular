@@ -1,0 +1,83 @@
+.epc {
+  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", sans-serif;
+  color: #1c1c1e; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+  background: #f2f2f7;
+}
+::ng-deep .epc .mat-mdc-tab-body-content { background: #f2f2f7; }
+::ng-deep .epc .mat-mdc-tab-header { background: #f2f2f7; border-bottom: .5px solid rgba(60,60,67,.12); }
+
+/* Tabs */
+.tab-label { display: inline-flex; align-items: center; gap: 7px; }
+.tab-prod { font-weight: 600; }
+.tab-evt { font-size: 12px; color: rgba(60,60,67,.5); }
+.tab-close { border: none; background: transparent; padding: 0; margin: 0 -2px 0 2px; cursor: pointer;
+  display: inline-flex; align-items: center; opacity: .5; color: inherit; border-radius: 4px; }
+.tab-close:hover { opacity: 1; }
+.tab-close:focus-visible { outline: 2px solid #007aff; }
+.tab-close mat-icon { font-size: 16px; height: 16px; width: 16px; }
+
+/* Overview */
+.ov { max-width: 1180px; margin: 0 auto; padding: 16px 22px 40px; }
+.ov-eyebrow { font-size: 14px; font-weight: 600; color: rgba(60,60,67,.6); letter-spacing: .2px; padding-top: 6px; }
+.ov-title { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin: 3px 0 4px; line-height: 1.05; }
+.ov-sub { font-size: 15px; color: rgba(60,60,67,.6); margin-bottom: 16px; }
+.ov-filters { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ov-search { width: 300px; }
+.ov-showing { font-size: 12.5px; color: rgba(60,60,67,.55); }
+
+/* Material controls -> iOS look */
+:host ::ng-deep .mdc-button { font-family: inherit; letter-spacing: 0; }
+:host ::ng-deep .mat-mdc-outlined-button { border-radius: 10px; height: 40px;
+  --mdc-outlined-button-container-shape: 10px; --mdc-outlined-button-outline-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mat-mdc-text-field-wrapper { background: #fff; }
+:host ::ng-deep .mat-mdc-form-field-flex { align-items: center; }
+:host ::ng-deep .mat-mdc-form-field-infix { min-height: 40px; padding-top: 9px; padding-bottom: 8px; }
+:host ::ng-deep .mdc-notched-outline__leading { border-radius: 10px 0 0 10px; border-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mdc-notched-outline__trailing { border-radius: 0 10px 10px 0; border-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mdc-notched-outline__notch { border-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mat-mdc-paginator { font-family: inherit; background: transparent; }
+:host ::ng-deep .mat-mdc-form-field-icon-suffix .mat-icon { font-size: 18px; width: 18px; height: 18px; color: rgba(60,60,67,.45); }
+:host ::ng-deep .ov-empty .mdc-button { --mdc-text-button-label-text-color: #007aff; }
+
+.ov-error { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #fff; border: .5px solid rgba(215,0,21,.25); border-radius: 14px; padding: 14px 18px;
+  margin-bottom: 12px; color: #d70015; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.ov-error span { display: inline-flex; align-items: center; gap: 8px; }
+.ov-error mat-icon { font-size: 20px; height: 20px; width: 20px; }
+
+.ov-loading { display: flex; align-items: center; gap: 8px; color: rgba(60,60,67,.6); font-size: 14px; padding: 30px 0; }
+.ov-loading .spin { animation: ov-spin 1s linear infinite; }
+@keyframes ov-spin { to { transform: rotate(360deg); } }
+
+/* Table card */
+.ov-wrap { background: #fff; border-radius: 16px; overflow: hidden; border: .5px solid rgba(60,60,67,.08);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.ov-table { width: 100%; border-collapse: collapse; }
+.ov-table thead th { font-size: 11.5px; font-weight: 600; color: rgba(60,60,67,.5); text-align: left;
+  padding: 12px 15px; border-bottom: .5px solid rgba(60,60,67,.12); }
+.ov-table thead th.r, .ov-table td.r { text-align: right; }
+.ov-table td { padding: 12px 15px; font-size: 14px; vertical-align: middle; border-bottom: .5px solid rgba(60,60,67,.07); }
+.ov-table tbody tr:last-child td { border-bottom: none; }
+.ov-row { cursor: pointer; transition: background .1s ease; }
+.ov-row:hover { background: #fafafd; }
+.ov-row:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(0,122,255,.22) inset; }
+.ov-evt { display: flex; align-items: center; gap: 11px; }
+.ov-av { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; color: #fff;
+  font-weight: 700; font-size: 14px; letter-spacing: -.02em; display: flex; align-items: center;
+  justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,.12) inset; }
+.ov-evt-txt { display: flex; flex-direction: column; min-width: 0; }
+.ov-name { font-weight: 600; letter-spacing: -.01em; }
+.ov-prod { font-size: 12.5px; color: rgba(60,60,67,.5); }
+.ov-today { font-size: 11px; font-weight: 600; color: #fff; background: #007aff;
+  padding: 1.5px 8px; border-radius: 999px; margin-left: 6px; }
+.ov-num { font-weight: 600; }
+.ov-pot { color: #48484a; }
+.ov-elig { color: #1f8a3b; font-weight: 700; }
+.ov-ne { color: #c25e00; font-weight: 700; }
+.ov-app { color: #0060df; font-weight: 700; }
+.ov-zero { color: rgba(60,60,67,.6); }
+.ov-mut { color: rgba(60,60,67,.6); }
+.ov-warn mat-icon { font-size: 16px; height: 16px; width: 16px; color: #c25e00; vertical-align: -3px; }
+.ov-c-go { width: 36px; text-align: right; }
+.ov-chev { color: rgba(60,60,67,.45); font-size: 20px; }
+.ov-empty { text-align: center; color: rgba(60,60,67,.5); font-style: italic; padding: 26px; }

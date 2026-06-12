@@ -227,3 +227,30 @@ html:has(.dyn-studio-v2-app) {
   overflow: hidden !important;
   height: 100vh !important;
 }
+
+/* =============================================================
+   Event Participation Confirmations — CDK overlay theming.
+   :host ::ng-deep cannot reach overlays (they mount at <body>),
+   so these rules are scoped ONLY to this feature's overlays via
+   panelClass ('sx-select-panel', 'sx-dialog') and matTooltipClass
+   ('sx-tip'). They do not affect any other screen's overlays.
+   ============================================================= */
+.sx-select-panel,
+.sx-select-panel .mat-mdc-option,
+.sx-dialog .mat-mdc-dialog-surface,
+.sx-tip {
+  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.sx-select-panel.mat-mdc-select-panel { border-radius: 12px; padding: 5px; }
+.sx-select-panel .mat-mdc-option { --mat-option-selected-state-layer-color: rgba(0, 122, 255, .08); }
+.sx-select-panel .mat-mdc-option .mdc-list-item__primary-text { color: #1c1c1e; }
+.sx-select-panel .mat-mdc-option.mdc-list-item--selected .mdc-list-item__primary-text { color: #0060df; }
+
+.sx-dialog .mat-mdc-dialog-surface { border-radius: 16px; }
+.sx-dialog .mdc-button { font-family: inherit; letter-spacing: 0; border-radius: 10px; height: 40px; }
+.sx-dialog .mat-mdc-button { --mdc-text-button-label-text-color: #007aff; }
+.sx-dialog .mat-mdc-unelevated-button {
+  --mdc-filled-button-container-color: #007aff;
+  --mdc-filled-button-label-text-color: #fff;
+}
