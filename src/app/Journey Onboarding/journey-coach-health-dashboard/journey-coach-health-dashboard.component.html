@@ -269,7 +269,7 @@
       </button>
       <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
         matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
-        <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded"
+        <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded()"
           matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
         <span class="mc-num">{{ summary.goingQuiet }}</span>
       </button>
@@ -476,7 +476,7 @@
     <div class="sr-only" aria-live="polite">{{ focusedRowName }}</div>
 
     <div class="jchd-table-wrap ios-table-card">
-      <table mat-table [dataSource]="dataSource" matSort matSortActive="priority" matSortDirection="desc"
+      <table mat-table [dataSource]="dataSource" [trackBy]="trackByProfileId" matSort matSortActive="priority" matSortDirection="desc"
              class="jchd-table ios-grid-t">
 
         <!-- Participant: initials avatar + bold name (+ flag glyph when flagged) + masked mono id -->
@@ -636,7 +636,7 @@
 
       <!-- Mockup #panel-coaches: one .coach-card per coach, all stats from real loaded data. -->
       <div class="coach-list">
-        <div class="coach-card" *ngFor="let card of coachCards()"
+        <div class="coach-card" *ngFor="let card of coachCards(); trackBy: trackByCoachId"
              [class.open]="expandedCoachIds.has(card.coachId)"
              (click)="toggleCoachCard(card.coachId)">
           <div class="coach-top">
@@ -702,7 +702,7 @@
       </div>
 
       <div class="wl-list" *ngIf="worklistTotal() > 0">
-        <article class="wl-card" *ngFor="let r of worklistRows(); let i = index" [ngClass]="bandClass(r.priorityBand)" [style.--i]="i">
+        <article class="wl-card" *ngFor="let r of worklistRows(); let i = index; trackBy: trackByProfileId" [ngClass]="bandClass(r.priorityBand)" [style.--i]="i">
           <div class="wl-rail"></div>
 
           <div class="wl-body">

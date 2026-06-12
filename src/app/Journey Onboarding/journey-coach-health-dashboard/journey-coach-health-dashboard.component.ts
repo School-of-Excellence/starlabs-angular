@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, HostListener } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, HostListener, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -193,7 +193,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   period: 'week' | 'month' | 'custom' = 'month';
   rangeFrom: Date = this.startOfMonth(new Date());
   rangeTo: Date = new Date();
-  scoreboard: ScoreboardRow[] = [];
+  // Phase 1: signal so coachCards()/scoreboard derivations recompute only when it changes.
+  scoreboard = signal<ScoreboardRow[]>([]);
   scoreboardComputed = false;
   // True when the scoreboard's touchpoint / appointment reads were permission-denied. The reads
   // still return empty, so without this flag everyone would render at 0% coverage/quality as if
@@ -263,7 +264,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // profileid independent of paging, so it needs the global map). Full mode scopes it instead.
   private coachHealthFullLoaded = false;
 
-  allRows: PortfolioRow[] = [];
+  // Phase 1: the base rows are a signal so the ~10 derived list/count computeds below
+  // recompute only when the rows actually change, not on every change-detection tick.
+  allRows = signal<PortfolioRow[]>([]);
   dataSource = new MatTableDataSource<PortfolioRow>([]);
 
   search = '';
@@ -301,8 +304,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // base-wide Going-quiet / Needs-Attention — needs touchpoints + appointments, loaded in the
   // BACKGROUND after first paint (B-in-the-background); cards snap to these when ready.
   private fullBaseGoingQuiet = 0;
-  private fullBaseNeedsAttention = 0;
-  private contactDataLoaded = false;
+  private fullBaseNeedsAttention = signal(0);
+  private contactDataLoaded = signal(false);
   // ---- indexed pagination (once the lite index is built): paginate over the MATCHED set so
   // filters page through ALL matches, and page-size just re-slices (no refetch / summary reset) ----
   private matchedIds: string[] = [];
@@ -318,7 +321,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // Global participant flags (star). Loaded ONCE in loadPortfolio (both modes) from the
   // healthtracker_flag collection where flagged == true. Base-wide by construction, so the
   // Flagged count + filter are correct in paged mode too (no page-local caveat needed).
-  flaggedIds = new Set<string>();
+  flaggedIds = signal<Set<string>>(new Set());
 
   private pjpData: any[] = [];
   private profileMap: any = {};
@@ -511,10 +514,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** B-in-the-background: after first paint + index, load touchpoints + attended coach appointments
    *  base-wide, compute Going-quiet / Needs-Attention across the WHOLE base, then snap the cards. */
   private async loadAttentionDataInBackground(): Promise<void> {
-    if (this.contactDataLoaded || !this.fullIndexBuilt) return;
+    if (this.contactDataLoaded() || !this.fullIndexBuilt) return;
     try {
       await Promise.all([this.loadTouchpoints(), this.loadContactEvents()]);
-      this.contactDataLoaded = true;
+      this.contactDataLoaded.set(true);
       this.computeBaseWideAttention();
       if (this.pagedMode) {
         this.accumulatePagedSummary();   // snap Going-quiet on the cards
@@ -545,7 +548,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (goingQuiet || lite.lapsed || lite.notStarted || lite.renewalWindow || lite.openTickets > 0) na++;
     }
     this.fullBaseGoingQuiet = gq;
-    this.fullBaseNeedsAttention = na;
+    this.fullBaseNeedsAttention.set(na);
   }
 
   /** Per-coach path — used when a SPECIFIC coach is selected (and cached for re-use).
@@ -733,7 +736,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** KPI in paged mode: accurate server counts where available, else accumulate over loaded pages.
    *  Keyed by profileid so revisiting a cached page never double-counts. */
   private accumulatePagedSummary(): void {
-    for (const r of this.allRows) {
+    for (const r of this.allRows()) {
       if (this.countedProfiles.has(r.profileid)) continue;
       this.countedProfiles.add(r.profileid);
       // total / active / inactive / renewalsSoon are derived base-wide from the lite index once it
@@ -758,7 +761,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     // base-wide Going-quiet once the background touchpoint/appointment data has loaded (else it
     // stays the page-accumulated value, which is replaced the moment contact data lands).
-    if (this.contactDataLoaded) this.summary.goingQuiet = this.fullBaseGoingQuiet;
+    if (this.contactDataLoaded()) this.summary.goingQuiet = this.fullBaseGoingQuiet;
     // Base-wide participant-level counts come from the lite index (one entry per DISTINCT
     // participant). This replaces the pjp-RECORD total and the customerstatus inactive query
     // (both wrong: total counted records, inactive read an empty field). notStarted still uses the
@@ -930,7 +933,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         const pid = (d.data() as any)['profileid'];
         if (pid) ids.add(pid);
       });
-      this.flaggedIds = ids;
+      this.flaggedIds.set(ids);
     } catch (e) {
       console.warn('flags load failed (non-fatal)', e);
     }
@@ -1110,7 +1113,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         onboarded,
         // going-quiet only counts ACTIVE participants (subActive); set after the row is built (below).
         goingQuiet: false,
-        flagged: this.flaggedIds.has(profileid),
+        flagged: this.flaggedIds().has(profileid),
         renewalWindow: daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS,
         // subscription-based active: this product's subscriptionend is in the future. The
         // per-participant subActive is the OR across products, finalised at merge time below.
@@ -1150,13 +1153,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
 
     this.matchedCount = matched;
-    this.allRows = Array.from(byProfile.values()).sort((a, b) => b.priority - a.priority);
-    this.journeyOptions = Array.from(new Set(this.allRows.map(r => r.journeyname))).sort();
+    this.allRows.set(Array.from(byProfile.values()).sort((a, b) => b.priority - a.priority));
+    this.journeyOptions = Array.from(new Set(this.allRows().map(r => r.journeyname))).sort();
     // full mode: derive finance filter options from the (full) base; paged mode sources them from
     // ensureFullIndex (the page-local allRows would otherwise miss off-page financial statuses).
     if (!this.pagedMode) {
       this.financeOptions = Array.from(
-        new Set(this.allRows.map(r => r.financialstatus).filter((v): v is string => !!v)),
+        new Set(this.allRows().map(r => r.financialstatus).filter((v): v is string => !!v)),
       ).sort();
     }
     // paged mode builds the summary via accumulatePagedSummary() (server counts + loaded-so-far)
@@ -1456,7 +1459,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         row.daysSinceCoach = 0;
         row.goingQuiet = false;
         this.scoreRow(row);
-        this.allRows.sort((a, b) => b.priority - a.priority);
+        // re-sort via an immutable set() so the derived computeds pick up the new order
+        this.allRows.set([...this.allRows()].sort((a, b) => b.priority - a.priority));
         this.computeSummary();
         this.applyFilters();
       }
@@ -1536,6 +1540,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
   }
 
+  /** Immutable add/remove on the flaggedIds signal so the Flagged count/filter computeds update. */
+  private setFlagged(profileid: string, on: boolean): void {
+    const next = new Set(this.flaggedIds());
+    if (on) next.add(profileid); else next.delete(profileid);
+    this.flaggedIds.set(next);
+  }
+
   /** Toggle a participant's GLOBAL flag (star). Optimistic: flip row.flagged + flaggedIds, then
    *  await the merge-write to healthtracker_flag (docId = profileid). Un-flag NEVER deletes the
    *  doc — it sets flagged: false. On failure, REVERT the optimistic change and snackbar the
@@ -1544,7 +1555,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const next = !row.flagged;
     // optimistic flip (row + the base-wide set the count/filter read from)
     row.flagged = next;
-    if (next) this.flaggedIds.add(row.profileid); else this.flaggedIds.delete(row.profileid);
+    this.setFlagged(row.profileid, next);
     this.applyFilters();
     try {
       // dual-write: the EXISTING healthtracker_flag on/off doc AND the unified activity event, in parallel.
@@ -1567,7 +1578,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       console.error('toggleFlag write failed', e);
       // revert the optimistic change
       row.flagged = !next;
-      if (next) this.flaggedIds.delete(row.profileid); else this.flaggedIds.add(row.profileid);
+      this.setFlagged(row.profileid, !next);
       this.applyFilters();
       this.guard.openSnackBar('Could not update flag: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
     }
@@ -1667,47 +1678,48 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Distinct participants matching ANY active lever — the "Needs Attention" set. Reuses the
    *  existing per-row lever flags (no new scoring): goingQuiet ∪ lapsed ∪ notStarted ∪
    *  renewalWindow ∪ openTickets. Computed over the currently-loaded base rows (allRows). */
-  needsAttentionRows(): PortfolioRow[] {
-    return this.allRows
+  /** Stable identity for *ngFor / mat-table rows so the DOM diffs by participant, not by index. */
+  trackByProfileId = (_: number, r: { profileid: string }): string => r.profileid;
+  trackByCoachId = (_: number, c: { coachId: string }): string => c.coachId;
+
+  needsAttentionRows = computed<PortfolioRow[]>(() =>
+    this.allRows()
       .filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)
-      .sort((a, b) => b.priority - a.priority);
-  }
-  get needsAttentionCount(): number {
+      .sort((a, b) => b.priority - a.priority));
+  // backing computed for the parens-free `needsAttentionCount` getter (template binds the getter).
+  private _needsAttentionCount = computed<number>(() => {
     // paged: use the base-wide count once contact data has loaded (else page-local rows).
-    if (this.pagedMode && this.contactDataLoaded) return this.fullBaseNeedsAttention;
+    if (this.pagedMode && this.contactDataLoaded()) return this.fullBaseNeedsAttention();
     return this.needsAttentionRows().length;
-  }
+  });
+  get needsAttentionCount(): number { return this._needsAttentionCount(); }
 
   /** Real participant rows behind a given Summary card (from the loaded base). */
-  goingQuietRows(): PortfolioRow[] {
-    return this.allRows.filter(r => r.goingQuiet).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0));
-  }
-  paymentsLockedRows(): PortfolioRow[] {
-    return this.allRows.filter(r => (r.financialstatus ?? '').toLowerCase() === 'locked').sort((a, b) => b.priority - a.priority);
-  }
-  renewalRows(): PortfolioRow[] {
-    return this.allRows.filter(r => r.renewalWindow).sort((a, b) => (a.daysToRenewal ?? 0) - (b.daysToRenewal ?? 0));
-  }
-  openTicketRows(): PortfolioRow[] {
-    return this.allRows.filter(r => r.openTickets > 0).sort((a, b) => b.openTickets - a.openTickets);
-  }
-  flaggedRows(): PortfolioRow[] {
-    return this.allRows.filter(r => r.flagged).sort((a, b) => b.priority - a.priority);
-  }
+  goingQuietRows = computed<PortfolioRow[]>(() =>
+    this.allRows().filter(r => r.goingQuiet).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0)));
+  paymentsLockedRows = computed<PortfolioRow[]>(() =>
+    this.allRows().filter(r => (r.financialstatus ?? '').toLowerCase() === 'locked').sort((a, b) => b.priority - a.priority));
+  renewalRows = computed<PortfolioRow[]>(() =>
+    this.allRows().filter(r => r.renewalWindow).sort((a, b) => (a.daysToRenewal ?? 0) - (b.daysToRenewal ?? 0)));
+  openTicketRows = computed<PortfolioRow[]>(() =>
+    this.allRows().filter(r => r.openTickets > 0).sort((a, b) => b.openTickets - a.openTickets));
+  flaggedRows = computed<PortfolioRow[]>(() =>
+    this.allRows().filter(r => r.flagged).sort((a, b) => b.priority - a.priority));
   /** Scope-aware flagged count: base-wide for the ALL view, but this coach's flagged participants
    *  for a specific coach (allRows is that coach's full base in non-paged mode). The global
-   *  flaggedIds set is base-wide, so it must NOT be used as the count when a coach is selected. */
-  flaggedCount(): number {
-    return this.selectedCoachId === this.ALL ? this.flaggedIds.size : this.flaggedRows().length;
-  }
+   *  flaggedIds set is base-wide, so it must NOT be used as the count when a coach is selected.
+   *  (selectedCoachId is read as a plain field — it co-changes with an allRows rebuild on scope
+   *  switch, and flaggedIds is a signal, so the memoized count stays correct.) */
+  flaggedCount = computed<number>(() =>
+    this.selectedCoachId === this.ALL ? this.flaggedIds().size : this.flaggedRows().length);
 
   /** Coach-set health distribution across the CURRENT scope's loaded rows (allRows). Honest: it
    *  reflects only KNOWN/loaded states — every row without a coach assessment is Not assessed (no
    *  fabrication). Counts per state come from the row's coachHealthState (built from
    *  coachHealthByProfile in computeRows). */
-  healthDistribution(): { happy: number; neutral: number; unhappy: number; atRisk: number; critical: number; notAssessed: number; total: number } {
+  healthDistribution = computed<{ happy: number; neutral: number; unhappy: number; atRisk: number; critical: number; notAssessed: number; total: number }>(() => {
     const d = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
-    for (const r of this.allRows) {
+    for (const r of this.allRows()) {
       d.total++;
       switch (r.coachHealthState?.state) {
         case 'HAPPY': d.happy++; break;
@@ -1719,7 +1731,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       }
     }
     return d;
-  }
+  });
 
   /** Percentage width for a health-bar segment (0 when nothing loaded). */
   healthPct(count: number, total: number): number {
@@ -1732,7 +1744,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   topQueueForCoach(coachId: string): PortfolioRow[] {
     const coachName = this.coaches.find(c => c.id === coachId)?.name ?? '';
     if (!coachName) return [];
-    return this.allRows
+    return this.allRows()
       .filter(r => r.coachname === coachName)
       .filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)
       .sort((a, b) => b.priority - a.priority)
@@ -1767,12 +1779,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  grouped from the currently-loaded base rows by coach name; Handled today = touchpoints this coach
    *  logged today (from the already-loaded touchpoint data). Coaches with no assigned base are dropped
    *  so the view never invents coaches or numbers. */
-  coachCards(): CoachCard[] {
+  coachCards = computed<CoachCard[]>(() => {
     const todayStart = this.startOfDay(new Date()).getTime();
     const todayEnd = this.endOfDay(new Date()).getTime();
     // group the loaded base rows by coach name (computeRows resolves coachname from coachedby)
     const rowsByCoach = new Map<string, PortfolioRow[]>();
-    for (const r of this.allRows) {
+    for (const r of this.allRows()) {
       const list = rowsByCoach.get(r.coachname) ?? [];
       list.push(r);
       rowsByCoach.set(r.coachname, list);
@@ -1787,7 +1799,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     // scoreboard baseSize (distinct coachedby) when computed — the authoritative caseload
     const baseByScoreboard: Record<string, number> = {};
-    for (const sb of this.scoreboard) baseByScoreboard[sb.coachId] = sb.baseSize;
+    for (const sb of this.scoreboard()) baseByScoreboard[sb.coachId] = sb.baseSize;
 
     const cards: CoachCard[] = [];
     for (const c of this.coaches) {
@@ -1805,7 +1817,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       });
     }
     return cards;
-  }
+  });
 
   /** Progress-bar fill for a coach card: handled / needToday, clamped 0..100 (0 when nothing due). */
   handledPct(card: CoachCard): number {
@@ -1934,7 +1946,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     rows.sort((a, b) => b.engagementScore - a.engagementScore || b.coverage - a.coverage || a.coachName.localeCompare(b.coachName));
     rows.forEach((r, i) => r.rank = i + 1);
-    this.scoreboard = rows;
+    this.scoreboard.set(rows);
     this.scoreboardComputed = true;
   }
 
@@ -2157,7 +2169,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const targetCoachId = this.assignTargetCoachId;
     const coachRef = doc(this.firestore, 'profile_data', targetCoachId);
     const targetCoachName = this.coaches.find(c => c.id === targetCoachId)?.name ?? targetCoachId;
-    const rowsById = new Map(this.allRows.map(r => [r.profileid, r]));
+    const rowsById = new Map(this.allRows().map(r => [r.profileid, r]));
     const ids = Array.from(this.selectedProfiles);
     const failed = new Set<string>();
     // Write coachedby to EVERY pjp doc of each participant (queried by profileid, not the loaded
@@ -2197,7 +2209,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // allRows is already per-distinct-participant. Active/Inactive are SUBSCRIPTION-based
     // (subActive), NOT customerstatus (empty on pjp — the prior bug). Total = distinct participants.
     const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0 };
-    for (const r of this.allRows) {
+    for (const r of this.allRows()) {
       s.total++;
       if (r.subActive) s.active++; else s.inactive++;
       if (r.renewalWindow) s.renewalsSoon++;
@@ -2227,7 +2239,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       void this.renderMatchedPage();
       return;
     }
-    this.dataSource.data = this.allRows.filter(r => this.rowMatches(r));
+    this.dataSource.data = this.allRows().filter(r => this.rowMatches(r));
     // the visible rows just changed — drop the keyboard highlight so it never points at a stale row
     this.focusedRowIndex = -1;
   }
@@ -2329,7 +2341,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       || this.activeLever === 'flagged' || this.activeLever === 'needsAttention';
     if (!bypassActiveGate && lite.subActive === wantInactive) return false;
     // flags are a base-wide global Set, so the flagged filter covers the WHOLE base in paged mode.
-    if (this.activeLever === 'flagged' && !this.flaggedIds.has(lite.profileid)) return false;
+    if (this.activeLever === 'flagged' && !this.flaggedIds().has(lite.profileid)) return false;
     if (this.activeLever === 'active' && !lite.subActive) return false;
     if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
@@ -2345,7 +2357,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'notStarted' && !lite.notStarted) return false;
     // going-quiet / needs-attention need touchpoint+appointment data. Once it has loaded (lite.goingQuiet
     // is populated), scope the matched set base-wide; before that, fall through (page-local refine).
-    if (this.contactDataLoaded) {
+    if (this.contactDataLoaded()) {
       if (this.activeLever === 'goingQuiet' && !lite.goingQuiet) return false;
       if (this.goingQuietOnly && !lite.goingQuiet) return false;
       if (this.activeLever === 'needsAttention'
@@ -2502,7 +2514,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // band / health are never in the lite index → always page-local. Going-quiet / needs-attention
     // are page-local ONLY until the touchpoint+appointment data loads (then they're base-wide).
     return this.bandFilters.length > 0 || this.healthFilters.length > 0
-      || (!this.contactDataLoaded && (this.goingQuietOnly || this.activeLever === 'goingQuiet' || this.activeLever === 'needsAttention'));
+      || (!this.contactDataLoaded() && (this.goingQuietOnly || this.activeLever === 'goingQuiet' || this.activeLever === 'needsAttention'));
   }
 
   /** One plain-English line describing who's in the list for the card you clicked. Shown next to
