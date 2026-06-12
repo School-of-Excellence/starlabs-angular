@@ -1,13 +1,15 @@
 import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp, updateDoc
+  doc, writeBatch, serverTimestamp, updateDoc, setDoc
 } from '@angular/fire/firestore';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { MatSelectModule, MAT_SELECT_CONFIG } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -16,7 +18,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSnackBar, MAT_SNACK_BAR_DEFAULT_OPTIONS } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import * as XLSX from 'xlsx';
@@ -25,6 +27,7 @@ import { AuthguardService } from '../../authguard.service';
 import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
 type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow';
 
@@ -64,6 +67,11 @@ interface PRow {
     MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule,
     MatIconModule, MatTooltipModule, MatCheckboxModule, MatPaginatorModule,
     MatProgressBarModule, MatDialogModule, MatMenuModule
+  ],
+  providers: [
+    { provide: MAT_SELECT_CONFIG, useValue: { overlayPanelClass: 'sx-select-pane' } },
+    { provide: MAT_SNACK_BAR_DEFAULT_OPTIONS, useValue: { duration: 4000, panelClass: 'sx-snack' } },
+    MatSnackBar
   ],
   templateUrl: './product-funnel.component.html',
   styleUrl: './product-funnel.component.css'
@@ -121,7 +129,7 @@ export class ProductFunnelComponent implements OnInit {
     potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0
   };
 
-  pageSize = 25;
+  pageSize = 10;
   pageIndex = 0;
   loading = true;
   loadError = false;
@@ -134,7 +142,8 @@ export class ProductFunnelComponent implements OnInit {
     public guard: AuthguardService,
     public dialog: MatDialog,
     public snackbar: MatSnackBar,
-    public storage: Storage
+    public storage: Storage,
+    public http: HttpClient
   ) {}
 
   async ngOnInit() {
@@ -576,11 +585,16 @@ export class ProductFunnelComponent implements OnInit {
     return this.rows.filter(r => r.isApproved && !r.attended && r.attendanceState !== 'no_show');
   }
   get canFinalize(): boolean { return this.eventEnded && !this.alreadyFinalized; }
-  get showUpPct(): number {
-    const snap = this.arena?.['epc_snapshot'];
-    const pot = snap ? (snap['potential'] || 0) : this.counts.potential;
-    const att = snap ? (snap['attended'] || 0) : this.counts.attended;
-    return pot ? Math.round(att / pot * 100) : 0;
+  get frozenStats() {
+    const s = this.arena?.['epc_snapshot'];
+    const att = s ? (s['attended'] || 0) : this.counts.attended;
+    const app = s ? (s['approved'] || 0) : this.counts.approved;
+    const pot = s ? (s['potential'] || 0) : this.counts.potential;
+    return {
+      attended: att, approved: app, potential: pot,
+      ofApproved: app ? Math.round(att / app * 100) : 0,
+      ofPotential: pot ? Math.round(att / pot * 100) : 0
+    };
   }
 
   async finalizeAttendance() {
@@ -641,7 +655,7 @@ export class ProductFunnelComponent implements OnInit {
     const participants = [{ profileid: row.profileid, name: row.name, email: row.email }];
     this.dialog.open(BulkAddProductsComponent, {
       data: { participants, productrefId: this.arena?.['productref']?.id },
-      width: '70vw', disableClose: true
+      width: '70vw', disableClose: true, panelClass: 'sx-dialog-surface'
     }).afterClosed().subscribe(async () => {
       const seq = this.selectedDeliverySet, variation = this.selectedQueueVariation;
       await this.loadData();
@@ -657,7 +671,7 @@ export class ProductFunnelComponent implements OnInit {
     const recipients = this.commsRecipients;
     if (!recipients.length) { this.snackbar.open('No participants to message', 'OK', { duration: 3000 }); return; }
     const data = recipients.map(r => ({ profileid: r.profileid, name: r.name, email: r.email }));
-    this.dialog.open(WatiInputComponent, { data, width: '70vw', height: '80vh', disableClose: true })
+    this.dialog.open(WatiInputComponent, { data, width: '70vw', height: '80vh', disableClose: true, panelClass: 'sx-dialog-surface' })
       .afterClosed().subscribe(result => {
         if (!result) return;
         const failed = result === 'failed' || result?.status === 'failed';
@@ -669,7 +683,7 @@ export class ProductFunnelComponent implements OnInit {
     const recipients = this.commsRecipients;
     if (!recipients.length) { this.snackbar.open('No participants to notify', 'OK', { duration: 3000 }); return; }
     const profileids = recipients.map(r => r.profileid);
-    this.dialog.open(AhNotificationComponent, { width: '60vw', maxHeight: '90vh', disableClose: true, autoFocus: false })
+    this.dialog.open(AhNotificationComponent, { width: '60vw', maxHeight: '90vh', disableClose: true, autoFocus: false, panelClass: 'sx-dialog-surface' })
       .afterClosed().subscribe(async result => {
         if (!result) return;
         try {
@@ -689,6 +703,33 @@ export class ProductFunnelComponent implements OnInit {
           console.log(e);
           this.snackbar.open('Could not send notification', 'OK', { duration: 4000 });
         }
+      });
+  }
+
+  sendEmail() {
+    const recipients = this.commsRecipients;
+    if (!recipients.length) { this.snackbar.open('No participants to email', 'OK', { duration: 3000 }); return; }
+    const data = recipients.map(r => ({ profileid: r.profileid, name: r.name, email: r.email }));
+    this.dialog.open(EmailInputComponent, { data, minWidth: '600px', disableClose: true, panelClass: 'sx-dialog-surface' })
+      .afterClosed().subscribe(async (result: any) => {
+        if (!result) return;
+        try {
+          if (result['status'] === 'queued' || result['status'] === 'send') {
+            await setDoc(doc(collection(this.firestore, 'email archive'), result['docid']), result, { merge: true });
+            this.snackbar.open('Email queued', 'OK', { duration: 4000 });
+          } else if (result['status'] === 'validated') {
+            const url = environment.firebase.projectId === 'starlabs-test'
+              ? 'https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail'
+              : 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail';
+            const payload: any = { ...result, archiveid: result['docid'] };
+            this.http.post(url, JSON.stringify(payload), {
+              responseType: 'text', headers: new HttpHeaders().set('Content-Type', 'application/json')
+            }).subscribe({
+              next: () => this.snackbar.open('Email sent', 'OK', { duration: 4000 }),
+              error: (e) => { console.log(e); this.snackbar.open('Error sending email', 'OK', { duration: 4000 }); }
+            });
+          }
+        } catch (e) { console.log(e); this.snackbar.open('Could not send email', 'OK', { duration: 4000 }); }
       });
   }
 

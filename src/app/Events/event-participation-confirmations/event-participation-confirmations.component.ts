@@ -11,6 +11,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MAT_SELECT_CONFIG } from '@angular/material/select';
 
 import { AuthguardService } from '../../authguard.service';
 import { ProductFunnelComponent } from './product-funnel.component';
@@ -54,6 +55,9 @@ const PAST_WINDOW_MS = 180 * 86400000;
     CommonModule, FormsModule, MatTabsModule, MatButtonModule, MatIconModule, MatTooltipModule,
     MatFormFieldModule, MatInputModule, MatPaginatorModule, ProductFunnelComponent
   ],
+  providers: [
+    { provide: MAT_SELECT_CONFIG, useValue: { overlayPanelClass: 'sx-select-pane' } }
+  ],
   templateUrl: './event-participation-confirmations.component.html',
   styleUrl: './event-participation-confirmations.component.css'
 })
@@ -69,7 +73,7 @@ export class EventParticipationConfirmationsComponent {
   mode: 'upcoming' | 'past' = 'upcoming';
 
   pageIndex = 0;
-  pageSize = 15;
+  pageSize = 10;
   private tabsRestored = false;
 
   constructor(public firestore: Firestore, public guard: AuthguardService) {

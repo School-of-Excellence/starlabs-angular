@@ -9,9 +9,18 @@
 .sx-eyebrow { font-size: 14px; font-weight: 600; color: rgba(60,60,67,.6); letter-spacing: .2px; }
 .sx-title { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin: 3px 0 4px; line-height: 1.05; }
 .sx-subt { font-size: 15px; color: rgba(60,60,67,.6); }
-.sx-frozen { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 13px;
-  font-weight: 600; color: #6c6c70; background: rgba(60,60,67,.06); padding: 3px 11px; border-radius: 999px; }
-.sx-frozen mat-icon { font-size: 15px; height: 15px; width: 15px; }
+.sx-frozen-card { display: inline-block; margin-top: 10px; background: #fff; border: .5px solid rgba(60,60,67,.1);
+  border-radius: 12px; padding: 9px 14px 10px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.sx-frozen-head { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700;
+  color: #6c6c70; margin-bottom: 7px; letter-spacing: .2px; }
+.sx-frozen-head mat-icon { font-size: 15px; height: 15px; width: 15px; }
+.sx-frozen-tbl { border-collapse: collapse; font-size: 13px; }
+.sx-frozen-tbl th { font-size: 10px; font-weight: 600; color: rgba(60,60,67,.5); text-transform: uppercase;
+  letter-spacing: .3px; padding: 0 14px 5px 0; text-align: left; border-bottom: .5px solid rgba(60,60,67,.08); }
+.sx-frozen-tbl td { padding: 4px 14px 2px 0; color: #1c1c1e; }
+.sx-frozen-tbl td:first-child { color: rgba(60,60,67,.7); }
+.sx-frozen-tbl .r { text-align: right; }
+.sx-frozen-tbl .sx-fp-ok { color: #1f8a3b; font-weight: 700; }
 
 .sx-error { display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: #fff; border: .5px solid rgba(215,0,21,.25); border-radius: 14px; padding: 14px 18px;
@@ -138,6 +147,11 @@ table.sx-t { width: 100%; border-collapse: collapse; }
 .sx-att mat-icon { font-size: 16px; height: 16px; width: 16px; }
 .sx-noshow { font-size: 13.5px; color: #d70015; font-weight: 600; margin-right: 8px; }
 .sx-mark { font-size: 13.5px; min-width: 0; color: #007aff; }
+:host ::ng-deep .sx-assign.mdc-button, :host ::ng-deep .sx-mark.mdc-button {
+  --mdc-text-button-label-text-color: #007aff;
+  --mat-text-button-state-layer-color: #007aff;
+  --mat-text-button-ripple-color: #007aff;
+}
 .sx-empty { text-align: center; color: rgba(60,60,67,.6); font-style: italic; padding: 26px; }
 :host ::ng-deep .sx-empty .mdc-button { --mdc-text-button-label-text-color: #007aff; }
 
