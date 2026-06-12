@@ -238,6 +238,8 @@ html:has(.dyn-studio-v2-app) {
 .sx-select-panel,
 .sx-select-panel .mat-mdc-option,
 .sx-dialog .mat-mdc-dialog-surface,
+.sx-menu-panel,
+.sx-menu-panel .mat-mdc-menu-item,
 .sx-tip {
   font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", sans-serif;
   font-variant-numeric: tabular-nums;

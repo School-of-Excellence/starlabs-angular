@@ -4,6 +4,7 @@
     <div class="sx-eyebrow">Confirmations</div>
     <h3 class="sx-title">{{ productName }}</h3>
     <div class="sx-subt">{{ eventName }} &middot; {{ arena?.type }}</div>
+    <div class="sx-frozen" *ngIf="alreadyFinalized"><mat-icon>lock</mat-icon> Finalized &middot; show-up {{ showUpPct }}%</div>
   </div>
 
   <div class="sx-error" *ngIf="loadError">
@@ -57,12 +58,26 @@
         </button>
       </ng-container>
 
+      <button mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
+        matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
+        <mat-icon>how_to_reg</mat-icon> Finalize attendance<span *ngIf="pendingNoShow.length"> ({{ pendingNoShow.length }})</span>
+      </button>
+
       <mat-form-field appearance="outline" class="sx-finance" subscriptSizing="dynamic">
         <mat-label>Finance</mat-label>
         <mat-select [(ngModel)]="financeFilter" (ngModelChange)="onFinance()" [panelClass]="'sx-select-panel'">
           <mat-option *ngFor="let f of financeOptions" [value]="f.value">{{ f.label }}</mat-option>
         </mat-select>
       </mat-form-field>
+
+      <button mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
+        matTooltipClass="sx-tip" matTooltip="Message the participants in this segment">
+        <mat-icon>campaign</mat-icon> Send
+      </button>
+      <mat-menu #sendMenu="matMenu" class="sx-menu-panel">
+        <button mat-menu-item (click)="sendWhatsApp()"><mat-icon>chat</mat-icon> WhatsApp ({{ segmentRows.length }})</button>
+        <button mat-menu-item (click)="sendNotification()"><mat-icon>notifications</mat-icon> App notification ({{ segmentRows.length }})</button>
+      </mat-menu>
 
       <button mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
 
@@ -88,7 +103,7 @@
             <th>Current journey</th>
             <th>Subscription</th>
             <th>Finance</th>
-            <th>{{ segment==='notEligible' ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
+            <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -134,21 +149,23 @@
               </span>
             </td>
             <td>
-              <!-- Reason (not eligible) -->
-              <ng-container *ngIf="segment==='notEligible'">
-                <span class="sx-reason">{{ row.reason }}</span>
-                <button mat-button class="sx-assign" *ngIf="!row.isOwner" (click)="assignProduct(row)">Assign product</button>
+              <!-- Reason (no product / in queue) -->
+              <ng-container *ngIf="segment==='noProduct' || segment==='inQueue'">
+                <span class="sx-reason" [class.sx-reason-mut]="segment==='inQueue'">{{ row.reason }}</span>
+                <button mat-button class="sx-assign" *ngIf="segment==='noProduct' && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
               </ng-container>
               <!-- Attendance (approved/attended/no-show) -->
               <ng-container *ngIf="selectionMode==='attend'">
                 <span class="sx-att" *ngIf="row.attended">
                   <mat-icon>check</mat-icon> Attended <span class="sx-mut" *ngIf="row.scanned">· scanned</span>
-                  <button mat-icon-button class="sx-undo" *ngIf="!row.scanned && row.approvedRequestId" matTooltip="Undo" aria-label="Undo attendance" (click)="unmarkAttended([row])"><mat-icon>undo</mat-icon></button>
                 </span>
-                <button mat-button class="sx-mark" *ngIf="!row.attended" (click)="markAttended([row])">Mark attended</button>
+                <ng-container *ngIf="!row.attended">
+                  <span class="sx-noshow" *ngIf="row.attendanceState==='no_show'">No-show</span>
+                  <button mat-button class="sx-mark" (click)="markAttended([row])">Mark attended</button>
+                </ng-container>
               </ng-container>
               <!-- Status (other segments) -->
-              <span class="sx-mut" *ngIf="segment!=='notEligible' && selectionMode!=='attend'">
+              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && selectionMode!=='attend'">
                 {{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}
               </span>
             </td>

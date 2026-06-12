@@ -1,7 +1,7 @@
 import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp
+  doc, writeBatch, serverTimestamp, updateDoc
 } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -15,14 +15,18 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import * as XLSX from 'xlsx';
 
 import { AuthguardService } from '../../authguard.service';
 import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
+import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
+import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 
-type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'notEligible' | 'approved' | 'attended' | 'noShow';
+type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow';
 
 interface PRow {
   profileid: string;
@@ -36,11 +40,13 @@ interface PRow {
   isRequested: boolean;
   isApproved: boolean;
   isEligible: boolean;
-  isNotEligible: boolean;
+  isNoProduct: boolean;
+  isInQueueReq: boolean;
   isNotRequested: boolean;
   inQueue: boolean;
   attended: boolean;
   scanned: boolean;
+  attendanceState: string;
   reason: string;
   journey: string;
   subEnd: number;
@@ -57,7 +63,7 @@ interface PRow {
     CommonModule, FormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule,
     MatIconModule, MatTooltipModule, MatCheckboxModule, MatPaginatorModule,
-    MatProgressBarModule, MatDialogModule
+    MatProgressBarModule, MatDialogModule, MatMenuModule
   ],
   templateUrl: './product-funnel.component.html',
   styleUrl: './product-funnel.component.css'
@@ -66,6 +72,7 @@ export class ProductFunnelComponent implements OnInit {
 
   @Input() arena: any;
   @Input() eventName = '';
+  @Input() eventEnd = 0;
 
   @ViewChild('confirmTpl') confirmTpl!: TemplateRef<any>;
   @ViewChild('progressTpl') progressTpl!: TemplateRef<any>;
@@ -86,10 +93,11 @@ export class ProductFunnelComponent implements OnInit {
     { key: 'requested', label: 'Requested', cls: '', desc: 'said yes' },
     { key: 'notRequested', label: 'Not requested', cls: '', desc: 'owners, no request', tip: 'Hold the product but have not requested' },
     { key: 'eligible', label: 'Eligible', cls: 'elig', desc: 'ready to approve' },
-    { key: 'notEligible', label: 'Not eligible', cls: 'ne', desc: 'no product / queued' },
+    { key: 'noProduct', label: 'No product', cls: 'ne', desc: 'requested, needs product', tip: 'Requested but does not hold the product — assign it to revive them' },
+    { key: 'inQueue', label: 'In queue', cls: 'inq', desc: 'already in a queue', tip: 'Requested but already in an active queue — already being served, no action needed' },
     { key: 'approved', label: 'Approved', cls: 'app', desc: 'initiated' },
     { key: 'attended', label: 'Attended', cls: 'att', desc: 'scanned or marked', tip: 'Of the approved, how many attended (scanned or marked)' },
-    { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'approved, not in', tip: 'Approved but not yet attended' }
+    { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'did not attend', tip: 'Approved but did not attend — set when you finalize attendance after the event' }
   ];
 
   mapProfile: Record<string, any> = {};
@@ -110,7 +118,7 @@ export class ProductFunnelComponent implements OnInit {
   selection = new SelectionModel<PRow>(true, []);
 
   counts: Record<SegmentKey, number> = {
-    potential: 0, requested: 0, notRequested: 0, eligible: 0, notEligible: 0, approved: 0, attended: 0, noShow: 0
+    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0
   };
 
   pageSize = 25;
@@ -125,7 +133,8 @@ export class ProductFunnelComponent implements OnInit {
     public firestore: Firestore,
     public guard: AuthguardService,
     public dialog: MatDialog,
-    public snackbar: MatSnackBar
+    public snackbar: MatSnackBar,
+    public storage: Storage
   ) {}
 
   async ngOnInit() {
@@ -169,12 +178,13 @@ export class ProductFunnelComponent implements OnInit {
       const requestedData = new Map<string, any>();
       const approvedReq = new Map<string, string>();
       const attendedIds = new Set<string>();
+      const attendanceStateByPid = new Map<string, string>();
       eprSnap.docs.forEach(d => {
         const x = d.data();
         const pid = x['profileid'];
         if (!pid) return;
-        if (x['status'] == 'approved') approvedReq.set(pid, x['docid'] ?? d.id);
-        else if (x['status'] == 'attended') { attendedIds.add(pid); approvedReq.set(pid, x['docid'] ?? d.id); }
+        if (x['status'] == 'approved') { approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? ''); }
+        else if (x['status'] == 'attended') { attendedIds.add(pid); approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended'); }
         else if (x['status'] == 'requested') requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id });
       });
 
@@ -203,9 +213,10 @@ export class ProductFunnelComponent implements OnInit {
         const isRequested = requestedData.has(pid);
         const inQueue = active.has(pid);
         const isEligible = isRequested && isOwner && !inQueue;
-        const isNotEligible = isRequested && !isEligible;
+        const isNoProduct = isRequested && !isOwner;
+        const isInQueueReq = isRequested && isOwner && inQueue;
         const isNotRequested = isOwner && !isRequested && !inCohort;
-        const reason = isNotEligible ? (!isOwner ? 'No product' : 'Already in active queue') : '';
+        const reason = isNoProduct ? 'No product' : (isInQueueReq ? 'In active queue' : '');
         rows.push({
           profileid: pid,
           name: prof['name'] ?? 'Unknown',
@@ -215,9 +226,10 @@ export class ProductFunnelComponent implements OnInit {
           approvedRequestId: approvedReq.get(pid) ?? null,
           requestData: requestedData.get(pid) ?? null,
           isOwner, isRequested, isApproved: inCohort,
-          isEligible, isNotEligible, isNotRequested, inQueue,
+          isEligible, isNoProduct, isInQueueReq, isNotRequested, inQueue,
           attended: isAttended,
           scanned: isScanned,
+          attendanceState: attendanceStateByPid.get(pid) ?? '',
           reason,
           journey: '', subEnd: 0, subActive: false, finance: '', metaLoaded: false, metaError: false
         });
@@ -230,10 +242,11 @@ export class ProductFunnelComponent implements OnInit {
         requested: requestedData.size,
         notRequested: [...owners.keys()].filter(o => !requestedData.has(o) && !cohort.has(o)).length,
         eligible: rows.filter(r => r.isEligible).length,
-        notEligible: rows.filter(r => r.isNotEligible).length,
+        noProduct: rows.filter(r => r.isNoProduct).length,
+        inQueue: rows.filter(r => r.isInQueueReq).length,
         approved: cohort.size,
         attended: rows.filter(r => r.attended).length,
-        noShow: rows.filter(r => r.isApproved && !r.attended).length
+        noShow: rows.filter(r => r.attendanceState === 'no_show').length
       };
 
       this.deliverySetList = await this.loadDeliverySets(arena);
@@ -320,10 +333,11 @@ export class ProductFunnelComponent implements OnInit {
       case 'requested': return r.isRequested;
       case 'notRequested': return r.isNotRequested;
       case 'eligible': return r.isEligible;
-      case 'notEligible': return r.isNotEligible;
+      case 'noProduct': return r.isNoProduct;
+      case 'inQueue': return r.isInQueueReq;
       case 'approved': return r.isApproved;
       case 'attended': return r.attended;
-      case 'noShow': return r.isApproved && !r.attended;
+      case 'noShow': return r.attendanceState === 'no_show';
     }
     return false;
   }
@@ -517,13 +531,17 @@ export class ProductFunnelComponent implements OnInit {
   async markAttended(rows: PRow[]) {
     const targets = rows.filter(r => r.approvedRequestId && !r.attended);
     if (!targets.length) return;
+    const wasNoShow = targets.filter(r => r.attendanceState === 'no_show').length;
     this.progress = { msg: 'Marking attended...', value: 0, total: targets.length, eta: '' };
     const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
     try {
       const refList = targets.map(r => doc(this.firestore, 'event participation request', r.approvedRequestId!));
       const batch = writeBatch(this.firestore);
       targets.forEach((r, i) => {
-        batch.update(refList[i], { status: 'attended' });
+        batch.update(refList[i], {
+          status: 'attended', attendance_state: 'attended',
+          attendance_source: 'manual', attendance_marked_at: serverTimestamp()
+        });
         batch.set(doc(collection(this.firestore, 'events_profiles')), {
           event_ref: this.arena['eventref'],
           profile_ref: doc(this.firestore, 'profile_data', r.profileid),
@@ -537,13 +555,11 @@ export class ProductFunnelComponent implements OnInit {
         delSnap.docs.forEach(d => batch.update(d.ref, { status: 'completed' }));
       }
       await batch.commit();
-      targets.forEach(r => { r.attended = true; });
+      targets.forEach(r => { r.attended = true; r.attendanceState = 'attended'; });
       this.counts.attended += targets.length;
-      this.counts.noShow = Math.max(0, this.counts.noShow - targets.length);
+      this.counts.noShow = Math.max(0, this.counts.noShow - wasNoShow);
       this.selection.clear();
-      const justMarked = targets;
-      this.snackbar.open(`Marked ${targets.length} attended`, 'Undo', { duration: 6000 })
-        .onAction().subscribe(() => this.unmarkAttended(justMarked));
+      this.snackbar.open(`Marked ${targets.length} attended`, 'OK', { duration: 4000 });
     } catch (e) {
       console.log(e);
       this.snackbar.open('Could not mark attended', 'OK', { duration: 4000 });
@@ -552,27 +568,71 @@ export class ProductFunnelComponent implements OnInit {
     }
   }
 
-  async unmarkAttended(rows: PRow[]) {
-    const targets = rows.filter(r => r.approvedRequestId && r.attended && !r.scanned);
-    if (!targets.length) return;
-    try {
-      const batch = writeBatch(this.firestore);
-      for (const r of targets) {
-        const eprRef = doc(this.firestore, 'event participation request', r.approvedRequestId!);
-        batch.update(eprRef, { status: 'approved' });
-        const epSnap = await getDocs(query(collection(this.firestore, 'events_profiles'),
-          where('event_ref', '==', this.arena['eventref']),
-          where('profile_ref', '==', doc(this.firestore, 'profile_data', r.profileid))));
-        epSnap.docs.forEach(d => batch.delete(d.ref));
+  // ---- Finalize attendance (after the event): mark no-show + lock the frozen snapshot ----
+  // Product-preserving: writes only namespaced fields (attendance on the request, snapshot on the arena doc).
+  get eventEnded(): boolean { return !!this.eventEnd && Date.now() > this.eventEnd; }
+  get alreadyFinalized(): boolean { return !!this.arena?.['epc_snapshot']; }
+  get pendingNoShow(): PRow[] {
+    return this.rows.filter(r => r.isApproved && !r.attended && r.attendanceState !== 'no_show');
+  }
+  get canFinalize(): boolean { return this.eventEnded && !this.alreadyFinalized; }
+  get showUpPct(): number {
+    const snap = this.arena?.['epc_snapshot'];
+    const pot = snap ? (snap['potential'] || 0) : this.counts.potential;
+    const att = snap ? (snap['attended'] || 0) : this.counts.attended;
+    return pot ? Math.round(att / pot * 100) : 0;
+  }
+
+  async finalizeAttendance() {
+    if (!this.canFinalize) return;
+    const targets = this.pendingNoShow.filter(r => r.approvedRequestId);
+    const ref = this.dialog.open(this.confirmTpl, {
+      width: '420px', autoFocus: false, panelClass: 'sx-dialog',
+      data: {
+        title: 'Finalize attendance',
+        body: targets.length
+          ? `Mark ${targets.length} approved participant(s) who did not attend as no-show, and lock this event's final numbers. Their product is not changed.`
+          : `Lock this event's final numbers. Everyone approved has attended.`,
+        warn: 'This cannot be undone.',
+        confirm: 'Finalize'
       }
-      await batch.commit();
-      targets.forEach(r => { r.attended = false; r.scanned = false; });
-      this.counts.attended = Math.max(0, this.counts.attended - targets.length);
+    });
+    const ok = await ref.afterClosed().toPromise();
+    if (!ok) return;
+
+    this.progress = { msg: 'Finalizing...', value: 0, total: Math.max(1, targets.length), eta: '' };
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
+    try {
+      for (let i = 0; i < targets.length; i += 400) {
+        const chunk = targets.slice(i, i + 400);
+        const batch = writeBatch(this.firestore);
+        chunk.forEach(r => {
+          batch.update(doc(this.firestore, 'event participation request', r.approvedRequestId!), {
+            attendance_state: 'no_show', attendance_source: 'manual', attendance_marked_at: serverTimestamp()
+          });
+        });
+        await batch.commit();
+        this.progress.value = Math.round(Math.min(i + chunk.length, targets.length) / targets.length * 100);
+      }
+      targets.forEach(r => { r.attendanceState = 'no_show'; });
       this.counts.noShow += targets.length;
-      this.snackbar.open(`Reverted ${targets.length}`, 'OK', { duration: 3000 });
+
+      const snapshot = {
+        potential: this.counts.potential, requested: this.counts.requested,
+        notRequested: this.counts.notRequested, eligible: this.counts.eligible,
+        noProduct: this.counts.noProduct, inQueue: this.counts.inQueue,
+        approved: this.counts.approved, attended: this.counts.attended, noShow: this.counts.noShow
+      };
+      await updateDoc(doc(this.firestore, 'arena events', this.arena['docid']), {
+        epc_snapshot: snapshot, epc_snapshot_at: serverTimestamp()
+      });
+      this.arena['epc_snapshot'] = snapshot;
+      this.snackbar.open(targets.length ? `Finalized — ${targets.length} marked no-show` : 'Event finalized', 'OK', { duration: 4000 });
     } catch (e) {
       console.log(e);
-      this.snackbar.open('Could not undo', 'OK', { duration: 4000 });
+      this.snackbar.open('Could not finalize', 'OK', { duration: 4000 });
+    } finally {
+      pref.close();
     }
   }
 
@@ -588,6 +648,48 @@ export class ProductFunnelComponent implements OnInit {
       this.selectedDeliverySet = seq;
       this.selectedQueueVariation = variation;
     });
+  }
+
+  // ---- Communications (sends to the current segment's participants) ----
+  get commsRecipients(): PRow[] { return this.segmentRows; }
+
+  sendWhatsApp() {
+    const recipients = this.commsRecipients;
+    if (!recipients.length) { this.snackbar.open('No participants to message', 'OK', { duration: 3000 }); return; }
+    const data = recipients.map(r => ({ profileid: r.profileid, name: r.name, email: r.email }));
+    this.dialog.open(WatiInputComponent, { data, width: '70vw', height: '80vh', disableClose: true })
+      .afterClosed().subscribe(result => {
+        if (!result) return;
+        const failed = result === 'failed' || result?.status === 'failed';
+        this.snackbar.open(failed ? 'WhatsApp send failed' : 'WhatsApp message sent', 'OK', { duration: 4000 });
+      });
+  }
+
+  sendNotification() {
+    const recipients = this.commsRecipients;
+    if (!recipients.length) { this.snackbar.open('No participants to notify', 'OK', { duration: 3000 }); return; }
+    const profileids = recipients.map(r => r.profileid);
+    this.dialog.open(AhNotificationComponent, { width: '60vw', maxHeight: '90vh', disableClose: true, autoFocus: false })
+      .afterClosed().subscribe(async result => {
+        if (!result) return;
+        try {
+          let image: string | null = null;
+          if (result['notificationimage']) {
+            const path = 'Notification Images/' + new Date().toISOString() + result['notificationimage'].name;
+            const up = await uploadBytes(ref(this.storage, path), result['notificationimage']);
+            image = await getDownloadURL(up.ref);
+          }
+          await this.guard.saveNotificationRecord({
+            title: result['title'], message: result['message'], subtitle: result['subtitle'] ?? null,
+            notificationtype: 'ahupdate', notificationimage: image, sticky: result['sticky'],
+            logged: true, landingpage: result['landingpage'], profileid: profileids
+          });
+          this.snackbar.open(`Notification sent to ${profileids.length}`, 'OK', { duration: 4000 });
+        } catch (e) {
+          console.log(e);
+          this.snackbar.open('Could not send notification', 'OK', { duration: 4000 });
+        }
+      });
   }
 
   exportList() {
