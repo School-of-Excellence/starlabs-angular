@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flutter e2e suite — How to run</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#30363d; --text:#e6edf3;
+    --muted:#9aa7b4; --accent:#2f81f7; --green:#3fb950; --amber:#d29922; --red:#f85149;
+    --code:#0b0f14; --codeText:#d6e1ee; --mono:"SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 22px 80px;}
+  header.hero{border:1px solid var(--border);border-radius:14px;padding:26px 28px;
+    background:linear-gradient(135deg,#161b22,#10202e);margin-bottom:30px;}
+  header.hero h1{margin:0 0 6px;font-size:27px;letter-spacing:-.3px}
+  header.hero p{margin:0;color:var(--muted)}
+  .pill{display:inline-block;font-weight:600;font-size:12.5px;padding:3px 10px;border-radius:999px;
+    background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.35);margin-top:14px}
+  h2{font-size:20px;margin:38px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--border)}
+  h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:8px}
+  h3{font-size:16px;margin:22px 0 8px;color:#cdd9e5}
+  p,li{color:var(--text)} a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  code.inline{font-family:var(--mono);font-size:13px;background:#22272e;border:1px solid var(--border);
+    border-radius:5px;padding:1px 6px;color:#a8c7fa}
+  .codeblock{position:relative;margin:12px 0}
+  pre{background:var(--code);border:1px solid var(--border);border-radius:10px;margin:0;
+    padding:16px 16px;overflow:auto;font-family:var(--mono);font-size:13px;color:var(--codeText)}
+  pre .c{color:#6b7785}      /* comment */
+  pre .k{color:#79c0ff}      /* keyword/cmd */
+  pre .s{color:#7ee787}      /* string */
+  pre .v{color:#ffa657}      /* var */
+  .copy{position:absolute;top:9px;right:9px;font:600 11px var(--mono);color:var(--muted);
+    background:#22272e;border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer}
+  .copy:hover{color:var(--text);border-color:#4b5563}
+  .copy.ok{color:var(--green);border-color:rgba(63,185,80,.45)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{border:1px solid var(--border);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#cdd9e5;font-weight:600}
+  td.mono,th.mono{font-family:var(--mono);font-size:12.5px}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  .note{border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;
+    background:var(--panel);padding:12px 16px;margin:14px 0}
+  .note.warn{border-left-color:var(--amber);background:rgba(210,153,34,.07)}
+  .note.danger{border-left-color:var(--red);background:rgba(248,81,73,.07)}
+  .note.good{border-left-color:var(--green);background:rgba(63,185,80,.07)}
+  .note b{color:#fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+  .stat{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px}
+  .stat .big{font-size:24px;font-weight:700} .stat .lbl{color:var(--muted);font-size:12.5px}
+  ul.tight{margin:8px 0;padding-left:22px} ul.tight li{margin:3px 0}
+  footer{margin-top:46px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);padding-top:16px}
+  kbd{font-family:var(--mono);font-size:11px;background:#22272e;border:1px solid var(--border);
+    border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>Flutter e2e test suite — How to run</h1>
+  <p>End-to-end tests for the native <code class="inline">breakthroughs-flutter</code> app, driven on the iOS
+     simulator against a disposable Firebase test project. One marquee <b>journey-flow</b> walk + 10
+     per-area <b>individual-functionality</b> buckets.</p>
+  <span class="pill">● 11 / 11 buckets GREEN · 171 real-UI screenshots · 11 users</span>
+</header>
+
+<div class="grid">
+  <div class="stat"><div class="big">11</div><div class="lbl">buckets, all green</div></div>
+  <div class="stat"><div class="big">171</div><div class="lbl">screenshots (anti-circular)</div></div>
+  <div class="stat"><div class="big">~5&nbsp;min</div><div class="lbl">per bucket (cached build)</div></div>
+  <div class="stat"><div class="big">slabs-queue-e2e-exdcz</div><div class="lbl">test project (never prod)</div></div>
+</div>
+
+<div class="note danger">
+  <b>Safety rails (non-negotiable).</b> These tests ONLY touch the disposable test project
+  <code class="inline">slabs-queue-e2e-exdcz</code> — never production (<code class="inline">fir-sample-aae4a</code>).
+  ATC data is off-limits. The seeders <code class="inline">initAdmin()</code> hard-abort unless they're pointed at the test project.
+</div>
+
+<h2><span class="n">1</span>Prerequisites (one-time)</h2>
+<table>
+  <tr><th>Tool</th><th>Version / location</th><th>Check</th></tr>
+  <tr><td>Flutter</td><td class="mono">3.44.1 — /opt/homebrew/bin/flutter</td><td class="mono">flutter --version</td></tr>
+  <tr><td>Xcode + iOS simulator</td><td class="mono">iPhone 17 Pro (UDID F32D5A01-E3AA-42E7-A578-1DA897F3E5C8)</td><td class="mono">xcrun simctl list devices</td></tr>
+  <tr><td>Node.js</td><td>for the seeders &amp; runner (<code class="inline">.cjs</code>)</td><td class="mono">node --version</td></tr>
+  <tr><td>Firebase CLI</td><td>to deploy composite indexes</td><td class="mono">firebase --version</td></tr>
+  <tr><td>Service account</td><td class="mono">~/solarcode/serviceAccountKeyProduction.json (read-only) + test-project creds</td><td>—</td></tr>
+</table>
+
+<h3>Boot the simulator (it must be running)</h3>
+<div class="codeblock"><button class="copy">copy</button><pre><span class="k">xcrun</span> simctl boot F32D5A01-E3AA-42E7-A578-1DA897F3E5C8   <span class="c"># ignore "already booted"</span>
+<span class="k">open</span> -a Simulator</pre></div>
+
+<h3>Install Flutter deps (only after a clean / first run)</h3>
+<div class="codeblock"><button class="copy">copy</button><pre><span class="k">cd</span> breakthroughs-flutter &amp;&amp; /opt/homebrew/bin/flutter pub get &amp;&amp; <span class="k">cd</span> -</pre></div>
+
+<h2><span class="n">2</span>Quick start — run the whole suite</h2>
+<p>The orchestrator seeds the 200-user cohort + every bucket's preconditions, then runs the journey-flow walk
+   and all 10 bucket tests serially, writing screenshots + regenerating <code class="inline">RESULTS.md</code>.
+   Run it from the <code class="inline">e2e/</code> directory:</p>
+<div class="codeblock"><button class="copy">copy</button><pre><span class="k">cd</span> e2e
+
+<span class="c"># seed everything, then run everything (default):</span>
+<span class="k">node</span> flutter-suite/run-suite.cjs --all
+
+<span class="c"># or split the two phases:</span>
+<span class="k">node</span> flutter-suite/run-suite.cjs --seed    <span class="c"># (re)seed cohort + all bucket preconditions</span>
+<span class="k">node</span> flutter-suite/run-suite.cjs --run     <span class="c"># run all tests (assumes already seeded)</span>
+
+<span class="c"># run just a subset:</span>
+<span class="v">ONLY</span>=queue,forms,journey <span class="k">node</span> flutter-suite/run-suite.cjs --run</pre></div>
+
+<div class="note good"><b>Evidence lands in</b>
+  <code class="inline">breakthroughs-flutter/mobile-evidence/&lt;bucket&gt;/</code> — one folder per bucket, files named in
+  drive order (<code class="inline">&lt;bucket&gt;-&lt;step&gt;-&lt;what&gt;.png</code>). Browse with
+  <code class="inline">open breakthroughs-flutter/mobile-evidence</code> then select-all + <kbd>Space</kbd> for a Quick Look slideshow.</p>
+</div>
+
+<h2><span class="n">3</span>Run a single bucket (the fast iterate loop)</h2>
+<p>Each run <b>re-seeds first</b> (the app mutates its data), then drives one test. Run from
+  <code class="inline">e2e/flutter-suite/</code>. Substitute <code class="inline">&lt;bucket&gt;</code> and the user
+  <code class="inline">&lt;idx&gt;</code> from the table below:</p>
+<div class="codeblock"><button class="copy">copy</button><pre><span class="k">cd</span> e2e/flutter-suite
+
+<span class="k">node</span> seed-<span class="v">&lt;bucket&gt;</span>.cjs --seed \
+  &amp;&amp; <span class="v">SKIP_PUBGET</span>=1 \
+     <span class="v">TEST_TARGET</span>=integration_test/features/<span class="v">&lt;bucket&gt;</span>_test.dart \
+     <span class="v">E2E_EMAIL</span>=participant<span class="v">&lt;idx&gt;</span>+jrny@example.com \
+     <span class="v">E2E_LABEL</span>=<span class="v">&lt;bucket&gt;</span> \
+     <span class="v">E2E_EVIDENCE</span>=<span class="v">&lt;bucket&gt;</span> \
+     <span class="k">node</span> run-flutter-test.cjs</pre></div>
+
+<h3>Concrete example — the <code class="inline">journey</code> bucket (user 92)</h3>
+<div class="codeblock"><button class="copy">copy</button><pre><span class="k">cd</span> e2e/flutter-suite
+<span class="k">node</span> seed-journey.cjs --seed \
+  &amp;&amp; <span class="v">SKIP_PUBGET</span>=1 <span class="v">TEST_TARGET</span>=integration_test/features/journey_test.dart \
+     <span class="v">E2E_EMAIL</span>=participant92+jrny@example.com <span class="v">E2E_LABEL</span>=journey <span class="v">E2E_EVIDENCE</span>=journey \
+     <span class="k">node</span> run-flutter-test.cjs</pre></div>
+<p>A green run prints <code class="inline">✓ &lt;bucket&gt; PASSED · N screenshots</code> (exit 0). The journey-flow
+   walk uses <code class="inline">integration_test/journey_flow_test.dart</code> (no <code class="inline">features/</code> prefix), user 170.</p>
+
+<h3>Bucket → user → test</h3>
+<table>
+  <tr><th>Bucket (<code class="inline">E2E_LABEL</code>)</th><th class="mono">&lt;idx&gt;</th><th class="mono">TEST_TARGET</th><th>Shots</th></tr>
+  <tr><td>journey-flow (marquee)</td><td class="mono">170</td><td class="mono">integration_test/journey_flow_test.dart</td><td>7</td></tr>
+  <tr><td>auth</td><td class="mono">90</td><td class="mono">…/features/auth_test.dart</td><td>19</td></tr>
+  <tr><td>shell</td><td class="mono">91</td><td class="mono">…/features/shell_test.dart</td><td>29</td></tr>
+  <tr><td>journey</td><td class="mono">92</td><td class="mono">…/features/journey_test.dart</td><td>17</td></tr>
+  <tr><td>queue</td><td class="mono">93</td><td class="mono">…/features/queue_test.dart</td><td>15</td></tr>
+  <tr><td>forms</td><td class="mono">94</td><td class="mono">…/features/forms_test.dart</td><td>5</td></tr>
+  <tr><td>appointments</td><td class="mono">95</td><td class="mono">…/features/appointments_test.dart</td><td>10</td></tr>
+  <tr><td>events</td><td class="mono">96</td><td class="mono">…/features/events_test.dart</td><td>21</td></tr>
+  <tr><td>content</td><td class="mono">97</td><td class="mono">…/features/content_test.dart</td><td>20</td></tr>
+  <tr><td>workshops</td><td class="mono">150</td><td class="mono">…/features/workshops_test.dart</td><td>9</td></tr>
+  <tr><td>social</td><td class="mono">151</td><td class="mono">…/features/social_test.dart</td><td>19</td></tr>
+</table>
+<p style="color:var(--muted);font-size:13px">Optional env knobs: <code class="inline">E2E_SIM_UDID</code> (override the simulator),
+  <code class="inline">E2E_DEFINES</code> (extra <code class="inline">--dart-define</code>s), <code class="inline">SKIP_PUBGET=1</code> (skip pub-get for speed once warm).</p>
+
+<h2><span class="n">4</span>Firestore composite indexes</h2>
+<p>Some screens need composite indexes on the test project. They're declared in
+  <code class="inline">firestore.indexes.json</code> and deployed with a <b>dedicated</b> config:</p>
+<div class="codeblock"><button class="copy">copy</button><pre><span class="k">firebase</span> deploy --only firestore:indexes \
+  --config firebase.indexes.json \
+  --project slabs-queue-e2e-exdcz \
+  --non-interactive</pre></div>
+<div class="note danger"><b>Footgun:</b> the main <code class="inline">firebase.json</code> is hosting-only and points at
+  <b>PRODUCTION</b>. ALWAYS pass <code class="inline">--config firebase.indexes.json --project slabs-queue-e2e-exdcz</code>.
+  Index builds take 1–5 min; a run started too early fails with <i>"index currently building"</i> — wait and re-run.</div>
+
+<h2><span class="n">5</span>Gotchas (read before debugging a red run)</h2>
+<div class="note warn"><b>Always <code class="inline">flutter analyze</code> the test before running.</b> A compile error makes
+  <code class="inline">flutter drive</code> <i>silently run the LAST successful build</i> (you'll debug the wrong test).
+  <div class="codeblock" style="margin-top:8px"><button class="copy">copy</button><pre><span class="k">cd</span> breakthroughs-flutter &amp;&amp; /opt/homebrew/bin/flutter analyze integration_test/features/&lt;bucket&gt;_test.dart</pre></div>
+</div>
+<ul class="tight">
+  <li><b>Re-seed before every run.</b> The app writes to Firestore during the test, so each run must reset
+      its preconditions — the per-bucket command above does <code class="inline">node seed-&lt;bucket&gt;.cjs --seed &amp;&amp; …</code> for you.</li>
+  <li><b>Read the FULL log, not the tail.</b> The runner only prints the last 30 lines on failure; the complete
+      output is at <code class="inline">$TMPDIR/flutterdrive-&lt;label&gt;.log</code> — grep it for the real cause
+      (<code class="inline">requires an index</code>, <code class="inline">was thrown</code>, your <code class="inline">CONTENT/AUTH/…[label]:</code> prints).</li>
+  <li><b><code class="inline">breakthroughs-flutter</code> is its own nested git repo.</b> Commit test files there
+      (<code class="inline">git -C breakthroughs-flutter add … &amp;&amp; commit</code>); seeds / indexes / RESULTS commit to the parent repo.</li>
+  <li><b>One Flutter build at a time.</b> Don't run two flutter drives against this repo's <code class="inline">build/ios</code>
+      concurrently — they corrupt each other. If a run shows output from a different test, kill the other session and <code class="inline">flutter clean</code> once.</li>
+  <li><b>Sim-blocked legs are honest.</b> Real-media players (BetterPlayer/just_audio), CallKit/push, camera/QR,
+      OpenAI and external links can't run headless — those legs are drive-to-screen + render-asserted and labelled
+      in <code class="inline">RESULTS.md</code>, never faked green.</li>
+</ul>
+
+<h2><span class="n">6</span>What "green" means</h2>
+<ul class="tight">
+  <li>Runner prints <code class="inline">✓ &lt;bucket&gt; PASSED · N screenshots</code> and exits <code class="inline">0</code>;
+      the flutter log ends with <code class="inline">All tests passed.</code></li>
+  <li>Every functional assertion is <b>anti-circular</b>: it polls the server for the doc the <i>app</i> wrote
+      (e.g. <code class="inline">profile_data.last_login</code>, <code class="inline">clientissue</code>,
+      <code class="inline">arenalayers.attended</code>), never a value the seed wrote.</li>
+  <li>A trailing <code class="inline">+1 -1 … Some tests failed</code> with exit 0 + <code class="inline">All tests passed.</code>
+      is benign post-test (tearDownAll) noise — the runner's <code class="inline">✓ PASSED</code> verdict is authoritative.</li>
+</ul>
+
+<footer>
+  Suite: <code class="inline">e2e/flutter-suite/</code> · matrix &amp; per-bucket detail: <code class="inline">RESULTS.md</code> ·
+  user/index map: <code class="inline">SUITE-PLAN.md</code> · why-it-landed: <code class="inline">specs/journals/2026-06-12-flutter-e2e-suite-all-green.md</code>.
+  <br>Generated for the StarLabs / breakthroughs-flutter e2e suite.
+</footer>
+
+</div>
+<script>
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = btn.parentElement.querySelector('pre');
+      var text = pre.innerText.replace(/\s+#.*$/gm, function(m){return m;}); // keep as-is
+      navigator.clipboard.writeText(pre.innerText).then(function(){
+        var old = btn.textContent; btn.textContent='copied ✓'; btn.classList.add('ok');
+        setTimeout(function(){ btn.textContent=old; btn.classList.remove('ok'); }, 1400);
+      });
+    });
+  });
+</script>
+</body>
+</html>
