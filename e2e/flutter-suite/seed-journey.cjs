@@ -176,9 +176,12 @@ async function seedBucket() {
   await ref('participantJourneySequence', B.pjsDoc).set({
     docid: B.pjsDoc, profileid: P, journeyref: ref('journey', J1), journeystatus: 'ongoing',
     subscriptionstart: past(90), subscriptionend: future(90),
-    // getMyJourney (participantJourneySequence.dart:176) iterates doc['products'] UNGUARDED (.length) and
-    // reads each products[j].productref(.path)/tentativestart — without a products[] list it crashes.
-    products: [{ productref: ref('products', PA), tentativestart: past(80), tentativeend: future(80), productstatus: 'ongoing' }],
+    // getMyJourney (participantJourneySequence.dart:176-188) iterates doc['products'] UNGUARDED (.length),
+    // then each products[j].productref(.path)/['status'], then products[j]['delivery'].length (188) — all
+    // unguarded. So products[] needs productref + status + a delivery[] list (empty is a valid just-started
+    // state; the deliverable-sequence render is covered separately by F16). The "Request Clarity Call"
+    // button (item 0) only needs the journey list non-empty, which this single product satisfies.
+    products: [{ productref: ref('products', PA), tentativestart: past(80), status: 'ongoing', delivery: [] }],
     participantproducts: [PPA], productref: [ref('products', PA)], ...tag,
   }, { merge: true });
   await ref('deliverables', B.pjsDeliverable).set({
