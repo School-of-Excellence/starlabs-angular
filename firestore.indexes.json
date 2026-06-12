@@ -683,6 +683,15 @@
       ]
     },
     {
+      "collectionGroup": "content analytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "playlistid", "order": "ASCENDING" },
+        { "fieldPath": "profileid", "order": "ASCENDING" },
+        { "fieldPath": "logdate", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "logs",
       "queryScope": "COLLECTION",
       "fields": [
