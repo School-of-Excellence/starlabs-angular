@@ -21,6 +21,14 @@
 .ov-eyebrow { font-size: 14px; font-weight: 600; color: rgba(60,60,67,.6); letter-spacing: .2px; padding-top: 6px; }
 .ov-title { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin: 3px 0 4px; line-height: 1.05; }
 .ov-sub { font-size: 15px; color: rgba(60,60,67,.6); margin-bottom: 16px; }
+.ov-toggle { display: inline-flex; background: rgba(118,118,128,.12); border-radius: 9px; padding: 2px; margin: 0 0 14px; }
+.ov-seg { border: none; background: transparent; font-family: inherit; font-size: 13px; font-weight: 600;
+  color: rgba(60,60,67,.7); padding: 5px 16px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
+.ov-seg.on { background: #fff; color: #1c1c1e; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.ov-seg:focus-visible { outline: 2px solid #007aff; outline-offset: 2px; }
+.ov-frozen { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: rgba(60,60,67,.45); }
+.ov-frozen mat-icon { font-size: 14px; height: 14px; width: 14px; }
+
 .ov-filters { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .ov-search { width: 300px; }
 .ov-showing { font-size: 12.5px; color: rgba(60,60,67,.55); }
@@ -36,6 +44,9 @@
 :host ::ng-deep .mdc-notched-outline__trailing { border-radius: 0 10px 10px 0; border-color: rgba(60,60,67,.2); }
 :host ::ng-deep .mdc-notched-outline__notch { border-color: rgba(60,60,67,.2); }
 :host ::ng-deep .mat-mdc-paginator { font-family: inherit; background: transparent; }
+:host ::ng-deep .mat-mdc-select-value-text { color: #1c1c1e; font-family: inherit; }
+:host ::ng-deep .mat-mdc-select-arrow { color: rgba(60,60,67,.5); }
+:host ::ng-deep .mat-mdc-select-placeholder { color: rgba(60,60,67,.5); }
 :host ::ng-deep .mat-mdc-form-field-icon-suffix .mat-icon { font-size: 18px; width: 18px; height: 18px; color: rgba(60,60,67,.45); }
 :host ::ng-deep .ov-empty .mdc-button { --mdc-text-button-label-text-color: #007aff; }
 

@@ -96,6 +96,7 @@ interface FormItem { name: string; date: Date | null; }
 interface ReportItem { types: string; status: string; date: Date | null; }
 interface BreakthroughItem { message: string; date: Date | null; }
 interface AelItem { status: string; date: Date | null; }
+interface CoachNoteItem { text: string; author: string; date: Date | null; }
 
 /** Composer type switch options. */
 type ComposerType = 'call' | 'health' | 'schedule' | 'note';
@@ -276,6 +277,32 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
               <option [ngValue]="'__unassign__'">Unassign</option>
               <option *ngFor="let c of data.coaches" [ngValue]="c.id">{{ c.name }}</option>
             </select>
+          </div>
+        </section>
+
+        <!-- Coach notes -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('notes')" (click)="toggleCollapsed('notes')">
+            <span>Coach notes <span class="so-count" *ngIf="!coachNotesLoading">{{ coachNotes.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('notes')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('notes')">
+            <div *ngIf="coachNotesLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!coachNotesLoading">
+              <ul class="so-notes" *ngIf="coachNotes.length; else noNotes">
+                <li *ngFor="let n of (coachNotes | slice:0:(isShowAll('notes') ? coachNotes.length : 3))" class="so-cnote">
+                  <p class="so-cnote-text">{{ n.text }}</p>
+                  <div class="so-cnote-meta">
+                    <span class="so-cnote-author">{{ n.author }}</span>
+                    <span class="so-sub" *ngIf="n.date">{{ n.date | date:'mediumDate' }}</span>
+                  </div>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="coachNotes.length > 3" (click)="toggleShowAll('notes')">
+                {{ isShowAll('notes') ? 'Show less' : 'Show all (' + coachNotes.length + ')' }}
+              </button>
+              <ng-template #noNotes><p class="so-empty">No coach notes yet.</p></ng-template>
+            </ng-container>
           </div>
         </section>
 
@@ -664,6 +691,19 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       letter-spacing: 0.05em; color: var(--so-muted);
     }
 
+    /* coach notes — stacked cards: full note text + author/date footer */
+    .so-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .so-cnote {
+      padding: 10px 12px; border-radius: 12px; background: var(--so-surface-soft, rgba(120,120,128,.06));
+      border: 1px solid var(--so-border-soft);
+    }
+    .so-cnote-text { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--so-ink); white-space: pre-wrap; }
+    .so-cnote-meta {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 6px;
+      font-size: 11.5px;
+    }
+    .so-cnote-author { font-weight: 600; color: var(--so-ink2); }
+
     .so-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .so-list-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
     .so-list-main { font-size: 12.5px; color: var(--so-ink); }
@@ -857,6 +897,8 @@ export class ParticipantSlideoverComponent implements OnInit {
   breakthroughsLoading = true;
   ael: AelItem[] = [];
   aelLoading = true;
+  coachNotes: CoachNoteItem[] = [];
+  coachNotesLoading = true;
 
   // How many rows each intel section FETCHES (most-recent-first). Display defaults to the
   // first 3 (the template slice handles that); a larger fetch lets "Show all" reveal real data.
@@ -916,6 +958,7 @@ export class ParticipantSlideoverComponent implements OnInit {
     void this.loadReports();
     void this.loadBreakthroughs();
     void this.loadAel();
+    void this.loadCoachNotes();
   }
 
   private async loadTickets(): Promise<void> {
@@ -1135,6 +1178,46 @@ export class ParticipantSlideoverComponent implements OnInit {
       console.warn('slideover AEL read failed', e);
     } finally {
       this.aelLoading = false;
+    }
+  }
+
+  /** COACH NOTES — `participant metadata` doc (id == profileid), nested `notes.ahnotes[]`
+   *  ({ givenby, ahnotes, date }). This is the A&H CRM coach-notes surface and is readable here
+   *  (unlike healthtracker_activity, which has no dev rule). Authors (givenby = a coach profileid)
+   *  are resolved to names from their own `participant metadata` docs in one parallel batch. */
+  private async loadCoachNotes(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      const snap = await getDoc(doc(this.firestore, 'participant metadata', pid));
+      const raw: any[] = (snap.data() as any)?.['notes']?.['ahnotes'] ?? [];
+      const items: CoachNoteItem[] = raw
+        .map(n => ({
+          text: (n?.['ahnotes'] ?? '').toString().trim(),
+          givenby: (n?.['givenby'] ?? '').toString(),
+          date: this.toDate(n?.['date']),
+        }))
+        .filter(n => n.text)
+        .map(n => ({ text: n.text, author: '', date: n.date, givenby: n.givenby } as any));
+
+      // Resolve distinct author ids -> names in parallel; fall back to 'Coach' if missing.
+      const ids = [...new Set(items.map((n: any) => n.givenby).filter(Boolean))];
+      const names = new Map<string, string>();
+      await Promise.all(ids.map(async id => {
+        try {
+          const a = await getDoc(doc(this.firestore, 'participant metadata', id));
+          const name = (a.data() as any)?.['name'];
+          if (name) names.set(id, name.toString());
+        } catch { /* leave unresolved */ }
+      }));
+
+      this.coachNotes = items
+        .map((n: any) => ({ text: n.text, date: n.date, author: names.get(n.givenby) || 'Coach' }))
+        .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
+        .slice(0, this.sectionCap);
+    } catch (e) {
+      console.warn('slideover coach notes read failed', e);
+    } finally {
+      this.coachNotesLoading = false;
     }
   }
 
