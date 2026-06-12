@@ -129,6 +129,9 @@ async function seedBucket() {
   for (const d of _blPrev.docs) { await d.ref.delete().catch(() => {}); }
   const _ciPrev = await db.collection('clientissue').where('profileid', '==', PID).get().catch(() => ({ docs: [] }));
   for (const d of _ciPrev.docs) { const _m = await d.ref.collection('messages').get().catch(() => ({ docs: [] })); for (const mm of _m.docs) { await mm.ref.delete().catch(() => {}); } await d.ref.delete().catch(() => {}); }
+  // (4) profile_data.accountdeleted — the delete-account feature sets it true; reset to false so the
+  // delete-account pre-state (expect accountdeleted==false before the sheet) holds on every re-run.
+  await db.collection('profile_data').doc(PID).set({ accountdeleted: false }, { merge: true }).catch(() => {});
 
   const bw = db.bulkWriter();
   bw.onWriteError((err) => err.failedAttempts < 5);
