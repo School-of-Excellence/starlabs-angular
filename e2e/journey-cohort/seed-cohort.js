@@ -179,7 +179,7 @@ async function seedCohort() {
     W(ref('participantsproduct', ppB), { docid: ppB, profileid: P, productref: ref('products', PB), packageref: ref('package', CAT.package), status: 'ongoing', mode: 'Priority Mode', deliverymode: 'Priority Mode', sequenceorder: 1, ...tag });
 
     // (4) mode / journey assignment
-    W(ref('participant mode checklist', `${RUN}_pmc_${i}`), { profileid: P, mode: 'Event Mode', productref: ref('products', PA), participantproductid: ppA, aelid: null, widget: [], createddate: past(40), ...tag });
+    W(ref('participant mode checklist', `${RUN}_pmc_${i}`), { docid: `${RUN}_pmc_${i}`, profileid: P, mode: 'Event Mode', productref: ref('products', PA), participantproductid: ppA, aelid: null, widget: [], createddate: past(40), ...tag }); // docid REQUIRED: homeContent.dart:1800 batch.update(participant mode checklist/{docid}) → .doc(undefined) not-found without it
     W(ref('participant metadata', P), { docid: P, profileid: P, name: `Cohort User ${i} ${RUN}`, email: email.toLowerCase(), participantmode: 'Event Mode', activejourney: J1, customerstatus: 'active', financialstatus: 'regular', pp_totalpaid: '50000', pp_totalpurchasevalue: '100000', activeproduct: [PA, PB], consumedproducts: [], unconsumedproducts: [], productmode: ['Event Mode'], cosmeticmode: mode, ...tag });
 
     // (5) queue delivery + appointment delivery (the Flutter-home render chain + a completed appt)
