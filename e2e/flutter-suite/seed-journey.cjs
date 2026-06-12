@@ -214,13 +214,16 @@ async function seedBucket() {
     docid: P, profileid: P, delete: false, summary: `Your evolution is on track ${RUN}.`,
     evolutionyearsaved: 2, createddate: past(20), ...tag,
   }, { merge: true });
+  // NOTE: AELVersion.getParticipantAEL (aelVersion.dart:138) sorts these by `a["created"].toDate()` —
+  // it reads `created`, NOT `createddate`; without a `created` Timestamp the comparator does null.compareTo
+  // and throws NoSuchMethodError (surfaces via FlutterError.onError → fails F8). Seed BOTH keys.
   await ref('interim crossover', B.cross0).set({
-    docid: B.cross0, aelid: B.ael, profileid: P, validatedby: null, createddate: past(50),
+    docid: B.cross0, aelid: B.ael, profileid: P, validatedby: null, created: past(50), createddate: past(50),
     crossovermetric: { Health: { metric: null } }, ...tag,
   }, { merge: true });
   await ref('interim crossover', B.cross1).set({
     docid: B.cross1, aelid: B.ael, profileid: P, validatedby: ref('profile_data', `${RUN}_pf_eis`),
-    validateddate: past(10), createddate: past(10),
+    validateddate: past(10), created: past(10), createddate: past(10),
     crossovermetric: { Health: { metric: 7 }, 'Personal Genius': { metric: 6 } }, ...tag,
   }, { merge: true });
 
