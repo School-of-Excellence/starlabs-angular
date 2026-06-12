@@ -197,6 +197,22 @@ async function seedBucket() {
   const PPB = `${RUN}_pp_${IDX}_b`;
   await ref('participantsproduct', PPA).set({ subscriptionstart: past(90), subscriptionend: future(90) }, { merge: true });
   await ref('participantsproduct', PPB).set({ subscriptionstart: past(90), subscriptionend: future(90) }, { merge: true });
+  // ParticipantDeliverySequence (F16) build line 372 reads sequence["sequenceref"].path UNGUARDED, but ONLY
+  // when sequence["label"] is empty — the cohort's participantdeliverysequence delivery items carry no label.
+  // Overwrite THIS user's participantdeliverysequence with LABELED delivery items (journey-bucket-scoped) so
+  // the ternary takes the safe Text(label) branch and never dereferences a null/loose sequenceref. mapProduct-
+  // Delivery is keyed by participantproductid (ppA/ppB), matching the participantsproduct docids the build iterates.
+  await ref('participantdeliverysequence', P).set({
+    docid: P, profileid: P, products: [
+      { participantproductid: PPA, productref: ref('products', PA), delivery: [
+        { type: 'queue', status: 'ongoing', label: `Queue Delivery ${RUN}`, sequenceref: ref('deliverables', B.pjsDeliverable) },
+        { type: 'event', status: 'completed', label: `Event Session ${RUN}`, sequenceref: ref('deliverables', B.pjsDeliverable) },
+      ] },
+      { participantproductid: PPB, productref: ref('products', PA), delivery: [
+        { type: 'appointment', status: 'completed', label: `Onboarding Call ${RUN}`, sequenceref: ref('deliverables', B.pjsDeliverable) },
+      ] },
+    ], ...tag,
+  }, { merge: true });
 
   // ──────────────────────────────────────────────────────────────────────────────────────────────
   // 4) STATIC META DATA — wishlist (family + self trailer), evolve (video), Launch Your Legacy,
@@ -277,7 +293,10 @@ async function seedBucket() {
   // ──────────────────────────────────────────────────────────────────────────────────────────────
   await ref('content_urls', B.contentUrl).set({ docid: B.contentUrl, id: B.contentUrl, videoname: `Journey Content ${RUN}`, type: 'generalcontent', ...trailer, ...tag }, { merge: true });
   await ref('solar voice playlist', B.solarVoice).set({ id: B.solarVoice, docid: B.solarVoice, playlistname: `Journey Solar Voice ${RUN}`, ...tag }, { merge: true });
-  await ref('adsplaylist', B.adsPlaylist).set({ docid: B.adsPlaylist, id: B.adsPlaylist, name: `Journey Ads ${RUN}`, ...tag }, { merge: true });
+  // AdsPlaylistQueue (F14 ModePlaylist ads row) reads adsthumbnail as a CachedNetworkImage imageUrl (String,
+  // REQUIRED → null throws "Null is not a String", adsplaylistQueue.dart:134) and startdate/enddate.toDate()
+  // (:201/:211). Seed all three (+ adstitle/adstype for the labels).
+  await ref('adsplaylist', B.adsPlaylist).set({ docid: B.adsPlaylist, id: B.adsPlaylist, name: `Journey Ads ${RUN}`, adsthumbnail: 'https://example.com/e2e-ads.png', adstitle: `Journey Ad ${RUN}`, adstype: 'Promo', startdate: past(10), enddate: future(30), ...tag }, { merge: true });
   await ref('series', B.series).set({ id: B.series, docid: B.series, seriesname: `Journey EiFlix ${RUN}`, ...tag }, { merge: true });
 
   // ──────────────────────────────────────────────────────────────────────────────────────────────
