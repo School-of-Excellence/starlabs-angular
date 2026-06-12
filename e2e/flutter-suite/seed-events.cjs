@@ -146,6 +146,10 @@ async function seedBucket() {
   W(ref('event collection', ID.liveEvent), {
     id: ID.liveEvent, docid: ID.liveEvent, name: `LIVE Arena Event ${RUN}`, eventname: `LIVE Arena Event ${RUN}`,
     start_date: past(1), end_date: future(1), eventdate: past(1), arenaeventid: ID.liveArena,
+    // delete:false — MastercalendarClone.getDataFromFireStore (F9) does `if(element["delete"])` UNGUARDED on
+    // every start_date>=startOfMonth event; a missing field throws "Null is not a subtype of bool" (swallowed
+    // un-awaited, but it aborts the calendar body). false lets the calendar/marathon list actually populate.
+    delete: false,
     eventtyperef: ref('delivery events', ID.liveDeliveryEvents), atcmodel: null, ...tag,
   });
   W(ref('delivery events', ID.liveDeliveryEvents), {
@@ -223,6 +227,7 @@ async function seedBucket() {
   W(ref('event collection', ID.futureEvent), {
     id: ID.futureEvent, docid: ID.futureEvent, name: `Upcoming Event ${RUN}`, eventname: `Upcoming Event ${RUN}`,
     start_date: future(14), end_date: future(15), eventdate: future(14),
+    delete: false, // see liveEvent note — F9 calendar reads element["delete"] unguarded
     eventtyperef: ref('delivery events', ID.futureDeliveryEvents), atcmodel: null, ...tag,
   });
   W(ref('delivery events', ID.futureDeliveryEvents), {
@@ -233,7 +238,7 @@ async function seedBucket() {
   // ── 4) a FUTURE non-deleted arena event for ArenaEventRequest ("Yes, I'm In!") ──────────────────
   W(ref('event collection', ID.futureArenaEvent), {
     id: ID.futureArenaEvent, docid: ID.futureArenaEvent, name: `Upcoming Arena ${RUN}`, eventname: `Upcoming Arena ${RUN}`,
-    start_date: future(20), end_date: future(21), eventdate: future(20), atcmodel: null, ...tag,
+    start_date: future(20), end_date: future(21), eventdate: future(20), delete: false, atcmodel: null, ...tag,
   });
   W(ref('arena events', ID.futureArena), {
     id: ID.futureArena, docid: ID.futureArena, eventref: ref('event collection', ID.futureArenaEvent),

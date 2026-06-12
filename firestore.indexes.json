@@ -627,68 +627,128 @@
       "collectionGroup": "supportchat",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "members", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "isdelete", "order": "ASCENDING" },
-        { "fieldPath": "last_modification", "order": "DESCENDING" }
+        {
+          "fieldPath": "members",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "isdelete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "last_modification",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "queue studio pairing",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "queueref", "order": "ASCENDING" },
-        { "fieldPath": "checkin", "order": "ASCENDING" },
-        { "fieldPath": "studioin", "order": "ASCENDING" }
+        {
+          "fieldPath": "queueref",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "checkin",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "studioin",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "recommended mix playlist",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "profileid", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "stagechat",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "stage", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "DESCENDING" }
+        {
+          "fieldPath": "stage",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "postcollection",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "profileid", "order": "ASCENDING" },
-        { "fieldPath": "created", "order": "DESCENDING" }
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "participantplanning",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "profileid", "order": "ASCENDING" },
-        { "fieldPath": "monthstartdate", "order": "ASCENDING" }
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "monthstartdate",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "content analytics",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "from", "order": "ASCENDING" },
-        { "fieldPath": "profileid", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "DESCENDING" }
+        {
+          "fieldPath": "from",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "content analytics",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "playlistid", "order": "ASCENDING" },
-        { "fieldPath": "profileid", "order": "ASCENDING" },
-        { "fieldPath": "logdate", "order": "DESCENDING" }
+        {
+          "fieldPath": "playlistid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
@@ -1060,6 +1120,60 @@
         {
           "fieldPath": "starttime",
           "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "appointment",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cancelled",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "starttime",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "workshopQA",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "workshopId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "replyid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isdelete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "CTD",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "time",
+          "order": "DESCENDING"
         }
       ]
     }

@@ -169,7 +169,12 @@ async function seedBucket() {
       workshopStartDate: past(2), workshopEndDate: future(30),
       day: '1', price: '0', pricestriked: '0',
       workshopoverview: 'Overview of the seeded workshop.',
-      testimonialmap: [], faq: [], knowinfo: [], joinus: [], sneakpeak: [], whyworkshop: [],
+      // EiFlixWorkshop.buildLeftSideContent (workshopenrollment.dart:1185/1209) renders these as Text(String)
+      // POSITIONALS, UNFILTERED by the test's onError list — a null shortdescription throws "non-null String
+      // required", and a List whyworkshop throws "List is not a String"; either kills the build before the
+      // enroll button (later in the same Column) renders → W2 fails. Seed both as non-empty Strings.
+      shortdescription: 'A seeded enrollable workshop for the flutter e2e suite.',
+      testimonialmap: [], faq: [], knowinfo: [], joinus: [], sneakpeak: [], whyworkshop: 'Why this workshop',
     },
     atcmodel: null, ...tag,
   });
