@@ -30,10 +30,17 @@ read in **one** request (~100 ms, flat regardless of scale).
 ## Data written (all additive — the shared `status` enum is untouched)
 
 - `event_stats/{arenaeventid}` — the 8 funnel counts + `updatedAt`.
-- `epc_bucket` on each *requested* `event participation request` — `eligible` | `noProduct` | `inQueue`,
-  so the funnel list can filter server-side (`where arenaeventid == X and epc_bucket == 'eligible'`)
-  instead of re-joining. (Wire this into `product-funnel`'s `loadData` as a follow-up — out of
-  scope for this commit, which does the high-value overview path.)
+- `epc_bucket` on each *requested* `event participation request` — `eligible` | `noProduct` | `inQueue`.
+  The funnel's `loadData` now **uses it** (when every requested doc carries one) and **skips the
+  `queue_token` scan**, falling back to the live split otherwise. NOTE: the funnel still scans the
+  product's owners (for `potential` / `not requested` / the row data) — eliminating that needs a
+  lazy-per-segment rewrite (counts from `event_stats`, owners loaded only when those segments are
+  viewed). That's the remaining funnel optimization, deliberately deferred.
+
+## Phase 2 — analytics
+
+See `bigquery/` for the BigQuery deploy kit (stream extension + Dataform/derived-table SQL +
+Looker Studio) — funnel + show-up-trend dashboards, decoupled from Firestore.
 - `rollup_dirty/{arenaeventid}` — transient work queue, deleted after each recompute.
 
 ## Watch-outs
