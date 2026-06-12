@@ -150,7 +150,10 @@ async function seedBucket() {
     // every start_date>=startOfMonth event; a missing field throws "Null is not a subtype of bool" (swallowed
     // un-awaited, but it aborts the calendar body). false lets the calendar/marathon list actually populate.
     delete: false,
-    eventtyperef: ref('delivery events', ID.liveDeliveryEvents), atcmodel: null, ...tag,
+    // atcmodel:'' not null — Mastercalendar.getATCModelColor(eventData['atcmodel']) (mastercalendar.dart:1203,
+    // the appointments-bucket calendar, whose event query is GLOBAL by end_date) wants a non-null String; null
+    // throws "Null is not a String". '' is the safe default-color else-branch (not ATC data — just a color key).
+    eventtyperef: ref('delivery events', ID.liveDeliveryEvents), atcmodel: '', ...tag,
   });
   W(ref('delivery events', ID.liveDeliveryEvents), {
     docid: ID.liveDeliveryEvents, eventname: `LIVE Arena Delivery ${RUN}`,
@@ -228,7 +231,7 @@ async function seedBucket() {
     id: ID.futureEvent, docid: ID.futureEvent, name: `Upcoming Event ${RUN}`, eventname: `Upcoming Event ${RUN}`,
     start_date: future(14), end_date: future(15), eventdate: future(14),
     delete: false, // see liveEvent note — F9 calendar reads element["delete"] unguarded
-    eventtyperef: ref('delivery events', ID.futureDeliveryEvents), atcmodel: null, ...tag,
+    eventtyperef: ref('delivery events', ID.futureDeliveryEvents), atcmodel: '', ...tag, // '' not null — see liveEvent getATCModelColor note
   });
   W(ref('delivery events', ID.futureDeliveryEvents), {
     docid: ID.futureDeliveryEvents, eventname: `Upcoming Event Delivery ${RUN}`,
@@ -238,7 +241,7 @@ async function seedBucket() {
   // ── 4) a FUTURE non-deleted arena event for ArenaEventRequest ("Yes, I'm In!") ──────────────────
   W(ref('event collection', ID.futureArenaEvent), {
     id: ID.futureArenaEvent, docid: ID.futureArenaEvent, name: `Upcoming Arena ${RUN}`, eventname: `Upcoming Arena ${RUN}`,
-    start_date: future(20), end_date: future(21), eventdate: future(20), delete: false, atcmodel: null, ...tag,
+    start_date: future(20), end_date: future(21), eventdate: future(20), delete: false, atcmodel: '', ...tag, // '' not null — getATCModelColor
   });
   W(ref('arena events', ID.futureArena), {
     id: ID.futureArena, docid: ID.futureArena, eventref: ref('event collection', ID.futureArenaEvent),
