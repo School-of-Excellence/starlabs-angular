@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  Firestore, collection, query, orderBy, where, getDocs, getCountFromServer
+  Firestore, collection, query, orderBy, where, getDocs
 } from '@angular/fire/firestore';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,6 +11,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MAT_SELECT_CONFIG } from '@angular/material/select';
 
 import { AuthguardService } from '../../authguard.service';
 import { ProductFunnelComponent } from './product-funnel.component';
@@ -30,6 +31,7 @@ interface OverviewRow {
   approved: number | null;
   eligible: number | null;
   notEligible: number | null;
+  frozen: boolean;
   eligibleLoaded: boolean;
   error: boolean;
 }
@@ -39,10 +41,12 @@ interface OpenTab {
   arena: any;
   eventName: string;
   productName: string;
+  eventEnd: number;
 }
 
 const TABS_KEY = 'epc_open_tabs';
 const AVATAR_COLORS = ['#0a84ff', '#5856d6', '#30b0c7', '#ff9500', '#af52de', '#ff2d55', '#0fa37f'];
+const PAST_WINDOW_MS = 180 * 86400000;
 
 @Component({
   selector: 'app-event-participation-confirmations',
@@ -50,6 +54,9 @@ const AVATAR_COLORS = ['#0a84ff', '#5856d6', '#30b0c7', '#ff9500', '#af52de', '#
   imports: [
     CommonModule, FormsModule, MatTabsModule, MatButtonModule, MatIconModule, MatTooltipModule,
     MatFormFieldModule, MatInputModule, MatPaginatorModule, ProductFunnelComponent
+  ],
+  providers: [
+    { provide: MAT_SELECT_CONFIG, useValue: { overlayPanelClass: 'sx-select-pane' } }
   ],
   templateUrl: './event-participation-confirmations.component.html',
   styleUrl: './event-participation-confirmations.component.css'
@@ -63,9 +70,11 @@ export class EventParticipationConfirmationsComponent {
   loadingOverview = true;
   loadError = false;
   searchOverview = '';
+  mode: 'upcoming' | 'past' = 'upcoming';
 
   pageIndex = 0;
-  pageSize = 15;
+  pageSize = 10;
+  private tabsRestored = false;
 
   constructor(public firestore: Firestore, public guard: AuthguardService) {
     this.loadOverview();
@@ -81,6 +90,9 @@ export class EventParticipationConfirmationsComponent {
       now.setHours(0, 0, 0, 0);
       const todayStart = now.getTime();
       const todayEnd = todayStart + 86400000 - 1;
+      const pastFloor = todayStart - PAST_WINDOW_MS;
+      const inWindow = (end: number) =>
+        this.mode === 'past' ? (end < todayStart && end >= pastFloor) : (end >= todayStart);
 
       const [eventSnap, queueSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc'))),
@@ -88,27 +100,27 @@ export class EventParticipationConfirmationsComponent {
       ]);
 
       const mapEvent: Record<string, any> = {};
-      const futureRefs: any[] = [];
+      const refs: any[] = [];
       eventSnap.docs.forEach(d => {
         const data = d.data();
         const end = this.toMillis(data['end_date']);
-        if (data['delete'] != true && end >= todayStart) {
+        if (data['delete'] != true && inWindow(end)) {
           mapEvent[d.id] = { name: data['name'], end, start: this.toMillis(data['start_date']) };
-          futureRefs.push(d.ref);
+          refs.push(d.ref);
         }
       });
       queueSnap.docs.forEach(d => {
         const data = d.data();
         const end = this.toMillis(data['queueenddate']);
-        if (data['delete'] != true && end >= todayStart) {
+        if (data['delete'] != true && inWindow(end)) {
           mapEvent[d.id] = { name: data['queuename'], end, start: this.toMillis(data['queuestartdate']) };
-          futureRefs.push(d.ref);
+          refs.push(d.ref);
         }
       });
 
       const arenas: any[] = [];
-      for (let i = 0; i < futureRefs.length; i += 10) {
-        const chunk = futureRefs.slice(i, i + 10);
+      for (let i = 0; i < refs.length; i += 10) {
+        const chunk = refs.slice(i, i + 10);
         const snap = await getDocs(query(
           collection(this.firestore, 'arena events'), where('eventref', 'in', chunk)));
         snap.docs.forEach(d => { const a = d.data(); if (a['delete'] != true) arenas.push(a); });
@@ -121,25 +133,36 @@ export class EventParticipationConfirmationsComponent {
           const start = ev?.start ?? 0;
           const end = ev?.end ?? 0;
           const eventName = ev?.name ?? 'Event';
-          return {
+          const productName = this.mapProduct[a['productref']?.id] ?? 'Product';
+          const row: OverviewRow = {
             arena: a,
             eventName,
-            productName: this.mapProduct[a['productref']?.id] ?? 'Product',
-            initial: this.initialFor(eventName),
+            productName,
+            initial: this.initialFor(productName),
             avatarColor: this.avatarColorFor(a['docid'] || eventName),
             dateLabel: this.formatRange(start, end),
             endValue: end, startValue: start,
             isToday: !!start && start <= todayEnd && end >= todayStart,
             potential: null, requested: null, approved: null,
-            eligible: null, notEligible: null, eligibleLoaded: false, error: false
+            eligible: null, notEligible: null, frozen: false, eligibleLoaded: false, error: false
           };
+          const snap = a['epc_snapshot'];
+          if (snap) {
+            row.potential = snap['potential'] ?? null;
+            row.requested = snap['requested'] ?? null;
+            row.approved = snap['approved'] ?? null;
+            row.eligible = snap['eligible'] ?? null;
+            row.notEligible = (snap['noProduct'] ?? 0) + (snap['inQueue'] ?? 0);
+            row.frozen = true;
+            row.eligibleLoaded = true;
+          }
+          return row;
         });
       rows.sort((x, y) => (y.endValue - x.endValue) || x.eventName.localeCompare(y.eventName));
       this.overviewRows = rows;
       this.loadingOverview = false;
 
-      this.restoreTabs();
-      this.loadCounts(rows);
+      if (!this.tabsRestored) { this.restoreTabs(); this.tabsRestored = true; }
       this.computePageEligibility();
     } catch (err) {
       console.log(err);
@@ -150,31 +173,13 @@ export class EventParticipationConfirmationsComponent {
 
   retry() { this.loadOverview(); }
 
-  private async loadCounts(rows: OverviewRow[]) {
-    const CHUNK = 8;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK);
-      await Promise.all(chunk.map(async r => {
-        try {
-          const [pot, req, app] = await Promise.all([
-            getCountFromServer(query(collection(this.firestore, 'participantsproduct'),
-              where('productref', '==', r.arena['productref']), where('status', '==', null))),
-            getCountFromServer(query(collection(this.firestore, 'event participation request'),
-              where('arenaeventid', '==', r.arena['docid']), where('status', '==', 'requested'))),
-            getCountFromServer(query(collection(this.firestore, 'event participation request'),
-              where('arenaeventid', '==', r.arena['docid']), where('status', '==', 'approved')))
-          ]);
-          if (!r.eligibleLoaded) {
-            r.potential = pot.data().count;
-            r.requested = req.data().count;
-            r.approved = app.data().count;
-          }
-        } catch (e) {
-          console.log('overview count load failed', e);
-          if (!r.eligibleLoaded) r.error = true;
-        }
-      }));
-    }
+  setMode(m: 'upcoming' | 'past') {
+    if (this.mode === m) return;
+    this.mode = m;
+    this.pageIndex = 0;
+    this.searchOverview = '';
+    this.overviewRows = [];
+    this.loadOverview();
   }
 
   private async computePageEligibility() {
@@ -293,7 +298,7 @@ export class EventParticipationConfirmationsComponent {
     const key = row.arena['docid'];
     const existing = this.openTabs.findIndex(t => t.key === key);
     if (existing >= 0) { this.selectedIndex = existing + 1; return; }
-    this.openTabs.push({ key, arena: row.arena, eventName: row.eventName, productName: row.productName });
+    this.openTabs.push({ key, arena: row.arena, eventName: row.eventName, productName: row.productName, eventEnd: row.endValue });
     this.selectedIndex = this.openTabs.length;
     this.saveTabs();
   }
@@ -323,7 +328,7 @@ export class EventParticipationConfirmationsComponent {
       if (seen.has(k)) return;
       seen.add(k);
       const row = this.overviewRows.find(r => r.arena['docid'] === k);
-      if (row) this.openTabs.push({ key: k, arena: row.arena, eventName: row.eventName, productName: row.productName });
+      if (row) this.openTabs.push({ key: k, arena: row.arena, eventName: row.eventName, productName: row.productName, eventEnd: row.endValue });
     });
     this.saveTabs();
   }

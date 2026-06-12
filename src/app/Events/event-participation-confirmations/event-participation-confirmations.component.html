@@ -6,7 +6,12 @@
       <div class="ov">
         <div class="ov-eyebrow">Events</div>
         <h3 class="ov-title">Event participation confirmations</h3>
-        <div class="ov-sub">Current &amp; upcoming events &middot; open a row to work a product</div>
+        <div class="ov-sub">{{ mode==='past' ? 'Past events · frozen at finalize' : 'Current & upcoming events' }} &middot; open a row to work a product</div>
+
+        <div class="ov-toggle">
+          <button class="ov-seg" [class.on]="mode==='upcoming'" (click)="setMode('upcoming')">Upcoming</button>
+          <button class="ov-seg" [class.on]="mode==='past'" (click)="setMode('past')">Past</button>
+        </div>
 
         <div class="ov-filters">
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ov-search">
@@ -30,7 +35,7 @@
           <table class="ov-table">
             <thead>
               <tr>
-                <th>Event</th>
+                <th>Product</th>
                 <th>Dates</th>
                 <th class="r">Potential</th>
                 <th class="r">Requested</th>
@@ -42,20 +47,21 @@
             </thead>
             <tbody>
               <tr *ngFor="let row of pagedRows" class="ov-row" role="button" tabindex="0"
-                [attr.aria-label]="'Open ' + row.eventName + ' ' + row.productName"
+                [attr.aria-label]="'Open ' + row.productName + ' ' + row.eventName"
                 (click)="openProduct(row)" (keydown)="onRowKey($event, row)">
                 <td>
                   <div class="ov-evt">
                     <span class="ov-av" [style.background]="row.avatarColor">{{ row.initial }}</span>
                     <span class="ov-evt-txt">
-                      <span class="ov-name">{{ row.eventName }}</span>
-                      <span class="ov-prod">{{ row.productName }}</span>
+                      <span class="ov-name">{{ row.productName }}</span>
+                      <span class="ov-prod">{{ row.eventName }}</span>
                     </span>
                   </div>
                 </td>
                 <td>
                   {{ row.dateLabel || '—' }}
                   <span class="ov-today" *ngIf="row.isToday">Today</span>
+                  <span class="ov-frozen" *ngIf="row.frozen" matTooltip="Numbers frozen at finalize" matTooltipClass="sx-tip"><mat-icon>lock</mat-icon></span>
                 </td>
                 <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num ov-pot" *ngIf="!row.error && row.potential !== null">{{ row.potential | number }}</span><span class="ov-mut" *ngIf="!row.error && row.potential === null">…</span></td>
                 <td class="r"><span class="ov-warn" *ngIf="row.error" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span><span class="ov-num" *ngIf="!row.error && row.requested !== null">{{ row.requested | number }}</span><span class="ov-mut" *ngIf="!row.error && row.requested === null">…</span></td>
@@ -66,14 +72,14 @@
               </tr>
               <tr *ngIf="filteredRows.length === 0">
                 <td colspan="8" class="ov-empty">
-                  {{ isFiltered ? 'No events match “' + searchOverview + '”' : 'No current or upcoming events' }}
+                  {{ isFiltered ? 'No events match “' + searchOverview + '”' : (mode==='past' ? 'No past events in the last 6 months' : 'No current or upcoming events') }}
                   <button mat-button *ngIf="isFiltered" (click)="searchOverview=''; onSearch()">Clear search</button>
                 </td>
               </tr>
             </tbody>
           </table>
           <mat-paginator [length]="filteredRows.length" [pageSize]="pageSize"
-            [pageSizeOptions]="[15, 30, 50]" [pageIndex]="pageIndex" (page)="onPage($event)"></mat-paginator>
+            [pageSizeOptions]="[10, 25, 50]" [pageIndex]="pageIndex" (page)="onPage($event)"></mat-paginator>
         </div>
       </div>
     </mat-tab>
@@ -88,7 +94,7 @@
         </span>
       </ng-template>
       <ng-template matTabContent>
-        <app-product-funnel [arena]="tab.arena" [eventName]="tab.eventName"></app-product-funnel>
+        <app-product-funnel [arena]="tab.arena" [eventName]="tab.eventName" [eventEnd]="tab.eventEnd"></app-product-funnel>
       </ng-template>
     </mat-tab>
 
