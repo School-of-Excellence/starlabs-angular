@@ -1250,6 +1250,24 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "content analytics",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "videoid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "logdate",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
