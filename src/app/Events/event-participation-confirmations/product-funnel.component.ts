@@ -166,14 +166,12 @@ export class ProductFunnelComponent implements OnInit {
     this.loadError = false;
     const arena = this.arena;
     try {
-      const [ownSnap, eprSnap, tokSnap, scanSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
           where('arenaeventid', '==', arena['docid']),
           where('status', 'in', ['requested', 'approved', 'attended']))),
-        getDocs(query(collection(this.firestore, 'queue_token'),
-          where('queueref', '==', arena['eventref']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
           where('eventref', '==', arena['eventref'])))
       ]);
@@ -188,20 +186,29 @@ export class ProductFunnelComponent implements OnInit {
       const approvedReq = new Map<string, string>();
       const attendedIds = new Set<string>();
       const attendanceStateByPid = new Map<string, string>();
+      const bucketByPid = new Map<string, string>();
       eprSnap.docs.forEach(d => {
         const x = d.data();
         const pid = x['profileid'];
         if (!pid) return;
         if (x['status'] == 'approved') { approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? ''); }
         else if (x['status'] == 'attended') { attendedIds.add(pid); approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended'); }
-        else if (x['status'] == 'requested') requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id });
+        else if (x['status'] == 'requested') { requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id }); if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']); }
       });
 
+      // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
+      // When every requested participant carries one, use them and SKIP the queue_token scan;
+      // otherwise fall back to reading active tokens and computing the split live.
+      const useBuckets = requestedData.size > 0 && [...requestedData.keys()].every(pid => bucketByPid.has(pid));
       const active = new Set<string>();
-      tokSnap.docs.forEach(d => {
-        const x = d.data();
-        if ((x['tokenstatus'] ?? '').toString().toLowerCase() == 'active' && x['profile_id']) active.add(x['profile_id']);
-      });
+      if (!useBuckets) {
+        const tokSnap = await getDocs(query(collection(this.firestore, 'queue_token'),
+          where('queueref', '==', arena['eventref'])));
+        tokSnap.docs.forEach(d => {
+          const x = d.data();
+          if ((x['tokenstatus'] ?? '').toString().toLowerCase() == 'active' && x['profile_id']) active.add(x['profile_id']);
+        });
+      }
 
       const scanned = new Set<string>();
       scanSnap.docs.forEach(d => { const x = d.data(); if (x['profileid']) scanned.add(x['profileid']); });
@@ -220,10 +227,11 @@ export class ProductFunnelComponent implements OnInit {
         const isAttended = attendedIds.has(pid) || isScanned;
         const inCohort = approvedReq.has(pid) || isScanned;
         const isRequested = requestedData.has(pid);
-        const inQueue = active.has(pid);
-        const isEligible = isRequested && isOwner && !inQueue;
-        const isNoProduct = isRequested && !isOwner;
-        const isInQueueReq = isRequested && isOwner && inQueue;
+        const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
+        const inQueue = bucket ? (bucket === 'inQueue') : active.has(pid);
+        const isEligible = bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue);
+        const isNoProduct = bucket ? (bucket === 'noProduct') : (isRequested && !isOwner);
+        const isInQueueReq = bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue);
         const isNotRequested = isOwner && !isRequested && !inCohort;
         const reason = isNoProduct ? 'No product' : (isInQueueReq ? 'In active queue' : '');
         rows.push({
