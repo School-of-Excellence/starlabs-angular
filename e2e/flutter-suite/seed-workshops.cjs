@@ -168,13 +168,17 @@ async function seedBucket() {
       registrationStartDate: past(10), registrationEndDate: future(30),
       workshopStartDate: past(2), workshopEndDate: future(30),
       day: '1', price: '0', pricestriked: '0',
-      workshopoverview: 'Overview of the seeded workshop.',
+      // workshopoverview is LIST-rendered (workshopenrollment.dart:1476-1480 indexes it + reads item.question/
+      // item.answer) — a String would throw "String has no []"/"List is not String". Seed an array of Q&A items.
+      workshopoverview: [{ question: 'What will I learn?', answer: 'Everything in this seeded e2e workshop.' }],
       // EiFlixWorkshop.buildLeftSideContent (workshopenrollment.dart:1185/1209) renders these as Text(String)
       // POSITIONALS, UNFILTERED by the test's onError list — a null shortdescription throws "non-null String
       // required", and a List whyworkshop throws "List is not a String"; either kills the build before the
       // enroll button (later in the same Column) renders → W2 fails. Seed both as non-empty Strings.
       shortdescription: 'A seeded enrollable workshop for the flutter e2e suite.',
-      testimonialmap: [], faq: [], knowinfo: [], joinus: [], sneakpeak: [], whyworkshop: 'Why this workshop',
+      // joinus is rendered via renderHtml(String?) (workshopenrollment.dart:1330) → MUST be a String, not [].
+      // testimonialmap/faq/knowinfo/sneakpeak stay arrays (list-rendered with .isNotEmpty/.map).
+      testimonialmap: [], faq: [], knowinfo: [], joinus: 'Join us for this workshop', sneakpeak: [], whyworkshop: 'Why this workshop',
     },
     atcmodel: null, ...tag,
   });
