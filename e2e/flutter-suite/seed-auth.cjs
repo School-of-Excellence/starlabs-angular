@@ -193,7 +193,11 @@ async function seedBucket() {
   // customer_eismapping/{profileid} — the participant's EIS roster (ScheduleOnboarding :113 reads
   // customer_eismapping/{profileid}.eisroles); keyed by the DRIVEN user's profileid.
   W(ref('customer_eismapping', PID), {
-    docid: PID, profileid: PID, eisroles: [ref('eisroles', ID.eisRole)], ...tag,
+    // eisroles MUST be a MAP keyed by role-path String, NOT a list: ScheduleOnboarding.onAppointmentSelect
+    // (scheduleOnboarding.dart:116) does eisroles[rolesOfAppt] where rolesOfAppt is a role-path String — a
+    // List throws "String is not int of index" (F13). A Map indexes by String safely; this key matches the
+    // appointment's role path so the prior-assigned EIS resolves (value = list of profile refs, read by .path).
+    docid: PID, profileid: PID, eisroles: { ['eisroles/' + ID.eisRole]: [ref('profile_data', ID.eisProfile)] }, ...tag,
   });
   // the host EIS profile + a future availability window with one slot per the onboarding-call type.
   W(ref('profile_data', ID.eisProfile), {
