@@ -99,3 +99,40 @@ The seam from #3: `initiate-event-product` (`/initiateeventproduct`) takes queue
 
 ## 13. E2E coverage (the green `e2e/events/` suite — 6/6)
 Covers the event spine; recon at `e2e/recon-allcomp/events-arena.md` (test cases EVT-*). **Known harness notes from recon:** no `data-testid`s (selector fallback), the **ZXing QR scanner can't run headless** (inject the payload via `component.onCodeResult(...)`), CFs not all deployed to the test project, and `arena e-ticket log` does a full-collection scan. **Deferred** there: QR/initiate multi-step flows. Reconcile doc↔test in a later pass (as for #4 §11).
+
+## 14. Participant journeys THROUGH events & arena (data-mapped 2026-06-10)
+> Mapped from all 15,770 `event participation request` records. **Join note:** `journeyref` is null on **98%** of requests, so journey attribution is derived at the **product grain** (`productref → products.product`), then bucketed into journey families by name. Probes: `event_journey_map.js`, `event_family_map.js`.
+
+### 14a. 🔑 Structural finding — "events" are TWO categories
+Classifying products by attendance rate splits the event system cleanly:
+- **Readiness gates** (<35% attended — *virtual funnel/qualification steps*, "attended" is **not** the terminal): **Evolution Prep (19%, n=4,762)** — the single biggest event by volume — plus Evolution Mapping Activity (12%), B!G Readiness Masterclass (17%), CPM (34%), Conversational Programming Masterclass/Workshop (0%), Scope Enhancement Workshop (0%), Mega Consultation (0%).
+- **Live arenas** (≥35% attended — *the in-person destinations*): uP! Live Event (74%, n=3,648), uP! Arenas (79–96%), **CTD Live (99%)**, Mini uP! (88%), B!G Accelerator Arena (47%), Winning Heart (72%), CPM Live Readiness (91%), Mega Consultation B!G (96%).
+- **Future** (0%, not yet held): A&H Installation Concert Jan 2026, uP! Live Event July 2026.
+
+This **explains the §2 aggregate** (45% attended / 24% no-show): it blends low-attendance gates with high-attendance arenas. The readiness-gate category was invisible in the code-only view.
+
+### 14b. Journey family → events
+| Family | Reqs | Attended | No-show | Pending | #products |
+|---|---|---|---|---|---|
+| **uP!** | 8,889 | 44% | 40% | 16% | 6 |
+| **CPM** | 2,453 | 34% | 2% | **64%** | 6 |
+| **B!G** | 2,298 | 58% | 6% | 36% | **19** |
+| **A&H/Leadership** | 1,204 | 46% | 7% | 47% | 6 |
+| **CTD** | 445 | **98%** | 1% | 1% | 2 |
+- **uP! is the flagship** (8,889 reqs) but carries the high no-show (40%) because it includes the huge Evolution-Prep gate. **B!G has the most event touchpoints (19 products)** — a multi-step arena ladder. **CTD is near-100% attended** (a tight, committed cohort). **CPM is 64% pending** — largely a registration funnel.
+
+### 14c. Arena zones (the in-person layer)
+Zone assignment is concentrated: for "uP! Live Event Jan 2026", **634 of 637 assignments are "Main Arena"** (Zones A/B/D used once each) — i.e. one primary hall with rare breakouts. `event participant zones.addedflow` is mostly `automatic` (cohort-eligibility-driven via `eligiliblecohorts`). Check-in (`arena e-ticket log`) is concentrated on **8 events** — the big physical uP!/B!G arenas.
+
+### 14d. Real participant paths (multi-year journeys)
+The data shows participants looping through the event system for **years**. Example real paths (top attenders, 47–56 events each):
+- **Abirami Ganesan (56 events):** BiG Arena (Apr 2022) → uP! Mumbai (Sep 2022) → BiG Accelerator (Nov 2022) → CTD Live (Mar 2023) → BiG Accelerator (Apr 2023) → Mega Consultation (May 2023) → uP! Arena Mumbai (Jun 2023) → B!G Accelerator (Nov 2023) → … — a continuous **B!G + uP! + CPM** interleave, almost all `attended`.
+- **Shilpa Rao (51)** and **Anjleen Kaur (50)** follow near-identical BiG→uP!→Accelerator ladders (a cohort moving together).
+- **Saravanan Aruljothi (47):** an **A&H/Leadership + CTD** staff-style path (Leadership Training repeated, CTD Diagnostics, occasional uP!).
+
+→ **The personalized journey IS the sequence of events a participant is registered into** — a multi-year ladder of readiness-gates → live-arenas, family-consistent (a B!G participant keeps returning to B!G arenas), with cohorts visibly moving together. There is no single "journey state machine" in the event system; the journey is *emergent* from the ordered `event participation request` trail per `profileid`.
+
+### 14e. Open data questions
+1. **`journeyref` is null on 98%** of requests — is the formal journey link deprecated in favour of product-grain, or a data-quality gap?
+2. **Readiness-gate vs live-arena** isn't an explicit field — it's inferred from attendance. Is there a config flag (event `type`/`eventtyperef → delivery events`) that formally distinguishes them? (worth confirming for the e2e oracle.)
+3. The **40% uP! no-show** is dominated by Evolution-Prep being a gate — confirm "unattended" on a gate means "didn't need to attend / auto-advanced", not a true no-show.

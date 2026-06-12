@@ -24,5 +24,14 @@ The **scheduled-delivery rail** — a *sibling, independent* delivery mechanism 
 - Later: doc↔e2e reconciliation pass for the `e2e/appointments/` suite (as done for #4 §11).
 - **Next: #6 Events, Arena & Calendar.**
 
+## Deepening pass (same day) — personalization & actual-data verification → `05` §14
+Operator pushed "give all the variations/combinations/intricate decisions, personalized" then "verify with actual appointment data." Extracted the full decision tree (agent over `book-appointment`/`mark-appointment-status`/`add-appointment-availability` + CF `appointment.js`) and verified against the 10,468 real records (`appt_combos_probe.js`, `appt_verify.js`, `appt_grounding.js`). Added `05` §14. Key findings + corrections:
+- **~90% operator-mediated booking** (`loggedid≠bookedby` 9,419/9,562) — the dominant reality; participant self-book rules bind only ~10%. Reframed §4. (Lead-time data: ~38% booked <24h, consistent with admins' *today* floor.)
+- **Two non-equivalent booking engines** (BAC deliverable-driven vs DASH Priority-Mode-driven) — undocumented in-app; can yield different bookable sets.
+- **Continuity engine is WiSH-specific, not generic** (CORRECTION): hardcoded type IDs resolve to "WiSH Diagnostics" (writes a 5-role `customer_eismapping`) and "WiSH Final Review Call" (deletes them). Delete verified 90% (36/40 bookers); write side ~63%. Earlier code-read had wrong role names + over-generalized it.
+- **86%** of appts run their configured duration; **89%** of 2-role appts have distinct specialists.
+- **Group-capacity gap:** booking ignores `maxbooking`; capacity only decrements on cancel.
+- **Evidence-tier honesty:** §14 is *artifact-verified* (persisted CF effects: `customer_eismapping`, `email archive`, `participant touchpoint`), NOT GCP-execution-log-verified — that tier needs Cloud Logging access (§12-Q6). **When data disagreed with code-inference, data won.**
+
 ## Side note
 The spawned `/arenastudioactivity` role-guard task (from the #4 reconciliation) **landed this day** — `role.guard.ts` + route wiring + SS-15b flipped green. `04` header/§3a updated to reflect the fix.

@@ -24,7 +24,9 @@ An appointment is typed and staffed through a **config chain**, not free-text:
 - **Off-time** carves holes: see §6.
 
 ## 4. The booking flow (`book-appointment`, route `/bookappointment`)
-A participant (self, next-day onward) or an admin/scheduler/AH (any participant via `?pid=`) books. On confirm, a **single batch** (`book-appointment.component.ts:479-628`) does:
+> **⚠ Actual-data reality (verified over all 10,468 records):** booking is **overwhelmingly operator-mediated, not self-service** — **`loggedid ≠ bookedby` on 9,419 of 9,562 (~90%)**, i.e. an admin/scheduler/AH books *on behalf of* the participant (`bookedby`=participant, `loggedid`=actor). The participant-self path (the next-day/24h floor, the deliverable-`ready` filter) governs only the ~10% self-bookings; this is why **~38% of appointments are booked <24h out** (admins have a *today* floor — the data *confirms* the actor-role fork rather than breaking it). So "who books" personalizes the rules, but in practice the operator drives it.
+
+A participant (self, next-day onward) or — in 90% of cases — an admin/scheduler/AH (any participant via `?pid=`) books. On confirm, a **single batch** (`book-appointment.component.ts:479-628`) does:
 1. **`availability/{slot}`** — flip the chosen slot `booked:true, available:false` (across all matching role slot-arrays).
 2. **`appointments/{new}`** — create the session doc (schema below).
 3. **Advance the delivery sequence** (`createJourneyRecord`): `participantsproduct.status → "ongoing"`, `participantdeliverysequence.products[].delivery[n].status → "ongoing"`, `deliverables.fileref arrayUnion(apptRef) + status → "ongoing"`.
@@ -103,6 +105,29 @@ Specialists request off-time (`offtime`: `date/starttime/endtime/fullday/status`
 3. **Group appointments** (3 types, `maxbooking`) — which sessions are 1:many, and how does slot capacity work?
 4. **`capacityutilization` guard is commented out** (loads for all) — intended, or an access gap like #4 §3a? (worth a quick check.)
 5. **OpenVidu for appointments** (~1%) — dead experiment or specific use-case? (mirrors #4's LiveKit question.)
+6. **Execution-log tier** — §14 is *artifact-verified* (persisted CF effects), not verified against GCP Cloud Functions logs (not reachable from the read-only Firestore harness). Grant Cloud Logging access to close the last tier (exact branch firing, error/retry rates, the group-capacity gap actually overbooking).
+7. **BAC vs DASH** are two non-equivalent booking engines (§14-A) — is that intentional, and which is the canonical one going forward?
 
 ## 13. E2E coverage (the green `e2e/appointments/` suite — 7/7)
 Covers booking (incl. slot-merge + 2-role), mark attended/cancelled (APPT-04…06), off-time approval, roster resend, capacity utilization; recon at `e2e/recon-allcomp/appointments.md` (18 candidate cases APPT-01…18). **Deferred** (per that suite's notes): the booking deep-path and ATC-procedure dialog (off-limits). Reconcile doc↔test in a later pass as we did for #4 (§11 there).
+
+## 14. Personalization & decision tree (data-verified 2026-06-10)
+> **Evidence tiers:** logic = source `file:line`; distributions/outcomes = persisted production data (artifact-verified, *not* GCP execution-log-verified — see §12-Q6). Probes: `appt_combos_probe.js`, `appt_verify.js`, `appt_grounding.js`.
+
+**A. Two non-equivalent booking engines** (don't treat as one): **BAC** (`book-appointment`) = participant-deliverable-driven, continuity-aware, additional-role-aware, demands full multi-role coverage; **DASH** (`appointment-dashboard`) = `products.mode=='Priority Mode'`-driven, required-roles-only, no continuity, tolerates partial-coverage slots.
+
+**B. The 4 real appointment shapes** (of 10,468): regular 1:1 **80%** · regular 2-role **11%** · journey-coach **5%** · onboarding (jc+ob) **4%** · one 3-role outlier.
+
+**C. Catalog variation** (108 types): durations 10–300 min (mode 30m=42; 120m=25); **changework-required 20**; **group 3** (`maxbooking` 5/10). Roles/type (102): **85 single-required-role, 16 two-role**; additional roles on 58. Specialists/role: **1→31** (34 roles have a single eligible specialist).
+
+**D. 🎯 Continuity engine (WiSH-specific — corrected by data).** Hardcoded to two type IDs that resolve to **"WiSH Diagnostics"** (`AkOr1WLFFq2ttBIQQKYe`) and **"WiSH Final Review Call"** (`gQR1GKk9no7YQqk2yoCW`) — *not* generic. Booking WiSH-Diagnostics **writes** `customer_eismapping` pinning the specialist team to **5 WiSH roles** (Review Diagnostics, Celebration Shadow, Review Shadow, Implementation Specialist, Celebration Diagnostics — 53 participants carry all five); booking WiSH-Final-Review **deletes** those pins. **Verified:** of 40 final-review bookers, **36 (90%) had the pins removed**; the write side is ~63% (25/40 mapping-holders have a WiSH-Diagnostics booking under their own `bookedby`). At booking, BAC uses the pinned specialist per role for continuity; an *additional* role joins only if a pin exists.
+
+**E. Multi-role slots** = same start-time, distinct specialists (`book-appointment.ts:426`); **89% of 2-role appts (1,002/1,128) have all-distinct hosts** in the data. BAC requires every role covered or the date fails; DASH emits partial-coverage slots.
+
+**F. Actor-role fork (dominant reality = operator-mediated):** ~90% admin-on-behalf (`loggedid≠bookedby`); the 24h/next-day floor + `ready`-only deliverable view bind only the ~10% self-bookings; lead-time data: ~38% booked <24h out (admin *today*-floor). **86% of appointments run their configured duration** (±5min).
+
+**G. journeycoach/onboarding forks:** different studio URLs (CF `appointment.js:576,684` — confirmed in `email archive`: 43 of 312 appt emails carry `participant/appointmentstudio`); a cancelled jc/onboarding sets `participantjourneyproduct.onreschedule:true` instead of completing; the last-delivery-extension prompt fires only on attended non-jc/onboarding.
+
+**H. Status fork:** attended→`deliverables.completed` + "Appointment Scheduled" touchpoint (75× observed); cancelled→`ready`; changework dialog only when `ischangeworkrequired && attended`.
+
+**Open findings from this pass:** (1) **group-capacity gap** — booking ignores `maxbooking`; capacity only decrements on cancel (`appointment.js:1103`). (2) **BAC vs DASH divergence** is undocumented in-app and could yield different bookable sets for the same participant. (3) the continuity engine being **WiSH-hardcoded** means other journey families get no continuity — confirm intended.

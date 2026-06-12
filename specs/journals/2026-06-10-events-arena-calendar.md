@@ -24,5 +24,13 @@ The **uP!-event venue** — the live event participants reach *after* the queue.
 - Operator walkthrough of `06` §12 (the bulk-approve bug; the requested/approved backlog; RSVP-type origins; zone eligibility; atcmodel reference-only).
 - Later: doc↔e2e reconciliation pass for `e2e/events/` (as #4 §11).
 
+## Deepening pass (2026-06-10, same day) — participant journeys through events
+Per operator goal "map what journeys which participants have taken through which events and arena," added **§14** to `06` from all 15,770 `event participation request` records (`event_journey_map.js`, `event_family_map.js`):
+- **Structural finding:** "events" are **two categories** — *readiness gates* (virtual funnel steps, <35% attended; Evolution Prep is the biggest event at 19%/n=4,762) vs *live arenas* (in-person destinations, 47–99% attended). This explains the 45%/24% aggregate and was invisible in the code-only view.
+- **Journey-family flow** (product-grain; `journeyref` null on 98%): uP! 8,889 reqs (44% att, 40% no-show via the Evolution-Prep gate) · CPM 2,453 (64% pending funnel) · B!G 2,298 (58% att, **19 products** = longest arena ladder) · CTD 445 (**98%** att) · A&H/Leadership 1,204.
+- **Arena zones:** one "Main Arena" dominates (634/637 for uP! Jan 2026); cohort-eligibility-driven (`addedflow:automatic`); check-in concentrated on 8 physical events.
+- **Real multi-year paths:** top attenders (47–56 events) loop family-consistently through readiness-gate→live-arena ladders for years; **the journey is *emergent* from the ordered participation trail per `profileid`** — no single event state machine.
+- Also folded the **#5 actual-data findings** into `05` §14 (90% operator-mediated booking, WiSH-specific continuity engine, lead-time/duration grounding).
+
 ## Roadmap status after this session
-All 6 concept groups now have a `validated/` doc: **#1–#4 VALIDATED, #5 & #6 DRAFT-for-sign-off.** The 7 extra e2e component groups (content, workshops, support, profiles, comms, evomap, authroles) remain undocumented — candidate roadmap extension (#7+).
+All 6 concept groups now have a `validated/` doc: **#1–#4 VALIDATED, #5 & #6 DRAFT-for-sign-off** (both now deepened with actual-data analysis). The 7 extra e2e component groups (content, workshops, support, profiles, comms, evomap, authroles) remain undocumented — candidate roadmap extension (#7+).
