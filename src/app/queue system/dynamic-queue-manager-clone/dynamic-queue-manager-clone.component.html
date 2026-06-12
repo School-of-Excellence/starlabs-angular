@@ -568,6 +568,37 @@
           </div>
         </div>
 
+        <!-- VARIATION FILTER ROW -->
+        <div class="fsb-expandable" *ngIf="variationList.length > 0">
+          <div class="fsb-row" [class.fsb-row-active]="selectedVariations.length > 0"
+            (click)="variationDropdownOpen = !variationDropdownOpen">
+            <mat-icon class="fsb-icon">account_tree</mat-icon>
+            <span class="fsb-label">
+              <span *ngIf="selectedVariations.length === 0">Filter by Variation</span>
+              <span *ngIf="selectedVariations.length > 0">{{selectedVariations.length}} Variation(s)</span>
+            </span>
+            <span class="fsb-count" *ngIf="selectedVariations.length > 0">{{selectedVariations.length}}</span>
+            <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="variationDropdownOpen">expand_more</mat-icon>
+          </div>
+          <div class="fsb-dropdown" *ngIf="variationDropdownOpen">
+            <div class="fsb-dropdown-options">
+              <div class="fsb-option" *ngFor="let variation of variationList"
+                [class.fsb-option-selected]="selectedVariations.includes(variation.id)"
+                (click)="toggleVariationSelection(variation.id); $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">
+                  {{selectedVariations.includes(variation.id) ? 'check_box' : 'check_box_outline_blank'}}
+                </mat-icon>
+                <span>{{variation.variationname}}</span>
+              </div>
+            </div>
+            <div class="fsb-dropdown-footer" *ngIf="selectedVariations.length > 0">
+              <button (click)="selectedVariations=[]; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+                Clear selection
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- CUSTOMER SUPPORT FILTER ROW -->
         <div class="fsb-expandable" *ngIf="availableCustomerSupportCategories.length > 0">
           <div class="fsb-row" [class.fsb-row-active]="selectedCustomerSupportCategories.length > 0"
@@ -1116,6 +1147,11 @@
           <mat-chip *ngIf="evolutionMappingLiveFilter !== 'all'"
             (removed)="setEvolutionMappingFilter('all')">
             Evolution Mapping: {{ evolutionMappingLiveFilter === 'live' ? 'Live' : 'Not Live' }}
+            <mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+          <mat-chip *ngFor="let varId of selectedVariations"
+            (removed)="toggleVariationSelection(varId)">
+            {{getVariationName(varId)}}
             <mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="selectedCustomerSupportCategories.length > 0"
@@ -1869,6 +1905,7 @@
         <mat-label>Move to Stage</mat-label>
         <mat-select
           [(ngModel)]="bulkMoveTargetStageKey"
+          (ngModelChange)="onBulkTargetStageChange($event)"
           [disabled]="bulkMoveInProgress">
           <mat-option
             *ngFor="let stage of availableStagesForBulkMove"
@@ -1880,10 +1917,19 @@
         </mat-select>
       </mat-form-field>
 
-      <!-- DFU warning banner -->
-      <div class="bulk-dfu-banner" *ngIf="bulkDFUCount > 0">
+      <!-- DFU skip warning -->
+      <div class="bulk-dfu-banner"
+          *ngIf="bulkMoveComputedResult.skippedDFU.length > 0">
         <mat-icon style="font-size:16px; width:16px; height:16px; vertical-align:middle;">info</mat-icon>
-        {{bulkDFUCount}} DFU participant(s) will be skipped
+        {{bulkMoveComputedResult.skippedDFU.length}} DFU participant(s) will be skipped
+      </div>
+
+      <!-- Variation skip warning -->
+      <div class="bulk-dfu-banner"
+          *ngIf="bulkMoveComputedResult.skippedVariation.length > 0"
+          style="background:#fff3e0; border-left:3px solid #e65100; color:#e65100; margin-top:6px;">
+        <mat-icon style="font-size:16px; width:16px; height:16px; vertical-align:middle;">route</mat-icon>
+        {{bulkMoveComputedResult.skippedVariation.length}} participant(s) will be skipped — stage not in their variation path
       </div>
 
       <!-- Participants list -->
@@ -1893,13 +1939,39 @@
           <span>Variation</span>
           <span></span>
         </div>
-        <div *ngFor="let r of bulkMoveResults" class="bulk-list-row" [class.bulk-row-dfu]="r.isDFU">
-          <span class="bulk-name">
-            {{mapProfileData[r.token.profile_id]?.['name']}}
-          </span>
+
+        <!-- Movable -->
+        <div *ngFor="let r of bulkMoveComputedResult.movable"
+            class="bulk-list-row">
+          <span class="bulk-name">{{mapProfileData[r.token.profile_id]?.['name']}}</span>
           <span class="bulk-variation">{{r.variationName}}</span>
-          <span class="bulk-dfu-tag" *ngIf="r.isDFU">DFU – Skip</span>
         </div>
+
+        <!-- DFU skipped -->
+        <div *ngFor="let r of bulkMoveComputedResult.skippedDFU"
+            class="bulk-list-row bulk-row-dfu">
+          <span class="bulk-name">{{mapProfileData[r.token.profile_id]?.['name']}}</span>
+          <span class="bulk-variation">{{r.variationName}}</span>
+          <span class="bulk-dfu-tag">DFU – Skip</span>
+        </div>
+
+        <!-- Variation skipped -->
+        <div *ngFor="let r of bulkMoveComputedResult.skippedVariation"
+            class="bulk-list-row bulk-row-dfu">
+          <span class="bulk-name">{{mapProfileData[r.token.profile_id]?.['name']}}</span>
+          <span class="bulk-variation">{{r.variationName}}</span>
+          <span class="bulk-dfu-tag"
+                style="background:#fff3e0; color:#e65100; border:1px solid #e65100;">
+            Variation – Skip
+          </span>
+        </div>
+
+        <!-- Empty state before stage is selected -->
+        <div *ngIf="!bulkMoveTargetStageKey"
+            style="padding:12px; text-align:center; color:#999; font-size:13px;">
+          Select a stage above to preview
+        </div>
+
       </div>
 
       <!-- Action button -->
@@ -1929,7 +2001,12 @@
       </mat-icon>
       <p *ngIf="!bulkMoveFailed" class="done-ok">
         ✓ {{bulkMovableCount}} participant(s) moved successfully
-        <span *ngIf="bulkDFUCount > 0">&nbsp;({{bulkDFUCount}} DFU skipped)</span>
+        <span *ngIf="bulkMoveComputedResult.skippedDFU.length > 0">
+          &nbsp;({{bulkMoveComputedResult.skippedDFU.length}} DFU skipped)
+        </span>
+        <span *ngIf="bulkMoveComputedResult.skippedVariation.length > 0">
+          &nbsp;({{bulkMoveComputedResult.skippedVariation.length}} variation skipped)
+        </span>
       </p>
       <p *ngIf="bulkMoveFailed" class="done-fail">
         ✗ Move failed. Please try again.
