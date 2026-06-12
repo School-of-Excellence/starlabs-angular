@@ -1208,6 +1208,34 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "hosts",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "starttime",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "availability",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "appointments",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "starttime",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
