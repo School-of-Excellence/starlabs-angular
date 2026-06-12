@@ -1,9 +1,10 @@
 import { Component, Inject, OnInit, TemplateRef, ViewChild } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule, DatePipe, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
   Firestore, collection, query, where, getDocs,
+  doc, getDoc, getFirestore, DocumentReference,
 } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -88,7 +89,13 @@ export interface SlideoverData {
   onAssignCoach: (coachIdOrNull: string | null) => void;
 }
 
-interface TicketItem { subject: string; status: string; date: Date | null; }
+interface TicketItem { subject: string; status: string; category: string; date: Date | null; }
+interface EventItem { name: string; date: Date | null; attended: boolean | null; statusLabel: string; }
+interface AppointmentItem { name: string; date: Date | null; statusLabel: string; statusKind: 'done' | 'ongoing' | 'cancelled'; }
+interface FormItem { name: string; date: Date | null; }
+interface ReportItem { types: string; status: string; date: Date | null; }
+interface BreakthroughItem { message: string; date: Date | null; }
+interface AelItem { status: string; date: Date | null; }
 
 /** Composer type switch options. */
 type ComposerType = 'call' | 'health' | 'schedule' | 'note';
@@ -182,11 +189,68 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
               </dd>
             </div>
             <div><dt>Going quiet</dt><dd>{{ row.goingQuiet ? 'Yes' : 'No' }}</dd></div>
-            <div *ngIf="row.recentEventRequest">
-              <dt>Recent event</dt>
-              <dd>{{ row.recentEventRequest.eventName }}<span class="so-sub"> · {{ row.recentEventRequest.status }}</span></dd>
-            </div>
           </dl>
+        </section>
+
+        <!-- Events: last attended (past) + genuinely upcoming (today/future) -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('events')" (click)="toggleCollapsed('events')">
+            <span>Events <span class="so-count" *ngIf="!eventsLoading">{{ upcomingEvents.length }} upcoming</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('events')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="eventsLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+          <ng-container *ngIf="!eventsLoading">
+            <!-- Last attended stays always visible (not part of the collapse) -->
+            <dl class="so-kv">
+              <div>
+                <dt>Last attended</dt>
+                <dd *ngIf="lastAttendedEvent">{{ lastAttendedEvent.name }}<span class="so-sub" *ngIf="lastAttendedEvent.date"> · {{ lastAttendedEvent.date | date:'mediumDate' }}</span></dd>
+                <dd *ngIf="!lastAttendedEvent" class="so-muted">None yet</dd>
+              </div>
+            </dl>
+            <div *ngIf="!isCollapsed('events')">
+              <p class="so-group-label">Upcoming</p>
+              <ul class="so-list" *ngIf="upcomingEvents.length; else noUpcoming">
+                <li *ngFor="let e of (upcomingEvents | slice:0:(isShowAll('events') ? upcomingEvents.length : 3))" class="so-list-row">
+                  <span class="so-list-main">{{ e.name }}</span>
+                  <span class="so-list-side">
+                    <span class="so-pill so-pill-neutral" *ngIf="e.statusLabel">{{ e.statusLabel }}</span>
+                    <span class="so-sub" *ngIf="e.date">{{ e.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="upcomingEvents.length > 3" (click)="toggleShowAll('events')">
+                {{ isShowAll('events') ? 'Show less' : 'Show all (' + upcomingEvents.length + ')' }}
+              </button>
+              <ng-template #noUpcoming><p class="so-empty">No upcoming events.</p></ng-template>
+            </div>
+          </ng-container>
+        </section>
+
+        <!-- Appointments -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('appointments')" (click)="toggleCollapsed('appointments')">
+            <span>Appointments <span class="so-count" *ngIf="!apptsLoading">{{ appointments.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('appointments')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('appointments')">
+            <div *ngIf="apptsLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!apptsLoading">
+              <ul class="so-list" *ngIf="appointments.length; else noAppts">
+                <li *ngFor="let a of (appointments | slice:0:(isShowAll('appointments') ? appointments.length : 3))" class="so-list-row">
+                  <span class="so-list-main">{{ a.name }}</span>
+                  <span class="so-list-side">
+                    <span class="so-pill" [ngClass]="apptPillClass(a.statusKind)">{{ a.statusLabel }}</span>
+                    <span class="so-sub" *ngIf="a.date">{{ a.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="appointments.length > 3" (click)="toggleShowAll('appointments')">
+                {{ isShowAll('appointments') ? 'Show less' : 'Show all (' + appointments.length + ')' }}
+              </button>
+              <ng-template #noAppts><p class="so-empty">No appointments.</p></ng-template>
+            </ng-container>
+          </div>
         </section>
 
         <!-- Coach health -->
@@ -217,22 +281,128 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
 
         <!-- Tickets -->
         <section class="so-sec" aria-live="polite">
-          <h3 class="so-sec-h">Tickets <span class="so-count">{{ row.openTickets }}</span></h3>
-          <div *ngIf="ticketsLoading" class="so-skel-group">
-            <div class="so-skel"></div><div class="so-skel"></div>
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('tickets')" (click)="toggleCollapsed('tickets')">
+            <span>Tickets <span class="so-count" *ngIf="!ticketsLoading">{{ tickets.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('tickets')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('tickets')">
+            <div *ngIf="ticketsLoading" class="so-skel-group">
+              <div class="so-skel"></div><div class="so-skel"></div>
+            </div>
+            <ng-container *ngIf="!ticketsLoading">
+              <ul class="so-list" *ngIf="tickets.length; else noTickets">
+                <li *ngFor="let t of (tickets | slice:0:(isShowAll('tickets') ? tickets.length : 3))" class="so-list-row">
+                  <span class="so-list-main">
+                    {{ t.subject || 'Support ticket' }}
+                    <span class="so-cat" *ngIf="t.category">{{ t.category }}</span>
+                  </span>
+                  <span class="so-list-side">
+                    <span class="so-status">{{ t.status }}</span>
+                    <span class="so-sub" *ngIf="t.date">{{ t.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="tickets.length > 3" (click)="toggleShowAll('tickets')">
+                {{ isShowAll('tickets') ? 'Show less' : 'Show all (' + tickets.length + ')' }}
+              </button>
+              <ng-template #noTickets><p class="so-empty">No tickets.</p></ng-template>
+            </ng-container>
           </div>
-          <ng-container *ngIf="!ticketsLoading">
-            <ul class="so-list" *ngIf="tickets.length; else noTickets">
-              <li *ngFor="let t of tickets" class="so-list-row">
-                <span class="so-list-main">{{ t.subject || 'Support ticket' }}</span>
-                <span class="so-list-side">
-                  <span class="so-status">{{ t.status }}</span>
-                  <span class="so-sub" *ngIf="t.date">{{ t.date | date:'shortDate' }}</span>
-                </span>
-              </li>
-            </ul>
-            <ng-template #noTickets><p class="so-empty">No open tickets.</p></ng-template>
-          </ng-container>
+        </section>
+
+        <!-- Forms filled -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('forms')" (click)="toggleCollapsed('forms')">
+            <span>Forms filled <span class="so-count" *ngIf="!formsLoading">{{ forms.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('forms')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('forms')">
+            <div *ngIf="formsLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!formsLoading">
+              <ul class="so-list" *ngIf="forms.length; else noForms">
+                <li *ngFor="let f of (forms | slice:0:(isShowAll('forms') ? forms.length : 3))" class="so-list-row">
+                  <span class="so-list-main">{{ f.name }}</span>
+                  <span class="so-list-side"><span class="so-sub" *ngIf="f.date">{{ f.date | date:'shortDate' }}</span></span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="forms.length > 3" (click)="toggleShowAll('forms')">
+                {{ isShowAll('forms') ? 'Show less' : 'Show all (' + forms.length + ')' }}
+              </button>
+              <ng-template #noForms><p class="so-empty">No forms filled.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- Interim reports -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('interim')" (click)="toggleCollapsed('interim')">
+            <span>Interim reports <span class="so-count" *ngIf="!reportsLoading">{{ reports.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('interim')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('interim')">
+            <div *ngIf="reportsLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!reportsLoading">
+              <ul class="so-list" *ngIf="reports.length; else noReports">
+                <li *ngFor="let r of (reports | slice:0:(isShowAll('interim') ? reports.length : 3))" class="so-list-row">
+                  <span class="so-list-main">{{ r.types || 'Report' }}</span>
+                  <span class="so-list-side">
+                    <span class="so-status" *ngIf="r.status">{{ r.status }}</span>
+                    <span class="so-sub" *ngIf="r.date">{{ r.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="reports.length > 3" (click)="toggleShowAll('interim')">
+                {{ isShowAll('interim') ? 'Show less' : 'Show all (' + reports.length + ')' }}
+              </button>
+              <ng-template #noReports><p class="so-empty">No interim reports.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- Breakthroughs -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('breakthroughs')" (click)="toggleCollapsed('breakthroughs')">
+            <span>Breakthroughs <span class="so-count" *ngIf="!breakthroughsLoading">{{ breakthroughs.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('breakthroughs')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('breakthroughs')">
+            <div *ngIf="breakthroughsLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!breakthroughsLoading">
+              <ul class="so-list" *ngIf="breakthroughs.length; else noBt">
+                <li *ngFor="let b of (breakthroughs | slice:0:(isShowAll('breakthroughs') ? breakthroughs.length : 3))" class="so-list-row">
+                  <span class="so-list-main so-clamp">{{ b.message || 'Breakthrough' }}</span>
+                  <span class="so-list-side"><span class="so-sub" *ngIf="b.date">{{ b.date | date:'shortDate' }}</span></span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="breakthroughs.length > 3" (click)="toggleShowAll('breakthroughs')">
+                {{ isShowAll('breakthroughs') ? 'Show less' : 'Show all (' + breakthroughs.length + ')' }}
+              </button>
+              <ng-template #noBt><p class="so-empty">No breakthroughs posted.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- AEL -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('ael')" (click)="toggleCollapsed('ael')">
+            <span>AEL <span class="so-count" *ngIf="!aelLoading">{{ ael.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('ael')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('ael')">
+            <div *ngIf="aelLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!aelLoading">
+              <ul class="so-list" *ngIf="ael.length; else noAel">
+                <li *ngFor="let x of (ael | slice:0:(isShowAll('ael') ? ael.length : 3))" class="so-list-row">
+                  <span class="so-list-main"><span class="so-status">{{ x.status || '—' }}</span></span>
+                  <span class="so-list-side"><span class="so-sub" *ngIf="x.date">{{ x.date | date:'shortDate' }}</span></span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="ael.length > 3" (click)="toggleShowAll('ael')">
+                {{ isShowAll('ael') ? 'Show less' : 'Show all (' + ael.length + ')' }}
+              </button>
+              <ng-template #noAel><p class="so-empty">No AEL records.</p></ng-template>
+            </ng-container>
+          </div>
         </section>
 
         <!-- Activity timeline (unified log, newest first) -->
@@ -454,6 +624,30 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       color: var(--so-ink2); background: var(--so-border-soft); font-variant-numeric: tabular-nums;
     }
 
+    /* collapsible section header — keeps the .so-sec-h look but becomes a full-width toggle */
+    .so-sec-toggle {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; padding: 0; border: none; background: transparent; cursor: pointer;
+      font: inherit; text-align: left;
+      margin: 0 0 9px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--so-muted);
+    }
+    .so-sec-toggle:hover { color: var(--so-ink2); }
+    .so-chev {
+      flex: 0 0 auto; font-size: 18px; width: 18px; height: 18px; color: var(--so-muted);
+      transition: transform .18s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .so-chev.open { transform: rotate(180deg); }
+    @media (prefers-reduced-motion: reduce) { .so-chev { transition: none; } }
+
+    /* borderless accent text button — Show all / Show less */
+    .so-showall {
+      display: inline-block; margin: 8px 0 0; padding: 0; border: none; background: transparent;
+      color: var(--so-accent); font: inherit; font-size: 12.5px; font-weight: 600;
+      text-align: left; cursor: pointer;
+    }
+    .so-showall:hover { text-decoration: underline; }
+
     .so-kv { margin: 0; display: grid; grid-template-columns: 1fr; gap: 7px; }
     .so-kv > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
     .so-kv dt { margin: 0; color: var(--so-ink2); font-size: 12px; flex: 0 0 auto; }
@@ -464,12 +658,36 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-health { display: flex; align-items: center; gap: 8px; }
     .so-note { margin: 8px 0 0; font-size: 12.5px; color: var(--so-ink2); }
     .so-empty { margin: 0; font-size: 12.5px; color: var(--so-muted); }
+    .so-muted { color: var(--so-muted); }
+    .so-group-label {
+      margin: 12px 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--so-muted);
+    }
 
     .so-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .so-list-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
     .so-list-main { font-size: 12.5px; color: var(--so-ink); }
     .so-list-side { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
     .so-status { font-size: 11.5px; font-weight: 600; color: #c25e00; text-transform: capitalize; }
+
+    /* status pills for events / appointments (compact, list-side) */
+    .so-list-side .so-pill { padding: 1px 8px; font-size: 11px; }
+    .so-pill-ok { color: #1d7a3a; background: rgba(52,199,89,.14); border: none; }
+    .so-pill-neutral { color: rgba(60,60,67,.6); background: rgba(120,120,128,.12); border: none; }
+    .so-pill-amber { color: #c25e00; background: rgba(255,149,0,.14); border: none; }
+    .so-pill-cancel { color: #d70015; background: rgba(255,59,48,.12); border: none; }
+
+    /* ticket category soft chip */
+    .so-cat {
+      display: inline-block; margin-left: 7px; padding: 1px 8px; border-radius: 999px;
+      font-size: 10.5px; font-weight: 600; vertical-align: middle; text-transform: capitalize;
+      color: var(--so-ink2); background: var(--so-border-soft);
+    }
+    /* clamp long breakthrough snippets to two lines */
+    .so-clamp {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; max-width: 100%;
+    }
 
     .so-tl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
     .so-tl-row { display: grid; grid-template-columns: 12px 1fr; gap: 10px; }
@@ -624,6 +842,46 @@ export class ParticipantSlideoverComponent implements OnInit {
   tickets: TicketItem[] = [];
   ticketsLoading = true;
 
+  // ---- per-participant intel sections (one-shot, scoped, parallel) ----
+  events: EventItem[] = [];
+  upcomingEvents: EventItem[] = [];      // event date today or later
+  lastAttendedEvent: EventItem | null = null;  // most recent past event he attended
+  eventsLoading = true;
+  appointments: AppointmentItem[] = [];
+  apptsLoading = true;
+  forms: FormItem[] = [];
+  formsLoading = true;
+  reports: ReportItem[] = [];
+  reportsLoading = true;
+  breakthroughs: BreakthroughItem[] = [];
+  breakthroughsLoading = true;
+  ael: AelItem[] = [];
+  aelLoading = true;
+
+  // How many rows each intel section FETCHES (most-recent-first). Display defaults to the
+  // first 3 (the template slice handles that); a larger fetch lets "Show all" reveal real data.
+  private readonly sectionCap = 50;
+
+  // ---- collapsible list sections + top-3 / show-all state ----
+  // Reference-heavy sections start collapsed; events/appointments/tickets start open.
+  collapsed = new Set<string>(['forms', 'interim', 'breakthroughs', 'ael']);
+  showAll = new Set<string>();
+
+  // Secondary Firestore instance that holds the forms data (mirrors userprofile's
+  // `firestoreForms = getFirestore('firestore-forms')`). May be null if it can't be obtained.
+  private readonly firestoreForms: Firestore | null = (() => {
+    try { return getFirestore('firestore-forms') as unknown as Firestore; }
+    catch { return null; }
+  })();
+
+  // Interim-report type-code -> human label (mirrors userprofile.mapReport).
+  private readonly reportLabels: Record<string, string> = {
+    crossover: 'AEL Crossover Metric',
+    evolutionprogress: 'Evolution Progress',
+    loveletter: 'A&H Love Letter',
+    askah: 'Ask A&H',
+  };
+
   // Coach-set health scale options for the composer's 5-state picker.
   healthOptions: CoachHealthState[] = COACH_HEALTH_OPTIONS;
 
@@ -648,8 +906,16 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.row = data.row;
   }
 
-  async ngOnInit(): Promise<void> {
-    await this.loadTickets();
+  ngOnInit(): void {
+    // Fire every scoped read in parallel; each owns its own loading flag and degrades
+    // independently, so a slow/denied section never blocks the rest of the panel.
+    void this.loadTickets();
+    void this.loadEvents();
+    void this.loadAppointments();
+    void this.loadForms();
+    void this.loadReports();
+    void this.loadBreakthroughs();
+    void this.loadAel();
   }
 
   private async loadTickets(): Promise<void> {
@@ -660,23 +926,236 @@ export class ParticipantSlideoverComponent implements OnInit {
       snap.forEach(d => {
         const data: any = d.data();
         const status = data['status']?.status ?? 'open';
-        if ((status ?? '').toLowerCase() !== 'open') return;
         // 'issue' is the human-readable subject on clientissue docs (same field the
         // Customer Support screens display). Fall back to a clean label, never a raw id.
         const issue = typeof data['issue'] === 'string' ? data['issue'].trim() : '';
+        const category = typeof data['category'] === 'string' ? data['category'].trim() : '';
         items.push({
           subject: issue || `Support ticket · ${status}`,
           status,
+          category,
           date: this.toDate(data['reporteddate']) ?? this.toDate(data['doccreateddate']) ?? this.toDate(data['createddate']) ?? this.toDate(data['date']),
         });
       });
-      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
-      this.tickets = items;
+      // Open tickets first (most actionable), then most recent.
+      items.sort((a, b) => {
+        const ao = a.status.toLowerCase() === 'open' ? 0 : 1;
+        const bo = b.status.toLowerCase() === 'open' ? 0 : 1;
+        return ao !== bo ? ao - bo : (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0);
+      });
+      this.tickets = items.slice(0, this.sectionCap);
     } catch (e) {
       console.warn('slideover tickets read failed', e);
     } finally {
       this.ticketsLoading = false;
     }
+  }
+
+  /** EVENTS — `event participation request` where profileid == pid. Resolve each `eventref`
+   *  (points to `event collection` or `queue generation`) to a name + start date. Capped. */
+  private async loadEvents(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'event participation request'),
+        where('profileid', '==', pid),
+      ));
+      const rows = snap.docs.map(d => d.data() as any).filter(d => d['eventref']);
+      // Resolve EVERY event ref (bounded by the participant's own count) so we have the real EVENT
+      // date — upcoming vs past is decided by that date, not the request's status field.
+      const items: EventItem[] = await Promise.all(rows.slice(0, 40).map(async (d) => {
+        const status = (d['status'] ?? '').toString().toLowerCase();
+        let name = 'Event';
+        let date: Date | null = this.toDate(d['createdon']);
+        try {
+          const ref = d['eventref'] as DocumentReference;
+          const evSnap = await getDoc(ref);
+          if (evSnap.exists()) {
+            const ev: any = evSnap.data();
+            if (ref.parent.id === 'queue generation') {
+              name = ev['queuename'] || 'Queue event';
+              date = this.toDate(ev['queuestartdate']) ?? date;
+            } else {
+              name = ev['name'] || 'Event';
+              date = this.toDate(ev['start_date']) ?? date;
+            }
+          }
+        } catch { /* ref read denied/missing — keep fallback name + request date */ }
+        return {
+          name,
+          date,
+          attended: status === 'attended',
+          statusLabel: status ? status.charAt(0).toUpperCase() + status.slice(1) : '',
+        };
+      }));
+      this.events = items;
+      const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+      this.upcomingEvents = items
+        .filter(e => e.date && e.date.getTime() >= startToday.getTime())
+        .sort((a, b) => (a.date!.getTime()) - (b.date!.getTime()))   // soonest first
+        .slice(0, this.sectionCap);
+      this.lastAttendedEvent = items
+        .filter(e => e.attended && e.date)
+        .sort((a, b) => (b.date!.getTime()) - (a.date!.getTime()))[0] ?? null;   // most recent
+    } catch (e) {
+      console.warn('slideover events read failed', e);
+    } finally {
+      this.eventsLoading = false;
+    }
+  }
+
+  /** APPOINTMENTS — `appointments` where bookedby == profile_data/pid. Status from attended/cancelled.
+   *  Resolve each `appointment` ref to its appointmenttype name (scoped, capped — at most 5 ref reads). */
+  private async loadAppointments(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'appointments'),
+        where('bookedby', '==', doc(this.firestore, 'profile_data', pid)),
+      ));
+      const rows = snap.docs.map(d => d.data() as any);
+      rows.sort((a, b) => (this.toDate(b['starttime'])?.getTime() ?? 0) - (this.toDate(a['starttime'])?.getTime() ?? 0));
+      const top = rows.slice(0, this.sectionCap);
+      const items: AppointmentItem[] = await Promise.all(top.map(async (d) => {
+        const cancelled = d['cancelled'] === true;
+        const attended = d['attended'] === true;
+        let name = 'Appointment';
+        try {
+          const ref = d['appointment'] as DocumentReference;
+          if (ref) {
+            const aSnap = await getDoc(ref);
+            if (aSnap.exists()) name = (aSnap.data() as any)['appointmenttype'] || name;
+          }
+        } catch { /* keep fallback name */ }
+        const statusKind: 'done' | 'ongoing' | 'cancelled' = cancelled ? 'cancelled' : (attended ? 'done' : 'ongoing');
+        return {
+          name,
+          date: this.toDate(d['starttime']),
+          statusLabel: cancelled ? 'Cancelled' : (attended ? 'Completed' : 'Scheduled'),
+          statusKind,
+        };
+      }));
+      this.appointments = items;
+    } catch (e) {
+      console.warn('slideover appointments read failed', e);
+    } finally {
+      this.apptsLoading = false;
+    }
+  }
+
+  /** FORMS FILLED — `formsByClient` in the SECONDARY `firestore-forms` instance, where profileid == pid.
+   *  If the named instance couldn't be obtained, degrade to an empty state. Capped. */
+  private async loadForms(): Promise<void> {
+    const pid = this.row.profileid;
+    if (!this.firestoreForms) { this.formsLoading = false; return; }
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestoreForms, 'formsByClient'),
+        where('profileid', '==', pid),
+      ));
+      const items: FormItem[] = snap.docs.map(d => {
+        const data: any = d.data();
+        return { name: (data['formname'] ?? 'Form').toString(), date: this.toDate(data['date']) };
+      });
+      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+      this.forms = items.slice(0, this.sectionCap);
+    } catch (e) {
+      console.warn('slideover forms read failed', e);
+    } finally {
+      this.formsLoading = false;
+    }
+  }
+
+  /** INTERIM REPORTS — `interimreport log` where profileid == pid. Show report types + status + last update. */
+  private async loadReports(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'interimreport log'),
+        where('profileid', '==', pid),
+      ));
+      const items: ReportItem[] = snap.docs.map(d => {
+        const data: any = d.data();
+        const codes: string[] = Array.isArray(data['reports']) ? data['reports'] : [];
+        const types = codes.map(c => this.reportLabels[c] ?? c).join(', ');
+        return {
+          types,
+          status: (data['status'] ?? '').toString(),
+          date: this.toDate(data['lastupdate']) ?? this.toDate(data['createdon']),
+        };
+      });
+      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+      this.reports = items.slice(0, this.sectionCap);
+    } catch (e) {
+      console.warn('slideover interim reports read failed', e);
+    } finally {
+      this.reportsLoading = false;
+    }
+  }
+
+  /** BREAKTHROUGHS — `Achievements/posts/postcollection` where profileid == pid. Short snippet + date. */
+  private async loadBreakthroughs(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'Achievements/posts/postcollection'),
+        where('profileid', '==', pid),
+      ));
+      const items: BreakthroughItem[] = snap.docs.map(d => {
+        const data: any = d.data();
+        const msg = (data['postmessage'] ?? data['paralleltrajectory'] ?? '').toString().trim();
+        return { message: msg, date: this.toDate(data['created']) };
+      });
+      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+      this.breakthroughs = items.slice(0, this.sectionCap);
+    } catch (e) {
+      console.warn('slideover breakthroughs read failed', e);
+    } finally {
+      this.breakthroughsLoading = false;
+    }
+  }
+
+  /** AEL — `participant AEL` where profileid == pid, orderBy created desc. Status + date. Capped. */
+  private async loadAel(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      // No orderBy here — a (profileid + created) composite index isn't deployed; sort client-side.
+      const snap = await getDocs(query(
+        collection(this.firestore, 'participant AEL'),
+        where('profileid', '==', pid),
+      ));
+      this.ael = snap.docs
+        .map(d => {
+          const data: any = d.data();
+          return { status: (data['status'] ?? '').toString(), date: this.toDate(data['created']) };
+        })
+        .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
+        .slice(0, this.sectionCap);
+    } catch (e) {
+      console.warn('slideover AEL read failed', e);
+    } finally {
+      this.aelLoading = false;
+    }
+  }
+
+  // ---- collapsible list sections + top-3 / show-all ----
+  /** Toggle a list section open/collapsed. */
+  toggleCollapsed(key: string): void {
+    if (this.collapsed.has(key)) this.collapsed.delete(key);
+    else this.collapsed.add(key);
+  }
+  isCollapsed(key: string): boolean { return this.collapsed.has(key); }
+
+  /** Toggle a list section between top-3 and its full list. */
+  toggleShowAll(key: string): void {
+    if (this.showAll.has(key)) this.showAll.delete(key);
+    else this.showAll.add(key);
+  }
+  isShowAll(key: string): boolean { return this.showAll.has(key); }
+
+  /** Pill class for an appointment status kind. */
+  apptPillClass(kind: 'done' | 'ongoing' | 'cancelled'): string {
+    return kind === 'done' ? 'so-pill-ok' : (kind === 'cancelled' ? 'so-pill-cancel' : 'so-pill-amber');
   }
 
   healthLabel(s: CoachHealthState | null | undefined): string {
