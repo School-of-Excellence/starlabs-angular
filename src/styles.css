@@ -227,3 +227,60 @@ html:has(.dyn-studio-v2-app) {
   overflow: hidden !important;
   height: 100vh !important;
 }
+
+/* =============================================================
+   Event Participation Confirmations — CDK overlay theming.
+   :host ::ng-deep cannot reach overlays (they mount at <body>), so
+   these are scoped to THIS feature's overlays via panelClass /
+   overlayPanelClass: 'sx-select-pane' (every select incl. the
+   paginator's page-size, via MAT_SELECT_CONFIG), 'sx-dialog' /
+   'sx-dialog-surface' (dialogs), 'sx-menu-panel' (menu), 'sx-snack'
+   (snackbars), 'sx-tip' (tooltips). No effect on other screens.
+   ============================================================= */
+.sx-select-pane .mat-mdc-select-panel,
+.sx-select-pane .mat-mdc-option,
+.sx-dialog .mat-mdc-dialog-surface,
+.sx-menu-panel,
+.sx-menu-panel .mat-mdc-menu-item,
+.sx-snack .mdc-snackbar__surface,
+.sx-tip {
+  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Select dropdown panels — named selects AND the paginator page-size select */
+.sx-select-pane .mat-mdc-select-panel { border-radius: 12px; padding: 5px; background: #fff;
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, .18); }
+.sx-select-pane .mat-mdc-option { --mat-option-selected-state-layer-color: rgba(0, 122, 255, .08); }
+.sx-select-pane .mat-mdc-option .mdc-list-item__primary-text { color: #1c1c1e; }
+.sx-select-pane .mat-mdc-option.mdc-list-item--selected .mdc-list-item__primary-text { color: #0060df; }
+.sx-select-pane .mat-mdc-option:hover:not(.mdc-list-item--disabled),
+.sx-select-pane .mat-mdc-option.mat-mdc-option-active { background: rgba(0, 122, 255, .06); }
+
+/* Dialogs (confirm / progress / failures via sx-dialog) */
+.sx-dialog .mat-mdc-dialog-surface { border-radius: 16px; }
+.sx-dialog .mdc-button { font-family: inherit; letter-spacing: 0; border-radius: 10px; height: 40px; }
+.sx-dialog .mat-mdc-button { --mdc-text-button-label-text-color: #007aff; }
+.sx-dialog .mat-mdc-unelevated-button {
+  --mdc-filled-button-container-color: #007aff;
+  --mdc-filled-button-label-text-color: #fff;
+}
+.sx-dialog .mat-mdc-unelevated-button:hover { --mdc-filled-button-container-color: #0060df; }
+.sx-dialog .mdc-linear-progress { --mdc-linear-progress-active-indicator-color: #007aff; }
+.sx-dialog .mdc-linear-progress__buffer-bar { background: rgba(0, 122, 255, .16); }
+
+/* Surface-only class for foreign dialogs (assign-product, comms) — rounds the
+   surface WITHOUT recolouring their internal buttons */
+.sx-dialog-surface .mat-mdc-dialog-surface { border-radius: 16px;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .18), 0 30px 60px -20px rgba(0, 0, 0, .28); }
+
+/* Send menu panel */
+.sx-menu-panel.mat-mdc-menu-panel { border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 32px -12px rgba(0, 0, 0, .22); }
+.sx-menu-panel .mat-mdc-menu-item { min-height: 40px; --mat-menu-item-label-text-color: #1c1c1e; }
+.sx-menu-panel .mat-mdc-menu-item .mat-icon { color: #6c6c70; font-size: 20px; width: 20px; height: 20px; }
+.sx-menu-panel .mat-mdc-menu-item:hover,
+.sx-menu-panel .mat-mdc-menu-item.cdk-focused { background: rgba(0, 122, 255, .08); }
+
+/* Snackbars (sx-snack via MAT_SNACK_BAR_DEFAULT_OPTIONS) */
+.sx-snack { --mdc-snackbar-container-shape: 12px; --mat-snack-bar-button-color: #4da3ff; }
