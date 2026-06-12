@@ -11,13 +11,13 @@
 |---|---|---|---:|---:|---|
 | — | **journey-flow** (marquee end-to-end) | participant170 | ✅ **GREEN** | 7 | login → onboarding-locked → intro write (`orientationstatus:initiated`) → booking surface → 8 attended events + 10 content + projection |
 | U4 | **queue** delivery | participant93 | ✅ **GREEN** | 15 | F3 support-nav · F4 stage-chat read · **F5 stage-chat send (app-write 1→2)** · F7 contact-support surface · **F8 fill-form self-move (Performance→Integration, log)** · **F9 plain self-move (Integration→Onboarded, log)**. F6 slot-booking honestly recorded not-surfaced. |
-| U5 | forms | participant94 | ⏳ running | — | — |
+| U5 | **forms** | participant94 | ✅ **GREEN** | 5 | form fields render · **F5 submit wrote a new `formsByClient` doc** · **F7 deliverable marked completed** · F3 autosave handled gracefully |
 | U1 | auth & onboarding | participant90 | ⏳ pending | — | onboarding-lock + intro write proven in journey-flow; auth-login needs the Login UI (programmatic signIn bypasses it) |
-| U2 | shell & home feed | participant91 | ⏳ pending | — | — |
-| U3 | journey dashboard & mode | participant92 | ⏳ pending | — | — |
+| U2 | **shell & home feed** | participant91 | ✅ **GREEN** | 29 | 34 features · anti-circular **notification read-flag** · **create-post (postcollection 1→2)** · **procedure-code marked** · timeline/explore/people-search/deeplink/AH-updates render · QR variant honestly skipped |
+| U3 | journey dashboard & mode | participant92 | ⏳ running | — | — |
 | U6 | appointments & calendar | participant95 | ⏳ pending | — | `ScheduleOnboarding.onAppointmentSelect` has a String-as-int slot-index app bug to work around |
 | U7 | events & arena | participant96 | ⏳ pending | — | — |
-| U8 | content (eiflix+solarvoice+hpc) | participant97 | ⏳ pending | — | — |
+| U8 | content (eiflix+solarvoice+hpc) | participant97 | 🟡 **PARTIAL** | 9 | **8 features driven+screenshotted** (eiflix home/series/mylist/episode/saved/search/tier/recommended-mix). Many EiFlix/SolarVoice/HPC legs are SIM-BLOCKED (BetterPlayer/just_audio need real media; TierScreen/EpisodePlayer crash on seed; mylist write is CF-rebuilt projection) — recorded render-only, honestly not fake-green. Remaining content-analytics index variants + media legs need more iteration. |
 | U9 | workshops | participant150 | ⏳ pending | — | — |
 | U10 | social/big/shadow/reports/profile | participant151 | ⏳ pending | — | — |
 
