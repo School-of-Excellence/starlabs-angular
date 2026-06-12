@@ -167,8 +167,12 @@ async function seedBucket() {
   // recommended mix playlist fields: type, list[] (refs), completedcontent[], completedplaylist[],
   // status, expiredate, date, delete, title, description. Read in home.dart (profileid==, date>now-2mo).
   // The Recommended block also needs appService.recommendedSolarVoice/Eiflix populated from these.
+  // bufferdocref: recommenedmixplaylist.dart:59 reads doc['bufferdocref'].id UNGUARDED (group key); the
+  // buffer doc itself is never fetched, so a valid ref suffices. Without it the Home recmix initState crashes.
+  const recBufRef = ref('recommended mix playlist', `${RUN}_content_recbuf`);
   const mkRec = (id, type, listRefs) => ({
     docid: id, profileid: PID, type, list: listRefs, completedcontent: [], completedplaylist: [],
+    bufferdocref: recBufRef,
     status: 'ongoing', delete: false, date: past(5), expiredate: future(30),
     title: `For You ${type} ${RUN}`, description: 'seeded recommended mix', ...tag,
   });
