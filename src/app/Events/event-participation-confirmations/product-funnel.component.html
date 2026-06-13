@@ -1,0 +1,226 @@
+<div class="sx">
+
+  <div class="sx-head">
+    <div class="sx-eyebrow">Confirmations</div>
+    <h3 class="sx-title">{{ productName }}</h3>
+    <div class="sx-subt">{{ eventName }} &middot; {{ arena?.type }}</div>
+    <div class="sx-frozen-card" *ngIf="alreadyFinalized">
+      <div class="sx-frozen-head"><mat-icon>lock</mat-icon> Finalized &middot; show-up</div>
+      <table class="sx-frozen-tbl">
+        <tr><th>Basis</th><th class="r">Rate</th><th class="r">Attended / total</th></tr>
+        <tr><td>Of approved</td><td class="r sx-fp-ok">{{ frozenStats.ofApproved }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.approved | number }}</td></tr>
+        <tr><td>Of potential</td><td class="r">{{ frozenStats.ofPotential }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.potential | number }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="sx-error" *ngIf="loadError">
+    <span><mat-icon>error_outline</mat-icon> Couldn't load participants.</span>
+    <button mat-stroked-button (click)="retry()">Retry</button>
+  </div>
+
+  <div class="sx-loading" *ngIf="loading">
+    <mat-icon class="spin">progress_activity</mat-icon> Loading participants...
+  </div>
+
+  <ng-container *ngIf="!loading && !loadError">
+
+    <!-- Segment cards -->
+    <div class="sx-cards">
+      <button *ngFor="let c of cards" class="sx-card {{ c.cls }}" [class.on]="segment===c.key"
+        [attr.aria-pressed]="segment===c.key" [matTooltip]="c.tip || ''" matTooltipClass="sx-tip" (click)="setSegment(c.key)">
+        <span class="sx-lab">{{ c.label }}</span>
+        <span class="sx-num">{{ counts[c.key] | number }}</span>
+        <span class="sx-desc">{{ c.desc }}</span>
+      </button>
+    </div>
+
+    <!-- Action bar -->
+    <div class="sx-bar">
+      <ng-container *ngIf="selectionMode==='approve'">
+        <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
+          <mat-label>Delivery sequence</mat-label>
+          <mat-select [(ngModel)]="selectedDeliverySet" required>
+            <mat-option *ngFor="let set of deliverySetList" [value]="set['deliverytype']">{{ set['deliverytype'] }}</mat-option>
+            <mat-option *ngIf="!deliverySetList.length" disabled>No sequence configured for this product</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="sx-seq"
+          *ngIf="arena?.type === 'queue' && queueVariationList.length" subscriptSizing="dynamic">
+          <mat-label>Queue variation</mat-label>
+          <mat-select [(ngModel)]="selectedQueueVariation">
+            <mat-option *ngFor="let v of queueVariationList" [value]="v.id">{{ v.data['variationname'] }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button mat-flat-button class="sx-approve" [disabled]="!canApprove()"
+          [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
+          <mat-icon>check</mat-icon> Approve {{ readyCount }}
+        </button>
+        <span class="sx-hint" *ngIf="approveDisabledReason()">{{ approveDisabledReason() }}</span>
+      </ng-container>
+
+      <ng-container *ngIf="selectionMode==='attend'">
+        <button mat-flat-button class="sx-approve" [disabled]="selectedToMark.length===0" (click)="markAttended(selectedToMark)">
+          <mat-icon>task_alt</mat-icon> Mark {{ selectedToMark.length }} attended
+        </button>
+      </ng-container>
+
+      <button mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
+        matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
+        <mat-icon>how_to_reg</mat-icon> Finalize attendance<span *ngIf="pendingNoShow.length"> ({{ pendingNoShow.length }})</span>
+      </button>
+
+      <mat-form-field appearance="outline" class="sx-finance" subscriptSizing="dynamic">
+        <mat-label>Finance</mat-label>
+        <mat-select [(ngModel)]="financeFilter" (ngModelChange)="onFinance()">
+          <mat-option *ngFor="let f of financeOptions" [value]="f.value">{{ f.label }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
+        matTooltipClass="sx-tip" matTooltip="Message the participants in this segment">
+        <mat-icon>campaign</mat-icon> Send
+      </button>
+      <mat-menu #sendMenu="matMenu" class="sx-menu-panel">
+        <button mat-menu-item (click)="sendWhatsApp()"><mat-icon>chat</mat-icon> WhatsApp ({{ segmentRows.length }})</button>
+        <button mat-menu-item (click)="sendNotification()"><mat-icon>notifications</mat-icon> App notification ({{ segmentRows.length }})</button>
+        <button mat-menu-item (click)="sendEmail()"><mat-icon>mail</mat-icon> Email ({{ segmentRows.length }})</button>
+      </mat-menu>
+
+      <button mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
+
+      <mat-form-field appearance="outline" class="sx-search" subscriptSizing="dynamic">
+        <mat-label>Filter</mat-label>
+        <input matInput [(ngModel)]="searchText" (ngModelChange)="onSearch()" placeholder="Name or email">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+    </div>
+
+    <div class="sx-showing" *ngIf="isFiltered">Showing {{ segmentRows.length | number }} of {{ counts[segment] | number }}</div>
+
+    <!-- Spreadsheet table -->
+    <div class="sx-wrap">
+      <table class="sx-t">
+        <thead>
+          <tr>
+            <th class="sx-c-check" *ngIf="showSelect">
+              <mat-checkbox [checked]="isAllSelected()" [indeterminate]="hasSelectionInView() && !isAllSelected()"
+                (change)="masterToggle()" aria-label="Select all"></mat-checkbox>
+            </th>
+            <th>Name</th>
+            <th>Current journey</th>
+            <th>Subscription</th>
+            <th>Finance</th>
+            <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of pagedRows">
+            <td class="sx-c-check" *ngIf="showSelect">
+              <mat-checkbox [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
+                (change)="toggleRow(row)"
+                [attr.aria-label]="isSelectable(row) ? ('Select ' + row.name) : ('Cannot select ' + row.name + (row.reason ? ' — ' + row.reason : ''))"></mat-checkbox>
+            </td>
+            <td>
+              <div class="sx-nmcell">
+                <span class="sx-ph">
+                  <img *ngIf="row.photo" [src]="row.photo" alt="" referrerpolicy="no-referrer">
+                  <span *ngIf="!row.photo" class="sx-init">{{ initials(row.name) }}</span>
+                </span>
+                <div class="sx-nmtext">
+                  <div class="sx-nm">{{ row.name }}</div>
+                  <div class="sx-em">{{ row.email || 'No email' }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+              <span *ngIf="row.metaLoaded && !row.metaError">{{ row.journey || '—' }}</span>
+            </td>
+            <td>
+              <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+              <ng-container *ngIf="row.metaLoaded && !row.metaError">
+                <ng-container *ngIf="row.subEnd; else dashSub">
+                  <span class="dot" [ngClass]="row.subActive ? 'd-ok' : 'd-bad'"></span>{{ row.subActive ? 'Active' : 'Expired' }}
+                  <span class="sx-mut">{{ formatMonthYear(row.subEnd) }}</span>
+                </ng-container>
+                <ng-template #dashSub><span class="sx-mut">—</span></ng-template>
+              </ng-container>
+            </td>
+            <td>
+              <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+              <span *ngIf="row.metaLoaded && !row.metaError">
+                <span class="dot" [ngClass]="financeDotClass(row.finance)" *ngIf="row.finance"></span>{{ row.finance || '—' }}
+              </span>
+            </td>
+            <td>
+              <!-- Reason (no product / in queue) -->
+              <ng-container *ngIf="segment==='noProduct' || segment==='inQueue'">
+                <span class="sx-reason" [class.sx-reason-mut]="segment==='inQueue'">{{ row.reason }}</span>
+                <button mat-button class="sx-assign" *ngIf="segment==='noProduct' && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
+              </ng-container>
+              <!-- Attendance (approved/attended/no-show) -->
+              <ng-container *ngIf="selectionMode==='attend'">
+                <span class="sx-att" *ngIf="row.attended">
+                  <mat-icon>check</mat-icon> Attended <span class="sx-mut" *ngIf="row.scanned">· scanned</span>
+                </span>
+                <ng-container *ngIf="!row.attended">
+                  <span class="sx-noshow" *ngIf="row.attendanceState==='no_show'">No-show</span>
+                  <button mat-button class="sx-mark" (click)="markAttended([row])">Mark attended</button>
+                </ng-container>
+              </ng-container>
+              <!-- Status (other segments) -->
+              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && selectionMode!=='attend'">
+                {{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="segmentRows.length === 0">
+            <td [attr.colspan]="showSelect ? 6 : 5" class="sx-empty">
+              {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
+              <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; onFinance()">Clear filter</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <mat-paginator [length]="segmentRows.length" [pageSize]="pageSize"
+        [pageSizeOptions]="[10, 25, 50, 100]" [pageIndex]="pageIndex" (page)="onPage($event)"></mat-paginator>
+    </div>
+
+  </ng-container>
+</div>
+
+<ng-template #confirmTpl let-data>
+  <h2 mat-dialog-title>{{ data.title }}</h2>
+  <mat-dialog-content>
+    <p>{{ data.body }}</p>
+    <p class="sx-warnline" *ngIf="data.warn"><mat-icon>warning</mat-icon> {{ data.warn }}</p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button [mat-dialog-close]="false">Cancel</button>
+    <button mat-flat-button color="primary" [mat-dialog-close]="true">{{ data.confirm }}</button>
+  </mat-dialog-actions>
+</ng-template>
+
+<ng-template #progressTpl>
+  <div class="sx-prog">
+    <div class="sx-prog-msg">{{ progress.msg }}</div>
+    <mat-progress-bar mode="determinate" [value]="progress.value"></mat-progress-bar>
+    <div class="sx-prog-sub">{{ progress.value }}%<span *ngIf="progress.eta"> · {{ progress.eta }}</span></div>
+  </div>
+</ng-template>
+
+<ng-template #failuresTpl let-data>
+  <h2 mat-dialog-title>Approved {{ data.success }} of {{ data.total }}</h2>
+  <mat-dialog-content>
+    <p>{{ data.failed.length }} could not be approved:</p>
+    <ul class="sx-fail"><li *ngFor="let n of data.failed">{{ n }}</li></ul>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button [mat-dialog-close]="false">Close</button>
+    <button mat-flat-button color="primary" [mat-dialog-close]="'retry'">Retry {{ data.failed.length }}</button>
+  </mat-dialog-actions>
+</ng-template>
