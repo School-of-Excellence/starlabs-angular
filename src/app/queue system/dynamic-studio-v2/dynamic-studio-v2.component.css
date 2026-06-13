@@ -411,6 +411,90 @@
   flex: 1 1 auto;
 }
 
+/* Extra invited specialists roster (sidebar, under participant profile) */
+.ds-app .ds-extra-specialists {
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ds-app .ds-extra-specialists__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--ink-3, #6B7686);
+  font-family: inherit;
+}
+.ds-app .ds-extra-specialists.is-open .ds-extra-specialists__head { margin-bottom: 8px; }
+.ds-app .ds-extra-specialists__head:hover { color: var(--primary-ink); }
+.ds-app .ds-extra-specialists__head .ic {
+  font-size: 16px; width: 16px; height: 16px; line-height: 16px;
+}
+.ds-app .ds-extra-specialists__title { text-align: left; }
+.ds-app .ds-extra-specialists__chevron {
+  margin-left: auto;
+  transition: transform .18s ease;
+}
+.ds-app .ds-extra-specialists.is-open .ds-extra-specialists__chevron { transform: rotate(180deg); }
+.ds-app .ds-extra-specialists__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ds-app .ds-extra-specialist {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+.ds-app .ds-extra-specialist__avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ds-app .ds-extra-specialist__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ds-app .ds-extra-specialist__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink, #1E2733);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ds-app .ds-extra-specialist__activity {
+  font-size: 11.5px;
+  color: var(--primary-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ds-app .ds-side-actions {
   display: flex;
   flex-direction: column;
@@ -1151,6 +1235,49 @@
   white-space: nowrap;
 }
 .ds-app .zoom-link--pending { color: var(--amber); }
+
+/* Raw Zoom start URL row shown under the Start Meeting button (getstarted step) */
+.ds-app .zoom-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+}
+.ds-app .zoom-link-row__ic {
+  font-size: 17px; width: 17px; height: 17px; line-height: 17px;
+  color: var(--ink-3); flex: 0 0 auto;
+}
+.ds-app .zoom-link-row__url {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ds-app .zoom-link-row__url:hover { text-decoration: underline; }
+.ds-app .zoom-link-row__copy {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.ds-app .zoom-link-row__copy:hover { background: var(--surface-2); color: var(--primary); }
+.ds-app .zoom-link-row__copy .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
 
 /* ============================================================== ATC BANNER */
 .ds-app .atc-banner {

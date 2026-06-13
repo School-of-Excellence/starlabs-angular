@@ -274,11 +274,41 @@
         </div>
       </div>
 
+      <!-- Extra specialists invited into this studio via "Invite More
+           Specialist(s)". Shown right under the participant profile so the
+           host can see who else is in their studio (name + activity). -->
+      <div class="ds-extra-specialists" *ngIf="additionalSpecialists.length"
+           [class.is-open]="extraSpecialistsOpen">
+        <button type="button" class="ds-extra-specialists__head"
+                (click)="toggleExtraSpecialists()"
+                [attr.aria-expanded]="extraSpecialistsOpen">
+          <mat-icon class="ic">groups</mat-icon>
+          <span class="ds-extra-specialists__title">Specialists included</span>
+          <span class="ds-extra-specialists__count">{{ additionalSpecialists.length }}</span>
+          <mat-icon class="ic ds-extra-specialists__chevron">expand_more</mat-icon>
+        </button>
+        <div class="ds-extra-specialists__list" *ngIf="extraSpecialistsOpen">
+          <div class="ds-extra-specialist" *ngFor="let sp of additionalSpecialists">
+            <span class="ds-extra-specialist__avatar">{{ (sp.name || '?').charAt(0) | uppercase }}</span>
+            <span class="ds-extra-specialist__body">
+              <span class="ds-extra-specialist__name" [title]="sp.name">{{ sp.name }}</span>
+              <span class="ds-extra-specialist__activity" *ngIf="sp.activity" [title]="sp.activity">{{ sp.activity }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
       <!-- Sidebar actions -->
       <div class="ds-side-actions">
         <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)">
           <mat-icon class="ic">person_add</mat-icon>
           Invite More Specialist(s)
+        </button>
+        <!-- Return the participant to the queued section of the SAME stage
+             without advancing them. Closes this studio. -->
+        <button type="button" class="btn btn-ghost btn-sm" (click)="moveBackToQueue()">
+          <mat-icon class="ic">undo</mat-icon>
+          Move Back to Queue
         </button>
       </div>
 
@@ -576,6 +606,21 @@
                   <mat-icon class="ic">play_arrow</mat-icon>
                   <span class="start-meeting-btn__label">Start Meeting</span>
                 </button>
+
+                <!-- Raw Zoom start URL shown below the button so the host can
+                     open/copy the link directly (parity with legacy studio).
+                     Sourced from liveAssignment.zoomdata.start_url. -->
+                <div class="zoom-link-row" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
+                  <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
+                  <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
+                     [title]="liveAssignment['zoomdata']?.start_url">
+                    {{ liveAssignment['zoomdata']?.start_url }}
+                  </a>
+                  <button type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
+                          matTooltip="Copy link">
+                    <mat-icon class="ic">content_copy</mat-icon>
+                  </button>
+                </div>
               </div>
 
               <!-- Generate New Link (placed at the BOTTOM as a separate row).
@@ -677,9 +722,10 @@
               </div>
             </div>
 
-            <!-- Shared widgets -->
-            <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedvalidatedatc')" [ngTemplateOutlet]="tplValidatedATC"></ng-container>
-            <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedunvalidatedatc')" [ngTemplateOutlet]="tplUnvalidatedATC"></ng-container>
+            <!-- Shared widgets. NOTE: the Validated / Unvalidated ATC lists are
+                 intentionally NOT shown in this step — the Prescribe ATC step
+                 only surfaces "ATC submitted for this activity" (above). The
+                 full validated/unvalidated breakdown lives on the View ATC step. -->
             <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('viewtripleatc')" [ngTemplateOutlet]="tplTripleATC"></ng-container>
             </div>
           </ng-container>

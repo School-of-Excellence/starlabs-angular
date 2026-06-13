@@ -177,6 +177,10 @@ export class DynamicStudioV2Component {
   sidebarProfileOpen: boolean = true
   toggleSidebarProfile() { this.sidebarProfileOpen = !this.sidebarProfileOpen }
 
+  // Expand/collapse state for the "Extra invited specialists" roster panel.
+  extraSpecialistsOpen: boolean = true
+  toggleExtraSpecialists() { this.extraSpecialistsOpen = !this.extraSpecialistsOpen }
+
   // Per-stage-note expand state (clamp to 2 lines, "Show more" when longer).
   expandedStageNotes = new Set<string>()
   toggleStageNote(key: string) {
@@ -483,6 +487,19 @@ export class DynamicStudioV2Component {
     const qid = this.ongoingQueue?.['docid']
     if (!qid) return []
     return (this.unvalidatedATCList || []).filter(atc => atc?.['atcdata']?.['queueid'] === qid)
+  }
+
+  // Extra specialists invited into THIS studio via "Invite More Specialist(s)"
+  // (stored on the live assignment as bonusactivity = { profileId: activityId }).
+  // Resolved to display name + activity name for the sidebar roster shown next
+  // to the participant profile.
+  get additionalSpecialists(): { profileId: string; name: string; activity: string }[] {
+    const bonus = this.liveAssignment?.['bonusactivity'] ?? {}
+    return Object.keys(bonus).map(profileId => ({
+      profileId,
+      name: this.mapProfile?.[profileId] ?? '—',
+      activity: this.mapActivity?.[bonus[profileId]] ?? ''
+    }))
   }
 
   // Returns the stage name immediately before the current one in the participant's
@@ -2176,6 +2193,86 @@ export class DynamicStudioV2Component {
       console.log(err)
     })
   }
+  // Move the participant back to the QUEUED section of the SAME stage.
+  // Unlike moveStage(), this does NOT advance the token: `currentstage` stays
+  // the current stage and `status` is forced to "queued" so they reappear in
+  // the queued pool of this stage. Based on the same-stage branch of
+  // moveStage() (StageIncompleteConfirmation → close studio → release pairing),
+  // minus the dropIndex/last-stage delivery-completed handling, since we are
+  // not progressing the token.
+  async moveBackToQueue(){
+    if(this.liveAssignment == null) return
+    var inCompleteDialog = this.dialog.open(StageIncompleteConfirmationComponent, {
+      data: {
+        currentstage: this.liveAssignment["stagename"],
+        participantname: this.mapProfile[this.liveAssignment["token"]?.profile_id]
+      },
+      maxWidth: "70vw",
+      maxHeight: "90vh",
+      disableClose: true
+    })
+    await firstValueFrom(inCompleteDialog.afterClosed()).then(async value =>{
+      console.log("[moveBackToQueue] confirm value", value)
+      if(!value) return
+      var loading = this.dialog.open(LoadingProgressComponent, {
+        data: {msg: "Moving participant back to queue"},
+        disableClose: true
+      })
+      try {
+        var currentstage = this.liveAssignment["stagename"]
+        var data: any = {
+          previousstage: currentstage,
+          currentstage: currentstage,
+          logdate: serverTimestamp(),
+          stagestatus: "Returned",
+          quicknotes: null,
+          cwmentoring: null,
+          cwshadowing: null,
+          cwperson: null,
+          diagnosticmentoring: null,
+          diagnosticshadowing: null,
+          diagnosticperson: null,
+          people_involved: [],
+          arenaid: null,
+          liveassignmentid: null,
+          studioid: null,
+          status: "queued"
+        }
+        if(value["preassign"]){
+          data[`preassigned.${currentstage}`] = arrayUnion(this.liveAssignment["studioid"])
+        }
+        if((value["reason"] ?? "").trim().length != 0){
+          data["notes"] = value["reason"]
+          data["notesList"] = arrayUnion({
+            author: this.profileid,
+            stage: currentstage,
+            text: value["reason"],
+            updatedon: new Date()
+          })
+        }
+        var log = {...this.liveAssignment["token"], ...data}
+        await this.updateQueueStage(log)
+        var studioid = this.liveAssignment["studioid"]
+        await updateDoc(doc(this.firestore,'live assignment/' + this.liveAssignment["docid"]),{
+          isactivitydone : false,
+          status: "completed",
+          updated: serverTimestamp()
+        })
+        if(studioid){
+          await updateDoc(doc(this.firestore,"queue studio pairing",studioid),{
+            status: null,
+          })
+        }
+        this.snackBar.open('Participant moved back to the queue.', 'OK', { duration: 2500 })
+      } catch(err) {
+        console.error("[moveBackToQueue] failed", err)
+        this.snackBar.open('Could not move participant back. Please try again.', 'Dismiss', { duration: 3500 })
+      } finally {
+        loading.close()
+      }
+    })
+  }
+
   async moveStage(nextstage:string,markascompleted:any){
     console.log("********* moveStage *********");
     
@@ -2644,6 +2741,20 @@ export class DynamicStudioV2Component {
         { duration: 7000, horizontalPosition: 'center', verticalPosition: 'top' });
     }
     return invited
+  }
+
+  // Copy the raw Zoom start URL to the clipboard (shown below Start Meeting
+  // on the getstarted step). Falls back gracefully when the Clipboard API is
+  // unavailable (e.g. non-secure context).
+  async copyZoomLink(url: string){
+    if(!url) return
+    try{
+      await navigator.clipboard.writeText(url)
+      this.snackBar.open('Zoom link copied to clipboard.', 'OK', { duration: 2000 })
+    }catch(err){
+      console.warn('Clipboard copy failed', err)
+      this.snackBar.open('Could not copy the link. Long-press or right-click to copy it manually.', 'Dismiss', { duration: 3000 })
+    }
   }
 
   async regenerateZoomLink(){
