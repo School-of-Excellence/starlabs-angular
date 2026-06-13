@@ -631,7 +631,7 @@ export class DynamicStudioV2Component {
 
     // session ended — both participant left and call had started
     if (leftAt && specialistJoinedAt && !fresh(lastSeen)) {
-      return { tone: 'slate', icon: 'check', title: 'Session ended', sub: 'The participant has disconnected' }
+      return { tone: 'slate', icon: 'check', title: 'Session ended', sub: '' }
     }
     // participant left mid-call
     if (leftAt && specialistJoinedAt) {

@@ -336,14 +336,17 @@ position: fixed;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 14px;
+  padding: 9px 16px;          /* unchanged */
   margin-bottom: 22px;
   background: #fef3c7;
   border: 1px solid #fcd34d;
-  border-radius: 999px;
+  border-radius: 10px;        /* was 999px */
   font-size: 12.5px;
   font-weight: 600;
   color: #92400e;
+  width: 100%;                /* add this */
+  box-sizing: border-box;     /* add this */
+  text-align: left;           /* add this */
 }
 .rec-prompt-card__hint mat-icon {
   font-size: 16px;
