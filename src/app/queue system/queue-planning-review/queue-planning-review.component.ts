@@ -1,5 +1,5 @@
 import { Component, ElementRef, inject, OnDestroy, OnInit, TemplateRef, ViewChild, AfterViewInit } from '@angular/core';
-import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query,runTransaction, deleteField, setDoc, Timestamp, updateDoc, where } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query,runTransaction, deleteField, setDoc, Timestamp, updateDoc, where ,arrayUnion} from '@angular/fire/firestore';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -224,7 +224,11 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   selectedArenaEventId: string | null = null;
   arenaEventProfileMap: { [arenaeventid: string]: Set<string> } = {};
   eventParticipationProfileIds: Set<string> = new Set();
-  
+  //slot revert
+  expandedRevertLogs: Set<string> = new Set();
+  showRevertHistoryDialog: boolean = false;
+  revertHistoryParticipant: any = null;
+
   slotPlannerFilter = {
     startDate: null,
     endDate: null,
@@ -5295,12 +5299,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   // slot revert
   async revertSlot(participant: any, stageName: string) {
     const profileId = participant.profile_id || participant.profileid;
-    const name = this.getProfileName(profileId);
 
-    const confirmed = window.confirm(
-      `Are you sure you want to revert the slot`
-    );
-
+    const confirmed = window.confirm(`Are you sure you want to revert the slot`);
     if (!confirmed) return;
 
     const stageSlots = participant.selectedstageslot || {};
@@ -5340,7 +5340,13 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       const tokenRef = doc(this.firestore, 'queue_token', tokenId);
 
       await updateDoc(tokenRef, {
-        [`selectedstageslot.${stageName}`]: deleteField()
+        [`selectedstageslot.${stageName}`]: deleteField(),
+        [`queue_slot_log.${stageName}`]: arrayUnion({
+          ...selectedSlot,
+          type:       'reverted',
+          revertedby: this.profileid,
+          createdon:  Timestamp.fromDate(new Date())
+        })
       });
 
       const tokenIndex = this.queueTokenList.findIndex(t => t.tokenid === tokenId || t.id === tokenId);
@@ -5358,6 +5364,19 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       this.rebuildMergedSlots();
       this.refreshSelectedSlot();
       this.showAllNonConfirmedParticipants();
+      
+      setTimeout(() => {
+        const token = this.queueTokenList.find(t => t.tokenid === tokenId || t.id === tokenId);
+        if (token?.queue_slot_log) {
+          const p = this.nonConfirmedParticipants.find(
+            p => (p.profile_id || p.profileid) === profileId
+          );
+          if (p) {
+            p.queue_slot_log = token.queue_slot_log;
+          }
+        }
+      }, 200);
+
       loading.close();
       alert('Slot reverted successfully!');
 
@@ -5366,6 +5385,11 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       loading.close();
       alert('Error reverting slot. Please try again.');
     }
+  }
+
+  openRevertHistoryDialog(participant: any) {
+    this.revertHistoryParticipant = participant;
+    this.showRevertHistoryDialog = true;
   }
 
   async loadEventParticipationList() {
