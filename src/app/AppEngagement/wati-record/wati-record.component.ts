@@ -80,6 +80,22 @@ export class WatiRecordComponent implements OnInit {
   // Statistics computed values
   totalNotifications = computed(() => this.records().length);
 
+  //  WATI Categories 
+  watiCategories: { id: string; name: string }[] = [];
+  isLoadingCategories = false;
+
+  // Category Dialog
+  showCategoryDialog = false;
+  selectedCategoryId = '';
+  isCategoryLoading = false;
+  categoryParticipants: any[] = [];
+  filteredCategoryParticipants: any[] = [];
+  categoryDisplayedParticipants: any[] = [];
+  categorySearchText = '';
+  categoryCurrentPage = 0;
+  readonly CATEGORY_PAGE_SIZE = 10;
+  categoryTotalPages = 0;
+
   newlyCreatedToday = computed(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -130,7 +146,113 @@ export class WatiRecordComponent implements OnInit {
     this.setDefaultDateRange();
     this.fetchProfiles();
     this.fetchNotificationRecord();
+    this.loadWatiCategories();
   }
+
+  async loadWatiCategories() {
+    this.isLoadingCategories = true;
+    try {
+      const snap = await getDoc(doc(this.firestore, 'classify', 'waticategories'));
+      this.watiCategories = snap.exists() ? (snap.data()?.['categories'] || []) : [];
+    } catch (e) { console.error(e); }
+    finally { this.isLoadingCategories = false; }
+  }
+
+  getWatiCategoryName(id: string): string {
+    return this.watiCategories.find(c => c.id === id)?.name ?? '—';
+  }
+
+  async openCategoryDialog(categoryId: string) {
+    if (!categoryId) return;
+    this.selectedCategoryId = categoryId;
+    this.showCategoryDialog = true;
+    this.isCategoryLoading = true;
+    this.categoryParticipants = [];
+    this.categorySearchText = '';
+
+    try {
+      // Fetch all archive docs for this category
+      const snap = await getDocs(
+        query(collection(this.firestore, 'wati archive'),
+          where('watiCategory', '==', categoryId),
+          orderBy('date', 'desc'))
+      );
+
+      const profileMap: Record<string, any> = {};
+
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const templateName = data['watitemplateid'] || data['broadcastname'] || '—';
+        const sentArr: string[] = data['sent'] || [];
+        const failedArr: string[] = data['failed'] || [];
+        const profileids: string[] = data['profileid'] || [];
+        const numbermap: Record<string, string> = data['numbermap'] || {};
+
+        profileids.forEach(pid => {
+          if (!profileMap[pid]) {
+            const prof = this.mapProfile[pid] || {};
+            profileMap[pid] = {
+              profileid: pid,
+              name: prof['name'] || 'Unknown',
+              email: prof['email'] || '',
+              templateStatuses: [],
+              sent: false, open: false, failed: false,
+              sentCount: 0, openCount: 0, failedCount: 0,
+            };
+          }
+
+          const phone = Object.entries(numbermap).find(([, id]) => id === pid)?.[0] ?? '';
+          const isSent = sentArr.some(n => n.replace(/\D/g, '').endsWith(phone.replace(/\D/g, '')));
+          const isFailed = failedArr.some(n => n.replace(/\D/g, '').endsWith(phone.replace(/\D/g, '')));
+
+          profileMap[pid].templateStatuses.push({
+            templateName,
+            sent: isSent,
+            failed: isFailed,
+            open: false,
+          });
+
+          if (isSent) { profileMap[pid].sent = true; profileMap[pid].sentCount++; }
+          if (isFailed) { profileMap[pid].failed = true; profileMap[pid].failedCount++; }
+        });
+      });
+
+      this.categoryParticipants = Object.values(profileMap);
+      this.applyCategoryFilter();
+    } catch (e) { console.error(e); }
+    finally { this.isCategoryLoading = false; }
+  }
+
+  applyCategoryFilter() {
+    const s = this.categorySearchText.toLowerCase().trim();
+    this.filteredCategoryParticipants = s
+      ? this.categoryParticipants.filter(p =>
+          p.name?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s))
+      : [...this.categoryParticipants];
+    this.categoryCurrentPage = 0;
+    this.categoryTotalPages = Math.ceil(this.filteredCategoryParticipants.length / this.CATEGORY_PAGE_SIZE);
+    this.updateCategoryPage();
+  }
+
+  updateCategoryPage() {
+    const start = this.categoryCurrentPage * this.CATEGORY_PAGE_SIZE;
+    this.categoryDisplayedParticipants = this.filteredCategoryParticipants.slice(start, start + this.CATEGORY_PAGE_SIZE);
+  }
+
+  categoryNextPage() { if (this.categoryCurrentPage < this.categoryTotalPages - 1) { this.categoryCurrentPage++; this.updateCategoryPage(); } }
+  categoryPrevPage() { if (this.categoryCurrentPage > 0) { this.categoryCurrentPage--; this.updateCategoryPage(); } }
+
+  closeCategoryDialog() {
+    this.showCategoryDialog = false;
+    this.selectedCategoryId = '';
+    this.categoryParticipants = [];
+    this.filteredCategoryParticipants = [];
+    this.categoryDisplayedParticipants = [];
+  }
+
+    fetchSentCount(p: any): number { return p.sentCount || 0; }
+    fetchOpenCount(p: any): number { return p.openCount || 0; }
+    fetchFailedCount(p: any): number { return p.failedCount || 0; }
 
   initializeForm() {
     this.filterForm = this.fb.group({
@@ -138,7 +260,8 @@ export class WatiRecordComponent implements OnInit {
       endDate: [null],
       searchText: [''],
       profileFilter: [''],
-      searchByPerson: ['']
+      searchByPerson: [''],
+      categoryFilter: [''],   
     });
 
     // Subscribe to form changes for filtering
