@@ -2,14 +2,24 @@
     height: 3px !important;
   }
   
-  /* Status Bars */
+  /* Status Bars — fixed just below the app toolbar (64px) so the message is always visible without scrolling */
   .status-bar {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    z-index: 9;
     height: 40px;
     padding: 0;
     display: flex;
     justify-content: flex-end;
     align-items: center;
     font-weight: bold;
+  }
+
+  /* reserve space only while a status bar is showing, so the fixed bar doesn't cover content */
+  .atc-edit-container.has-status-bar {
+    padding-top: 40px;
   }
   
   .status-bar:not(.autosave-bar) {
