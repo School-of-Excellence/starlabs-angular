@@ -2,19 +2,21 @@
     <mat-progress-spinner mode="indeterminate" class="loading-bar"></mat-progress-spinner>
   </div>
   
-  <div class="atc-edit-container">
+  <div class="atc-edit-container" [class.has-status-bar]="!isonline || autoSaveID != null">
     <!-- Offline/Online status bar -->
-    <nav class="navbar sticky-top navbar-light justify-content-end status-bar" *ngIf="!isonline">
-      <span class="status-message">No internet connection. Autosave is off. Keep this tab open until it's restored.</span>
+    <nav class="navbar navbar-light justify-content-end status-bar" *ngIf="!isonline">
+      <span class="status-message">You're offline — changes are saved on this device and will sync when you reconnect.</span>
     </nav>
     
-    <nav class="navbar sticky-top navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
+    <nav class="navbar navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
       <div>
         <span class="icon-text-container" (click)="autoSave()">
           <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
           <span>{{draftStatus.message}}</span>
           <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
         </span>
+        <!-- explicit retry shown only when a save failed -->
+        <button *ngIf="draftStatus.code == -1" mat-button class="retry-button" (click)="autoSave()">Retry</button>
       </div>
       <!-- <div *ngIf="autosaveonprogress">
         <span class="icon-text-container">
@@ -32,37 +34,56 @@
     
     <header class="atc-header">
       <h1 class="header-title">Prescribe ATC</h1>
-      
-      <div class="share-container" *ngIf="autoSaveID != null">
-        <button mat-button class="share-button" (click)="copyToClipboard()">
-          Copy Link For Collaborators
-          <mat-icon>content_copy</mat-icon>
-        </button>
-      </div>
     </header>
   
     <main class="atc-main">
+      <!-- Participant selection — always first; the full screen unlocks once a participant is chosen -->
+      <section class="content-section">
+        <h2 class="section-heading">Participant</h2>
+        <div class="info-box">
+          <mat-form-field appearance="outline" class="flat-field">
+            <mat-label>Participant's Name</mat-label>
+            <!-- lock the participant name once a draft context exists; switch participant via "Create New ATC" -->
+            <mat-select [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity() || autoSaveID != null" [required]="true">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div *ngIf="participantProfileid !== null && (selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile'])" class="profile-image-container">
+            <img class="profile-image" [src]="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']">
+          </div>
+
+          <!-- draft / new-atc actions, shown once a participant is selected -->
+          <div class="participant-actions" *ngIf="autoSaveID != null">
+            <!-- only when this participant has a draft other than the current one -->
+            <button *ngIf="!aigeneratedEntry && hasOtherDrafts" mat-button class="share-button" (click)="openAnotherDraft()">
+              Open & Continue Another Draft
+              <mat-icon>folder_open</mat-icon>
+            </button>
+            <!-- start a brand new ATC in a new tab -->
+            <button mat-button class="share-button" (click)="createNewATC()">
+              Create New ATC
+              <mat-icon>note_add</mat-icon>
+            </button>
+            <!-- share the draft link with collaborators -->
+            <button mat-button class="share-button" (click)="copyToClipboard()">
+              Copy Link For Collaborators
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- The full ATC screen is shown only after a participant is selected -->
+      <ng-container *ngIf="autoSaveID != null">
       <!-- ATC Data Section -->
       <section class="content-section">
         <h2 class="section-heading">ATC Data</h2>
         <div class="info-grid">
-          <div class="info-box" id="atcfield-profile">
-            <mat-form-field appearance="outline" class="flat-field">
-              <mat-label>Participant's Name</mat-label>
-              <mat-select [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity()" [required]="true">
-                <mat-option>
-                  <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
-                </mat-option>
-                <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
-              </mat-select>
-            </mat-form-field>
-            
-            <div *ngIf="participantProfileid !== null && (selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile'])" class="profile-image-container">
-              <img class="profile-image" [src]="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']">
-            </div>
-          </div>
-  
-          <div class="info-box" id="atcfield-product">
+          <div class="info-box">
             <mat-form-field appearance="outline" class="flat-field">
               <mat-label>What is the ATC given for?</mat-label>
               <mat-select [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()" [required]="true">
@@ -70,8 +91,8 @@
               </mat-select>
             </mat-form-field>
           </div>
-  
-          <div class="info-box" id="atcfield-date">
+
+          <div class="info-box">
             <mat-form-field appearance="outline" class="flat-field">
               <mat-label>Prescribed Date</mat-label>
               <input matInput [(ngModel)]="date" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY" (dateChange)="autoSave()" [disabled]="!transcriber || this.assignmentInitiated" [required]="true">
@@ -81,7 +102,7 @@
           </div>
         </div>
       </section>
-      
+
       <!-- ATC Directive Section -->
       <section class="content-section" id="atcfield-directive" *ngIf="product != null">
         <h2 class="section-heading">ATC DIRECTIVE</h2>
@@ -529,5 +550,6 @@
           Submit ATC
         </button>
       </section>
+      </ng-container>
     </main>
   </div>
