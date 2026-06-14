@@ -702,8 +702,16 @@
   }
 /* Brief red flash highlight applied to a missing required field when the
    user submits with it empty (scroll-to-field validation). */
+/* inline "required" hint for plain (non-Material) fields */
+.required-text {
+  display: block;
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
 .atc-field-invalid-flash {
-  animation: atcFieldFlash 1.8s ease-out;
+  animation: atcFieldFlash 2.5s ease-out;
   border-radius: 10px;
 }
 @keyframes atcFieldFlash {

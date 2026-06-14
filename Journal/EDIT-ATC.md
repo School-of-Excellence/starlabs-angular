@@ -34,6 +34,19 @@
 5. **Status bar + messaging** — fixed just under the toolbar (always visible), friendly
    messages ("Saved on this device…"), no raw error JSON, and a Retry button on failure.
 
+## Submit validation UX (scroll-to-missing-field + inline "Required")
+
+Mirrors Prescribe ATC. On **Submit**, if a required field is empty:
+- `submitAttempted` is set true, so a custom `ErrorStateMatcher` (`requiredMatcher`) reveals an
+  inline **"This field is required"** message under **every** empty required box at once
+  (awareness detail, potential years, procedure name — existing *and* new adjustments).
+- `focusMissingField(anchorId, message)` **scrolls** to the missing field (an `id="atcfield-*"`
+  anchor, or the first `.ng-invalid` Material control as a fallback), **flashes** it red
+  (`.atc-field-invalid-flash`), and shows the reason in a top **snackbar** (replacing the old
+  blocking `alert`).
+- Anchors added: `atcfield-author`, `atcfield-changework`. Adjustment fields rely on the
+  `[required]` → `.ng-invalid` fallback, so no per-row anchor is needed.
+
 ## Where things live (Edit ATC specifics)
 
 | Thing | Location |
