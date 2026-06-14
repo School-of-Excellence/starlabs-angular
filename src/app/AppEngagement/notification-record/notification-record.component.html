@@ -110,6 +110,39 @@
         </div>
       </div>
 
+      <!-- App engagement funnel: notification tap -> landing (from client tracking) -->
+      <div class="stats-row engagement-row">
+        <div class="stat-card">
+          <h3 class="stat-title">App Delivered → Tapped</h3>
+          <div class="stat-value">{{totalClicked}}</div>
+          <div class="stat-subtitle">
+            <mat-icon class="trend-icon">ads_click</mat-icon>
+            {{clickThroughRate}}% click-through · {{totalAppDelivered}} delivered
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <h3 class="stat-title">Landed on Page</h3>
+          <div class="stat-value green">{{totalLanded}}</div>
+          <div class="stat-subtitle green">
+            <mat-icon class="trend-icon">check_circle</mat-icon>
+            {{landingRate}}% of taps reached the screen
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <h3 class="stat-title">Broke Midway</h3>
+          <div class="stat-value failure">
+            <mat-icon class="warning-icon">link_off</mat-icon>
+            {{totalBroke}}
+          </div>
+          <div class="stat-subtitle red">
+            <mat-icon class="trend-icon">trending_down</mat-icon>
+            {{breakRate}}% of taps failed to land
+          </div>
+        </div>
+      </div>
+
       <!-- Data Table -->
       <div class="table-container">
         <table mat-table [dataSource]="notificationDataSource" matSort class="notification-table">
@@ -334,6 +367,39 @@
               </td>
             </ng-container>
 
+          <!-- NEW: Deep-link Outcome Column (app tap tracking) -->
+          <ng-container matColumnDef="outcome">
+            <th mat-header-cell *matHeaderCellDef>Tap Outcome</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span class="outcome-badge {{recipient.outcomeClass}}"
+                    [title]="recipient.failReason ? (recipient.failStage + ': ' + recipient.failReason) : recipient.outcome">
+                {{recipient.outcome}}
+              </span>
+              <div *ngIf="recipient.failReadable" class="outcome-reason" [title]="(recipient.failStage || '') + ' — ' + (recipient.failReason || '')">
+                {{recipient.failReadable}}
+              </div>
+            </td>
+          </ng-container>
+
+          <!-- NEW: Landed Column -->
+          <ng-container matColumnDef="landed">
+            <th mat-header-cell *matHeaderCellDef>Landed</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span *ngIf="recipient.landed" class="clicked-yes">Yes</span>
+              <span *ngIf="!recipient.landed && recipient.appClicked && !recipient.clientFailedFlag" class="clicked-unknown">No</span>
+              <span *ngIf="!recipient.landed && !recipient.appClicked">-</span>
+              <span *ngIf="!recipient.landed && recipient.clientFailedFlag" class="read-no">No</span>
+            </td>
+          </ng-container>
+
+          <!-- NEW: Launch Scenario Column -->
+          <ng-container matColumnDef="scenario">
+            <th mat-header-cell *matHeaderCellDef>Scenario</th>
+            <td mat-cell *matCellDef="let recipient">
+              <span class="scenario-badge">{{recipient.scenario}}</span>
+            </td>
+          </ng-container>
+
           <!-- Log Status Column -->
           <ng-container matColumnDef="logStatus">
             <th mat-header-cell *matHeaderCellDef>Log Created</th>
@@ -357,8 +423,8 @@
           </ng-container>
 
           <!-- Update the header and row definitions to include new columns -->
-          <tr mat-header-row *matHeaderRowDef="['name', 'status', 'channel', 'read', 'clicked', 'logStatus']"></tr>
-          <tr mat-row *matRowDef="let row; columns: ['name', 'status', 'channel', 'read', 'clicked', 'logStatus'];"></tr>
+          <tr mat-header-row *matHeaderRowDef="['name', 'status', 'channel', 'read', 'clicked', 'outcome', 'landed', 'scenario', 'logStatus']"></tr>
+          <tr mat-row *matRowDef="let row; columns: ['name', 'status', 'channel', 'read', 'clicked', 'outcome', 'landed', 'scenario', 'logStatus'];"></tr>
         </table>
 
         <mat-paginator 
@@ -443,6 +509,39 @@
             </td>
           </ng-container>
 
+              <!-- NEW: Deep-link Outcome Column (app tap tracking) -->
+              <ng-container matColumnDef="outcome">
+                <th mat-header-cell *matHeaderCellDef>Tap Outcome</th>
+                <td mat-cell *matCellDef="let recipient">
+                  <span class="outcome-badge {{recipient.outcomeClass}}"
+                        [title]="recipient.failReason ? (recipient.failStage + ': ' + recipient.failReason) : recipient.outcome">
+                    {{recipient.outcome}}
+                  </span>
+                  <div *ngIf="recipient.failReason" class="outcome-reason" [title]="recipient.failReason">
+                    {{recipient.failStage}}
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- NEW: Landed Column -->
+              <ng-container matColumnDef="landed">
+                <th mat-header-cell *matHeaderCellDef>Landed</th>
+                <td mat-cell *matCellDef="let recipient">
+                  <span *ngIf="recipient.landed" class="clicked-yes">Yes</span>
+                  <span *ngIf="!recipient.landed && recipient.appClicked && !recipient.clientFailedFlag" class="clicked-unknown">No</span>
+                  <span *ngIf="!recipient.landed && !recipient.appClicked">-</span>
+                  <span *ngIf="!recipient.landed && recipient.clientFailedFlag" class="read-no">No</span>
+                </td>
+              </ng-container>
+
+              <!-- NEW: Launch Scenario Column -->
+              <ng-container matColumnDef="scenario">
+                <th mat-header-cell *matHeaderCellDef>Scenario</th>
+                <td mat-cell *matCellDef="let recipient">
+                  <span class="scenario-badge">{{recipient.scenario}}</span>
+                </td>
+              </ng-container>
+
               <!-- Log Status Column -->
               <ng-container matColumnDef="logStatus">
                 <th mat-header-cell *matHeaderCellDef>Log Created</th>
@@ -466,8 +565,8 @@
               </ng-container>
 
               <!-- Update the header and row definitions to include new columns -->
-              <tr mat-header-row *matHeaderRowDef="['name', 'status', 'reason', 'channel', 'read', 'clicked', 'logStatus']"></tr>
-              <tr mat-row *matRowDef="let row; columns: ['name', 'status', 'reason', 'channel', 'read', 'clicked', 'logStatus'];"></tr>
+              <tr mat-header-row *matHeaderRowDef="['name', 'status', 'reason', 'channel', 'read', 'clicked', 'outcome', 'landed', 'scenario', 'logStatus']"></tr>
+              <tr mat-row *matRowDef="let row; columns: ['name', 'status', 'reason', 'channel', 'read', 'clicked', 'outcome', 'landed', 'scenario', 'logStatus'];"></tr>
             </table>
 
             <mat-paginator 
@@ -497,5 +596,8 @@
   </mat-tab>
   <mat-tab label="Calls">
     <app-calls-record></app-calls-record>
+  </mat-tab>
+  <mat-tab label="Channel">
+    <app-channel-record></app-channel-record>
   </mat-tab>
 </mat-tab-group>
