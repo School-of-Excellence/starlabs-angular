@@ -191,8 +191,11 @@ So offline we issue the write (durable immediately) and move on.
 ## 11. Reopening a draft (resume)
 
 ```
-getATCoptions()                       ── lists drafts (from cloud, or from cache if offline)
+getATCoptions()                       ── lists drafts
+   ├─ online  → getDocs(query)          (server; also refreshes the local cache)
+   ├─ offline → getDocsFromCache(query) (cache; INCLUDES your offline/pending drafts)
    └─ pick a draft
+        ├─ re-read it with getDoc(id)    (loads the latest offline edits, not the stale list snapshot)
         ├─ load text from the doc
         ├─ load uploaded media (loadAudio/Note/ATCFromURLs):
         │     • always keep the uploaded URL (shows/plays when online)

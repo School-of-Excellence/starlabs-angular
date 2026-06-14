@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getDocsFromCache, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, Location } from '@angular/common';
@@ -987,7 +987,8 @@ export class PrescribeATCComponent {
         where('profileid', '==', this.participantProfileid),
         where('delete', '==', false)
       );
-      draftATC = (await getDocs(q)).docs;
+      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
+      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
     } else {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
@@ -995,7 +996,8 @@ export class PrescribeATCComponent {
         where('delete', '==', false),
         where('authorprofileid', 'array-contains', this.loggedinProfileid)
       );
-      draftATC = (await getDocs(q)).docs;
+      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
+      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
     }
     console.log(draftATC.map(e => e.ref.path))
     this.existingDraftIds = draftATC.map(e => e.id)  // remember this participant's existing draft ids
@@ -1017,7 +1019,9 @@ export class PrescribeATCComponent {
           var atc = selectedATC
           if(atc["type"] == "draft"){
             this.autoSaveID = atc["doc"].id
-            var value = atc["doc"].data()
+            // re-read the doc so the latest offline edits (pending writes) are loaded, not the stale query snapshot
+            const freshSnap = await getDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID))
+            var value = freshSnap.exists() ? freshSnap.data() : atc["doc"].data()
             console.log(value);
             this.date = value['date']
             this.product = value['product']
