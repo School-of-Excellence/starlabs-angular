@@ -439,6 +439,43 @@
 .kc__status--blue  { color: var(--blue); }
 .kc__status--green { color: var(--green); }
 
+/* Labeled Participant / Specialist names shown at the top of a card so the
+   coordinator can tell the two roles apart at a glance. */
+.kc__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+}
+.kc__role { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.kc__role-label {
+  flex: 0 0 64px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.kc__role-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: normal;
+  word-break: break-word;
+}
+.kc__role-act { font-weight: 500; color: var(--ink-3); }
+
+/* Idle-card specialist name: allow full name to wrap instead of truncating. */
+.kc__name--wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+
 .kc__meta {
   display: flex;
   align-items: center;
