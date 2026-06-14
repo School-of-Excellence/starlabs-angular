@@ -172,22 +172,32 @@
     <table mat-table [dataSource]="tableData" matSort class="sales-table">
       <!-- Name Column -->
       <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header> <strong>Name</strong> </th>
-        <td mat-cell *matCellDef="let row">
-          <span class="name-hover">
-            <span style="display: flex;flex-direction: column;gap: 2px;padding: 5px;">
-              <span><b>{{row.name}}</b></span>
-              <span>{{row.email}}</span>
-              <span>{{row.phonenumber}}</span>
-            </span>
-            <div class="hover-menu">
-              <a class="profilename" [routerLink]="'/participantpurchase/' + row['profileid']" target="_blank"
-                rel="noopener noreferrer">Manage Purchase</a>
-              <a (click)="openWattCharge(row['email'])" rel="noopener noreferrer">Watson Wattcharge</a>
-            </div>
-          </span>
-        </td>
-      </ng-container>
+  <th mat-header-cell *matHeaderCellDef mat-sort-header> <strong>Name</strong> </th>
+  <td mat-cell *matCellDef="let row">
+    <span class="name-hover">
+      <span style="display: flex; align-items: center; gap: 10px; padding: 5px;">
+
+        <app-profile-picture
+          [profileId]="row['profileid']"
+          [name]="row.name"
+          [size]="46">
+        </app-profile-picture>
+
+        <span style="display: flex; flex-direction: column; gap: 2px;">
+          <span><b>{{row.name}}</b></span>
+          <span>{{row.email}}</span>
+          <span>{{row.phonenumber}}</span>
+        </span>
+
+      </span>
+      <div class="hover-menu">
+        <a class="profilename" [routerLink]="'/participantpurchase/' + row['profileid']" target="_blank"
+          rel="noopener noreferrer">Manage Purchase</a>
+        <a (click)="openWattCharge(row['email'])" rel="noopener noreferrer">Watson Wattcharge</a>
+      </div>
+    </span>
+  </td>
+</ng-container>
       
       <!-- Email Column -->
       <!-- <ng-container matColumnDef="email">

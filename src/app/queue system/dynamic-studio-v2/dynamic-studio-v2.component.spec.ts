@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { OnewayChannelComponent } from './oneway-channel.component';
+import { DynamicStudioV2Component } from './dynamic-studio-v2.component';
 
-describe('OnewayChannelComponent', () => {
-  let component: OnewayChannelComponent;
-  let fixture: ComponentFixture<OnewayChannelComponent>;
+describe('DynamicStudioV2Component', () => {
+  let component: DynamicStudioV2Component;
+  let fixture: ComponentFixture<DynamicStudioV2Component>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [OnewayChannelComponent]
+      imports: [DynamicStudioV2Component]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(OnewayChannelComponent);
+    fixture = TestBed.createComponent(DynamicStudioV2Component);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

@@ -23,6 +23,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-profilelist',
@@ -41,7 +42,8 @@ import { MatNativeDateModule } from '@angular/material/core';
     FormsModule,
     MatCheckboxModule,
     MatDatepickerModule,
-    MatNativeDateModule
+    MatNativeDateModule,
+    ProfilePictureComponent
   ],
   templateUrl: './profilelist.component.html',
   styleUrl: './profilelist.component.css',

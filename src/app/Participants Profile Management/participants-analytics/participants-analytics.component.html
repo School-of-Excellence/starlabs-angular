@@ -688,7 +688,20 @@
             </span>
             
             <span *ngIf="['subscriptionend','purchasedate','subscriptionstart','lastsubscriptionstart','lastsubscriptionend','lastpaymentdate' , 'dateofbirth'].includes(column)">{{(element[column] != null ? (element[column].toDate() | date:'mediumDate') : null)}}</span>
-            <span *ngIf="column == 'name'"><a class="profilename" [routerLink]="'/profilesummary/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
+             <span *ngIf="column == 'name'" style="display:flex; align-items:center; gap:8px;">
+              <app-profile-picture
+                [profileId]="element['profileid']"
+                [name]="element['name']"
+                [size]="40">
+              </app-profile-picture>
+
+              <a class="profilename"
+                [routerLink]="'/userprofile/' + element['profileid']"
+                target="_blank">
+                {{ element['name'] }}
+              </a>
+
+            </span>
             <span *ngIf="column == 'atccount'">{{element[column] ?? 0}}</span>
             <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <!-- <span *ngIf="column == 'activejourney'"><a class="profilename" [routerLink]="'/participantpurchase/' + element['profileid']" target="_blank">{{mapfiltervalues[element[column]]}}</a></span> -->

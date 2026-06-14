@@ -1238,6 +1238,11 @@
         
         <div class="participant-info">
           <div class="participant-name-row">
+            <app-profile-picture
+              [profileId]="participant.profileid"
+              [name]="participant.name"
+              [size]="40">
+            </app-profile-picture>
             <span class="participant-name">{{ participant.name }}</span>
             <span class="not-registered-badge" *ngIf="participant.isNotRegistered">Not Registered</span>
           </div>

@@ -462,7 +462,7 @@
                     <span class="label">Position:&nbsp;</span>
                     <span>{{token['queueposition']}}</span>
                   </div>
-                  <div *ngIf="token['preassigned']">
+                  <div *ngIf="token['preassigned'] && getPreassignedEntries(token).length > 0">
                     <span class="label">Preassigned To: </span>
                     <ng-container *ngFor="let stage of getPreassignedEntries(token); let last = last">
                       <span class="stage-entry">

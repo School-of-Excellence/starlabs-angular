@@ -442,11 +442,21 @@
                         </div>
 
                         <div class="crm-list">
-                            <div *ngFor="let profileId of mapTags[tag]" class="crm-item">
+                            <!-- <div *ngFor="let profileId of mapTags[tag]" class="crm-item">
                                 <div class="crm-item-info">
                                     <div class="crm-item-name">{{ participantMetadataMap[profileId]?.['name'] }}</div>
                                 </div>
-                            </div>
+                            </div> -->
+                            <div *ngFor="let profileId of mapTags[tag]" class="crm-item">
+                                <app-profile-picture
+                                    [profileId]="profileId"
+                                    [name]="participantMetadataMap[profileId]?.['name'] || ''"
+                                    [size]="32">
+                                </app-profile-picture>
+                                <div class="crm-item-info">
+                                    <div class="crm-item-name">{{ participantMetadataMap[profileId]?.['name'] }}</div>
+                                </div>
+                                </div>
 
                             <div *ngIf="!mapTags[tag] || mapTags[tag].length === 0" class="crm-empty">
                                 No participants
@@ -493,19 +503,23 @@
                 <div class="participant-card live-changework-card" *ngFor="let participant of selectedParticipants;"
                     [class.selected]="participant.selected" 
                     (click)="toggleParticipant(participant)">
-                    <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
-                        (click)="$event.stopPropagation()">
-                    <div class="participant-avatar live">
-                       {{ participant.initials }}
-                    </div>
-                    <div class="participant-info">
-                        <div class="participant-name live-display">
-                            {{ participant.name }}
+                <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
+                    (click)="$event.stopPropagation()">
+
+                <app-profile-picture
+                    [profileId]="participant.profileId"
+                    [name]="participant.name"
+                    [size]="36">
+                </app-profile-picture>
+
+                <div class="participant-info">
+                    <div class="participant-name live-display">
+                    {{ participant.name }}
                             <span *ngIf="participant.count">
                                 ({{participant.count}})
                             </span>
-                        </div>
                     </div>
+                </div>
                 </div>
             </ng-container>
 
@@ -514,31 +528,33 @@
                 <div class="participant-card completed-card" *ngFor="let participant of selectedParticipants; let i = index"
                     [class.selected]="participant.selected" 
                     (click)="toggleParticipant(participant)">
-                    <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
-                        (click)="$event.stopPropagation()">
-                    <div class="participant-avatar green">
-                       {{ participant.initials }}
+                <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
+                    (click)="$event.stopPropagation()">
+
+                <app-profile-picture
+                    [profileId]="participant.profileId"
+                    [name]="participant.name"
+                    [size]="36">
+                </app-profile-picture>
+
+                <div class="participant-info">
+                    <div class="participant-name live-display">
+                    {{ participant.name }}
+                    <span *ngIf="participant.count">({{participant.count}})</span>
                     </div>
-                    <div class="participant-info">
-                        <div class="participant-name live-display">
-                            {{ participant.name }} 
-                            <span *ngIf="participant.count">
-                                ({{participant.count}})
-                            </span>
-                        </div>
-                        <div class="participant-meta">
-                            <span class="meta-item" *ngIf="participant.hours">
-                                <span class="meta-label">Hours:</span> {{ participant.hours }}
-                            </span>
-                            <span class="meta-item" *ngIf="participant.hourType">
-                                <span class="meta-label">Type:</span> {{ participant.hourType }}
-                            </span>
-                        </div>
-                        <div class="participant-notes" *ngIf="participant.sharedNotes">
-                            <span class="notes-label">Notes:</span>
-                            <span class="notes-text">{{ participant.sharedNotes }}</span>
-                        </div>
+                    <div class="participant-meta">
+                    <span class="meta-item" *ngIf="participant.hours">
+                        <span class="meta-label">Hours:</span> {{ participant.hours }}
+                    </span>
+                    <span class="meta-item" *ngIf="participant.hourType">
+                        <span class="meta-label">Type:</span> {{ participant.hourType }}
+                    </span>
                     </div>
+                    <div class="participant-notes" *ngIf="participant.sharedNotes">
+                    <span class="notes-label">Notes:</span>
+                    <span class="notes-text">{{ participant.sharedNotes }}</span>
+                    </div>
+                </div>
                 </div>
             </ng-container>
 
@@ -546,21 +562,22 @@
             <ng-container *ngIf="currentSelection?.role !== 'Live Changework' && currentSelection?.status !== 'Completed'">
                 <div class="participant-card" *ngFor="let participant of selectedParticipants; let i = index"
                     [class.selected]="participant.selected" (click)="toggleParticipant(participant)">
-                    <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
-                        (click)="$event.stopPropagation()">
-                    <div class="participant-avatar red">
-                     {{ participant.initials }}
-                    </div>
-                    <div class="participant-info">
-                        <div class="participant-name">
-                            {{ participant.name }}
-                            <span *ngIf="participant.count">
-                                ({{participant.count}})
-                            </span>
-                        </div>
+                <input type="checkbox" class="participant-checkbox" [checked]="participant.selected"
+                    (click)="$event.stopPropagation()">
 
-                        <div class="participant-detail">{{ participant.cohort }}</div>
+                <app-profile-picture
+                    [profileId]="participant.profileId"
+                    [name]="participant.name"
+                    [size]="36">
+                </app-profile-picture>
+
+                <div class="participant-info">
+                    <div class="participant-name">
+                    {{ participant.name }}
+                    <span *ngIf="participant.count">({{participant.count}})</span>
                     </div>
+                    <div class="participant-detail">{{ participant.cohort }}</div>
+                </div>
                 </div>
             </ng-container>
         </ng-container>

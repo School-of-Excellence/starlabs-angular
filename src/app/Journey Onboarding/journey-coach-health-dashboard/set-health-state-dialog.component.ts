@@ -7,16 +7,16 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 
-import { HealthState } from './health-score.engine';
+import { CoachHealthState } from './coach-health.types';
 
 export interface SetHealthStateResult {
-  state: HealthState;
+  state: CoachHealthState;
   note: string;
 }
 
 /**
  * Small dialog a coach fills to set a participant's coach-assessed Health State
- * (Happy / Neutral / Sad / Evangelist) plus an optional note. Pre-selects the
+ * (Happy / Neutral / Unhappy / At-risk / Critical) plus an optional note. Pre-selects the
  * participant's current coach-set state if one is passed in via dialog data.
  * This is a manual assessment, separate from customerstatus (lifecycle).
  */
@@ -35,8 +35,9 @@ export interface SetHealthStateResult {
         <mat-select [(ngModel)]="state">
           <mat-option value="HAPPY">Happy</mat-option>
           <mat-option value="NEUTRAL">Neutral</mat-option>
-          <mat-option value="SAD">Sad</mat-option>
-          <mat-option value="EVANGELIST">Evangelist</mat-option>
+          <mat-option value="UNHAPPY">Unhappy</mat-option>
+          <mat-option value="AT_RISK">At-risk</mat-option>
+          <mat-option value="CRITICAL">Critical</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -56,12 +57,12 @@ export interface SetHealthStateResult {
   `],
 })
 export class SetHealthStateDialogComponent {
-  state: HealthState = 'NEUTRAL';
+  state: CoachHealthState = 'NEUTRAL';
   note = '';
 
   constructor(
     private ref: MatDialogRef<SetHealthStateDialogComponent, SetHealthStateResult>,
-    @Inject(MAT_DIALOG_DATA) public data: { name: string; current?: HealthState | null },
+    @Inject(MAT_DIALOG_DATA) public data: { name: string; current?: CoachHealthState | null },
   ) {
     if (data.current) this.state = data.current;
   }
