@@ -1013,6 +1013,9 @@
                                 <div class="detail-stage-label text-muted">
                                   {{ appointment?.appointmentTypeName || appointment?.formname || 'Appointment' }}
                                 </div>
+                                <div class="detail-stage-label text-muted">
+                                  Specialist: {{ mapMetaData[(appointment.hosts[0]?.path || appointment.hosts[0]).split('/').pop()]?.name || '—' }}
+                                </div>
                                 <div *ngIf="appointment?.starttime">
                                   <span class="detail-stage-label">Start: </span>
                                   <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>

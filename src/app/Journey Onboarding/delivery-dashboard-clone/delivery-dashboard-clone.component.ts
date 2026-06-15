@@ -3,7 +3,7 @@ import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule }
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, serverTimestamp, arrayUnion, writeBatch, getFirestore, documentId } from '@angular/fire/firestore';
-import { Observable, Subscription, combineLatest } from 'rxjs';
+import { Observable, Subscription, combineLatest, firstValueFrom } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
@@ -1022,7 +1022,7 @@ export class DeliveryDashboardCloneComponent {
                 const tentativestart = item?.tentativestart || null;
                 const packageId = item?.packageref?.id;
 
-                if (['initiated'].includes(status)) {
+                if (!['completed', 'ongoing'].includes(status)) {
                     // ── Pre-completion pool (Total, Eligible, Not Elig., Purchased, Bonus) ──
                     // All four participant-count columns use the same base filter:
                     // exclude completed and ongoing so the sums are consistent:
@@ -1031,7 +1031,7 @@ export class DeliveryDashboardCloneComponent {
                     (groupedAll[productId] ||= []).push(item);
 
                     if (isEligible) {
-                        (groupedFiltered[productId] ||= []).push(item);
+                        if(status === 'initiated') (groupedFiltered[productId] ||= []).push(item);
 
                         if (tentativestart?.toDate) {
                             const d = tentativestart.toDate();
@@ -1621,7 +1621,7 @@ export class DeliveryDashboardCloneComponent {
             } else if (app?.formname === 'Critical Support Pre Form') {
                 typeName = 'Pre-Process';
             } else if (app?.formname === 'Critical Support Post Form') {
-                typeName = 'Post-Process Form'
+                typeName = 'Post-Process Form';
             } else if (app?.formname === 'EI Starter Pack Post Session Check-in') {
                 typeName = 'Post Session Check-in';
             }
