@@ -12,19 +12,21 @@
     </mat-form-field>
   </div>
   
-  <div class="atc-edit-container">
+  <div class="atc-edit-container" [class.has-status-bar]="(!isonline || reportATC.atcData != null) && !hideDraftBanner">
     <!-- Offline/Online status bar -->
-    <nav class="navbar sticky-top navbar-light justify-content-end status-bar" *ngIf="!isonline && !hideDraftBanner">
-      <h6 class="status-message">No internet connection. Autosave is off. Keep this tab open until it's restored.</h6>
+    <nav class="navbar navbar-light justify-content-end status-bar" *ngIf="!isonline && !hideDraftBanner">
+      <span class="status-message">You're offline — changes are saved on this device and will sync when you reconnect.</span>
     </nav>
-    
-    <nav class="navbar sticky-top navbar-light justify-content-end status-bar autosave-bar" *ngIf="reportATC.atcData != null && isonline && !hideDraftBanner">
+
+    <nav class="navbar navbar-light justify-content-end status-bar autosave-bar" *ngIf="reportATC.atcData != null && isonline && !hideDraftBanner">
       <div>
         <span class="icon-text-container" (click)="autoSave()">
           <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
           <span>{{draftStatus.message}}</span>
           <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
         </span>
+        <!-- explicit retry shown only when a save failed -->
+        <button *ngIf="draftStatus.code == -1" mat-button class="retry-button" (click)="autoSave()">Retry</button>
       </div>
       <!-- <div *ngIf="autosaveonprogress">
         <span class="icon-text-container">
@@ -80,7 +82,7 @@
       </section>
   
       <!-- Authors Section -->
-      <section *ngIf="!this.bigActivity()" class="content-section">
+      <section *ngIf="!this.bigActivity()" class="content-section" id="atcfield-author">
         <h2 class="section-heading">AUTHORS</h2>
         <div class="personnel-container">
           <div class="field-grid field-header">
@@ -231,18 +233,20 @@
                 <div class="awareness-field">
                   <mat-label>{{adjustmentAwarenessDetail.label}}</mat-label>
                   <mat-form-field appearance="outline" class="flat-field">
-                    <mat-select [name]="'awarenessdetail'+i" [compareWith]="compareFnc" [(ngModel)]="prescription.awarenessdetail" (selectionChange)="updateExistingAwarenessDetail(i,$event)" [required]="true">
+                    <mat-select [name]="'awarenessdetail'+i" [compareWith]="compareFnc" [(ngModel)]="prescription.awarenessdetail" (selectionChange)="updateExistingAwarenessDetail(i,$event)" [required]="true" [errorStateMatcher]="requiredMatcher">
                       <mat-option *ngFor="let item of adjustmentAwarenessDetail['awarenesslist']" [value]="item">
                         {{item.value}}
                       </mat-option>
                     </mat-select>
+                    <mat-error>This field is required</mat-error>
                   </mat-form-field>
                 </div>
                 
                 <div class="potential-years">
                   <mat-label>{{adjustmentAwarenessDetail.potentialyearlabel}}</mat-label>
                   <mat-form-field appearance="outline" class="year-field">
-                    <input type="number" (focusout)="autoSave()" [(ngModel)]="prescription.potentialyears" matInput [required]="true">
+                    <input type="number" (focusout)="autoSave()" [(ngModel)]="prescription.potentialyears" matInput [required]="true" [errorStateMatcher]="requiredMatcher">
+                    <mat-error>This field is required</mat-error>
                   </mat-form-field>
                 </div>
                 
@@ -270,9 +274,10 @@
                     
                     <mat-form-field appearance="outline" class="procedure-field">
                       <mat-label>Procedure</mat-label>
-                      <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true">
+                      <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                         <mat-option *ngFor="let pro of procedureList" [value]="pro.path">{{pro.name}}</mat-option>
                       </mat-select>
+                      <mat-error>This field is required</mat-error>
                     </mat-form-field>
         
                     <mat-form-field appearance="outline" class="procedure-field">
@@ -331,9 +336,10 @@
             <div class="awareness-field">
               <mat-form-field appearance="outline" class="flat-field">
                 <mat-label>{{adjustmentAwarenessDetail.label}}</mat-label>
-                <mat-select [compareWith]="compareFnc" [(ngModel)]="newTranscription[i]['awarenessdetail']" (selectionChange)="onAwarenessSubmit(i,$event)" [required]="true">
+                <mat-select [compareWith]="compareFnc" [(ngModel)]="newTranscription[i]['awarenessdetail']" (selectionChange)="onAwarenessSubmit(i,$event)" [required]="true" [errorStateMatcher]="requiredMatcher">
                   <mat-option *ngFor="let item of adjustmentAwarenessDetail['awarenesslist']" [value]="item">{{item.value}}</mat-option>
                 </mat-select>
+                <mat-error>This field is required</mat-error>
               </mat-form-field>
             </div>
             
@@ -341,7 +347,8 @@
             <div class="potential-years">
               <mat-label>{{adjustmentAwarenessDetail.potentialyearlabel}}</mat-label>
               <mat-form-field appearance="outline" class="year-field">
-                <input type="number" [(ngModel)]="newTranscription[i].potentialyears" matInput [required]="true">
+                <input type="number" [(ngModel)]="newTranscription[i].potentialyears" matInput [required]="true" [errorStateMatcher]="requiredMatcher">
+                <mat-error>This field is required</mat-error>
               </mat-form-field>
             </div>
             
@@ -351,9 +358,10 @@
                 <span class="procedure-marker">*</span>
                 <mat-form-field appearance="outline" class="procedure-field">
                   <mat-label>Procedure</mat-label>
-                  <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true">
+                  <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                     <mat-option *ngFor="let pro of procedureList" [value]="pro.path">{{pro.name}}</mat-option>
                   </mat-select>
+                  <mat-error>This field is required</mat-error>
                 </mat-form-field>
     
                 <mat-form-field appearance="outline" class="procedure-field">
@@ -400,7 +408,7 @@
       </section>
   
       <!-- Audio Section -->
-      <section class="content-section">
+      <section class="content-section" id="atcfield-changework">
         <h2 class="section-heading">CHANGEWORK BRIEF</h2>
         <div class="audio-container">
           <div *ngFor="let audio of audioBlobURL; let i = index" class="audio-item">

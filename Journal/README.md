@@ -8,5 +8,6 @@ feature in plain language (Part 1) and then for developers (Part 2).
 | Document | What it covers |
 |----------|----------------|
 | [PRESCRIBE-ATC.md](PRESCRIBE-ATC.md) | The Prescribe ATC screen — drafts, autosave, offline persistence, media handling, submit. |
+| [EDIT-ATC.md](EDIT-ATC.md) | The Edit ATC screen — the offline draft layer and how it differs from Prescribe ATC. |
 
 > Add a new file here for each feature, and list it in the table above.

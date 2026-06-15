@@ -15,6 +15,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { AtcAelConfirmComponent } from '../../ATC/atc-ael-confirm/atc-ael-confirm.component';
 import { NetworkStatusService } from '../../network-status.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -217,6 +218,11 @@ export class PrescribeATCComponent {
   isonline:boolean
   pageloadedatfirsttime:boolean = false
   aigeneratedEntry:boolean = false  // true when opened from an AI-generated draft link (hides "open another draft")
+  submitAttempted = false  // true once Submit was pressed — drives the inline "required" hints
+  // shows the inline "Required" message on every required field once Submit was attempted
+  requiredMatcher: ErrorStateMatcher = {
+    isErrorState: (control) => !!(control && control.invalid && (control.touched || this.submitAttempted))
+  };
 
   // Draft
   draftStatus = {
@@ -1922,7 +1928,7 @@ async removeATCImage(index: number) {
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.add('atc-field-invalid-flash');
-        setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 1800);
+        setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 2500);
       }
     } catch {}
     this.snackbar.open(message, 'Dismiss', {
@@ -1957,6 +1963,8 @@ async removeATCImage(index: number) {
   }
 
   async submit(){
+    // mark that a submit was attempted so required fields reveal their inline "required" message
+    this.submitAttempted = true;
     // block submit while offline — the ATC must reach the server before the draft is removed (draft stays saved)
     if (!navigator.onLine) {
       alert("You're offline. Your draft is saved — please reconnect to submit the ATC.");
@@ -2038,7 +2046,7 @@ async removeATCImage(index: number) {
             console.log("Mandatory Procedure ", mandatoryProcedure)
             if(mandatoryProcedure != 0 && this.audioBlob.length == 0){
               if(this.eis || this.admin || this.ah){
-                alert("Changework Brief Missing!")
+                this.focusMissingField('atcfield-changework', 'Changework Brief is required when a mandatory procedure is given')
                 return
               }
             }
