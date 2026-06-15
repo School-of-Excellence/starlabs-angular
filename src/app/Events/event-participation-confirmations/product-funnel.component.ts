@@ -24,6 +24,7 @@ import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage
 import * as XLSX from 'xlsx';
 
 import { AuthguardService } from '../../authguard.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
@@ -73,7 +74,8 @@ interface PRow {
     CommonModule, FormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule,
     MatIconModule, MatTooltipModule, MatCheckboxModule, MatPaginatorModule,
-    MatProgressBarModule, MatDialogModule, MatMenuModule
+    MatProgressBarModule, MatDialogModule, MatMenuModule,
+    ProfilePictureComponent
   ],
   providers: [
     { provide: MAT_SELECT_CONFIG, useValue: { overlayPanelClass: 'sx-select-pane' } },
