@@ -482,7 +482,7 @@
         <!-- Participant: initials avatar + bold name (+ flag glyph when flagged) + masked mono id -->
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
-          <td mat-cell *matCellDef="let r">
+          <td mat-cell *matCellDef="let r" class="col-person">
             <span class="cell-person">
               <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
               <span class="cp-id-wrap">
@@ -491,7 +491,8 @@
                     <mat-icon>flag</mat-icon>
                   </span>
                 </span>
-                <span class="cp-id">{{ maskedId(r.number) }}</span>
+                <span class="cp-email" *ngIf="r.email">{{ r.email }}</span>
+                <span class="cp-id">{{ r.number || '—' }}</span>
               </span>
             </span>
           </td>

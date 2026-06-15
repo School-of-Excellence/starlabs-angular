@@ -53,6 +53,7 @@ interface PortfolioRow {
   profileid: string;
   name: string;
   number: string | null;
+  email: string | null;
   coachname: string;
   journeyname: string;
   atcmodel: string | null;
@@ -176,6 +177,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   readonly LAPSED_DAYS = 90;       // show lapses up to this many days past end
   readonly ALL = '__all__';
   readonly UNASSIGNED = '__unassigned__';
+  // The participant's CURRENT journey product is the single pjp doc whose journeystatus is one of
+  // these. Every PJP read is scoped to this set so we load exactly one current doc per participant
+  // (no historical/superseded enrollments). Values are lowercase to match the stored data.
+  readonly CURRENT_JOURNEY_STATUSES = ['initiated', 'ongoing', 'completed', 'cancelled'];
   readonly SHOW_HEALTH = false;    // Phase-2: flip true only after calibration
 
   // ---- Phase C: Coach Scoreboard ----
@@ -514,7 +519,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** B-in-the-background: after first paint + index, load touchpoints + attended coach appointments
    *  base-wide, compute Going-quiet / Needs-Attention across the WHOLE base, then snap the cards. */
   private async loadAttentionDataInBackground(): Promise<void> {
-    if (this.contactDataLoaded() || !this.fullIndexBuilt) return;
+    // already have the contact data (loaded on a prior view) — nothing to do, but finish the
+    // progress bar so switching into a second paged view doesn't strand it at 85%.
+    if (this.contactDataLoaded()) { this.setProgress(100, 'Up to date'); return; }
+    // index not ready yet — onFullIndexReady() re-invokes this once it is, so bail quietly.
+    if (!this.fullIndexBuilt) return;
     try {
       await Promise.all([this.loadTouchpoints(), this.loadContactEvents()]);
       this.contactDataLoaded.set(true);
@@ -556,8 +565,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  the scoreboard), but the dependent joins are now SCOPED to the coach's base via the same
    *  batched `where(... 'in', chunk30)` loaders the paged path uses — no full-collection scans. */
   private async loadFullPortfolio(): Promise<void> {
-    const pjpSnap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
-    this.pjpData = pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id }));
+    const pjpSnap = await getDocs(query(
+      collection(this.firestore, 'participantjourneyproduct'),
+      where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
+    ));
+    this.pjpData = this.stampCoachedBy(pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id })));
     this.fullPjpData = this.pjpData;
     this.scannedCount = this.pjpData.length;
     this.setProgress(55, 'Loaded base…');
@@ -625,8 +637,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   private buildPjpPageQuery(startAfterDoc?: QueryDocumentSnapshot) {
     const ref = collection(this.firestore, 'participantjourneyproduct');
-    // order by documentId() so NO doc is skipped (UNASSIGNED docs may lack coachedby / ordering fields)
-    const constraints: any[] = [orderBy(documentId())];
+    // scope to the participant's current journey product (one doc per participant), then order by
+    // documentId() so paging is stable and NO matching doc is ever skipped.
+    const constraints: any[] = [
+      where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
+      orderBy(documentId()),
+    ];
     if (startAfterDoc) constraints.push(startAfter(startAfterDoc));
     constraints.push(limit(this.pageSize));
     return query(ref, ...constraints);
@@ -713,7 +729,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private async renderPage(pageDocs: QueryDocumentSnapshot[]): Promise<void> {
     this.pageLoading = true;
     try {
-      let pjpForPage = pageDocs.map(d => ({ ...d.data(), __id: d.id }));
+      let pjpForPage = this.stampCoachedBy(pageDocs.map(d => ({ ...d.data(), __id: d.id })));
       if (this.selectedCoachId === this.UNASSIGNED) {
         pjpForPage = pjpForPage.filter(d => this.isUnassigned(d['coachedby']));
       }
@@ -888,8 +904,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.fullPjpData) {
       this.sbPjp = this.fullPjpData;     // pjp already cached from a prior full load
     } else {
-      const pjpSnap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
-      this.sbPjp = pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id }));
+      const pjpSnap = await getDocs(query(
+        collection(this.firestore, 'participantjourneyproduct'),
+        where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
+      ));
+      this.sbPjp = this.stampCoachedBy(pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id })));
     }
     if (!this.fullTouchAndContactLoaded) {
       await this.loadTouchpoints();      // populates allTouchpoints + touchpointByProfile (full)
@@ -1072,7 +1091,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
       const meta: any = this.metaMap.docdata?.[profileid] ?? {};
       const journeyId = d['journeyref']?.id ?? null;
-      const subEnd = this.toDate(d['subscriptionend']) ?? this.toDate(meta['subscriptionend']);
+      // subscriptionend comes ONLY from the participant's current PJP doc (no metadata fallback).
+      const subEnd = this.toDate(d['subscriptionend']);
 
       // last touch = latest of: derived field, raw attended sessions, logged touchpoints
       const lastCoach = this.maxDate(
@@ -1092,6 +1112,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         profileid,
         name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
         number: this.profileMap.phonenumber?.[profileid] ?? null,
+        email: this.profileMap.email?.[profileid] ?? meta['email'] ?? null,
         coachname: this.coachNameFor(d['coachedby']),
         journeyname: journeyId ? (this.journeyNameMap[journeyId] ?? journeyId) : (meta['activejourney'] ?? '-'),
         atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
@@ -1103,8 +1124,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         financialstatus: meta['financialstatus'] ?? null,
         opportunities: Array.isArray(d['opportunities']) ? d['opportunities'] : [],
         opportunitiesConsumed: Array.isArray(d['opportunities_consumed']) ? d['opportunities_consumed'] : [],
-        totalpurchasevalue: this.num(meta['totalpurchasevalue']),
-        balance: this.num(meta['balance']),
+        totalpurchasevalue: this.num(meta['pp_totalpurchasevalue']),
+        balance: this.balanceFor(meta),
         emi: this.num(meta['emi']),
         lastcoachdate: lastCoach,
         daysSinceCoach,
@@ -2128,39 +2149,36 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   /** Bulk-assign the selected unassigned participants to a coach — writes real coachedby. */
-  /** Write `value` to coachedby on EVERY participantjourneyproduct doc of a participant — queried
-   *  fresh by profileid, NOT the partially-loaded row.pjpIds — so the assignment is complete and
-   *  survives a refresh even when the participant's journey-products span multiple pages. Batched.
-   *  Returns the number of docs that failed to write (0 = fully written). */
+  /** Coach assignment lives on the participant's SINGLE `participant metadata` doc (id == profileid),
+   *  NOT on the per-journey-product docs. Stamp it onto each loaded pjp row from the meta map so every
+   *  downstream read of d['coachedby'] (filters / computeRows / scoreboard) keeps working unchanged. */
+  private stampCoachedBy(rows: any[]): any[] {
+    for (const d of rows) {
+      d['coachedby'] = this.metaMap?.docdata?.[d['profileid']]?.['coachedby'] ?? null;
+    }
+    return rows;
+  }
+
+  /** Write `value` (array) to coachedby on the participant's `participant metadata` doc (id ==
+   *  profileid) — one write per participant, regardless of how many journey-products they have.
+   *  Reflects locally on the meta map (the authoritative read source) + any loaded pjp rows so the
+   *  board updates immediately. Returns 0 on success, 1 on failure (callers check `fail > 0`). */
   private async writeCoachForProfile(profileid: string, value: any[]): Promise<number> {
-    let docs: QueryDocumentSnapshot[];
+    if (!profileid) return 1;
     try {
-      const snap = await getDocs(query(
-        collection(this.firestore, 'participantjourneyproduct'),
-        where('profileid', '==', profileid),
-      ));
-      docs = snap.docs;
+      // merge so we never clobber the rest of the metadata doc (and create it if somehow absent).
+      await setDoc(doc(this.firestore, 'participant metadata', profileid), { coachedby: value }, { merge: true });
     } catch (e) {
-      console.error('assign: could not load pjp docs for', profileid, e);
+      console.error('assign: could not write coachedby for', profileid, e);
       return 1;
     }
-    let fail = 0;
-    for (let i = 0; i < docs.length; i += 400) {
-      const chunk = docs.slice(i, i + 400);
-      const batch = writeBatch(this.firestore);
-      chunk.forEach(d => batch.update(d.ref, { coachedby: value }));
-      try {
-        await batch.commit();
-        chunk.forEach(d => {
-          const local = this.pjpData.find(x => x['__id'] === d.id);
-          if (local) local['coachedby'] = value;   // reflect locally for any loaded docs
-        });
-      } catch (e) {
-        console.error('assign: batch write failed for', profileid, e);
-        fail += chunk.length;
-      }
+    // reflect locally: meta map first (read source), then any loaded pjp rows stamped from it.
+    if (this.metaMap?.docdata?.[profileid]) this.metaMap.docdata[profileid]['coachedby'] = value;
+    for (const d of this.pjpData) { if (d['profileid'] === profileid) d['coachedby'] = value; }
+    if (this.fullPjpData && this.fullPjpData !== this.pjpData) {
+      for (const d of this.fullPjpData) { if (d['profileid'] === profileid) d['coachedby'] = value; }
     }
-    return fail;
+    return 0;
   }
 
   async assignSelected(): Promise<void> {
@@ -2384,8 +2402,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.fullIndexBuilt) return;
     let pjp = this.fullPjpData;
     if (!pjp) {
-      const snap = await getDocs(collection(this.firestore, 'participantjourneyproduct'));
-      pjp = snap.docs.map(d => ({ ...d.data(), __id: d.id }));
+      const snap = await getDocs(query(
+        collection(this.firestore, 'participantjourneyproduct'),
+        where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
+      ));
+      pjp = this.stampCoachedBy(snap.docs.map(d => ({ ...d.data(), __id: d.id })));
       this.fullPjpData = pjp;
     }
     // base-wide open-ticket counts: ONE clientissue read (cached), so renewal/tickets can be
@@ -2405,8 +2426,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const productType: ProductType = journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other';
       const fin = meta['financialstatus'] ?? null;
       if (fin) finance.add(fin);
-      // renewal window: SAME logic as computeRows (subscriptionend from pjp doc, falling back to meta).
-      const subEnd = this.toDate(d['subscriptionend']) ?? this.toDate(meta['subscriptionend']);
+      // renewal window: SAME logic as computeRows — subscriptionend from the PJP doc ONLY (no meta fallback).
+      const subEnd = this.toDate(d['subscriptionend']);
       const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / 86400000) : null;
       const renewalWindow = daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS;
       // subscription-based active: this pjp record's subscriptionend is in the future.
@@ -2573,6 +2594,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const n = Number(v);
     return isNaN(n) ? null : n;
   }
+  /** Outstanding balance = pp_totalpurchasevalue − pp_totalpaid (both from participant metadata).
+   *  Null only when NEITHER field is present; otherwise the missing side counts as 0. */
+  private balanceFor(meta: any): number | null {
+    const total = this.num(meta?.['pp_totalpurchasevalue']);
+    const paid = this.num(meta?.['pp_totalpaid']);
+    if (total == null && paid == null) return null;
+    return (total ?? 0) - (paid ?? 0);
+  }
   fmtDate(v: Date | null): string {
     return v ? (this.datepipe.transform(v, 'dd-MMM-yyyy') ?? '-') : '-';
   }
@@ -2605,14 +2634,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Mockup priority class (drives dot colour + label tint): urgent / watch / calm. */
   prioClass(band: 'High' | 'Medium' | 'Low'): string {
     return band === 'High' ? 'urgent' : band === 'Medium' ? 'watch' : 'calm';
-  }
-
-  /** Mockup masked participant id: first 5 digits then a dotted tail (e.g. "84285·····").
-   *  Uses the real participant number; shows an em-dash when absent. */
-  maskedId(number: string | number | null | undefined): string {
-    const digits = String(number ?? '').replace(/\D/g, '');
-    if (!digits) return '—';
-    return digits.slice(0, 5) + '·····';
   }
 
   /** Mockup Status capsule label: subscription-active → Active, else Non-Active. */
