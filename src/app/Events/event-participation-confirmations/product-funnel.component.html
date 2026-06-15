@@ -134,10 +134,7 @@
             </td>
             <td>
               <div class="sx-nmcell">
-                <span class="sx-ph">
-                  <img *ngIf="row.photo" [src]="row.photo" alt="" referrerpolicy="no-referrer">
-                  <span *ngIf="!row.photo" class="sx-init">{{ initials(row.name) }}</span>
-                </span>
+                <app-profile-picture class="sx-ph" [profileId]="row.profileid" [name]="row.name" [size]="30"></app-profile-picture>
                 <div class="sx-nmtext">
                   <div class="sx-nm">{{ row.name }}</div>
                   <div class="sx-em">{{ row.email || 'No email' }}</div>
