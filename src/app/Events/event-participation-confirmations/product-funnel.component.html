@@ -1,17 +1,12 @@
 <div class="sx">
 
-  <div class="sx-head">
-    <div class="sx-eyebrow">Confirmations</div>
-    <h3 class="sx-title">{{ productName }}</h3>
-    <div class="sx-subt">{{ eventName }} &middot; {{ arena?.type }}</div>
-    <div class="sx-frozen-card" *ngIf="alreadyFinalized">
-      <div class="sx-frozen-head"><mat-icon>lock</mat-icon> Finalized &middot; show-up</div>
-      <table class="sx-frozen-tbl">
-        <tr><th>Basis</th><th class="r">Rate</th><th class="r">Attended / total</th></tr>
-        <tr><td>Of approved</td><td class="r sx-fp-ok">{{ frozenStats.ofApproved }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.approved | number }}</td></tr>
-        <tr><td>Of potential</td><td class="r">{{ frozenStats.ofPotential }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.potential | number }}</td></tr>
-      </table>
-    </div>
+  <div class="sx-frozen-card" *ngIf="alreadyFinalized">
+    <div class="sx-frozen-head"><mat-icon>lock</mat-icon> Finalized &middot; show-up</div>
+    <table class="sx-frozen-tbl">
+      <tr><th>Basis</th><th class="r">Rate</th><th class="r">Attended / total</th></tr>
+      <tr><td>Of approved</td><td class="r sx-fp-ok">{{ frozenStats.ofApproved }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.approved | number }}</td></tr>
+      <tr><td>Of potential</td><td class="r">{{ frozenStats.ofPotential }}%</td><td class="r">{{ frozenStats.attended | number }} / {{ frozenStats.potential | number }}</td></tr>
+    </table>
   </div>
 
   <div class="sx-error" *ngIf="loadError">
@@ -25,14 +20,21 @@
 
   <ng-container *ngIf="!loading && !loadError">
 
-    <!-- Segment cards -->
-    <div class="sx-cards">
-      <button *ngFor="let c of cards" class="sx-card {{ c.cls }}" [class.on]="segment===c.key"
-        [attr.aria-pressed]="segment===c.key" [matTooltip]="c.tip || ''" matTooltipClass="sx-tip" (click)="setSegment(c.key)">
-        <span class="sx-lab">{{ c.label }}</span>
-        <span class="sx-num">{{ counts[c.key] | number }}</span>
-        <span class="sx-desc">{{ c.desc }}</span>
-      </button>
+    <!-- Grouped breakdown: bold total row + indented rows that are subsets of it -->
+    <div class="sx-bd">
+      <div class="sx-bd-panel" *ngFor="let p of funnelTree">
+        <div class="sx-bd-about">{{ p.about }}</div>
+        <button *ngFor="let r of p.rows" type="button"
+          class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key].cls }}"
+          [class.on]="segment===r.key" [attr.aria-pressed]="segment===r.key"
+          [matTooltip]="cardMap[r.key].tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
+          <span class="sx-bd-dot"></span>
+          <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
+          <span class="sx-bd-bar"><span class="sx-bd-fill" [style.width.%]="barPct(r.key, p.total)"></span></span>
+          <span class="sx-bd-pct">{{ barPct(r.key, p.total) }}%</span>
+          <span class="sx-bd-num">{{ counts[r.key] | number }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- Action bar -->
@@ -56,12 +58,21 @@
           [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
           <mat-icon>check</mat-icon> Approve {{ readyCount }}
         </button>
+        <button mat-stroked-button class="sx-ghost" (click)="importParticipants()"
+          matTooltipClass="sx-tip" matTooltip="Import an Excel of name + email to initiate owners in bulk (non-requesters included)">
+          <mat-icon>upload_file</mat-icon> Import
+        </button>
+        <button mat-button class="sx-mark" (click)="downloadSampleExcel()">Sample</button>
         <span class="sx-hint" *ngIf="approveDisabledReason()">{{ approveDisabledReason() }}</span>
       </ng-container>
 
       <ng-container *ngIf="selectionMode==='attend'">
         <button mat-flat-button class="sx-approve" [disabled]="selectedToMark.length===0" (click)="markAttended(selectedToMark)">
           <mat-icon>task_alt</mat-icon> Mark {{ selectedToMark.length }} attended
+        </button>
+        <button mat-stroked-button class="sx-danger" [disabled]="selectedToUnattend.length===0" (click)="markUnattended(selectedToUnattend)"
+          matTooltipClass="sx-tip" matTooltip="Mark not attended and cancel the product (destructive)">
+          <mat-icon>person_off</mat-icon> Mark {{ selectedToUnattend.length }} not attended
         </button>
       </ng-container>
 
@@ -171,9 +182,14 @@
                   <span class="sx-noshow" *ngIf="row.attendanceState==='no_show'">No-show</span>
                   <button mat-button class="sx-mark" (click)="markAttended([row])">Mark attended</button>
                 </ng-container>
+                <button mat-button class="sx-mark-danger" (click)="markUnattended([row])">Not attended</button>
               </ng-container>
+              <!-- Unattended segment -->
+              <span class="sx-unatt" *ngIf="segment==='unattended'">
+                <mat-icon>person_off</mat-icon> Unattended <span class="sx-mut">· product cancelled</span>
+              </span>
               <!-- Status (other segments) -->
-              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && selectionMode!=='attend'">
+              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && segment!=='unattended' && selectionMode!=='attend'">
                 {{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}
               </span>
             </td>
@@ -192,6 +208,56 @@
 
   </ng-container>
 </div>
+
+<ng-template #importTpl>
+  <h2 mat-dialog-title>Import participants</h2>
+  <mat-dialog-content>
+    <p class="sx-imp-total" *ngIf="importPreview">{{ importPreview.total | number }} row(s) read from the file.</p>
+
+    <div class="sx-imp-sec sx-imp-add" *ngIf="importPreview">
+      <button type="button" class="sx-imp-head" (click)="importExpand.willAdd = !importExpand.willAdd">
+        <mat-icon>{{ importExpand.willAdd ? 'expand_more' : 'chevron_right' }}</mat-icon>
+        <span>Will be initiated</span><span class="sx-imp-n">{{ importPreview.willAdd.length }}</span>
+      </button>
+      <ul *ngIf="importExpand.willAdd" class="sx-imp-list">
+        <li *ngFor="let p of importPreview.willAdd">{{ p.name }} <span class="sx-mut">{{ p.email }}</span></li>
+        <li *ngIf="!importPreview.willAdd.length" class="sx-mut">None</li>
+      </ul>
+    </div>
+
+    <div class="sx-imp-sec sx-imp-queue" *ngIf="importPreview">
+      <button type="button" class="sx-imp-head" (click)="importExpand.inQueue = !importExpand.inQueue">
+        <mat-icon>{{ importExpand.inQueue ? 'expand_more' : 'chevron_right' }}</mat-icon>
+        <span>Already in an active queue — skipped</span><span class="sx-imp-n">{{ importPreview.inQueue.length }}</span>
+      </button>
+      <ul *ngIf="importExpand.inQueue" class="sx-imp-list">
+        <li *ngFor="let p of importPreview.inQueue">{{ p.name }} <span class="sx-mut">{{ p.email }}</span></li>
+        <li *ngIf="!importPreview.inQueue.length" class="sx-mut">None</li>
+      </ul>
+    </div>
+
+    <div class="sx-imp-sec sx-imp-no" *ngIf="importPreview">
+      <button type="button" class="sx-imp-head" (click)="importExpand.noProduct = !importExpand.noProduct">
+        <mat-icon>{{ importExpand.noProduct ? 'expand_more' : 'chevron_right' }}</mat-icon>
+        <span>No product — needs assigning</span><span class="sx-imp-n">{{ importPreview.noProduct.length }}</span>
+      </button>
+      <ul *ngIf="importExpand.noProduct" class="sx-imp-list">
+        <li *ngFor="let p of importPreview.noProduct">{{ p.name }} <span class="sx-mut">{{ p.email }}</span></li>
+        <li *ngIf="!importPreview.noProduct.length" class="sx-mut">None</li>
+      </ul>
+      <div class="sx-imp-no-act" *ngIf="importPreview.noProduct.length">
+        <button mat-stroked-button class="sx-ghost" (click)="assignImportNoProduct()"><mat-icon>add</mat-icon> Assign product</button>
+        <button mat-button class="sx-mark" (click)="exportImportNoProduct()">Export</button>
+      </div>
+    </div>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button [mat-dialog-close]="false">Cancel</button>
+    <button mat-flat-button color="primary" [disabled]="!importPreview?.willAdd?.length" (click)="confirmImport()">
+      Initiate {{ importPreview?.willAdd?.length || 0 }}
+    </button>
+  </mat-dialog-actions>
+</ng-template>
 
 <ng-template #confirmTpl let-data>
   <h2 mat-dialog-title>{{ data.title }}</h2>

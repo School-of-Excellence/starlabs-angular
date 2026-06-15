@@ -29,7 +29,9 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
-type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow';
+type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended';
+
+interface ImportPreviewRow { name: string; email: string; }
 
 interface PRow {
   profileid: string;
@@ -46,6 +48,7 @@ interface PRow {
   isNoProduct: boolean;
   isInQueueReq: boolean;
   isNotRequested: boolean;
+  isUnattended: boolean;
   inQueue: boolean;
   attended: boolean;
   scanned: boolean;
@@ -55,6 +58,10 @@ interface PRow {
   subEnd: number;
   subActive: boolean;
   finance: string;
+  phone: string;
+  purchaseValue: number | null;
+  paid: number | null;
+  customerStatus: string;
   metaLoaded: boolean;
   metaError: boolean;
 }
@@ -105,8 +112,38 @@ export class ProductFunnelComponent implements OnInit {
     { key: 'inQueue', label: 'In queue', cls: 'inq', desc: 'already in a queue', tip: 'Requested but already in an active queue — already being served, no action needed' },
     { key: 'approved', label: 'Approved', cls: 'app', desc: 'initiated' },
     { key: 'attended', label: 'Attended', cls: 'att', desc: 'scanned or marked', tip: 'Of the approved, how many attended (scanned or marked)' },
-    { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'did not attend', tip: 'Approved but did not attend — set when you finalize attendance after the event' }
+    { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'did not attend', tip: 'Approved but did not attend — set when you finalize attendance after the event. Product is kept.' },
+    { key: 'unattended', label: 'Unattended', cls: 'un', desc: 'cancelled — product pulled', tip: 'Manually marked not attended during the event — the product is cancelled (status “unattended”).' }
   ];
+
+  // Card lookup + a grouped breakdown tree (depth = indentation; bar = share of the group total).
+  readonly cardMap = this.cards.reduce((m, c) => (m[c.key] = c, m),
+    {} as Record<SegmentKey, (typeof this.cards)[number]>);
+  readonly funnelTree: { about: string; total: SegmentKey; rows: { key: SegmentKey; depth: number }[] }[] = [
+    {
+      about: 'Owners not yet initiated — your approval pool', total: 'potential', rows: [
+        { key: 'potential', depth: 0 },
+        { key: 'requested', depth: 1 },
+        { key: 'eligible', depth: 2 },
+        { key: 'noProduct', depth: 2 },
+        { key: 'inQueue', depth: 2 },
+        { key: 'notRequested', depth: 1 }
+      ]
+    },
+    {
+      about: 'Attendance outcome of the approved', total: 'approved', rows: [
+        { key: 'approved', depth: 0 },
+        { key: 'attended', depth: 1 },
+        { key: 'noShow', depth: 1 },
+        { key: 'unattended', depth: 1 }
+      ]
+    }
+  ];
+  // Share of a row within its panel total, for the proportion bar + percent label.
+  barPct(key: SegmentKey, total: SegmentKey): number {
+    const t = this.counts[total] || 0;
+    return t ? Math.min(100, Math.round((this.counts[key] / t) * 100)) : 0;
+  }
 
   mapProfile: Record<string, any> = {};
   mapEmailData: Record<string, any> = {};
@@ -126,8 +163,15 @@ export class ProductFunnelComponent implements OnInit {
   selection = new SelectionModel<PRow>(true, []);
 
   counts: Record<SegmentKey, number> = {
-    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0
+    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0
   };
+
+  // owner email → row, and active-queue profile ids — used by bulk import categorisation
+  private ownerByEmail = new Map<string, PRow>();
+  private activeProfileIds = new Set<string>();
+  importPreview: { total: number; willAdd: ImportPreviewRow[]; inQueue: ImportPreviewRow[]; noProduct: ImportPreviewRow[] } | null = null;
+  importExpand = { willAdd: false, inQueue: false, noProduct: false };
+  private pendingImportRows: PRow[] = [];
 
   pageSize = 10;
   pageIndex = 0;
@@ -171,7 +215,7 @@ export class ProductFunnelComponent implements OnInit {
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
           where('arenaeventid', '==', arena['docid']),
-          where('status', 'in', ['requested', 'approved', 'attended']))),
+          where('status', 'in', ['requested', 'approved', 'attended', 'unattended']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
           where('eventref', '==', arena['eventref'])))
       ]);
@@ -185,6 +229,7 @@ export class ProductFunnelComponent implements OnInit {
       const requestedData = new Map<string, any>();
       const approvedReq = new Map<string, string>();
       const attendedIds = new Set<string>();
+      const unattendedIds = new Set<string>();
       const attendanceStateByPid = new Map<string, string>();
       const bucketByPid = new Map<string, string>();
       eprSnap.docs.forEach(d => {
@@ -193,8 +238,11 @@ export class ProductFunnelComponent implements OnInit {
         if (!pid) return;
         if (x['status'] == 'approved') { approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? ''); }
         else if (x['status'] == 'attended') { attendedIds.add(pid); approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended'); }
+        else if (x['status'] == 'unattended') { unattendedIds.add(pid); attendanceStateByPid.set(pid, 'unattended'); }
         else if (x['status'] == 'requested') { requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id }); if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']); }
       });
+      // Unattended participants are terminal (product cancelled) — they never belong to any live bucket.
+      unattendedIds.forEach(p => requestedData.delete(p));
 
       // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
       // When every requested participant carries one, use them and SKIP the queue_token scan;
@@ -218,22 +266,26 @@ export class ProductFunnelComponent implements OnInit {
       const cohort = new Set<string>([...approvedReq.keys(), ...scanned]);
       cohort.forEach(p => requestedData.delete(p));
 
-      const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort]);
+      // Unattended are terminal — drop them from the live cohort/owner sets so they only show as "Unattended".
+      unattendedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); });
+
+      const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds]);
       const rows: PRow[] = [];
       ids.forEach(pid => {
         const prof = this.mapProfile[pid] ?? {};
-        const isOwner = owners.has(pid);
-        const isScanned = scanned.has(pid);
-        const isAttended = attendedIds.has(pid) || isScanned;
-        const inCohort = approvedReq.has(pid) || isScanned;
-        const isRequested = requestedData.has(pid);
+        const isUnattended = unattendedIds.has(pid);
+        const isOwner = !isUnattended && owners.has(pid);
+        const isScanned = !isUnattended && scanned.has(pid);
+        const isAttended = !isUnattended && (attendedIds.has(pid) || isScanned);
+        const inCohort = !isUnattended && (approvedReq.has(pid) || isScanned);
+        const isRequested = !isUnattended && requestedData.has(pid);
         const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
         const inQueue = bucket ? (bucket === 'inQueue') : active.has(pid);
-        const isEligible = bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue);
-        const isNoProduct = bucket ? (bucket === 'noProduct') : (isRequested && !isOwner);
-        const isInQueueReq = bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue);
-        const isNotRequested = isOwner && !isRequested && !inCohort;
-        const reason = isNoProduct ? 'No product' : (isInQueueReq ? 'In active queue' : '');
+        const isEligible = isUnattended ? false : (bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue));
+        const isNoProduct = isUnattended ? false : (bucket ? (bucket === 'noProduct') : (isRequested && !isOwner));
+        const isInQueueReq = isUnattended ? false : (bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue));
+        const isNotRequested = !isUnattended && isOwner && !isRequested && !inCohort;
+        const reason = isNoProduct ? 'No product' : (isInQueueReq ? 'In active queue' : (isUnattended ? 'Product cancelled' : ''));
         rows.push({
           profileid: pid,
           name: prof['name'] ?? 'Unknown',
@@ -243,16 +295,24 @@ export class ProductFunnelComponent implements OnInit {
           approvedRequestId: approvedReq.get(pid) ?? null,
           requestData: requestedData.get(pid) ?? null,
           isOwner, isRequested, isApproved: inCohort,
-          isEligible, isNoProduct, isInQueueReq, isNotRequested, inQueue,
+          isEligible, isNoProduct, isInQueueReq, isNotRequested, isUnattended, inQueue,
           attended: isAttended,
           scanned: isScanned,
           attendanceState: attendanceStateByPid.get(pid) ?? '',
           reason,
-          journey: '', subEnd: 0, subActive: false, finance: '', metaLoaded: false, metaError: false
+          journey: '', subEnd: 0, subActive: false, finance: '',
+          phone: prof['number'] ?? prof['phone'] ?? '',
+          purchaseValue: null, paid: null, customerStatus: '',
+          metaLoaded: false, metaError: false
         });
       });
       rows.sort((a, b) => a.name.localeCompare(b.name));
       this.rows = rows;
+
+      // Indexes for bulk import categorisation.
+      this.ownerByEmail = new Map<string, PRow>();
+      rows.forEach(r => { if (r.isOwner && r.email) this.ownerByEmail.set(r.email.trim().toLowerCase(), r); });
+      this.activeProfileIds = active;
 
       this.counts = {
         potential: owners.size,
@@ -263,7 +323,8 @@ export class ProductFunnelComponent implements OnInit {
         inQueue: rows.filter(r => r.isInQueueReq).length,
         approved: cohort.size,
         attended: rows.filter(r => r.attended).length,
-        noShow: rows.filter(r => r.attendanceState === 'no_show').length
+        noShow: rows.filter(r => r.attendanceState === 'no_show').length,
+        unattended: rows.filter(r => r.isUnattended).length
       };
 
       this.deliverySetList = await this.loadDeliverySets(arena);
@@ -322,6 +383,9 @@ export class ProductFunnelComponent implements OnInit {
           row.subEnd = this.toMillis(m['subscriptionend']);
           row.subActive = row.subEnd ? row.subEnd >= now : false;
           row.finance = m['financialstatus'] ?? '';
+          row.purchaseValue = m['pp_totalpurchasevalue'] ?? null;
+          row.paid = m['pp_totalpaid'] ?? null;
+          row.customerStatus = m['customerstatus'] ?? '';
           row.metaLoaded = true;
         });
       } catch (e) {
@@ -355,6 +419,7 @@ export class ProductFunnelComponent implements OnInit {
       case 'approved': return r.isApproved;
       case 'attended': return r.attended;
       case 'noShow': return r.attendanceState === 'no_show';
+      case 'unattended': return r.isUnattended;
     }
     return false;
   }
@@ -386,21 +451,24 @@ export class ProductFunnelComponent implements OnInit {
   onSearch() { this.pageIndex = 0; this.refreshMeta(); }
   onFinance() { this.pageIndex = 0; this.refreshMeta(); }
 
-  // ---- Selection: approve on Eligible, attendance on Approved/No-show/Attended ----
+  // ---- Selection: approve on Eligible + Not requested, attendance on Approved/Attended/No-show ----
   get selectionMode(): 'approve' | 'attend' | 'none' {
-    if (this.segment === 'eligible') return 'approve';
+    if (this.segment === 'eligible' || this.segment === 'notRequested') return 'approve';
     if (this.segment === 'approved' || this.segment === 'noShow' || this.segment === 'attended') return 'attend';
     return 'none';
   }
   get showSelect() { return this.selectionMode !== 'none'; }
 
+  // An owner is approvable whether or not they requested (matches initiate-event-product).
+  private isApprovable(r: PRow) { return (r.isEligible || r.isNotRequested) && !!r.participantproductid; }
+
   private defaultSelection() {
+    // Start every segment with nothing checked — the user opts in.
     this.selection.clear();
-    if (this.segment === 'eligible') this.rows.filter(r => r.isEligible).forEach(r => this.selection.select(r));
   }
   isSelectable(r: PRow) {
-    if (this.selectionMode === 'approve') return r.isEligible;
-    if (this.selectionMode === 'attend') return r.isApproved && !r.attended;
+    if (this.selectionMode === 'approve') return this.isApprovable(r);
+    if (this.selectionMode === 'attend') return r.isApproved;   // approved rows; attended ones can still be marked unattended
     return false;
   }
   toggleRow(r: PRow) { if (this.isSelectable(r)) this.selection.toggle(r); }
@@ -412,8 +480,9 @@ export class ProductFunnelComponent implements OnInit {
     if (this.isAllSelected()) v.forEach(r => this.selection.deselect(r));
     else v.forEach(r => this.selection.select(r));
   }
-  get readyCount() { return this.selection.selected.filter(r => r.isEligible).length; }
+  get readyCount() { return this.selection.selected.filter(r => this.isApprovable(r)).length; }
   get selectedToMark() { return this.selection.selected.filter(r => r.isApproved && !r.attended); }
+  get selectedToUnattend() { return this.selection.selected.filter(r => r.isApproved); }
 
   // ---- Display helpers ----
   formatMonthYear(ms: number): string {
@@ -453,7 +522,7 @@ export class ProductFunnelComponent implements OnInit {
 
   async approveSelected() {
     if (!this.canApprove()) return;
-    const selected = this.selection.selected.filter(r => r.isEligible && r.participantproductid);
+    const selected = this.selection.selected.filter(r => this.isApprovable(r));
     if (!selected.length) return;
     await this.loadMeta(selected);
     const risky = selected.filter(r => ['locked', 'defaulted'].includes(
@@ -585,6 +654,59 @@ export class ProductFunnelComponent implements OnInit {
     }
   }
 
+  // ---- Mark not attended (destructive): status -> 'unattended' AND cancel the product ----
+  // Mirrors the legacy "Mark as Not Attended": cancels participantsproduct, deletes the events_profiles
+  // record, and nulls the deliverables. Use this DURING the event; no-show (product-preserving) is at finalize.
+  async markUnattended(rows: PRow[]) {
+    const targets = rows.filter(r => r.approvedRequestId);
+    if (!targets.length) return;
+    const ref = this.dialog.open(this.confirmTpl, {
+      width: '440px', autoFocus: false, panelClass: 'sx-dialog',
+      data: {
+        title: 'Mark not attended',
+        body: `Mark ${targets.length} participant(s) as not attended. Their product will be cancelled.`,
+        warn: 'This cancels the product, removes their event profile, and clears deliverables. It cannot be undone.',
+        confirm: `Mark ${targets.length} unattended`
+      }
+    });
+    const ok = await ref.afterClosed().toPromise();
+    if (!ok) return;
+
+    this.progress = { msg: 'Cancelling…', value: 0, total: targets.length, eta: '' };
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
+    try {
+      const batch = writeBatch(this.firestore);
+      const reqRefs = targets.map(r => doc(this.firestore, 'event participation request', r.approvedRequestId!));
+      targets.forEach((r, i) => {
+        batch.update(reqRefs[i], { status: 'unattended', attendance_state: 'unattended', attendance_source: 'manual', attendance_marked_at: serverTimestamp() });
+        if (r.participantproductid) batch.update(doc(this.firestore, 'participantsproduct', r.participantproductid), { status: 'cancelled' });
+      });
+      // Delete the events_profiles record for each (profile + event).
+      for (const r of targets) {
+        const epSnap = await getDocs(query(collection(this.firestore, 'events_profiles'),
+          where('profile_ref', '==', doc(this.firestore, 'profile_data', r.profileid)),
+          where('event_ref', '==', this.arena['eventref'])));
+        epSnap.docs.forEach(d => batch.delete(d.ref));
+      }
+      // Null the deliverables that point at these requests.
+      for (let i = 0; i < reqRefs.length; i += 10) {
+        const sub = reqRefs.slice(i, i + 10);
+        const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'),
+          where('fileref', 'array-contains-any', sub)));
+        delSnap.docs.forEach(d => batch.update(d.ref, { status: null }));
+      }
+      await batch.commit();
+      this.snackbar.open(`Marked ${targets.length} not attended`, 'OK', { duration: 4000 });
+      this.selection.clear();
+      await this.loadData();
+    } catch (e) {
+      console.log(e);
+      this.snackbar.open('Could not mark not attended', 'OK', { duration: 4000 });
+    } finally {
+      pref.close();
+    }
+  }
+
   // ---- Finalize attendance (after the event): mark no-show + lock the frozen snapshot ----
   // Product-preserving: writes only namespaced fields (attendance on the request, snapshot on the arena doc).
   get eventEnded(): boolean { return !!this.eventEnd && Date.now() > this.eventEnd; }
@@ -672,6 +794,100 @@ export class ProductFunnelComponent implements OnInit {
     });
   }
 
+  // ---- Bulk import (Excel) — mirrors initiate-event-product, incl. non-requesters ----
+  @ViewChild('importTpl') importTpl!: TemplateRef<any>;
+  private importDialogRef: any = null;
+
+  downloadSampleExcel() {
+    const ws = XLSX.utils.aoa_to_sheet([['name', 'email'], ['Jane Doe', 'jane@example.com']]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+    XLSX.writeFile(wb, 'participants_sample.xlsx');
+  }
+
+  importParticipants() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xls,.xlsx';
+    input.addEventListener('change', (ev: any) => {
+      const file: File = ev.target.files?.[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) { this.snackbar.open('File too large (max 10MB)', 'OK', { duration: 4000 }); return; }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target!.result as ArrayBuffer), { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+          const parsed: ImportPreviewRow[] = [];
+          const seen = new Set<string>();
+          json.forEach((row, idx) => {
+            if (idx === 0 || !row[0] || !row[1]) return;
+            const name = row[0].toString().trim();
+            const email = row[1].toString().trim().toLowerCase();
+            if (name && email && !seen.has(email)) { seen.add(email); parsed.push({ name, email }); }
+          });
+          const willAdd: ImportPreviewRow[] = [], inQueue: ImportPreviewRow[] = [], noProduct: ImportPreviewRow[] = [];
+          this.pendingImportRows = [];
+          parsed.forEach(p => {
+            const owner = this.ownerByEmail.get(p.email);
+            if (owner && (owner.inQueue || this.activeProfileIds.has(owner.profileid))) inQueue.push(p);
+            else if (owner) { willAdd.push(p); this.pendingImportRows.push(owner); }
+            else noProduct.push(p);
+          });
+          this.importPreview = { total: parsed.length, willAdd, inQueue, noProduct };
+          this.importExpand = { willAdd: false, inQueue: false, noProduct: false };
+          this.importDialogRef = this.dialog.open(this.importTpl, { width: '560px', maxHeight: '90vh', autoFocus: false, panelClass: 'sx-dialog' });
+        } catch (err) {
+          console.log(err);
+          this.snackbar.open('Could not read file', 'OK', { duration: 4000 });
+        }
+      };
+      reader.onerror = () => this.snackbar.open('Could not read file', 'OK', { duration: 4000 });
+      reader.readAsArrayBuffer(file);
+    });
+    input.click();
+  }
+
+  // Confirm import → initiate the owner rows (eligible OR not-requested) with the chosen sequence.
+  async confirmImport() {
+    this.importDialogRef?.close();
+    const rows = this.pendingImportRows.slice();
+    this.pendingImportRows = [];
+    if (!rows.length) { this.snackbar.open('No participants to add', 'OK', { duration: 4000 }); return; }
+    if (!this.selectedDeliverySet) { this.snackbar.open('Pick a delivery sequence first, then import', 'OK', { duration: 5000 }); return; }
+    if (this.arena?.['type'] === 'queue' && this.queueVariationList.length > 0 && !this.selectedQueueVariation) {
+      this.snackbar.open('Pick a queue variation first, then import', 'OK', { duration: 5000 }); return;
+    }
+    await this.runApprove(rows);
+  }
+
+  // Assign the product to the imported "no product" people via the shared bulk-add dialog.
+  assignImportNoProduct() {
+    const noProduct = this.importPreview?.noProduct ?? [];
+    const participants = noProduct
+      .map(p => ({ profileid: this.mapEmailData[p.email]?.['profileid'], name: p.name, email: p.email }))
+      .filter(p => p.profileid);
+    this.importDialogRef?.close();
+    if (!participants.length) { this.snackbar.open('No matching profiles to assign', 'OK', { duration: 4000 }); return; }
+    this.dialog.open(BulkAddProductsComponent, {
+      data: { participants, productrefId: this.arena?.['productref']?.id },
+      width: '70vw', disableClose: true, panelClass: 'sx-dialog-surface'
+    }).afterClosed().subscribe(async () => {
+      const seq = this.selectedDeliverySet, variation = this.selectedQueueVariation;
+      await this.loadData();
+      this.selectedDeliverySet = seq;
+      this.selectedQueueVariation = variation;
+    });
+  }
+
+  exportImportNoProduct() {
+    const ws = XLSX.utils.json_to_sheet(this.importPreview?.noProduct ?? []);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'No product');
+    XLSX.writeFile(wb, 'import_no_product.xlsx');
+  }
+
   // ---- Communications (sends to the current segment's participants) ----
   get commsRecipients(): PRow[] { return this.segmentRows; }
 
@@ -741,17 +957,55 @@ export class ProductFunnelComponent implements OnInit {
       });
   }
 
-  exportList() {
+  // Funnel-bucket label for a row (used in export "Eligibility" column).
+  eligibilityLabel(r: PRow): string {
+    if (r.isUnattended) return 'Unattended';
+    if (r.attended) return 'Attended';
+    if (r.attendanceState === 'no_show') return 'No-show';
+    if (r.isApproved) return 'Approved';
+    if (r.isEligible) return 'Eligible';
+    if (r.isNoProduct) return 'No product';
+    if (r.isInQueueReq) return 'In queue';
+    if (r.isNotRequested) return 'Not requested';
+    return '';
+  }
+
+  async exportList() {
     const rows = this.segmentRows;
-    const data = rows.map(r => ({
-      Name: r.name, Email: r.email, Journey: r.journey,
-      Subscription: (r.subActive ? 'Active' : (r.subEnd ? 'Expired' : '')) + (r.subEnd ? ' ' + this.formatMonthYear(r.subEnd) : ''),
-      Finance: r.finance, Reason: r.reason, Attended: r.attended ? 'Yes' : 'No'
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Participants');
-    XLSX.writeFile(wb, `${this.productName}_${this.segment}.xlsx`);
-    this.snackbar.open(`Exported ${rows.length} rows`, 'OK', { duration: 3000 });
+    if (!rows.length) { this.snackbar.open('Nothing to export', 'OK', { duration: 3000 }); return; }
+    // Make sure every row in the segment has its metadata before exporting (not just the visible page).
+    this.progress = { msg: 'Preparing export…', value: 0, total: rows.length, eta: '' };
+    const pref = this.dialog.open(this.progressTpl, { width: '360px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
+    try {
+      await this.loadMeta(rows);
+      const data = rows.map(r => {
+        const due = (typeof r.purchaseValue === 'number' && typeof r.paid === 'number') ? r.purchaseValue - r.paid : '';
+        return {
+          Name: r.name,
+          Email: r.email || '',
+          Phone: r.phone || '',
+          'Active journey': r.journey || '',
+          'Total purchase value': r.purchaseValue ?? '',
+          'Total paid': r.paid ?? '',
+          Due: due,
+          'Financial status': r.finance || '',
+          Subscription: (r.subActive ? 'Active' : (r.subEnd ? 'Expired' : '')) + (r.subEnd ? ' ' + this.formatMonthYear(r.subEnd) : ''),
+          'Customer status': r.customerStatus || '',
+          Eligibility: this.eligibilityLabel(r),
+          Reason: r.reason || '',
+          Attended: r.attended ? 'Yes' : 'No'
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+      XLSX.writeFile(wb, `${this.productName}_${this.segment}.xlsx`);
+      this.snackbar.open(`Exported ${rows.length} rows`, 'OK', { duration: 3000 });
+    } catch (e) {
+      console.log(e);
+      this.snackbar.open('Could not export', 'OK', { duration: 4000 });
+    } finally {
+      pref.close();
+    }
   }
 }
