@@ -9,9 +9,9 @@ import { provideServiceWorker } from '@angular/service-worker';
 
 const app = initializeApp(environment.firebase);
 // enable durable, multi-tab offline persistence (default + named ATC database) before any component reads them
-const offlineCache = { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) };
+const offlineCache = { }; 
 const firestore = initializeFirestore(app, offlineCache);
-initializeFirestore(app, offlineCache, 'firestore-atc');
+initializeFirestore(app, {localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })}, 'firestore-atc');
 
 (window as any).process = {
   env: { DEBUG: undefined },

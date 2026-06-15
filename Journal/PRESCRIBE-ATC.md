@@ -230,6 +230,17 @@ submit()
              └─ reset the screen (or, in arena mode, close the tab)
 ```
 
+## 12b. Submit validation UX (scroll + inline "required")
+
+On **Submit**, if a required field is empty:
+- `focusMissingField(anchorId, message)` **scrolls** to the field (an `id="atcfield-*"` anchor,
+  or the first `.ng-invalid` Material control as fallback), **flashes** it red
+  (`.atc-field-invalid-flash`), and shows the reason in a top **snackbar**.
+- `submitAttempted` is set true, so a custom `ErrorStateMatcher` (`requiredMatcher`) reveals an
+  inline **"This field is required"** message under **every** empty required box (product, date,
+  awareness, potential years, procedure, consultation points, case notes). The plain adjustment
+  textarea (not a Material field) uses a manual `<span class="required-text">` hint.
+
 ## 13. How to test it (manual)
 
 Use Chrome DevTools → **Network → Offline** to simulate no internet, and
