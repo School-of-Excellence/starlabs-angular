@@ -1022,7 +1022,7 @@ export class DeliveryDashboardCloneComponent {
                 const tentativestart = item?.tentativestart || null;
                 const packageId = item?.packageref?.id;
 
-                if (!['completed', 'ongoing'].includes(status)) {
+                if (['initiated'].includes(status)) {
                     // ── Pre-completion pool (Total, Eligible, Not Elig., Purchased, Bonus) ──
                     // All four participant-count columns use the same base filter:
                     // exclude completed and ongoing so the sums are consistent:
@@ -1307,7 +1307,7 @@ export class DeliveryDashboardCloneComponent {
                 for (let data of totalEligible) {
                     const { status, tentativestart } = data;
 
-                    if (status === null || status === "initiated") {
+                    if (status === "initiated") {
                         if (!tentativestart) productData.eiStarterPack.totalEligible.push(data);
                         else if (tentativestart) {
                             const date = tentativestart.toDate();
