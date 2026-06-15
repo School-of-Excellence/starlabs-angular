@@ -144,18 +144,13 @@
             <div class="kc__head">
               <span class="kc__avatar kc__avatar--ink">{{ initials(participantName(s.participants?.[0] || '')) }}</span>
               <div class="kc__title">
-                <span class="kc__name">{{ specialistList(s)[0]?.activity || 'Idle Studio' }}</span>
-                <span class="kc__status kc__status--ink">IDLE</span>
+                <!-- Show the specialist holding this idle studio. Long names wrap
+                     instead of being truncated with an ellipsis. -->
+                <span class="kc__name kc__name--wrap">{{ specialistList(s)[0]?.name || 'Idle Studio' }}</span>
+                <span class="kc__role-act" *ngIf="specialistList(s)[0]?.activity">{{ specialistList(s)[0]?.activity }}</span>
               </div>
             </div>
             <div class="kc__meta kc__meta--placeholder">No participant assigned</div>
-            <div class="kc__foot">
-              <span class="kc__timer kc__timer--idle">{{ studioTagFor(s) }}</span>
-            </div>
-            <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
-            </div>
           </article>
           <div class="kcol__empty" *ngIf="idleStudios.length === 0">— no idle studios —</div>
         </div>
@@ -173,7 +168,6 @@
               <span class="kc__avatar kc__avatar--amber">{{ initials(item.invitation.participantname || '?') }}</span>
               <div class="kc__title">
                 <span class="kc__name">{{ item.invitation.participantname || '—' }}</span>
-                <span class="kc__status kc__status--amber">INVITING</span>
               </div>
             </div>
             <!-- Who is doing the inviting (specialist) -->
@@ -187,11 +181,8 @@
             </div>
             <div class="kc__foot">
               <span class="kc__timer kc__timer--amber">{{ inviteCountdown(item.invitation) }}</span>
-              <span class="kc__tag">{{ studioTagFor(item.studio) }}</span>
             </div>
             <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
               <span class="kc__pill kc__pill--amber">{{ attemptsLabel(item.invitation) }}</span>
             </div>
           </article>
@@ -210,14 +201,24 @@
             <div class="kc__head">
               <span class="kc__avatar kc__avatar--blue">{{ initials(participantName(a.participantid)) }}</span>
               <div class="kc__title">
-                <span class="kc__name">{{ participantName(a.participantid) }}</span>
-                <span class="kc__status kc__status--blue">JOINED</span>
+                <span class="kc__name kc__name--wrap">{{ participantName(a.participantid) }}</span>
               </div>
             </div>
-            <div class="kc__meta" *ngIf="a.pairing?.length">
-              <mat-icon>person</mat-icon>
-              {{ participantName(a.pairing[0]) }}
-              <mat-icon class="kc__chev">arrow_forward</mat-icon>
+
+            <!-- Participant name is already shown in the card head above; here
+                 we name the specialist (and any bonus-activity specialists). -->
+            <div class="kc__roles" *ngIf="a.pairing?.length || bonusSpecialists(a).length">
+              <div class="kc__role" *ngIf="a.pairing?.length">
+                <span class="kc__role-label">Specialist</span>
+                <span class="kc__role-name">{{ participantName(a.pairing[0]) }}</span>
+              </div>
+              <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
+                <span class="kc__role-label">Bonus</span>
+                <span class="kc__role-name">
+                  {{ bs.name }}
+                  <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
+                </span>
+              </div>
             </div>
             <div class="kc__wait" *ngIf="!participantPresent(a)">
               <mat-icon>schedule</mat-icon>
@@ -238,11 +239,6 @@
                 <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">hourglass_top</mat-icon>
                 {{ sinceStudioEntry(a) }}
               </span>
-              <span class="kc__tag">{{ studioTagFor(null, 'SE · ATC') }}</span>
-            </div>
-            <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
             </div>
           </article>
           <div class="kcol__empty" *ngIf="joinedAssignments.length === 0">— none —</div>
@@ -266,14 +262,21 @@
               </span>
               <div class="kc__title">
                 <span class="kc__name">{{ participantName(a.participantid) }}</span>
-                <span class="kc__status"
-                      [class.kc__status--green]="bothInCall(a)"
-                      [class.kc__status--amber]="onlySpecialistLeft(a) || onlyParticipantLeft(a)"
-                      [class.kc__status--ink]="callEnded(a)">
-                  {{ callEnded(a) ? 'CALL ENDED'
-                     : onlySpecialistLeft(a) ? 'SPECIALIST LEFT'
-                     : onlyParticipantLeft(a) ? 'PARTICIPANT LEFT'
-                     : 'ACTIVE' }}
+              </div>
+            </div>
+
+            <!-- Participant name is already shown in the card head above; here
+                 we name the specialist (and any bonus-activity specialists). -->
+            <div class="kc__roles">
+              <div class="kc__role">
+                <span class="kc__role-label">Specialist</span>
+                <span class="kc__role-name">{{ participantName(a.pairing?.[0] || '') }}</span>
+              </div>
+              <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
+                <span class="kc__role-label">Bonus</span>
+                <span class="kc__role-name">
+                  {{ bs.name }}
+                  <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
                 </span>
               </div>
             </div>
@@ -346,11 +349,6 @@
                 </mat-icon>
                 {{ sessionElapsed(a) }}
               </span>
-              <span class="kc__tag">{{ studioTagFor(null, 'SE · ATC') }}</span>
-            </div>
-            <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
             </div>
           </article>
           <div class="kcol__empty" *ngIf="activeAssignments.length === 0">— none —</div>

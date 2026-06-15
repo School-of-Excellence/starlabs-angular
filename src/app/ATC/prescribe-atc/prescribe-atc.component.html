@@ -2,19 +2,21 @@
     <mat-progress-spinner mode="indeterminate" class="loading-bar"></mat-progress-spinner>
   </div>
   
-  <div class="atc-edit-container">
+  <div class="atc-edit-container" [class.has-status-bar]="!isonline || autoSaveID != null">
     <!-- Offline/Online status bar -->
-    <nav class="navbar sticky-top navbar-light justify-content-end status-bar" *ngIf="!isonline">
-      <span class="status-message">No internet connection. Autosave is off. Keep this tab open until it's restored.</span>
+    <nav class="navbar navbar-light justify-content-end status-bar" *ngIf="!isonline">
+      <span class="status-message">You're offline — changes are saved on this device and will sync when you reconnect.</span>
     </nav>
     
-    <nav class="navbar sticky-top navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
+    <nav class="navbar navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
       <div>
         <span class="icon-text-container" (click)="autoSave()">
           <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
           <span>{{draftStatus.message}}</span>
           <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
         </span>
+        <!-- explicit retry shown only when a save failed -->
+        <button *ngIf="draftStatus.code == -1" mat-button class="retry-button" (click)="autoSave()">Retry</button>
       </div>
       <!-- <div *ngIf="autosaveonprogress">
         <span class="icon-text-container">
@@ -32,56 +34,77 @@
     
     <header class="atc-header">
       <h1 class="header-title">Prescribe ATC</h1>
-      
-      <div class="share-container" *ngIf="autoSaveID != null">
-        <button mat-button class="share-button" (click)="copyToClipboard()">
-          Copy Link For Collaborators
-          <mat-icon>content_copy</mat-icon>
-        </button>
-      </div>
     </header>
   
     <main class="atc-main">
+      <!-- Participant selection — always first; the full screen unlocks once a participant is chosen -->
+      <section class="content-section">
+        <h2 class="section-heading">Participant</h2>
+        <div class="info-box">
+          <mat-form-field appearance="outline" class="flat-field">
+            <mat-label>Participant's Name</mat-label>
+            <!-- lock the participant name once a draft context exists; switch participant via "Create New ATC" -->
+            <mat-select [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity() || autoSaveID != null" [required]="true">
+              <mat-option>
+                <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div *ngIf="participantProfileid !== null && (selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile'])" class="profile-image-container">
+            <img class="profile-image" [src]="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']">
+          </div>
+
+          <!-- draft / new-atc actions, shown once a participant is selected -->
+          <div class="participant-actions" *ngIf="autoSaveID != null">
+            <!-- only when this participant has a draft other than the current one -->
+            <button *ngIf="!aigeneratedEntry && hasOtherDrafts" mat-button class="share-button" (click)="openAnotherDraft()">
+              Open & Continue Another Draft
+              <mat-icon>folder_open</mat-icon>
+            </button>
+            <!-- start a brand new ATC in a new tab -->
+            <button mat-button class="share-button" (click)="createNewATC()">
+              Create New ATC
+              <mat-icon>note_add</mat-icon>
+            </button>
+            <!-- share the draft link with collaborators -->
+            <button mat-button class="share-button" (click)="copyToClipboard()">
+              Copy Link For Collaborators
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- The full ATC screen is shown only after a participant is selected -->
+      <ng-container *ngIf="autoSaveID != null">
       <!-- ATC Data Section -->
       <section class="content-section">
         <h2 class="section-heading">ATC Data</h2>
         <div class="info-grid">
-          <div class="info-box" id="atcfield-profile">
-            <mat-form-field appearance="outline" class="flat-field">
-              <mat-label>Participant's Name</mat-label>
-              <mat-select [(ngModel)]="participantProfileid" (selectionChange)="onProfileSelect()" [disabled]="settingup || this.assignmentInitiated || this.bigActivity()" [required]="true">
-                <mat-option>
-                  <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
-                </mat-option>
-                <mat-option *ngFor="let profile of availableProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
-              </mat-select>
-            </mat-form-field>
-            
-            <div *ngIf="participantProfileid !== null && (selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile'])" class="profile-image-container">
-              <img class="profile-image" [src]="selectedParticipantProfile['profileimg'] || selectedParticipantProfile['profile']">
-            </div>
-          </div>
-  
-          <div class="info-box" id="atcfield-product">
+          <div class="info-box">
             <mat-form-field appearance="outline" class="flat-field">
               <mat-label>What is the ATC given for?</mat-label>
-              <mat-select [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()" [required]="true">
+              <mat-select [(ngModel)]="product" (selectionChange)="onProductSelect(); autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                 <mat-option *ngFor="let productName of productLists" [value]="productName.atcmodel">{{productName.atcmodel}}</mat-option>
               </mat-select>
+              <mat-error>This field is required</mat-error>
             </mat-form-field>
           </div>
-  
-          <div class="info-box" id="atcfield-date">
+
+          <div class="info-box">
             <mat-form-field appearance="outline" class="flat-field">
               <mat-label>Prescribed Date</mat-label>
-              <input matInput [(ngModel)]="date" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY" (dateChange)="autoSave()" [disabled]="!transcriber || this.assignmentInitiated" [required]="true">
+              <input matInput [(ngModel)]="date" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY" (dateChange)="autoSave()" [disabled]="!transcriber || this.assignmentInitiated" [required]="true" [errorStateMatcher]="requiredMatcher">
               <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
               <mat-datepicker #picker></mat-datepicker>
+              <mat-error>This field is required</mat-error>
             </mat-form-field>
           </div>
         </div>
       </section>
-      
+
       <!-- ATC Directive Section -->
       <section class="content-section" id="atcfield-directive" *ngIf="product != null">
         <h2 class="section-heading">ATC DIRECTIVE</h2>
@@ -258,6 +281,8 @@
               <div class="adjustment-text">
                 <span class="adjustment-number">{{i+1}}.</span>
                 <textarea class="adjustment-textarea" rows="6" [(ngModel)]="adjustment.adjustment" (focusout)="autoSave()" placeholder="Type Your Adjustment..." [required]="true"></textarea>
+                <!-- plain textarea (not a Material field) → show the required hint manually -->
+                <span class="required-text" *ngIf="submitAttempted && !(adjustment.adjustment || '').trim()">This field is required</span>
                 
                 <div class="adjustment-actions">
                   <button class="reorder-button" mat-stroked-button cdkDragHandle>
@@ -273,15 +298,17 @@
               <div class="awareness-field">
                 <mat-label>{{adjustmentAwarenessDetail.label}}</mat-label>
                 <mat-form-field appearance="outline" class="flat-field">
-                  <mat-select [compareWith]="compareFnc" [(ngModel)]="adjustment.awareness" (selectionChange)="autoSave()" [required]="true">
+                  <mat-select [compareWith]="compareFnc" [(ngModel)]="adjustment.awareness" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                     <mat-option *ngFor="let item of adjustmentAwarenessDetail.awarenesslist" [value]="item">{{item.value}}</mat-option>
                   </mat-select>
+                  <mat-error>This field is required</mat-error>
                 </mat-form-field>
                 
                 <div class="potential-years">
                   <mat-label>{{adjustmentAwarenessDetail.potentialyearlabel}}</mat-label>
                   <mat-form-field appearance="outline" class="year-field">
-                    <input type="number" matInput [(ngModel)]="adjustment.potentialyears" (focusout)="autoSave()" [required]="true">
+                    <input type="number" matInput [(ngModel)]="adjustment.potentialyears" (focusout)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
+                    <mat-error>This field is required</mat-error>
                   </mat-form-field>
                 </div>
               </div>
@@ -294,9 +321,10 @@
                     
                     <mat-form-field appearance="outline" class="procedure-field">
                       <mat-label>Procedure</mat-label>
-                      <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true">
+                      <mat-select [(ngModel)]="procedure.name" (selectionChange)="autoSave()" [required]="true" [errorStateMatcher]="requiredMatcher">
                         <mat-option *ngFor="let pro of procedurelist" [value]="pro.procedurepath">{{pro.procedurename}}</mat-option>
                       </mat-select>
+                      <mat-error>This field is required</mat-error>
                     </mat-form-field>
                     
                     <mat-form-field appearance="outline" class="procedure-field">
@@ -396,14 +424,16 @@
           <div class="note-field" id="atcfield-consultationpoint">
             <h3 class="field-label">Consultation Points*</h3>
             <mat-form-field appearance="outline" class="note-textarea">
-              <textarea matInput rows="6" [(ngModel)]="consultationpoint" (focusout)="autoSave()" placeholder="Notes" [required]="true"></textarea>
+              <textarea matInput rows="6" [(ngModel)]="consultationpoint" (focusout)="autoSave()" placeholder="Notes" [required]="true" [errorStateMatcher]="requiredMatcher"></textarea>
+              <mat-error>This field is required</mat-error>
             </mat-form-field>
           </div>
 
           <div class="note-field" id="atcfield-casenotes">
             <h3 class="field-label">Case Notes*</h3>
             <mat-form-field appearance="outline" class="note-textarea">
-              <textarea matInput rows="6" [(ngModel)]="casenotes" (focusout)="autoSave()" placeholder="Notes" [required]="true"></textarea>
+              <textarea matInput rows="6" [(ngModel)]="casenotes" (focusout)="autoSave()" placeholder="Notes" [required]="true" [errorStateMatcher]="requiredMatcher"></textarea>
+              <mat-error>This field is required</mat-error>
             </mat-form-field>
           </div>
           
@@ -417,7 +447,7 @@
       </section>
       
       <!-- Audio Section -->
-      <section class="content-section">
+      <section class="content-section" id="atcfield-changework">
         <h2 class="section-heading">CHANGEWORK BRIEF</h2>
         <div class="audio-container">
           <div *ngFor="let audio of audioBlobURL; let i = index" class="audio-item">
@@ -529,5 +559,6 @@
           Submit ATC
         </button>
       </section>
+      </ng-container>
     </main>
   </div>
