@@ -5,7 +5,7 @@ import {
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -55,6 +55,7 @@ interface PRow {
   scanned: boolean;
   attendanceState: string;
   reason: string;
+  requestedDate: number;
   journey: string;
   subEnd: number;
   subActive: boolean;
@@ -234,10 +235,13 @@ export class ProductFunnelComponent implements OnInit {
       const unattendedIds = new Set<string>();
       const attendanceStateByPid = new Map<string, string>();
       const bucketByPid = new Map<string, string>();
+      const reqDateByPid = new Map<string, number>();
       eprSnap.docs.forEach(d => {
         const x = d.data();
         const pid = x['profileid'];
         if (!pid) return;
+        const created = this.toMillis(x['doccreateddate']);
+        if (created) reqDateByPid.set(pid, created);
         if (x['status'] == 'approved') { approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? ''); }
         else if (x['status'] == 'attended') { attendedIds.add(pid); approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended'); }
         else if (x['status'] == 'unattended') { unattendedIds.add(pid); attendanceStateByPid.set(pid, 'unattended'); }
@@ -302,6 +306,7 @@ export class ProductFunnelComponent implements OnInit {
           scanned: isScanned,
           attendanceState: attendanceStateByPid.get(pid) ?? '',
           reason,
+          requestedDate: reqDateByPid.get(pid) ?? 0,
           journey: '', subEnd: 0, subActive: false, finance: '',
           phone: prof['number'] ?? prof['phone'] ?? '',
           purchaseValue: null, paid: null, customerStatus: '',
@@ -982,10 +987,14 @@ export class ProductFunnelComponent implements OnInit {
       await this.loadMeta(rows);
       const data = rows.map(r => {
         const due = (typeof r.purchaseValue === 'number' && typeof r.paid === 'number') ? r.purchaseValue - r.paid : '';
+        const rd = r.requestedDate ? new Date(r.requestedDate) : null;
         return {
           Name: r.name,
           Email: r.email || '',
           Phone: r.phone || '',
+          // Real Excel date value (date-only) so it sorts/filters as a date; time in its own column.
+          'Requested date': rd ? new Date(rd.getFullYear(), rd.getMonth(), rd.getDate()) : '',
+          'Requested time': rd ? formatDate(rd, 'h:mm:ss a', 'en-US') : '',
           'Active journey': r.journey || '',
           'Total purchase value': r.purchaseValue ?? '',
           'Total paid': r.paid ?? '',
@@ -998,7 +1007,7 @@ export class ProductFunnelComponent implements OnInit {
           Attended: r.attended ? 'Yes' : 'No'
         };
       });
-      const ws = XLSX.utils.json_to_sheet(data);
+      const ws = XLSX.utils.json_to_sheet(data, { cellDates: true, dateNF: 'yyyy-mm-dd' });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Participants');
       XLSX.writeFile(wb, `${this.productName}_${this.segment}.xlsx`);

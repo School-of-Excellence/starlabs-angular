@@ -119,6 +119,7 @@
                 (change)="masterToggle()" aria-label="Select all"></mat-checkbox>
             </th>
             <th>Name</th>
+            <th>Requested date</th>
             <th>Current journey</th>
             <th>Subscription</th>
             <th>Finance</th>
@@ -140,6 +141,10 @@
                   <div class="sx-em">{{ row.email || 'No email' }}</div>
                 </div>
               </div>
+            </td>
+            <td>
+              <span *ngIf="row.requestedDate">{{ row.requestedDate | date:'medium' }}</span>
+              <span *ngIf="!row.requestedDate" class="sx-mut">—</span>
             </td>
             <td>
               <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
@@ -192,7 +197,7 @@
             </td>
           </tr>
           <tr *ngIf="segmentRows.length === 0">
-            <td [attr.colspan]="showSelect ? 6 : 5" class="sx-empty">
+            <td [attr.colspan]="showSelect ? 7 : 6" class="sx-empty">
               {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
               <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; onFinance()">Clear filter</button>
             </td>
