@@ -10,10 +10,13 @@ import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage
 import { MatDialog } from '@angular/material/dialog';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
 import { NetworkStatusService } from '../../network-status.service';
+import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
 import { PreviewAtcBeforeSubmissionComponent } from '../preview-atc-before-submission/preview-atc-before-submission.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -36,7 +39,8 @@ import { MarkdownModule } from 'ngx-markdown';
     MatIconModule,
     NgxMatSelectSearchModule,
     MatCheckboxModule,
-    MarkdownModule
+    MarkdownModule,
+    MatSnackBarModule
   ],
   templateUrl: './edit-atc.component.html',
   styleUrl: './edit-atc.component.css'
@@ -171,11 +175,18 @@ export class EditAtcComponent {
 
   // Draft
   draftStatus = {
-    message: "No Draft Created!",
+    message: "Draft not saved yet.",
     code: 0
   }
   lastDraftSavedOn = null
   hideDraftBanner = false
+  submitAttempted = false  // true once Submit was pressed — drives the inline "required" hints
+  // shows the inline "Required" message on every required field once Submit was attempted
+  requiredMatcher: ErrorStateMatcher = {
+    isErrorState: (control) => !!(control && control.invalid && (control.touched || this.submitAttempted))
+  };
+  // serialize draft saves so concurrent autosaves cannot overwrite each other
+  private autoSaveInFlight: Promise<void> | null = null;
 
   firebaseDefaultBatch = writeBatch(this.firestoreDefault)
   firebaseATCBatch = writeBatch(this.firestoreATC)
@@ -197,7 +208,9 @@ export class EditAtcComponent {
     public dialog: MatDialog,
     public location: Location,
     public datepipe: DatePipe,
-    private networkStatusService: NetworkStatusService
+    private networkStatusService: NetworkStatusService,
+    private mediaCache: MediaCacheService,
+    public snackbar: MatSnackBar
   ) {
     this.reportATC = {
       atcData: null,
@@ -512,7 +525,7 @@ export class EditAtcComponent {
   async getATCoptions() {
     console.log("ATC Draft")
     this.draftStatus = {
-      message: "No Draft Created!",
+      message: "Draft not saved yet.",
       code: 0
     }
     this.loading = false
@@ -536,7 +549,7 @@ export class EditAtcComponent {
         maxHeight: "90vh",
         disableClose: true
       })
-      dialogRef.afterClosed().toPromise().then(selectedATC => {
+      dialogRef.afterClosed().toPromise().then(async selectedATC => {
         if (selectedATC != null) {
           var atc = selectedATC
           if (atc["type"] == "draft") {
@@ -552,6 +565,9 @@ export class EditAtcComponent {
             this.editNotes.notes = value["notes"] ?? null
             this.editNotes.notesedited = value["notesedited"] ?? false
             // this.editNotes.mentoringnote = value["mentornotes"] ?? null
+            // re-attach any media captured offline during a previous edit session
+            const pendingMedia = await this.mediaCache.listByDraft(this.reportATC.atcData["atcid"]);
+            this.reattachPendingMedia(pendingMedia);
             this.draftStatus = {
               message: "ATC Draft Imported Successfully.",
               code: 1
@@ -565,7 +581,15 @@ export class EditAtcComponent {
     }
   }
 
-  autoSave() {
+  async autoSave() {
+    // chain each save after the previous one so writes stay in order
+    this.autoSaveInFlight = (this.autoSaveInFlight ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => this.runAutoSave());
+    return this.autoSaveInFlight;
+  }
+
+  async runAutoSave() {
     console.log("Auto Saved")
     try {
       if (this.reportATC.atcData["atcid"] != null) {
@@ -574,7 +598,8 @@ export class EditAtcComponent {
           code: 0
         }
 
-        console.log(this.newTranscription);
+        // keep a durable local copy of any media added during editing (survives offline + app close)
+        await this.mediaCache.replaceDraft(this.reportATC.atcData["atcid"], this.collectLocalMedia());
 
         var data = {
           date: this.datepipe.transform(this.reportATC.atcData["prescription_date"].toDate(), "yyyy-MM-dd"),
@@ -593,28 +618,60 @@ export class EditAtcComponent {
           delete: false,
           lastupdated: serverTimestamp()
         }
-        console.log(data)
-        setDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"]), data).then(() => {
-          this.draftStatus = {
-            message: "ATC Saved to Draft.",
-            code: 1
-          }
-          this.lastDraftSavedOn = new Date()
-        }).catch(err => {
-          console.log(err)
-          this.draftStatus = {
-            message: "Failed to Save Draft. " + JSON.stringify(err),
-            code: -1
-          }
-        })
+
+        // save the draft first; with offline persistence the write is durable in IndexedDB the moment it's called
+        const writePromise = setDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"]), data);
+        if (navigator.onLine) {
+          await writePromise;            // online: confirm the server write
+        } else {
+          writePromise.catch(() => {});  // offline: already durable locally; don't block the next save so EVERY offline edit persists
+        }
+
+        this.draftStatus = {
+          message: navigator.onLine ? "Draft saved." : "Saved on this device — will sync when online.",
+          code: 1
+        }
+        this.lastDraftSavedOn = new Date()
       }
     } catch (error) {
       console.log(error)
       this.draftStatus = {
-        message: "Failed to Save Draft. " + JSON.stringify(error),
+        message: "Couldn't save draft. Waiting for network...",
         code: -1
       }
     }
+  }
+
+  // collect media blobs added during editing (for durable offline storage)
+  private collectLocalMedia(): PendingMedia[] {
+    const id = this.reportATC.atcData["atcid"];
+    const records: PendingMedia[] = [];
+    (this.audioBlob ?? []).forEach((blob, i) => {
+      if (blob) records.push({ id: `${id}-audio-${i}`, draftId: id, kind: 'audio', blob, name: 'audio-' + i });
+    });
+    (this.selectedNoteImages ?? []).forEach((file, i) => {
+      if (file) records.push({ id: `${id}-note-${i}`, draftId: id, kind: 'note', blob: file, name: file.name });
+    });
+    (this.selectedATCImages ?? []).forEach((file, i) => {
+      if (file) records.push({ id: `${id}-atc-${i}`, draftId: id, kind: 'atc', blob: file, name: file.name });
+    });
+    return records;
+  }
+
+  // re-attach media captured during a previous (offline) session when the draft is reopened
+  private reattachPendingMedia(records: PendingMedia[]) {
+    records.forEach(r => {
+      if (r.kind === 'audio') {
+        this.audioBlob.push(r.blob);
+        this.audioBlobURL.push(URL.createObjectURL(r.blob));
+      } else if (r.kind === 'note') {
+        this.selectedNoteImages.push(new File([r.blob], r.name, { type: r.blob.type }));
+        this.previewNoteImages.push(URL.createObjectURL(r.blob));
+      } else {
+        this.selectedATCImages.push(new File([r.blob], r.name, { type: r.blob.type }));
+        this.previewATCImages.push(URL.createObjectURL(r.blob));
+      }
+    });
   }
 
   addAdditionalActivity() {
@@ -849,6 +906,7 @@ export class EditAtcComponent {
     this.audioBlob = this.audioBlob.concat(blob);
     this.audioBlobURL = this.audioBlobURL
     console.log("blob", blob);
+    this.autoSave();  // draft the new recording (also caches it locally for offline)
   }
 
   // Process Error.
@@ -877,6 +935,7 @@ export class EditAtcComponent {
     if (confirm("Do you want to remove the recording?")) {
       this.audioBlob.splice(index, 1)
       this.audioBlobURL.splice(index, 1)
+      this.autoSave();  // re-snapshot media so the removed item is dropped from the local cache
     }
   }
 
@@ -892,12 +951,14 @@ export class EditAtcComponent {
       })
     }
     console.log(this.selectedNoteImages, this.previewNoteImages)
+    this.autoSave();  // draft the imported note images (also caches them locally for offline)
   }
 
   removeImage(index) {
     console.log(index)
     this.selectedNoteImages.splice(index, 1)
     this.previewNoteImages.splice(index, 1)
+    this.autoSave();  // re-snapshot media so the removed item is dropped from the local cache
   }
 
   importATCImages(images) {
@@ -912,12 +973,14 @@ export class EditAtcComponent {
       })
     }
     console.log(this.selectedATCImages, this.previewATCImages)
+    this.autoSave();  // draft the imported ATC images (also caches them locally for offline)
   }
 
   removeATCImage(index) {
     console.log(index)
     this.selectedATCImages.splice(index, 1)
     this.previewATCImages.splice(index, 1)
+    this.autoSave();  // re-snapshot media so the removed item is dropped from the local cache
   }
 
   validateExistingPrescription(): boolean {
@@ -927,7 +990,7 @@ export class EditAtcComponent {
     console.log("author", authorGiven)
     if (authorGiven.length == 0 && !this.bigActivity()) {
       result = false
-      alert("Author name required!")
+      this.focusMissingField('atcfield-author', 'Author name required')
     }
 
     if (result) {
@@ -935,7 +998,7 @@ export class EditAtcComponent {
         var existingAdj = this.reportATC.transcription[i]
         if (existingAdj.awareness == null || existingAdj.awarenessdetail == null || existingAdj.potentialyears == null) {
           result = false
-          alert("Avoid empty fields in the Add new Adjustment ex: Awareness Detail & Potential Year")
+          this.focusMissingField('', "Fill the missing Awareness Detail & Potential Years in the existing adjustments")
           break
         }
       }
@@ -945,7 +1008,7 @@ export class EditAtcComponent {
       for (let i = 0; i < this.updatedAdjustment.length; i++) {
         if (this.reportATC.transcription[this.updatedAdjustment[i]].procedure.filter(e => e.name == null).length != 0) {
           result = false
-          alert("Remove empty procedures fields on the existing Adjustments")
+          this.focusMissingField('', "Fill or remove the empty procedure on the existing adjustments")
           break
         }
         if (i + 1 == this.updatedAdjustment.length) {
@@ -966,14 +1029,14 @@ export class EditAtcComponent {
         console.log(this.newTranscription[i]);
 
         if ((this.newTranscription[i]['awareness'] === null || this.newTranscription[i]['awarenessdetail'] === null) || this.newTranscription[i]['potentialyears'] === null) {
-          alert("Avoid empty fields in the Add new Adjustment ex: awareness & potential year")
+          this.focusMissingField('', "Fill the missing Awareness & Potential Years in the new adjustments")
           result = false
           break;
         }
         for (let j = 0; j < this.newTranscription[i].procedure.length; j++) {
           if (this.newTranscription[i].procedure[j].name == null) {
             if (this.newTranscription[i].adjustment.length > 0) {
-              alert("Avoid empty fields in the Add new Adjustment and procedures, Fill Every Adjustment's Procedure row or Remove the Empty Procedure row")
+              this.focusMissingField('', "Fill or remove the empty procedure row in the new adjustments")
               result = false
               i = 1000;
               j = 1000;
@@ -1004,7 +1067,7 @@ export class EditAtcComponent {
     console.log(totalMandatoryProcedure)
     if (totalMandatoryProcedure != 0 && this.audioBlob.length == 0) {
       value = false
-      alert("Changework brief missing!")
+      this.focusMissingField('atcfield-changework', 'Changework brief missing')
     }
     else {
       value = true
@@ -1013,8 +1076,56 @@ export class EditAtcComponent {
   }
 
   adjustmentNewOrder = []
+  /**
+   * Scrolls to the field with the given anchor id (or, if none, the first invalid
+   * Material field in the form), flashes a red highlight, and shows the message in
+   * a top snackbar — so the user is taken to exactly what they missed.
+   */
+  private focusMissingField(anchorId: string, message: string) {
+    try {
+      let el: HTMLElement | null = anchorId ? document.getElementById(anchorId) : null;
+      if (!el) el = this.firstInvalidFieldElement();
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('atc-field-invalid-flash');
+        setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 2500);
+      }
+    } catch {}
+    this.snackbar.open(message, 'Dismiss', {
+      duration: 4000,
+      horizontalPosition: 'center',
+      verticalPosition: 'top',
+      panelClass: ['atc-validation-snack'],
+    });
+  }
+
+  /** Finds the first visible required-but-empty Material field (Angular marks it .ng-invalid). */
+  private firstInvalidFieldElement(): HTMLElement | null {
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.atc-main .ng-invalid, .atc-main mat-form-field.mat-form-field-invalid, ' +
+        '.atc-main textarea.ng-invalid, .atc-main input.ng-invalid, .atc-main mat-select.ng-invalid'
+      )
+    );
+    for (const c of candidates) {
+      if (c.tagName.toLowerCase() === 'form') continue;
+      const rect = c.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      return c;
+    }
+    return null;
+  }
+
   async submit() {
-    this.autoSave()
+    // mark that a submit was attempted so required fields reveal their inline "required" message
+    this.submitAttempted = true;
+    // block submit while offline — the ATC must reach the server before the draft is removed (changes stay saved)
+    if (!navigator.onLine) {
+      alert("You're offline. Your changes are saved — please reconnect to submit.");
+      return;
+    }
+    // flush any in-flight save so the latest edits are included and the draft can't re-appear after submit
+    await this.autoSave()
     var validation1: boolean = this.validateExistingPrescription()
     var validation2: boolean = this.validateNewPrescription()
     var validation3: boolean = this.collectionName == "atc_alpha" ? this.changeworkBriefValidation() : true
@@ -1448,6 +1559,9 @@ export class EditAtcComponent {
 
       await this.firebaseATCBatch.commit();
       await this.firebaseDefaultBatch.commit();
+
+      // clear locally-cached media for the submitted ATC
+      await this.mediaCache.deleteByDraft(this.reportATC.atcData["atcid"]);
 
       if (this.roles["mentor"] && !this.bigActivity()) {
         const existingValidator = Array.from(new Set([...(this.reportATC.validator ?? []), this.loggedProfileID]));

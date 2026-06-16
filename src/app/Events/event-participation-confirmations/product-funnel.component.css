@@ -32,6 +32,45 @@
 .sx-loading .spin { animation: sx-spin 1s linear infinite; }
 @keyframes sx-spin { to { transform: rotate(360deg); } }
 
+/* Grouped breakdown — a header total + indented subset rows with share bars + %.
+   Vertical, grouped, fixed compact width, never full-screen. */
+.sx-bd { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+.sx-bd-panel { width: 360px; max-width: 100%; background: #fff; border: .5px solid rgba(60,60,67,.1);
+  border-radius: 16px; padding: 8px 8px 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -18px rgba(0,0,0,.18); }
+.sx-bd-about { font-size: 11.5px; color: rgba(60,60,67,.5); padding: 2px 8px 8px; line-height: 1.3; }
+
+/* Rows — the depth-0 row is the total (Potential / Approved) */
+.sx-bd-row { display: flex; align-items: center; gap: 9px; width: 100%; border: none; background: none;
+  cursor: pointer; text-align: left; padding: 7px 12px; border-radius: 9px; font: inherit; }
+.sx-bd-row:hover { background: #f6f6f9; }
+.sx-bd-row.on { background: linear-gradient(180deg, rgba(0,122,255,.08), rgba(0,122,255,.04)); }
+.sx-bd-row.d0 { padding: 9px 12px; margin-bottom: 4px; border-bottom: .5px solid rgba(60,60,67,.1);
+  border-radius: 10px 10px 0 0; }
+.sx-bd-row.d1 { padding-left: 18px; }
+.sx-bd-row.d2 { padding-left: 34px; }
+.sx-bd-dot { width: 8px; height: 8px; border-radius: 3px; flex: 0 0 auto; background: rgba(60,60,67,.3); }
+.sx-bd-row.d0 .sx-bd-dot { width: 5px; height: 20px; border-radius: 3px; background: #8e8e93; }
+.sx-bd-row.d0.app .sx-bd-dot { background: #0060df; }
+.sx-bd-lab { font-size: 13.5px; color: #1c1c1e; white-space: nowrap; }
+.sx-bd-row.d0 .sx-bd-lab { font-size: 15px; font-weight: 700; }
+.sx-bd-bar { flex: 1 1 auto; min-width: 24px; height: 6px; border-radius: 4px;
+  background: rgba(60,60,67,.08); overflow: hidden; margin: 0 4px; }
+.sx-bd-fill { display: block; height: 100%; border-radius: 4px; background: rgba(60,60,67,.4);
+  transition: width .25s ease; }
+.sx-bd-row.d0 .sx-bd-bar { display: none; }
+.sx-bd-pct { font-size: 11.5px; color: rgba(60,60,67,.5); font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
+.sx-bd-row.d0 .sx-bd-pct { display: none; }
+.sx-bd-num { font-size: 15px; font-weight: 600; color: #1c1c1e; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+.sx-bd-row.d0 .sx-bd-num { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+/* per-segment accent on dot + bar fill (reuse card palette) */
+.sx-bd-row.elig .sx-bd-dot, .sx-bd-row.elig .sx-bd-fill { background: #1f8a3b; }
+.sx-bd-row.ne .sx-bd-dot, .sx-bd-row.ne .sx-bd-fill { background: #c25e00; }
+.sx-bd-row.inq .sx-bd-dot, .sx-bd-row.inq .sx-bd-fill { background: #8e8e93; }
+.sx-bd-row.att .sx-bd-dot, .sx-bd-row.att .sx-bd-fill { background: #1f8a3b; }
+.sx-bd-row.ns .sx-bd-dot, .sx-bd-row.ns .sx-bd-fill { background: #d70015; }
+.sx-bd-row.un .sx-bd-dot, .sx-bd-row.un .sx-bd-fill { background: #7a2638; }
+.sx-bd-row:focus-visible, .sx-bd-head:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
+
 /* KPI cards */
 .sx-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .sx-card { position: relative; background: #fff; border-radius: 14px; padding: 13px 15px 13px 18px;
@@ -51,6 +90,7 @@
 .sx-card.app::before { background: #0060df; } .sx-card.app .sx-lab { color: #0060df; }
 .sx-card.att::before { background: #1f8a3b; } .sx-card.att .sx-lab { color: #1f8a3b; }
 .sx-card.ns::before { background: #d70015; } .sx-card.ns .sx-lab { color: #d70015; }
+.sx-card.un::before { background: #7a2638; } .sx-card.un .sx-lab { color: #7a2638; }
 .sx-card.on { background: linear-gradient(180deg, rgba(0,122,255,.08) 0%, #f5f9ff 100%);
   border-color: rgba(0,122,255,.22); box-shadow: 0 0 0 1px rgba(0,122,255,.22) inset, 0 10px 24px -14px rgba(47,102,214,.42); }
 .sx-card.on::before { background: #007aff; }
@@ -58,10 +98,11 @@
 .sx-card:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(0,122,255,.35); }
 
 /* Action bar */
-.sx-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-.sx-seq { width: 230px; }
-.sx-finance { width: 150px; }
-.sx-search { width: 210px; margin-left: auto; }
+.sx-bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 14px;
+  padding: 9px 11px; background: #f7f7f9; border: .5px solid rgba(60,60,67,.08); border-radius: 14px; }
+.sx-seq { width: 210px; }
+.sx-finance { width: 150px; margin-left: auto; }
+.sx-search { width: 200px; }
 .sx-approve { border-radius: 10px; height: 40px; font-weight: 600; font-size: 14px; padding: 0 16px;
   --mdc-filled-button-container-color: #007aff; --mdc-filled-button-label-text-color: #fff;
   --mdc-filled-button-container-shape: 10px; }
@@ -96,24 +137,31 @@
 
 /* Checkboxes -> iOS blue (was Material pink) */
 :host ::ng-deep .mat-mdc-checkbox {
-  --mdc-checkbox-selected-container-color: #007aff;
-  --mdc-checkbox-selected-hover-container-color: #0060df;
-  --mdc-checkbox-selected-focus-container-color: #007aff;
-  --mdc-checkbox-selected-pressed-container-color: #007aff;
-  --mdc-checkbox-selected-icon-color: #fff;
-  --mdc-checkbox-selected-hover-icon-color: #fff;
-  --mdc-checkbox-selected-focus-icon-color: #fff;
-  --mdc-checkbox-selected-pressed-icon-color: #fff;
-  --mat-checkbox-selected-checkmark-color: #fff;
+  /* selected-icon-color is the BOX FILL when checked; checkmark-color is the tick. */
+  --mdc-checkbox-selected-icon-color: #007aff;
+  --mdc-checkbox-selected-hover-icon-color: #0060df;
+  --mdc-checkbox-selected-focus-icon-color: #007aff;
+  --mdc-checkbox-selected-pressed-icon-color: #007aff;
+  --mdc-checkbox-selected-checkmark-color: #fff;
   --mdc-checkbox-selected-hover-state-layer-color: #007aff;
   --mdc-checkbox-selected-focus-state-layer-color: #007aff;
   --mdc-checkbox-selected-pressed-state-layer-color: #007aff;
   --mat-checkbox-ripple-color: #007aff;
 }
+/* Hard fallback in case the host theme overrides the MDC tokens. */
+:host ::ng-deep .mat-mdc-checkbox-checked .mdc-checkbox__background {
+  background-color: #007aff !important;
+  border-color: #007aff !important;
+}
+:host ::ng-deep .mat-mdc-checkbox-checked .mdc-checkbox__checkmark { color: #fff !important; }
 
 /* Paginator -> SF Pro */
 :host ::ng-deep .mat-mdc-paginator { font-family: inherit; background: transparent; }
 .sx-hint { font-size: 12.5px; color: rgba(60,60,67,.55); }
+/* Toolbar polish — white inputs on the grey bar, ghost buttons get a surface */
+:host ::ng-deep .sx-bar .mat-mdc-text-field-wrapper { background: #fff; border-radius: 10px; }
+.sx-bar .sx-ghost { background: #fff; border: .5px solid rgba(60,60,67,.14); }
+.sx-bar .sx-ghost:hover { background: #f1f1f4; }
 .sx-showing { font-size: 12.5px; color: rgba(60,60,67,.55); margin: 2px 0 10px; }
 
 /* Table card */
@@ -147,11 +195,38 @@ table.sx-t { width: 100%; border-collapse: collapse; }
 .sx-att mat-icon { font-size: 16px; height: 16px; width: 16px; }
 .sx-noshow { font-size: 13.5px; color: #d70015; font-weight: 600; margin-right: 8px; }
 .sx-mark { font-size: 13.5px; min-width: 0; color: #007aff; }
+.sx-mark-danger { font-size: 13.5px; min-width: 0; color: #a32d2d; margin-left: 4px; }
+.sx-unatt { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; color: #7a2638; font-weight: 600; }
+.sx-unatt mat-icon { font-size: 16px; height: 16px; width: 16px; }
 :host ::ng-deep .sx-assign.mdc-button, :host ::ng-deep .sx-mark.mdc-button {
   --mdc-text-button-label-text-color: #007aff;
   --mat-text-button-state-layer-color: #007aff;
   --mat-text-button-ripple-color: #007aff;
 }
+:host ::ng-deep .sx-mark-danger.mdc-button {
+  --mdc-text-button-label-text-color: #a32d2d;
+  --mat-text-button-state-layer-color: #a32d2d;
+}
+/* Danger action button (Mark not attended) */
+.sx-danger { height: 40px; border-radius: 10px; font-weight: 500; font-size: 14px;
+  border: 1px solid rgba(163,45,45,.4); color: #a32d2d; }
+.sx-danger:hover:not([disabled]) { background: rgba(163,45,45,.06); }
+.sx-danger[disabled] { color: rgba(60,60,67,.32); border-color: rgba(60,60,67,.12); }
+.sx-danger mat-icon { vertical-align: middle; margin-right: 4px; }
+
+/* Import preview dialog */
+.sx-imp-total { font-size: 13px; color: rgba(60,60,67,.7); margin: 0 0 10px; }
+.sx-imp-sec { border: .5px solid rgba(60,60,67,.12); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.sx-imp-head { display: flex; align-items: center; gap: 6px; width: 100%; background: #fafafb;
+  border: none; padding: 10px 12px; cursor: pointer; font-size: 13.5px; font-weight: 600; color: #1c1c1e; text-align: left; }
+.sx-imp-head mat-icon { font-size: 18px; height: 18px; width: 18px; color: rgba(60,60,67,.5); }
+.sx-imp-head .sx-imp-n { margin-left: auto; font-weight: 700; background: rgba(60,60,67,.08); border-radius: 20px; padding: 1px 9px; font-size: 12px; }
+.sx-imp-add .sx-imp-head { color: #1f8a3b; } .sx-imp-add .sx-imp-n { background: rgba(31,138,59,.12); color: #1f8a3b; }
+.sx-imp-queue .sx-imp-head { color: #6c6c70; }
+.sx-imp-no .sx-imp-head { color: #c25e00; } .sx-imp-no .sx-imp-n { background: rgba(194,94,0,.12); color: #c25e00; }
+.sx-imp-list { list-style: none; margin: 0; padding: 6px 12px 10px; max-height: 180px; overflow: auto; font-size: 13px; }
+.sx-imp-list li { padding: 3px 0; }
+.sx-imp-no-act { display: flex; gap: 8px; align-items: center; padding: 0 12px 10px; }
 .sx-empty { text-align: center; color: rgba(60,60,67,.6); font-style: italic; padding: 26px; }
 :host ::ng-deep .sx-empty .mdc-button { --mdc-text-button-label-text-color: #007aff; }
 

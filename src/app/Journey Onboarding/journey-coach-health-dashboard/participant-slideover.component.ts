@@ -21,6 +21,7 @@ export interface SlideoverRow {
   profileid: string;
   name: string;
   number: string | null;
+  email: string | null;
   coachname: string;          // current coach display name ('—' when unassigned)
   atcmodel: string | null;
   productType: string;
@@ -91,7 +92,7 @@ export interface SlideoverData {
 
 interface TicketItem { subject: string; status: string; category: string; date: Date | null; }
 interface EventItem { name: string; date: Date | null; attended: boolean | null; statusLabel: string; }
-interface AppointmentItem { name: string; date: Date | null; statusLabel: string; statusKind: 'done' | 'ongoing' | 'cancelled'; }
+interface AppointmentItem { name: string; start: Date | null; end: Date | null; statusLabel: string; statusKind: 'done' | 'ongoing' | 'cancelled'; }
 interface FormItem { name: string; date: Date | null; }
 interface ReportItem { types: string; status: string; date: Date | null; }
 interface BreakthroughItem { message: string; date: Date | null; }
@@ -121,11 +122,17 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       <!-- Header -->
       <header class="so-header">
         <div class="so-id">
-          <h2 class="so-name" id="so-title">{{ row.name }}</h2>
+          <h2 class="so-name" id="so-title">
+            <button type="button" class="so-copy so-copy-name" (click)="copy(row.name, 'name')"
+                    [matTooltip]="copied === 'name' ? 'Copied!' : 'Copy name'">{{ row.name }}</button>
+          </h2>
           <div class="so-meta">
-            <span class="so-num">{{ row.number || '—' }}</span>
-            <span class="so-dot">·</span>
-            <span class="so-tier">{{ row.atcmodel || 'No tier' }}</span>
+            <button type="button" class="so-copy" *ngIf="row.email" (click)="copy(row.email, 'email')"
+                    [matTooltip]="copied === 'email' ? 'Copied!' : 'Copy email'">{{ row.email }}</button>
+            <span class="so-dot" *ngIf="row.email && row.number">·</span>
+            <button type="button" class="so-copy" *ngIf="row.number" (click)="copy(row.number, 'phone')"
+                    [matTooltip]="copied === 'phone' ? 'Copied!' : 'Copy phone'">{{ row.number }}</button>
+            <span class="so-num" *ngIf="!row.email && !row.number">—</span>
           </div>
         </div>
         <div class="so-head-actions">
@@ -238,17 +245,25 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
             <div *ngIf="apptsLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
             <ng-container *ngIf="!apptsLoading">
               <ul class="so-list" *ngIf="appointments.length; else noAppts">
-                <li *ngFor="let a of (appointments | slice:0:(isShowAll('appointments') ? appointments.length : 3))" class="so-list-row">
+                <li *ngFor="let a of (appointments | slice:0:apptVisible)" class="so-list-row">
                   <span class="so-list-main">{{ a.name }}</span>
                   <span class="so-list-side">
                     <span class="so-pill" [ngClass]="apptPillClass(a.statusKind)">{{ a.statusLabel }}</span>
-                    <span class="so-sub" *ngIf="a.date">{{ a.date | date:'shortDate' }}</span>
+                    <span class="so-sub" *ngIf="a.start || a.end">
+                      {{ a.start ? (a.start | date:'MMM d, y, h:mm a') : '—' }} → {{ a.end ? (a.end | date:'h:mm a') : '—' }}
+                    </span>
                   </span>
                 </li>
               </ul>
-              <button type="button" class="so-showall" *ngIf="appointments.length > 3" (click)="toggleShowAll('appointments')">
-                {{ isShowAll('appointments') ? 'Show less' : 'Show all (' + appointments.length + ')' }}
-              </button>
+              <div class="so-appt-actions" *ngIf="appointments.length > APPT_PAGE">
+                <button type="button" class="so-showall" *ngIf="apptVisible < appointments.length" (click)="showMoreAppts()">
+                  Show {{ apptPageNext() }} more
+                </button>
+                <button type="button" class="so-showall" *ngIf="apptVisible >= appointments.length" (click)="resetAppts()">
+                  Show less
+                </button>
+                <span class="so-sub">{{ (apptVisible < appointments.length ? apptVisible : appointments.length) }} of {{ appointments.length }}</span>
+              </div>
               <ng-template #noAppts><p class="so-empty">No appointments.</p></ng-template>
             </ng-container>
           </div>
@@ -456,7 +471,8 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
 
       <!-- Footer: single Log button reveals an inline composer (Call / Health / Schedule / Note) -->
       <footer class="so-footer">
-        <a mat-stroked-button class="so-act" [routerLink]="['/userprofile', row.profileid]" (click)="close()">
+        <a mat-stroked-button class="so-act" [routerLink]="['/userprofile', row.profileid]"
+           target="_blank" rel="noopener">
           Open profile
         </a>
         <button mat-flat-button color="primary" class="so-act so-act-log" type="button"
@@ -580,9 +596,16 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       padding: 18px 20px 12px; border-bottom: 1px solid var(--so-border);
     }
     .so-name { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; }
-    .so-meta { margin-top: 3px; color: var(--so-ink2); font-size: 12.5px; }
+    .so-meta { margin-top: 3px; color: var(--so-ink2); font-size: 12.5px; display: flex; align-items: baseline; flex-wrap: wrap; }
     .so-dot { margin: 0 6px; color: var(--so-muted); }
-    .so-tier { text-transform: uppercase; letter-spacing: 0.02em; font-size: 11.5px; color: var(--so-ink2); }
+    /* copyable name / email / phone — look like text, behave like a button */
+    .so-copy {
+      border: none; background: transparent; padding: 0; margin: 0; cursor: pointer;
+      font: inherit; color: inherit; text-align: left; border-radius: 4px;
+      transition: background .12s ease, color .12s ease;
+    }
+    .so-copy:hover { color: var(--so-accent); background: rgba(10,106,224,.08); }
+    .so-copy-name { font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: -0.4px; }
 
     .so-close {
       flex: 0 0 auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
@@ -889,6 +912,12 @@ export class ParticipantSlideoverComponent implements OnInit {
   eventsLoading = true;
   appointments: AppointmentItem[] = [];
   apptsLoading = true;
+  // appointments paginate client-side: show APPT_PAGE at a time, "Show 15 more" reveals the next page.
+  readonly APPT_PAGE = 15;
+  apptVisible = this.APPT_PAGE;
+
+  // transient "Copied!" feedback for the copyable header fields ('name' | 'email' | 'phone').
+  copied: string | null = null;
   forms: FormItem[] = [];
   formsLoading = true;
   reports: ReportItem[] = [];
@@ -1057,28 +1086,36 @@ export class ParticipantSlideoverComponent implements OnInit {
         where('bookedby', '==', doc(this.firestore, 'profile_data', pid)),
       ));
       const rows = snap.docs.map(d => d.data() as any);
-      rows.sort((a, b) => (this.toDate(b['starttime'])?.getTime() ?? 0) - (this.toDate(a['starttime'])?.getTime() ?? 0));
-      const top = rows.slice(0, this.sectionCap);
-      const items: AppointmentItem[] = await Promise.all(top.map(async (d) => {
+      // sort by endtime, most recent first
+      rows.sort((a, b) => (this.toDate(b['endtime'])?.getTime() ?? 0) - (this.toDate(a['endtime'])?.getTime() ?? 0));
+      // Resolve each DISTINCT appointment-type ref once (there are only a handful of types), so we can
+      // keep ALL of the participant's appointments without an unbounded number of ref reads.
+      const distinctRefs = new Map<string, DocumentReference>();
+      for (const d of rows) {
+        const ref = d['appointment'] as DocumentReference | undefined;
+        if (ref && !distinctRefs.has(ref.path)) distinctRefs.set(ref.path, ref);
+      }
+      const nameByRef = new Map<string, string>();
+      await Promise.all([...distinctRefs.values()].map(async (ref) => {
+        try {
+          const aSnap = await getDoc(ref);
+          if (aSnap.exists()) nameByRef.set(ref.path, (aSnap.data() as any)['appointmenttype'] || 'Appointment');
+        } catch { /* denied/missing — falls back below */ }
+      }));
+      this.appointments = rows.map((d) => {
         const cancelled = d['cancelled'] === true;
         const attended = d['attended'] === true;
-        let name = 'Appointment';
-        try {
-          const ref = d['appointment'] as DocumentReference;
-          if (ref) {
-            const aSnap = await getDoc(ref);
-            if (aSnap.exists()) name = (aSnap.data() as any)['appointmenttype'] || name;
-          }
-        } catch { /* keep fallback name */ }
+        const ref = d['appointment'] as DocumentReference | undefined;
         const statusKind: 'done' | 'ongoing' | 'cancelled' = cancelled ? 'cancelled' : (attended ? 'done' : 'ongoing');
         return {
-          name,
-          date: this.toDate(d['starttime']),
+          name: (ref && nameByRef.get(ref.path)) || 'Appointment',
+          start: this.toDate(d['starttime']),
+          end: this.toDate(d['endtime']),
           statusLabel: cancelled ? 'Cancelled' : (attended ? 'Completed' : 'Scheduled'),
           statusKind,
         };
-      }));
-      this.appointments = items;
+      });
+      this.apptVisible = this.APPT_PAGE;
     } catch (e) {
       console.warn('slideover appointments read failed', e);
     } finally {
@@ -1236,6 +1273,21 @@ export class ParticipantSlideoverComponent implements OnInit {
   }
   isShowAll(key: string): boolean { return this.showAll.has(key); }
 
+  /** Appointments pager: reveal the next page of APPT_PAGE; "Show less" collapses back to one page. */
+  showMoreAppts(): void { this.apptVisible = Math.min(this.appointments.length, this.apptVisible + this.APPT_PAGE); }
+  resetAppts(): void { this.apptVisible = this.APPT_PAGE; }
+  apptPageNext(): number { return Math.min(this.APPT_PAGE, this.appointments.length - this.apptVisible); }
+
+  /** Copy a header field (name / email / phone) to the clipboard with brief "Copied!" feedback. */
+  async copy(value: string | null, field: string): Promise<void> {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      this.copied = field;
+      setTimeout(() => { if (this.copied === field) this.copied = null; }, 1500);
+    } catch { /* clipboard unavailable — no-op */ }
+  }
+
   /** Pill class for an appointment status kind. */
   apptPillClass(kind: 'done' | 'ongoing' | 'cancelled'): string {
     return kind === 'done' ? 'so-pill-ok' : (kind === 'cancelled' ? 'so-pill-cancel' : 'so-pill-amber');
@@ -1318,6 +1370,20 @@ export class ParticipantSlideoverComponent implements OnInit {
     } else {
       this.data.onLog('note', { note });
     }
+    // Optimistic: the dashboard owns the write (fire-and-forget) and already reflects row-level fields
+    // (last touch / health) on the shared row object. The activity timeline is one-shot-loaded at open,
+    // so prepend the new entry here too — otherwise the log only appears after a refresh/reopen.
+    this.data.activity = [{
+      type: this.composerType as ActivityType,
+      actorName: 'You',
+      date: new Date(),
+      note,
+      outcome: this.composerType === 'call' ? this.callOutcome : null,
+      state: this.composerType === 'health' ? this.healthChoice : null,
+      flagged: false,
+      dueDate: this.composerType === 'schedule' ? this.parseDate(this.scheduleDate) : null,
+      action: null, fromCoachName: null, toCoachName: null,
+    }, ...(this.data.activity ?? [])];
     this.composerRef?.close();
     this.composerOpen = false;
     this.resetComposer();

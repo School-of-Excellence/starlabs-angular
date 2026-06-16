@@ -23,6 +23,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { StageIncompleteConfirmationComponent } from '../stage-incomplete-confirmation/stage-incomplete-confirmation.component';
 import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view-participant-atc.component';
@@ -38,6 +39,7 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
     FormsModule,
     MatButtonModule,
     MatIconModule,
+    MatTooltipModule,
     MatSlideToggleModule,
     ReactiveFormsModule,
     MatDialogModule,
@@ -49,6 +51,7 @@ import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view
 export class DynamicStudioV2Component {
   @ViewChildren('itemElement') itemElements: QueryList<ElementRef>;
   @ViewChild('formDialogTpl') formDialogTpl!: TemplateRef<any>;
+  @ViewChild('atcDialogTpl') atcDialogTpl!: TemplateRef<any>;
   @ViewChild('checkinConflictTpl') checkinConflictTpl!: TemplateRef<any>;
   profileRoles = {}
   profileid = null
@@ -111,6 +114,14 @@ export class DynamicStudioV2Component {
   loveLetterList: any[] = []
   loveLetterLoading: boolean = false
   loveLetterLoadedFor: string | null = null
+  // Next-month-review action state (drives the inline confirmation in the
+  // Mark-as-Completed step so the specialist sees the action succeeded).
+  nextMonthReviewMarked: boolean = false
+  nextMonthReviewSaving: boolean = false
+  // Evolution Wishlist
+  evolutionWishlist: any[] = []
+  evolutionWishlistLoaded: string = ''
+  evolutionWishlistLoading: boolean = false
   // UP Attendance
   readonly upProductIds = ['N0MhGQnxP9S8TdavuRJR', '0ayiNALL1HDVvCXDHcZ4', 'Rq9cu2Z3FSuILXdwYtca']
   participantUPVisitLabel: string | null = null
@@ -165,6 +176,237 @@ export class DynamicStudioV2Component {
   // Sidebar profile collapse state (Milestone/Product/Variation/Journey rows)
   sidebarProfileOpen: boolean = true
   toggleSidebarProfile() { this.sidebarProfileOpen = !this.sidebarProfileOpen }
+
+  // Expand/collapse state for the "Extra invited specialists" roster panel.
+  extraSpecialistsOpen: boolean = true
+  toggleExtraSpecialists() { this.extraSpecialistsOpen = !this.extraSpecialistsOpen }
+
+  // Per-stage-note expand state (clamp to 2 lines, "Show more" when longer).
+  expandedStageNotes = new Set<string>()
+  toggleStageNote(key: string) {
+    if (this.expandedStageNotes.has(key)) this.expandedStageNotes.delete(key)
+    else this.expandedStageNotes.add(key)
+  }
+  isStageNoteExpanded(key: string): boolean {
+    return this.expandedStageNotes.has(key)
+  }
+
+  /**
+   * The participant's profile ID for the current live assignment. Prefers
+   * the queue_token's `profile_id` (set when the specialist invited them
+   * via the Bring-To-Studio flow) but falls back to the assignment's own
+   * `participantid` so auto-enter (no token hydrated) still shows the
+   * participant's name and photo in the sidebar.
+   */
+  get participantProfileId(): string {
+    const la: any = this.liveAssignment || {}
+    return la['token']?.['profile_id'] || la['participantid'] || ''
+  }
+
+  /**
+   * Runs ALL widget-driven fetches for the current live assignment —
+   * Validated ATC, Unvalidated ATC, Assigned ATC, Triple ATC, AEL, UP
+   * Visit, Forms, Transferred Queue. Idempotent — safe to call from both
+   * `onStudioSelect`'s queue_token subscription AND directly from the
+   * live-assignment auto-enter path, so the data lights up regardless of
+   * which path fired first.
+   * Only re-runs when the assignment / stage actually changes.
+   */
+  private widgetFetchSignature = ''
+  async loadAssignmentWidgetData() {
+    const la: any = this.liveAssignment
+    if (!la?.['docid'] || !la?.['stagename']) return
+    const sig = la['docid'] + '|' + la['stagename']
+    if (sig === this.widgetFetchSignature) return  // already loaded this combination
+    this.widgetFetchSignature = sig
+
+    // New assignment/stage → reset per-session action state so confirmations
+    // from a previous participant don't carry over.
+    this.nextMonthReviewMarked = false
+    this.nextMonthReviewSaving = false
+
+    const studioWidget: string[] =
+      this.ongoingQueue?.['stageproperty']?.[la['stagename']]?.studiowidgets ?? []
+    console.log('[loadAssignmentWidgetData] widgets', studioWidget)
+
+    // Validated / Alpha ATC
+    if (studioWidget.includes('prescribedvalidatedatc')) {
+      this.previewATC('alpha')
+    } else {
+      this.alphaATCList = []
+    }
+    // Unvalidated ATC
+    if (studioWidget.includes('prescribedunvalidatedatc')) {
+      this.previewATC('validation')
+    } else {
+      this.unvalidatedATCList = []
+    }
+    // Assigned changework ATC
+    if (studioWidget.includes('assignedatc')) {
+      this.getAssignedATC()
+    } else {
+      this.cwATClist = []
+    }
+    // Triple ATC
+    if (studioWidget.includes('viewtripleatc')) {
+      this.getTripleATC()
+    } else {
+      this.tripleATCList = []
+    }
+    // UP visit count for the Milestone row
+    this.getParticipantUPVisit()
+    // AEL
+    if (studioWidget.includes('validateael')) {
+      this.getCurrentAEL()
+    } else {
+      this.participantAEL = {}
+    }
+    // Evolution Wishlist
+    if (studioWidget.includes('evolutionwishlist')) {
+      this.loadEvolutionWishlist(this.participantProfileId)
+    } else {
+      this.evolutionWishlist = []
+    }
+    // Forms (needs token.queueref for cross-queue history; falls back to
+    // a single-queue lookup if the token isn't hydrated yet).
+    this.loadParticipantForms()
+  }
+
+  /**
+   * Fetches the participant's Evolution Wishlist log entries from the
+   * `evolutionwishlistlog` collection, sorted newest-first. Guarded by
+   * `evolutionWishlistLoaded` (profileid) to avoid re-fetching for the same
+   * participant. Each entry keeps its raw fields — the template formats them.
+   */
+  async loadEvolutionWishlist(profileid: string) {
+    if (!profileid) {
+      this.evolutionWishlist = []
+      return
+    }
+    if (this.evolutionWishlistLoaded === profileid) {
+      return
+    }
+    this.evolutionWishlistLoading = true
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'evolutionwishlistlog'),
+        where('profileid', '==', profileid),
+      ))
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      list.sort((a: any, b: any) => {
+        const am = typeof a?.['created']?.toMillis === 'function' ? a['created'].toMillis() : 0
+        const bm = typeof b?.['created']?.toMillis === 'function' ? b['created'].toMillis() : 0
+        return bm - am
+      })
+      this.evolutionWishlist = list
+      this.evolutionWishlistLoaded = profileid
+    } catch (error) {
+      console.error('Error fetching evolution wishlist:', error)
+      this.evolutionWishlist = []
+    } finally {
+      this.evolutionWishlistLoading = false
+    }
+  }
+
+  /** Formats an Evolution Wishlist `type` for display. */
+  formatEvolutionWishlistType(type: string): string {
+    if (type === 'familyandpeers') return 'Family & Peers'
+    if (type === 'self') return 'Self'
+    return type || '-'
+  }
+
+  /**
+   * Formats an Evolution Wishlist `status` for display. 'sended' renders as
+   * 'Shared'; the 'Partially ' prefix is applied when `mannualcompleted` is
+   * truthy on the entry.
+   */
+  formatEvolutionWishlistStatus(entry: any): string {
+    let status: string = entry?.['status'] || '-'
+    if (status === 'sended') status = 'Shared'
+    if (entry?.['mannualcompleted']) status = 'Partially ' + status
+    return status
+  }
+
+  /**
+   * Returns the contacts count string `submitted/total` when the entry has a
+   * contacts array; otherwise null (hide the chip). The submitted count is
+   * computed from the contacts array directly (matching the Evolution
+   * Wishlist Log screen, which counts `contact.submitted === true`) so it's
+   * accurate even when the doc doesn't carry a stored `submittedCount`.
+   */
+  evolutionWishlistContactsLabel(entry: any): string | null {
+    const contacts = entry?.['contacts']
+    if (!Array.isArray(contacts) || contacts.length === 0) return null
+    const submitted = contacts.filter((c: any) => c?.submitted === true).length
+    return `${submitted}/${contacts.length}`
+  }
+
+  /**
+   * Fetches the participant's submitted forms for the current live
+   * assignment's stage. Tolerant of a missing `token` — falls back to the
+   * ongoing queue's ref when the token hasn't been hydrated by
+   * `onStudioSelect`'s queue_token subscription yet.
+   */
+  private async loadParticipantForms() {
+    const la: any = this.liveAssignment
+    if (!la?.['stagename']) { this.participantForm = []; return }
+    const mappedForm: string[] =
+      this.ongoingQueue?.['stageproperty']?.[la['stagename']]?.participantform ?? []
+    if (mappedForm.length === 0 || !la?.['participantid']) {
+      this.participantForm = []
+      return
+    }
+    try {
+      const firestoreForms = getFirestore('firestore-forms')
+      const queueRef = la?.['token']?.['queueref']
+        || doc(this.firestore, 'queue generation', this.ongoingQueue['docid'])
+      const involvedQueueRef = [doc(firestoreForms, queueRef.path)]
+      const snap = await getDocs(query(
+        collection(firestoreForms, 'formsByClient'),
+        where('queueref', 'in', involvedQueueRef),
+        where('profileid', '==', la['participantid']),
+      ))
+      this.participantForm = snap.docs.map(d => d.data())
+        .filter(d => mappedForm.includes(d['formid']))
+      console.log('[loadParticipantForms] result', this.participantForm)
+    } catch (err) {
+      console.warn('loadParticipantForms failed', err)
+      this.participantForm = []
+    }
+  }
+
+  /**
+   * Auto-fetches the queue_token row for the current live assignment when
+   * it isn't already attached (e.g. when we entered the studio directly via
+   * auto-enter, skipping the Bring-To-Studio flow). Stamps it onto
+   * `liveAssignment.token` so the existing template bindings light up
+   * (product name, variation, queueposition, preassigned, etc.).
+   */
+  private fetchingTokenFor = ''
+  private async ensureTokenForAssignment() {
+    const la: any = this.liveAssignment
+    if (!la?.['docid']) return
+    if (la['token']?.['profile_id']) return  // already hydrated
+    if (this.fetchingTokenFor === la['docid']) return  // already fetching
+    this.fetchingTokenFor = la['docid']
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'queue_token'),
+        where('liveassignmentid', '==', la['docid']),
+        limit(1),
+      ))
+      if (!snap.empty) {
+        const tok: any = snap.docs[0].data()
+        if (this.liveAssignment?.['docid'] === la['docid']) {
+          this.liveAssignment = { ...this.liveAssignment, token: tok }
+        }
+      }
+    } catch (err) {
+      console.warn('ensureTokenForAssignment failed', err)
+    } finally {
+      this.fetchingTokenFor = ''
+    }
+  }
 
   // True only when the participant is currently in the wait screen (which
   // is the moment the specialist might want to jump to the meeting button).
@@ -231,6 +473,35 @@ export class DynamicStudioV2Component {
     return count
   }
 
+  // Validated ATCs prescribed specifically for the current queue session.
+  // Used by the green "ATC has been submitted for this activity" highlight at
+  // the top of the Prescribe ATC step.
+  get currentQueueValidatedATCList(): any[] {
+    const qid = this.ongoingQueue?.['docid']
+    if (!qid) return []
+    return (this.alphaATCList || []).filter(atc => atc?.['atcdata']?.['queueid'] === qid)
+  }
+
+  // Pending/unvalidated ATCs prescribed for the current queue session.
+  get currentQueueUnvalidatedATCList(): any[] {
+    const qid = this.ongoingQueue?.['docid']
+    if (!qid) return []
+    return (this.unvalidatedATCList || []).filter(atc => atc?.['atcdata']?.['queueid'] === qid)
+  }
+
+  // Extra specialists invited into THIS studio via "Invite More Specialist(s)"
+  // (stored on the live assignment as bonusactivity = { profileId: activityId }).
+  // Resolved to display name + activity name for the sidebar roster shown next
+  // to the participant profile.
+  get additionalSpecialists(): { profileId: string; name: string; activity: string }[] {
+    const bonus = this.liveAssignment?.['bonusactivity'] ?? {}
+    return Object.keys(bonus).map(profileId => ({
+      profileId,
+      name: this.mapProfile?.[profileId] ?? '—',
+      activity: this.mapActivity?.[bonus[profileId]] ?? ''
+    }))
+  }
+
   // Returns the stage name immediately before the current one in the participant's
   // stage list. Used by the "Send Back" button next to Invite More.
   get previousStageName(): string | null {
@@ -242,6 +513,54 @@ export class DynamicStudioV2Component {
     if (!stageList.length) return null
     const idx = stageList.findIndex(s => s === this.liveAssignment['stagename'])
     return idx > 0 ? stageList[idx - 1] : null
+  }
+
+  /**
+   * Stage notes to display in the topbar. Configured in queue-creation under
+   * the CURRENT stage as a map { [targetStage]: note } — where targetStage
+   * need not be the current stage. Each note is shown ONLY when the
+   * participant's variation includes that target stage.
+   *
+   * Variation→stage list resolution mirrors `previousStageName`: when the
+   * token carries a `variationid` we use `queueVariation[variationid]`; if
+   * that map has no entry we are conservative and show nothing. When there's
+   * no variationid we fall back to the queue's full stage list.
+   */
+  get currentStageNotes(): { stage: string; note: string }[] {
+    if (!this.liveAssignment || !this.ongoingQueue) return []
+    const stagename = this.liveAssignment['stagename']
+    if (!stagename) return []
+    const raw = this.ongoingQueue?.['stageproperty']?.[stagename]?.['stagenote']
+    if (raw == null) return []
+
+    // Normalize both shapes into [{ stage, note }]:
+    //  - new ARRAY format: [{ stage, note }]
+    //  - legacy MAP format: { [stage]: note }
+    const entries: { stage: string; note: any }[] = Array.isArray(raw)
+      ? raw.map((r: any) => ({ stage: r?.['stage'], note: r?.['note'] }))
+      : (typeof raw === 'object'
+          ? Object.keys(raw).map(k => ({ stage: k, note: raw[k] }))
+          : [])
+
+    // Resolve the participant's variation stage list.
+    const variationId = this.liveAssignment['token']?.['variationid']
+    let stageList: string[]
+    if (variationId != null) {
+      if (!(variationId in this.queueVariation)) return [] // conservative
+      stageList = this.queueVariation[variationId] ?? []
+    } else {
+      stageList = this.ongoingQueue?.['stages'] ?? []
+    }
+
+    const out: { stage: string; note: string }[] = []
+    for (const e of entries) {
+      if (!e.stage) continue
+      if (e.note == null || String(e.note).trim().length === 0) continue
+      if (stageList.includes(e.stage)) {
+        out.push({ stage: e.stage, note: String(e.note) })
+      }
+    }
+    return out
   }
 
   sendBack() {
@@ -312,7 +631,7 @@ export class DynamicStudioV2Component {
 
     // session ended — both participant left and call had started
     if (leftAt && specialistJoinedAt && !fresh(lastSeen)) {
-      return { tone: 'slate', icon: 'check', title: 'Session ended', sub: 'The participant has disconnected' }
+      return { tone: 'slate', icon: 'check', title: 'Session ended', sub: '' }
     }
     // participant left mid-call
     if (leftAt && specialistJoinedAt) {
@@ -415,7 +734,7 @@ export class DynamicStudioV2Component {
     }
 
     // 2. ATC & Love Letter - Previous uP! cycle(s)
-    if (widgets.includes('previousatc') || widgets.includes('loveletters')) {
+    if (widgets.includes('previousatc') || widgets.includes('loveletters') || widgets.includes('evolutionwishlist')) {
       steps.push({ id: 'prev-history', label: 'Previous ATC & Love Letters', icon: 'history', color: '#84cc16' })
     }
 
@@ -635,7 +954,12 @@ export class DynamicStudioV2Component {
             await this.loadQueueStudioCounts()
             const firstWithStudios = this.ongoingQueueList.find(q => (this.queueStudioCounts[q['docid']] || 0) > 0)
             this.noStudioInAnyQueue = !firstWithStudios
-            this.ongoingQueue = firstWithStudios || this.ongoingQueueList[0]
+
+            // If the specialist is already in a LIVE session, prefer that
+            // queue so they go straight inside the studio (no queue picker).
+            const queueWithLive = await this.findQueueWithLiveAssignment()
+
+            this.ongoingQueue = queueWithLive || firstWithStudios || this.ongoingQueueList[0]
             this.selectedQueue = this.ongoingQueue
             await this.onQueueSelect()
             const profileMap = await guard.getProfileMap()
@@ -796,6 +1120,39 @@ export class DynamicStudioV2Component {
     return c1 && c2 ? c1.docid === c2.docid : c1 === c2;
   }
 
+
+  /**
+   * Returns the queue object that already has a live assignment for this
+   * specialist (so we can auto-enter it on page load instead of showing
+   * the queue picker). Returns null if none exist. Cross-queue lookup —
+   * searches all the specialist's ongoing queues.
+   */
+  private async findQueueWithLiveAssignment(): Promise<any | null> {
+    try {
+      if (!this.profileid || !this.ongoingQueueList?.length) return null
+      const queueIds = this.ongoingQueueList.map(q => q['docid'])
+      // Firestore `in` operator is limited to 30 values; chunk if needed.
+      for (let i = 0; i < queueIds.length; i += 30) {
+        const chunk = queueIds.slice(i, i + 30)
+        const snap = await getDocs(query(
+          collection(this.firestore, 'live assignment'),
+          where('status', '==', 'live'),
+          where('pairing', 'array-contains', this.profileid),
+          where('queueid', 'in', chunk),
+          limit(1),
+        ))
+        if (!snap.empty) {
+          const liveQueueId = snap.docs[0].data()?.['queueid']
+          const match = this.ongoingQueueList.find(q => q['docid'] === liveQueueId)
+          if (match) return match
+        }
+      }
+      return null
+    } catch (err) {
+      console.warn('findQueueWithLiveAssignment failed', err)
+      return null
+    }
+  }
 
   async loadQueueStudioCounts(){
     // Cleanup any previous subscriptions
@@ -1034,6 +1391,30 @@ export class DynamicStudioV2Component {
                 this.mapStudioLiveAssignment[e] = null
               }
             })
+
+            // Auto-enter the live studio when the specialist lands on the
+            // page. If they already have a studio in this queue with an
+            // active live assignment AND they haven't selected anything yet
+            // (and aren't navigating themselves), select it for them — so
+            // they go straight into the session instead of seeing the
+            // queue/stage picker first.
+            // CRITICAL: we must call onStudioSelect() (not just set
+            // selectedStudio) because that's what kicks off form / ATC /
+            // milestone / journey fetches. Without it, the sidebar shows
+            // no name / no product / no milestone and the Submitted Forms
+            // step is hidden.
+            const noSelection = !this.selectedStudio?.['docid']
+            const liveStudioId = activeStudio[0]
+            if (noSelection && liveStudioId && !this.userNavigated) {
+              const target = this.studioList.find(s => s['docid'] === liveStudioId)
+              if (target) {
+                console.log('[auto-enter] live studio found — onStudioSelect', liveStudioId)
+                // Fire-and-forget — onStudioSelect is async but the
+                // subscription handler stays sync.
+                this.onStudioSelect(target)
+              }
+            }
+
             if(this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != null && this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != undefined){
               this.liveAssignment = {
                 ...{token: (this.liveAssignment ?? {})["token"]},
@@ -1046,6 +1427,17 @@ export class DynamicStudioV2Component {
                 this.ensureProfileLoaded(profId)
                 this.fetchParticipantJourney(profId)
               }
+              // When we auto-entered the studio (no manual Bring-To-Studio
+              // flow), the queue_token isn't attached. Pull it so the
+              // sidebar shows product / variation / queue position.
+              this.ensureTokenForAssignment()
+              // Trigger all widget-driven fetches (Validated ATC,
+              // Unvalidated ATC, Assigned ATC, Triple ATC, AEL, UP visit,
+              // Forms) directly from the live-assignment subscription so
+              // they don't depend on onStudioSelect's nested queue_token
+              // subscription firing in time. Idempotent — skips if the
+              // assignment / stage hasn't changed.
+              this.loadAssignmentWidgetData()
             }
             else{
               this.liveAssignment = null
@@ -1357,14 +1749,12 @@ export class DynamicStudioV2Component {
       if (conflicts.length > 0) {
         const confirmed = await firstValueFrom(
           this.dialog.open(this.checkinConflictTpl, {
-            data: {
-              studios: conflicts.map(c => ({
-                docid: c['docid'],
-                name: c['studioname'] || c['name'] || 'Studio'
-              }))
-            },
+            // `conflicts` already carries queueName / stageName / isLive,
+            // pass through untouched so the template can render the queue +
+            // stage context (not just the studio name).
+            data: { studios: conflicts },
             disableClose: true,
-            width: '460px',
+            width: '500px',
             maxWidth: '92vw',
             autoFocus: false,
           }).afterClosed()
@@ -1403,6 +1793,9 @@ export class DynamicStudioV2Component {
    * Returns the user's other studios across all queues that currently have
    * `checkin: true`. Excludes the studio identified by `excludeStudioId`
    * (typically the one being toggled). Returns empty array on no conflict.
+   * Each returned entry is enriched with `queueName` and `stageName` so the
+   * conflict dialog can show the user EXACTLY where else they are checked
+   * in (not just an opaque studio name).
    */
   private async findActiveCheckins(excludeStudioId: string | undefined | null): Promise<any[]> {
     if (!this.profileid) return []
@@ -1412,9 +1805,56 @@ export class DynamicStudioV2Component {
         where('participants', 'array-contains', this.profileid),
         where('checkin', '==', true),
       ))
-      return snap.docs
+      // Only consider studios that belong to the specialist's currently LIVE
+      // / ongoing queues. A studio in a queue that has ended shouldn't count
+      // as an active check-in conflict.
+      const liveQueueIds = new Set(
+        (this.ongoingQueueList || []).map((q: any) => q['docid'])
+      )
+      const studios = snap.docs
         .map(d => d.data())
-        .filter(s => s['docid'] !== excludeStudioId && [null, undefined, false].includes(s['delete']))
+        .filter(s =>
+          s['docid'] !== excludeStudioId &&
+          [null, undefined, false].includes(s['delete']) &&
+          (liveQueueIds.size === 0 || liveQueueIds.has(s['queueref']?.id))
+        )
+
+      // Enrich each conflicting studio with queue name + current stage name
+      // (best-effort — falls back to "Studio" / "—" if lookups fail).
+      const enriched = await Promise.all(studios.map(async (s: any) => {
+        let queueName = ''
+        let stageName = ''
+        try {
+          if (s['queueref']) {
+            const queueSnap = await getDoc(s['queueref'])
+            if (queueSnap.exists()) {
+              const qd: any = queueSnap.data()
+              queueName = qd?.['queuename'] || qd?.['name'] || ''
+            }
+          }
+        } catch {}
+        try {
+          const liveSnap = await getDocs(query(
+            collection(this.firestore, 'live assignment'),
+            where('studioid', '==', s['docid']),
+            where('status', '==', 'live'),
+            limit(1),
+          ))
+          if (!liveSnap.empty) {
+            stageName = liveSnap.docs[0].data()?.['stagename'] || ''
+          }
+        } catch {}
+        return {
+          docid: s['docid'],
+          queueref: s['queueref'],
+          participants: s['participants'] || [],
+          name: s['studioname'] || s['name'] || 'Studio',
+          queueName,
+          stageName,
+          isLive: !!stageName,
+        }
+      }))
+      return enriched
     } catch (err) {
       console.log('findActiveCheckins error', err)
       return []
@@ -1753,6 +2193,86 @@ export class DynamicStudioV2Component {
       console.log(err)
     })
   }
+  // Move the participant back to the QUEUED section of the SAME stage.
+  // Unlike moveStage(), this does NOT advance the token: `currentstage` stays
+  // the current stage and `status` is forced to "queued" so they reappear in
+  // the queued pool of this stage. Based on the same-stage branch of
+  // moveStage() (StageIncompleteConfirmation → close studio → release pairing),
+  // minus the dropIndex/last-stage delivery-completed handling, since we are
+  // not progressing the token.
+  async moveBackToQueue(){
+    if(this.liveAssignment == null) return
+    var inCompleteDialog = this.dialog.open(StageIncompleteConfirmationComponent, {
+      data: {
+        currentstage: this.liveAssignment["stagename"],
+        participantname: this.mapProfile[this.liveAssignment["token"]?.profile_id]
+      },
+      maxWidth: "70vw",
+      maxHeight: "90vh",
+      disableClose: true
+    })
+    await firstValueFrom(inCompleteDialog.afterClosed()).then(async value =>{
+      console.log("[moveBackToQueue] confirm value", value)
+      if(!value) return
+      var loading = this.dialog.open(LoadingProgressComponent, {
+        data: {msg: "Moving participant back to queue"},
+        disableClose: true
+      })
+      try {
+        var currentstage = this.liveAssignment["stagename"]
+        var data: any = {
+          previousstage: currentstage,
+          currentstage: currentstage,
+          logdate: serverTimestamp(),
+          stagestatus: "Returned",
+          quicknotes: null,
+          cwmentoring: null,
+          cwshadowing: null,
+          cwperson: null,
+          diagnosticmentoring: null,
+          diagnosticshadowing: null,
+          diagnosticperson: null,
+          people_involved: [],
+          arenaid: null,
+          liveassignmentid: null,
+          studioid: null,
+          status: "queued"
+        }
+        if(value["preassign"]){
+          data[`preassigned.${currentstage}`] = arrayUnion(this.liveAssignment["studioid"])
+        }
+        if((value["reason"] ?? "").trim().length != 0){
+          data["notes"] = value["reason"]
+          data["notesList"] = arrayUnion({
+            author: this.profileid,
+            stage: currentstage,
+            text: value["reason"],
+            updatedon: new Date()
+          })
+        }
+        var log = {...this.liveAssignment["token"], ...data}
+        await this.updateQueueStage(log)
+        var studioid = this.liveAssignment["studioid"]
+        await updateDoc(doc(this.firestore,'live assignment/' + this.liveAssignment["docid"]),{
+          isactivitydone : false,
+          status: "completed",
+          updated: serverTimestamp()
+        })
+        if(studioid){
+          await updateDoc(doc(this.firestore,"queue studio pairing",studioid),{
+            status: null,
+          })
+        }
+        this.snackBar.open('Participant moved back to the queue.', 'OK', { duration: 2500 })
+      } catch(err) {
+        console.error("[moveBackToQueue] failed", err)
+        this.snackBar.open('Could not move participant back. Please try again.', 'Dismiss', { duration: 3500 })
+      } finally {
+        loading.close()
+      }
+    })
+  }
+
   async moveStage(nextstage:string,markascompleted:any){
     console.log("********* moveStage *********");
     
@@ -2171,11 +2691,11 @@ export class DynamicStudioV2Component {
     Object.keys(this.liveAssignment["bonusactivity"] ?? {}).forEach(profileid =>{
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]] = additionalActivities[this.liveAssignment["bonusactivity"][profileid]] ?? []
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]].push(profileid)
-    }) 
-    console.log(additionalActivities)   
+    })
+    console.log(additionalActivities)
     var inviteParticipant = this.dialog.open(AssignQueueStudioComponent, {
       data: {
-        title: reviewSpecialist ? "Assign Other Specialist if attended in this Studio" : "Update Additional Specialist and Activity in the Studio",
+        title: reviewSpecialist ? "Confirm Specialist(s) who attended this Studio" : "Update Additional Specialist and Activity in the Studio",
         studiolist: reviewSpecialist ? [this.selectedStudio] : null,
         mapprofile: this.mapProfile,
         mapactivity: this.mapActivity,
@@ -2189,41 +2709,60 @@ export class DynamicStudioV2Component {
     try {
       const result = await inviteParticipant.afterClosed().toPromise();
       if(result != null){
-        console.log(result)
         if(Object.keys(result).length != 0){
           // Update Bonus Activity
           var mergeActivity = reviewSpecialist ? (result["bonusactivity"] ?? {}) : {...(this.liveAssignment["bonusactivity"] ?? {}), ...result["bonusactivity"]}
-          console.log(mergeActivity)
           var additionalSpecialist = Object.keys(mergeActivity)
-          
+
           await updateDoc(doc(this.firestore, "live assignment", this.liveAssignment["docid"]), {
             bonusactivity: additionalSpecialist.length != 0 ? mergeActivity : null,
             bonusactivityparticipant: additionalSpecialist.length != 0 ? additionalSpecialist : null
           });
-  
+
           // Update People Involved
           var peopleInvolved = Object.keys(mergeActivity)
           var mergePeopleInvolved = Array.from(new Set(peopleInvolved.concat(this.liveAssignment["pairing"] ?? []) as string[]))
-          console.log(mergePeopleInvolved)
-          
+
           await updateDoc(doc(this.firestore, "queue_token", this.liveAssignment["token"]["docid"]), {
             people_involved: mergePeopleInvolved
           });
+          this.snackBar.open('Specialist(s) added to the studio.', 'OK',
+            { duration: 3000, horizontalPosition: 'center', verticalPosition: 'top' })
+        } else {
+          // Dialog closed with no specialist rows added — tell the user how.
+          this.snackBar.open('No specialist was added. Click "Add Other Specialists", fill it, then Assign.', 'OK',
+            { duration: 5000, horizontalPosition: 'center', verticalPosition: 'top' })
         }
         invited = true
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in inviteMore:', error);
+      this.snackBar.open('Invite failed: ' + (error?.message || error), 'Dismiss',
+        { duration: 7000, horizontalPosition: 'center', verticalPosition: 'top' });
     }
     return invited
   }
-  
+
+  // Copy the raw Zoom start URL to the clipboard (shown below Start Meeting
+  // on the getstarted step). Falls back gracefully when the Clipboard API is
+  // unavailable (e.g. non-secure context).
+  async copyZoomLink(url: string){
+    if(!url) return
+    try{
+      await navigator.clipboard.writeText(url)
+      this.snackBar.open('Zoom link copied to clipboard.', 'OK', { duration: 2000 })
+    }catch(err){
+      console.warn('Clipboard copy failed', err)
+      this.snackBar.open('Could not copy the link. Long-press or right-click to copy it manually.', 'Dismiss', { duration: 3000 })
+    }
+  }
+
   async regenerateZoomLink(){
     var url:string
     if(environment.firebase.projectId == "starlabs-test"){
       console.log("test")
       console.log(this.liveAssignment["zoomdata"], 'liveassignment');
-      
+
       url = "https://us-central1-starlabs-test.cloudfunctions.net/studioZoomLinkRegenerate?liveassignmentid="+this.liveAssignment["docid"]+"&zoomdata="+JSON.stringify(this.liveAssignment['zoomdata'])
     }
     else if(environment.firebase.projectId == "fir-sample-aae4a" || environment.firebase.projectId == "launch-your-legacy-development"){
@@ -2235,35 +2774,272 @@ export class DynamicStudioV2Component {
         msg: "Generating Link...."
       }
     })
-    
+
+    // Snapshot the current (broken) URL so we can detect when the
+    // subscription delivers a fresh one. If after a few seconds the URL is
+    // still the same broken value, surface the failure to the user instead
+    // of silently leaving them stuck.
+    const prevUrl: string = this.liveAssignment?.['zoomdata']?.['start_url'] || ''
+    let cloudErr: any = null
+
     try {
-      const res = await this.http.get(url).toPromise();
-      console.log(res)
-    } catch (err) {
-      console.log("Error", err)
+      // The cloud function returns a plain "success" string, not JSON, so
+      // tell HttpClient not to try to parse it. Without responseType:'text'
+      // Angular throws a parse error even though the call returned 200.
+      const res = await this.http.get(url, { responseType: 'text' }).toPromise();
+      console.log('[regenerateZoomLink] response', res)
+    } catch (err: any) {
+      cloudErr = err
+      console.warn('[regenerateZoomLink] cloud function error', err)
+      // status 0 + "Unknown Error" = the browser blocked the response,
+      // almost always because the cloud function is missing CORS headers
+      // (or is unreachable / behind a network block). Flag it for the UI.
+      if (err?.status === 0) {
+        cloudErr = Object.assign(new Error('CORS / network blocked'), { isCors: true })
+      }
+      // Parse errors with a 2xx status mean the request itself succeeded,
+      // we just couldn't deserialize the response body. Treat as success.
+      if (err?.status >= 200 && err?.status < 300) {
+        console.log('[regenerateZoomLink] succeeded (non-JSON body)', err?.error?.text)
+        cloudErr = null
+      }
     }
-    
+
+    // Wait up to 8 seconds for the Firestore subscription to push the new
+    // zoomdata back into `liveAssignment`. Poll once per second.
+    const isBroken = (u: any) => !u || u === 'Link Broken'
+    const startedWait = Date.now()
+    while (Date.now() - startedWait < 8000) {
+      const cur = this.liveAssignment?.['zoomdata']?.['start_url']
+      if (!isBroken(cur) && cur !== prevUrl) break
+      await new Promise(r => setTimeout(r, 1000))
+    }
+
     generateLoading.close()
     this.enableZoomLinkGenerator()
+
+    const final = this.liveAssignment?.['zoomdata']?.['start_url']
+    if (cloudErr) {
+      const msg = (cloudErr as any)?.isCors
+        ? 'Cannot reach the link-regeneration service (CORS / network blocked). Backend needs to be fixed by the dev team.'
+        : 'Could not regenerate the Zoom link — please try again or contact support.'
+      this.snackBar.open(msg, 'Dismiss',
+        { duration: 8000, horizontalPosition: 'center', verticalPosition: 'top' }
+      )
+      return
+    }
+    if (isBroken(final)) {
+      this.snackBar.open(
+        'Zoom link could not be regenerated. The previous link is still broken — try again in a moment.',
+        'Dismiss',
+        { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
+      )
+      return
+    }
+    this.snackBar.open(
+      'New Zoom link generated. You can start the meeting now.',
+      'Dismiss',
+      { duration: 4000, horizontalPosition: 'center', verticalPosition: 'top' }
+    )
   }
   
-  viewform(form){
-    const firestoreForms = getFirestore("firestore-forms")
-    let path = doc(firestoreForms, "formsByClient", form['docid']).path
-    // embed=true tells the app shell to hide its toolbar/sidenav so only the
-    // form renders inside the iframe — no STARLABS chrome.
-    const url = this.router.createUrlTree(['/formtemplate'], {
-      queryParams: { id: form.formid, type: 'form', patchdata: path, embed: 'true' }
-    })
-    const safeUrl: SafeResourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url.toString())
+  // ==========================================
+  // Inline form viewer state (used by formDialogTpl)
+  // Mirrors the overlay used by view-participants-form so the specialist sees
+  // the rendered submitted form inside the dialog instead of an iframe.
+  // ==========================================
+  formViewerState: { loading: boolean; data: any; title: string } = {
+    loading: false,
+    data: null,
+    title: ''
+  }
+
+  async viewform(form: any) {
+    this.formViewerState = {
+      loading: true,
+      data: null,
+      title: form?.['formname'] || 'Form'
+    }
     this.dialog.open(this.formDialogTpl, {
-      data: { url: safeUrl, formname: form['formname'] || 'Form' },
       width: '92vw',
-      maxWidth: '1200px',
+      maxWidth: '1000px',
       height: '92vh',
       panelClass: 'form-dialog-panel',
       autoFocus: false
     })
+
+    try {
+      const firestoreForms = getFirestore('firestore-forms')
+      const [formTemplateDoc, submittedFormDoc] = await Promise.all([
+        getDoc(doc(this.firestore, 'delivery forms', form['formid'])),
+        getDoc(doc(firestoreForms, 'formsByClient', form['docid']))
+      ])
+
+      if (!formTemplateDoc.exists() || !submittedFormDoc.exists()) {
+        this.formViewerState = { ...this.formViewerState, loading: false }
+        return
+      }
+
+      this.formViewerState = {
+        loading: false,
+        data: this.buildFormDisplayData(form, formTemplateDoc.data(), submittedFormDoc.data()),
+        title: this.formViewerState.title
+      }
+    } catch (err) {
+      console.error('Error loading form overlay:', err)
+      this.formViewerState = { ...this.formViewerState, loading: false }
+    }
+  }
+
+  // ==========================================
+  // Full-ATC overlay viewer state (used by atcDialogTpl).
+  // Mirrors formViewerState so "View Full ATC" opens the ATC in a MatDialog
+  // overlay (same UX as the form viewer) instead of expanding inline.
+  // ==========================================
+  atcViewerState: { loading: boolean; data: any; title: string; kind: string } = {
+    loading: false,
+    data: null,
+    title: '',
+    kind: ''
+  }
+
+  viewATCInDialog(atc: any, kind: string = '') {
+    this.atcViewerState = {
+      loading: false,
+      data: atc,
+      title: 'Full ATC',
+      kind: kind || ''
+    }
+    this.dialog.open(this.atcDialogTpl, {
+      width: '92vw',
+      maxWidth: '1000px',
+      height: '92vh',
+      panelClass: 'form-dialog-panel',
+      autoFocus: false
+    })
+  }
+
+  // ==========================================
+  // SHARED: Build form display data for overlay (ported from
+  // view-participants-form.component.ts buildFormDisplayData)
+  // ==========================================
+  private buildFormDisplayData(row: any, formTemplate: any, submittedFormData: any): any {
+    const formValues: any = {}
+    let controlIndex = 0
+    if (submittedFormData['formarray']) {
+      for (const field of submittedFormData['formarray']) {
+        if (['label', 'video', 'audio'].includes(field.type)) continue
+        formValues[`control${controlIndex}`] = field.value
+        controlIndex++
+      }
+    }
+
+    controlIndex = 0
+    let questionNumber = 0
+    const fields: any[] = []
+
+    for (const field of formTemplate['formarray'] || []) {
+      if (['video', 'audio'].includes(field.type)) continue
+
+      if (field.type === 'label') {
+        fields.push({ type: 'label', fieldname: field.fieldname, fielddescription: field.fielddescription || null })
+        continue
+      }
+
+      const fieldValue = formValues[`control${controlIndex}`]
+      controlIndex++
+      questionNumber++
+
+      fields.push({
+        type: 'field',
+        number: questionNumber,
+        fieldname: field.fieldname,
+        fielddescription: field.fielddescription || null,
+        fieldnotes: field.fieldnotes || null,
+        required: field.required || false,
+        fieldType: field.type,
+        value: this.formatFieldValueForOverlay(field, fieldValue),
+        isEmpty: !fieldValue || (Array.isArray(fieldValue) && fieldValue.length === 0)
+      })
+    }
+
+    // Studio doesn't have the full mapProfile/mapWorkshop landscape of
+    // view-participants-form — fall back to row-level fields with safe defaults.
+    const participantName =
+      (row?.['profileid'] && this.mapProfile?.[row['profileid']])
+      || row?.['profilename']
+      || (this.liveAssignment && this.mapProfile?.[(this.liveAssignment as any)?.['participantid']])
+      || '—'
+    const queueId = row?.['queueid'] || row?.['queueref']?.id
+    const queueName = (queueId && this.mapQueue?.[queueId]) || '—'
+    const workshopName = '—'
+    let submittedDate = '—'
+    try {
+      if (row?.['date']?.toDate) submittedDate = new Date(row['date'].toDate()).toLocaleDateString()
+      else if (row?.['date']) submittedDate = new Date(row['date']).toLocaleDateString()
+    } catch { /* keep dash */ }
+
+    return {
+      participantName,
+      formTitle: formTemplate['formname'] || 'Form',
+      formDescription: formTemplate['formdescription'] || null,
+      queue: queueName,
+      workshop: workshopName,
+      date: submittedDate,
+      fields
+    }
+  }
+
+  // ==========================================
+  // FORMAT FIELD VALUE FOR OVERLAY DISPLAY (ported)
+  // ==========================================
+  private formatFieldValueForOverlay(field: any, value: any): string {
+    if (!value && value !== 0) return 'Not answered'
+
+    switch (field.type) {
+      case 'date':
+        if (value?.toDate) return value.toDate().toLocaleDateString()
+        try { return new Date(value).toLocaleDateString() } catch { return String(value) }
+      case 'Checkbox':
+        return value ? 'Yes' : 'No'
+      case 'MultiSelect':
+      case 'multicheckbox':
+        return Array.isArray(value) ? value.join(', ') : String(value)
+      case 'slider': {
+        let result = String(value)
+        if (field.options?.length > 0) result += ` (Range: ${field.options[0]}-${field.options[field.options.length - 1]})`
+        return result
+      }
+      case 'array':
+        if (Array.isArray(value) && value.length > 0) {
+          return value.map((item: any) => {
+            if (typeof item === 'object' && item !== null) {
+              if (field.array && Array.isArray(field.array)) {
+                const parts = field.array.map((af: any) => {
+                  const v = item[af.fieldname]
+                  return v != null && v !== '' ? `${af.fieldname}: ${v}` : null
+                }).filter(Boolean)
+                return parts.join('\n')
+              }
+              const parts = Object.entries(item)
+                .filter(([, v]) => v != null && v !== '')
+                .map(([k, v]) => `${k}: ${v}`)
+              return parts.join('\n')
+            }
+            return String(item)
+          }).join('\n')
+        }
+        return 'No items'
+      default:
+        if (Array.isArray(value)) return value.join(', ')
+        if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+        if (typeof value === 'object') {
+          try {
+            return Object.entries(value).filter(([, v]) => v != null).map(([k, v]) => `${k}: ${v}`).join(', ')
+          } catch { return JSON.stringify(value) }
+        }
+        return String(value)
+    }
   }
   
   addATC(validated, profileid) {
@@ -2459,13 +3235,26 @@ export class DynamicStudioV2Component {
     }
     this.loveLetterLoading = true
     try {
+      // NOTE: we deliberately do NOT add `orderBy('created')` to the Firestore
+      // query. Combining `where('profileid')` with `orderBy('created')` requires
+      // a composite index — when that index is missing the whole query throws and
+      // the list ends up empty ("Love Letters not displayed"). `orderBy` would
+      // also silently drop any love-letter doc that lacks a `created` field.
+      // Fetch by profile only, then sort newest-first on the client.
       const q = query(
         collection(this.firestore, "love letter"),
-        where("profileid", "==", profileid),
-        orderBy("created", "desc")
+        where("profileid", "==", profileid)
       )
       const snap = await getDocs(q)
-      this.loveLetterList = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const toMillis = (v: any): number => {
+        if (!v) return 0
+        if (typeof v?.toDate === 'function') return v.toDate().getTime()
+        const t = new Date(v).getTime()
+        return isNaN(t) ? 0 : t
+      }
+      this.loveLetterList = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => toMillis(b['created']) - toMillis(a['created']))
       this.loveLetterLoadedFor = profileid
     } catch (error) {
       console.error('Error fetching love letters:', error)
@@ -2753,8 +3542,9 @@ export class DynamicStudioV2Component {
     console.log("Checking AEL.....")
     this.participantAEL = {}
 
+    // AEL needs liveAssignment.token to know which queue(s) to search.
     if(!this.liveAssignment["token"]) return;
-    
+
     try {
       const level = await getDocs(collection(this.firestore, "accelerated evolution level"));
       this.aelLevelList = level.docs.map(e => e.data())
@@ -2882,31 +3672,53 @@ export class DynamicStudioV2Component {
     }
   }
   
+  // True when the current live assignment's Zoom link is missing or marked
+  // as broken by the cloud function. Used by the template to show an inline
+  // amber warning and to swap the Start Meeting button copy.
+  get isZoomLinkBroken(): boolean {
+    const url = this.liveAssignment?.['zoomdata']?.['start_url']
+    return !url || url === 'Link Broken'
+  }
+
   navigateMeeting(doc:any){
     console.log(doc);
     const zoomData = doc["zoomdata"] ?? {}
 
     if(!zoomData["start_url"] || zoomData["start_url"] == "Link Broken"){
-      alert("Link is broken. Generate new Link.")
+      // Replace the blunt alert with an inline snackbar pointing the user at
+      // the "Generate New Link" action right below.
+      this.snackBar.open(
+        'This Zoom link is broken. Use "Generate New Link" below.',
+        'Dismiss',
+        { duration: 5000, horizontalPosition: 'center', verticalPosition: 'top' }
+      )
       return
     }
 
     const url = this.router.serializeUrl(
       this.router.createUrlTree(['/openmeeting', doc['docid'], 'queue'])
     );
-         
+
     window.open(url, "_blank");
   }
   
   async movetoNextMonthReview(){
     console.log(this.liveAssignment);
     var token = this.liveAssignment["token"]
-    
+
     if(window.confirm('Are you sure want to move participants to the next month review?')){
+      this.nextMonthReviewSaving = true
       try {
         await setDoc(doc(this.firestore, "review participants", token['docid']), token);
+        this.nextMonthReviewMarked = true
+        this.snackBar.open('Participant marked for next month review.', 'OK',
+          { duration: 4000, horizontalPosition: 'center', verticalPosition: 'top' })
       } catch (error) {
         console.error('Error moving to next month review:', error);
+        this.snackBar.open('Could not mark for next month review. Please try again.', 'Dismiss',
+          { duration: 5000, horizontalPosition: 'center', verticalPosition: 'top' })
+      } finally {
+        this.nextMonthReviewSaving = false
       }
     }
   }
