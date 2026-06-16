@@ -744,7 +744,15 @@
 .cat-pname { font-weight: 600; font-size: 13px; }
 .cat-pemail, .cat-pid { font-size: 11px; color: #999; }
 
-.cat-tpl-block { margin-bottom: 6px; }
+.cat-tpl-block {
+  margin-bottom: 0; 
+  border-right: 1px solid #eee;
+  padding-right: 12px;
+}
+.cat-tpl-block:last-child {
+  border-right: none;
+  padding-right: 0;
+}
 .cat-tpl-name { font-size: 12px; font-weight: 500; color: #444; margin-bottom: 3px; }
 .cat-tpl-pills { display: flex; gap: 4px; flex-wrap: wrap; }
 
@@ -769,3 +777,10 @@
   color: #bbb; display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
 .cat-dialog-empty mat-icon { font-size: 40px; width: 40px; height: 40px; }
+.cat-col-templates {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}

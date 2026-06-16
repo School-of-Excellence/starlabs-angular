@@ -171,7 +171,6 @@ export class WatiRecordComponent implements OnInit {
     this.categorySearchText = '';
 
     try {
-      // Fetch all archive docs for this category
       const snap = await getDocs(
         query(collection(this.firestore, 'wati archive'),
           where('watiCategory', '==', categoryId),
