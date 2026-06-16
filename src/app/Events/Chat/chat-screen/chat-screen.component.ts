@@ -1438,6 +1438,7 @@ get isChannelSelected(): boolean {
   }
 
   getFileIcon(fileType: string): string {
+    if (!fileType) return 'attach_file'; // some file records have no filetype
     if (fileType.startsWith('image/')) return 'image';
     if (fileType.startsWith('audio/')) return 'audiotrack';
     if (fileType.startsWith('video/')) return 'videocam';

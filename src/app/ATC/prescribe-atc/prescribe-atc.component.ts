@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getDocsFromCache, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, Location } from '@angular/common';
@@ -10,10 +10,12 @@ import { Subject, Subscription, takeUntil, timer } from 'rxjs';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
 import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
+import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { AtcAelConfirmComponent } from '../../ATC/atc-ael-confirm/atc-ael-confirm.component';
 import { NetworkStatusService } from '../../network-status.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -215,12 +217,19 @@ export class PrescribeATCComponent {
   //network status
   isonline:boolean
   pageloadedatfirsttime:boolean = false
+  aigeneratedEntry:boolean = false  // true when opened from an AI-generated draft link (hides "open another draft")
+  submitAttempted = false  // true once Submit was pressed — drives the inline "required" hints
+  // shows the inline "Required" message on every required field once Submit was attempted
+  requiredMatcher: ErrorStateMatcher = {
+    isErrorState: (control) => !!(control && control.invalid && (control.touched || this.submitAttempted))
+  };
 
   // Draft
   draftStatus = {
-    message: "No Draft Created!",
+    message: "Draft not saved yet.",
     code: 0
   }
+  existingDraftIds: string[] = []  // ids of this participant's existing drafts (to detect drafts other than the current one)
 
   audiolist = []
   imagelist = []
@@ -262,7 +271,8 @@ export class PrescribeATCComponent {
     public matDialog: MatDialog,
     public snackbar: MatSnackBar,
     private networkStatusService : NetworkStatusService,
-    private connectivity: ConnectivityGuardService
+    private connectivity: ConnectivityGuardService,
+    private mediaCache: MediaCacheService
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -299,9 +309,11 @@ export class PrescribeATCComponent {
             alert("Access for this screen is denied")
             this.router.navigateByUrl('/')
           }
-          guardservice.getProfileMap().then(e => this.getDirectiveAssignments(e.docdata))
           // this.addActivity()
           await this.setupData()
+          // await the assignment check so its popup resolves before setup completes
+          const profileMapData = await guardservice.getProfileMap()
+          await this.getDirectiveAssignments(profileMapData.docdata)
           if(this.participantProfileid){
             await this.onProfileSelect()
           }
@@ -435,6 +447,7 @@ export class PrescribeATCComponent {
         const value = draftSnap.data();
 
         this.autoSaveID = docid;
+        this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
         this.participantProfileid = value['profileid'] ?? null;
         this.transcript = value['transcript'] ?? [];
         this.consultationSummary = value['consultationsummary'] ?? null;
@@ -507,6 +520,7 @@ export class PrescribeATCComponent {
       this.pendingAIJson = parsedJson;
 
       this.autoSaveID = docid;
+      this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
 
       await setDoc(draftRef, {
         profileid: this.participantProfileid,
@@ -546,10 +560,7 @@ export class PrescribeATCComponent {
       if(!this.isonline){
         this.pageloadedatfirsttime = true
       }
-      if(this.pageloadedatfirsttime && this.isonline){
-        console.log("atc draft runned");
-        this.autoSave()
-      }
+      // reconnect autosave is handled once by ConnectivityGuardService.register; no duplicate save here
     });
     // Big Assignment
     if(this.bigActivity()){
@@ -971,7 +982,7 @@ export class PrescribeATCComponent {
   async getATCoptions(){
     console.log("ATC Draft")
     this.draftStatus = {
-      message: "No Draft Created!",
+      message: "Draft not saved yet.",
       code: 0
     }
     this.lastDraftSavedOn = null
@@ -982,7 +993,8 @@ export class PrescribeATCComponent {
         where('profileid', '==', this.participantProfileid),
         where('delete', '==', false)
       );
-      draftATC = (await getDocs(q)).docs;
+      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
+      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
     } else {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
@@ -990,9 +1002,11 @@ export class PrescribeATCComponent {
         where('delete', '==', false),
         where('authorprofileid', 'array-contains', this.loggedinProfileid)
       );
-      draftATC = (await getDocs(q)).docs;
+      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
+      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
     }
     console.log(draftATC.map(e => e.ref.path))
+    this.existingDraftIds = draftATC.map(e => e.id)  // remember this participant's existing draft ids
     this.autoSaveID = this.guardservice.generateId(this.firestoreATC, "temporary_ATC")
     if(draftATC.length != 0){
       var dialogRef = this.matDialog.open(AtcOptionComponent, {
@@ -1011,7 +1025,9 @@ export class PrescribeATCComponent {
           var atc = selectedATC
           if(atc["type"] == "draft"){
             this.autoSaveID = atc["doc"].id
-            var value = atc["doc"].data()
+            // re-read the doc so the latest offline edits (pending writes) are loaded, not the stale query snapshot
+            const freshSnap = await getDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID))
+            var value = freshSnap.exists() ? freshSnap.data() : atc["doc"].data()
             console.log(value);
             this.date = value['date']
             this.product = value['product']
@@ -1034,31 +1050,25 @@ export class PrescribeATCComponent {
               this.transcript[i]['potentialyears'] = this.transcript[i]['potentialyears'] ?? null
             }
 
-            // Load audio recordings if they exist
-            if(value['audioRecordings'] && value['audioRecordings'].length > 0) {
-              try {
-                this.draftStatus = {
-                  message: "Loading Audio Recordings...",
-                  code: 0
-                }
-                this.existingAudioURLs = value['audioRecordings'] || [];
-                this.existingNoteImageURLs = value['noteImageURLs'] || [];
-                this.existingATCImageURLs = value['atcImageURLs'] || [];
-                this.imagelist = [...this.existingNoteImageURLs];
-                this.atcImageURL = [...this.existingATCImageURLs];
-                await this.loadAudioFromURLs(value['audioRecordings']);
-                await this.loadNoteImagesFromURLs(value['noteImageURLs'])
-                await this.loadATCImagesFromURLs(value['atcImageURLs'])
-                console.log("Audio recordings loaded successfully");
-              } catch (error) {
-                console.error("Error loading audio recordings:", error);
-                this.draftStatus = {
-                  message: "ATC Draft Imported but failed to load audio. " + JSON.stringify(error),
-                  code: -1
-                }
-                return;
-              }
+            // Load any uploaded media that exists (images can exist without audio); never abort the import on failure
+            this.existingAudioURLs = value['audioRecordings'] || [];
+            this.existingNoteImageURLs = value['noteImageURLs'] || [];
+            this.existingATCImageURLs = value['atcImageURLs'] || [];
+            this.imagelist = [...this.existingNoteImageURLs];
+            this.atcImageURL = [...this.existingATCImageURLs];
+            try {
+              this.draftStatus = { message: "Loading media...", code: 0 };
+              await this.loadAudioFromURLs(this.existingAudioURLs);
+              await this.loadNoteImagesFromURLs(this.existingNoteImageURLs);
+              await this.loadATCImagesFromURLs(this.existingATCImageURLs);
+            } catch (error) {
+              console.warn("Some media could not be loaded (kept by URL):", error);
             }
+
+            // re-attach any media captured offline that hasn't uploaded yet, and upload it if back online
+            const pendingMedia = await this.mediaCache.listByDraft(this.autoSaveID);
+            this.reattachPendingMedia(pendingMedia);
+            if (pendingMedia.length && navigator.onLine) this.autoSave();
 
             this.draftStatus = {
               message: "ATC Draft Imported Successfully.",
@@ -1077,38 +1087,20 @@ export class PrescribeATCComponent {
     this.audioBlobURL = [];
     this.audioBlob = [];
 
-    const loadPromises = audioURLs.map(async (url, index) => {
+    // load sequentially so the arrays stay index-aligned with existingAudioURLs
+    for (let index = 0; index < audioURLs.length; index++) {
+      const url = audioURLs[index];
+      // always keep the uploaded audio (plays from the URL when online); placeholder keeps alignment if offline
+      this.audioBlobURL.push(url);
       try {
-        console.log(`Loading audio ${index + 1}/${audioURLs.length}:`, url);
         const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
-
-        this.audioBlob.push(blob);
-        this.audioBlobURL.push(url);
-        console.log(this.audioBlobURL, 'this.audioBlobURL');
-
-        console.log(`Audio ${index + 1} loaded successfully`);
-        return blob;
+        if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status}`);
+        this.audioBlob.push(await response.blob());
       } catch (error) {
-        console.error(`Error loading audio ${index + 1} from URL:`, url, error);
+        console.warn(`Audio ${index + 1} kept by URL (not fetched, offline?):`, url);
         this.audioBlob.push(null);
-        this.audioBlobURL.push(null);
-        return null;
       }
-    });
-
-    const results = await Promise.all(loadPromises);
-    const successfulLoads = results.filter(result => result !== null).length;
-    console.log(`Audio files loaded: ${successfulLoads}/${audioURLs.length}`);
-
-    // Filter out failed loads
-    this.audioBlob = this.audioBlob.filter(blob => blob !== null);
-    this.audioBlobURL = this.audioBlobURL.filter(url => url !== null);
+    }
   }
 
   // Load Note Images from URLs
@@ -1116,35 +1108,21 @@ export class PrescribeATCComponent {
     this.selectedNoteImages = [];
     this.previewNoteImages = [];
 
-
-    const loadPromises = imageURLs.map(async (url, index) => {
+    // load sequentially so the arrays stay index-aligned with existingNoteImageURLs
+    for (let index = 0; index < imageURLs.length; index++) {
+      const url = imageURLs[index];
+      // always keep the uploaded image (shows from the URL when online); placeholder keeps alignment if offline
+      this.previewNoteImages.push(url);
       try {
-        console.log(`Loading note image ${index + 1}/${imageURLs.length}:`, url);
         const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-        }
-
+        if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
         const blob = await response.blob();
-
-
-        this.previewNoteImages.push(url);
-
-        const file = new File([blob], `image_${index}.jpg`, { type: blob.type });
-        this.selectedNoteImages.push(file);
-
-        console.log(`Note Image ${index + 1} loaded successfully`);
-        return blob;
+        this.selectedNoteImages.push(new File([blob], `image_${index}.jpg`, { type: blob.type }));
       } catch (error) {
-        console.error(`Error loading note image ${index + 1} from URL:`, url, error);
-        return null;
+        console.warn(`Note image ${index + 1} kept by URL (not fetched, offline?):`, url);
+        this.selectedNoteImages.push(null);
       }
-    });
-
-    const results = await Promise.all(loadPromises);
-    const successfulLoads = results.filter(result => result !== null).length;
-    console.log(`Note images loaded: ${successfulLoads}/${imageURLs.length}`);
+    }
   }
 
   // Load ATC Images from URLs
@@ -1152,32 +1130,21 @@ export class PrescribeATCComponent {
     this.selectedATCImages = [];
     this.previewATCImages = [];
 
-    const loadPromises = imageURLs.map(async (url, index) => {
+    // load sequentially so the arrays stay index-aligned with existingATCImageURLs
+    for (let index = 0; index < imageURLs.length; index++) {
+      const url = imageURLs[index];
+      // always keep the uploaded image (shows from the URL when online); placeholder keeps alignment if offline
+      this.previewATCImages.push(url);
       try {
-        console.log(`Loading ATC image ${index + 1}/${imageURLs.length}:`, url);
         const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-        }
-
+        if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
         const blob = await response.blob();
-        this.previewATCImages.push(url);
-
-        const file = new File([blob], `atc_image_${index}.jpg`, { type: blob.type });
-        this.selectedATCImages.push(file);
-
-        console.log(`ATC Image ${index + 1} loaded successfully`);
-        return blob;
+        this.selectedATCImages.push(new File([blob], `atc_image_${index}.jpg`, { type: blob.type }));
       } catch (error) {
-        console.error(`Error loading ATC image ${index + 1} from URL:`, url, error);
-        return null;
+        console.warn(`ATC image ${index + 1} kept by URL (not fetched, offline?):`, url);
+        this.selectedATCImages.push(null);
       }
-    });
-
-    const results = await Promise.all(loadPromises);
-    const successfulLoads = results.filter(result => result !== null).length;
-    console.log(`ATC images loaded: ${successfulLoads}/${imageURLs.length}`);
+    }
   }
 
 
@@ -1441,7 +1408,18 @@ export class PrescribeATCComponent {
   }
 
 
+  // serialize draft saves so concurrent autosaves cannot overwrite each other
+  private autoSaveInFlight: Promise<void> | null = null;
+
   async autoSave() {
+    // chain each save after the previous one so writes stay in order
+    this.autoSaveInFlight = (this.autoSaveInFlight ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => this.runAutoSave());
+    return this.autoSaveInFlight;
+  }
+
+  async runAutoSave() {
     this.filteredSpecialist = "";
     try {
       if (this.autoSaveID != null) {
@@ -1451,23 +1429,25 @@ export class PrescribeATCComponent {
           code: 0
         };
 
+        // keep a durable local copy of any not-yet-uploaded media (survives offline + app close)
+        await this.mediaCache.replaceDraft(this.autoSaveID, this.collectLocalMedia());
+
         console.log(this.date);
         var authorprofileid = [];
         Object.values<any>(this.authorMap ?? {}).forEach(value => {
           if (value) {
-            var id = (value ?? []).map(e => doc(this.firestoreDefault, e).id);
+            // guard each path so a malformed ref can't throw and abort the whole draft save
+            var id = (value ?? []).map(e => {
+              try { return doc(this.firestoreDefault, e).id; }
+              catch { return null; }
+            }).filter(id => id != null);
             authorprofileid = [...authorprofileid, ...id];
           }
         });
 
         if (authorprofileid.length == 0) authorprofileid = [this.loggedinProfileid];
 
-        const [audioURLs, noteImageURLs, atcImageURLs] = await Promise.all([
-          this.uploadAudioToStorage(),
-          this.uploadNotesImageToStorage(),
-          this.uploadATCImageToStorage()
-        ]);
-
+        // build the draft with the media URLs we already have; new media is uploaded after the text is saved
         var data = {
           date: this.datepipe.transform(this.date, "yyyy-MM-dd"),
           product: this.product,
@@ -1485,9 +1465,9 @@ export class PrescribeATCComponent {
           notes: this.casenotes ?? null,
           mentornotes: this.mentornotes ?? null,
           atcassignment: this.atcAssignment ?? [],
-          audioRecordings: audioURLs,
-          noteImageURLs: noteImageURLs,
-          atcImageURLs: atcImageURLs,
+          audioRecordings: this.existingAudioURLs ?? [],
+          noteImageURLs: this.existingNoteImageURLs ?? [],
+          atcImageURLs: this.existingATCImageURLs ?? [],
           delete: false,
           authorprofileid: authorprofileid,
           lastupdated: serverTimestamp(),
@@ -1495,32 +1475,57 @@ export class PrescribeATCComponent {
           areastoexplore:this.areasstring ?? '',
         };
 
-        this.draftUrls = audioURLs;
-        this.audiolist = audioURLs;
-        this.imagelist = noteImageURLs;
-        this.atcImageURL = atcImageURLs;
-
-        // Update existing URLs for next save
-        this.existingAudioURLs = audioURLs;
-        this.existingNoteImageURLs = noteImageURLs;
-        this.existingATCImageURLs = atcImageURLs;
-
-        console.log("Data with audio URLs:", data);
-
-        await setDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID), data);
+        // save the TEXT first; with offline persistence the write is durable in IndexedDB the moment it's called
+        const writePromise = setDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID), data);
+        if (navigator.onLine) {
+          await writePromise;            // online: confirm the server write (for status + ordering)
+        } else {
+          writePromise.catch(() => {});  // offline: already durable locally; don't block the next save so EVERY offline edit persists
+        }
 
         this.draftStatus = {
-          message: "ATC and Audio Saved to Draft.",
+          message: navigator.onLine ? "Draft saved." : "Saved on this device — will sync when online.",
           code: 1
         };
         this.lastDraftSavedOn = new Date();
+
+        // upload media only when online; failures are non-fatal and retried on the next save / reconnect
+        if (navigator.onLine) {
+          try {
+            const [audioURLs, noteImageURLs, atcImageURLs] = await Promise.all([
+              this.uploadAudioToStorage(),
+              this.uploadNotesImageToStorage(),
+              this.uploadATCImageToStorage()
+            ]);
+
+            this.draftUrls = audioURLs;
+            this.audiolist = audioURLs;
+            this.imagelist = noteImageURLs;
+            this.atcImageURL = atcImageURLs;
+            this.existingAudioURLs = audioURLs;
+            this.existingNoteImageURLs = noteImageURLs;
+            this.existingATCImageURLs = atcImageURLs;
+
+            // patch the uploaded media URLs into the saved draft
+            await updateDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID), {
+              audioRecordings: audioURLs,
+              noteImageURLs: noteImageURLs,
+              atcImageURLs: atcImageURLs
+            });
+            // all media uploaded — drop the local copies
+            await this.mediaCache.deleteByDraft(this.autoSaveID);
+          } catch (mediaErr) {
+            console.warn("Media upload deferred, will retry:", mediaErr);
+          }
+        }
+
         this.uploadProgress.isUploading = false;
 
       }
     } catch (error) {
       console.error("Error in autoSave:", error);
       this.draftStatus = {
-        message: "Failed to Save Draft. " + JSON.stringify(error),
+        message: "Couldn't save draft. Waiting for network...",
         code: -1
       };
       this.uploadProgress.isUploading = false;
@@ -1529,6 +1534,59 @@ export class PrescribeATCComponent {
 
 
 
+
+  // re-open the draft picker for the same participant after flushing the current draft
+  async openAnotherDraft(){
+    await this.autoSave();
+    this.getATCoptions();
+  }
+
+  // open a fresh prescribe-atc screen in a new browser tab to start a new ATC
+  createNewATC(){
+    window.open(window.location.origin + window.location.pathname, '_blank');
+  }
+
+  // true when the participant has at least one draft other than the one currently open
+  get hasOtherDrafts(): boolean {
+    return this.existingDraftIds.some(id => id !== this.autoSaveID);
+  }
+
+  // collect media blobs that haven't been uploaded yet (for durable offline storage)
+  private collectLocalMedia(): PendingMedia[] {
+    const records: PendingMedia[] = [];
+    (this.audioBlob ?? []).forEach((blob, i) => {
+      if (blob && !this.existingAudioURLs[i]) {
+        records.push({ id: `${this.autoSaveID}-audio-${i}`, draftId: this.autoSaveID, kind: 'audio', blob, name: 'audio-' + i });
+      }
+    });
+    (this.selectedNoteImages ?? []).forEach((file, i) => {
+      if (file && !this.existingNoteImageURLs[i]) {
+        records.push({ id: `${this.autoSaveID}-note-${i}`, draftId: this.autoSaveID, kind: 'note', blob: file, name: file.name });
+      }
+    });
+    (this.selectedATCImages ?? []).forEach((file, i) => {
+      if (file && !this.existingATCImageURLs[i]) {
+        records.push({ id: `${this.autoSaveID}-atc-${i}`, draftId: this.autoSaveID, kind: 'atc', blob: file, name: file.name });
+      }
+    });
+    return records;
+  }
+
+  // re-attach media captured offline (not yet uploaded) when a draft is reopened, so it shows and uploads later
+  private reattachPendingMedia(records: PendingMedia[]) {
+    records.forEach(r => {
+      if (r.kind === 'audio') {
+        this.audioBlob.push(r.blob);
+        this.audioBlobURL.push(URL.createObjectURL(r.blob));
+      } else if (r.kind === 'note') {
+        this.selectedNoteImages.push(new File([r.blob], r.name, { type: r.blob.type }));
+        this.previewNoteImages.push(URL.createObjectURL(r.blob));
+      } else {
+        this.selectedATCImages.push(new File([r.blob], r.name, { type: r.blob.type }));
+        this.previewATCImages.push(URL.createObjectURL(r.blob));
+      }
+    });
+  }
 
   drop(event: CdkDragDrop<string[]>) {
     moveItemInArray(this.transcript, event.previousIndex, event.currentIndex);
@@ -1870,7 +1928,7 @@ async removeATCImage(index: number) {
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.add('atc-field-invalid-flash');
-        setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 1800);
+        setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 2500);
       }
     } catch {}
     this.snackbar.open(message, 'Dismiss', {
@@ -1905,6 +1963,15 @@ async removeATCImage(index: number) {
   }
 
   async submit(){
+    // mark that a submit was attempted so required fields reveal their inline "required" message
+    this.submitAttempted = true;
+    // block submit while offline — the ATC must reach the server before the draft is removed (draft stays saved)
+    if (!navigator.onLine) {
+      alert("You're offline. Your draft is saved — please reconnect to submit the ATC.");
+      return;
+    }
+    // wait for any in-flight draft save to finish so it can't re-create the draft after the soft-delete
+    await this.autoSaveInFlight;
     this.alphaid = generateId(this.firestoreATC, 'atc_alpha');
 
     if(this.date == null || this.date == undefined){
@@ -1979,7 +2046,7 @@ async removeATCImage(index: number) {
             console.log("Mandatory Procedure ", mandatoryProcedure)
             if(mandatoryProcedure != 0 && this.audioBlob.length == 0){
               if(this.eis || this.admin || this.ah){
-                alert("Changework Brief Missing!")
+                this.focusMissingField('atcfield-changework', 'Changework Brief is required when a mandatory procedure is given')
                 return
               }
             }
@@ -2331,9 +2398,12 @@ async removeATCImage(index: number) {
     this.loadingref?.close()
     this.loading = false
     // await this.cleanTemporaryaudio()
-    updateDoc(doc(this.firestoreATC, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
+    // wait for the soft-delete to complete so the submitted draft does not reappear
+    await updateDoc(doc(this.firestoreATC, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
       console.log(err)
     })
+    // clear locally-cached media for the submitted draft
+    await this.mediaCache.deleteByDraft(this.autoSaveID)
 
     if(!this.arenamode){
       window.scrollTo({
@@ -2371,7 +2441,9 @@ async removeATCImage(index: number) {
       this.mentornotes = null;
       this.audioBlob = [];
       this.audioBlobURL = [];
-      this.autoSaveID = generateId(this.firestoreATC, 'temporary_ATC');
+      this.autoSaveID = null;  // clear draft context so the name unlocks and a new participant can be selected
+      this.aigeneratedEntry = false;
+      this.existingDraftIds = [];
       this.selectedNoteImages = []
       this.previewNoteImages = []
       this.selectedATCImages = []

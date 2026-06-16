@@ -33,7 +33,7 @@ export class AssignQueueStudioComponent {
   filterText = ""
   profileList = []
 
-  title = "Assign Specialist"
+  title = "Confirm Specialist"
 
   constructor(public formbuilder:FormBuilder, @Inject(MAT_DIALOG_DATA) dialogdata:any, public dialogRef: MatDialogRef<any>) {
     console.log(dialogdata, 'dialogdata');

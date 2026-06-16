@@ -104,6 +104,12 @@ export class ZoomClientviewComponent {
   // Big-center recording overlay (host only). Replaces the older snackbar.
   recordingPromptVisible: boolean = false;
   recordingPromptKind: 'paused' | 'stopped' = 'stopped';
+  // Set when the host explicitly confirms recording is running. Suppresses the
+  // prompt for good — needed because some Zoom SDK builds never fire
+  // `onRecordingStatusChange`, so we can't detect the started state ourselves
+  // and would otherwise nag forever even while recording IS on. A genuine later
+  // 'stopped'/'paused' event resets this so a real stop still re-prompts.
+  private recordingConfirmedByHost: boolean = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -401,26 +407,47 @@ export class ZoomClientviewComponent {
       ZM.inMeetingServiceListener('onUserLeave', () => this.refreshRemoteCountSnapshot());
       ZM.inMeetingServiceListener('onUserUpdate', () => this.refreshRemoteCountSnapshot());
       const handleRecordingChange = (data: any) => {
-        const raw = (data?.recordingStatus ?? data?.status ?? data ?? '').toString();
+        // The Zoom Web SDK's onRecordingStatusChange passes { state: '...' }
+        // (e.g. 'Recording', 'Paused', 'Stopped', 'Connecting'). Earlier code
+        // read recordingStatus/status which don't exist on this event, so the
+        // object fell through to "[object Object]" and the status never
+        // updated — leaving the prompt stuck on 'paused' after resume.
+        // Read `state` first, then the other shapes for older SDK builds.
+        const raw = (
+          data?.state ??
+          data?.recordingStatus ??
+          data?.status ??
+          (typeof data === 'string' ? data : '')
+        ).toString();
         const s: string = raw.toLowerCase();
-        console.debug('[recording-prompt] status event', raw, data);
+        console.log('[recording-prompt] status event raw=', raw, 'payload=', data);
         let newStatus: 'started' | 'paused' | 'stopped' | 'unknown' = this.recordingStatus;
-        // Order matters — "NotRecording" must classify as stopped before the
-        // 'record' check below would otherwise label it 'started'. Likewise
-        // 'PauseRecord' must hit the paused branch before 'record' steals it.
-        if (s.includes('not') || s.includes('stop') || s.includes('end')) {
+        // Order matters — "NotRecording"/"Stopped" must classify as stopped
+        // before the 'record' check would label it 'started'. "Paused" /
+        // "PauseRecord" must hit the paused branch before 'record' steals it.
+        if (s.includes('not') || s.includes('stop') || s.includes('end') || s.includes('disconnect')) {
           newStatus = 'stopped';
         } else if (s.includes('paus')) {
           newStatus = 'paused';
-        } else if (s.includes('start') || s.includes('record') || s.includes('connect')) {
+        } else if (s.includes('start') || s.includes('record') || s.includes('connect') || s.includes('resume')) {
           newStatus = 'started';
         }
 
         if (newStatus !== this.recordingStatus) {
+          console.log('[recording-prompt] status', this.recordingStatus, '→', newStatus);
           this.recordingStatus = newStatus;
           // Status changed → cooldown from a previous dismiss is no longer
           // relevant. Reset so the new state can prompt immediately.
           this.recordingPromptDismissedAt = 0;
+          // If recording is now on, close any open prompt right away.
+          if (newStatus === 'started') {
+            this.ngZone.run(() => { this.recordingPromptVisible = false; });
+          }
+          // A genuine later stop/pause means the host's earlier "recording is
+          // on" confirmation no longer holds — allow the prompt to re-appear.
+          if (newStatus === 'stopped' || newStatus === 'paused') {
+            this.recordingConfirmedByHost = false;
+          }
         }
         this.evaluateRecordingPrompt();
       };
@@ -468,6 +495,15 @@ export class ZoomClientviewComponent {
   }
 
   private evaluateRecordingPrompt() {
+    // Host explicitly confirmed recording is running → never nag. This is the
+    // escape hatch for SDK builds that don't emit recording-status events.
+    if (this.recordingConfirmedByHost) {
+      if (this.recordingPromptVisible) {
+        this.ngZone.run(() => { this.recordingPromptVisible = false; });
+      }
+      return;
+    }
+
     // Recording is on → close any open prompt and exit. This handles the
     // "paused → started" or "stopped → started" transition mid-call.
     if (this.recordingStatus === 'started') {
@@ -517,6 +553,17 @@ export class ZoomClientviewComponent {
   dismissRecordingPrompt() {
     this.recordingPromptVisible = false;
     this.recordingPromptDismissedAt = Date.now();
+  }
+
+  // Called from the overlay's "Recording is on — stop reminding me" button.
+  // The host asserts recording is running; suppress the prompt until a real
+  // stop/pause event proves otherwise. Fixes the loop where the SDK never
+  // reports the 'started' state and the prompt nags even while recording.
+  confirmRecordingOn() {
+    this.recordingConfirmedByHost = true;
+    this.recordingStatus = 'started';
+    this.recordingPromptVisible = false;
+    this.recordingPromptDismissedAt = 0;
   }
 
   private stopRecordingListeners() {

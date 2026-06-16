@@ -55,6 +55,7 @@ interface ArenaAssignment {
   participantid: string;
   pairing?: string[];
   participantsactivity?: { [profileid: string]: string };
+  bonusactivity?: { [profileid: string]: string }; // additional-activity specialists keyed by profile id
   specialistJoinedAt?: any;
   specialistLastSeenAt?: any;
   specialistLeftAt?: any;            // stamped on host pagehide / ngOnDestroy
@@ -225,6 +226,8 @@ export class ArenaBoardComponent implements OnDestroy {
       this.liveAssignments.forEach(a => {
         if (a.participantid) this.ensureProfileLoaded(a.participantid);
         (a.pairing || []).forEach(pid => this.ensureProfileLoaded(pid));
+        // Bonus-activity (additional) specialists are keyed by profile id.
+        Object.keys(a.bonusactivity || {}).forEach(pid => this.ensureProfileLoaded(pid));
       });
     });
 
@@ -321,6 +324,20 @@ export class ArenaBoardComponent implements OnDestroy {
     return this.mapProfile[profileid] || '—';
   }
 
+  // Bonus-activity (additional) specialists for an assignment. Keyed by
+  // profile id on the live assignment; we exclude the main pairing specialist
+  // and the participant so the same person isn't listed twice.
+  bonusSpecialists(a: ArenaAssignment): { id: string, name: string, activity: string }[] {
+    const exclude = new Set<string>([a.participantid, ...(a.pairing || [])]);
+    return Object.keys(a.bonusactivity || {})
+      .filter(pid => !exclude.has(pid))
+      .map(pid => ({
+        id: pid,
+        name: this.participantName(pid),
+        activity: this.mapActivity[a.bonusactivity?.[pid] || ''] || ''
+      }));
+  }
+
   // True when we've resolved a real name for this id (i.e. the chip is worth
   // rendering — used to hide "→ —" rows in the Queued list when the
   // preassigned specialist hasn't loaded yet).
@@ -357,13 +374,6 @@ export class ArenaBoardComponent implements OnDestroy {
       name: this.mapProfile[pid] || pid,
       activity: this.mapActivity[studio.participantsactivity?.[pid] || ''] || '',
     }));
-  }
-
-  // Returns a label like "SE 1 · ATC 0" — derived from token preassigned + invitations counters
-  studioTagFor(studio: ArenaStudio | null, fallback = ''): string {
-    if (!studio) return fallback;
-    const idx = this.studios.findIndex(s => s.docid === studio.docid) + 1;
-    return `SE ${Math.max(idx, 1)} · ATC ${idx}`;
   }
 
   // Returns the queue position to display, or null when the token has no
