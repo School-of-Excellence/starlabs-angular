@@ -370,11 +370,12 @@
                 <span class="dd-statbadge__count">{{ getCardFunnel(cardId).ongoing?.length || 0 }}</span>
                 <span class="dd-statbadge__lbl">Ongoing</span>
               </button>
-              <div class="dd-statbadge dd-statbadge--ended"
-                [class.dd-statbadge--zero]="getCardNonActiveSub(cardId) === 0">
-                <span class="dd-statbadge__count">{{ getCardNonActiveSub(cardId) }}</span>
+              <button class="dd-statbadge dd-statbadge--ended" type="button"
+                [class.dd-statbadge--zero]="getCardGroupedNonActive(cardId).length === 0"
+                (click)="openCardModal(cardId, 'nonactive'); $event.stopPropagation()">
+                <span class="dd-statbadge__count">{{ getCardGroupedNonActive(cardId).length | number }}</span>
                 <span class="dd-statbadge__lbl">Sub. Ended</span>
-              </div>
+              </button>
             </div>
 
           </article>
@@ -540,15 +541,17 @@
                     <span class="participant-name">{{ mapMetaData[pid]?.['name'] || pid }}</span>
                     <span class="product-count">{{ currentGroupedByProfile[pid]?.length }} products</span>
                   </div>
-                  <div class="profile-products">
+
+                  <div class="profile-products flex-direction-column">
                     <div class="product-tag" *ngFor="let item of currentGroupedByProfile[pid]">
                       <span>{{ mapProductName[item['productref']?.id] || 'Unknown' }}</span>
                       <span class="status-tag" [ngClass]="item['status']?.toLowerCase() || 'na'">{{ item['status'] ||
                         'N/A'
                         }}</span>
                       <span *ngIf="!isParticipantEligible(pid, item)">
+                        <span class="fw-bold">Reason: </span>
                         <span>
-                          <span class="fw-bold">Mode: </span>
+                          <span class="fw-bold text-muted">Mode: </span>
                           <span>{{ mapMetaData[pid]?.['participantmode'] || pid }}</span>
                         </span>
                         <span class="ps-2"
@@ -559,7 +562,17 @@
                             }}</span>
                         </span>
                       </span>
-                      <button class="dd-initiate-btn" (click)="initiateProduct(pid)" *ngIf="!item['status']">
+                      <span class="ps-2" *ngIf="isSubscriptionEnded(item)">
+                        <span class="fw-bold text-danger">
+                          Subscription Ended:
+                        </span>
+
+                        <span class="text-muted">
+                          {{ (item['subscriptionend']?.toDate?.() || item['subscriptionend']) | date:'dd MMM yyyy' }}
+                        </span>
+                      </span>
+                      <button class="dd-initiate-btn" (click)="initiateProduct(pid)"
+                        *ngIf="!item['status'] && !isSubscriptionEnded(item)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                           <polygon points="5 3 19 12 5 21 5 3" />
@@ -1013,9 +1026,9 @@
                                 <div class="detail-stage-label text-muted">
                                   {{ appointment?.appointmentTypeName || appointment?.formname || 'Appointment' }}
                                 </div>
-                                <div class="detail-stage-label text-muted">
+                                <!-- <div *ngIf="appointment?.appointmentTypeName" class="detail-stage-label text-muted">
                                   Specialist: {{ mapMetaData[(appointment.hosts[0]?.path || appointment.hosts[0]).split('/').pop()]?.name || '—' }}
-                                </div>
+                                </div> -->
                                 <div *ngIf="appointment?.starttime">
                                   <span class="detail-stage-label">Start: </span>
                                   <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
@@ -1612,6 +1625,24 @@
                       current period</p>
                   </div>
                 </header>
+
+                <div class="spec-field spec-field--activity mt-3">
+                  <span class="spec-field-label">Delivery Activity</span>
+                  <div class="spec-input-wrap pt-2">
+                    <select class="spec-input spec-select border" [(ngModel)]="selectedActivity"
+                      (ngModelChange)="onActivityChange($event)">
+                      <option [ngValue]="null" disabled>Select activity</option>
+                      <option *ngFor="let activity of specialistSequences" [ngValue]="activity.appointmentTypeId">
+                        {{ activity.appointmentType }}
+                      </option>
+                    </select>
+                    <svg class="spec-input-chevron" width="16" height="16" fill="none" stroke="currentColor"
+                      stroke-width="2" viewBox="0 0 24 24">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                </div>
+
                 <!-- Loading state while specialistData is being fetched -->
                 <div class="spec-util-loading" *ngIf="specialistLoading">
                   <div class="specialist-loading-spinner"></div>
