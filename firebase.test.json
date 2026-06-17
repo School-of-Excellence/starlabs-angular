@@ -1,0 +1,7 @@
+{
+  "//": "Test-only Firebase config. Pinned to the disposable test project via --project. Deploys OPEN Firestore rules to BOTH databases so the e2e harness + app can read/write freely. NEVER use for prod.",
+  "firestore": [
+    { "database": "(default)", "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+    { "database": "firestore-forms", "rules": "firestore.rules" }
+  ]
+}

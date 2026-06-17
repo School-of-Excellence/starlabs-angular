@@ -2,7 +2,7 @@
     <h5 class="title">Awaiting Confirmation</h5>
     <span class="subtitle">You are requested to join '{{invitationdata["stage"]}}' with the participant {{invitationdata["participantname"]}}</span>
     <div class="mt-3 text-center" style="display: flex;justify-content: center;align-items: center;">
-      <button class="cancelbtn mr-3" mat-stroked-button (click)="cancel()">Deny Invitation</button>
-      <button class="successbtn" mat-stroked-button (click)="submit()">Accept Participant</button>
+      <button class="cancelbtn mr-3" mat-stroked-button (click)="cancel()" data-testid="aos-deny-btn">Deny Invitation</button>
+      <button class="successbtn" mat-stroked-button (click)="submit()" data-testid="aos-accept-btn">Accept Participant</button>
     </div>
   </div>

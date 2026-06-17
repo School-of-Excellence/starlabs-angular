@@ -1,0 +1,73 @@
+
+## "queue_token"  count=7046
+   [00dyh4CxBHvM0NjWivlu] {queuename:str(16), denynote:null, docid:str(20), tokenstatus:str(6), profile_name:str(11), tokennumber:number, queueref:ref, profile_id:str(20), productref:ref, productname:str(34), quicknotes:null, stagestatus:str(8), createdon:ts, cwmentoring:null, cwperson:null, cwshadowing:null, readyimplementation:array[1], currentstage:str(9), people_involved:array[0], diagnosticshadowing:null, arenaid:null, diagnosticmentoring:null, logdate:ts, diagnosticperson:null, liveassignmentid:null, previousstage:str(9)}
+   [039WJ8PpyNKV0JNGKb8f] {docid:str(20), tokennumber:number, profile_name:str(15), profile_id:str(20), quicknotes:null, tokenstatus:str(6), productref:ref, productname:str(14), createdon:ts, queueref:ref, queuename:str(25), stagestatus:str(8), denynote:null, variationid:str(20), diagnosticshadowing:null, arenaid:null, diagnosticmentoring:null, cwshadowing:null, cwmentoring:null, cwperson:null, diagnosticperson:null, formref:ref, people_involved:array[0], studioid:null, preassigned:{Evolution Mapping Activity:array[0]}, liveassignmentid:null, tokentransferredto:ref, transferredto:ref, currentstage:str(9), logdate:ts}
+
+## "queue generation"  count=96
+   [0McTJFfjLZW6Tc3X0cGc] {venue:str(7), queuedmessage:str(85), docid:str(20), created:ts, queuewelcometemplate:str(4), description:str(122), queuetargetcapacity:number, stagegroup:array[0], enablezoommeetingsdk:boolean, totalcapacity:number, queuementor:array[4], stages:array[20], zoomlinkrequired:boolean, lastregistrationdate:ts, waitingmessage:str(163), queueadmin:array[4], availabilitygivenby:array[6], queuename:str(24), queuestartdate:ts, queueenddate:ts, arenaeventidlist:array[2], queuevariation:array[2], modified:ts, stageproperty:{Diagnostics:obj, Review 4:obj, Evolution Mapping Activity:obj, Implementation:obj, At the Venue:obj, Yet to Come:obj, Consultation:obj, ATC Orientation:obj, ATC Assessment:obj, Self ATC:obj, Self ATC Next Cycle:obj, Post Video Log:obj, Completed:obj, uP! Life Report:obj, Diagnostics 2:obj, Diagnostics 3:obj, Review 1:obj, Review 2:obj, Diagnostics 1:obj, Review 3:obj, Review:obj, Video Log:obj, Implementation 3:obj, Implementation 2:obj, Implementation 4:obj, Diagnostics 4:obj, Implementation 1:obj}}
+   [12sDrzNScSnpNoeXjkbZ] {ahperson:array[0], queuename:str(28), venue:str(6), isreviewrequired:array[0], queuewelcometemplate:str(4), videologperson:array[0], queuetargetcapacity:number, isdiagnosticsrequired:array[0], isconsultationrequired:array[0], isvideologrequired:array[0], queuementor:array[2], queuevariation:array[0], diagnosticsperson:array[0], changeworkperson:array[0], created:ts, docid:str(20), ischangeworkreq:array[0], reviewperson:array[0], stagegroup:array[0], consultationperson:array[0], zoomlinkrequired:boolean, lastregistrationdate:ts, isahrequired:array[0], queueadmin:array[2], description:str(161), availabilitygivenby:array[32], totalcapacity:number, stages:array[6], queuedmessage:str(3), queuestartdate:ts}
+
+## "queue variation"  count=183
+   [0L0CpsqppJEFGUjg95ER] {variationname:str(18), queueref:ref, stages:array[14]}
+   [0bH0Tm5SflXdjc7mZUYm] {variationname:str(23), stages:array[12], queueref:ref, atcmodel:str(3)}
+
+## "queue stage log"  count=68659
+   [00176065-bf24-4c5c-92b6-561360b8d886] {docid:str(20), quicknotes:null, queueposition:number, queueref:ref, people_involved:array[0], diagnosticperson:null, manuallymoved:boolean, deliveryRef:str(33), profile_id:str(20), productref:ref, queuename:str(35), createdon:ts, variationid:str(20), studioid:null, liveassignmentid:null, cwshadowing:null, denynote:null, diagnosticmentoring:null, currentstage:str(20), selectedstageslot:{Scope Enhancement:obj}, stagestatus:str(8), status:null, tokenstatus:str(6), createdAttempt:number, tokennumber:number, cwperson:null, arenaid:null, productname:str(14), previousstage:str(29), participantproductid:str(20)}
+   [005wovd5ODpiAI1eWuu6] {queuename:str(25), currentstage:str(11), logdocid:str(20), liveassignmentid:null, tokenstatus:str(6), cwshadowing:null, formref:ref, profile_name:str(11), variationid:str(20), productname:str(32), quicknotes:null, stagestatus:str(8), queueposition:number, previousstage:str(13), people_involved:array[0], studioid:null, denynote:null, diagnosticshadowing:null, arenaid:null, docid:str(20), diagnosticmentoring:null, createdon:ts, cwmentoring:null, tokennumber:number, cwperson:null, queueref:ref, profile_id:str(20), productref:ref, diagnosticperson:null, status:str(6)}
+
+## "queue studio pairing"  count=2335
+   [00Brn3Tg7lYRmwGEE1bE] {participantsactivity:{jcetBGpfsd4J3AnPHlOL:str(20)}, queueref:ref, docid:str(20), participants:array[1], created:ts, studioin:boolean, status:null, checkin:boolean}
+   [00gQ1xpBSRhDbBKJil2r] {participantsactivity:{NoIDPYKQwZzmRtBF1MP0:str(20)}, queueref:ref, docid:str(20), participants:array[1], created:ts, studioin:boolean, status:null, checkin:boolean}
+
+## "cohorts queue planner"  count=46
+   [11NufP66nY87D3GtwWbu] {profileid:str(20), queueid:str(20), selectedslots:array[1]}
+   [2McL5xSeW59V2eh00ZvL] {queueid:str(20), profileid:str(20), docid:str(20), selectedslots:array[1]}
+
+## "arenaspace"  count=93
+   [0DQMrBO9bwnGmECMefeU] {docid:str(20), createddate:ts, date:ts, spaceid:str(20), mentor:array[1], pivottype:str(20), summary:str(86), eventref:ref, assignmentref:null, marathonref:null, validated:boolean, delete:boolean, cohortsid:array[0], participantslist:array[1]}
+   [0PjiIQv9sGPQoMa9mnak] {docid:str(20), createddate:ts, date:ts, spaceid:str(20), mentor:array[1], pivottype:str(20), summary:str(131), eventref:ref, assignmentref:null, marathonref:null, validated:boolean, delete:boolean, cohortsid:array[0], participantslist:array[1]}
+
+## "arena space"  count=0
+
+## "arena participant"  count=1239
+   [05V9HQCUEvi3thgc6r1t] {pairingmode:str(6), queueid:str(20), tentativenextready:null, docid:str(20), profileid:str(20), stagerole:array[3], liveassignmentstatus:str(9), status:str(8)}
+   [0AOpv2gyQHAjg2LeNu2I] {pairingmode:str(6), queueid:str(20), tentativenextready:null, docid:str(20), profileid:str(20), stagerole:array[1], status:str(5), liveassignmentstatus:str(9)}
+
+## "live assignment"  count=12787
+   [00N0C291k0Z9pTPKn4yi] {bonusactivity:null, participantid:str(20), queueid:str(20), stagename:str(11), studioid:str(20), bonusactivityparticipant:null, pairing:array[1], participantsactivity:{Ztk3ghEOPJnaMKF2QnAe:str(20)}, docid:str(20), created:ts, zoomlinkrequired:boolean, signature:str(283), zoomdata:{settings:obj, join_url:str(74), pstn_password:str(6), timezone:str(19), pre_schedule:boolean, start_url:str(428), created_at:str(20), type:number, uuid:str(24), host_id:str(22), password:str(6), h323_password:str(6), topic:str(12), id:number, host_email:str(22), status:str(7), encrypted_password:str(32)}, changeworkbrief:array[1], updated:ts, status:str(9)}
+   [00eH9urdXggWILK12w56] {participantid:str(20), stagename:str(12), queueid:str(20), stagetype:str(8), shadowperson:array[0], pairing:array[1], docid:str(20), created:ts, zoomdata:{settings:obj, join_url:str(74), pstn_password:str(6), timezone:str(13), pre_schedule:boolean, start_url:str(428), created_at:str(20), type:number, uuid:str(24), host_id:str(22), password:str(6), h323_password:str(6), topic:str(12), id:number, host_email:str(22), status:str(7), encrypted_password:str(32)}, updated:ts, status:str(9)}
+
+## "openviduroom"  count=102
+   [1BZMBayABmr8jwu6zZzZ] {sessiontype:str(11), metadata:{appointmentid:str(20)}, sessionid:str(20), hosts:array[1], title:str(60), participantid:str(20), roomid:str(20), createddate:ts, participantjoined:array[2], egressInfo:{roomId:str(15), segmentResults:array[0], fileResults:array[1], error:str(0), imageResults:array[0], manifestLocation:str(0), backupStorageUsed:boolean, details:str(0), roomComposite:obj, egressId:str(15), status:str(15), retryCount:number, sourceType:str(22), file:obj, streamResults:array[0], endedAt:str(1), updatedAt:str(19), roomName:str(20), startedAt:str(19), errorCode:number}, participantlive:array[0], roomstatus:str(8), recordingstatus:str(5), active:boolean}
+   [1X69fnI18RfJjLHFS3RG] {sessiontype:str(11), sessionid:str(20), roomid:str(20), hosts:array[1], participantid:str(20), title:str(55), metadata:{appointmentid:str(20)}, createddate:ts, egressInfo:{egressId:str(15), roomId:str(15), status:str(15), roomComposite:obj, file:obj, error:str(0), startedAt:str(19), endedAt:str(1), roomName:str(20), streamResults:array[0], fileResults:array[1], segmentResults:array[0], updatedAt:str(19), imageResults:array[0], details:str(0), errorCode:number, manifestLocation:str(0), backupStorageUsed:boolean, sourceType:str(22), retryCount:number}, participantjoined:array[2], active:boolean, participantlive:array[0], roomstatus:str(8), recordingstatus:str(5)}
+
+## "modes"  count=15
+   [1EzvXY76tQ0ODVx0bvQD] {mode:str(25), sequence:number, docid:str(20), info:null}
+   [42KjKWS4UpPonrh3Sk4a] {mode:str(31), sequence:number, docid:str(20), info:null}
+
+## "classify"  count=36
+   [3minuteshpc] {docid:str(11), apikey:str(164), titleprompt:str(91), gptmodel:str(6), apikeytest:str(164), summaryprompt:str(157), prompt:str(426), admins:array[1], claudeapikey:str(108), installation:array[10], installationnotification:array[50], durationofinstallation:array[4]}
+   [AHCRM_dashboard_access] {business dashboard:array[6]}
+
+## "dashboard"  count=23
+   [FwJ0g5qxzBfNUUJHSKUR] {label:str(12), route:null, icon:str(5), showInSidenav:boolean, order:number, roles:array[0], profileid:array[0], children:array[14]}
+   [JW36x6hDtZ19NULmxxc1] {showInSidenav:boolean, order:number, icon:str(5), route:null, label:str(13), roles:array[0], profileid:array[0], children:array[1]}
+
+## "productToDeliverySequence"  count=85
+   [0mQIrpSvydzfe9OPcgoh] {deliveryoptions:array[1], product:ref}
+   [1zqp5C4wb9GNDMrs3fd5] {product:ref, deliveryoptions:array[2]}
+
+## "procedures"  count=34
+   [1HvGWd2x9LPl9V6PBbj6] {name:str(9), authoruid:array[0], suedoname:str(15)}
+   [24NMqew9LuMnsybrkPZE] {name:str(11), authoruid:array[0], suedoname:str(15)}
+
+## "tier access config"  count=12
+   [5TUK8xByPaWJgWiwLLke] {tieraccessby:str(7), tierid:str(20), docid:str(20), biglevelid:array[0], biglevel:array[0], productaccess:{1TgyhjEt97ZIjY1stgBb:array[2], A3ZxESwYwEq3Iix1Npsx:array[1], FUAG7SaEBFQKNr8vXxtc:array[1], q7WWy1HcvtvyeiDJ8rUD:array[1], lNmGPKApROBlTUtZDNCo:array[1], IipQJEwAqPIqKyX5RMnv:array[1], zXOSlrDXv0M1R1jaQzfv:array[1], WtmtoBKg7NSlKtlfONQ1:array[1], 9e8eryFH3ilV4jITfGUP:array[1], TPLw1DYWP2KDTRiuGZJ3:array[1], QhbyEhyUHWXAXtalz8VK:array[3], AFJQAbdlGATlEm0zoRnf:array[1], DqPYgBq7S4ujRetOQT1b:array[1], 63nswIbTuhBpW8sZezjk:array[1], uTkOjxaPZpoXASM38IU1:array[1], gL25qjTQHpzpMRRFiOpr:array[1], Z1BG0uILFjBJAHzDU8Oj:array[1], Qedrk9QWQvlizWLWXemR:array[1], ESgJg1EUYarVj9GAd2md:array[1], WW9HbnNHjz3nbspb6brG:array[1], RXvsMYoK0g4SstvDDURZ:array[1], Po8GJ3Gd18WxcUZeIxRw:array[1], aGumGa58nBR2SBuO0DSq:array[1], g64UgmMhdrWenvDUWUni:array[1], O2mt0C41gij5DL3RGnbz:array[1], r222gQt0aXhJAnyFfD2f:array[1], tbHe0RxEj6ZW6ZxfO5pd:array[1], lv05Armcn9KpVzt3aWFa:array[1], 5ieaVGJGUMFWCpw0GdCG:array[1], YYsg9Lux3oaNjEC8jqex:array[1]}}
+   [6tTCDoXZhcrjgWw79r53] {biglevel:array[0], tieraccessby:str(7), tierid:str(20), docid:str(20), productaccess:{5ieaVGJGUMFWCpw0GdCG:array[1], YYsg9Lux3oaNjEC8jqex:array[1], RXvsMYoK0g4SstvDDURZ:array[1]}}
+
+=== queue_token deep sample (the runtime state machine) ===
+  [00dyh4CxBHvM0NjWivlu] currentstage="Completed" queuemode=undefined stages=undefined
+  [039WJ8PpyNKV0JNGKb8f] currentstage="Completed" queuemode=undefined stages=undefined
+  [03E7evgXvAKSRzGXv6pX] currentstage="Yet to Start" queuemode=undefined stages=undefined
+
+DONE

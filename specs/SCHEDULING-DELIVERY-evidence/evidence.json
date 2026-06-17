@@ -1,0 +1,1814 @@
+{
+  "doc": "SCHEDULING-DELIVERY",
+  "provenance": "READ-ONLY production probes (fir-sample-aae4a), 2026-06-02. Regenerate: specs/evidence/probe_*.js then split_evidence.js. ATC denylist enforced.",
+  "now": "2026-06-02",
+  "note": "Delivered-sequence worked examples (10 anonymised participant timelines) are in specs/evidence/journey_evidence_final.json.",
+  "schema": {
+    "appointments": {
+      "collection": "appointments",
+      "count": 10312,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00QvMFICayJEqOZRKYi5",
+        "01J7KTuiXc2Ixstcg1ud",
+        "01YLdwAjsVUk0kkFk7x6"
+      ],
+      "tsField": "created",
+      "fields": {
+        "hosts": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "endtime": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "hostRole": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 100
+          }
+        },
+        "appointment": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "starttime": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "slotdata": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "appointmentrole": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "cancelled": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "bookedby": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "attended": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "loggedid": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "string",
+          "types": {
+            "string": 89
+          }
+        },
+        "zoomid": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "string",
+          "types": {
+            "string": 89
+          }
+        },
+        "zoompassword": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "string",
+          "types": {
+            "string": 89
+          }
+        },
+        "zoomurl": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "string",
+          "types": {
+            "string": 89
+          }
+        },
+        "appointmentstart": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "ts",
+          "types": {
+            "ts": 85
+          }
+        },
+        "appointmentend": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "ts",
+          "types": {
+            "ts": 85
+          }
+        },
+        "totalminutes": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "number",
+          "types": {
+            "number": 85
+          }
+        },
+        "participantproductid": {
+          "fillPct": 78,
+          "presentPct": 78,
+          "type": "string",
+          "types": {
+            "string": 78
+          }
+        },
+        "productid": {
+          "fillPct": 73,
+          "presentPct": 73,
+          "type": "string",
+          "types": {
+            "string": 73
+          }
+        },
+        "docid": {
+          "fillPct": 34,
+          "presentPct": 34,
+          "type": "string",
+          "types": {
+            "string": 34
+          }
+        },
+        "journeyid": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        },
+        "cancelledon": {
+          "fillPct": 18,
+          "presentPct": 90,
+          "type": "null",
+          "types": {
+            "null": 72,
+            "ts": 18
+          }
+        },
+        "participantjourneyid": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "string",
+          "types": {
+            "string": 10
+          }
+        },
+        "cancelledreason": {
+          "fillPct": 7,
+          "presentPct": 80,
+          "type": "null",
+          "types": {
+            "null": 73,
+            "string": 7
+          }
+        },
+        "participantjourneyproductid": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "string",
+          "types": {
+            "string": 7
+          }
+        },
+        "journeycoach": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "boolean",
+          "types": {
+            "boolean": 7
+          }
+        },
+        "onboarding": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "boolean",
+          "types": {
+            "boolean": 5
+          }
+        }
+      },
+      "fieldCount": 28,
+      "lastWrite": "2026-06-02",
+      "writes90d": 1380,
+      "writes365d": 4240
+    },
+    "availability": {
+      "collection": "availability",
+      "count": 20782,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00Ktb5k8EeVACJVjxDRw",
+        "01MqMx3whthLluir8XsF",
+        "01bu3Rjd3OezsYvHY5ig"
+      ],
+      "tsField": "starttime",
+      "fields": {
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "starttime": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "endtime": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "profileref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "appointments": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "weeklyhours": {
+          "fillPct": 49,
+          "presentPct": 49,
+          "type": "boolean",
+          "types": {
+            "boolean": 49
+          }
+        },
+        "nH69M6LjV1rZbCy1GQp1": {
+          "fillPct": 44,
+          "presentPct": 44,
+          "type": "array",
+          "types": {
+            "array": 44
+          }
+        },
+        "BGL9XTv48QoRg06LGu6K": {
+          "fillPct": 42,
+          "presentPct": 42,
+          "type": "array",
+          "types": {
+            "array": 42
+          }
+        },
+        "hpuworRbbhT4UwzmkorH": {
+          "fillPct": 34,
+          "presentPct": 34,
+          "type": "array",
+          "types": {
+            "array": 34
+          }
+        },
+        "SARZ5NK8wjdV6QCZSTIO": {
+          "fillPct": 28,
+          "presentPct": 28,
+          "type": "array",
+          "types": {
+            "array": 28
+          }
+        },
+        "3yQ7vgbiAcrgSvVvfaqL": {
+          "fillPct": 26,
+          "presentPct": 26,
+          "type": "array",
+          "types": {
+            "array": 26
+          }
+        },
+        "5rNG8EFMomEooRn6s3cn": {
+          "fillPct": 25,
+          "presentPct": 25,
+          "type": "array",
+          "types": {
+            "array": 25
+          }
+        },
+        "M2RXgbbJHs05G7dmvN8N": {
+          "fillPct": 25,
+          "presentPct": 25,
+          "type": "array",
+          "types": {
+            "array": 25
+          }
+        },
+        "RM9FIdA69wra8Tnajwt2": {
+          "fillPct": 21,
+          "presentPct": 21,
+          "type": "array",
+          "types": {
+            "array": 21
+          }
+        },
+        "9KSURURJwtKkd2wI1qy8": {
+          "fillPct": 19,
+          "presentPct": 19,
+          "type": "array",
+          "types": {
+            "array": 19
+          }
+        },
+        "M0xWNEtFMh1o7l2Baouy": {
+          "fillPct": 19,
+          "presentPct": 19,
+          "type": "array",
+          "types": {
+            "array": 19
+          }
+        },
+        "AkOr1WLFFq2ttBIQQKYe": {
+          "fillPct": 18,
+          "presentPct": 18,
+          "type": "array",
+          "types": {
+            "array": 18
+          }
+        },
+        "3RgGr63F5ztGnk7qNMSV": {
+          "fillPct": 18,
+          "presentPct": 18,
+          "type": "array",
+          "types": {
+            "array": 18
+          }
+        },
+        "M5I6AlpEGfQ8ynmi3gfl": {
+          "fillPct": 17,
+          "presentPct": 17,
+          "type": "array",
+          "types": {
+            "array": 17
+          }
+        },
+        "F36WRjDRXNCDP1Ox32ZN": {
+          "fillPct": 17,
+          "presentPct": 17,
+          "type": "array",
+          "types": {
+            "array": 17
+          }
+        },
+        "gQR1GKk9no7YQqk2yoCW": {
+          "fillPct": 17,
+          "presentPct": 17,
+          "type": "array",
+          "types": {
+            "array": 17
+          }
+        },
+        "6SGqOjv2ManENd7HxMNz": {
+          "fillPct": 17,
+          "presentPct": 17,
+          "type": "array",
+          "types": {
+            "array": 17
+          }
+        },
+        "JOr5RKxqpAwsm0mpDhjb": {
+          "fillPct": 17,
+          "presentPct": 17,
+          "type": "array",
+          "types": {
+            "array": 17
+          }
+        },
+        "gfjkKtFPApMoWCdWUNF7": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "array",
+          "types": {
+            "array": 16
+          }
+        },
+        "TtSPFwIhBW6uYv5nuAxl": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "array",
+          "types": {
+            "array": 16
+          }
+        },
+        "tpmjVBtQXXXa3ks1mfIa": {
+          "fillPct": 15,
+          "presentPct": 15,
+          "type": "array",
+          "types": {
+            "array": 15
+          }
+        },
+        "2kfKCJSqi9dVWgst0VBw": {
+          "fillPct": 15,
+          "presentPct": 15,
+          "type": "array",
+          "types": {
+            "array": 15
+          }
+        },
+        "JzFOvGIdsNfspGU7fhqu": {
+          "fillPct": 15,
+          "presentPct": 15,
+          "type": "array",
+          "types": {
+            "array": 15
+          }
+        },
+        "whoNsdLwl3YaMG0NsPH1": {
+          "fillPct": 15,
+          "presentPct": 15,
+          "type": "array",
+          "types": {
+            "array": 15
+          }
+        },
+        "v0GP8nZLJItYJgUOnYGd": {
+          "fillPct": 15,
+          "presentPct": 15,
+          "type": "array",
+          "types": {
+            "array": 15
+          }
+        },
+        "sytW53Q3XYlXse1UzyCY": {
+          "fillPct": 14,
+          "presentPct": 14,
+          "type": "array",
+          "types": {
+            "array": 14
+          }
+        },
+        "QRb8RlmmEyr5Qn963scN": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "array",
+          "types": {
+            "array": 13
+          }
+        },
+        "2uhRxs9NUExgp4iWwE29": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "array",
+          "types": {
+            "array": 13
+          }
+        },
+        "Wo04Di4xY4L7ABfOpxDU": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "array",
+          "types": {
+            "array": 13
+          }
+        },
+        "NQWW0NCHe6v5nJCfsYyI": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "array",
+          "types": {
+            "array": 13
+          }
+        },
+        "VCQ5jwCNnIndK1cBUe48": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "array",
+          "types": {
+            "array": 12
+          }
+        },
+        "uNpEB6vsiVdkClh1NmxB": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "array",
+          "types": {
+            "array": 12
+          }
+        },
+        "UGEZFlmVmGTxCG7j5l1A": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "array",
+          "types": {
+            "array": 12
+          }
+        },
+        "Gn69Sq9ZfRwabCANMMZ6": {
+          "fillPct": 11,
+          "presentPct": 11,
+          "type": "array",
+          "types": {
+            "array": 11
+          }
+        },
+        "jas15I1t0ZzCV8Ff4QQ6": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "array",
+          "types": {
+            "array": 10
+          }
+        },
+        "wNguwJMVj1eMAyKz19mt": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "array",
+          "types": {
+            "array": 10
+          }
+        },
+        "8f9YIeRt4GA1107qakuY": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "array",
+          "types": {
+            "array": 10
+          }
+        },
+        "vUIn6cHig2rB58GIyILt": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "array",
+          "types": {
+            "array": 9
+          }
+        },
+        "w2HQ7WW5eQJrOMenin9w": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "array",
+          "types": {
+            "array": 8
+          }
+        },
+        "GfcZNlNty9Z6szD8BOJu": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "array",
+          "types": {
+            "array": 7
+          }
+        },
+        "iyvtusM2McNvOs0yEdwT": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "array",
+          "types": {
+            "array": 7
+          }
+        },
+        "jnOF3oS1Hnd2UeC3uBM4": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "array",
+          "types": {
+            "array": 6
+          }
+        },
+        "E8G4mMLVF9FtGcUcUQ86": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "array",
+          "types": {
+            "array": 6
+          }
+        },
+        "JaK9JtB2htP2rPlybUCX": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "array",
+          "types": {
+            "array": 6
+          }
+        },
+        "DDcVxCDzQbxQSjjtTCW6": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "array",
+          "types": {
+            "array": 6
+          }
+        },
+        "PlU2qsRdiwl1LXY9K6MQ": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "array",
+          "types": {
+            "array": 6
+          }
+        },
+        "QU8sUJyuGWJbpKtJK7gY": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "array",
+          "types": {
+            "array": 5
+          }
+        },
+        "QfkT9y7hSC0hVGGcqasu": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "array",
+          "types": {
+            "array": 5
+          }
+        },
+        "hlqd5hnStktykvTV2PYk": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "array",
+          "types": {
+            "array": 5
+          }
+        },
+        "2XDbWUnCkw8XGCD3vTdu": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "poNaVsBaaxG6LAB7Ft5f": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "oRt1TphidY9iTkLFWKbt": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "yh5Mxm60pF9RjMXOALBP": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "Uf4UkFBsEyaXHhsDYgkW": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "EdkDLZ4Yhbz7ynyk1OKA": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "kZs0qvi3oUKDgHkqr6id": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "0I0eYF3Fakyw7pmcJRWG": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "Iu14YL1wPb529nUnUBO0": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "2ktJMzKJKI7xDy9M8JCT": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "Jjlg22yU2oWar8AMnAfN": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "uXMHeYhrHZyaseoGhJqk": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "G48Es8IMLPDRUyLzLnUF": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "bcJNzrzIznZhsHb6NUC8": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "miZKIu9qdaP1zO8Fo5P0": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "uByxiMS8nPoflyV3iILB": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "amjQLA8tb06ITnzZ69Tn": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "UuGBrq6Zce0xZ6T0JMCw": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "S8mvXFeAdOh14jXnnJUP": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "SgCtNplcck2n9biH0l6H": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "0xKJEQgNEB2A9hMi9TvK": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "pXldxKeIn2PuPLtKa1tI": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "Chcsicq6tbFTCN8lzv9N": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "fALkdP0GgSEDSuneMDUy": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "8J2evdpDC3ePRq2xl0hE": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "2s8QQBZZ2CwHQRB2N5Lu": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "DpWNVer8MrrvX62uMXGL": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "opPqinjA0O6XEdQUaxZU": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "sM4dDVzCzKiFfzOzGH6R": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        }
+      },
+      "fieldCount": 83,
+      "lastWrite": "2026-06-17",
+      "writes90d": 2212,
+      "writes365d": 7693
+    },
+    "offtime": {
+      "collection": "offtime",
+      "count": 125,
+      "sampled": 100,
+      "sampleDocIds": [
+        "0JnAgcXjhxiisXnrYh4O",
+        "0zZnRKvgf3oNMZUF4hQJ",
+        "17JXAX8z4ow63LLArrnP"
+      ],
+      "tsField": "date",
+      "fields": {
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "endtime": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "fullday": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "starttime": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "authorizedby": {
+          "fillPct": 67,
+          "presentPct": 67,
+          "type": "string",
+          "types": {
+            "string": 67
+          }
+        },
+        "status": {
+          "fillPct": 66,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 66,
+            "null": 34
+          }
+        }
+      },
+      "fieldCount": 8,
+      "lastWrite": "2026-05-14",
+      "writes90d": 1,
+      "writes365d": 8
+    },
+    "deliverables": {
+      "collection": "deliverables",
+      "count": 30738,
+      "sampled": 100,
+      "sampleDocIds": [
+        "005lm8Byg2NNcrvrz9jG",
+        "00I8NZagrd7qf753Oxoa",
+        "00k97lMiZMwYnQd00NtK"
+      ],
+      "tsField": null,
+      "fields": {
+        "type": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "deliveryref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "fileref": {
+          "fillPct": 96,
+          "presentPct": 96,
+          "type": "array",
+          "types": {
+            "array": 96
+          }
+        },
+        "profileid": {
+          "fillPct": 95,
+          "presentPct": 95,
+          "type": "string",
+          "types": {
+            "string": 95
+          }
+        },
+        "participantproductid": {
+          "fillPct": 95,
+          "presentPct": 95,
+          "type": "string",
+          "types": {
+            "string": 95
+          }
+        },
+        "status": {
+          "fillPct": 84,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 84,
+            "null": 16
+          }
+        },
+        "participantjourneyid": {
+          "fillPct": 22,
+          "presentPct": 22,
+          "type": "string",
+          "types": {
+            "string": 22
+          }
+        }
+      },
+      "fieldCount": 7
+    },
+    "participantdeliverysequence": {
+      "collection": "participantdeliverysequence",
+      "count": 3294,
+      "sampled": 100,
+      "sampleDocIds": [
+        "023uA43FNuDnIo0NM8wX",
+        "0288ehN1xP1MmTXAoCNs",
+        "038soRzLMjiF7lK4C4If"
+      ],
+      "tsField": null,
+      "fields": {
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "products": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        }
+      },
+      "fieldCount": 2
+    },
+    "appointmenttype": {
+      "collection": "appointmenttype",
+      "count": 108,
+      "sampled": 100,
+      "sampleDocIds": [
+        "0iun86HHeIEuxsO3McUl",
+        "0xKJEQgNEB2A9hMi9TvK",
+        "15frlwo46SbTRbVq0eTn"
+      ],
+      "tsField": null,
+      "fields": {
+        "duration": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "appointmenttype": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "ischangeworkrequired": {
+          "fillPct": 58,
+          "presentPct": 58,
+          "type": "boolean",
+          "types": {
+            "boolean": 58
+          }
+        },
+        "groupappointment": {
+          "fillPct": 43,
+          "presentPct": 43,
+          "type": "boolean",
+          "types": {
+            "boolean": 43
+          }
+        },
+        "maxbooking": {
+          "fillPct": 3,
+          "presentPct": 43,
+          "type": "null",
+          "types": {
+            "null": 40,
+            "number": 3
+          }
+        },
+        "journeycoach": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        }
+      },
+      "fieldCount": 7
+    },
+    "productToDeliverySequence": {
+      "collection": "productToDeliverySequence",
+      "count": 85,
+      "sampled": 85,
+      "sampleDocIds": [
+        "0mQIrpSvydzfe9OPcgoh",
+        "1zqp5C4wb9GNDMrs3fd5",
+        "3DvXZ4BdOksCxKwhvGaH"
+      ],
+      "tsField": null,
+      "fields": {
+        "deliveryoptions": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "product": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 85
+          }
+        },
+        "deliverysequence": {
+          "fillPct": 26,
+          "presentPct": 26,
+          "type": "array",
+          "types": {
+            "array": 22
+          }
+        },
+        "deliverydescription": {
+          "fillPct": 15,
+          "presentPct": 15,
+          "type": "array",
+          "types": {
+            "array": 13
+          }
+        }
+      },
+      "fieldCount": 4
+    },
+    "modes": {
+      "collection": "modes",
+      "count": 15,
+      "sampled": 15,
+      "sampleDocIds": [
+        "1EzvXY76tQ0ODVx0bvQD",
+        "42KjKWS4UpPonrh3Sk4a",
+        "7tTJy1HMasL9JZhfnu8L"
+      ],
+      "tsField": null,
+      "fields": {
+        "mode": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 15
+          }
+        },
+        "sequence": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 15
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 15
+          }
+        },
+        "info": {
+          "fillPct": 60,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "null": 6,
+            "string": 9
+          }
+        }
+      },
+      "fieldCount": 4
+    },
+    "delivery events": {
+      "collection": "delivery events",
+      "count": 42,
+      "sampled": 42,
+      "sampleDocIds": [
+        "0ZyWRZulf4fhxV3SG78c",
+        "231TJG12TaW76cOtBDXi",
+        "39nta9ZeEJmOeoaM3Num"
+      ],
+      "tsField": null,
+      "fields": {
+        "eventname": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 42
+          }
+        },
+        "events": {
+          "fillPct": 67,
+          "presentPct": 67,
+          "type": "array",
+          "types": {
+            "array": 28
+          }
+        }
+      },
+      "fieldCount": 2
+    },
+    "delivery forms": {
+      "collection": "delivery forms",
+      "count": 84,
+      "sampled": 84,
+      "sampleDocIds": [
+        "28VXVYIPcwpbepl977o9",
+        "2jlA6zDnQgVdz6qLxgNA",
+        "2w5LdlgDLh2J8mr8txZX"
+      ],
+      "tsField": null,
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 84
+          }
+        },
+        "formname": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 84
+          }
+        },
+        "formarray": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 84
+          }
+        },
+        "formtype": {
+          "fillPct": 83,
+          "presentPct": 83,
+          "type": "string",
+          "types": {
+            "string": 70
+          }
+        },
+        "formdescription": {
+          "fillPct": 54,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 45,
+            "null": 39
+          }
+        },
+        "formfor": {
+          "fillPct": 14,
+          "presentPct": 52,
+          "type": "null",
+          "types": {
+            "string": 12,
+            "null": 32
+          }
+        },
+        "delete": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "boolean",
+          "types": {
+            "boolean": 5
+          }
+        }
+      },
+      "fieldCount": 7
+    },
+    "AppointmentType-To-Roles": {
+      "collection": "AppointmentType-To-Roles",
+      "count": 102,
+      "sampled": 100,
+      "sampleDocIds": [
+        "0NIf3JMqMHDjIUZGrKvs",
+        "0p5I1I8k6rumCnHjM4B8",
+        "1Ihi5gL7AG6eq8q8zxUU"
+      ],
+      "tsField": null,
+      "fields": {
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "assigned_appttype_ref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "assigned_role": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "additional_role": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "array",
+          "types": {
+            "array": 99
+          }
+        },
+        "required_role": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "array",
+          "types": {
+            "array": 99
+          }
+        },
+        "assigned_appttype": {
+          "fillPct": 93,
+          "presentPct": 93,
+          "type": "string",
+          "types": {
+            "string": 93
+          }
+        }
+      },
+      "fieldCount": 6
+    },
+    "Roles-To-EIS": {
+      "collection": "Roles-To-EIS",
+      "count": 102,
+      "sampled": 100,
+      "sampleDocIds": [
+        "10i0yJmltGZhuZ4wteUI",
+        "1kV0uP1M3QYq6iJWK6Gt",
+        "2n8ffJiFTG4u62EytDmI"
+      ],
+      "tsField": null,
+      "fields": {
+        "assigned_role_ref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "assigned_eis": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "assigned_role": {
+          "fillPct": 92,
+          "presentPct": 92,
+          "type": "string",
+          "types": {
+            "string": 92
+          }
+        }
+      },
+      "fieldCount": 4
+    }
+  },
+  "config": {
+    "productToDeliverySequence": {
+      "collection": "productToDeliverySequence",
+      "count": 85,
+      "sampled": 85,
+      "variantCount": 3,
+      "variants": [
+        {
+          "count": 63,
+          "exampleId": "0mQIrpSvydzfe9OPcgoh",
+          "keys": [
+            "deliveryoptions",
+            "product"
+          ],
+          "shape": "{deliveryoptions:array[1]<{deliverysequence:array[1]<map>, deliverytype:str(20)}>, product:ref}"
+        },
+        {
+          "count": 13,
+          "exampleId": "3DvXZ4BdOksCxKwhvGaH",
+          "keys": [
+            "deliverydescription",
+            "deliveryoptions",
+            "deliverysequence",
+            "product"
+          ],
+          "shape": "{deliverysequence:array[3]<ref>, deliveryoptions:array[1]<{deliverysequence:array[3]<map>, deliverytype:str(20)}>, product:ref, deliverydescription:array[3]<{activity:ref, description:str(0), label:str(0)}>}"
+        },
+        {
+          "count": 9,
+          "exampleId": "CUBkW1N7GFD6sqkP0XHr",
+          "keys": [
+            "deliveryoptions",
+            "deliverysequence",
+            "product"
+          ],
+          "shape": "{deliverysequence:array[2]<ref>, product:ref, deliveryoptions:array[1]<{deliverysequence:array[2]<map>, deliverytype:str(5)}>}"
+        }
+      ]
+    },
+    "modes": {
+      "collection": "modes",
+      "count": 15,
+      "sampled": 15,
+      "variantCount": 1,
+      "variants": [
+        {
+          "count": 15,
+          "exampleId": "1EzvXY76tQ0ODVx0bvQD",
+          "keys": [
+            "docid",
+            "info",
+            "mode",
+            "sequence"
+          ],
+          "shape": "{mode:str(25), sequence:number, docid:str(20), info:null}"
+        }
+      ]
+    },
+    "appointmenttype": {
+      "collection": "appointmenttype",
+      "count": 108,
+      "sampled": 108,
+      "variantCount": 5,
+      "variants": [
+        {
+          "count": 46,
+          "exampleId": "0iun86HHeIEuxsO3McUl",
+          "keys": [
+            "appointmenttype",
+            "duration",
+            "id"
+          ],
+          "shape": "{duration:number, id:str(20), appointmenttype:str(26)}"
+        },
+        {
+          "count": 44,
+          "exampleId": "2kfKCJSqi9dVWgst0VBw",
+          "keys": [
+            "appointmenttype",
+            "duration",
+            "groupappointment",
+            "id",
+            "ischangeworkrequired",
+            "maxbooking"
+          ],
+          "shape": "{id:str(20), appointmenttype:str(36), maxbooking:null, groupappointment:boolean, ischangeworkrequired:boolean, duration:number}"
+        },
+        {
+          "count": 16,
+          "exampleId": "0xKJEQgNEB2A9hMi9TvK",
+          "keys": [
+            "appointmenttype",
+            "duration",
+            "id",
+            "ischangeworkrequired"
+          ],
+          "shape": "{duration:number, ischangeworkrequired:boolean, id:str(20), appointmenttype:str(34)}"
+        },
+        {
+          "count": 1,
+          "exampleId": "2XDbWUnCkw8XGCD3vTdu",
+          "keys": [
+            "appointmenttype",
+            "duration",
+            "groupappointment",
+            "id",
+            "ischangeworkrequired",
+            "journeycoach",
+            "maxbooking"
+          ],
+          "shape": "{id:str(20), appointmenttype:str(16), journeycoach:boolean, ischangeworkrequired:boolean, maxbooking:null, groupappointment:boolean, duration:number}"
+        },
+        {
+          "count": 1,
+          "exampleId": "w2HQ7WW5eQJrOMenin9w",
+          "keys": [
+            "appointmenttype",
+            "duration",
+            "groupappointment",
+            "id",
+            "ischangeworkrequired",
+            "maxbooking",
+            "onboardingcall"
+          ],
+          "shape": "{duration:number, ischangeworkrequired:boolean, id:str(20), appointmenttype:str(18), maxbooking:null, groupappointment:boolean, onboardingcall:boolean}"
+        }
+      ]
+    },
+    "delivery events": {
+      "collection": "delivery events",
+      "count": 42,
+      "sampled": 42,
+      "variantCount": 2,
+      "variants": [
+        {
+          "count": 28,
+          "exampleId": "0ZyWRZulf4fhxV3SG78c",
+          "keys": [
+            "eventname",
+            "events"
+          ],
+          "shape": "{eventname:str(23), events:array[1]<ref>}"
+        },
+        {
+          "count": 14,
+          "exampleId": "231TJG12TaW76cOtBDXi",
+          "keys": [
+            "eventname"
+          ],
+          "shape": "{eventname:str(18)}"
+        }
+      ]
+    },
+    "delivery forms": {
+      "collection": "delivery forms",
+      "count": 84,
+      "sampled": 84,
+      "variantCount": 5,
+      "variants": [
+        {
+          "count": 42,
+          "exampleId": "28VXVYIPcwpbepl977o9",
+          "keys": [
+            "docid",
+            "formarray",
+            "formdescription",
+            "formfor",
+            "formname",
+            "formtype"
+          ],
+          "shape": "{formdescription:str(724), docid:str(20), formname:str(32), formtype:str(6), formfor:str(8), formarray:array[30]<{fieldname:str(112), fielddescription:null, fieldnotes:null, type:str(5), options:array[0], maxcount:boolean, mincount:boolean, maxitems:null, flipping:boolean, required:boolean, array:array[0]}>}"
+        },
+        {
+          "count": 23,
+          "exampleId": "7JTgP3qViawv5UQWbrgB",
+          "keys": [
+            "docid",
+            "formarray",
+            "formdescription",
+            "formname",
+            "formtype"
+          ],
+          "shape": "{formdescription:null, formtype:str(6), docid:str(20), formname:str(50), formarray:array[2]<{fieldname:str(312), maxcount:null, fieldnotes:null, array:array[0], mincount:null, options:array[0], flipping:boolean, fielddescription:null, type:str(5), required:boolean}>}"
+        },
+        {
+          "count": 14,
+          "exampleId": "9MAITIdhxR53EFmBJGhX",
+          "keys": [
+            "docid",
+            "formarray",
+            "formdescription",
+            "formname"
+          ],
+          "shape": "{docid:str(20), formname:str(14), formdescription:null, formarray:array[8]<{fieldname:str(53), fieldnotes:null, array:array[0], options:array[1]<str(183)>, fielddescription:null, type:str(5), required:boolean}>}"
+        },
+        {
+          "count": 3,
+          "exampleId": "7EL9sddhNTwE7NX6NiU4",
+          "keys": [
+            "delete",
+            "docid",
+            "formarray",
+            "formdescription",
+            "formname",
+            "formtype"
+          ],
+          "shape": "{formdescription:null, formtype:str(7), docid:str(20), formname:str(40), formarray:array[8]<{mincount:boolean, maxcount:boolean, required:boolean, fielddescription:null, fieldnotes:null, type:str(9), flipping:boolean, array:array[0], fieldname:str(85), options:array[0]}>, delete:boolean}"
+        },
+        {
+          "count": 2,
+          "exampleId": "2jlA6zDnQgVdz6qLxgNA",
+          "keys": [
+            "delete",
+            "docid",
+            "formarray",
+            "formdescription",
+            "formfor",
+            "formname",
+            "formtype"
+          ],
+          "shape": "{formdescription:str(0), docid:str(20), formname:str(10), formtype:str(6), delete:boolean, formfor:null, formarray:array[3]<{fieldname:str(10), fielddescription:null, fieldnotes:null, type:str(5), options:array[0], maxcount:null, mincount:null, flipping:boolean, required:boolean, array:array[2]<map>}>}"
+        }
+      ]
+    },
+    "AppointmentType-To-Roles": {
+      "collection": "AppointmentType-To-Roles",
+      "count": 102,
+      "sampled": 102,
+      "variantCount": 3,
+      "variants": [
+        {
+          "count": 94,
+          "exampleId": "0NIf3JMqMHDjIUZGrKvs",
+          "keys": [
+            "additional_role",
+            "assigned_appttype",
+            "assigned_appttype_ref",
+            "assigned_role",
+            "id",
+            "required_role"
+          ],
+          "shape": "{additional_role:array[0], id:str(20), assigned_appttype:str(16), assigned_appttype_ref:ref, required_role:array[1]<ref>, assigned_role:array[1]<ref>}"
+        },
+        {
+          "count": 7,
+          "exampleId": "2bQKiW106VunAYmhj0c2",
+          "keys": [
+            "additional_role",
+            "assigned_appttype_ref",
+            "assigned_role",
+            "id",
+            "required_role"
+          ],
+          "shape": "{required_role:array[1]<ref>, assigned_appttype_ref:ref, assigned_role:array[1]<ref>, additional_role:array[0], id:str(20)}"
+        },
+        {
+          "count": 1,
+          "exampleId": "1Ihi5gL7AG6eq8q8zxUU",
+          "keys": [
+            "assigned_appttype",
+            "assigned_appttype_ref",
+            "assigned_role",
+            "id"
+          ],
+          "shape": "{assigned_appttype_ref:ref, assigned_role:array[1]<ref>, assigned_appttype:str(42), id:str(20)}"
+        }
+      ]
+    },
+    "Roles-To-EIS": {
+      "collection": "Roles-To-EIS",
+      "count": 102,
+      "sampled": 102,
+      "variantCount": 2,
+      "variants": [
+        {
+          "count": 94,
+          "exampleId": "10i0yJmltGZhuZ4wteUI",
+          "keys": [
+            "assigned_eis",
+            "assigned_role",
+            "assigned_role_ref",
+            "id"
+          ],
+          "shape": "{assigned_role_ref:ref, assigned_role:str(36), id:str(20), assigned_eis:array[5]<ref>}"
+        },
+        {
+          "count": 8,
+          "exampleId": "5e4sbspDDMwt8SQZimWZ",
+          "keys": [
+            "assigned_eis",
+            "assigned_role_ref",
+            "id"
+          ],
+          "shape": "{id:str(20), assigned_role_ref:ref, assigned_eis:array[4]<ref>}"
+        }
+      ]
+    }
+  },
+  "traces": {
+    "schedulingTrace": {
+      "appointmentId": "YJkhYjIPNyT7KJ6d9IBP",
+      "start": "2026-06-07 01:30:00",
+      "end": "2026-06-07 03:30:00",
+      "attended": false,
+      "cancelled": false,
+      "totalminutes": null,
+      "appointmentRef": "appointmenttype/BGL9XTv48QoRg06LGu6K",
+      "participantproductid": null,
+      "productid": "tdN8iRRoB74PvWapeLNV",
+      "hostCount": 1,
+      "hasZoom": false,
+      "appointmentType": "Critical Support Implementation",
+      "appointmentTypeId": "BGL9XTv48QoRg06LGu6K"
+    },
+    "productToDeliverySequenceSample": {
+      "id": "0mQIrpSvydzfe9OPcgoh",
+      "product": "products/Rq9cu2Z3FSuILXdwYtca",
+      "deliveryoptionCount": 1,
+      "firstOptionKeys": [
+        "deliverysequence",
+        "deliverytype"
+      ],
+      "firstOptionDeliverySeqLen": 1
+    }
+  }
+}
