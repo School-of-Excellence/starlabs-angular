@@ -10,5 +10,5 @@ jobs:
     uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/branch-guard.yml@main
     with:
       allowlist: 'vignesh-027'
-      auto_revert: false
+      auto_revert: true     # PR-only stopgap on Free: a non-PR direct push to dev/prod is auto-reverted
     secrets: inherit
