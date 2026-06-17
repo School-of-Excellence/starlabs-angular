@@ -1,0 +1,14 @@
+name: branch-guard
+
+# Thin caller — detects stray direct pushes to protected branches. Logic lives in the hub.
+on:
+  push:
+    branches: [development, production]
+
+jobs:
+  guard:
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/branch-guard.yml@main
+    with:
+      allowlist: 'vignesh-027'
+      auto_revert: false
+    secrets: inherit
