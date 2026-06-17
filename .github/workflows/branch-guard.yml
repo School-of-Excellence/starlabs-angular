@@ -10,5 +10,6 @@ jobs:
     uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/branch-guard.yml@main
     with:
       allowlist: 'vignesh-027'
-      auto_revert: true     # PR-only stopgap on Free: a non-PR direct push to dev/prod is auto-reverted
+      auto_revert: false    # alert-only tripwire for now (policy = don't push). Real enforcement comes via
+                            # the release-console approval gate + GitHub branch protection (Team).
     secrets: inherit

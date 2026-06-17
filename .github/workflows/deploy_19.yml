@@ -1,43 +1,19 @@
 name: Deploy to Firebase
 
-# CI/CD plan enforcement (deploy-gate, not branch-lock):
-#   • Stage 3 — push to `development` AUTO-deploys to the TEST project (starlabs-test).
-#   • Stage 4 — PRODUCTION deploy is MANUAL ONLY: workflow_dispatch from the `production` branch,
-#               restricted to the maintainer allowlist (github.actor). A raw push to `production`
-#               NO LONGER deploys (that trigger was removed — it was an unguarded prod-deploy footgun).
-#   The `branch-guard` workflow additionally alerts/reverts stray direct pushes to protected branches.
+# AUTO-DEPLOY ON MERGE (the only model — no "merged-but-not-deployed" gap).
+#   The ONLY way code reaches development/production is an APPROVED Pull Request. Direct pushes are forbidden
+#   by team policy now, and will be HARD-blocked later by the release-console approval gate + GitHub branch
+#   protection. A merge is a push to the base branch, which triggers this deploy:
+#     • merge into development → deploy to TEST  (starlabs-test)
+#     • merge into production  → deploy to LIVE  (fir-sample-aae4a)
 on:
   push:
     branches:
-      - development          # Stage 3: auto-deploy to TEST
-  workflow_dispatch:         # Stage 4: manual, allowlisted PRODUCTION deploy (run it from the `production` branch)
-
-permissions:
-  contents: read
+      - development
+      - production
 
 jobs:
-  # ── Gate: only an allowlisted maintainer may dispatch a production deploy, and only from `production`.
-  guard:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Enforce production allowlist + source branch
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          ALLOWLIST: 'vignesh-027'        # maintainer allowlist (space-separated). Add usernames as needed.
-          ACTOR: ${{ github.actor }}
-          REF: ${{ github.ref }}
-        run: |
-          echo "Manual production deploy requested by: $ACTOR (ref: $REF)"
-          case " $ALLOWLIST " in
-            *" $ACTOR "*) echo "✓ $ACTOR is allowlisted for production." ;;
-            *) echo "::error::$ACTOR is NOT in the production deploy allowlist ($ALLOWLIST). Refusing."; exit 1 ;;
-          esac
-          if [ "$REF" != "refs/heads/production" ]; then
-            echo "::error::Production deploy must be dispatched from the 'production' branch (got $REF). Refusing."; exit 1
-          fi
-
   deploy:
-    needs: guard
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
