@@ -418,7 +418,6 @@ export class ViewAssignedATCComponent {
   }
 
   openATC(atc: DocumentSnapshot<any>){
-    console.log(atc)
     var atcData = atc.data()
 
     // Clear Previous Subscription
