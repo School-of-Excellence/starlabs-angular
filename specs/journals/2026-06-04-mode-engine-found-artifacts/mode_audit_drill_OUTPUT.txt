@@ -1,0 +1,28 @@
+──────────────────────────────────────────────────────────────────────────────────────────
+446C4lLw2gDOHProZE2P  uP! Live Event  mode=After Extended Performance Mode  dSince=125  expected=Extended
+  CURRENT knobs  I/P/E = 45/60/30  (sum 135)   product.modified=—  product.created=—
+  HISTORICAL intervals from statusdate = 30/60/30  (sum 120)
+  statusdate: completed=2026-01-29 integ=2026-01-29 perf=2026-02-28 ext=2026-04-29 afterext=2026-05-29
+  *completeddate variants: integ=2026-02-28 perf=2026-04-29 ext=2026-05-29
+  nextmode=null nextmodedate=—
+──────────────────────────────────────────────────────────────────────────────────────────
+J0A39MX1WjCdNk3Z8Isg  uP! Live Event  mode=After Extended Performance Mode  dSince=120  expected=Extended
+  CURRENT knobs  I/P/E = 45/60/30  (sum 135)   product.modified=—  product.created=—
+  HISTORICAL intervals from statusdate = 30/60/30  (sum 120)
+  statusdate: completed=2026-02-03 integ=2026-02-03 perf=2026-03-05 ext=2026-05-04 afterext=2026-06-03
+  *completeddate variants: integ=2026-03-05 perf=2026-05-04 ext=2026-06-03
+  nextmode=null nextmodedate=—
+──────────────────────────────────────────────────────────────────────────────────────────
+8dS0yAL0EmGWQC80DKld  uP! Live Event  mode=After Extended Performance Mode  dSince=121  expected=Extended
+  CURRENT knobs  I/P/E = 45/60/30  (sum 135)   product.modified=—  product.created=—
+  HISTORICAL intervals from statusdate = 30/60/30  (sum 120)
+  statusdate: completed=2026-02-03 integ=2026-02-03 perf=2026-03-05 ext=2026-05-04 afterext=2026-06-03
+  *completeddate variants: integ=2026-03-05 perf=2026-05-04 ext=2026-06-03
+  nextmode=null nextmodedate=—
+──────────────────────────────────────────────────────────────────────────────────────────
+8dS0yAL0EmGWQC80DKld  Conversational Programming Mastery  mode=After Extended Performance Mode  dSince=121  expected=Extended
+  CURRENT knobs  I/P/E = 45/60/30  (sum 135)   product.modified=—  product.created=—
+  HISTORICAL intervals from statusdate = 30/60/30  (sum 120)
+  statusdate: completed=2026-02-03 integ=2026-02-03 perf=2026-03-05 ext=2026-05-04 afterext=2026-06-03
+  *completeddate variants: integ=2026-03-05 perf=2026-05-04 ext=2026-06-03
+  nextmode=null nextmodedate=—

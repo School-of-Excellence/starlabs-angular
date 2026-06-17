@@ -7,14 +7,14 @@
       <span class="title-spacer"></span>
       <h1 class="main-title">B!G Planner - {{selectedQueue?.queuename || ''}}</h1>
       <span class="title-spacer"></span>
-      <mat-slide-toggle color="accent" labelPosition="before" [(ngModel)]="viewOnly">
+      <mat-slide-toggle color="accent" labelPosition="before" [(ngModel)]="viewOnly" data-testid="bp-viewonly-toggle">
         <span class="view-only-label">View Only</span>
       </mat-slide-toggle>
     </mat-toolbar>
 
     <div>
       <mat-form-field appearance="outline" style="width: 350px;padding: 20px;">
-        <mat-select placeholder="Select Event" [(ngModel)]="selectedEvent" (selectionChange)="eventSelected()">
+        <mat-select placeholder="Select Event" [(ngModel)]="selectedEvent" (selectionChange)="eventSelected()" data-testid="bp-event-select">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterEvent" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
           </mat-option>
@@ -52,7 +52,7 @@
             <mat-divider></mat-divider>
             <mat-card-content>
               <mat-nav-list class="participant-list">
-                <mat-list-item *ngFor="let invitation of cohortparticipantsList; let i = index" class="participant-item">
+                <mat-list-item *ngFor="let invitation of cohortparticipantsList; let i = index" data-testid="bp-participant-row" [attr.data-profile-id]="invitation" class="participant-item">
                   <!-- <div class="participant-row">
                     <div class="status-and-name">
                       <mat-icon class="status-icon" [ngClass]="invitation.status === 'away' ? 'status-away' : 'status-active'">
@@ -90,13 +90,13 @@
                         (mouseleave)="onLeave()">
                         <mat-icon class="chip-icon">groups</mat-icon>
                         <span class="stat-label">Studios</span>
-                        <span class="stat-value">{{profileStudioCount[invitation]?.length || 0}}</span>
+                        <span class="stat-value" data-testid="bp-stat-studios">{{profileStudioCount[invitation]?.length || 0}}</span>
                       </div>
                       <div class="stat-chip chip-pair" (mouseenter)="onEnter($event, invitation , 'pair')"
                         (mouseleave)="onLeave()">
                         <mat-icon class="chip-icon">group</mat-icon>
                         <span class="stat-label">Pair</span>
-                        <span class="stat-value">{{profilePairCount[invitation]?.length || 0}}</span>
+                        <span class="stat-value" data-testid="bp-stat-pair">{{profilePairCount[invitation]?.length || 0}}</span>
                       </div>
                       <div class="stat-chip chip-duplicate" (mouseenter)="onEnter($event, invitation , 'duplicate')"
                         (mouseleave)="onLeave()" (click)="onDuplicateClick(invitation)">
@@ -391,7 +391,7 @@
                       <div *ngIf="!viewOnly" class="actions-cell">
                         <button type="button" class="action-pill"
                           [class.on]="studio.studioin"
-                          (click)="toggleStudio(studio)"
+                          (click)="toggleStudio(studio)" data-testid="bp-studio-toggle" [attr.data-studio-id]="studio['docid']"
                           [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
                           <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
                           <span>Studio</span>
@@ -425,7 +425,7 @@
                   </ng-container>
   
                   <tr mat-header-row *matHeaderRowDef="displayedColumns;"></tr>
-                  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+                  <tr mat-row *matRowDef="let row; columns: displayedColumns;" data-testid="bp-studio-row" [attr.data-studio-id]="row['docid']"></tr>
                 </table>
                 <mat-paginator [pageSizeOptions]="[10, 20, 50, 1000]" aria-label="Select page of users"></mat-paginator>
               

@@ -1,0 +1,2907 @@
+{
+  "doc": "AUTH-ROLES",
+  "provenance": "READ-ONLY production probes (fir-sample-aae4a), 2026-06-02. Regenerate: specs/evidence/probe_*.js then split_evidence.js. ATC denylist enforced.",
+  "now": "2026-06-02",
+  "schema": {
+    "profile_data": {
+      "collection": "profile_data",
+      "count": 3248,
+      "sampled": 100,
+      "sampleDocIds": [
+        "023uA43FNuDnIo0NM8wX",
+        "0288ehN1xP1MmTXAoCNs",
+        "038soRzLMjiF7lK4C4If"
+      ],
+      "tsField": "lastmodifieddate",
+      "fields": {
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "email": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "enable": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "role_ref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "number": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "participantmode": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "testuser": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "boolean",
+          "types": {
+            "boolean": 89
+          }
+        },
+        "user_ref": {
+          "fillPct": 70,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "null": 30,
+            "ref": 70
+          }
+        },
+        "profile": {
+          "fillPct": 70,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "null": 30,
+            "string": 70
+          }
+        },
+        "countrycode": {
+          "fillPct": 49,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "string": 49,
+            "null": 51
+          }
+        },
+        "profileimg": {
+          "fillPct": 49,
+          "presentPct": 49,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "last_login": {
+          "fillPct": 41,
+          "presentPct": 41,
+          "type": "ts",
+          "types": {
+            "ts": 41
+          }
+        },
+        "dateofbirth": {
+          "fillPct": 40,
+          "presentPct": 96,
+          "type": "null",
+          "types": {
+            "null": 56,
+            "ts": 40
+          }
+        },
+        "recentpurchasedate": {
+          "fillPct": 27,
+          "presentPct": 27,
+          "type": "ts",
+          "types": {
+            "ts": 27
+          }
+        },
+        "block": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "boolean",
+          "types": {
+            "boolean": 16
+          }
+        },
+        "firstname": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        },
+        "lastmodifieddate": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "ts",
+          "types": {
+            "ts": 12
+          }
+        },
+        "deliveryonhold": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "boolean",
+          "types": {
+            "boolean": 12
+          }
+        },
+        "lastname": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        },
+        "address": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "string",
+          "types": {
+            "string": 10
+          }
+        },
+        "enableahcrm": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "boolean",
+          "types": {
+            "boolean": 4
+          }
+        },
+        "notes": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "map",
+          "types": {
+            "map": 3
+          }
+        },
+        "referralcode": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 3
+          }
+        },
+        "accountdeleted": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "user_ref_existing": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "map",
+          "types": {
+            "map": 1
+          }
+        },
+        "recentpurchase": {
+          "fillPct": 0,
+          "presentPct": 16,
+          "type": "null",
+          "types": {
+            "null": 16
+          }
+        }
+      },
+      "fieldCount": 28,
+      "lastWrite": "2026-06-02",
+      "writes90d": 77,
+      "writes365d": 413
+    },
+    "user_data": {
+      "collection": "user_data",
+      "count": 2257,
+      "sampled": 100,
+      "sampleDocIds": [
+        "044lzP4VHXQAzrq8nTwdho1H4vm1",
+        "05DRSPhXahMDt0vULTp3cXBPU9B3",
+        "05lCd6WHXuc1mm1SKkk2qtULlOp1"
+      ],
+      "tsField": "last_login",
+      "fields": {
+        "number": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "email": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "countrycode": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        },
+        "profile": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "uid": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "enable": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "ahmember": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "roles": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "map",
+          "types": {
+            "map": 1
+          }
+        },
+        "last_login": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "ts",
+          "types": {
+            "ts": 1
+          }
+        },
+        "admin": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "block": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        }
+      },
+      "fieldCount": 12,
+      "lastWrite": "2021-07-30",
+      "writes90d": 0,
+      "writes365d": 0
+    },
+    "new_user_data": {
+      "collection": "new_user_data",
+      "count": 625,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00hUv7Zfayo32xg7ziQM",
+        "0DUKtOHO6QCrGNGyAILE",
+        "0MIOx5CVcJDCkH3XikC3"
+      ],
+      "tsField": "created",
+      "fields": {
+        "uid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "email": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "phonenumber": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "countryCode": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "refferedby": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "emailVerified": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "registrationMethod": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "enable": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "workshoponly": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "last_login": {
+          "fillPct": 97,
+          "presentPct": 97,
+          "type": "ts",
+          "types": {
+            "ts": 97
+          }
+        },
+        "subscriber": {
+          "fillPct": 88,
+          "presentPct": 88,
+          "type": "boolean",
+          "types": {
+            "boolean": 88
+          }
+        },
+        "refferedprofile": {
+          "fillPct": 12,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 88,
+            "string": 12
+          }
+        }
+      },
+      "fieldCount": 16,
+      "lastWrite": "2026-06-01",
+      "writes90d": 535,
+      "writes365d": 625
+    },
+    "eisroles": {
+      "collection": "eisroles",
+      "count": 166,
+      "sampled": 100,
+      "sampleDocIds": [
+        "0VDWDUDz6A6d9wyqn88g",
+        "0X0xTZHfFY9WH9hU0Jcr",
+        "1KunlbALzQ6inQilT4Ie"
+      ],
+      "tsField": null,
+      "fields": {
+        "role": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "experiencestage": {
+          "fillPct": 64,
+          "presentPct": 69,
+          "type": "string",
+          "types": {
+            "string": 64,
+            "null": 5
+          }
+        },
+        "experiencelevel": {
+          "fillPct": 61,
+          "presentPct": 69,
+          "type": "string",
+          "types": {
+            "string": 61,
+            "null": 8
+          }
+        }
+      },
+      "fieldCount": 4
+    },
+    "FCM_token": {
+      "collection": "FCM_token",
+      "count": 8940,
+      "sampled": 100,
+      "sampleDocIds": [
+        "-M71ab0qi8_1d0A_Unxm",
+        "008AkO04ayr2KC5xXzAQ",
+        "00QqTEkr091S8adp5SGg"
+      ],
+      "tsField": "last_modified",
+      "fields": {
+        "active": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "FCM_id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "uid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "email": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "device_os": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "current_version": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "deviceinfo": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 100
+          }
+        },
+        "last_modified": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "profile_ref": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "ref",
+          "types": {
+            "ref": 99
+          }
+        },
+        "created": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "ts",
+          "types": {
+            "ts": 99
+          }
+        },
+        "user_ref": {
+          "fillPct": 94,
+          "presentPct": 94,
+          "type": "ref",
+          "types": {
+            "ref": 94
+          }
+        },
+        "device_fingerprint": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        },
+        "deactivated_reason": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        },
+        "deactivated_at": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "ts",
+          "types": {
+            "ts": 20
+          }
+        },
+        "voipToken": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        }
+      },
+      "fieldCount": 15,
+      "lastWrite": "2026-06-02",
+      "writes90d": 4369,
+      "writes365d": 7035
+    },
+    "dashboard": {
+      "collection": "dashboard",
+      "count": 23,
+      "sampled": 23,
+      "sampleDocIds": [
+        "FwJ0g5qxzBfNUUJHSKUR",
+        "JW36x6hDtZ19NULmxxc1",
+        "Jfe1vJkSH58EJ1D6Kui1"
+      ],
+      "tsField": null,
+      "fields": {
+        "label": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 23
+          }
+        },
+        "icon": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 23
+          }
+        },
+        "showInSidenav": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 23
+          }
+        },
+        "order": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 23
+          }
+        },
+        "roles": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 23
+          }
+        },
+        "children": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 23
+          }
+        },
+        "profileid": {
+          "fillPct": 87,
+          "presentPct": 87,
+          "type": "array",
+          "types": {
+            "array": 20
+          }
+        },
+        "route": {
+          "fillPct": 26,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 17,
+            "string": 6
+          }
+        },
+        "docid": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "favourites": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        }
+      },
+      "fieldCount": 10
+    },
+    "classify": {
+      "collection": "classify",
+      "count": 36,
+      "sampled": 36,
+      "sampleDocIds": [
+        "3minuteshpc",
+        "AHCRM_dashboard_access",
+        "adjustment_awareness"
+      ],
+      "tsField": "updatedAt",
+      "fields": {
+        "101723": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "map",
+          "types": {
+            "map": 1
+          }
+        },
+        "names": {
+          "fillPct": 22,
+          "presentPct": 22,
+          "type": "array",
+          "types": {
+            "array": 8
+          }
+        },
+        "docid": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "string",
+          "types": {
+            "string": 3
+          }
+        },
+        "apikey": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "string",
+          "types": {
+            "string": 3
+          }
+        },
+        "content": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "string",
+          "types": {
+            "string": 3
+          }
+        },
+        "gptmodel": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "prompt": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "string",
+          "types": {
+            "string": 1,
+            "array": 1
+          }
+        },
+        "approvedProcedures": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "approvedproceduresprompt": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "systemprompt": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "updatedAt": {
+          "fillPct": 6,
+          "presentPct": 6,
+          "type": "ts",
+          "types": {
+            "ts": 2
+          }
+        },
+        "titleprompt": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "apikeytest": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "summaryprompt": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "admins": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "claudeapikey": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "installation": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "installationnotification": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "durationofinstallation": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "business dashboard": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "potentialyearlabel": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "label": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "awarenesslist": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "dashboardaccess": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "generalcontentplaylist": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "eiflixplaylist": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "solarvoiceplaylist": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "podtemplateid": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "lastPrompt": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "FIREBASE_FETCH_URL": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "FIREBASE_SUBMIT_URL": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "prompttogenerateatc": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "SLACK_WEBHOOK_URL": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "fieldnames": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "name": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "allowapp": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "videoasktags": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "firsttimetags": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "serverid": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "duration": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "introduction": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "EI Solutions": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "A&H Light": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "EI Starter Pack": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "EI for Entheprenures": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "Critical Support": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "WiSH": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "list": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "apiurl": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "apitoken": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "Onboardingpaymentmesage": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "servername": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "senderemails": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "active": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "quicklinks": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "outputformat": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "contentdescription": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "description": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "intro": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "contenturl": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "touchpointlist": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "summary": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "capabilities": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "timeline": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "eventwati": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "clicklink": {
+          "fillPct": 0,
+          "presentPct": 3,
+          "type": "null",
+          "types": {
+            "null": 1
+          }
+        },
+        "imageurl": {
+          "fillPct": 0,
+          "presentPct": 3,
+          "type": "null",
+          "types": {
+            "null": 1
+          }
+        }
+      },
+      "fieldCount": 67,
+      "lastWrite": "2026-04-15",
+      "writes90d": 2,
+      "writes365d": 2
+    }
+  },
+  "config": {
+    "dashboard": {
+      "collection": "dashboard",
+      "count": 23,
+      "sampled": 23,
+      "variantCount": 4,
+      "variants": [
+        {
+          "count": 18,
+          "exampleId": "FwJ0g5qxzBfNUUJHSKUR",
+          "keys": [
+            "children",
+            "icon",
+            "label",
+            "order",
+            "profileid",
+            "roles",
+            "route",
+            "showInSidenav"
+          ],
+          "shape": "{label:str(12), route:null, icon:str(5), showInSidenav:boolean, order:number, roles:array[0], profileid:array[0], children:array[14]<{showInSidenav:boolean, route:str(10), label:str(10), roles:array[4]<str(5)>, icon:str(12), profileid:array[0], favourites:array[1]<str(20)>}>}"
+        },
+        {
+          "count": 2,
+          "exampleId": "aPvcAnJK3yHLZAc21o7g",
+          "keys": [
+            "children",
+            "docid",
+            "icon",
+            "label",
+            "order",
+            "profileid",
+            "roles",
+            "route",
+            "showInSidenav"
+          ],
+          "shape": "{label:str(18), route:null, icon:str(4), showInSidenav:boolean, order:number, roles:array[0], profileid:array[0], docid:str(20), children:array[3]<{showInSidenav:boolean, route:str(10), label:str(9), icon:str(13), roles:array[0], profileid:array[4]<str(20)>}>}"
+        },
+        {
+          "count": 2,
+          "exampleId": "ticEn0412bPh2K03IdmN",
+          "keys": [
+            "children",
+            "icon",
+            "label",
+            "order",
+            "roles",
+            "route",
+            "showInSidenav"
+          ],
+          "shape": "{label:str(18), icon:str(4), showInSidenav:boolean, order:number, children:array[0], roles:array[1]<str(5)>, route:str(19)}"
+        },
+        {
+          "count": 1,
+          "exampleId": "gWzSE8DjALql9acU5rDi",
+          "keys": [
+            "children",
+            "favourites",
+            "icon",
+            "label",
+            "order",
+            "roles",
+            "route",
+            "showInSidenav"
+          ],
+          "shape": "{label:str(9), route:str(13), icon:str(9), showInSidenav:boolean, children:array[0], roles:array[0], order:number, favourites:array[2]<str(20)>}"
+        }
+      ]
+    }
+  },
+  "traces": {
+    "authTrace": {
+      "dashboard": [
+        {
+          "id": "gWzSE8DjALql9acU5rDi",
+          "label": "Dashboard",
+          "route": "/EISDashboard",
+          "showInSidenav": true,
+          "order": 1,
+          "roles": [],
+          "profileidCount": 0,
+          "children": []
+        },
+        {
+          "id": "O9d7l9TOSgxLF1wsieeI",
+          "label": "Product Designer",
+          "route": null,
+          "showInSidenav": true,
+          "order": 2,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Add Package",
+              "route": "/addpackage",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Add Journey",
+              "route": "/addjourney",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Add Product",
+              "route": "/addproduct",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "ATC Model",
+              "route": "/atcmodel",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Package Design",
+              "route": "/packagedesign",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Delivery Activities",
+              "route": "/deliveryactivities",
+              "roles": 3,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Product Mode Config",
+              "route": "/productmodeconfig",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Journey Product Map",
+              "route": "/journeyproductmap",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Products & Delivery Activities Map",
+              "route": "/productdelivery",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "deliverysequence",
+              "route": "/deliverysequence",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Appointment Roles",
+              "route": "/appointmentrole",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "EIS & Appointment Role Map",
+              "route": "/eisappointmentrole",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Map Appointment Type & Roles",
+              "route": "/mapappointmentrole",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Create Accelerator Evolution Level",
+              "route": "/createaelnames",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "ticEn0412bPh2K03IdmN",
+          "label": "Developer Settings",
+          "route": "/routeconfiguration",
+          "showInSidenav": false,
+          "order": 3,
+          "roles": [
+            "admin"
+          ],
+          "profileidCount": 0,
+          "children": []
+        },
+        {
+          "id": "vR6m6bDQybRTyHdwMN7e",
+          "label": "Participant Profiles Management",
+          "route": null,
+          "showInSidenav": true,
+          "order": 4,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "View Participants Form",
+              "route": "/view-participants-form",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant Profiles",
+              "route": "/profilelist",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participants Analytics",
+              "route": "/participants-analytics",
+              "roles": 9,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "userprofile",
+              "route": "/userprofile",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Participant Purchase",
+              "route": "/participantpurchase",
+              "roles": 9,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Journey Support",
+              "route": "/journeysupport",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Participant Delivery Sequence",
+              "route": "/participantdeliverysequence",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "participant-evolution-summary",
+              "route": "/participant-evolution-summary",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Profile Summary",
+              "route": "/profilesummary",
+              "roles": 11,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Participant Product",
+              "route": "/participantproduct",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Profile Screen",
+              "route": "/ProfileScreen",
+              "roles": 8,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "User Profile",
+              "route": "/user%20profile",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Participant Form Tracker",
+              "route": "/participant-form-tracker",
+              "roles": 0,
+              "profileid": 2,
+              "showInSidenav": false
+            },
+            {
+              "label": "User Profile Old",
+              "route": "/userprofile_old",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "O7rc91Bb0t3Ce4p2MPqi",
+          "label": "Workshop",
+          "route": null,
+          "showInSidenav": true,
+          "order": 5,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Workshop Dashboard",
+              "route": "/workshop_dashboard",
+              "roles": 17,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "EiFlix Workshops",
+              "route": "/workshops",
+              "roles": 5,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Workshop Image Upload",
+              "route": "/workshop_image_upload",
+              "roles": 2,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Engagement Dashboard",
+              "route": "/engagementdashboard",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "B!G Event Mentor",
+              "route": "/bigeventmentor",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "B!G Engagement Dashboard",
+              "route": "/bigengagementdashboard",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Success Multiplier",
+              "route": "/hpc",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Quiz",
+              "route": "/quiz",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "qtGF5KgvW5TOQiRVCYhA",
+          "label": "Content",
+          "route": null,
+          "showInSidenav": true,
+          "order": 6,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Content Home",
+              "route": "/content-upload-v2",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Solar Voice Upload",
+              "route": "/audiodashboard",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Solar Voice Playlist",
+              "route": "/playlistdashboard",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "EiFlix Video Upload",
+              "route": "/videodashboard",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "EiFlix Category Assign",
+              "route": "/assigncategory",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "EiFlix Series Configuration",
+              "route": "/seriesdashboard",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "EiFlix Tier Configuration",
+              "route": "/viewparticipantstieraccess",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "General Content Upload",
+              "route": "/contentupload",
+              "roles": 4,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Ads",
+              "route": "/ads",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Playlist Ads",
+              "route": "/playlistads",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Health Stories",
+              "route": "/healthstories",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Community Manager",
+              "route": "/communitymanager",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Content Analytics",
+              "route": "/contentanalytics",
+              "roles": 9,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Create Arena Video Ask Template",
+              "route": "/createarenavideoasktemplate",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Resources",
+              "route": "/learningmaterial",
+              "roles": 1,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Manage Recommended Playlist",
+              "route": "/recommendedplaylist",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Content Analytics Dashboard",
+              "route": "/content-analytics-dashboard",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "ytoEaZKRgvHBYZbKQ5h3",
+          "label": "Journey Dashboard",
+          "route": null,
+          "showInSidenav": true,
+          "order": 7,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Sales Approval",
+              "route": "/salesleads",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Journey Experience Dashboard",
+              "route": "/JourneycoachDashboard-new",
+              "roles": 11,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "ProductInitiated Dashboard",
+              "route": "/productinitiated-dashboard",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Delivery Dashboard",
+              "route": "/delivery-dashboard",
+              "roles": 4,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Business Dashboard",
+              "route": "/overall-dashboard",
+              "roles": 2,
+              "profileid": 9,
+              "showInSidenav": false
+            },
+            {
+              "label": "Sales Report",
+              "route": "/sales-report",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Ecosystem",
+              "route": "/ecosystem",
+              "roles": 8,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Onboarding Pipeline",
+              "route": "/onboarding-pipeline",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "rkisciZC9SRaZRSJBKmc",
+          "label": "EiFlix",
+          "route": null,
+          "showInSidenav": false,
+          "order": 9,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Tier Access Config",
+              "route": "/tieraccessconfig",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "QG4otvdZUDV1BERR4yIv",
+          "label": "Form Template",
+          "route": "/formtemplate",
+          "showInSidenav": false,
+          "order": 10,
+          "roles": [
+            "admin",
+            "ah",
+            "ahmember",
+            "capacityplanner",
+            "developer",
+            "eis",
+            "participant"
+          ],
+          "profileidCount": 0,
+          "children": []
+        },
+        {
+          "id": "KcCogoTrhqGj1EFxzNSv",
+          "label": "Events",
+          "route": null,
+          "showInSidenav": true,
+          "order": 11,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Create Event",
+              "route": "/create_event",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Initiate Event Product",
+              "route": "/initiateeventproduct",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Arena E-Ticket Approve",
+              "route": "/arena_e_ticket_approve",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Event Participation Approve",
+              "route": "/event_participation_approve",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "QR Scanner",
+              "route": "/qr-scanner",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Layers screen",
+              "route": "/layers-screen",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "B!G Wall",
+              "route": "/bigwall",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Video Ask",
+              "route": "/videoask-display",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Live Event Dashboard",
+              "route": "/live_event_dashboard",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Event Attendence Log",
+              "route": "/event_attendance_log",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Event Group Chat",
+              "route": "/group-chat",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant  Evolution Mapping",
+              "route": "/participantevolution",
+              "roles": 16,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Evolution Mapping",
+              "route": "/evolutionmapping",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "First Timers Dashboard",
+              "route": "/first_timers_dashboard",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Event Zone Management",
+              "route": "/eventzonemanagement",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Overall Event Dashboard",
+              "route": "/overall_event_dashboard",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant Videos Mapping",
+              "route": "/participant_videos_mapping",
+              "roles": 3,
+              "profileid": 4,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "bWRM3C6tvYBQr4z7MvQQ",
+          "label": "Scheduling",
+          "route": null,
+          "showInSidenav": true,
+          "order": 12,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "EIS Zoom Account",
+              "route": "/EISzoom",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Appointment Availability",
+              "route": "/appointmentavailability",
+              "roles": 8,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Book Appointment",
+              "route": "/bookappointment",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "My Calendar",
+              "route": "/mycalendar",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Appointment Calendar",
+              "route": "/appointmentcalendar",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Daily Roster",
+              "route": "/roster",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Appointment Status Pending",
+              "route": "/appointmentstatuspending",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Team Delivery Hours",
+              "route": "/teamdeliveryhours",
+              "roles": 9,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Team Offtime",
+              "route": "/offtime",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Approve Offtime",
+              "route": "/approveofftime",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Capacity Utilization",
+              "route": "/capacityutilization",
+              "roles": 8,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Personalize Delivery Teams",
+              "route": "/mapclienteis",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Appointment Studio",
+              "route": "/appointmentstudio",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Open Appointment Studio",
+              "route": "/openappointmentzoom",
+              "roles": 2,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Appointment-Dashboard",
+              "route": "/appointment-dashboard",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "FwJ0g5qxzBfNUUJHSKUR",
+          "label": "Queue System",
+          "route": null,
+          "showInSidenav": true,
+          "order": 13,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Queue List",
+              "route": "/queuelist",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "BiG Planner",
+              "route": "/queuebigplanner",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Dynamic Studio",
+              "route": "/dynamicstudio",
+              "roles": 8,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Queue Zoom Account",
+              "route": "/zoomaccount",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Arena Activities by Studio",
+              "route": "/arenastudioactivity",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Queue Participant Transfer",
+              "route": "/queuetransfer",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Event Opportunity Dashboard",
+              "route": "/eventopportunitydashboard",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Queue Broadcast for Arena",
+              "route": "/queuevenue",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Zoom Studio",
+              "route": "/openmeeting",
+              "roles": 8,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Queue Planner",
+              "route": "/queue-planner",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Queue Planner Review",
+              "route": "/queue-planner-review",
+              "roles": 9,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Queue Manager",
+              "route": "/dynamicqueuemanager",
+              "roles": 11,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Queue Web",
+              "route": "/queue-web",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Scope Enhancement Rubrics Scoring",
+              "route": "/viewrubrics_scoring_atc",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "epAIBqboQwdDJSKSWFPa",
+          "label": "B!G",
+          "route": null,
+          "showInSidenav": true,
+          "order": 14,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Taxonomy",
+              "route": "/atctaxonomy",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Big Activity",
+              "route": "/bigactivity",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Big Dashboard",
+              "route": "/big-dashboard",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "B!G Level",
+              "route": "/biglevel",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Big Accelerator - Arena Activities",
+              "route": "/particiant_assignment_board",
+              "roles": 2,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "B!G Aggregate",
+              "route": "/big_aggregate",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "ATC Model Level Config",
+              "route": "/modellevelconfig",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Big Activity Log",
+              "route": "/bigactivitylog",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "A&H Space",
+              "route": "/arena_space",
+              "roles": 2,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Big Activity Monitor",
+              "route": "/bigactivitymonitor",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Big Cohorts",
+              "route": "/bigcohorts",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "B!G Chat Screen",
+              "route": "/bigchatscreen",
+              "roles": 8,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Form Based Submission",
+              "route": "/formbasedsubmission",
+              "roles": 8,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Zoom Meeting",
+              "route": "/zoommeeting_bigparticipants",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Validate B!G Activity",
+              "route": "/validateParticipantAssignments",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "BiG Profile",
+              "route": "/bigProfile",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "finUNEFnplEK8MSGsyrV",
+          "label": "ATC",
+          "route": null,
+          "showInSidenav": true,
+          "order": 15,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Prescribe ATC",
+              "route": "/prescribeATC",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "View Prescribed ATC",
+              "route": "/viewprescribedATC",
+              "roles": 7,
+              "profileid": 2,
+              "showInSidenav": true
+            },
+            {
+              "label": "View Assigned ATC",
+              "route": "/viewassignedATC",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "ATC - Review/Flag",
+              "route": "/reviewflagATC",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Pick ATC for Mentoring",
+              "route": "/pickformentoring",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Edit ATC",
+              "route": "/editATC",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Add Triple ATC",
+              "route": "/addtripleATC",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "View Triple ATC",
+              "route": "/viewtripleATC",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Edit Triple ATC",
+              "route": "/edittripleATC",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "ATC Education",
+              "route": "/atctrajectory",
+              "roles": 2,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Preview ATC",
+              "route": "/previewATC",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Preview Triple ATC",
+              "route": "/previewtripleATC",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Live Prescription",
+              "route": "/liveprescription",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Upgraded ATC",
+              "route": "/viewUpgradedATC",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "mB2bSe8d8N6pOFry1LTi",
+          "label": "App Engagement",
+          "route": null,
+          "showInSidenav": true,
+          "order": 16,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "App Action Pending",
+              "route": "/appactionpending",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Interim Report Log",
+              "route": "/interimreportlog",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Evolution Wishlist Log",
+              "route": "/evolutionwishlistlog",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Mode Dashboard",
+              "route": "/modedashboard",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant AEL",
+              "route": "/participantAEL",
+              "roles": 5,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant ATC Taxonomy Update",
+              "route": "/updateprofiletaxonomy",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Notification Record",
+              "route": "/notificationrecord",
+              "roles": 5,
+              "profileid": 1,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant Notification Log",
+              "route": "/notificationlog",
+              "roles": 6,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant Touch Point",
+              "route": "/participanttouchpoint",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Mode Dashboard New",
+              "route": "/mode-dashboard-new",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "App Flow Breaks",
+              "route": "/app-flow-breaks",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Evolution Wishlist Form",
+              "route": "/evolutionwishlist",
+              "roles": 1,
+              "profileid": 0,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "Jfe1vJkSH58EJ1D6Kui1",
+          "label": "Customer Support",
+          "route": null,
+          "showInSidenav": true,
+          "order": 17,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Customer Support Dashboard",
+              "route": "/customersupportdashboard",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Customer Support Tickets",
+              "route": "/customer-support-tickets",
+              "roles": 7,
+              "profileid": 0,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "JW36x6hDtZ19NULmxxc1",
+          "label": "Communication",
+          "route": null,
+          "showInSidenav": true,
+          "order": 18,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Email Template",
+              "route": "/email-templates",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "aPvcAnJK3yHLZAc21o7g",
+          "label": "Business Dashboard",
+          "route": null,
+          "showInSidenav": false,
+          "order": 20,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Ads Entry",
+              "route": "/ads-entry",
+              "roles": 0,
+              "profileid": 4,
+              "showInSidenav": false
+            },
+            {
+              "label": "Expense Planner",
+              "route": "/expense-planner",
+              "roles": 0,
+              "profileid": 5,
+              "showInSidenav": false
+            },
+            {
+              "label": "Profile Based Access",
+              "route": "/profile-role-access",
+              "roles": 0,
+              "profileid": 4,
+              "showInSidenav": false
+            }
+          ]
+        },
+        {
+          "id": "iskRMxeivnY9tCMknkmE",
+          "label": "OpenVidu",
+          "route": null,
+          "showInSidenav": true,
+          "order": 21,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Join Room",
+              "route": "/joinroom",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": false
+            },
+            {
+              "label": "Monitor Live Assignment",
+              "route": "/monitorliveassignment",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Participant Studio",
+              "route": "/participantstudio",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "OpenVidu Recordings",
+              "route": "/openvidurecordings",
+              "roles": 3,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "xB7h0ivhbz7eRkmYsnvT",
+          "label": "EI AI",
+          "route": "/viewaigeneratedatc",
+          "showInSidenav": true,
+          "order": 22,
+          "roles": [
+            "ah",
+            "developer",
+            "eis"
+          ],
+          "profileidCount": 0,
+          "children": []
+        },
+        {
+          "id": "oSdsJ4VtVRCZ6NW0ELJ5",
+          "label": "Diagnostics System",
+          "route": null,
+          "showInSidenav": true,
+          "order": 23,
+          "roles": [],
+          "profileidCount": 0,
+          "children": [
+            {
+              "label": "Queue Event Health",
+              "route": "/queueeventhealth",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            },
+            {
+              "label": "Live Event Health",
+              "route": "/liveeventhealth",
+              "roles": 4,
+              "profileid": 0,
+              "showInSidenav": true
+            }
+          ]
+        },
+        {
+          "id": "JszoEkhMyzxyFSZlVcEL",
+          "label": "Journey Onboarding Detail",
+          "route": "/journeyonboardingdetail",
+          "showInSidenav": true,
+          "order": 24,
+          "roles": [
+            "admin",
+            "developer"
+          ],
+          "profileidCount": 0,
+          "children": []
+        },
+        {
+          "id": "pgsQV7vXEMP47Q2M5xkf",
+          "label": "Development Mic Test",
+          "route": "/devtestmic",
+          "showInSidenav": true,
+          "order": 25,
+          "roles": [
+            "developer"
+          ],
+          "profileidCount": 0,
+          "children": []
+        }
+      ],
+      "eisrolesSample": [
+        {
+          "id": "0VDWDUDz6A6d9wyqn88g",
+          "role": "Breakthrough Mid Review Collaborator"
+        },
+        {
+          "id": "0X0xTZHfFY9WH9hU0Jcr",
+          "role": "Critical Support Orientation Facilitator"
+        },
+        {
+          "id": "1KunlbALzQ6inQilT4Ie",
+          "role": "Breakthrough Review Collaborator"
+        },
+        {
+          "id": "1nx4kcY11DOeXOkIN9hs",
+          "role": "WiSH Testimonial Call Facilitator"
+        },
+        {
+          "id": "31NmzRzHmnAH9YfV3Qsn",
+          "role": "A&H Motherhood Diagnostics"
+        },
+        {
+          "id": "3U7nWgtBvH3p3LRYvpsd",
+          "role": "Health Diagnostics Collaborator"
+        },
+        {
+          "id": "3iBTsNr3EzwHmOCoijzN",
+          "role": "Fertility Implementation Specialist"
+        },
+        {
+          "id": "3iNrNlLqGeJjOV59gNYL",
+          "role": "Critical Support Implementation Validation Specialist"
+        }
+      ],
+      "eisrolesCount": 166,
+      "ahcrmAccess": {
+        "business dashboard": "6 profileids"
+      },
+      "profileRoleRefExample": {
+        "profileid": "Od2wVistwa7znbTSRylR",
+        "role_ref": "users_roles/00uKMRyllw0kmwkQXgGv"
+      }
+    },
+    "roleRefTargetTally": {
+      "users_roles": 60
+    },
+    "usersRolesDoc": {
+      "path": "users_roles/OY9ngjcvUXtgkPUl5cRl",
+      "fieldCount": 13,
+      "trueFlags": [
+        "participant"
+      ],
+      "allKeysSample": [
+        "profile_ref",
+        "transcriber",
+        "supportdesk",
+        "admin",
+        "chatxadmin",
+        "changeagent",
+        "eitfellowship",
+        "participant",
+        "eitcoordinator",
+        "verifier",
+        "name",
+        "eventcoordinator",
+        "eitapprentice"
+      ]
+    },
+    "eisrolesDocs": [
+      {
+        "id": "0VDWDUDz6A6d9wyqn88g",
+        "role": "Breakthrough Mid Review Collaborator",
+        "experiencestage": "Diagnostics",
+        "experiencelevel": "Apprenticing"
+      },
+      {
+        "id": "0X0xTZHfFY9WH9hU0Jcr",
+        "role": "Critical Support Orientation Facilitator"
+      },
+      {
+        "id": "1KunlbALzQ6inQilT4Ie",
+        "role": "Breakthrough Review Collaborator",
+        "experiencestage": "Diagnostics",
+        "experiencelevel": "Apprenticing"
+      }
+    ],
+    "usersRolesCount": 3252
+  }
+}

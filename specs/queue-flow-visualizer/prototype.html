@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Queue Flow Visualizer — schematic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080a0e; --bg2:#0b0e13; --panel:#0f141b; --panel2:#141a23; --raise:#19212c;
+  --line:#1e2530; --line2:#2a3441; --hair:rgba(120,145,180,.07);
+  --ink:#e8eef6; --dim:#8a97a9; --faint:#566273;
+  --spec:#f6a429; --self:#46a6ff; --gate:#7b8a9d; --term:#2fd6a0;
+  --warn:#ff4d62; --ok:#2fd6a0;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --disp:'Saira Condensed',sans-serif;
+  --body:'IBM Plex Sans',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:
+   radial-gradient(1200px 600px at 78% -10%,rgba(40,70,110,.18),transparent 60%),
+   radial-gradient(900px 500px at 0% 110%,rgba(60,40,90,.14),transparent 55%),
+   var(--bg);
+  color:var(--ink);font-family:var(--body);overflow:hidden;
+  -webkit-font-smoothing:antialiased}
+
+/* ---------- frame ---------- */
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+header{display:flex;align-items:center;gap:22px;padding:14px 22px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--panel),rgba(15,20,27,.5))}
+.brand{display:flex;align-items:baseline;gap:12px;min-width:max-content}
+.brand .logo{font-family:var(--disp);font-weight:800;font-size:26px;letter-spacing:.12em;text-transform:uppercase;
+  background:linear-gradient(90deg,#fff,#9fb4cc);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1}
+.brand .logo b{color:var(--spec);-webkit-text-fill-color:var(--spec)}
+.brand .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:var(--faint);text-transform:uppercase}
+.legend{display:flex;gap:16px;margin-left:6px}
+.legend .lk{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);text-transform:uppercase}
+.legend .dot{width:9px;height:9px;border-radius:2px;box-shadow:0 0 8px currentColor}
+.spacer{flex:1}
+.demo{display:flex;gap:8px}
+.demo button{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--dim);background:var(--panel2);
+  border:1px solid var(--line2);border-radius:7px;padding:7px 11px;cursor:pointer;text-transform:uppercase;transition:.15s}
+.demo button:hover{color:var(--ink);border-color:#3a4757;background:var(--raise)}
+
+/* ---------- variation rail ---------- */
+.rail{display:flex;align-items:center;gap:10px;padding:11px 22px;border-bottom:1px solid var(--line);
+  background:var(--bg2);overflow-x:auto}
+.rail .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--faint);text-transform:uppercase;margin-right:4px}
+.chip{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;letter-spacing:.02em;
+  color:var(--dim);background:var(--panel);border:1px solid var(--line2);border-radius:999px;padding:7px 14px;cursor:pointer;
+  white-space:nowrap;transition:.16s;position:relative}
+.chip .vdot{width:9px;height:9px;border-radius:50%;background:var(--c,#888);box-shadow:0 0 0 0 var(--c)}
+.chip .cnt{font-size:10.5px;color:var(--faint)}
+.chip:hover{color:var(--ink);border-color:#3a4757}
+.chip.on{color:#06090d;background:var(--c,#fff);border-color:transparent;box-shadow:0 0 22px -4px var(--c)}
+.chip.on .cnt{color:rgba(6,9,13,.6)}
+.chip.all.on{background:#e8eef6}
+.chip.all .vdot{background:conic-gradient(from 0deg,#ff6b9d,#8b8cf8,#2dd6c0,#a3e635,#ff6b9d)}
+
+/* ---------- canvas ---------- */
+.stage-wrap{position:relative;overflow:auto;background:
+   linear-gradient(var(--hair) 1px,transparent 1px) 0 0/100% 28px,
+   linear-gradient(90deg,var(--hair) 1px,transparent 1px) 0 0/28px 100%,
+   var(--bg)}
+.stage-wrap::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 50% 40%,transparent 60%,rgba(0,0,0,.45) 100%);z-index:3}
+#canvas{position:relative}
+svg.edges{position:absolute;inset:0;overflow:visible}
+.elabel{font-family:var(--mono);font-size:9.5px;fill:var(--dim);letter-spacing:.02em}
+.elabel rect{fill:#0c1118;stroke:var(--line2)}
+
+/* node card */
+.node{position:absolute;width:138px;min-height:60px;background:linear-gradient(180deg,var(--panel2),var(--panel));
+  border:1px solid var(--line2);border-radius:11px;padding:9px 11px 10px;cursor:pointer;
+  transition:transform .16s,box-shadow .16s,opacity .25s,filter .25s;will-change:transform;
+  box-shadow:0 10px 24px -16px #000, inset 0 1px 0 rgba(255,255,255,.03)}
+.node .kbar{position:absolute;left:11px;right:11px;top:0;height:3px;border-radius:0 0 3px 3px;background:var(--kc);box-shadow:0 0 12px -1px var(--kc)}
+.node .idx{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.1em}
+.node .nm{font-family:var(--body);font-weight:600;font-size:12.5px;line-height:1.25;margin-top:2px;letter-spacing:.005em}
+.node .meta{display:flex;align-items:center;gap:6px;margin-top:7px}
+.node .ktag{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--kc);
+  border:1px solid color-mix(in oklab,var(--kc) 40%,transparent);border-radius:4px;padding:1px 5px}
+.node .glyph{margin-left:auto;font-size:11px;opacity:.8}
+.node:hover{transform:translateY(-3px);box-shadow:0 18px 34px -18px #000,0 0 0 1px var(--kc)}
+.node.dim{opacity:.1;filter:grayscale(1)}
+.node.member{box-shadow:0 14px 30px -18px #000,0 0 0 1.5px var(--vc),0 0 26px -6px var(--vc)}
+.node.member .nm{color:#fff}
+.node.orphan{border-color:color-mix(in oklab,var(--warn) 55%,var(--line2));border-style:dashed}
+.node.orphan::after{content:"⚠ ORPHAN";position:absolute;right:8px;bottom:7px;font-family:var(--mono);font-size:8px;color:var(--warn);letter-spacing:.08em}
+.node.ghost{background:repeating-linear-gradient(135deg,#150d10,#150d10 6px,#1a0e12 6px,#1a0e12 12px);
+  border:1px dashed var(--warn);width:150px}
+.node.ghost .nm{color:var(--warn)}
+.node.ghost .ktag{color:var(--warn);border-color:color-mix(in oklab,var(--warn) 45%,transparent)}
+
+/* entrance */
+.node{animation:pop .5s cubic-bezier(.2,.9,.3,1.2) backwards}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}}
+svg.edges path.edge{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw .9s ease forwards .25s}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* ---------- detail drawer ---------- */
+.drawer{position:absolute;top:14px;right:14px;width:268px;background:rgba(11,15,21,.92);backdrop-filter:blur(10px);
+  border:1px solid var(--line2);border-radius:13px;padding:15px 16px;z-index:5;
+  box-shadow:0 24px 60px -24px #000;transform:translateX(18px);opacity:0;pointer-events:none;transition:.22s}
+.drawer.show{transform:none;opacity:1;pointer-events:auto}
+.drawer h3{margin:0;font-family:var(--body);font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}
+.drawer .hk{width:9px;height:9px;border-radius:3px;background:var(--kc);box-shadow:0 0 9px var(--kc)}
+.drawer .sub{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--kc);margin:3px 0 12px}
+.drawer .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px}
+.drawer .row .k{color:var(--faint);letter-spacing:.05em}
+.drawer .row .v{color:var(--ink);text-align:right}
+.drawer .widgets{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.drawer .w{font-family:var(--mono);font-size:9px;color:var(--spec);border:1px solid color-mix(in oklab,var(--spec) 35%,transparent);
+  border-radius:4px;padding:2px 5px}
+.drawer .outs{margin-top:11px}
+.drawer .outs .o{font-family:var(--mono);font-size:10px;color:var(--dim);padding:4px 0;border-top:1px dashed var(--line)}
+.drawer .outs .o b{color:var(--ink)} .drawer .outs .o .sc{color:var(--faint)}
+.drawer .hint{margin-top:11px;font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.04em}
+
+/* ---------- status bar ---------- */
+footer{display:flex;align-items:center;gap:20px;padding:9px 22px;border-top:1px solid var(--line);background:var(--panel);
+  font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--dim)}
+footer .stat b{color:var(--ink)}
+footer .v{display:flex;align-items:center;gap:8px;margin-left:auto}
+footer .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line2)}
+footer .pill.ok{color:var(--ok);border-color:color-mix(in oklab,var(--ok) 35%,transparent)}
+footer .pill.bad{color:var(--warn);border-color:color-mix(in oklab,var(--warn) 45%,transparent);
+  box-shadow:0 0 18px -6px var(--warn)}
+.blink{width:7px;height:7px;border-radius:50%;background:currentColor;animation:bk 1.4s steps(2) infinite}
+@keyframes bk{50%{opacity:.25}}
+::-webkit-scrollbar{height:11px;width:11px}::-webkit-scrollbar-thumb{background:#1f2733;border-radius:6px;border:3px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <span class="logo">Queue<b>·</b>Flow</span>
+      <span class="tag">schematic / live config mirror</span>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="spacer"></div>
+    <div class="demo">
+      <button data-demo="dangle">+ dangling edge</button>
+      <button data-demo="orphan">+ orphan stage</button>
+      <button data-demo="reset">reset</button>
+    </div>
+  </header>
+
+  <div class="rail" id="rail"><span class="lbl">trace variation</span></div>
+
+  <div class="stage-wrap">
+    <div id="canvas"></div>
+    <div class="drawer" id="drawer"></div>
+  </div>
+
+  <footer>
+    <span class="stat" id="s-stages"></span>
+    <span class="stat" id="s-edges"></span>
+    <span class="stat" id="s-vars"></span>
+    <div class="v" id="valid"></div>
+  </footer>
+</div>
+
+<script>
+/* =====================================================================
+   QueueFlow — public API:  QueueFlow.render(config)
+   The host (queue-creation-v3) calls render(config) on every form change.
+   config = { stages:[name...], stageproperty:{name:{actiontype,studiowidgets,
+             compulsoryactivity,participantform,enablezoom,nextstage:[{stage,
+             calltoaction,markascompleted,variations:[varId]}]}}, queuevariation:[{id,variationname}] }
+   Everything below is framework-free so it ports cleanly to an Angular component.
+   ===================================================================== */
+const KIND = {
+  spec:{c:'#f6a429',label:'specialist studio',glyph:'◆'},
+  self:{c:'#46a6ff',label:'self-guided',glyph:'▣'},
+  gate:{c:'#7b8a9d',label:'gate',glyph:'◇'},
+  term:{c:'#2fd6a0',label:'terminal',glyph:'◉'},
+};
+const VHUES = ['#ff6b9d','#8b8cf8','#2dd6c0','#a3e635','#fb923c','#22d3ee','#f472b6'];
+const COL=176, NODE_W=138, NODE_H=62;
+
+let CFG=null, STATE={active:null, pinned:null};
+
+/* ---- sample config (demonstrates loops, scoped forks, dangling + orphan) ---- */
+const SAMPLE = {"stages":["Evolution Prep Orientation","uP! Prep Process - Hold","Accelerated Evolution Level Form","Prodigies Preparation Form","uP! Life Aspiration Report","ATC Orientation Form","ATC Orientation Group Call","uP! Life Report","Scope Enhancement","Evolution Mapping Activity","In Evolution Mapping Activity","Self Evaluation Form","My Evolution Wishlist","Guided Self ATC","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","Diagnostics In-person","Consultation In-person","In-person Completed","Triple ATC","Triple ATC Validation","uP! Readiness Changework","Review","Expanding Horizon Consultation","Self Evolution Report","Completed"],"queuevariation":[{"id":"K9PRd4PfWDWtaO0vSxy3","variationname":"LYL - First Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","uP! Life Aspiration Report","ATC Orientation Form","ATC Orientation Group Call","Scope Enhancement","Guided Self ATC","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","uP! Readiness Changework","Review","Self Evolution Report","Completed"]},{"id":"zxcF1MNH8Jp0eCxxXASY","variationname":"LYL - Next Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","uP! Life Report","Scope Enhancement","Evolution Mapping Activity","In Evolution Mapping Activity","Self Evaluation Form","Guided Self ATC","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","uP! Readiness Changework","Review","Self Evolution Report","Completed"]},{"id":"mLAX7wA6n9XgkuTkGl7K","variationname":"B!G - Next Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","uP! Life Report","Scope Enhancement","Evolution Mapping Activity","In Evolution Mapping Activity","Self Evaluation Form","Guided Self ATC","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","Diagnostics In-person","Consultation In-person","In-person Completed","Triple ATC","Triple ATC Validation","uP! Readiness Changework","Review","Expanding Horizon Consultation","Self Evolution Report","Completed"]},{"id":"zvFQgmYarx1NKubIP70R","variationname":"Prodigies - Next Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","Prodigies Preparation Form","Scope Enhancement","Evolution Mapping Activity","In Evolution Mapping Activity","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","uP! Readiness Changework","Review","Self Evolution Report","Completed"]},{"id":"GHsYb6bRCg4qBWqgUKe6","variationname":"Prodigies - First Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","Scope Enhancement","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","uP! Readiness Changework","Review","Self Evolution Report","Completed"]},{"id":"M2wSxXnHYzvBRcpIlXYJ","variationname":"uP! - First Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","uP! Life Aspiration Report","ATC Orientation Form","ATC Orientation Group Call","Scope Enhancement","Guided Self ATC","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","uP! Readiness Changework","Review","Self Evolution Report","Completed"]},{"id":"hdxaoI8zASDEk56OVIrk","variationname":"uP! - Next Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","uP! Life Report","Scope Enhancement","Evolution Mapping Activity","In Evolution Mapping Activity","Self Evaluation Form","Guided Self ATC","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","uP! Readiness Changework","Review","Self Evolution Report","Completed"]},{"id":"XmCS5togakPzWjfQvEe3","variationname":"uP! - 3rd Cycle","stages":["Evolution Prep Orientation","Accelerated Evolution Level Form","uP! Life Report","Scope Enhancement","Evolution Mapping Activity","In Evolution Mapping Activity","Self Evaluation Form","Guided Self ATC","Ready for Diagnostics","Diagnostics","Diagnostics Readiness Changework","ATC Preparation","ATC Briefing","Consultation","uP! Readiness Changework","Review","Self Evolution Report","Completed"]},{"id":"PJQVQf9HU0PxSCIbH5re","variationname":"uP! - Prep Hold","stages":["uP! Prep Process - Hold"]}],"stageproperty":{"Evolution Prep Orientation":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"uP! Prep Process - Hold":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Accelerated Evolution Level Form":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Prodigies Preparation Form":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"uP! Life Aspiration Report":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"ATC Orientation Form":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"ATC Orientation Group Call":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"uP! Life Report":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Scope Enhancement":{"selfmovable":false,"actiontype":null,"studiowidgets":["addunvalidatedatc","prescribedunvalidatedatc"],"compulsoryactivity":{"0":["SBDo3ww3ZxKrKjkfIzLU"],"1":["SBDo3ww3ZxKrKjkfIzLU","zHZhg9GOmeuIEuqvCOPY"]},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Guided Self ATC","calltoaction":"If first cycle participant. send them to Guided Self ATC","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","M2wSxXnHYzvBRcpIlXYJ"]},{"stage":"Evolution Mapping Activity","calltoaction":"If next cycle participant, send to Evolution Mapping Activity","markascompleted":true,"variations":["zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3"]},{"stage":"Ready for Diagnostics","calltoaction":"If first cycle & Prodigie participant. send them to Diagnostics Ready","markascompleted":true,"variations":["GHsYb6bRCg4qBWqgUKe6"]},{"stage":"Scope Enhancement","calltoaction":"Send Back","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"Evolution Mapping Activity":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"In Evolution Mapping Activity":{"selfmovable":false,"actiontype":"link","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Self Evaluation Form":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"My Evolution Wishlist":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Guided Self ATC":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Ready for Diagnostics":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Diagnostics":{"selfmovable":false,"actiontype":null,"studiowidgets":["addunvalidatedatc","prescribedvalidatedatc","prescribedunvalidatedatc","assignprocedure","validateael"],"compulsoryactivity":{"0":["HFWFwv7YFPTNtcwkwAGK","rkM1XplBnoteX2GEJXX6"],"1":["HFWFwv7YFPTNtcwkwAGK","I5wPPCFQToxULZvwmU6L"],"2":["HFWFwv7YFPTNtcwkwAGK","I5wPPCFQToxULZvwmU6L","I5wPPCFQToxULZvwmU6L"],"3":["HFWFwv7YFPTNtcwkwAGK","I5wPPCFQToxULZvwmU6L","I5wPPCFQToxULZvwmU6L","I5wPPCFQToxULZvwmU6L"],"4":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI"],"5":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","I5wPPCFQToxULZvwmU6L"],"6":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","I5wPPCFQToxULZvwmU6L","I5wPPCFQToxULZvwmU6L"],"7":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","I5wPPCFQToxULZvwmU6L","I5wPPCFQToxULZvwmU6L","I5wPPCFQToxULZvwmU6L"],"8":["HFWFwv7YFPTNtcwkwAGK"],"9":["HFWFwv7YFPTNtcwkwAGK","rkM1XplBnoteX2GEJXX6"],"10":["MOt60i7xvRhOu0twmIIG","fSGa57cCU52aZgJP5kXI"],"11":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","rkM1XplBnoteX2GEJXX6"],"12":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI"]},"participantform":["KqHfM292QPXRLpv9RQNi","QundpMXgXlXiCJYZ7WU4","EgTIQkxWHjOHSOuSVZ2S","pSvB62jcyrgSSUI1WqtC","wfsPE4wUI8lrXpcSAAWr","mfMs9VWvYJA4TVS2QmH5","PXG71F09gzNoDCraQFBG","jaGY5kDrrhECQsny95Ns"],"enablezoom":true,"nextstage":[{"stage":"Diagnostics Readiness Changework","calltoaction":"Send for Implementation","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"Consultation","calltoaction":"Send for Consultation","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K"]},{"stage":"Diagnostics","calltoaction":"Send Back","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"ATC Briefing","calltoaction":"Send for ATC Briefing","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"uP! Readiness Changework","calltoaction":"Send for uP! Readiness Changework","markascompleted":true,"variations":["zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3"]},{"stage":"Self Evolution Report","calltoaction":"Send to Self Evolution Report","markascompleted":true,"variations":["zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","PJQVQf9HU0PxSCIbH5re"]},{"stage":"ATC Preparation","calltoaction":"Send if ATC Validation Pending","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"Diagnostics Readiness Changework":{"selfmovable":false,"actiontype":null,"studiowidgets":["prescribedvalidatedatc","assignedatc"],"compulsoryactivity":{"0":["ocH3kB9SL9Cgec9i7Uqq"],"1":["DtUbBAdrLVUYcKipIXD0","54toXo6Nl3UU03ehuV7V"],"2":["W0knU88qllYmVsdw87f5","W0knU88qllYmVsdw87f5"],"3":["DtUbBAdrLVUYcKipIXD0","ocH3kB9SL9Cgec9i7Uqq"]},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Diagnostics","calltoaction":"Send Again for Diagnostics","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"ATC Preparation":{"selfmovable":false,"actiontype":null,"studiowidgets":["prescribedvalidatedatc","prescribedunvalidatedatc"],"compulsoryactivity":{"0":["HFWFwv7YFPTNtcwkwAGK"],"1":["fSGa57cCU52aZgJP5kXI"],"2":["HFWFwv7YFPTNtcwkwAGK","I5wPPCFQToxULZvwmU6L"],"3":["MOt60i7xvRhOu0twmIIG"],"4":["HFWFwv7YFPTNtcwkwAGK","I5wPPCFQToxULZvwmU6L","rkM1XplBnoteX2GEJXX6"]},"participantform":["KqHfM292QPXRLpv9RQNi","QundpMXgXlXiCJYZ7WU4","EgTIQkxWHjOHSOuSVZ2S","pSvB62jcyrgSSUI1WqtC","wfsPE4wUI8lrXpcSAAWr","PXG71F09gzNoDCraQFBG","jaGY5kDrrhECQsny95Ns"],"enablezoom":false,"nextstage":[{"stage":"Consultation","calltoaction":"Send for Consultation","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K"]},{"stage":"ATC Preparation","calltoaction":"Send Back","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"ATC Briefing","calltoaction":"Send for ATC Briefing","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"Self Evolution Report","calltoaction":"Send to Self Evolution Report","markascompleted":true,"variations":["zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3"]},{"stage":"uP! Readiness Changework","calltoaction":"Send for uP! Readiness Changework","markascompleted":true,"variations":["zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3"]}]},"ATC Briefing":{"selfmovable":false,"actiontype":null,"studiowidgets":["addunvalidatedatc","prescribedvalidatedatc","prescribedunvalidatedatc","assignedatc","assignprocedure"],"compulsoryactivity":{"0":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","rkM1XplBnoteX2GEJXX6"],"1":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI"],"2":["HFWFwv7YFPTNtcwkwAGK","rkM1XplBnoteX2GEJXX6"],"3":["HFWFwv7YFPTNtcwkwAGK"],"4":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","I5wPPCFQToxULZvwmU6L","rkM1XplBnoteX2GEJXX6"]},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Consultation","calltoaction":"Send for Consultation","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K"]},{"stage":"Self Evolution Report","calltoaction":"Completed","markascompleted":true,"variations":["zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3"]},{"stage":"uP! Readiness Changework","calltoaction":"Send for uP! Readiness CW","markascompleted":false,"variations":["zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3"]}]},"Consultation":{"selfmovable":false,"actiontype":null,"studiowidgets":["addunvalidatedatc","addvalidatedatc","prescribedvalidatedatc","prescribedunvalidatedatc","assignedatc","assignprocedure","viewtripleatc","validateael"],"compulsoryactivity":{"0":["sbZGR2wuvssy1AvL82hk"],"1":["sbZGR2wuvssy1AvL82hk","SISu2bHKe4yHE2c29UZJ"],"2":["SISu2bHKe4yHE2c29UZJ","sbZGR2wuvssy1AvL82hk","SISu2bHKe4yHE2c29UZJ"]},"participantform":["KqHfM292QPXRLpv9RQNi","QundpMXgXlXiCJYZ7WU4","pSvB62jcyrgSSUI1WqtC","wfsPE4wUI8lrXpcSAAWr","mfMs9VWvYJA4TVS2QmH5","PXG71F09gzNoDCraQFBG"],"enablezoom":false,"nextstage":[{"stage":"uP! Readiness Changework","calltoaction":"Send for uP! Changework","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"Self Evolution Report","calltoaction":"Send to Self Evolution Report","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"Consultation","calltoaction":"Send back","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"Diagnostics Readiness Changework","calltoaction":"Send to Diagnostics Readiness Changework","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"Diagnostics In-person":{"selfmovable":false,"actiontype":null,"studiowidgets":["addunvalidatedatc","prescribedvalidatedatc","prescribedunvalidatedatc","assignprocedure"],"compulsoryactivity":{"0":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI"],"1":["fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI","fSGa57cCU52aZgJP5kXI"]},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Consultation In-person","calltoaction":"Completed","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K"]},{"stage":"Diagnostics In-person","calltoaction":"Send Back","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"Consultation In-person":{"selfmovable":false,"actiontype":null,"studiowidgets":["addunvalidatedatc","addvalidatedatc","prescribedvalidatedatc","prescribedunvalidatedatc","assignprocedure","validateael"],"compulsoryactivity":{"0":["sbZGR2wuvssy1AvL82hk"]},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"In-person Completed","calltoaction":"Completed","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"In-person Completed":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Triple ATC":{"selfmovable":true,"actiontype":"link","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Triple ATC Validation","calltoaction":"Send for Triple ATC Validation","markascompleted":false,"variations":["mLAX7wA6n9XgkuTkGl7K"]}]},"Triple ATC Validation":{"selfmovable":false,"actiontype":null,"studiowidgets":["viewtripleatc"],"compulsoryactivity":{"0":["iX3p8F4BVbt0sUtr8p5Z"]},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Consultation","calltoaction":"Send for Consultation","markascompleted":true,"variations":["mLAX7wA6n9XgkuTkGl7K"]},{"stage":"Self Evolution Report","calltoaction":"Send for Self Evolution Report(ATC for uP! is ready)","markascompleted":true,"variations":["mLAX7wA6n9XgkuTkGl7K"]}]},"uP! Readiness Changework":{"selfmovable":false,"actiontype":null,"studiowidgets":["assignedatc"],"compulsoryactivity":{"0":["ocH3kB9SL9Cgec9i7Uqq"],"1":["DtUbBAdrLVUYcKipIXD0","54toXo6Nl3UU03ehuV7V"],"2":["ocH3kB9SL9Cgec9i7Uqq","W0knU88qllYmVsdw87f5"],"3":["ocH3kB9SL9Cgec9i7Uqq","W0knU88qllYmVsdw87f5","W0knU88qllYmVsdw87f5"]},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Consultation","calltoaction":"Send Again for Consultation","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"Review","calltoaction":"Send for Review","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"Review":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[{"stage":"Self Evolution Report","calltoaction":"Completed","markascompleted":true,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]},{"stage":"uP! Readiness Changework","calltoaction":"Send for Implementation","markascompleted":false,"variations":["K9PRd4PfWDWtaO0vSxy3","zxcF1MNH8Jp0eCxxXASY","mLAX7wA6n9XgkuTkGl7K","zvFQgmYarx1NKubIP70R","GHsYb6bRCg4qBWqgUKe6","M2wSxXnHYzvBRcpIlXYJ","hdxaoI8zASDEk56OVIrk","XmCS5togakPzWjfQvEe3","PJQVQf9HU0PxSCIbH5re"]}]},"Expanding Horizon Consultation":{"selfmovable":false,"actiontype":null,"studiowidgets":["addunvalidatedatc","addvalidatedatc","prescribedvalidatedatc","prescribedunvalidatedatc"],"compulsoryactivity":{"0":["pz1RrfULkySqMUMGuPuj","pz1RrfULkySqMUMGuPuj"]},"participantform":[],"enablezoom":false,"nextstage":[]},"Self Evolution Report":{"selfmovable":true,"actiontype":"form","studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]},"Completed":{"selfmovable":false,"actiontype":null,"studiowidgets":[],"compulsoryactivity":{},"participantform":[],"enablezoom":false,"nextstage":[]}}};
+
+/* ---------------- model ---------------- */
+function build(cfg){
+  const order={}; cfg.stages.forEach((s,i)=>order[s]=i);
+  const nodes=cfg.stages.map((name,i)=>({name,i,prop:cfg.stageproperty[name]||{},inN:0,outN:0,vars:new Set()}));
+  const nodeBy={}; nodes.forEach(n=>nodeBy[n.name]=n);
+  const ghosts={}; const edges=[];
+  cfg.stages.forEach(s=>{
+    (cfg.stageproperty[s]?.nextstage||[]).forEach(b=>{
+      const dangling = order[b.stage]===undefined;
+      if(dangling && !ghosts[b.stage]) ghosts[b.stage]={name:b.stage,ghost:true};
+      edges.push({type:'next',from:s,to:b.stage,label:b.calltoaction||'',done:!!b.markascompleted,
+        variations:b.variations||[],loop:b.stage===s,dangling,back:!dangling&&order[b.stage]<order[s]});
+      if(!dangling){ nodeBy[s].outN++; nodeBy[b.stage].inN++; }
+    });
+  });
+  // IMPLICIT self-move / auto-advance edges — a self-movable form (or a gate with no nextstage button)
+  // advances to the NEXT stage in *that variation's* order on form submission; this move lives OUTSIDE
+  // nextstage (handled in the participant app / on submit). Without it, those stages look like false orphans.
+  (cfg.queuevariation||[]).forEach(v=>{
+    const vs=v.stages||[];
+    for(let i=0;i<vs.length-1;i++){
+      const a=vs[i], b=vs[i+1];
+      if(order[a]===undefined||order[b]===undefined) continue;
+      const ap=cfg.stageproperty[a]||{};
+      const explicit=(ap.nextstage||[]).some(btn=>!btn.variations||!btn.variations.length||btn.variations.includes(v.id));
+      if(explicit) continue;                       // this stage is routed by operator buttons for this variation
+      let e=edges.find(x=>x.type==='selfmove'&&x.from===a&&x.to===b);
+      if(!e){ e={type:'selfmove',from:a,to:b,label:ap.selfmovable?'on submit':'advance',done:true,
+                 variations:[],loop:false,dangling:false,back:false,selfmv:!!ap.selfmovable,_v:new Set()};
+              edges.push(e); nodeBy[a].outN++; nodeBy[b].inN++; }
+      e._v.add(v.id);
+    }
+  });
+  edges.forEach(e=>{ if(e.type==='selfmove'){ e.variations=[...e._v]; delete e._v; } });
+  // kind + variation membership per node
+  nodes.forEach(n=>{
+    const p=n.prop;
+    if((p.studiowidgets&&p.studiowidgets.length)||p.compulsoryactivity) n.kind='spec';
+    else if(n.outN===0 && n.inN>0) n.kind='term';
+    else if(p.actiontype) n.kind='self';
+    else n.kind='gate';
+    n.selfmv=!!p.selfmovable;
+    n.orphan = n.inN===0 && n.outN===0;   // true orphan only: no explicit AND no self-move edge either way
+  });
+  edges.forEach(e=>{ if(e.dangling)return;
+    const vs = e.variations.length?e.variations:cfg.queuevariation.map(v=>v.id);
+    vs.forEach(v=>{ nodeBy[e.from].vars.add(v); nodeBy[e.to].vars.add(v); });
+  });
+  return {nodes,ghosts:Object.values(ghosts),edges,order,nodeBy};
+}
+
+/* ---------------- render ---------------- */
+function render(cfg){
+  CFG=cfg;
+  const M=build(cfg);
+  const cv=document.getElementById('canvas');
+  const n=cfg.stages.length;
+  const W = 70 + n*COL + 40, H=560, spineY=300;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  const cx=i=>70+i*COL, varColor=id=>VHUES[cfg.queuevariation.findIndex(v=>v.id===id)%VHUES.length];
+
+  // edges svg
+  let paths='', labels='';
+  const mid=(a,b)=>(a+b)/2;
+  M.edges.forEach((e,ei)=>{
+    const s=M.nodeBy[e.from]; const sx=cx(s.i);
+    let d, lx, ly, cls='edge';
+    if(e.dangling){
+      const gi=M.ghosts.findIndex(g=>g.name===e.to);
+      const gx=cx(Math.min(s.i+1,n-1)), gy=spineY+186;
+      d=`M ${sx} ${spineY+NODE_H/2} C ${sx} ${gy-30} ${gx} ${gy-30} ${gx} ${gy-22}`;
+      lx=mid(sx,gx); ly=gy-44; cls='edge dangle';
+      e._g={gx,gy};
+    } else if(e.loop){
+      d=`M ${sx-16} ${spineY-NODE_H/2} C ${sx-30} ${spineY-NODE_H/2-58} ${sx+30} ${spineY-NODE_H/2-58} ${sx+16} ${spineY-NODE_H/2}`;
+      lx=sx; ly=spineY-NODE_H/2-62;
+    } else if(e.type==='selfmove'){
+      const t=M.nodeBy[e.to], tx=cx(t.i);
+      d=`M ${sx} ${spineY-NODE_H/2} C ${sx} ${spineY-NODE_H/2-20} ${tx} ${spineY-NODE_H/2-20} ${tx} ${spineY-NODE_H/2}`;
+      lx=mid(sx,tx); ly=spineY-NODE_H/2-22;
+    } else {
+      const t=M.nodeBy[e.to], tx=cx(t.i), span=Math.abs(t.i-s.i);
+      if(e.back){ const a=42+Math.min(span,7)*17;
+        d=`M ${sx} ${spineY+NODE_H/2} C ${sx} ${spineY+NODE_H/2+a} ${tx} ${spineY+NODE_H/2+a} ${tx} ${spineY+NODE_H/2}`;
+        lx=mid(sx,tx); ly=spineY+NODE_H/2+a+2;
+      } else { const a=46+Math.min(span,7)*19;
+        d=`M ${sx} ${spineY-NODE_H/2} C ${sx} ${spineY-NODE_H/2-a} ${tx} ${spineY-NODE_H/2-a} ${tx} ${spineY-NODE_H/2}`;
+        lx=mid(sx,tx); ly=spineY-NODE_H/2-a-2;
+      }
+    }
+    paths+=`<path class="${cls}" data-ei="${ei}" d="${d}" fill="none"></path>`;
+    labels+=`<g class="elabel" data-ei="${ei}" transform="translate(${lx},${ly})" text-anchor="middle" style="opacity:0">
+        <rect x="${-(e.label.length*4.4+10)/1}" y="-9" width="${e.label.length*4.4+20}" height="15" rx="4"></rect>
+        <text dy="2">${e.loop?'↺ ':''}${esc(e.label)}${e.done?' ✓':''}</text></g>`;
+  });
+  let svg=`<svg class="edges" width="${W}" height="${H}">
+     <defs>
+       <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#3b4756"/></marker>
+       <marker id="ahv" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="context-stroke"/></marker>
+       <marker id="ahw" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#ff4d62"/></marker>
+     </defs>${paths}${labels}</svg>`;
+
+  // nodes
+  let html=svg;
+  M.nodes.forEach(node=>{
+    const k=KIND[node.kind]; const x=cx(node.i)-NODE_W/2, y=spineY-NODE_H/2;
+    html+=`<div class="node ${node.orphan?'orphan':''}" data-node="${esc(node.name)}"
+       style="left:${x}px;top:${y}px;--kc:${k.c};animation-delay:${node.i*38}ms">
+       <div class="kbar"></div>
+       <div class="idx">STAGE ${String(node.i).padStart(2,'0')}</div>
+       <div class="nm">${esc(node.name)}</div>
+       <div class="meta"><span class="ktag">${k.label.split(' ')[0]}</span>
+         ${node.prop.enablezoom?'<span class="glyph" title="zoom">⦿</span>':''}
+         <span class="glyph">${k.glyph}</span></div></div>`;
+  });
+  // ghost (dangling targets)
+  M.ghosts.forEach((g,i)=>{
+    const e=M.edges.find(x=>x.dangling&&x.to===g.name&&x._g);
+    const gx=(e?._g.gx||200)-75, gy=(e?._g.gy||480)-22;
+    html+=`<div class="node ghost" style="left:${gx}px;top:${gy}px;--kc:var(--warn)">
+       <div class="kbar"></div><div class="idx">UNRESOLVED</div>
+       <div class="nm">${esc(g.name)}</div>
+       <div class="meta"><span class="ktag">missing stage</span><span class="glyph">⚠</span></div></div>`;
+  });
+  cv.innerHTML=html;
+  // measure edge lengths for draw animation
+  cv.querySelectorAll('path.edge').forEach(p=>{const L=p.getTotalLength();p.style.setProperty('--len',L)});
+
+  buildRail(cfg,varColor); buildLegend(); status(M); wire(M,varColor);
+  apply(M,varColor);
+  window.__M=M; window.__vc=varColor;
+}
+
+function buildLegend(){
+  document.getElementById('legend').innerHTML=Object.values(KIND).map(k=>
+    `<span class="lk"><span class="dot" style="background:${k.c};color:${k.c}"></span>${k.label}</span>`).join('')
+   +`<span class="lk" style="margin-left:8px;color:var(--faint)">━ operator button</span>`
+   +`<span class="lk" style="color:var(--faint)">┈ self-move (auto)</span>`;
+}
+function buildRail(cfg,varColor){
+  const r=document.getElementById('rail');
+  const counts=window.__counts||{};
+  let h=`<span class="lbl">trace variation</span>
+    <span class="chip all ${STATE.active===null?'on':''}" data-v="__all"><span class="vdot"></span>All paths</span>`;
+  cfg.queuevariation.forEach(v=>{
+    const c=varColor(v.id);
+    h+=`<span class="chip ${STATE.active===v.id?'on':''}" data-v="${v.id}" style="--c:${c}">
+        <span class="vdot" style="background:${c}"></span>${esc(v.variationname)}
+        ${counts[v.id]!=null?`<span class="cnt">${counts[v.id]}</span>`:''}</span>`;
+  });
+  r.innerHTML=h;
+}
+function status(M){
+  const dang=M.edges.filter(e=>e.dangling).length, orph=M.nodes.filter(n=>n.orphan).length;
+  document.getElementById('s-stages').innerHTML=`<b>${M.nodes.length}</b> stages`;
+  document.getElementById('s-edges').innerHTML=`<b>${M.edges.length}</b> transitions`;
+  document.getElementById('s-vars').innerHTML=`<b>${CFG.queuevariation.length}</b> variations`;
+  const ok=dang===0&&orph===0;
+  document.getElementById('valid').innerHTML = ok
+    ? `<span class="pill ok"><span class="blink"></span>config ⇄ flow consistent</span>`
+    : `<span class="pill bad"><span class="blink"></span>${orph} orphan · ${dang} dangling — flow drift</span>`;
+}
+
+/* ---------------- interaction ---------------- */
+function wire(M,varColor){
+  document.getElementById('rail').onclick=e=>{
+    const c=e.target.closest('.chip'); if(!c)return;
+    STATE.active = c.dataset.v==='__all'?null:c.dataset.v;
+    buildRail(CFG,varColor); apply(M,varColor);
+  };
+  const cv=document.getElementById('canvas');
+  cv.onmouseover=e=>{const nd=e.target.closest('.node');if(nd&&!nd.classList.contains('ghost'))detail(nd.dataset.node,M);};
+  cv.onmouseout=e=>{const nd=e.target.closest('.node');if(nd&&!STATE.pinned)hideDetail();};
+  cv.onclick=e=>{const nd=e.target.closest('.node');if(!nd||nd.classList.contains('ghost'))return;
+    STATE.pinned = STATE.pinned===nd.dataset.node?null:nd.dataset.node;
+    if(STATE.pinned)detail(nd.dataset.node,M);
+    /* host hook: emit node-click so the form scrolls to this stage */
+    console.log('[QueueFlow] focus stage →',nd.dataset.node);
+  };
+  document.querySelectorAll('.demo button').forEach(b=>b.onclick=()=>demo(b.dataset.demo));
+}
+function apply(M,varColor){
+  const v=STATE.active, vc=v?varColor(v):null;
+  const memberNodes=new Set();
+  M.edges.forEach((e,ei)=>{
+    const path=document.querySelector(`path[data-ei="${ei}"]`);
+    const lab=document.querySelector(`g.elabel[data-ei="${ei}"]`); if(!path)return;
+    const member = !v || e.dangling || e.variations.length===0 || e.variations.includes(v);
+    if(e.dangling){
+      path.setAttribute('stroke','#ff4d62');path.setAttribute('stroke-width','1.6');
+      path.setAttribute('stroke-dasharray','4 4');path.setAttribute('marker-end','url(#ahw)');
+      path.style.opacity = (!v)?1:.85; lab.style.opacity=1; lab.querySelector('text').setAttribute('fill','#ff7a88');
+      return;
+    }
+    const sm=e.type==='selfmove';
+    const dash=v=>{ if(sm)path.setAttribute('stroke-dasharray','6 5'); else path.removeAttribute('stroke-dasharray'); };
+    if(!v){
+      path.setAttribute('stroke',sm?'#3c4a5b':'#33404f');path.setAttribute('stroke-width',sm?'1.3':'1.5');dash();
+      path.setAttribute('marker-end','url(#ah)');path.style.opacity=sm?.4:.6;path.style.filter='none';lab.style.opacity=0;
+    } else if(member){
+      path.style.color=vc;path.setAttribute('stroke',vc);path.setAttribute('stroke-width',sm?'1.6':'2.3');dash();
+      path.setAttribute('marker-end','url(#ahv)');
+      path.style.opacity=sm?.78:1;path.style.filter=sm?'none':`drop-shadow(0 0 5px ${vc}88)`;
+      lab.style.opacity=sm?0:1;lab.querySelector('text').setAttribute('fill',vc);
+      memberNodes.add(e.from);memberNodes.add(e.to);
+    } else {
+      path.setAttribute('stroke','#28323e');path.setAttribute('stroke-width','1.2');dash();
+      path.setAttribute('marker-end','url(#ah)');path.style.opacity=.07;path.style.filter='none';lab.style.opacity=0;
+    }
+  });
+  document.querySelectorAll('.node').forEach(nd=>{
+    if(nd.classList.contains('ghost'))return;
+    nd.classList.remove('dim','member');nd.style.removeProperty('--vc');
+    if(v){ if(memberNodes.has(nd.dataset.node)){nd.classList.add('member');nd.style.setProperty('--vc',vc);} else nd.classList.add('dim'); }
+  });
+}
+function detail(name,M){
+  const node=M.nodeBy[name]; if(!node)return; const k=KIND[node.kind]; const p=node.prop;
+  const outs=(p.nextstage||[]); const sm=M.edges.filter(e=>e.type==='selfmove'&&e.from===name);
+  const vnames=id=>{const x=CFG.queuevariation.find(v=>v.id===id);return x?x.variationname:id;};
+  const through=[...node.vars].map(vnames);
+  const d=document.getElementById('drawer');
+  d.style.setProperty('--kc',k.c);
+  d.innerHTML=`<h3><span class="hk"></span>${esc(name)}</h3>
+    <div class="sub">${k.label}${node.orphan?' · ⚠ orphan':''}</div>
+    <div class="row"><span class="k">action</span><span class="v">${p.actiontype||'—'}</span></div>
+    <div class="row"><span class="k">forms</span><span class="v">${(p.participantform||[]).length||'—'}</span></div>
+    <div class="row"><span class="k">activity combos</span><span class="v">${p.compulsoryactivity?Object.keys(p.compulsoryactivity).length:'—'}</span></div>
+    <div class="row"><span class="k">zoom</span><span class="v">${p.enablezoom?'on':'—'}</span></div>
+    <div class="row"><span class="k">in / out</span><span class="v">${node.inN} / ${node.outN}</span></div>
+    <div class="row"><span class="k">self-movable</span><span class="v">${node.selfmv?'yes · auto-advance':'—'}</span></div>
+    ${(p.studiowidgets&&p.studiowidgets.length)?`<div class="widgets">${p.studiowidgets.map(w=>`<span class="w">${esc(w)}</span>`).join('')}</div>`:''}
+    <div class="outs"><div class="row" style="border:0;padding-bottom:2px"><span class="k">transitions →</span><span class="v">${outs.length+sm.length}</span></div>
+      ${outs.map(o=>`<div class="o"><b>${esc(o.stage)}</b> ${o.markascompleted?'✓':''}<br><span style="color:var(--dim)">operator: "${esc(o.calltoaction||'')}"</span> <span class="sc">[${o.variations&&o.variations.length?o.variations.map(vnames).join(', '):'all'}]</span></div>`).join('')}
+      ${sm.map(e=>`<div class="o">⤳ <b>${esc(e.to)}</b><br><span style="color:var(--dim)">self-move (${esc(e.label)})</span> <span class="sc">[${e.variations.length}/${CFG.queuevariation.length} var · auto]</span></div>`).join('')}
+      ${(outs.length+sm.length)===0?'<div class="o">— terminal —</div>':''}</div>
+    <div class="row" style="margin-top:8px"><span class="k">variations through</span><span class="v">${through.length}/${CFG.queuevariation.length}</span></div>
+    <div class="hint">click node → host scrolls to its form section</div>`;
+  d.classList.add('show');
+}
+function hideDetail(){document.getElementById('drawer').classList.remove('show');}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+/* ---------------- demo controls (simulate live form edits) ---------------- */
+function demo(kind){
+  const c=JSON.parse(JSON.stringify(CFG));
+  if(kind==='reset'){STATE.active=null;STATE.pinned=null;render(JSON.parse(JSON.stringify(SAMPLE)));return;}
+  if(kind==='dangle'){ (c.stageproperty['Review'].nextstage||[]).push(
+    {stage:'Archive (legacy)',calltoaction:'Archive',markascompleted:true,variations:[]}); }
+  if(kind==='orphan'){ if(!c.stages.includes('Hold Pen')){c.stages.push('Hold Pen');c.stageproperty['Hold Pen']={nextstage:[]};} }
+  render(c);
+}
+
+window.QueueFlow={render};
+render(JSON.parse(JSON.stringify(SAMPLE)));
+</script>
+</body>
+</html>

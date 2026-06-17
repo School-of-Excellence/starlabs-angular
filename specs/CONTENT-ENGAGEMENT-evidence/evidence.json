@@ -1,0 +1,1377 @@
+{
+  "doc": "CONTENT-ENGAGEMENT",
+  "provenance": "READ-ONLY production probes (fir-sample-aae4a), 2026-06-02. Regenerate: specs/evidence/probe_*.js then split_evidence.js. ATC denylist enforced.",
+  "now": "2026-06-02",
+  "schema": {
+    "content analytics": {
+      "collection": "content analytics",
+      "count": 278752,
+      "sampled": 100,
+      "sampleDocIds": [
+        "000FyNbqcZTtzmcFyNWD",
+        "001KoVZsSeXf1NdYRZjS",
+        "002YoRQtFlKyoQ8wxDIX"
+      ],
+      "tsField": "logdate",
+      "fields": {
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "videoname": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "from": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "videoid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "lastwatchedtime": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "totaltimespend": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "logdate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "totalruntime": {
+          "fillPct": 97,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 97,
+            "null": 3
+          }
+        },
+        "playlistid": {
+          "fillPct": 84,
+          "presentPct": 84,
+          "type": "string",
+          "types": {
+            "string": 84
+          }
+        },
+        "type": {
+          "fillPct": 81,
+          "presentPct": 81,
+          "type": "string",
+          "types": {
+            "string": 81
+          }
+        },
+        "status": {
+          "fillPct": 30,
+          "presentPct": 76,
+          "type": "null",
+          "types": {
+            "string": 30,
+            "null": 46
+          }
+        },
+        "platform_name": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "string",
+          "types": {
+            "string": 8
+          }
+        },
+        "parentreference": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "ref",
+          "types": {
+            "ref": 3
+          }
+        },
+        "deviceid": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        }
+      },
+      "fieldCount": 14,
+      "lastWrite": "2026-06-02",
+      "writes90d": 47622,
+      "writes365d": 153978
+    },
+    "participant touchpoint": {
+      "collection": "participant touchpoint",
+      "count": 89243,
+      "sampled": 100,
+      "sampleDocIds": [
+        "002WxwkWAs4z7nXona3x",
+        "005TypO7d6GEWzRhOkls",
+        "007ltiijlcIXQg526PeX"
+      ],
+      "tsField": "logdate",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "label": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "notes": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "touchpoint": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "parentreference": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "metadata": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 100
+          }
+        },
+        "touchpointdate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "logdate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        }
+      },
+      "fieldCount": 9,
+      "lastWrite": "2026-06-02",
+      "writes90d": 26835,
+      "writes365d": 89243
+    },
+    "recommended mix playlist": {
+      "collection": "recommended mix playlist",
+      "count": 9446,
+      "sampled": 100,
+      "sampleDocIds": [
+        "012CWIXnX806iJW994yh",
+        "026EVfIMZRcz8VM7WrIE",
+        "02oydQyRFJwYVaZwlR4V"
+      ],
+      "tsField": "date",
+      "fields": {
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "title": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "bufferdocref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "type": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "list": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "personalised": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "delete": {
+          "fillPct": 73,
+          "presentPct": 73,
+          "type": "boolean",
+          "types": {
+            "boolean": 73
+          }
+        },
+        "description": {
+          "fillPct": 55,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 55,
+            "null": 45
+          }
+        },
+        "expiredate": {
+          "fillPct": 20,
+          "presentPct": 24,
+          "type": "ts",
+          "types": {
+            "ts": 20,
+            "null": 4
+          }
+        },
+        "completedcontent": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "array",
+          "types": {
+            "array": 9
+          }
+        },
+        "status": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "string",
+          "types": {
+            "string": 4
+          }
+        },
+        "completedplaylist": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "recommendedby": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "recommendedbyname": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        }
+      },
+      "fieldCount": 16,
+      "lastWrite": "2026-05-29",
+      "writes90d": 1803,
+      "writes365d": 3386
+    },
+    "episodes": {
+      "collection": "episodes",
+      "count": 502,
+      "sampled": 100,
+      "sampleDocIds": [
+        "0HKQfugAXiB3VIa70jqR",
+        "0HUOqIVMNYAPE8lUFtIC",
+        "0I2WFy5UuQ04ixXUvoI2"
+      ],
+      "tsField": "date",
+      "fields": {
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "convertedtohls": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "boolean",
+          "types": {
+            "boolean": 99
+          }
+        },
+        "hsl_download": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "hsl_stream": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "hsl_embed": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "hsl_short": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "title": {
+          "fillPct": 99,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 99,
+            "null": 1
+          }
+        },
+        "videoUrl": {
+          "fillPct": 99,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 99,
+            "null": 1
+          }
+        },
+        "hsl_preview": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "hsl_thumbnail": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "responsepublitio": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "map",
+          "types": {
+            "map": 99
+          }
+        },
+        "reftitle": {
+          "fillPct": 99,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 99,
+            "null": 1
+          }
+        },
+        "description": {
+          "fillPct": 96,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 96,
+            "null": 4
+          }
+        },
+        "imageUrl": {
+          "fillPct": 85,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 85,
+            "null": 15
+          }
+        },
+        "imagesize": {
+          "fillPct": 85,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 85,
+            "null": 15
+          }
+        },
+        "tags": {
+          "fillPct": 63,
+          "presentPct": 63,
+          "type": "array",
+          "types": {
+            "array": 63
+          }
+        },
+        "series": {
+          "fillPct": 62,
+          "presentPct": 62,
+          "type": "array",
+          "types": {
+            "array": 62
+          }
+        },
+        "duration": {
+          "fillPct": 56,
+          "presentPct": 62,
+          "type": "number",
+          "types": {
+            "null": 6,
+            "number": 49,
+            "string": 7
+          }
+        },
+        "videoSizeBytes": {
+          "fillPct": 55,
+          "presentPct": 62,
+          "type": "number",
+          "types": {
+            "null": 7,
+            "number": 55
+          }
+        },
+        "videoSize": {
+          "fillPct": 55,
+          "presentPct": 62,
+          "type": "string",
+          "types": {
+            "null": 7,
+            "string": 55
+          }
+        },
+        "thumbnailhls": {
+          "fillPct": 36,
+          "presentPct": 55,
+          "type": "map",
+          "types": {
+            "null": 19,
+            "map": 36
+          }
+        },
+        "views": {
+          "fillPct": 11,
+          "presentPct": 11,
+          "type": "number",
+          "types": {
+            "number": 11
+          }
+        },
+        "screenshot": {
+          "fillPct": 8,
+          "presentPct": 55,
+          "type": "null",
+          "types": {
+            "null": 47,
+            "string": 8
+          }
+        },
+        "srt": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 97,
+            "string": 3
+          }
+        },
+        "screeshot": {
+          "fillPct": 0,
+          "presentPct": 53,
+          "type": "null",
+          "types": {
+            "null": 53
+          }
+        }
+      },
+      "fieldCount": 26,
+      "lastWrite": "2026-05-27",
+      "writes90d": 101,
+      "writes365d": 217
+    },
+    "series": {
+      "collection": "series",
+      "count": 53,
+      "sampled": 53,
+      "sampleDocIds": [
+        "141lsKoZHGipTRXPVtuO",
+        "1hbfmuh2MM6RxBh37n5l",
+        "2HTRgK8RUtI6GBAdSjk8"
+      ],
+      "tsField": "date",
+      "fields": {
+        "description": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 53
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 53
+          }
+        },
+        "seriesName": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 53
+          }
+        },
+        "imageUrl": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 53
+          }
+        },
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 53
+          }
+        },
+        "sequence": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 53
+          }
+        },
+        "tier": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 53
+          }
+        },
+        "order": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 53
+          }
+        },
+        "keywords": {
+          "fillPct": 72,
+          "presentPct": 72,
+          "type": "array",
+          "types": {
+            "array": 38
+          }
+        },
+        "heroImageUrl": {
+          "fillPct": 68,
+          "presentPct": 94,
+          "type": "string",
+          "types": {
+            "string": 36,
+            "null": 14
+          }
+        },
+        "category": {
+          "fillPct": 40,
+          "presentPct": 74,
+          "type": "ref",
+          "types": {
+            "ref": 21,
+            "null": 18
+          }
+        },
+        "updateddate": {
+          "fillPct": 40,
+          "presentPct": 40,
+          "type": "ts",
+          "types": {
+            "ts": 21
+          }
+        },
+        "freetier": {
+          "fillPct": 26,
+          "presentPct": 26,
+          "type": "boolean",
+          "types": {
+            "boolean": 14
+          }
+        },
+        "type": {
+          "fillPct": 23,
+          "presentPct": 23,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        }
+      },
+      "fieldCount": 14,
+      "lastWrite": "2026-04-07",
+      "writes90d": 6,
+      "writes365d": 38
+    },
+    "solar voice playlist": {
+      "collection": "solar voice playlist",
+      "count": 56,
+      "sampled": 56,
+      "sampleDocIds": [
+        "0czVi8scUgo65c6uuIR4",
+        "1AriVnvYqdDZmSNtgWl2",
+        "1Rx1jtRmik8RGHtSfauF"
+      ],
+      "tsField": "date",
+      "fields": {
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 56
+          }
+        },
+        "name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 56
+          }
+        },
+        "description": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 56
+          }
+        },
+        "sequence": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 56
+          }
+        },
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 56
+          }
+        },
+        "private": {
+          "fillPct": 96,
+          "presentPct": 96,
+          "type": "boolean",
+          "types": {
+            "boolean": 54
+          }
+        },
+        "tags": {
+          "fillPct": 73,
+          "presentPct": 73,
+          "type": "array",
+          "types": {
+            "array": 41
+          }
+        },
+        "keywords": {
+          "fillPct": 61,
+          "presentPct": 61,
+          "type": "array",
+          "types": {
+            "array": 34
+          }
+        },
+        "likedby": {
+          "fillPct": 59,
+          "presentPct": 59,
+          "type": "array",
+          "types": {
+            "array": 33
+          }
+        },
+        "imageurl": {
+          "fillPct": 32,
+          "presentPct": 48,
+          "type": "string",
+          "types": {
+            "string": 18,
+            "null": 9
+          }
+        }
+      },
+      "fieldCount": 10,
+      "lastWrite": "2026-04-22",
+      "writes90d": 9,
+      "writes365d": 23
+    },
+    "solar voice audios": {
+      "collection": "solar voice audios",
+      "count": 49,
+      "sampled": 49,
+      "sampleDocIds": [
+        "0HrDGJXQU52BvW7iLKQF",
+        "0oCsSH6eUnRhYJsvkqw5",
+        "1gDKh2uGbz4BIGVWwyQJ"
+      ],
+      "tsField": "date",
+      "fields": {
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "url": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "description": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 49
+          }
+        },
+        "size": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "sizeBytes": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 49
+          }
+        },
+        "duration": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 49
+          }
+        },
+        "imageUrl": {
+          "fillPct": 84,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "null": 8,
+            "string": 41
+          }
+        },
+        "segmentCount": {
+          "fillPct": 47,
+          "presentPct": 47,
+          "type": "number",
+          "types": {
+            "number": 23
+          }
+        },
+        "subtitleUrl": {
+          "fillPct": 47,
+          "presentPct": 47,
+          "type": "string",
+          "types": {
+            "string": 23
+          }
+        },
+        "tags": {
+          "fillPct": 41,
+          "presentPct": 41,
+          "type": "array",
+          "types": {
+            "array": 20
+          }
+        },
+        "hlsurl": {
+          "fillPct": 0,
+          "presentPct": 22,
+          "type": "null",
+          "types": {
+            "null": 11
+          }
+        }
+      },
+      "fieldCount": 13,
+      "lastWrite": "2026-03-10",
+      "writes90d": 1,
+      "writes365d": 9
+    },
+    "evolutionmappingvideo": {
+      "collection": "evolutionmappingvideo",
+      "count": 1526,
+      "sampled": 100,
+      "sampleDocIds": [
+        "01rkceA893uUGjjgyyB7",
+        "0CzsuSrb0cIJF2H1Tw5m",
+        "0EoBco6eiOjQVS8ImPoW"
+      ],
+      "tsField": "created",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "title": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "videourl": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "deleted": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "urllive": {
+          "fillPct": 94,
+          "presentPct": 94,
+          "type": "boolean",
+          "types": {
+            "boolean": 94
+          }
+        },
+        "recordeddate": {
+          "fillPct": 82,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "null": 18,
+            "ts": 82
+          }
+        }
+      },
+      "fieldCount": 8,
+      "lastWrite": "2026-06-01",
+      "writes90d": 539,
+      "writes365d": 1526
+    },
+    "liveevolutionmapping": {
+      "collection": "liveevolutionmapping",
+      "count": 538,
+      "sampled": 100,
+      "sampleDocIds": [
+        "038soRzLMjiF7lK4C4If",
+        "08yXZcraFGUAN5G2R3rl",
+        "0jg1pMSvvaBZeSPsw0sK"
+      ],
+      "tsField": "created",
+      "fields": {
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "title": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "videolist": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "live": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "lastupdated": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        }
+      },
+      "fieldCount": 6,
+      "lastWrite": "2026-06-01",
+      "writes90d": 117,
+      "writes365d": 538
+    },
+    "tier": {
+      "collection": "tier",
+      "count": 13,
+      "sampled": 13,
+      "sampleDocIds": [
+        "2UjrsgbxwY2nitzMSxRN",
+        "2sNA7uHvZ007lZlDJk9v",
+        "2yDtPQVMVqe80S8cB2DR"
+      ],
+      "tsField": "date",
+      "fields": {
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 13
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "tier": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "order": {
+          "fillPct": 77,
+          "presentPct": 77,
+          "type": "number",
+          "types": {
+            "number": 10
+          }
+        },
+        "tiereligibilitymessage": {
+          "fillPct": 77,
+          "presentPct": 77,
+          "type": "string",
+          "types": {
+            "string": 10
+          }
+        },
+        "tierdowngrademessage": {
+          "fillPct": 69,
+          "presentPct": 69,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        },
+        "tierUpgrademessage": {
+          "fillPct": 69,
+          "presentPct": 69,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        }
+      },
+      "fieldCount": 7,
+      "lastWrite": "2025-12-29",
+      "writes90d": 0,
+      "writes365d": 2
+    },
+    "tier access config": {
+      "collection": "tier access config",
+      "count": 12,
+      "sampled": 12,
+      "sampleDocIds": [
+        "5TUK8xByPaWJgWiwLLke",
+        "6tTCDoXZhcrjgWw79r53",
+        "DGVnquC25pAACfS2ZoiG"
+      ],
+      "tsField": null,
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        },
+        "productaccess": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 12
+          }
+        },
+        "tieraccessby": {
+          "fillPct": 92,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 11,
+            "null": 1
+          }
+        },
+        "tierid": {
+          "fillPct": 92,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 11,
+            "null": 1
+          }
+        },
+        "biglevel": {
+          "fillPct": 75,
+          "presentPct": 75,
+          "type": "array",
+          "types": {
+            "array": 9
+          }
+        },
+        "biglevelid": {
+          "fillPct": 67,
+          "presentPct": 67,
+          "type": "array",
+          "types": {
+            "array": 8
+          }
+        }
+      },
+      "fieldCount": 6
+    }
+  },
+  "config": {
+    "tier access config": {
+      "collection": "tier access config",
+      "count": 12,
+      "sampled": 12,
+      "variantCount": 3,
+      "variants": [
+        {
+          "count": 5,
+          "exampleId": "5TUK8xByPaWJgWiwLLke",
+          "keys": [
+            "biglevel",
+            "biglevelid",
+            "docid",
+            "productaccess",
+            "tieraccessby",
+            "tierid"
+          ],
+          "shape": "{tieraccessby:str(7), tierid:str(20), docid:str(20), biglevelid:array[0], biglevel:array[0], productaccess:{1TgyhjEt97ZIjY1stgBb:array[2]<map>, A3ZxESwYwEq3Iix1Npsx:array[1]<map>, FUAG7SaEBFQKNr8vXxtc:array[1]<map>, q7WWy1HcvtvyeiDJ8rUD:array[1]<map>, lNmGPKApROBlTUtZDNCo:array[1]<map>, IipQJEwAqPIqKyX5RMnv:array[1]<map>, zXOSlrDXv0M1R1jaQzfv:array[1]<map>, WtmtoBKg7NSlKtlfONQ1:array[1]<map>, 9e8eryFH3ilV4jITfGUP:array[1]<map>, TPLw1DYWP2KDTRiuGZJ3:array[1]<map>, QhbyEhyUHWXAXtalz8VK:array[3]<map>, AFJQAbdlGATlEm0zoRnf:array[1]<map>, DqPYgBq7S4ujRetOQT1b:array[1]<map>, 63nswIbTuhBpW8sZezjk:array[1]<map>, uTkOjxaPZpoXASM38IU1:array[1]<map>, gL25qjTQHpzpMRRFiOpr:array[1]<map>, Z1BG0uILFjBJAHzDU8Oj:array[1]<map>, Qedrk9QWQvlizWLWXemR:array[1]<map>, ESgJg1EUYarVj9GAd2md:array[1]<map>, WW9HbnNHjz3nbspb6brG:array[1]<map>, RXvsMYoK0g4SstvDDURZ:array[1]<map>, Po8GJ3Gd18WxcUZeIxRw:array[1]<map>, aGumGa58nBR2SBuO0DSq:array[1]<map>, g64UgmMhdrWenvDUWUni:array[1]<map>, O2mt0C41gij5DL3RGnbz:array[1]<map>, r222gQt0aXhJAnyFfD2f:array[1]<map>, tbHe0RxEj6ZW6ZxfO5pd:array[1]<map>, lv05Armcn9KpVzt3aWFa:array[1]<map>, 5ieaVGJGUMFWCpw0GdCG:array[1]<map>, YYsg9Lux3oaNjEC8jqex:array[1]<map>}}"
+        },
+        {
+          "count": 4,
+          "exampleId": "6tTCDoXZhcrjgWw79r53",
+          "keys": [
+            "biglevel",
+            "docid",
+            "productaccess",
+            "tieraccessby",
+            "tierid"
+          ],
+          "shape": "{biglevel:array[0], tieraccessby:str(7), tierid:str(20), docid:str(20), productaccess:{5ieaVGJGUMFWCpw0GdCG:array[1]<map>, YYsg9Lux3oaNjEC8jqex:array[1]<map>, RXvsMYoK0g4SstvDDURZ:array[1]<map>}}"
+        },
+        {
+          "count": 3,
+          "exampleId": "Lbz4JuXC4yquvS0lNSBB",
+          "keys": [
+            "biglevelid",
+            "docid",
+            "productaccess",
+            "tieraccessby",
+            "tierid"
+          ],
+          "shape": "{tieraccessby:str(7), tierid:str(20), docid:str(20), productaccess:{Qedrk9QWQvlizWLWXemR:array[1]<map>, ESgJg1EUYarVj9GAd2md:array[1]<map>, lv05Armcn9KpVzt3aWFa:array[1]<map>, GlmYrRE1UhMm6DEWAeOk:array[1]<map>}, biglevelid:array[0]}"
+        }
+      ]
+    },
+    "tier": {
+      "collection": "tier",
+      "count": 13,
+      "sampled": 13,
+      "variantCount": 4,
+      "variants": [
+        {
+          "count": 9,
+          "exampleId": "2sNA7uHvZ007lZlDJk9v",
+          "keys": [
+            "date",
+            "id",
+            "order",
+            "tier",
+            "tierUpgrademessage",
+            "tierdowngrademessage",
+            "tiereligibilitymessage"
+          ],
+          "shape": "{date:ts, tier:str(31), id:str(20), order:number, tiereligibilitymessage:str(104), tierdowngrademessage:str(96), tierUpgrademessage:str(121)}"
+        },
+        {
+          "count": 2,
+          "exampleId": "K9lL5iQyqJC3AT9sbUpV",
+          "keys": [
+            "date",
+            "id",
+            "tier"
+          ],
+          "shape": "{id:str(20), date:ts, tier:str(16)}"
+        },
+        {
+          "count": 1,
+          "exampleId": "2UjrsgbxwY2nitzMSxRN",
+          "keys": [
+            "date",
+            "id",
+            "order",
+            "tier"
+          ],
+          "shape": "{date:ts, id:str(20), tier:str(17), order:number}"
+        },
+        {
+          "count": 1,
+          "exampleId": "LwUggwyS80lqX3Lwm5Tz",
+          "keys": [
+            "date",
+            "id",
+            "tier",
+            "tiereligibilitymessage"
+          ],
+          "shape": "{tier:str(9), id:str(20), date:ts, tiereligibilitymessage:str(4)}"
+        }
+      ]
+    }
+  },
+  "traces": {
+    "contentTrace": {
+      "totalContentAnalytics": 278756,
+      "byType": {
+        "solarvoice": 119959,
+        "eiflixcontent": 39717,
+        "eiflix": 14928,
+        "video": 0,
+        "audio": 0,
+        "ads": 0,
+        "series": 0,
+        "healthstories": 0
+      },
+      "sample": {
+        "type": "eiflix",
+        "videoname": "DAY 01 - Part 08 - S2 - State changed",
+        "totaltimespend": 1170,
+        "from": "eiflixworkshop",
+        "logdate": "2026-06-02 16:07:54"
+      },
+      "touchpointSample": {
+        "touchpoint": "Form Submitted",
+        "label": "Form Submitted - ATC Understanding Validation",
+        "profileid": "27MaTyYg9qFNGRWQW1Ih",
+        "at": "2026-06-02 16:07:10"
+      },
+      "touchpointTotal": 89245
+    }
+  }
+}

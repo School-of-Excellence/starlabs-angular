@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Queue Flow — Evolution Mapping (599 participants)</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171b21; --panel2:#1d232b; --line:#2a323d; --ink:#e8edf3; --dim:#9aa7b6;
+    --self:#3b82f6; --spec:#f97316; --gate:#64748b; --accent:#22d3ee; --big:#34d399;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;padding:28px 32px 60px}
+  h1{font-size:21px;margin:0 0 2px} h2{font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:var(--dim);margin:34px 0 14px;font-weight:600}
+  .sub{color:var(--dim);margin:0 0 18px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px}
+  .chip b{font-size:16px;color:var(--accent)}
+  /* pipeline */
+  .pipe{display:flex;gap:0;overflow-x:auto;padding:6px 2px 16px}
+  .stage{min-width:150px;max-width:150px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--gate);border-radius:10px;padding:10px 11px;position:relative;margin-right:26px}
+  .stage.self{border-top-color:var(--self)} .stage.spec{border-top-color:var(--spec)} .stage.gate{border-top-color:var(--gate)}
+  .stage:not(:last-child)::after{content:"\2192";position:absolute;right:-21px;top:50%;transform:translateY(-50%);color:var(--line);font-size:20px}
+  .stage .n{font-size:11px;color:var(--dim)}
+  .stage .nm{font-weight:600;margin:2px 0 8px;min-height:38px;font-size:13px}
+  .badge{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:20px;font-weight:600}
+  .badge.self{background:rgba(59,130,246,.15);color:#93c5fd}
+  .badge.spec{background:rgba(249,115,22,.15);color:#fdba74}
+  .badge.gate{background:rgba(100,116,139,.18);color:#cbd5e1}
+  .stat{font-size:12px;color:var(--dim);margin-top:7px}
+  .stat b{color:var(--ink)}
+  .stage.hot{box-shadow:0 0 0 1px var(--spec),0 8px 30px -10px rgba(249,115,22,.5)}
+  .deliver{margin-top:8px;border-top:1px dashed var(--line);padding-top:7px;font-size:12px}
+  .deliver .big{color:var(--spec);font-weight:700}
+  /* variations grid */
+  .grid{border-collapse:collapse;width:auto}
+  .grid th,.grid td{border:1px solid var(--line);padding:9px 14px;text-align:center}
+  .grid th{background:var(--panel2);color:var(--dim);font-weight:600}
+  .grid td{background:var(--panel)}
+  .grid .track{text-align:left;font-weight:600;background:var(--panel2)}
+  .cell b{font-size:17px} .cell .pp{font-size:11px;color:var(--dim)}
+  .cell.zero{color:var(--line)} .cell.zero b{color:var(--line)}
+  /* studio grid */
+  .studios{display:flex;flex-wrap:wrap;gap:9px;max-width:980px}
+  .studio{width:64px;height:58px;background:var(--panel);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+  .studio .dots{display:flex;gap:3px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--big)}
+  .studio .lbl{font-size:9.5px;color:var(--dim)}
+  .studio.four{border-color:var(--big);box-shadow:0 0 0 1px var(--big)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--dim);font-size:12.5px;margin:6px 0 16px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .note{color:var(--dim);font-size:12.5px;margin-top:10px;max-width:920px}
+</style>
+</head>
+<body>
+  <h1>Evolution Mapping — happening online, queue-based</h1>
+  <p class="sub">Queue <code>vuvS7eBgTxLKufnesLQT</code> · active Feb 7 – Jun 6, 2026 · one real, &gt;100-participant queue</p>
+  <div class="chips">
+    <div class="chip"><b>599</b> participants</div>
+    <div class="chip"><b>14</b> stages (sessions)</div>
+    <div class="chip"><b>10</b> variations (paths)</div>
+    <div class="chip"><b>64</b> studios run</div>
+    <div class="chip"><b>63</b> specialists delivered</div>
+    <div class="chip">peak <b>29</b> studios at once</div>
+  </div>
+
+  <h2>The participant journey — a series of sessions → ATC → uP! event readiness</h2>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--self)"></i> self-guided (form / report / self-ATC — done alone)</span>
+    <span><i class="sw" style="background:var(--spec)"></i> specialist studio (needs specialist / appointment / Zoom)</span>
+    <span><i class="sw" style="background:var(--gate)"></i> gate / hold / terminal</span>
+  </div>
+  <div class="pipe" id="pipe"></div>
+  <p class="note">"Passed" = total times participants moved into the stage (a stage like Scope Enhancement is revisited many times — 1,556 passages over 599 people — because the ATC is built sitting-by-sitting). Forms run 0 studios (self-guided); the delivery load concentrates almost entirely on <b>Scope Enhancement</b>.</p>
+
+  <h2>The 10 variations — personalized paths (track × cycle)</h2>
+  <table class="grid">
+    <tr><th>track \ cycle</th><th>First Cycle</th><th>Next Cycle</th><th>other</th></tr>
+    <tr><td class="track">uP!</td><td class="cell"><b>83</b><div class="pp">first-timers</div></td><td class="cell"><b>421</b><div class="pp">returning</div></td><td></td></tr>
+    <tr><td class="track">B!G</td><td class="cell zero"><b>0</b></td><td class="cell"><b>32</b></td><td></td></tr>
+    <tr><td class="track">LYL</td><td class="cell"><b>8</b></td><td class="cell"><b>13</b></td><td></td></tr>
+    <tr><td class="track">Prodigies</td><td class="cell zero"><b>0</b></td><td class="cell"><b>21</b></td><td></td></tr>
+    <tr><td class="track">special</td><td colspan="2"></td><td class="cell">Scope Enh. Changework <b>20</b> · Transfer <b>1</b></td></tr>
+  </table>
+  <p class="note">A participant's variation is chosen manually from their <b>journey</b> + whether it's their <b>first time at uP!</b> (cycle). The "track" labels (uP!/B!G/LYL/Prodigies) are a convenience aggregation; the real input is the specific journey. Each variation is a different ordered subset of the 14 stages (6–12 stages each).</p>
+
+  <h2>Peak delivery load — Scope Enhancement, 2026-04-18</h2>
+  <p class="sub" style="margin-bottom:8px">29 studios running concurrently · 60 specialists delivering at once · 2 specialists per studio (one ran 4).</p>
+  <div class="studios" id="studios"></div>
+  <p class="note">Each box = one live studio session; green dots = specialists (BIG participants delivering for others). This is the supply side of delivery: at the busiest moment this single queue pulled <b>~60 specialists into 29 simultaneous rooms</b> for the Scope-Enhancement (ATC-building) stage alone.</p>
+
+<script>
+const stages=[
+ {n:0,nm:"Evolution Prep Orientation",k:"gate",pass:27,now:70},
+ {n:1,nm:"uP! Preparation Hold",k:"gate",pass:0,now:0},
+ {n:2,nm:"Accelerated Evolution Level Form",k:"self",pass:327,now:7},
+ {n:3,nm:"uP! Life Aspiration Report",k:"self",pass:53,now:2},
+ {n:4,nm:"ATC Orientation Form",k:"self",pass:49,now:1},
+ {n:5,nm:"Prodigies Preparation Form",k:"self",pass:25,now:9},
+ {n:6,nm:"uP! Life Report",k:"self",pass:468,now:88},
+ {n:7,nm:"Scope Enhancement",k:"spec",pass:1556,studios:64,spec:63,peak:29,hot:true},
+ {n:8,nm:"Evolution Mapping Activity",k:"self",pass:246,now:3},
+ {n:9,nm:"In Evolution Mapping Activity",k:"self",pass:246,now:89},
+ {n:10,nm:"Self Evaluation Form",k:"self",pass:150,now:6},
+ {n:11,nm:"Scope Enhancement Changework",k:"spec",pass:77,studios:7,spec:7,peak:2},
+ {n:12,nm:"Transfered",k:"gate",pass:114,now:104},
+ {n:13,nm:"Completed",k:"gate",pass:199,now:170},
+];
+const lab={self:"self-guided",spec:"specialist studio",gate:"gate / terminal"};
+document.getElementById('pipe').innerHTML=stages.map(s=>`
+ <div class="stage ${s.k} ${s.hot?'hot':''}">
+   <div class="n">stage ${s.n}</div>
+   <div class="nm">${s.nm}</div>
+   <span class="badge ${s.k}">${lab[s.k]}</span>
+   <div class="stat">passed <b>${s.pass.toLocaleString()}</b>${s.now?` · now <b>${s.now}</b>`:''}</div>
+   ${s.studios?`<div class="deliver">studios <b>${s.studios}</b> · specialists <b>${s.spec}</b><br><span class="big">peak ${s.peak} studios @ once</span></div>`:''}
+ </div>`).join('');
+// 29 studios, 2 specialists each, one with 4
+const perStudio=[4,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2];
+document.getElementById('studios').innerHTML=perStudio.map((c,i)=>`
+ <div class="studio ${c===4?'four':''}">
+   <div class="dots">${'<span class="dot"></span>'.repeat(c)}</div>
+   <div class="lbl">studio ${i+1}${c===4?' · 4':''}</div>
+ </div>`).join('');
+</script>
+</body>
+</html>

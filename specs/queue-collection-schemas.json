@@ -1,0 +1,2909 @@
+{
+  "queue generation": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "venue": "<string>",
+      "queuedmessage": "<string>",
+      "docid": "<string>",
+      "created": "<timestamp>",
+      "queuewelcometemplate": "<string>",
+      "description": "<string>",
+      "queuetargetcapacity": "<number>",
+      "stagegroup": [
+        "<empty>"
+      ],
+      "enablezoommeetingsdk": "<boolean>",
+      "totalcapacity": "<number>",
+      "queuementor": [
+        "<string>"
+      ],
+      "stages": [
+        "<string>"
+      ],
+      "zoomlinkrequired": "<boolean>",
+      "lastregistrationdate": "<timestamp>",
+      "waitingmessage": "<string>",
+      "queueadmin": [
+        "<string>"
+      ],
+      "availabilitygivenby": [
+        "<string>"
+      ],
+      "queuename": "<redacted>",
+      "queuestartdate": "<timestamp>",
+      "queueenddate": "<timestamp>",
+      "arenaeventidlist": [
+        "<string>"
+      ],
+      "queuevariation": [
+        "<string>"
+      ],
+      "modified": "<timestamp>",
+      "stageproperty": {
+        "Diagnostics": {
+          "actiontype": "<null>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ],
+            "2": [
+              "<deep>"
+            ],
+            "3": [
+              "<deep>"
+            ],
+            "4": [
+              "<deep>"
+            ],
+            "5": [
+              "<deep>"
+            ],
+            "6": [
+              "<deep>"
+            ],
+            "7": [
+              "<deep>"
+            ],
+            "8": [
+              "<deep>"
+            ],
+            "9": [
+              "<deep>"
+            ],
+            "10": [
+              "<deep>"
+            ],
+            "11": [
+              "<deep>"
+            ],
+            "12": [
+              "<deep>"
+            ]
+          },
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<string>"
+          ],
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "Review 4": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "Evolution Mapping Activity": {
+          "actiontype": "<null>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "Implementation": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<string>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "At the Venue": {
+          "actiontype": "<null>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "Yet to Come": {
+          "actiontype": "<null>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "Consultation": {
+          "actiontype": "<null>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ],
+            "2": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "ATC Orientation": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<string>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "cwstage": "<null>",
+          "cwcalltoaction": "<null>",
+          "nextcalltoaction": "<null>",
+          "consultationstage": "<null>",
+          "consultationcalltoaction": "<null>"
+        },
+        "ATC Assessment": {
+          "actiontype": "<string>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "actionresource": "<ref:delivery forms>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<string>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "Self ATC": {
+          "actiontype": "<string>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<string>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "actionresource": "<ref:delivery forms>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<string>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextcalltoaction": "<null>",
+          "cwstage": "<null>",
+          "cwcalltoaction": "<null>",
+          "consultationstage": "<null>",
+          "consultationcalltoaction": "<null>"
+        },
+        "Self ATC Next Cycle": {
+          "actiontype": "<string>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "actionresource": "<ref:delivery forms>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<string>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "cwstage": "<null>",
+          "cwcalltoaction": "<null>",
+          "consultationstage": "<null>",
+          "consultationcalltoaction": "<null>",
+          "nextcalltoaction": "<null>"
+        },
+        "Post Video Log": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "consultationcalltoaction": "<null>",
+          "cwcalltoaction": "<null>",
+          "cwstage": "<null>",
+          "nextcalltoaction": "<null>",
+          "consultationstage": "<null>"
+        },
+        "Completed": {
+          "actiontype": "<null>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "consultationstage": "<null>",
+          "cwstage": "<null>",
+          "nextcalltoaction": "<null>",
+          "consultationcalltoaction": "<null>",
+          "cwcalltoaction": "<null>"
+        },
+        "uP! Life Report": {
+          "actiontype": "<string>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "actionresource": "<ref:delivery forms>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<string>",
+          "stagegroup": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>"
+        },
+        "Diagnostics 2": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<string>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Diagnostics 3": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<string>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Review 1": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Review 2": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Diagnostics 1": {
+          "actiontype": "<null>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Review 3": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Review": {
+          "actiontype": "<null>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ],
+            "2": [
+              "<deep>"
+            ]
+          },
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {
+            "ocH3kB9SL9Cgec9i7Uqq": "<string>",
+            "DtUbBAdrLVUYcKipIXD0": "<string>",
+            "fSGa57cCU52aZgJP5kXI": "<string>",
+            "HFWFwv7YFPTNtcwkwAGK": "<string>",
+            "I5wPPCFQToxULZvwmU6L": "<string>",
+            "SISu2bHKe4yHE2c29UZJ": "<string>",
+            "MOt60i7xvRhOu0twmIIG": "<string>",
+            "sbZGR2wuvssy1AvL82hk": "<string>",
+            "rkM1XplBnoteX2GEJXX6": "<string>",
+            "54toXo6Nl3UU03ehuV7V": "<string>",
+            "W0knU88qllYmVsdw87f5": "<string>"
+          },
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Video Log": {
+          "actiontype": "<null>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ],
+            "2": [
+              "<deep>"
+            ],
+            "3": [
+              "<deep>"
+            ],
+            "4": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<string>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ],
+          "consultationstage": "<null>",
+          "cwstage": "<null>",
+          "cwcalltoaction": "<null>",
+          "nextcalltoaction": "<null>",
+          "consultationcalltoaction": "<null>"
+        },
+        "Implementation 3": {
+          "actiontype": "<null>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Implementation 2": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Implementation 4": {
+          "actiontype": "<null>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Diagnostics 4": {
+          "actiontype": "<null>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<string>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Implementation 1": {
+          "actiontype": "<null>",
+          "stageexplanation": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "Yet to start": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "consultationstage": "<null>",
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "minwatingminutes": "<null>",
+          "cwcalltoaction": "<null>",
+          "cwstage": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "nextcalltoaction": "<null>",
+          "participantform": "<redacted>",
+          "consultationcalltoaction": "<null>",
+          "messageheader": "<null>",
+          "compulsoryactivity": {},
+          "nextstage": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ]
+        },
+        "In Diagnostics": {
+          "implementationstages": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "consultationstage": "<null>",
+          "stagegroup": "<string>",
+          "messageheader": "<null>",
+          "minwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "actiontype": "<null>",
+          "compulsoryactivity": {},
+          "participantform": "<redacted>",
+          "transferactivity": {},
+          "actionresource": "<null>",
+          "maxwatingminutes": "<null>",
+          "selfmovable": "<boolean>",
+          "stageexplanation": "<null>",
+          "cwcalltoaction": "<string>",
+          "nextcalltoaction": "<null>",
+          "calltoaction": "<null>",
+          "consultationcalltoaction": "<null>",
+          "cwstage": "<string>"
+        },
+        "In Review": {
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "minwatingminutes": "<null>",
+          "messageheader": "<null>",
+          "stagemessage": "<null>",
+          "selfmovable": "<boolean>",
+          "actiontype": "<null>",
+          "cwcalltoaction": "<null>",
+          "stagegroup": "<string>",
+          "actionresource": "<null>",
+          "cwstage": "<null>",
+          "participantform": "<redacted>",
+          "compulsoryactivity": {},
+          "nextcalltoaction": "<null>",
+          "consultationstage": "<null>",
+          "consultationcalltoaction": "<null>",
+          "maxwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stageexplanation": "<null>"
+        },
+        "Ready for Diagnostic": {
+          "optionalstagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "implementationstages": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "stageexplanation": "<null>",
+          "cwstage": "<null>",
+          "consultationcalltoaction": "<null>",
+          "compulsoryactivity": {},
+          "participantform": "<redacted>",
+          "transferactivity": {},
+          "selfmovable": "<boolean>",
+          "messageheader": "<null>",
+          "stagemessage": "<null>",
+          "nextcalltoaction": "<null>",
+          "consultationstage": "<null>",
+          "maxwatingminutes": "<null>",
+          "actionresource": "<null>",
+          "minwatingminutes": "<null>",
+          "stagegroup": "<string>",
+          "cwcalltoaction": "<null>",
+          "calltoaction": "<null>",
+          "actiontype": "<null>"
+        },
+        "CTD Aspiration Form": {
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "optionalstagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "stagemessage": "<null>",
+          "transferactivity": {},
+          "stageexplanation": "<string>",
+          "minwatingminutes": "<null>",
+          "stagegroup": "<string>",
+          "calltoaction": "<string>",
+          "messageheader": "<null>",
+          "maxwatingminutes": "<null>",
+          "selfmovable": "<boolean>",
+          "actionresource": "<ref:delivery forms>",
+          "actiontype": "<string>",
+          "compulsoryactivity": {},
+          "participantform": "<redacted>"
+        },
+        "In Implementation": {
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "actiontype": "<null>",
+          "stagemessage": "<null>",
+          "stageexplanation": "<null>",
+          "actionresource": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagegroup": "<string>",
+          "messageheader": "<null>",
+          "participantform": "<redacted>",
+          "selfmovable": "<boolean>",
+          "transferactivity": {},
+          "calltoaction": "<null>",
+          "nextcalltoaction": "<string>",
+          "consultationstage": "<null>",
+          "cwstage": "<null>",
+          "minwatingminutes": "<null>",
+          "consultationcalltoaction": "<null>",
+          "compulsoryactivity": {},
+          "cwcalltoaction": "<null>"
+        },
+        "In ATC Orientation": {
+          "nextstage": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "implementationstages": [
+            "<empty>"
+          ],
+          "stageexplanation": "<string>",
+          "calltoaction": "<null>",
+          "actionresource": "<null>",
+          "maxwatingminutes": "<null>",
+          "stagemessage": "<null>",
+          "stagegroup": "<string>",
+          "selfmovable": "<boolean>",
+          "participantform": "<redacted>",
+          "messageheader": "<null>",
+          "compulsoryactivity": {},
+          "minwatingminutes": "<null>",
+          "actiontype": "<null>",
+          "transferactivity": {}
+        },
+        "Pre Event": {
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "selfmovable": "<boolean>",
+          "consultationstage": "<null>",
+          "stagegroup": "<string>",
+          "cwcalltoaction": "<null>",
+          "stagemessage": "<null>",
+          "consultationcalltoaction": "<null>",
+          "actiontype": "<null>",
+          "calltoaction": "<null>",
+          "minwatingminutes": "<null>",
+          "participantform": "<redacted>",
+          "nextcalltoaction": "<null>",
+          "compulsoryactivity": {},
+          "cwstage": "<null>",
+          "transferactivity": {},
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<string>",
+          "actionresource": "<null>"
+        },
+        "ATC Understanding Validation": {
+          "implementationstages": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "consultationstage": "<null>",
+          "stageexplanation": "<string>",
+          "participantform": "<redacted>",
+          "transferactivity": {},
+          "cwcalltoaction": "<null>",
+          "consultationcalltoaction": "<null>",
+          "stagemessage": "<null>",
+          "selfmovable": "<boolean>",
+          "nextcalltoaction": "<null>",
+          "messageheader": "<null>",
+          "calltoaction": "<string>",
+          "actiontype": "<string>",
+          "compulsoryactivity": {},
+          "cwstage": "<null>",
+          "actionresource": "<ref:delivery forms>",
+          "minwatingminutes": "<null>",
+          "stagegroup": "<string>",
+          "maxwatingminutes": "<null>"
+        },
+        "Ready for Implementation": {
+          "mandatorystagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "cwstage": "<null>",
+          "messageheader": "<null>",
+          "stagegroup": "<string>",
+          "participantform": "<redacted>",
+          "consultationcalltoaction": "<null>",
+          "transferactivity": {},
+          "compulsoryactivity": {},
+          "selfmovable": "<boolean>",
+          "nextcalltoaction": "<null>",
+          "actiontype": "<null>",
+          "minwatingminutes": "<null>",
+          "cwcalltoaction": "<null>",
+          "calltoaction": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "actionresource": "<null>",
+          "consultationstage": "<null>"
+        },
+        "Video Ask": {
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "optionalstagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "actiontype": "<string>",
+          "stagegroup": "<null>",
+          "transferactivity": {},
+          "selfmovable": "<boolean>",
+          "calltoaction": "<string>",
+          "actionresource": [
+            "<ref:arenavideoask>"
+          ],
+          "compulsoryactivity": {},
+          "minwatingminutes": "<number>",
+          "stagemessage": "<null>",
+          "messageheader": "<null>",
+          "maxwatingminutes": "<number>",
+          "participantform": "<redacted>",
+          "stageexplanation": "<string>"
+        },
+        "Ready for Review": {
+          "mandatorystagegrouping": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "nextcalltoaction": "<null>",
+          "stagegroup": "<string>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "cwcalltoaction": "<null>",
+          "actiontype": "<null>",
+          "messageheader": "<null>",
+          "cwstage": "<null>",
+          "stageexplanation": "<null>",
+          "consultationcalltoaction": "<null>",
+          "maxwatingminutes": "<null>",
+          "consultationstage": "<null>",
+          "stagemessage": "<null>",
+          "calltoaction": "<null>",
+          "minwatingminutes": "<null>",
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "compulsoryactivity": {}
+        },
+        "Evolution Mapping": {
+          "actiontype": "<string>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<string>",
+          "stagemessage": "<null>",
+          "compulsoryactivity": {},
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "actionresource": "<string>"
+        },
+        "Ready for Diagnostics": {
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "stageexplanation": "<null>",
+          "stagemessage": "<null>",
+          "consultationstage": "<null>",
+          "actionresource": "<null>",
+          "selfmovable": "<boolean>",
+          "nextstage": "<null>",
+          "minwatingminutes": "<null>",
+          "cwcalltoaction": "<null>",
+          "cwstage": "<null>",
+          "calltoaction": "<null>",
+          "stagegroup": "<string>",
+          "nextcalltoaction": "<null>",
+          "participantform": "<redacted>",
+          "consultationcalltoaction": "<null>",
+          "messageheader": "<null>",
+          "transferactivity": {},
+          "mandatorystagegrouping": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "compulsoryactivity": {},
+          "implementationstages": [
+            "<empty>"
+          ]
+        },
+        "Self Evolution Report": {
+          "selfmovable": "<boolean>",
+          "minwatingminutes": "<null>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "stagegroup": "<string>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "maxwatingminutes": "<null>",
+          "calltoaction": "<string>",
+          "stageexplanation": "<string>",
+          "actiontype": "<string>",
+          "mandatorystagegrouping": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "actionresource": "<ref:delivery forms>",
+          "transferactivity": {},
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "participantform": "<redacted>",
+          "compulsoryactivity": {},
+          "optionalstagegrouping": "<redacted>",
+          "stagemessage": "<null>"
+        },
+        "ATC Orientation Form": {
+          "stagemessage": "<null>",
+          "stagegroup": "<string>",
+          "selfmovable": "<boolean>",
+          "actionresource": "<ref:delivery forms>",
+          "participantform": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "calltoaction": "<string>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "maxwatingminutes": "<null>",
+          "transferactivity": {},
+          "actiontype": "<string>",
+          "messageheader": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "stageexplanation": "<string>",
+          "compulsoryactivity": {},
+          "implementationstages": [
+            "<empty>"
+          ]
+        },
+        "uP! Life Aspiration Report": {
+          "calltoaction": "<string>",
+          "messageheader": "<null>",
+          "participantform": "<redacted>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "stagemessage": "<null>",
+          "actiontype": "<string>",
+          "optionalstagegrouping": "<redacted>",
+          "stageexplanation": "<string>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "implementationstages": [
+            "<empty>"
+          ],
+          "compulsoryactivity": {},
+          "maxwatingminutes": "<null>",
+          "actionresource": "<ref:delivery forms>",
+          "mandatorystagegrouping": "<redacted>",
+          "stagegroup": "<string>",
+          "selfmovable": "<boolean>",
+          "minwatingminutes": "<null>"
+        },
+        "Junk": {
+          "stagemessage": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "compulsoryactivity": {},
+          "calltoaction": "<string>",
+          "messageheader": "<null>",
+          "minwatingminutes": "<null>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "selfmovable": "<boolean>",
+          "participantform": "<redacted>",
+          "optionalstagegrouping": "<redacted>",
+          "actiontype": "<null>",
+          "stagegroup": "<null>",
+          "stageexplanation": "<string>",
+          "maxwatingminutes": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>"
+        },
+        "In ATC Orientation Group Call": {
+          "participantform": "<redacted>",
+          "minwatingminutes": "<null>",
+          "calltoaction": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "implementationstages": [
+            "<empty>"
+          ],
+          "selfmovable": "<boolean>",
+          "actiontype": "<null>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "stageexplanation": "<string>",
+          "transferactivity": {},
+          "stagemessage": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "actionresource": "<null>",
+          "compulsoryactivity": {},
+          "stagegroup": "<string>",
+          "messageheader": "<null>",
+          "maxwatingminutes": "<null>"
+        },
+        "Wellness Scaling Form": {
+          "optionalstagegrouping": "<redacted>",
+          "calltoaction": "<string>",
+          "actiontype": "<string>",
+          "compulsoryactivity": {},
+          "stageexplanation": "<string>",
+          "actionresource": "<ref:delivery forms>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "selfmovable": "<boolean>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "stagegroup": "<string>",
+          "messageheader": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "participantform": "<redacted>",
+          "stagemessage": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "maxwatingminutes": "<null>"
+        },
+        "Diagnostics Readiness Changework": {
+          "minwatingminutes": "<null>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "actionresource": "<null>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ],
+            "2": [
+              "<deep>"
+            ],
+            "3": [
+              "<deep>"
+            ]
+          },
+          "stagemessage": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "mandatorystagegrouping": "<redacted>",
+          "stagegroup": "<string>",
+          "selfmovable": "<boolean>",
+          "maxwatingminutes": "<null>",
+          "actiontype": "<string>",
+          "participantform": "<redacted>",
+          "messageheader": "<null>",
+          "calltoaction": "<null>",
+          "stageexplanation": "<string>",
+          "nextstage": [
+            {
+              "markascompleted": "<deep>",
+              "stage": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ]
+        },
+        "In Evolution Mapping Activity": {
+          "stagemessage": "<null>",
+          "actionresource": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "messageheader": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "stagegroup": "<string>",
+          "calltoaction": "<null>",
+          "maxwatingminutes": "<null>",
+          "actiontype": "<null>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "selfmovable": "<boolean>",
+          "stageexplanation": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "transferactivity": {},
+          "compulsoryactivity": {},
+          "participantform": "<redacted>"
+        },
+        "In-person Completed": {
+          "stagegroup": "<null>",
+          "compulsoryactivity": {},
+          "stageexplanation": "<null>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "stagemessage": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "transferactivity": {},
+          "mandatorystagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "calltoaction": "<null>",
+          "maxwatingminutes": "<null>",
+          "participantform": "<redacted>",
+          "selfmovable": "<boolean>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "actiontype": "<null>"
+        },
+        "uP! Readiness Changework": {
+          "calltoaction": "<null>",
+          "transferactivity": {},
+          "mandatorystagegrouping": "<redacted>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ],
+            "2": [
+              "<deep>"
+            ],
+            "3": [
+              "<deep>"
+            ]
+          },
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "maxwatingminutes": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "selfmovable": "<boolean>",
+          "actionresource": "<null>",
+          "actiontype": "<string>",
+          "stagegroup": "<string>",
+          "minwatingminutes": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ],
+          "messageheader": "<null>",
+          "participantform": "<redacted>",
+          "stagemessage": "<null>",
+          "stageexplanation": "<string>",
+          "studiowidgets": [
+            "<string>"
+          ]
+        },
+        "Triple ATC": {
+          "transferactivity": {},
+          "actionresource": "<string>",
+          "mandatorystagegrouping": "<redacted>",
+          "maxwatingminutes": "<null>",
+          "compulsoryactivity": {},
+          "selfmovable": "<boolean>",
+          "participantform": "<redacted>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "calltoaction": "<string>",
+          "minwatingminutes": "<null>",
+          "messageheader": "<null>",
+          "stagegroup": "<null>",
+          "stagemessage": "<null>",
+          "optionalstagegrouping": "<redacted>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "actiontype": "<string>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "stageexplanation": "<string>"
+        },
+        "Triple ATC Validation": {
+          "nextstage": [
+            "<empty>"
+          ],
+          "maxwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "stagemessage": "<null>",
+          "transferactivity": {},
+          "participantform": "<redacted>",
+          "mandatorystagegrouping": "<redacted>",
+          "calltoaction": "<null>",
+          "selfmovable": "<boolean>",
+          "actiontype": "<string>",
+          "minwatingminutes": "<null>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "studiowidgets": [
+            "<string>"
+          ],
+          "optionalstagegrouping": "<redacted>",
+          "actionresource": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "stageexplanation": "<string>"
+        },
+        "Accelerated Evolution Level Form": {
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "maxwatingminutes": "<null>",
+          "messageheader": "<null>",
+          "actionresource": "<ref:delivery forms>",
+          "actiontype": "<string>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "transferactivity": {},
+          "optionalstagegrouping": "<redacted>",
+          "calltoaction": "<string>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "stagemessage": "<null>",
+          "stagegroup": "<null>",
+          "participantform": "<redacted>",
+          "selfmovable": "<boolean>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "compulsoryactivity": {},
+          "stageexplanation": "<null>"
+        },
+        "ATC Orientation Group Call": {
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "nextstage": [
+            "<empty>"
+          ],
+          "compulsoryactivity": {},
+          "minwatingminutes": "<null>",
+          "maxwatingminutes": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "selfmovable": "<boolean>",
+          "optionalstagegrouping": "<redacted>",
+          "mandatorystagegrouping": "<redacted>",
+          "stageexplanation": "<string>",
+          "calltoaction": "<null>",
+          "actionresource": "<null>",
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "stagemessage": "<null>",
+          "actiontype": "<null>",
+          "stagegroup": "<string>",
+          "participantform": "<redacted>",
+          "transferactivity": {},
+          "messageheader": "<null>"
+        },
+        "Diagnostics In-person": {
+          "stageexplanation": "<null>",
+          "selfmovable": "<boolean>",
+          "participantform": "<redacted>",
+          "stagemessage": "<null>",
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "messageheader": "<null>",
+          "studiowidgets": [
+            "<string>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "calltoaction": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ],
+            "1": [
+              "<deep>"
+            ]
+          },
+          "minwatingminutes": "<null>",
+          "stagegroup": "<null>",
+          "nextstage": [
+            {
+              "stage": "<deep>",
+              "markascompleted": "<deep>",
+              "calltoaction": "<deep>"
+            }
+          ],
+          "maxwatingminutes": "<null>",
+          "transferactivity": {},
+          "optionalstagegrouping": "<redacted>",
+          "actiontype": "<null>"
+        },
+        "Consultation In-person": {
+          "studiowidgets": [
+            "<string>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "minwatingminutes": "<null>",
+          "actiontype": "<null>",
+          "maxwatingminutes": "<null>",
+          "selfmovable": "<boolean>",
+          "stagegroup": "<null>",
+          "mandatorystagegrouping": "<redacted>",
+          "participantform": "<redacted>",
+          "calltoaction": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "stageexplanation": "<null>",
+          "compulsoryactivity": {
+            "0": [
+              "<deep>"
+            ]
+          },
+          "messageheader": "<null>",
+          "nextstage": [
+            {
+              "calltoaction": "<deep>",
+              "stage": "<deep>",
+              "markascompleted": "<deep>"
+            }
+          ],
+          "stagemessage": "<null>",
+          "transferactivity": {},
+          "optionalstagegrouping": "<redacted>"
+        },
+        "Expanding Horizon Consultation": "<redacted>",
+        "Yet to Start": {
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "nextstage": [
+            "<empty>"
+          ],
+          "compulsoryactivity": {},
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "actiontype": "<null>",
+          "stagemessage": "<null>",
+          "selfmovable": "<boolean>",
+          "optionalstagegrouping": "<redacted>",
+          "calltoaction": "<null>",
+          "stagegroup": "<string>",
+          "participantform": "<redacted>",
+          "stageexplanation": "<null>",
+          "actionresource": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "maxwatingminutes": "<null>",
+          "messageheader": "<null>",
+          "transferactivity": {}
+        },
+        "Self Evaluation Form": {
+          "studiowidgets": [
+            "<empty>"
+          ],
+          "compulsoryactivity": {},
+          "maxwatingminutes": "<null>",
+          "selfmovable": "<boolean>",
+          "actionresource": "<ref:delivery forms>",
+          "optionalstagegrouping": "<redacted>",
+          "minwatingminutes": "<null>",
+          "messageheader": "<null>",
+          "participantform": "<redacted>",
+          "actiontype": "<string>",
+          "stageexplanation": "<string>",
+          "transferactivity": {},
+          "nextstage": [
+            "<empty>"
+          ],
+          "transferactivityproperty": [
+            "<empty>"
+          ],
+          "stagegroup": "<string>",
+          "stagemessage": "<null>",
+          "implementationstages": [
+            "<empty>"
+          ],
+          "mandatorystagegrouping": "<redacted>",
+          "calltoaction": "<string>"
+        }
+      },
+      "ahperson": [
+        "<empty>"
+      ],
+      "isreviewrequired": [
+        "<empty>"
+      ],
+      "videologperson": [
+        "<empty>"
+      ],
+      "isdiagnosticsrequired": [
+        "<empty>"
+      ],
+      "isconsultationrequired": [
+        "<empty>"
+      ],
+      "isvideologrequired": [
+        "<empty>"
+      ],
+      "diagnosticsperson": [
+        "<empty>"
+      ],
+      "changeworkperson": [
+        "<empty>"
+      ],
+      "ischangeworkreq": [
+        "<empty>"
+      ],
+      "reviewperson": [
+        "<empty>"
+      ],
+      "consultationperson": [
+        "<empty>"
+      ],
+      "isahrequired": [
+        "<empty>"
+      ],
+      "showsnippet": "<boolean>",
+      "avtestlink": "<string>",
+      "queuestudio": [
+        {
+          "studioin": "<boolean>",
+          "checkin": "<boolean>",
+          "pairing": [
+            "<string>"
+          ]
+        }
+      ],
+      "delete": "<boolean>"
+    }
+  },
+  "queue variation": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "variationname": "<redacted>",
+      "queueref": "<ref:queue generation>",
+      "stages": [
+        "<string>"
+      ],
+      "atcmodel": "<string>"
+    }
+  },
+  "queue_token": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "queuename": "<redacted>",
+      "denynote": "<null>",
+      "docid": "<string>",
+      "tokenstatus": "<redacted>",
+      "profile_name": "<redacted>",
+      "tokennumber": "<redacted>",
+      "queueref": "<ref:queue generation>",
+      "profile_id": "<string>",
+      "productref": "<ref:products>",
+      "productname": "<redacted>",
+      "quicknotes": "<null>",
+      "stagestatus": "<string>",
+      "createdon": "<timestamp>",
+      "cwmentoring": "<null>",
+      "cwperson": "<null>",
+      "cwshadowing": "<null>",
+      "readyimplementation": [
+        "<string>"
+      ],
+      "currentstage": "<string>",
+      "people_involved": [
+        "<empty>"
+      ],
+      "diagnosticshadowing": "<null>",
+      "arenaid": "<null>",
+      "diagnosticmentoring": "<null>",
+      "logdate": "<timestamp>",
+      "diagnosticperson": "<null>",
+      "liveassignmentid": "<null>",
+      "previousstage": "<string>",
+      "variationid": "<string>",
+      "formref": "<ref:formsByClient>",
+      "studioid": "<null>",
+      "preassigned": {
+        "Evolution Mapping Activity": [
+          "<empty>"
+        ]
+      },
+      "tokentransferredto": "<redacted>",
+      "transferredto": "<ref:queue generation>",
+      "status": "<null>",
+      "queueposition": "<number>",
+      "participantproductid": "<redacted>",
+      "deliveryRef": "<ref:deliverables>",
+      "transferredfrom": "<ref:queue generation>",
+      "tokentransferredfrom": "<redacted>",
+      "notesList": [
+        {
+          "text": "<string>",
+          "updatedon": "<timestamp>",
+          "author": "<string>",
+          "stage": "<string>"
+        }
+      ],
+      "notes": "<string>",
+      "tags": "<null>",
+      "updatedAt": "<timestamp>",
+      "selectedstageslot": {
+        "Evolution Prep Orientation": {
+          "stagename": "<redacted>",
+          "enddate": "<timestamp>",
+          "variationid": "<string>",
+          "queueplanid": "<string>",
+          "queueplanningslots": "<boolean>",
+          "segmentid": "<string>",
+          "startdate": "<timestamp>",
+          "maxslot": "<number>",
+          "usedslot": "<number>",
+          "bigparticipants": "<redacted>"
+        }
+      },
+      "manuallymoved": "<boolean>"
+    }
+  },
+  "queue stage log": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "docid": "<string>",
+      "quicknotes": "<null>",
+      "queueposition": "<number>",
+      "queueref": "<ref:queue generation>",
+      "people_involved": [
+        "<empty>"
+      ],
+      "diagnosticperson": "<null>",
+      "manuallymoved": "<boolean>",
+      "deliveryRef": "<string>",
+      "profile_id": "<string>",
+      "productref": "<ref:products>",
+      "queuename": "<redacted>",
+      "createdon": "<timestamp>",
+      "variationid": "<string>",
+      "studioid": "<null>",
+      "liveassignmentid": "<null>",
+      "cwshadowing": "<null>",
+      "denynote": "<null>",
+      "diagnosticmentoring": "<null>",
+      "currentstage": "<string>",
+      "selectedstageslot": {
+        "Scope Enhancement": {
+          "startdate": "<timestamp>",
+          "segmentid": "<string>",
+          "maxslot": "<number>",
+          "enddate": "<timestamp>",
+          "queueplanningslots": "<boolean>",
+          "variationid": "<string>",
+          "queueplanid": "<string>",
+          "usedslot": "<number>",
+          "stagename": "<redacted>",
+          "bigparticipants": "<redacted>"
+        }
+      },
+      "stagestatus": "<string>",
+      "status": "<null>",
+      "tokenstatus": "<redacted>",
+      "createdAttempt": "<number>",
+      "tokennumber": "<redacted>",
+      "cwperson": "<null>",
+      "arenaid": "<null>",
+      "productname": "<redacted>",
+      "previousstage": "<string>",
+      "participantproductid": "<redacted>",
+      "cwmentoring": "<null>",
+      "formref": "<ref:formsByClient>",
+      "diagnosticshadowing": "<null>",
+      "profile_name": "<redacted>",
+      "logdocid": "<string>",
+      "movedby": "<string>",
+      "movedthrough": "<string>",
+      "logdate": "<timestamp>",
+      "transferredfrom": "<ref:queue generation>",
+      "tokentransferredfrom": "<redacted>"
+    }
+  },
+  "queue planning": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "queueid": "<string>",
+      "createdAt": "<timestamp>",
+      "queueref": "<ref:queue generation>",
+      "docid": "<string>",
+      "variationlist": [
+        "<string>"
+      ],
+      "segmentlist": [
+        "<string>"
+      ],
+      "updatedAt": "<timestamp>",
+      "planning": [
+        {
+          "variationid": "<string>",
+          "segments": [
+            {
+              "slots": "<deep>",
+              "segmentid": "<deep>",
+              "stagecohort": "<deep>"
+            }
+          ]
+        }
+      ],
+      "slotinterest": [
+        "<string>"
+      ]
+    }
+  },
+  "queue studio pairing": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "participantsactivity": "<redacted>",
+      "queueref": "<ref:queue generation>",
+      "docid": "<string>",
+      "participants": "<redacted>",
+      "created": "<timestamp>",
+      "studioin": "<boolean>",
+      "status": "<null>",
+      "checkin": "<boolean>",
+      "openvidu": "<boolean>",
+      "atcmodel": [
+        "<string>"
+      ]
+    }
+  },
+  "studioinvitation": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "studioid": "<string>",
+      "optionalstudio": [
+        "<string>"
+      ],
+      "createddate": "<timestamp>",
+      "docid": "<string>",
+      "invitedstudio": [
+        "<string>"
+      ],
+      "type": "<string>",
+      "participantname": "<redacted>",
+      "tokenref": "<redacted>",
+      "stage": "<string>",
+      "queueref": "<ref:queue generation>",
+      "acceptedstudio": [
+        "<empty>"
+      ],
+      "mandatorystudio": [
+        "<string>"
+      ],
+      "status": "<string>",
+      "deniedstudio": [
+        "<string>"
+      ],
+      "clientresponse": "<null>",
+      "expirydate": "<timestamp>",
+      "profileid": "<string>",
+      "createdby": "<string>",
+      "specialistpairing": [
+        "<string>"
+      ]
+    }
+  },
+  "live assignment": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "bonusactivity": "<null>",
+      "participantid": "<redacted>",
+      "queueid": "<string>",
+      "stagename": "<redacted>",
+      "studioid": "<string>",
+      "bonusactivityparticipant": "<redacted>",
+      "pairing": [
+        "<string>"
+      ],
+      "participantsactivity": "<redacted>",
+      "docid": "<string>",
+      "created": "<timestamp>",
+      "zoomlinkrequired": "<boolean>",
+      "signature": "<redacted>",
+      "zoomdata": {
+        "settings": {
+          "encryption_type": "<string>",
+          "authentication_option": "<string>",
+          "breakout_room": {
+            "enable": "<boolean>"
+          },
+          "sign_language_interpretation": {
+            "enable": "<boolean>"
+          },
+          "global_dial_in_numbers": [
+            {
+              "number": "<deep>",
+              "country": "<deep>",
+              "country_name": "<redacted>",
+              "type": "<deep>"
+            }
+          ],
+          "show_share_button": "<boolean>",
+          "registrants_confirmation_email": "<redacted>",
+          "focus_mode": "<boolean>",
+          "approved_or_denied_countries_or_regions": {
+            "enable": "<boolean>"
+          },
+          "continuous_meeting_chat": {
+            "enable": "<boolean>",
+            "auto_add_invited_external_users": "<boolean>"
+          },
+          "allow_multiple_devices": "<boolean>",
+          "meeting_authentication": "<boolean>",
+          "enable_dedicated_group_chat": "<boolean>",
+          "waiting_room": "<boolean>",
+          "alternative_hosts": "<string>",
+          "alternative_host_update_polls": "<boolean>",
+          "device_testing": "<boolean>",
+          "participant_video": "<redacted>",
+          "audio": "<string>",
+          "authentication_name": "<redacted>",
+          "show_join_info": "<boolean>",
+          "in_meeting": "<boolean>",
+          "mute_upon_entry": "<boolean>",
+          "enforce_login_domains": "<string>",
+          "request_permission_to_unmute_participants": "<redacted>",
+          "global_dial_in_countries": [
+            "<string>"
+          ],
+          "join_before_host": "<boolean>",
+          "host_save_video_order": "<boolean>",
+          "cn_meeting": "<boolean>",
+          "watermark": "<boolean>",
+          "registrants_email_notification": "<redacted>",
+          "use_pmi": "<boolean>",
+          "approval_type": "<number>",
+          "alternative_hosts_email_notification": "<redacted>",
+          "close_registration": "<boolean>",
+          "resources": [
+            "<empty>"
+          ],
+          "push_change_to_calendar": "<boolean>",
+          "host_video": "<boolean>",
+          "auto_recording": "<string>",
+          "internal_meeting": "<boolean>",
+          "enforce_login": "<boolean>",
+          "jbh_time": "<number>",
+          "participant_focused_meeting": "<redacted>",
+          "authentication_domains": "<string>",
+          "private_meeting": "<boolean>",
+          "email_in_attendee_report": "<redacted>",
+          "email_notification": "<redacted>",
+          "contact_email": "<redacted>",
+          "contact_name": "<redacted>"
+        },
+        "join_url": "<string>",
+        "pstn_password": "<redacted>",
+        "timezone": "<string>",
+        "pre_schedule": "<boolean>",
+        "start_url": "<string>",
+        "created_at": "<string>",
+        "type": "<number>",
+        "uuid": "<string>",
+        "host_id": "<string>",
+        "password": "<redacted>",
+        "h323_password": "<redacted>",
+        "topic": "<string>",
+        "id": "<number>",
+        "host_email": "<redacted>",
+        "status": "<string>",
+        "encrypted_password": "<redacted>"
+      },
+      "changeworkbrief": [
+        "<string>"
+      ],
+      "updated": "<timestamp>",
+      "status": "<string>",
+      "stagetype": "<string>",
+      "shadowperson": [
+        "<empty>"
+      ],
+      "groupid": "<redacted>"
+    }
+  },
+  "arena participant": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "pairingmode": "<string>",
+      "queueid": "<string>",
+      "tentativenextready": "<null>",
+      "docid": "<string>",
+      "profileid": "<string>",
+      "stagerole": [
+        "<string>"
+      ],
+      "liveassignmentstatus": "<string>",
+      "status": "<string>"
+    }
+  },
+  "profile_data": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "profileid": "<string>",
+      "name": "<redacted>",
+      "email": "<redacted>",
+      "testuser": "<boolean>",
+      "dateofbirth": "<null>",
+      "enable": "<boolean>",
+      "user_ref": "<null>",
+      "role_ref": "<ref:users_roles>",
+      "created": "<timestamp>",
+      "number": "<string>",
+      "countrycode": "<string>",
+      "profile": "<null>",
+      "participantmode": "<redacted>",
+      "profileimg": "<string>",
+      "last_login": "<timestamp>",
+      "address": "<redacted>",
+      "recentpurchasedate": "<timestamp>"
+    }
+  },
+  "participantsproduct": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "subscriptionstart": "<timestamp>",
+      "docid": "<string>",
+      "unlimited": "<boolean>",
+      "sequenceorder": "<number>",
+      "tentativestart": "<null>",
+      "minimumpayment": "<string>",
+      "journeyref": "<null>",
+      "packageref": "<ref:package>",
+      "subscriptionend": "<timestamp>",
+      "profileid": "<string>",
+      "productref": "<ref:products>",
+      "deliveryplanning": "<string>",
+      "deliverymode": "<string>",
+      "arenaeventid": "<string>",
+      "eventparticipationid": "<string>",
+      "deliverytype": "<string>",
+      "eventref": "<ref:event collection>",
+      "status": "<string>",
+      "mode": "<null>",
+      "nextmodedate": "<null>",
+      "nextmode": "<null>",
+      "statusdate": {
+        "journeyplanningmode": "<timestamp>",
+        "initiated": "<timestamp>",
+        "ongoing": "<timestamp>",
+        "preparationmode": "<timestamp>",
+        "cancelled": "<timestamp>",
+        "eventmode": "<timestamp>",
+        "completed": "<timestamp>",
+        "integrationmode": "<timestamp>",
+        "shifted": "<timestamp>"
+      },
+      "producteligible": "<string>",
+      "instantiated": "<string>",
+      "queuevariationid": "<string>"
+    }
+  },
+  "participantjourneyproduct": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "docid": "<string>",
+      "journeyref": "<ref:journey>",
+      "journeystatus": "<string>",
+      "profileid": "<string>",
+      "purchaseref": "<ref:journeyproductpurchase>",
+      "subscriptionend": "<timestamp>",
+      "subscriptionstart": "<timestamp>",
+      "purchasedate": "<timestamp>",
+      "salesperson": "<string>",
+      "presalesperson": "<null>",
+      "salesleadsref": "<ref:salesleads>",
+      "journeytype": "<string>",
+      "salenotes": "<string>",
+      "paymentplan": "<string>",
+      "paymentplanassureddate": "<timestamp>",
+      "emailsent": "<redacted>",
+      "onboarded": "<boolean>",
+      "referral": "<string>",
+      "onboardingreport": "<string>",
+      "opportunities": [
+        "<empty>"
+      ],
+      "onboardedtime": "<timestamp>",
+      "onboardedby": [
+        "<ref:profile_data>"
+      ],
+      "onboardingreportlog": [
+        {
+          "updated": "<timestamp>",
+          "report": "<string>"
+        }
+      ],
+      "orientationstatus": "<string>",
+      "productref": [
+        "<ref:products>"
+      ],
+      "participantproducts": "<redacted>",
+      "updated": "<timestamp>",
+      "generalnotes": [
+        "<empty>"
+      ],
+      "appointmentid": "<string>",
+      "onboardingscheduled": "<timestamp>",
+      "onreschedule": "<boolean>"
+    }
+  },
+  "participant mode checklist": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "mode": "<string>",
+      "aelid": "<string>",
+      "createddate": "<timestamp>",
+      "docid": "<string>",
+      "profileid": "<string>",
+      "participantproductid": "<redacted>",
+      "productref": "<ref:products>",
+      "widget": [
+        {
+          "reference": [
+            "<ref:solar voice playlist>"
+          ],
+          "result": "<null>",
+          "completedcontent": "<null>",
+          "widgetid": "<string>",
+          "donts": [
+            "<empty>"
+          ],
+          "dos": [
+            "<empty>"
+          ],
+          "completed": "<null>",
+          "title": "<string>",
+          "mandatory": "<boolean>",
+          "status": "<null>"
+        }
+      ]
+    }
+  },
+  "participantvideoask": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "filetype": "<string>",
+      "addtohighlights": "<boolean>",
+      "filename": "<redacted>",
+      "videoaskid": "<string>",
+      "docid": "<string>",
+      "profileid": "<string>",
+      "created": "<string>",
+      "uploaded": "<timestamp>",
+      "fileurl": "<string>",
+      "mediatype": "<string>",
+      "workshopref": "<ref:eiflix workshop>",
+      "convertedtohls": "<boolean>",
+      "hls": {
+        "thumb_id": "<null>",
+        "option_hls": "<string>",
+        "extension": "<string>",
+        "code": "<number>",
+        "url_embed": "<string>",
+        "description": "<string>",
+        "privacy": "<string>",
+        "url_preview": "<string>",
+        "created_at": "<string>",
+        "title": "<string>",
+        "type": "<string>",
+        "option_download": "<string>",
+        "public_id": "<string>",
+        "duration": "<number>",
+        "password": "<redacted>",
+        "option_ad": "<string>",
+        "url_thumbnail": "<string>",
+        "updated_at": "<string>",
+        "id": "<string>",
+        "wm_id": "<null>",
+        "url_download": "<string>",
+        "url_stream": "<string>",
+        "height": "<number>",
+        "url_short": "<string>",
+        "option_transform": "<string>",
+        "message": "<string>",
+        "tags": "<string>",
+        "hits": "<number>",
+        "folder": "<null>",
+        "size": "<number>",
+        "versions": "<number>",
+        "success": "<boolean>",
+        "width": "<number>",
+        "folder_id": "<null>"
+      },
+      "arenaevent": "<ref:event collection>",
+      "tags": [
+        "<string>"
+      ],
+      "watchedby": [
+        "<string>"
+      ]
+    }
+  },
+  "arenavideoask": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "docid": "<string>",
+      "createddate": "<timestamp>",
+      "description": "<string>",
+      "eventref": "<ref:event collection>",
+      "questiontype": "<string>",
+      "questionurl": "<string>",
+      "title": "<string>",
+      "active": "<boolean>"
+    }
+  },
+  "modes": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "mode": "<string>",
+      "sequence": "<number>",
+      "docid": "<string>",
+      "info": "<null>"
+    }
+  },
+  "journey": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "originalfee": "<number>",
+      "journeyupgrades": [
+        "<empty>"
+      ],
+      "extras": [
+        "<empty>"
+      ],
+      "id": "<string>",
+      "addonproducts": [
+        "<empty>"
+      ],
+      "type": "<string>",
+      "journey": "<string>",
+      "sequence": "<number>",
+      "updatedAt": "<timestamp>",
+      "atcmodel": "<string>",
+      "playlist": "<null>"
+    }
+  },
+  "user_data": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "number": "<string>",
+      "name": "<redacted>",
+      "email": "<redacted>"
+    }
+  },
+  "users_roles": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "profile_ref": "<ref:profile_data>",
+      "transcriber": "<boolean>",
+      "supportdesk": "<boolean>",
+      "admin": "<boolean>",
+      "chatxadmin": "<boolean>",
+      "eitfellowship": "<boolean>",
+      "changeagent": "<boolean>",
+      "participant": "<redacted>",
+      "eitcoordinator": "<boolean>",
+      "verifier": "<boolean>",
+      "name": "<redacted>",
+      "eventcoordinator": "<boolean>",
+      "eitapprentice": "<boolean>",
+      "ahmember": "<boolean>",
+      "id": "<string>"
+    }
+  },
+  "dashboard": {
+    "_db": "(default)",
+    "_samples": 5,
+    "fields": {
+      "label": "<string>",
+      "route": "<null>",
+      "icon": "<string>",
+      "showInSidenav": "<boolean>",
+      "order": "<number>",
+      "roles": [
+        "<empty>"
+      ],
+      "profileid": [
+        "<empty>"
+      ],
+      "children": [
+        {
+          "showInSidenav": "<boolean>",
+          "route": "<string>",
+          "label": "<string>",
+          "roles": [
+            "<string>"
+          ],
+          "icon": "<string>",
+          "profileid": [
+            "<empty>"
+          ],
+          "favourites": [
+            "<string>"
+          ]
+        }
+      ]
+    }
+  },
+  "delivery forms": {
+    "_db": "firestore-forms",
+    "_samples": 5,
+    "fields": {
+      "formdescription": "<string>",
+      "docid": "<string>",
+      "formname": "<redacted>",
+      "formtype": "<string>",
+      "formfor": "<string>",
+      "formarray": [
+        {
+          "fieldname": "<redacted>",
+          "fielddescription": "<null>",
+          "fieldnotes": "<null>",
+          "type": "<string>",
+          "options": [
+            "<empty>"
+          ],
+          "maxcount": "<boolean>",
+          "mincount": "<boolean>",
+          "maxitems": "<null>",
+          "flipping": "<boolean>",
+          "required": "<boolean>",
+          "array": [
+            "<empty>"
+          ]
+        }
+      ],
+      "delete": "<boolean>"
+    }
+  },
+  "formsByClient": {
+    "_db": "firestore-forms",
+    "_samples": 5,
+    "fields": {
+      "formid": "<string>",
+      "submittedin": "<string>",
+      "loginid": "<string>",
+      "docid": "<string>",
+      "profileid": "<string>",
+      "formname": "<redacted>",
+      "formarray": [
+        {
+          "fieldname": "<redacted>",
+          "maxcount": "<boolean>",
+          "fieldnotes": "<null>",
+          "array": [
+            "<empty>"
+          ],
+          "mincount": "<boolean>",
+          "options": [
+            "<empty>"
+          ],
+          "flipping": "<boolean>",
+          "type": "<string>",
+          "fielddescription": "<string>",
+          "required": "<boolean>"
+        }
+      ],
+      "workshopref": "<ref:eiflix workshop>",
+      "date": "<timestamp>",
+      "queueref": "<ref:queue generation>",
+      "queuetokenref": "<redacted>",
+      "stagename": "<redacted>"
+    }
+  }
+}
