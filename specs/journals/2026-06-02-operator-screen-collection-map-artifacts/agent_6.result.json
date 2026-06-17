@@ -1,0 +1,589 @@
+[
+  {
+    "route": "eventopportunitydashboard",
+    "file": "src/app/queue system/event-opportunity-dashboard/event-opportunity-dashboard-v2/event-opportunity-dashboard-v2.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "arena e-ticket", "line": 255},
+      {"c": "big marathon", "line": 295},
+      {"c": "big cohorts", "line": 309},
+      {"c": "queue generation", "line": 332},
+      {"c": "event collection", "line": 340},
+      {"c": "stage opportunity count", "line": 354},
+      {"c": "queue generation", "line": 1184},
+      {"c": "queue_token", "line": 1294}
+    ],
+    "writes": [
+      {"c": "stage opportunity count", "line": 920},
+      {"c": "stage opportunity count", "line": 1237},
+      {"c": "stage opportunity count", "line": 1251},
+      {"c": "stage opportunity count", "line": 1274}
+    ],
+    "services": ["AuthguardService.getProfileMap (l168)", "AuthguardService.getRoles (l174)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "920 deleteDoc on 'stage opportunity count' (ref defined l919). 1237 updateDoc, 1251 setDoc (new id from l1242), 1274 updateDoc - all 'stage opportunity count'."
+  },
+  {
+    "route": "queuelist",
+    "file": "src/app/queue system/queue-list/queue-list.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue generation", "line": 62}
+    ],
+    "writes": [
+      {"c": "queue generation", "line": 87},
+      {"c": "queue generation", "line": 152},
+      {"c": "arena events", "line": 156}
+    ],
+    "services": ["AuthguardService (guard, injected)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "87 setDoc 'queue generation' (new id l83). writeBatch l149: batch.update queueDocRef='queue generation' (l152), batch.update arenaDocRef='arena events' (l156)."
+  },
+  {
+    "route": "queuevenue",
+    "file": "src/app/queue system/queue-venue/queue-venue.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue generation", "line": 44},
+      {"c": "queue_token", "line": 99}
+    ],
+    "writes": [],
+    "services": ["AuthguardService (guard, injected)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only screen. 99 queue_token filtered by queueref (DocumentReference) and tokenstatus Active."
+  },
+  {
+    "route": "dynamicstudio",
+    "file": "src/app/queue system/dynamic-studio/dynamic-studio.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "products", "line": 171},
+      {"c": "queue generation", "line": 178},
+      {"c": "profile_data", "line": 206},
+      {"c": "bigactivity", "line": 228},
+      {"c": "queue studio pairing", "line": 296},
+      {"c": "queue variation", "line": 363},
+      {"c": "queue studio pairing", "line": 379},
+      {"c": "live assignment", "line": 396},
+      {"c": "queue studio pairing", "line": 410},
+      {"c": "queue studio pairing", "line": 440},
+      {"c": "studioinvitation", "line": 468},
+      {"c": "live assignment", "line": 500},
+      {"c": "studioinvitation", "line": 530},
+      {"c": "studio conversation", "line": 657},
+      {"c": "studio conversation/{docid}/messages", "line": 665},
+      {"c": "queue_token", "line": 679},
+      {"c": "formsByClient", "line": 760},
+      {"c": "studio checkin log", "line": 817},
+      {"c": "live assignment", "line": 865},
+      {"c": "studioinvitation", "line": 953},
+      {"c": "queue variation", "line": 1056},
+      {"c": "queue studio pairing", "line": 1187},
+      {"c": "atc_to_validate", "line": 1660},
+      {"c": "atc_alpha", "line": 1669},
+      {"c": "atc_alpha", "line": 1674},
+      {"c": "atc_notes", "line": 1703},
+      {"c": "pick_for_mentoring", "line": 1720},
+      {"c": "atc_notes", "line": 1862},
+      {"c": "atc_alpha", "line": 1792},
+      {"c": "atc_alpha", "line": 1939},
+      {"c": "triple atc", "line": 2027},
+      {"c": "accelerated evolution level", "line": 2055},
+      {"c": "participant AEL", "line": 2075},
+      {"c": "deliverables", "line": 2093},
+      {"c": "participantsproduct", "line": 2103},
+      {"c": "participant AEL", "line": 2109},
+      {"c": "review participants", "line": 2203},
+      {"c": "studio conversation", "line": 2234},
+      {"c": "studio conversation/{docid}/messages", "line": 2260},
+      {"c": "studio conversation/{docid}/messages", "line": 2417},
+      {"c": "openviduroom", "line": 2488}
+    ],
+    "writes": [
+      {"c": "studioinvitation", "line": 482},
+      {"c": "studioinvitation", "line": 486},
+      {"c": "studioinvitation", "line": 595},
+      {"c": "queue studio pairing", "line": 829},
+      {"c": "studio checkin log", "line": 843},
+      {"c": "queue studio pairing", "line": 849},
+      {"c": "studioinvitation", "line": 886},
+      {"c": "studioinvitation", "line": 915},
+      {"c": "studioinvitation", "line": 940},
+      {"c": "studioinvitation", "line": 973},
+      {"c": "queue studio pairing", "line": 1070},
+      {"c": "live assignment", "line": 1115},
+      {"c": "queue_token", "line": 1124},
+      {"c": "queue stage log", "line": 1132},
+      {"c": "queue_token", "line": 1217},
+      {"c": "queue_token", "line": 1239},
+      {"c": "live assignment", "line": 1321},
+      {"c": "queue studio pairing", "line": 1326},
+      {"c": "live assignment", "line": 1404},
+      {"c": "queue studio pairing", "line": 1409},
+      {"c": "live assignment", "line": 1579},
+      {"c": "queue_token", "line": 1589},
+      {"c": "queue_token", "line": 2012},
+      {"c": "interim crossover", "line": 2161},
+      {"c": "participant AEL", "line": 2170},
+      {"c": "studio conversation/{docid}/messages", "line": 2360},
+      {"c": "A&H updates", "line": 2391},
+      {"c": "openviduroom", "line": 2521}
+    ],
+    "services": [
+      "AuthguardService.getRoles (l155)",
+      "AuthguardService.getProfileMap (l194)",
+      "AuthguardService.getProcedureMap (l227)",
+      "AuthguardService.updateDeliveryStatus (l1307,1376,1377,1530)",
+      "AuthguardService.sendPushMessage (l2384)",
+      "AuthguardService.createOpenViduRoom (l2490)"
+    ],
+    "dynamic": [
+      {"c": "dynamic (token.transferredfrom.path getDoc)", "line": 689},
+      {"c": "dynamic (token.productref.path getDoc)", "line": 1065},
+      {"c": "atc procedure correction path getDocs", "line": 1747},
+      {"c": "atc procedure path getDocs", "line": 1762},
+      {"c": "atc procedure path getDocs", "line": 1815},
+      {"c": "atc procedure path getDocs", "line": 1833},
+      {"c": "dynamic (procedure.path updateDoc)", "line": 1886},
+      {"c": "dynamic (value getDoc - variation ref)", "line": 2044},
+      {"c": "dynamic (token.productref.path getDoc)", "line": 2953},
+      {"c": "dynamic (msgRef.path split -> collection[0]/[1] updateDoc)", "line": 2465}
+    ],
+    "atc": ["atc_to_validate (l1654,1660)", "atc_alpha (l1669,1674,1792,1939)", "atc_notes (l1703,1862)", "pick_for_mentoring (l1720)", "triple atc (l2027)", "atc corrections/procedures subcollections via atcDoc.ref.path (l1744,1759,1815,1833)"],
+    "notes": "ATC-heavy component (CLAUDE.md off-limits collections present). 1115/1321/1404/1579 live assignment via path string 'live assignment/'+id setDoc/updateDoc. 2161/2170 writeBatch (interim crossover set, participant AEL update). 2360 writeBatch set on chatDoc.ref.collection('messages'). studio conversation messages is subcollection 'studio conversation/{id}/messages'."
+  },
+  {
+    "route": "zoomaccount",
+    "file": "src/app/queue system/zoom-account/zoom-account.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "zoomaccount", "line": 47}
+    ],
+    "writes": [
+      {"c": "zoomaccount", "line": 71}
+    ],
+    "services": ["AuthguardService (guard, injected)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "47 collectionData ordered by lastname. 71 updateDoc zoomaccount by docid."
+  },
+  {
+    "route": "arenastudioactivity",
+    "file": "src/app/queue system/arenastudioactivity/arenastudioactivity.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue generation", "line": 63},
+      {"c": "zoomaccount", "line": 66},
+      {"c": "live assignment", "line": 93},
+      {"c": "queue_token", "line": 118}
+    ],
+    "writes": [
+      {"c": "live assignment", "line": 137},
+      {"c": "queue studio pairing", "line": 142}
+    ],
+    "services": ["AuthguardService (guard, injected)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "137 updateDoc 'live assignment' by docid, 142 updateDoc 'queue studio pairing' by studioid."
+  },
+  {
+    "route": "queuetransfer",
+    "file": "src/app/queue system/queue-transfer/queue-transfer.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue generation", "line": 69},
+      {"c": "journey", "line": 72},
+      {"c": "products", "line": 78},
+      {"c": "participantdashboard", "line": 85},
+      {"c": "queue variation", "line": 93},
+      {"c": "queue_token", "line": 147},
+      {"c": "participantsproduct", "line": 161},
+      {"c": "queue stage log", "line": 183},
+      {"c": "productToDeliverySequence", "line": 201},
+      {"c": "arena events", "line": 215}
+    ],
+    "writes": [
+      {"c": "queue participant transfer", "line": 285}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "No injected service (constructor: Firestore + MatDialog). 285 setDoc 'queue participant transfer' (new id l284)."
+  },
+  {
+    "route": "initiateeventproduct",
+    "file": "src/app/queue system/initiate-event-product/initiate-event-product.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 149},
+      {"c": "event collection", "line": 184},
+      {"c": "queue generation", "line": 195},
+      {"c": "products", "line": 212},
+      {"c": "productToDeliverySequence", "line": 278},
+      {"c": "event participation request", "line": 279},
+      {"c": "participantsproduct", "line": 280},
+      {"c": "queue_token", "line": 281},
+      {"c": "queue variation", "line": 285},
+      {"c": "arena events", "line": 641},
+      {"c": "event participation request", "line": 648}
+    ],
+    "writes": [
+      {"c": "event participation request", "line": 454},
+      {"c": "participantsproduct", "line": 468},
+      {"c": "wati archive", "line": 780},
+      {"c": "email archive", "line": 818}
+    ],
+    "services": [
+      "AuthguardService.getRoles (l135)",
+      "AuthguardService.getJourneyMap (l144)",
+      "AuthguardService.getProfileMap (l177)",
+      "AuthguardService.saveNotificationRecord (l899)"
+    ],
+    "dynamic": [
+      {"c": "dynamic (collectionName from Object.keys(property))", "line": 247}
+    ],
+    "atc": [],
+    "notes": "writeBatch l420: batch.set 'event participation request' (new id l440, set l454), batch.update 'participantsproduct' (l468), commit l471. 780 updateDoc 'wati archive', 818 setDoc 'email archive'. 247 dynamic collection name iterates property keys."
+  },
+  {
+    "route": "queue-planner",
+    "file": "src/app/queue system/queue-planning/queue-planning.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue generation", "line": 226},
+      {"c": "segments", "line": 235},
+      {"c": "big cohorts", "line": 240},
+      {"c": "participant tags", "line": 245},
+      {"c": "participant list", "line": 250},
+      {"c": "participant list", "line": 401},
+      {"c": "queue generation", "line": 905},
+      {"c": "queue variation", "line": 913},
+      {"c": "queue_token", "line": 928},
+      {"c": "cohorts queue planner", "line": 959},
+      {"c": "queue planning draft", "line": 969},
+      {"c": "queue planning", "line": 994}
+    ],
+    "writes": [
+      {"c": "wati archive", "line": 810},
+      {"c": "email archive", "line": 849},
+      {"c": "queue planning draft", "line": 1534},
+      {"c": "queue planning draft", "line": 1569},
+      {"c": "queue planning", "line": 1754}
+    ],
+    "services": ["AuthguardService.getProfileMap/getRoles (l215, guard)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "1534 updateDoc draftRef='queue planning draft' (l1533), 1569 setDoc draftRef (l1568), 1754 setDoc planningRef='queue planning' (l1753). 810 updateDoc wati archive, 849 setDoc email archive."
+  },
+  {
+    "route": "queue-planner-review",
+    "file": "src/app/queue system/queue-planning-review/queue-planning-review.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue generation", "line": 257},
+      {"c": "segments", "line": 276},
+      {"c": "participant list", "line": 281},
+      {"c": "queue generation", "line": 425},
+      {"c": "queue variation", "line": 433},
+      {"c": "queue_token", "line": 450},
+      {"c": "cohorts queue planner", "line": 476},
+      {"c": "queue planning", "line": 487},
+      {"c": "arena events", "line": 492},
+      {"c": "products", "line": 499},
+      {"c": "interimreport log", "line": 4797},
+      {"c": "participantsproduct", "line": 5106}
+    ],
+    "writes": [
+      {"c": "wati archive", "line": 3583},
+      {"c": "email archive", "line": 3627},
+      {"c": "queue_token", "line": 5070},
+      {"c": "participantsproduct", "line": 5139},
+      {"c": "event participation request", "line": 5148},
+      {"c": "queue_token", "line": 5233}
+    ],
+    "services": [
+      "AuthguardService.getProfileMap (l251,252)",
+      "AuthguardService.getRoles (l253)",
+      "AuthguardService.saveNotificationRecord (l3534)"
+    ],
+    "dynamic": [],
+    "atc": [],
+    "notes": "5070 updateDoc tokenRef='queue_token' (l5060), 5233 updateDoc tokenRef='queue_token' (l5231). 5139 updateDoc pendingProductDoc.ref ('participantsproduct' query l5106). 5148 setDoc eventParticipationRef='event participation request' (l5134). 3583 wati archive update, 3627 email archive set."
+  },
+  {
+    "route": "queuebigplanner",
+    "file": "src/app/queue system/big-planner/big-planner.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "products", "line": 195},
+      {"c": "queue generation", "line": 215},
+      {"c": "big cohorts", "line": 229},
+      {"c": "profile_data", "line": 260},
+      {"c": "event collection", "line": 269},
+      {"c": "review participants", "line": 277},
+      {"c": "bigactivity", "line": 286},
+      {"c": "big cohorts", "line": 305},
+      {"c": "arena events", "line": 376},
+      {"c": "biginvitation", "line": 388},
+      {"c": "queue studio pairing", "line": 460},
+      {"c": "studio activity log", "line": 511},
+      {"c": "live assignment", "line": 522},
+      {"c": "queue_token", "line": 546}
+    ],
+    "writes": [
+      {"c": "queue generation", "line": 298},
+      {"c": "queue studio pairing", "line": 798},
+      {"c": "queue studio pairing", "line": 885},
+      {"c": "queue studio pairing", "line": 893},
+      {"c": "queue studio pairing", "line": 901},
+      {"c": "queue_token", "line": 925},
+      {"c": "queue_token", "line": 941},
+      {"c": "queue studio pairing", "line": 953},
+      {"c": "queue studio pairing", "line": 959},
+      {"c": "queue studio pairing", "line": 971},
+      {"c": "queue studio pairing", "line": 984},
+      {"c": "queue studio pairing", "line": 993},
+      {"c": "queue studio pairing", "line": 1001},
+      {"c": "queue studio pairing", "line": 1157},
+      {"c": "queue studio pairing", "line": 1179}
+    ],
+    "services": ["AuthguardService.getProfileMap/getRoles (l186, guard)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "298 updateDoc queueRef='queue generation'. writeBatch l793: batch.set pairingRef='queue studio pairing' (l798), commit l811. writeBatch l909: batch.update 'queue_token' (l925,941), commit l948. Remaining updateDoc all 'queue studio pairing'."
+  },
+  {
+    "route": "dynamicqueuemanager",
+    "file": "src/app/queue system/dynamic-queue-manager-clone/dynamic-queue-manager-clone.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "stage opportunity count", "line": 1297},
+      {"c": "classify", "line": 1397},
+      {"c": "queue generation", "line": 1504},
+      {"c": "classify", "line": 1523},
+      {"c": "users_roles", "line": 1547},
+      {"c": "bigactivity", "line": 1554},
+      {"c": "participant tags", "line": 1561},
+      {"c": "products", "line": 1580},
+      {"c": "classify", "line": 1586},
+      {"c": "participant metadata", "line": 1614},
+      {"c": "queue studio pairing", "line": 1711},
+      {"c": "studioinvitation", "line": 1726},
+      {"c": "queue variation", "line": 1763},
+      {"c": "queue_token", "line": 1775},
+      {"c": "queue stage log", "line": 1822},
+      {"c": "queue planning", "line": 2285},
+      {"c": "participant list", "line": 2298},
+      {"c": "segments", "line": 2324},
+      {"c": "FCM_token", "line": 2514},
+      {"c": "live assignment", "line": 2988},
+      {"c": "queue variation", "line": 2944},
+      {"c": "participant list", "line": 4011},
+      {"c": "event participation request", "line": 3976},
+      {"c": "event participation request", "line": 4056},
+      {"c": "deliverables", "line": 4068},
+      {"c": "studioinvitation", "line": 4462},
+      {"c": "queuereminder", "line": 4606},
+      {"c": "clientissue", "line": 4999},
+      {"c": "event collection", "line": 5089},
+      {"c": "queue generation", "line": 5093},
+      {"c": "arena events", "line": 5126},
+      {"c": "event participation request", "line": 5153},
+      {"c": "atc_alpha", "line": 5205},
+      {"c": "atc_to_validate", "line": 5215},
+      {"c": "notificationrecord", "line": 5350},
+      {"c": "notificationrecord", "line": 5449},
+      {"c": "wati archive", "line": 5462},
+      {"c": "email archive", "line": 5475}
+    ],
+    "writes": [
+      {"c": "classify", "line": 1411},
+      {"c": "classify", "line": 1441},
+      {"c": "classify", "line": 1473},
+      {"c": "queue_token", "line": 2558},
+      {"c": "live assignment", "line": 2861},
+      {"c": "queue studio pairing", "line": 2866},
+      {"c": "queue studio pairing", "line": 2883},
+      {"c": "queue_token", "line": 2911},
+      {"c": "queue stage log", "line": 2917},
+      {"c": "live assignment", "line": 3063},
+      {"c": "queue studio pairing", "line": 3067},
+      {"c": "live assignment", "line": 3079},
+      {"c": "queue studio pairing", "line": 3089},
+      {"c": "live assignment", "line": 3111},
+      {"c": "queue_token", "line": 3137},
+      {"c": "queue stage log", "line": 3143},
+      {"c": "queue_token", "line": 3168},
+      {"c": "queue stage log", "line": 3175},
+      {"c": "queue avtest", "line": 3194},
+      {"c": "queue_token", "line": 3203},
+      {"c": "queue generation/{docid}/stagechat", "line": 3217},
+      {"c": "queue generation/{docid}/stagechat", "line": 3298},
+      {"c": "queue generation/{docid}/stagechat", "line": 3349},
+      {"c": "queue_token", "line": 3885},
+      {"c": "live assignment", "line": 3795},
+      {"c": "queue opportunity", "line": 3822},
+      {"c": "queue_token", "line": 3963},
+      {"c": "participantsproduct", "line": 3970},
+      {"c": "event participation request", "line": 3986},
+      {"c": "participant list", "line": 4017},
+      {"c": "event participation request", "line": 4060},
+      {"c": "deliverables", "line": 4072},
+      {"c": "queue avtest", "line": 4417},
+      {"c": "queue_token", "line": 4439},
+      {"c": "studioinvitation", "line": 4530},
+      {"c": "queuereminder", "line": 4676},
+      {"c": "queuereminder", "line": 4715},
+      {"c": "queuereminder", "line": 4735},
+      {"c": "queuereminder", "line": 4756},
+      {"c": "wati archive", "line": 4204},
+      {"c": "email archive", "line": 4246}
+    ],
+    "services": [
+      "AuthguardService.getRoles (l1493)",
+      "AuthguardService.getProductMap (l1497)",
+      "AuthguardService.getProfileMap (l1605)",
+      "AuthguardService.updateDeliveryStatus (l2935,3775)",
+      "AuthguardService.saveNotificationRecord (l3326,4317)"
+    ],
+    "dynamic": [
+      {"c": "dynamic (token.queueref.path updateDoc)", "line": 3207},
+      {"c": "dynamic (token.productref.path getDoc)", "line": 2953},
+      {"c": "arena participant/{arena} updateDoc (path string)", "line": 3798},
+      {"c": "dynamic (selectedQueue.queueref.path updateDoc)", "line": 4452}
+    ],
+    "atc": ["atc_alpha (l5205)", "atc_to_validate (l5215)"],
+    "notes": "1397/1411 classify doc 'queuesystem' getDoc+setDoc (same 1435/1441, 1463/1473). live assignment writes via path string 'live assignment/'+id (2861,3063,3079,3111,3795). stagechat is subcollection under 'queue generation/{docid}/stagechat' (3217,3298,3349). Multiple writeBatch blocks (2831,2913,3093,4055,4412,4519). 4756 deleteDoc 'queuereminder'. classify doc 'wati' read l3237 (mediated by guard wati flow)."
+  },
+  {
+    "route": "openmeeting/:id/:collectiontype",
+    "file": "src/app/queue system/zoom-clientview/zoom-clientview.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "live assignment", "line": 77},
+      {"c": "appointments", "line": 77},
+      {"c": "profile_data", "line": 108},
+      {"c": "live assignment", "line": 201}
+    ],
+    "writes": [
+      {"c": "live assignment", "line": 208}
+    ],
+    "services": ["AuthguardService.getRoles (l98)"],
+    "dynamic": [
+      {"c": "collectionMap[:collectiontype] -> 'live assignment'|'appointments'", "line": 77}
+    ],
+    "atc": [],
+    "notes": "77 getDoc reads from collectionMap keyed by route param :collectiontype = {queue:'live assignment', appointment:'appointments'} (l72-76). 201 getDoc + 208 updateDoc both 'live assignment' by zoomdata.docid."
+  },
+  {
+    "route": "queue-web",
+    "file": "src/app/queue system/QueueWebVerison1/queue-web-version1.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "products", "line": 67},
+      {"c": "evolutionmappingvideo", "line": 102},
+      {"c": "liveevolutionmapping", "line": 111},
+      {"c": "participantsproduct", "line": 121},
+      {"c": "deliverables", "line": 133},
+      {"c": "queue variation", "line": 163},
+      {"c": "queue_token", "line": 218},
+      {"c": "deliverables", "line": 238},
+      {"c": "participantsproduct", "line": 257},
+      {"c": "queue generation/{docid}/stagechat", "line": 354},
+      {"c": "queue generation/{docid}/stagechat", "line": 371}
+    ],
+    "writes": [
+      {"c": "queue generation/{docid}/stagechat", "line": 422}
+    ],
+    "services": [
+      "AuthguardService.username (l59)",
+      "AuthguardService.getProfileMap (l62)"
+    ],
+    "dynamic": [
+      {"c": "dynamic (lastFileref getDoc/onSnapshot - token ref)", "line": 146},
+      {"c": "dynamic (token.queueref DocumentReference getDoc)", "line": 224},
+      {"c": "dynamic (correctPP getDoc)", "line": 257}
+    ],
+    "atc": [],
+    "notes": "auth = inject(AuthguardService) (l33). stageChatCol = collection on 'queue generation/{queueid}/stagechat' subcollection (defined l345, used 354/371/422). 422 writeBatch batch.set chatSubCollectionRef (stagechat msg). 146 lastFileref/queueDataSnap (l173) read dynamic doc refs. 286 onSnapshot queueLiveUnsub on dynamic ref."
+  },
+  {
+    "route": "expense-planner/:tab",
+    "file": "src/app/Business Dashboard/expense-planner/expense-planner.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 255},
+      {"c": "expenseplanning", "line": 285},
+      {"c": "expenseplanning", "line": 338}
+    ],
+    "writes": [
+      {"c": "expenseplanning", "line": 583},
+      {"c": "expenseplanning", "line": 642},
+      {"c": "expenseplanning", "line": 661}
+    ],
+    "services": ["AuthguardService (authservice, l110)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "583 deleteDoc 'expenseplanning/{id}' (path string). 642 setDoc docRef='expenseplanning' (new doc l629). 661 updateDoc docRef (expenseplanning). 255 reads 'participant metadata' where financedata != null."
+  },
+  {
+    "route": "ads-entry",
+    "file": "src/app/Business Dashboard/AdsEntry/entry-management.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "adsinvestment", "line": 73},
+      {"c": "adsinvestment/{docRef.id}/logs", "line": 332}
+    ],
+    "writes": [
+      {"c": "adsinvestment", "line": 277},
+      {"c": "adsinvestment/{docRef.id}/logs", "line": 278},
+      {"c": "adsinvestment", "line": 316},
+      {"c": "adsinvestment/{docRef.id}/logs", "line": 317}
+    ],
+    "services": ["AuthguardService (authservice, l69)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "73 collRef='adsinvestment' subscribed via collectionData l119. writeBatch l254: batch.set 'adsinvestment' (l277) + subdoc 'adsinvestment/{id}/logs' (l278), commit l280. writeBatch l299: batch.update 'adsinvestment' (l316) + batch.set logs subcol (l317), commit l318. 332 reads logs subcollection."
+  },
+  {
+    "route": "profile-role-access",
+    "file": "src/app/Business Dashboard/profile-based-access/profile-based-access.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "dashboard", "line": 133},
+      {"c": "dashboarduseraccess", "line": 248},
+      {"c": "classify", "line": 537}
+    ],
+    "writes": [
+      {"c": "dashboarduseraccess", "line": 280},
+      {"c": "classify", "line": 303},
+      {"c": "dashboarduseraccess", "line": 328},
+      {"c": "dashboarduseraccess", "line": 362},
+      {"c": "dashboarduseraccess", "line": 379},
+      {"c": "dashboarduseraccess", "line": 388},
+      {"c": "dashboard", "line": 498},
+      {"c": "classify", "line": 526}
+    ],
+    "services": ["AuthguardService (authguard, l110)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "537 docData on doc '/classify/AHCRM_dashboard_access' (read). 303/526 setDoc to doc '/classify/AHCRM_dashboard_access'. 388 deleteDoc 'dashboarduseraccess/{id}'. 498 updateDoc 'dashboard/{docid}'. dashboarduseraccess written via setDoc (280,328) and updateDoc (362,379)."
+  },
+  {
+    "route": "EISDashboard",
+    "file": "src/app/main-dashboard/main-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 60},
+      {"c": "dashboard", "line": 83}
+    ],
+    "writes": [],
+    "services": ["AuthguardService (authguard, l41)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Imports many write fns (deleteDoc/setDoc/updateDoc/writeBatch l3) but only reads observed: 60 profile_data via getDocs (query by user_ref), 83 'dashboard' collection ref (subscribed). No write calls present in this component."
+  }
+]

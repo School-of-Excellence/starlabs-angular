@@ -1,0 +1,2652 @@
+{
+  "clockNote": "real now",
+  "now": "2026-06-04T09:13:13.349Z",
+  "tally": {
+    "arcChecked": 105,
+    "MATCH": 90,
+    "LAG": 0,
+    "MISMATCH": 15,
+    "knobsMissing": 0,
+    "f3": 1,
+    "rollupChecked": 12,
+    "rollupMatch": 11,
+    "rollupMismatch": 1
+  },
+  "report": [
+    {
+      "profileid": "yrB1WbAYBXLVtbjO6Arn",
+      "name": "Meena Rastogi",
+      "consumed": 5,
+      "total": 9,
+      "customerstatus": "active",
+      "profile_participantmode": "Priority Mode",
+      "pm_participantmode": "Priority Mode",
+      "expectedHeadline": "Priority Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Priority Mode",
+        "Performance Mode",
+        "Journey Priority Planning Mode",
+        "Extended Performance Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "Performance Mode",
+          "nextmode": "Extended Performance Mode",
+          "nextmodedate": "2025-12-18",
+          "knobs": "30/60/30",
+          "verdict": "MISMATCH(exp After)",
+          "daysSince": 170,
+          "expected": "After Extended Performance Mode",
+          "expNmd": "2026-03-16"
+        },
+        {
+          "product": "Critical Support Diagnostics And Implementation",
+          "status": "ongoing",
+          "mode": "Priority Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "Extended Performance Mode",
+          "nextmode": "After Extended Performance Mode",
+          "nextmodedate": "2026-06-04",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 119,
+          "expected": "Extended Performance Mode",
+          "expNmd": "2026-06-04"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "Performance Mode",
+          "nextmode": "Extended Performance Mode",
+          "nextmodedate": "2026-07-23",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 41,
+          "expected": "Performance Mode",
+          "expNmd": "2026-07-23"
+        },
+        {
+          "product": "EI Solution",
+          "status": "null",
+          "mode": "Journey Priority Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 125,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        }
+      ]
+    },
+    {
+      "profileid": "446C4lLw2gDOHProZE2P",
+      "name": "Daizy Makkar",
+      "consumed": 10,
+      "total": 17,
+      "customerstatus": "active",
+      "profile_participantmode": "Event Mode",
+      "pm_participantmode": "Event Mode",
+      "expectedHeadline": "Event Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Event Mode",
+        "Integration Mode",
+        "Performance Mode",
+        "Extended Performance Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "Critical Support Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 220,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Critical Support Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "Performance Mode",
+          "nextmode": "Extended Performance Mode",
+          "nextmodedate": "2026-07-07",
+          "knobs": "30/60/30",
+          "verdict": "MISMATCH(exp Integration)",
+          "daysSince": -61,
+          "expected": "Integration Mode",
+          "expNmd": "2026-11-02"
+        },
+        {
+          "product": "Mini uP!",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 252,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 173,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "Integration Mode",
+          "nextmode": "Performance Mode",
+          "nextmodedate": "2026-07-03",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 0,
+          "expected": "Integration Mode",
+          "expNmd": "2026-07-03"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 396,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "shifted",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "Extended Performance Mode",
+          "nextmode": "After Extended Performance Mode",
+          "nextmodedate": "2026-06-04",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 119,
+          "expected": "Extended Performance Mode",
+          "expNmd": "2026-06-04"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 125,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "ongoing",
+          "mode": "Event Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "2026-06-21",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "CTD Master Class",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        }
+      ]
+    },
+    {
+      "profileid": "8dS0yAL0EmGWQC80DKld",
+      "name": "Swati Kanodia",
+      "consumed": 10,
+      "total": 22,
+      "customerstatus": "active",
+      "profile_participantmode": "Event Mode",
+      "pm_participantmode": "Event Mode",
+      "expectedHeadline": "Event Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Event Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "Mini uP!",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 252,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 121,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "CTD Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 804,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 121,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "SMP Live",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "SMP Diagnostic & Implementation (Appointment)",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/60",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 173,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 628,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "ongoing",
+          "mode": "Event Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "2026-06-21",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "CTD Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 639,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        }
+      ]
+    },
+    {
+      "profileid": "NsH8cDOETuIV7SMzZpht",
+      "name": "Jagriti Pande",
+      "consumed": 12,
+      "total": 31,
+      "customerstatus": "active",
+      "profile_participantmode": "Event Mode",
+      "pm_participantmode": "Event Mode",
+      "expectedHeadline": "Event Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Event Mode",
+        "Extended Performance Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "A&H Expanding Horizon Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Complimentary Review with A&H",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": "MATCH",
+          "daysSince": 1121,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1356,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "ongoing",
+          "mode": "Event Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "2026-06-21",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 125,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "Extended Performance Mode",
+          "nextmode": "After Extended Performance Mode",
+          "nextmodedate": "2026-06-04",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 119,
+          "expected": "Extended Performance Mode",
+          "expNmd": "2026-06-04"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "CTD Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "A&H Expanding Horizon Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Super Life Directives ",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "CTD Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "WiSH Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1121,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 152,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "A&H Light Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1121,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1381,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Charisma Intensification",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        }
+      ]
+    },
+    {
+      "profileid": "DezTWzu6GdgDp7PsTA9J",
+      "name": "Mitali K Lalwani",
+      "consumed": 5,
+      "total": 22,
+      "customerstatus": "active",
+      "profile_participantmode": "Priority Mode",
+      "pm_participantmode": "Priority Mode",
+      "expectedHeadline": "Priority Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Priority Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Critical Support Diagnostics And Implementation",
+          "status": "ongoing",
+          "mode": "Priority Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "null",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "A&H Expanding Horizon Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 138,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "CTD Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "EI Starter Pack",
+          "status": "null",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 134,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Complimentary Review",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": "MATCH",
+          "daysSince": 70,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 125,
+          "expected": "Extended Performance Mode"
+        }
+      ]
+    },
+    {
+      "profileid": "J0A39MX1WjCdNk3Z8Isg",
+      "name": "Antano Solar",
+      "consumed": 10,
+      "total": 19,
+      "customerstatus": "non active",
+      "profile_participantmode": "Event Mode",
+      "pm_participantmode": "Exploration Mode",
+      "expectedHeadline": "Exploration Mode",
+      "rollup": "MISMATCH",
+      "sortedModes": [
+        "Event Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "CTD Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "B!G Accelerator Arena",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 587,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "B!G Accelerator Arena",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "WiSH Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 387,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "B!G Installation Apprentice",
+          "status": "ongoing",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Super Life Directives ",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "A&H Expanding Horizon Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "ongoing",
+          "mode": "Event Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "2025-11-25",
+          "knobs": "30/60/30",
+          "verdict": "F3-STUCK"
+        },
+        {
+          "product": "B!G Accelerator Studio",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 143,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 395,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "up live test",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 673,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "The BiG Vantage (Experienced)",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "B!G Installation Bridge",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 120,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Charisma Intensification",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "CTD Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        }
+      ]
+    },
+    {
+      "profileid": "SFrMh3ntKtNOo6MYN7dZ",
+      "name": "Arun Dass",
+      "consumed": 22,
+      "total": 34,
+      "customerstatus": "active",
+      "profile_participantmode": "Priority Mode",
+      "pm_participantmode": "Priority Mode",
+      "expectedHeadline": "Priority Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Priority Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "WiSH Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 441,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "A&H Light Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1149,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "CTD Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 484,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Winning Heart",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/30/30",
+          "verdict": "MATCH",
+          "daysSince": 115,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 831,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 391,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "B!G Installation Bridge",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "up live test",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Winning Heart",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/30/30",
+          "verdict": "MATCH",
+          "daysSince": 144,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1356,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 120,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "A&H Expanding Horizon Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "WiSH Diagnostics And Implementation",
+          "status": "null",
+          "mode": "Priority Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 396,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1373,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "WiSH Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 162,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 832,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "CPM Live Readiness",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 832,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 832,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "WiSH Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 649,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Critical Support Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1703,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "shifted",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 484,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Leadership Training for A&H Team",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/30/60",
+          "verdict": "MATCH",
+          "daysSince": 197,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        }
+      ]
+    },
+    {
+      "profileid": "hExtNzchkmzlwnB7ERaX",
+      "name": "Yash Melwani",
+      "consumed": 13,
+      "total": 21,
+      "customerstatus": "active",
+      "profile_participantmode": "Journey Planning Mode",
+      "pm_participantmode": "Journey Planning Mode",
+      "expectedHeadline": "Journey Planning Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1096,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 391,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "shifted",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "B!G Accelerator Studio",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 616,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 173,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1148,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 391,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "EI Solution",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 126,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 406,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "EI Solution",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 491,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1356,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "up live test",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 444,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 120,
+          "expected": "Extended Performance Mode"
+        }
+      ]
+    },
+    {
+      "profileid": "jflj8YpGdXy8RtgojT1j",
+      "name": "Harini Ramachandran",
+      "consumed": 9,
+      "total": 23,
+      "customerstatus": "active",
+      "profile_participantmode": "Journey Planning Mode",
+      "pm_participantmode": "Journey Planning Mode",
+      "expectedHeadline": "Journey Planning Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "A&H Expanding Horizon Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 640,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "B!G Accelerator Studio",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 143,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1103,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Super Life Directives ",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 120,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "B!G Accelerator Arena",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 731,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "B!G Installation Bridge",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 396,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Charisma Intensification",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 396,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "B!G Accelerator Arena",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "BiG Designer",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1096,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "A&H Expanding Horizon Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Legacy Consultation",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Conversational Programming Mastery",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 1096,
+          "expected": "After Extended Performance Mode"
+        }
+      ]
+    },
+    {
+      "profileid": "yabfW4C0PgqnfSK1jLNs",
+      "name": "Balbir",
+      "consumed": 9,
+      "total": 16,
+      "customerstatus": "active",
+      "profile_participantmode": "Event Mode",
+      "pm_participantmode": "Event Mode",
+      "expectedHeadline": "Event Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Event Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 125,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 173,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 210,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "ongoing",
+          "mode": "Event Mode",
+          "nextmode": "Integration Mode",
+          "nextmodedate": "2026-07-01",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "shifted",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 392,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 134,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "CTD Master Class",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "Mini uP!",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 252,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "EI Starter Pack",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        }
+      ]
+    },
+    {
+      "profileid": "qnbnlVy8aEf0WQOGAAfo",
+      "name": "Sonali Mudaliar",
+      "consumed": 6,
+      "total": 15,
+      "customerstatus": "active",
+      "profile_participantmode": "Journey Priority Planning Mode",
+      "pm_participantmode": "Journey Priority Planning Mode",
+      "expectedHeadline": "Journey Priority Planning Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Journey Priority Planning Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 125,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 412,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 173,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "shifted",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Critical Support Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 160,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "shifted",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 132,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "EI Starter Pack",
+          "status": "null",
+          "mode": "Journey Priority Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 391,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        }
+      ]
+    },
+    {
+      "profileid": "biyYZshfOlvJZSsdGn6j",
+      "name": "Siddharth Bharati",
+      "consumed": 7,
+      "total": 15,
+      "customerstatus": "active",
+      "profile_participantmode": "Journey Priority Planning Mode",
+      "pm_participantmode": "Journey Priority Planning Mode",
+      "expectedHeadline": "Journey Priority Planning Mode",
+      "rollup": "OK",
+      "sortedModes": [
+        "Journey Priority Planning Mode",
+        "Extended Performance Mode",
+        "Journey Planning Mode",
+        "After Extended Performance Mode"
+      ],
+      "rows": [
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MATCH",
+          "daysSince": 391,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 173,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "Extended Performance Mode",
+          "nextmode": "After Extended Performance Mode",
+          "nextmodedate": "2026-06-04",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 119,
+          "expected": "Extended Performance Mode",
+          "expNmd": "2026-06-04"
+        },
+        {
+          "product": "uP! Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 398,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 181,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Critical Support Diagnostics And Implementation",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": "MATCH",
+          "daysSince": 282,
+          "expected": "After Extended Performance Mode"
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "uP! Live Event",
+          "status": "completed",
+          "mode": "After Extended Performance Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "45/60/30",
+          "verdict": "MISMATCH(exp Extended)",
+          "daysSince": 125,
+          "expected": "Extended Performance Mode"
+        },
+        {
+          "product": "EI Starter Pack",
+          "status": "null",
+          "mode": "Journey Priority Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Prep",
+          "status": "cancelled",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "30/60/30",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "null",
+          "mode": "Journey Planning Mode",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        },
+        {
+          "product": "Evolution Mapping Activity",
+          "status": "shifted",
+          "mode": "null",
+          "nextmode": "null",
+          "nextmodedate": "—",
+          "knobs": "1/1/1",
+          "verdict": ""
+        }
+      ]
+    }
+  ]
+}

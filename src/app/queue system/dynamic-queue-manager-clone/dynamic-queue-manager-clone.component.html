@@ -42,7 +42,7 @@
           <button class="comm-btn whatsapp-btn" [class.active]="selectedCommType === 'whatsapp'"
             (click)="selectCommType('whatsapp')" [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-whatsapp"></i>
-            Whatsapp({{getSelectedTokens().length}})
+            Whatsapp(<span data-testid="qm-comms-recipient-count">{{getSelectedTokens().length}}</span>)
           </button>
           <button class="comm-btn email-btn" [class.active]="selectedCommType === 'email'"
             (click)="selectCommType('email')" [disabled]="getSelectedTokens().length === 0">
@@ -158,7 +158,7 @@
 
         <!-- Send Button -->
         <section class="send-button-section" *ngIf="selectedCommType">
-          <button class="send-btn" (click)="sendCommunication()" [disabled]="getSelectedTokens().length === 0">
+          <button class="send-btn" (click)="sendCommunication()" data-testid="qm-comms-send" [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-send-fill"></i>
             Send {{selectedCommType | titlecase}} to {{getSelectedTokens().length}} participant(s)
           </button>
@@ -172,7 +172,7 @@
               Participants ({{ selectedStages.length > 0 ? getMergedParticipants().length :
               (getStageParticipants(selectedChatStage)?.['tokenlist']?.length || 0) }})
             </h5>
-            <div class="select-all-wrapper" (click)="toggleSelectAll()">
+            <div class="select-all-wrapper" (click)="toggleSelectAll()" data-testid="qm-comms-selectall">
               <div class="custom-checkbox" [class.checked]="areAllSelected()">
                 <i class="bi bi-check" *ngIf="areAllSelected()"></i>
               </div>
@@ -375,7 +375,7 @@
         <div class="fsb-header" *ngIf="getActiveFilterCount() > 0">
           <span class="fsb-active-count">{{getActiveFilterCount()}} filter(s) active — {{totalParticipants}}
             participants</span>
-          <button class="fsb-clear-btn" (click)="clearAllFilters()">
+          <button class="fsb-clear-btn" (click)="clearAllFilters()" data-testid="qm-filters-clearall">
             <mat-icon>clear_all</mat-icon> Clear all
           </button>
         </div>
@@ -442,7 +442,7 @@
               </button>
             </div>
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" *ngFor="let tag of filteredTags"
+              <div class="fsb-option" *ngFor="let tag of filteredTags" data-testid="qm-tag-option" [attr.data-tag-id]="tag.docid"
                 [class.fsb-option-selected]="isTagSelected(tag.docid)"
                 (click)="toggleTagSelection(tag.docid); onTagFilterChange(); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{isTagSelected(tag.docid) ? 'check_box' :
@@ -850,7 +850,7 @@
         <div class="col-sm">
           <mat-form-field class="w-100" appearance="outline">
             <mat-label>Select Queue</mat-label>
-            <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+            <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()" data-testid="qm-queue-select">
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="searchQueue" [ngModelOptions]="{standalone: true}"
                   placeholderLabel="Columns" [placeholderLabel]="'Search'"
@@ -862,7 +862,7 @@
 
           <span *ngIf="selectedQueue != null">
             <h5 style="font-size: 16px;"><b style="font-weight: bold;color:rgb(0, 101, 135);">Total Participants</b> :
-              {{totalParticipants}}
+              <span data-testid="qm-total-participants">{{totalParticipants}}</span>
             </h5>
           </span>
         </div>
@@ -893,7 +893,7 @@
 
             <!-- Existing buttons -->
             <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button"
-              (click)="exportCSV()">Export CSV</button>
+              (click)="exportCSV()" data-testid="qm-export-csv">Export CSV</button>
             <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button"
               (click)="sidenavMode='comms'; selectedChatStage='queueadmin'; snav.open()">Admin Stage</button>
 
@@ -907,10 +907,10 @@
             </button>
 
             <!-- ADD THIS right before the quick links eye button -->
-            <button mat-icon-button (click)="sidenavMode='filter'; snav.open()" matTooltip="Filters"
+            <button mat-icon-button (click)="sidenavMode='filter'; snav.open()" data-testid="qm-filters-open" matTooltip="Filters"
               [style.color]="getActiveFilterCount() > 0 ? 'var(--color-text-info)' : null" style="position:relative">
               <mat-icon>tune</mat-icon>
-              <span *ngIf="getActiveFilterCount() > 0" class="filter-btn-badge">
+              <span *ngIf="getActiveFilterCount() > 0" class="filter-btn-badge" data-testid="qm-filter-badge">
                 {{getActiveFilterCount()}}
               </span>
             </button>
@@ -1042,7 +1042,7 @@
             <span *ngFor="let live of liveQueueList">
               <button mat-stroked-button class="me-2 mb-2"
                 [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
-                (click)="selectedQueue = live; onQueueSelect()">
+                (click)="selectedQueue = live; onQueueSelect()" data-testid="qm-livequeue-btn" [attr.data-queue-id]="live['docid']">
                 {{live["queuename"]}}
               </button>
             </span>
@@ -1084,7 +1084,7 @@
             {{(availableSegments | segmentName:segId) || segId}}
             <mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
-          <mat-chip *ngFor="let tagId of selectedTags" (removed)="removeTag(tagId)">
+          <mat-chip *ngFor="let tagId of selectedTags" (removed)="removeTag(tagId)" data-testid="qm-tag-chip" [attr.data-tag-id]="tagId">
             {{getTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="preassignedFilter !== 'all'"
@@ -1216,7 +1216,7 @@
                   <span [innerHTML]="highlightText(column.stagename)"></span>
                   <span *ngIf="column.type != null">&nbsp;(<span
                       [innerHTML]="highlightText(column.type)"></span>)</span>
-                  - <span>{{column.allTokens?.length || column.tokenlist.length}}</span>
+                  - <span data-testid="qm-stage-count">{{column.allTokens?.length || column.tokenlist.length}}</span>
                   <button class="m-2 text-secondary" mat-icon-button
                     (click)="sidenavMode='comms'; selectedChatStage=column.stagename; selectedChatStageType=column.type!=null?' - '+column.type:''; snav.open(); selectedStageType=column.type">
                     <mat-icon>message</mat-icon>
@@ -1249,7 +1249,7 @@
                   <div class="token-content">
                     <!-- Move Menu Wrapper -->
                     <div class="move-menu-wrapper">
-                      <button class="move-btn"
+                      <button class="move-btn" data-testid="qm-move-btn"
                         [disabled]="(['locked','defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) && (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] == true) || getTokenHighlight(token.profile_id) === 'orange'"
                         [class.disabled]="getTokenHighlight(token.profile_id) === 'orange'"
                         [matTooltip]="getTokenHighlight(token.profile_id) === 'orange' ? 'Move disabled for DFU participants' : ''"
@@ -1266,7 +1266,7 @@
                         </div>
 
                         <div class="stage-list">
-                          <button *ngFor="let targetColumn of filteredAvailableStages" class="stage-item"
+                          <button *ngFor="let targetColumn of filteredAvailableStages" class="stage-item" data-testid="qm-move-target" [attr.data-stage-name]="targetColumn.stagename"
                             [disabled]="targetColumn.stagename === column.stagename"
                             (click)="moveTokenToStage(token, column.stagename, column.type, targetColumn.stagename, targetColumn.markascompleted); closeMoveMenu()">
                             {{ targetColumn.stagename }}
@@ -1868,7 +1868,7 @@
       <mat-form-field appearance="outline" class="w-100">
         <mat-label>Move to Stage</mat-label>
         <mat-select
-          [(ngModel)]="bulkMoveTargetStageKey"
+          data-testid="qm-bulk-target" [(ngModel)]="bulkMoveTargetStageKey"
           [disabled]="bulkMoveInProgress">
           <mat-option
             *ngFor="let stage of availableStagesForBulkMove"
@@ -1907,7 +1907,7 @@
         mat-raised-button
         color="primary"
         class="bulk-action-btn"
-        (click)="executeBulkMove()"
+        data-testid="qm-bulk-commit" (click)="executeBulkMove()"
         [disabled]="!bulkMoveTargetStageKey || bulkMoveInProgress || bulkMovableCount === 0">
         <mat-spinner
           *ngIf="bulkMoveInProgress"

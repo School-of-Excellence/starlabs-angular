@@ -1,0 +1,56 @@
+[
+  {
+    "id": "L3rqCrqDBsshd7HM5YRn",
+    "file": "L3rqCrqDBsshd7HM5YRn.json",
+    "queuename": "uP!/Legacy Diagnostics & Consultation - (Nov 2025-Jan 2026)",
+    "stages": 30,
+    "variations": 9,
+    "operatorTransitions": 34,
+    "selfMovable": 10
+  },
+  {
+    "id": "vuvS7eBgTxLKufnesLQT",
+    "file": "vuvS7eBgTxLKufnesLQT.json",
+    "queuename": "A&H Evolution Preparation Event - April 2026",
+    "stages": 14,
+    "variations": 10,
+    "operatorTransitions": 5,
+    "selfMovable": 6
+  },
+  {
+    "id": "BhQgc9dU9Q27skitBCUD",
+    "file": "BhQgc9dU9Q27skitBCUD.json",
+    "queuename": "Evolution Prep (Oct 2025 - Jan 2026)",
+    "stages": 18,
+    "variations": 9,
+    "operatorTransitions": 4,
+    "selfMovable": 8
+  },
+  {
+    "id": "lWbXqjTbFNBeK9ENRNYe",
+    "file": "lWbXqjTbFNBeK9ENRNYe.json",
+    "queuename": "uP!/Legacy Diagnostics & Consultation - July 2024",
+    "stages": 28,
+    "variations": 6,
+    "operatorTransitions": 16,
+    "selfMovable": 10
+  },
+  {
+    "id": "XI0RAaTCqPb1KiOJbYHU",
+    "file": "XI0RAaTCqPb1KiOJbYHU.json",
+    "queuename": "Legacy Consultations (Delhi May '23)",
+    "stages": 40,
+    "variations": 6,
+    "operatorTransitions": 0,
+    "selfMovable": 9
+  },
+  {
+    "id": "DRIFT-demo",
+    "file": "DRIFT-demo.json",
+    "queuename": "⚠ Drift Demo (synthetic: dangling + orphan)",
+    "stages": 30,
+    "variations": 9,
+    "operatorTransitions": 36,
+    "selfMovable": 10
+  }
+]

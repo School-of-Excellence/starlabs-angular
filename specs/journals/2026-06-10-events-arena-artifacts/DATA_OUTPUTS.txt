@@ -1,0 +1,175 @@
+# DATA_OUTPUTS — #6 Events/Arena probes (production fir-sample-aae4a, read-only, 2026-06-10)
+
+## event_discover.js — collection discovery + schemas
+### "arena events" — 218 docs
+   keys: delete, deliveryref, docid, enddate, eventname, eventref, productref, startdate, type, venue
+### "arena e-ticket" — 2127 docs
+   keys: active, createddate, docid, eventenddate, eventparticipationref, eventref, eventstartdate, producteligible, profileid
+### "arena e-ticket log" — 9917 docs
+   keys: docid, eticketref, eventref, logdate, product, profileid
+### "arena highlights" — 62 docs
+   keys: consequence, created, eventref, from, name, paralleltrajectory, pinned, postcategory, postid, postimagelist, postmessage, private, profileid, significance, uid
+### "arenaspace" — 93 docs
+   keys: assignmentref, cohortsid, createddate, date, delete, docid, eventref, marathonref, mentor, participantslist, pivottype, spaceid, summary, validated
+### "arenalayers" — 17 docs
+   keys: attended, createddate, delete, description, docid, eventref, images, sequence, title
+### "arenavideoask" — 51 docs
+   keys: active, createddate, description, docid, eventref, questiontype, questionurl, title
+### "event collection" — 97 docs
+   keys: address, addtocalendar, arenaeventidlist, atcmodel, bigdescription, bigmarathonref, description, end_date, event_id, hosts, image, lastregistrationdate, name, notifyparticipants, start_date, venue
+### "event location" — 6 docs
+   keys: location
+### "event participant zones" — 637 docs
+   keys: addedby, addedflow, docid, eligiblezone, eligiliblecohorts, eventref, profileid, selectedzone
+### "event participant zones logs" — 19255 docs
+   keys: addedby, addedflow, docid, eligiblezone, eligiliblecohorts, eventref, logid, profileid, selectedzone
+### "event participation request" — 15717 docs
+   keys: doccreateddate, docid, eventdate, eventref, eventtyperef, journeyref, productref, profileid, status
+### "event rsvp" — 8766 docs
+   keys: arenaeventid, docid, eventref, eventtyperef, message, participantresponse, productref, profileid, teamresponse, type, updated
+### "event users" — 24 docs
+   keys: event_id, user_id
+### "event zones" — 10 docs
+   keys: cohorts, coordinators, created, docid, eventref, lastupdated, mentors, starttime, status, zonename
+### "event_token_user" — 102 docs
+   keys: name, token_id, user_ref
+### "events_hosts" — 9 docs
+   keys: event_ref, user_ref
+### "events_profiles" — 7845 docs
+   keys: event_ref, eventrequest, profile_ref, pseudo_name, token
+### "bigeventmentor" — 2 docs
+   keys: address, addtocalendar, arenaeventidlist, atcmodel, bigdescription, bigmarathonref, createdAt, description, end_date, event_id, hosts, image, lastregistrationdate, name, noteligible, notifyparticipants, notregistered, reached, registered, start_date, venue
+### "bigeventparticipantsplan" — 5 docs
+   keys: actions, createddate, eventid, profileid
+### "big aggregate event level" — 1145 docs
+   keys: atcmodel, boosteractivity, fasttrack, id, lastupdated, level, levelupcount, profileid, queueid, regular
+### "delivery events" — 42 docs
+   keys: eventname, events
+
+## event_runtime_probe.js — lifecycle state machines
+=== event participation request (15717) status: {"attended":7133,"unattended":3844,"approved":1673,"requested":3060,"initiated":4,"denied":3}
+=== event rsvp (8766) participantresponse: {"yes":8045,"no":596,"(null)":125}
+    rsvp type: {"queue":5194,"event":3572}
+=== arena e-ticket (2127) active:true 2102 (99%) | producteligible size: {"1":1352,"2":649,"3":124,"4":2}
+=== event collection (97) ===
+   with arenaeventidlist: 50 | with lastregistrationdate: 80 | with hosts: 96
+   past(ended): 93 | upcoming/ongoing: 4
+=== event participant zones (637) with selectedzone: 637
+=== arena e-ticket log (9917 scans) distinct profiles: 940 | distinct events: 8
+
+## (appended 2026-06-10) participant journey-through-events mapping
+### event_family_map.js
+journeyref non-null on 246 of 15770 requests (2%) — confirms product-grain mapping
+
+=== JOURNEY FAMILY → events participation ===
+  uP!: 8889 reqs · 44% attended · 40% no-show · 16% pending · 6 products
+  CPM: 2453 reqs · 34% attended · 2% no-show · 64% pending · 6 products
+  B!G: 2298 reqs · 58% attended · 6% no-show · 36% pending · 19 products
+  A&H/Leadership: 1204 reqs · 46% attended · 7% no-show · 47% pending · 6 products
+  Other: 481 reqs · 20% attended · 0% no-show · 78% pending · 9 products
+  CTD: 445 reqs · 98% attended · 1% no-show · 1% pending · 2 products
+
+=== EVENT-TYPE SPLIT (products n>=100) ===
+ READINESS GATES (<35% attended — virtual funnel steps):
+   - Evolution Prep (19%, n=4762)
+   - Conversational Programming Live Masterclass (0%, n=278)
+   - Scope Enhancement Workshop (0%, n=146)
+   - Conversational Programming Mastery (34%, n=1793)
+   - A&H Installation Concert (0%, n=427)
+   - B!G Readiness Masterclass (17%, n=203)
+   - Mega Consultation (0%, n=143)
+   - Evolution Mapping Activity (12%, n=174)
+   - Conversational Programming Live Workshop (0%, n=138)
+ LIVE ARENAS (>=35% attended — the in-person destinations):
+   - uP! Live Event (74%, n=3648)
+   - Mega Consultation B!G opportunities (96%, n=142)
+   - B!G Accelerator Arena (47%, n=974)
+   - CTD Live Event (99%, n=439)
+   - B!G Accelerator March 2025 (81%, n=108)
+   - Mini uP! (88%, n=252)
+   - Winning Heart (72%, n=393)
+   - Winning Heart - Vantage Point (70%, n=200)
+   - Mini uP! - B!G Accelerator (89%, n=105)
+   - Become Installation Genius (BiG) Advanced (46%, n=128)
+   - CPM Live Readiness (91%, n=178)
+   - B!G Accelerator Studio (51%, n=114)
+
+### event_journey_map.js (journey→event flow + real participant paths)
+=== JOURNEY → EVENTS (participation requests, top 14 journeys) ===
+  product:Evolution Prep: 4762 reqs · 4 distinct events · 19% attended
+  product:uP! Live Event: 3648 reqs · 14 distinct events · 74% attended
+  product:Conversational Programming Mastery: 1793 reqs · 9 distinct events · 34% attended
+  product:B!G Accelerator Arena: 974 reqs · 17 distinct events · 47% attended
+  product:CTD Live Event: 439 reqs · 2 distinct events · 99% attended
+  product:A&H Installation Concert: 427 reqs · 1 distinct events · 0% attended
+  product:Winning Heart: 393 reqs · 2 distinct events · 72% attended
+  product:Conversational Programming Live Masterclass: 278 reqs · 2 distinct events · 0% attended
+  product:Mini uP!: 252 reqs · 1 distinct events · 88% attended
+  product:B!G Readiness Masterclass: 203 reqs · 1 distinct events · 17% attended
+  product:Winning Heart - Vantage Point: 200 reqs · 3 distinct events · 70% attended
+  product:CPM Live Readiness: 178 reqs · 2 distinct events · 91% attended
+  product:Evolution Mapping Activity: 174 reqs · 2 distinct events · 12% attended
+  product:Scope Enhancement Workshop: 146 reqs · 1 distinct events · 0% attended
+
+=== TOP EVENTS by participation (top 12) — dominant journey + attendance ===
+  "kOYFTu7SSEUt0IWQErNa": 3138 · top journey product:Evolution Prep (3138) · 0% attended
+  "uP! Live Event Jan 2026": 1521 · top journey product:uP! Live Event (727) · 49% attended
+  "BhQgc9dU9Q27skitBCUD": 918 · top journey product:Evolution Prep (909) · 80% attended
+  "uP! Arena Apr-May 2025": 800 · top journey product:uP! Live Event (538) · 93% attended
+  "uP! Live Event July 2026": 788 · top journey product:uP! Live Event (464) · 0% attended
+  "uP! Arena Aug 2024": 746 · top journey product:uP! Live Event (450) · 79% attended
+  "uP! Arena Mumbai May-Jun 2023": 606 · top journey product:uP! Live Event (429) · 96% attended
+  "vuvS7eBgTxLKufnesLQT": 584 · top journey product:Evolution Prep (584) · 25% attended
+  " uP! Live Event Feb 2024": 518 · top journey product:uP! Live Event (335) · 91% attended
+  "CTD Live Mar 2023": 438 · top journey product:CTD Live Event (438) · 99% attended
+  "A&H Installation Concert Jan 2026": 427 · top journey product:A&H Installation Concert (427) · 0% attended
+  "Winning Heart Dec 2025": 375 · top journey product:Winning Heart (374) · 75% attended
+
+=== ARENA ZONES — assignment by event (events with zone usage) ===
+  "uP! Live Event Jan 2026" (637 assigned): Main Arena=634, Zone D First Floor=1, Zone B=1, Zone A=1
+
+=== REAL PARTICIPANT PATHS through events (4 participants with the most events) ===
+  Abirami Ganesan — 56 events:
+     [product:Become Installation Genius (BiG)] BiG Arena Apr - May 2022 → attended
+     [product:uP! Live Event] uP! Mumbai Sep 2022 → attended
+     [product:BiG Accelerator Nov 2022] BiG Accelerator Nov 2022 → attended
+     [product:CTD Live Event] CTD Live Mar 2023 → attended
+     [product:BiG Accelerator April 2023] BiG Accelerator April 2023 → attended
+     [product:Mega Consultation B!G opportunities] Mega Consultation Chennai May 2023 → attended
+     [product:CPM Live] uP! Arena Mumbai May-Jun 2023 → attended
+     [product:CPM Live] uP! Arena Mumbai May-Jun 2023 → approved
+     [product:uP! Live Event] uP! Arena Mumbai May-Jun 2023 → attended
+     [product:B!G Accelerator Arena] Nov 2023 B!G Accelerator   → attended
+  Shilpa Rao — 51 events:
+     [product:Become Installation Genius (BiG)] BiG Arena Apr - May 2022 → attended
+     [product:uP! Live Event] uP! Mumbai Sep 2022 → attended
+     [product:BiG Accelerator Nov 2022] BiG Accelerator Nov 2022 → attended
+     [product:BiG Accelerator April 2023] BiG Accelerator April 2023 → attended
+     [product:Mega Consultation B!G opportunities] Mega Consultation Chennai May 2023 → attended
+     [product:CPM Live] uP! Arena Mumbai May-Jun 2023 → attended
+     [product:uP! Live Event] uP! Arena Mumbai May-Jun 2023 → attended
+     [product:B!G Accelerator Arena] Nov 2023 B!G Accelerator   → attended
+     [product:Conversational Programming Mastery]  uP! Live Event Feb 2024 → attended
+     [product:uP! Live Event]  uP! Live Event Feb 2024 → attended
+  Anjleen Kaur — 50 events:
+     [product:Become Installation Genius (BiG)] BiG Arena Apr - May 2022 → attended
+     [product:uP! Live Event] uP! Mumbai Sep 2022 → attended
+     [product:BiG Accelerator Nov 2022] BiG Accelerator Nov 2022 → attended
+     [product:CTD Live Event] CTD Live Mar 2023 → attended
+     [product:BiG Accelerator April 2023] BiG Accelerator April 2023 → attended
+     [product:Mega Consultation B!G opportunities] Mega Consultation Delhi May 2023 → attended
+     [product:CPM Live] uP! Arena Mumbai May-Jun 2023 → attended
+     [product:uP! Live Event] uP! Arena Mumbai May-Jun 2023 → attended
+     [product:B!G Accelerator Arena] Nov 2023 B!G Accelerator   → attended
+     [product:Conversational Programming Mastery]  uP! Live Event Feb 2024 → approved
+  Saravanan Aruljothi — 47 events:
+     [product:Leadership Training for A&H Team] hHztccwirCN3k5zOH00W → attended
+     [product:Leadership Training for A&H Team] hHztccwirCN3k5zOH00W → attended
+     [product:CTD Diagnostics And Implementation] dWykj6z6LUcg4ywCUKMa → approved
+     [product:Leadership Training for A&H Team] hHztccwirCN3k5zOH00W → attended
+     [product:Legacy Consultation] ocvQ0j6WQL9oXIrx7N2E → approved
+     [product:CTD Diagnostics And Implementation] dWykj6z6LUcg4ywCUKMa → approved
+     [product:CTD Diagnostics And Implementation] hWfOfsSt9T6QtQfy0o7T → approved
+     [product:Leadership Training for A&H Team] hHztccwirCN3k5zOH00W → attended
+     [product:uP! Live Event] gTzUeYiCU6oMbhfI0yb9 → approved
+     [product:uP! Live Event] testing → attended
