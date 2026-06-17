@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  Firestore, collection, query, orderBy, where, getDocs
+  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc
 } from '@angular/fire/firestore';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatButtonModule } from '@angular/material/button';
@@ -190,6 +190,23 @@ export class EventParticipationConfirmationsComponent {
       await Promise.all(chunk.map(async r => {
         try {
           const arena = r.arena;
+          // Prefer the precomputed rollup doc (1 read). Any failure here — the doc
+          // doesn't exist yet, OR security rules don't allow event_stats yet — must
+          // fall through to the live scan-and-join below, so the screen never breaks.
+          try {
+            const statsSnap = await getDoc(doc(this.firestore, 'event_stats', arena['docid']));
+            if (statsSnap.exists()) {
+              const s: any = statsSnap.data();
+              r.potential = s['potential'] ?? null;
+              r.requested = s['requested'] ?? null;
+              r.approved = s['approved'] ?? null;
+              r.eligible = s['eligible'] ?? null;
+              r.notEligible = (s['noProduct'] ?? 0) + (s['inQueue'] ?? 0);
+              r.error = false;
+              r.eligibleLoaded = true;
+              return;
+            }
+          } catch { /* no event_stats yet / not readable — use the live fallback */ }
           const [eprSnap, owners, active] = await Promise.all([
             getDocs(query(collection(this.firestore, 'event participation request'),
               where('arenaeventid', '==', arena['docid']), where('status', 'in', ['requested', 'approved']))),
