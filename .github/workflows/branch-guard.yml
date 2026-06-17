@@ -3,7 +3,7 @@ name: branch-guard
 # Thin caller — detects stray direct pushes to protected branches. Logic lives in the hub.
 on:
   push:
-    branches: [development, production]
+    branches: [development, production, cicd-dev, cicd-prod]   # include TEST stand-ins. Remove after validation.
 
 jobs:
   guard:

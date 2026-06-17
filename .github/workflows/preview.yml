@@ -10,6 +10,8 @@ on:
       - development
       - production
       - main
+      - cicd-dev      # TEST stand-in branches are not feature branches — no preview channel for them
+      - cicd-prod
 
 permissions:
   contents: read

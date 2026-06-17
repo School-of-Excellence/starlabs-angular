@@ -10,7 +10,7 @@ name: queue-e2e (emulator gate)
 
 on:
   pull_request:
-    branches: [development]
+    branches: [development, cicd-dev]   # cicd-dev = TEST stand-in for development. Remove after validation.
     types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - 'src/app/queue system/**'

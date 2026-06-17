@@ -11,6 +11,8 @@ on:
     branches:
       - development
       - production
+      - cicd-dev      # TEST stand-in for development → deploys to starlabs-test. Remove after validation.
+      - cicd-prod     # TEST stand-in for production → also deploys to starlabs-test (NOT live). Remove after validation.
 
 jobs:
   deploy:
@@ -36,7 +38,7 @@ jobs:
         run: |
           mkdir -p src/environments
 
-          if [ "${{ github.ref }}" == "refs/heads/development" ]; then
+          if [ "${{ github.ref }}" == "refs/heads/development" ] || [ "${{ github.ref }}" == "refs/heads/cicd-dev" ] || [ "${{ github.ref }}" == "refs/heads/cicd-prod" ]; then
             # Test branch - use TEST config for both files
             cat > src/environments/environment.development.ts << EOF
           export const environment = {
@@ -100,7 +102,7 @@ jobs:
 
       - name: Update Firebase Site
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/development" ]; then
+          if [ "${{ github.ref }}" == "refs/heads/development" ] || [ "${{ github.ref }}" == "refs/heads/cicd-dev" ] || [ "${{ github.ref }}" == "refs/heads/cicd-prod" ]; then
             jq '.hosting.site = "breakthroughs-test"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
           else
             jq '.hosting.site = "star-labs"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
@@ -120,7 +122,7 @@ jobs:
 
       - name: Authenticate with Firebase & Set Project
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/development" ]; then
+          if [ "${{ github.ref }}" == "refs/heads/development" ] || [ "${{ github.ref }}" == "refs/heads/cicd-dev" ] || [ "${{ github.ref }}" == "refs/heads/cicd-prod" ]; then
             echo '${{ secrets.GOOGLE_SERVICE_TEST }}' > $HOME/firebase-key.json
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json
             firebase use --add starlabs-test
