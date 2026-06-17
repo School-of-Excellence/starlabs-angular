@@ -1,0 +1,119 @@
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo material-symbols-rounded">hub</span>
+      <div class="titles">
+        <h1>Participant Intelligence</h1>
+        <span class="sub">
+          @if (store.loading()) {
+            Loading participants…
+          } @else {
+            {{ store.filteredCount() | number }} of {{ store.totalCount() | number }} participants
+          }
+        </span>
+      </div>
+    </div>
+
+    <div class="search">
+      <span class="material-symbols-rounded">search</span>
+      <input type="text" [(ngModel)]="search" placeholder="Search name, email or phone…" />
+      @if (search) {
+        <button class="clear" (click)="search = ''" aria-label="Clear search">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      }
+    </div>
+
+    <div class="tools">
+      <app-audience-switcher (manage)="openManageAudiences()" />
+
+      <button class="tbtn" [class.active]="insightsOpen()" (click)="toggleInsights()" matTooltip="Toggle insights">
+        <span class="material-symbols-rounded">insights</span>
+        <span class="lbl">Insights</span>
+        @if (store.attentionCount()) {
+          <span class="pill warn">{{ store.attentionCount() | number }}</span>
+        }
+      </button>
+
+      <button class="tbtn" [class.active]="railOpen()" (click)="toggleRail()" matTooltip="Toggle filters">
+        <span class="material-symbols-rounded">filter_alt</span>
+        <span class="lbl">Filters</span>
+        @if (store.activeFilterCount()) {
+          <span class="pill">{{ store.activeFilterCount() }}</span>
+        }
+      </button>
+
+      <app-column-config />
+
+      <button class="tbtn" [matMenuTriggerFor]="exportMenu">
+        <span class="material-symbols-rounded">download</span>
+        <span class="lbl">Export</span>
+      </button>
+
+      <button class="tbtn icon-only" [matMenuTriggerFor]="importMenu" matTooltip="Import">
+        <span class="material-symbols-rounded">upload</span>
+      </button>
+
+      <span class="sep"></span>
+
+      <button class="iconbtn" matTooltip="Queued emails" (click)="snackQueued('email')">
+        <span class="material-symbols-rounded">mail</span>
+        @if (pendingEmails()) {
+          <span class="badge">{{ pendingEmails() }}</span>
+        }
+      </button>
+      <button class="iconbtn" matTooltip="Queued WhatsApp" (click)="snackQueued('whatsapp')">
+        <span class="material-symbols-rounded">chat</span>
+        @if (pendingWati()) {
+          <span class="badge">{{ pendingWati() }}</span>
+        }
+      </button>
+      <button class="iconbtn" matTooltip="Refresh" (click)="refresh()">
+        <span class="material-symbols-rounded">refresh</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="body">
+    @if (railOpen()) {
+      <aside class="rail">
+        <app-filter-rail (save)="saveAudience()" />
+      </aside>
+    }
+    <main class="main">
+      @if (insightsOpen() && !store.loading()) {
+        <app-signals-panel />
+      }
+      <app-active-filter-chips />
+      <div class="table-wrap">
+        <app-participant-table />
+      </div>
+    </main>
+  </div>
+
+  <app-bulk-action-bar (action)="handleBulk($event)" />
+</div>
+
+<input #fileInput type="file" accept=".xlsx,.xls" hidden (change)="onImportFile($event)" />
+
+<mat-menu #exportMenu="matMenu" xPosition="before">
+  <button mat-menu-item (click)="export(false)">
+    <span class="material-symbols-rounded mi">table_view</span>
+    Export all filtered ({{ store.filteredCount() | number }})
+  </button>
+  <button mat-menu-item (click)="export(true)" [disabled]="!store.selectedCount()">
+    <span class="material-symbols-rounded mi">checklist</span>
+    Export selected ({{ store.selectedCount() }})
+  </button>
+</mat-menu>
+
+<mat-menu #importMenu="matMenu" xPosition="before">
+  <button mat-menu-item (click)="downloadSample()">
+    <span class="material-symbols-rounded mi">file_download</span>
+    Download sample
+  </button>
+  <button mat-menu-item (click)="triggerImport()">
+    <span class="material-symbols-rounded mi">upload_file</span>
+    Upload &amp; select by email
+  </button>
+</mat-menu>

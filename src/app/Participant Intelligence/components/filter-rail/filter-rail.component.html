@@ -1,0 +1,121 @@
+<div class="rail-head">
+  <div class="title">
+    <span class="material-symbols-rounded">filter_alt</span>
+    <span>Filters</span>
+    @if (store.activeFilterCount()) {
+      <span class="count">{{ store.activeFilterCount() }}</span>
+    }
+  </div>
+  <button class="reset" [disabled]="!store.activeFilterCount()" (click)="store.clearFilter()">Reset</button>
+</div>
+
+<div class="rail-body">
+  @for (sec of sections(); track sec.group) {
+    <div class="section" [class.open]="isOpen(sec.group)">
+      <button class="sec-head" (click)="toggleSection(sec.group)">
+        <span class="sec-label">{{ sec.label }}</span>
+        @if (countFor(sec.group)) {
+          <span class="sec-count">{{ countFor(sec.group) }}</span>
+        }
+        <span class="material-symbols-rounded chev">{{ isOpen(sec.group) ? 'expand_less' : 'expand_more' }}</span>
+      </button>
+      @if (isOpen(sec.group)) {
+        <div class="sec-body">
+          @for (o of sec.options; track o.value) {
+            <label class="opt">
+              <input type="checkbox" [checked]="isChecked(sec.group, o.value)" (change)="toggle(sec.group, o.value)" />
+              <span class="box"></span>
+              <span class="opt-label">{{ o.label }}</span>
+            </label>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ATC count -->
+  <div class="section" [class.open]="isOpen('atc')">
+    <button class="sec-head" (click)="toggleSection('atc')">
+      <span class="sec-label">ATC count</span>
+      @if (atc != null) {
+        <span class="sec-count">1</span>
+      }
+      <span class="material-symbols-rounded chev">{{ isOpen('atc') ? 'expand_less' : 'expand_more' }}</span>
+    </button>
+    @if (isOpen('atc')) {
+      <div class="sec-body">
+        <div class="field-row">
+          <span class="field-lead">At least</span>
+          <input class="num-input" type="number" min="0" [value]="atc ?? ''" (input)="setAtc($any($event.target).value)" placeholder="0" />
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- subscription dates -->
+  <div class="section" [class.open]="isOpen('dates')">
+    <button class="sec-head" (click)="toggleSection('dates')">
+      <span class="sec-label">Subscription dates</span>
+      <span class="material-symbols-rounded chev">{{ isOpen('dates') ? 'expand_less' : 'expand_more' }}</span>
+    </button>
+    @if (isOpen('dates')) {
+      <div class="sec-body">
+        <span class="mini-label">Start between</span>
+        <div class="field-row two">
+          <input class="date-input" type="date" [value]="dateVal('subscriptionStart','start')" (change)="setDate('subscriptionStart','start',$any($event.target).value)" />
+          <input class="date-input" type="date" [value]="dateVal('subscriptionStart','end')" (change)="setDate('subscriptionStart','end',$any($event.target).value)" />
+        </div>
+        <span class="mini-label">End between</span>
+        <div class="field-row two">
+          <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','start')" (change)="setDate('subscriptionEnd','start',$any($event.target).value)" />
+          <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','end')" (change)="setDate('subscriptionEnd','end',$any($event.target).value)" />
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- product activity -->
+  <div class="section" [class.open]="isOpen('activity')">
+    <button class="sec-head" (click)="toggleSection('activity')">
+      <span class="sec-label">Product activity</span>
+      @if (rules('consumed').length + rules('unconsumed').length) {
+        <span class="sec-count">{{ rules('consumed').length + rules('unconsumed').length }}</span>
+      }
+      <span class="material-symbols-rounded chev">{{ isOpen('activity') ? 'expand_less' : 'expand_more' }}</span>
+    </button>
+    @if (isOpen('activity')) {
+      <div class="sec-body">
+        @for (kind of ['consumed','unconsumed']; track kind) {
+          <span class="mini-label">{{ kind === 'consumed' ? 'Consumed count' : 'Unconsumed count' }}</span>
+          @for (rule of rules($any(kind)); track $index) {
+            <div class="rule">
+              <select class="rule-sel" [value]="rule.productId" (change)="updateRule($any(kind), $index, { productId: $any($event.target).value })">
+                @for (p of products(); track p.id) {
+                  <option [value]="p.id">{{ p.name }}</option>
+                }
+              </select>
+              <select class="rule-cmp" [value]="rule.comparison" (change)="updateRule($any(kind), $index, { comparison: $any($event.target).value })">
+                @for (c of comparisons; track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+              <input class="rule-num" type="number" min="0" [value]="rule.count" (input)="updateRule($any(kind), $index, { count: asNum($any($event.target).value) })" />
+              <button class="rule-del" (click)="removeRule($any(kind), $index)">
+                <span class="material-symbols-rounded">close</span>
+              </button>
+            </div>
+          }
+          <button class="add-rule" (click)="addRule($any(kind))">
+            <span class="material-symbols-rounded">add</span> Add rule
+          </button>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<div class="rail-foot">
+  <button class="save-btn" [disabled]="!store.activeFilterCount()" (click)="save.emit()">
+    <span class="material-symbols-rounded">bookmark_add</span> Save as audience
+  </button>
+</div>

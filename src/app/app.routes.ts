@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
+import { loggedInGuard } from './Participant Intelligence/auth-only.guard';
 
 export const routes: Routes = [
   {path: 'journeyonboardingdetail', loadComponent: () => import('./journey-onboarding-detail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent), canActivate:[authGuard]},
@@ -225,6 +226,7 @@ export const routes: Routes = [
 
   // Participants Profile Management
   {path: 'participants-analytics', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-analytics.component').then(m => m.ParticipantsAnalyticsComponent), canActivate: [authGuard]},
+  {path: 'participant-intelligence', loadComponent: () => import('./Participant Intelligence/participant-intelligence.component').then(m => m.ParticipantIntelligenceComponent), canActivate: [loggedInGuard]},
   {path: 'participant-evolution-summary', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-evolution-summary/participants-evolution-summary.component').then(m => m.ParticipantsEvolutionSummaryComponent), canActivate:[authGuard]},
   {path: 'participant-form-tracker', loadComponent: () => import('./Participants Profile Management/participant-form-tracker/participant-form-tracker.component').then(m => m.ParticipantFormTrackerComponent), canActivate:[authGuard]},
 

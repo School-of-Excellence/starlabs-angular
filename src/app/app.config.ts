@@ -1,7 +1,7 @@
 import { provideRouter } from '@angular/router';
 import { initializeApp, provideFirebaseApp } from '@angular/fire/app';
 import { getAuth, provideAuth } from '@angular/fire/auth';
-import { getFirestore,provideFirestore } from '@angular/fire/firestore';
+import { getFirestore,provideFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
 import { routes } from './app.routes';
 import { ApplicationConfig, provideZoneChangeDetection , importProvidersFrom } from '@angular/core';
 import { environment } from '../environments/environment.development';
@@ -17,7 +17,22 @@ import { provideMarkdown } from 'ngx-markdown';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideFirestore(()=>getFirestore()),
+    provideFirestore(() => {
+      const fs = getFirestore();
+      // BENCHMARK-ONLY: opt-in redirect to the local Firestore emulator. OFF by
+      // default — normal dev/prod untouched. Enable with either:
+      //   localStorage.setItem('USE_FS_EMULATOR','1')   (then reload), or
+      //   append ?fsemu=1 to the URL.
+      try {
+        const on = (typeof localStorage !== 'undefined' && localStorage.getItem('USE_FS_EMULATOR') === '1')
+          || (typeof location !== 'undefined' && location.search.includes('fsemu=1'));
+        if (on) {
+          connectFirestoreEmulator(fs, '127.0.0.1', 8080);
+          console.warn('[BENCH] Firestore pointed at emulator 127.0.0.1:8080 — board data is synthetic.');
+        }
+      } catch { /* SSR / no window — ignore */ }
+      return fs;
+    }),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideFirebaseApp(() => initializeApp(environment.firebase)),

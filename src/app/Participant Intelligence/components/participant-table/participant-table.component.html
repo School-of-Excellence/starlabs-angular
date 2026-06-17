@@ -1,0 +1,135 @@
+@if (store.loading()) {
+  <div class="skeleton">
+    @for (r of [1,2,3,4,5,6,7,8,9,10]; track r) {
+      <div class="sk-row">
+        <span class="sk sk-cbx"></span>
+        <span class="sk sk-avatar"></span>
+        <span class="sk sk-line"></span>
+        <span class="sk sk-pill"></span>
+        <span class="sk sk-line short"></span>
+      </div>
+    }
+  </div>
+} @else if (store.loadError()) {
+  <div class="empty">
+    <span class="material-symbols-rounded">cloud_off</span>
+    <h3>Couldn't load participants</h3>
+    <p>The data read failed — check you're signed in and have access to the participant collections.</p>
+  </div>
+} @else if (rows().length === 0) {
+  <div class="empty">
+    <span class="material-symbols-rounded">filter_alt_off</span>
+    <h3>No participants match these filters</h3>
+    <p>Try removing a filter chip above, or reset to see the full base.</p>
+  </div>
+} @else {
+  <div class="table-scroll">
+    <div class="table-inner" [style.min-width.px]="minWidth()">
+      <div class="thead" [style.grid-template-columns]="gridTemplate()">
+        <div class="th th-select">
+          <label class="cbx" (click)="$event.stopPropagation()">
+            <input
+              type="checkbox"
+              [checked]="store.allFilteredSelected()"
+              (change)="store.toggleAllFiltered($any($event.target).checked)"
+            />
+            <span class="box"></span>
+          </label>
+        </div>
+        @for (def of columnDefs(); track def.key) {
+          <div class="th" [class.num]="def.type === 'number'" (click)="toggleSort(def.key)">
+            <span class="th-label">{{ def.label }}</span>
+            @if (sortKey() === def.key && sortDir()) {
+              <span class="material-symbols-rounded sort">{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+            }
+          </div>
+        }
+      </div>
+
+      <cdk-virtual-scroll-viewport itemSize="52" minBufferPx="600" maxBufferPx="1200" class="tbody">
+        <div
+          class="tr"
+          *cdkVirtualFor="let p of rows(); trackBy: trackById"
+          [class.selected]="store.isSelected(p.profileid)"
+          [style.grid-template-columns]="gridTemplate()"
+          (click)="store.toggleOne(p.profileid)"
+        >
+          <div class="td td-select" (click)="$event.stopPropagation()">
+            <label class="cbx">
+              <input type="checkbox" [checked]="store.isSelected(p.profileid)" (change)="store.toggleOne(p.profileid)" />
+              <span class="box"></span>
+            </label>
+          </div>
+
+          @for (def of columnDefs(); track def.key) {
+            <div class="td" [class.num]="def.type === 'number'" [ngSwitch]="def.type">
+              <ng-container *ngSwitchCase="'name'">
+                <span class="avatar" [style.background]="avatarHue(p)">{{ initials(p) }}</span>
+                <span class="name-block">
+                  <span class="name-row">
+                    <span class="name">{{ p.name }}</span>
+                    <a class="link" [matTooltip]="'Open profile'" (click)="$event.stopPropagation()">
+                      <span class="material-symbols-rounded">open_in_new</span>
+                    </a>
+                  </span>
+                  <span class="email">{{ p.email }}</span>
+                </span>
+              </ng-container>
+
+              <ng-container *ngSwitchCase="'status'">
+                @if (statusValue(p, def.key) === 'none') {
+                  <span class="muted">—</span>
+                } @else {
+                  <span class="pi-badge tone-{{ tone(statusValue(p, def.key)) }}">{{ statusLabel(p, def.key) }}</span>
+                }
+              </ng-container>
+
+              <ng-container *ngSwitchCase="'array'">
+                @if (arrayValues(p, def).length === 0) {
+                  <span class="muted">—</span>
+                } @else {
+                  <span class="chips">
+                    @for (v of arrayValues(p, def).slice(0, 2); track v) {
+                      <span class="chip">{{ v }}</span>
+                    }
+                    @if (arrayValues(p, def).length > 2) {
+                      <span class="chip more" [matTooltip]="arrayValues(p, def).join(', ')">+{{ arrayValues(p, def).length - 2 }}</span>
+                    }
+                  </span>
+                }
+              </ng-container>
+
+              <ng-container *ngSwitchCase="'tags'">
+                @if (arrayValues(p, def).length === 0) {
+                  <span class="muted">—</span>
+                } @else {
+                  <span class="chips">
+                    @for (v of arrayValues(p, def).slice(0, 2); track v) {
+                      <span class="chip tag">{{ v }}</span>
+                    }
+                    @if (arrayValues(p, def).length > 2) {
+                      <span class="chip tag more" [matTooltip]="arrayValues(p, def).join(', ')">+{{ arrayValues(p, def).length - 2 }}</span>
+                    }
+                  </span>
+                }
+              </ng-container>
+
+              <ng-container *ngSwitchCase="'remarks'">
+                @if (p.remarks.length === 0) {
+                  <span class="muted">—</span>
+                } @else {
+                  <span class="remark" [matTooltip]="p.remarks[p.remarks.length - 1].note">
+                    <span class="material-symbols-rounded">sticky_note_2</span>
+                    {{ p.remarks.length }}
+                  </span>
+                }
+              </ng-container>
+
+              <span *ngSwitchDefault [class.muted]="cellText(p, def) === '—'">{{ cellText(p, def) }}</span>
+            </div>
+          }
+        </div>
+      </cdk-virtual-scroll-viewport>
+    </div>
+  </div>
+}
