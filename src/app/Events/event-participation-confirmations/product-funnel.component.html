@@ -20,19 +20,27 @@
 
   <ng-container *ngIf="!loading && !loadError">
 
-    <!-- Grouped breakdown: bold total row + indented rows that are subsets of it -->
+    <!-- Grouped breakdown: metric on top line, customer-status split below -->
     <div class="sx-bd">
       <div class="sx-bd-panel" *ngFor="let p of funnelTree">
         <div class="sx-bd-about">{{ p.about }}</div>
         <button *ngFor="let r of p.rows" type="button"
           class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key].cls }}"
           [class.on]="segment===r.key" [attr.aria-pressed]="segment===r.key"
-          [matTooltip]="cardMap[r.key].tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
-          <span class="sx-bd-dot"></span>
-          <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
-          <span class="sx-bd-bar"><span class="sx-bd-fill" [style.width.%]="barPct(r.key, p.total)"></span></span>
-          <span class="sx-bd-pct">{{ barPct(r.key, p.total) }}%</span>
-          <span class="sx-bd-num">{{ counts[r.key] | number }}</span>
+          [matTooltip]="cardMap[r.key].tip || ''" matTooltipClass="sx-tip"
+          (click)="setSegment(r.key)">
+          <span class="sx-bd-top">
+            <span class="sx-bd-dot"></span>
+            <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
+            <!-- <span class="sx-bd-pct">{{ barPct(r.key, p.total) }}%</span> -->
+            <span class="sx-bd-num">{{ counts[r.key] | number }}</span>
+          </span>
+          <span class="sx-bd-cs" *ngIf="splitsReady && statusSplit(r.key).length">
+            <span class="sx-bd-cs-i" *ngFor="let s of statusSplit(r.key)" [style.color]="statusColor(s.key)">
+              <i class="cs-dot" [style.background]="statusColor(s.key)"></i>{{ s.label }} {{ s.count | number }}
+            </span>
+          </span>
+          <span class="sx-bd-cs sx-bd-cs-load" *ngIf="!splitsReady">loading customer status…</span>
         </button>
       </div>
     </div>
@@ -88,6 +96,14 @@
         </mat-select>
       </mat-form-field>
 
+      <mat-form-field appearance="outline" class="sx-finance" subscriptSizing="dynamic">
+        <mat-label>Customer status</mat-label>
+        <mat-select [(ngModel)]="customerFilter" (ngModelChange)="onCustomer()">
+          <mat-option value="all">All customers</mat-option>
+          <mat-option *ngFor="let c of customerFilterOptions" [value]="c.key">{{ c.label }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
       <button mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
         matTooltipClass="sx-tip" matTooltip="Message the participants in this segment">
         <mat-icon>campaign</mat-icon> Send
@@ -121,7 +137,8 @@
             <th>Name</th>
             <th>Requested date</th>
             <th>Current journey</th>
-            <th>Subscription</th>
+            <th>Subscription end</th>
+            <th>Customer status</th>
             <th>Finance</th>
             <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
           </tr>
@@ -152,15 +169,16 @@
               <span *ngIf="row.metaLoaded && !row.metaError">{{ row.journey || '—' }}</span>
             </td>
             <td>
+              <span *ngIf="!row.subLoaded" class="sx-mut">…</span>
+              <ng-container *ngIf="row.subLoaded">
+                <span *ngIf="row.subEnd">{{ row.subEnd | date:'mediumDate' }}</span>
+                <span *ngIf="!row.subEnd" class="sx-mut">—</span>
+              </ng-container>
+            </td>
+            <td>
               <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
               <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
-              <ng-container *ngIf="row.metaLoaded && !row.metaError">
-                <ng-container *ngIf="row.subEnd; else dashSub">
-                  <span class="dot" [ngClass]="row.subActive ? 'd-ok' : 'd-bad'"></span>{{ row.subActive ? 'Active' : 'Expired' }}
-                  <span class="sx-mut">{{ formatMonthYear(row.subEnd) }}</span>
-                </ng-container>
-                <ng-template #dashSub><span class="sx-mut">—</span></ng-template>
-              </ng-container>
+              <span *ngIf="row.metaLoaded && !row.metaError" class="sx-cust">{{ row.customerStatus || '—' }}</span>
             </td>
             <td>
               <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
@@ -197,9 +215,9 @@
             </td>
           </tr>
           <tr *ngIf="segmentRows.length === 0">
-            <td [attr.colspan]="showSelect ? 7 : 6" class="sx-empty">
+            <td [attr.colspan]="showSelect ? 8 : 7" class="sx-empty">
               {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
-              <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; onFinance()">Clear filter</button>
+              <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; customerFilter='all'; onFinance()">Clear filter</button>
             </td>
           </tr>
         </tbody>
