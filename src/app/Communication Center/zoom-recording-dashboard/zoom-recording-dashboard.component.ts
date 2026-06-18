@@ -178,6 +178,14 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     return new Date(start.getTime() + mins * 60000)
   }
 
+  // when our pipeline started / finished processing this recording
+  processingStart(record: any): Date | null {
+    return this.toDate(record?.processingStartedAt)
+  }
+  processingEnd(record: any): Date | null {
+    return this.toDate(record?.completedAt || record?.failedAt)
+  }
+
   // overall % across a record's files (for the inline progress in the table)
   recordPercent(record: any): number {
     const files = this.normalizeFiles(record?.files)
