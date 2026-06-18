@@ -1153,17 +1153,17 @@ export class BigCohortClone2Component {
       minWidth: "500px",
       disableClose: true
     })
-    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
-      if (result != null && result != undefined) {
-        let docid = doc(collection(this.firestore, "buffermix archive")).id
-        result['docid'] = docid
-        setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
-          console.log("buffer document created");
-        }).catch(err => {
-          console.log(err);
-        })
-      }
-    });
+    // dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
+    //   if (result != null && result != undefined) {
+    //     let docid = doc(collection(this.firestore, "buffermix archive")).id
+    //     result['docid'] = docid
+    //     setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
+    //       console.log("buffer document created");
+    //     }).catch(err => {
+    //       console.log(err);
+    //     })
+    //   }
+    // });
   }
 
   moveMenuSearchQuery: string = '';
