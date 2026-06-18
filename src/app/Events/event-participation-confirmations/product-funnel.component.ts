@@ -1,7 +1,7 @@
 import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp, updateDoc, setDoc
+  doc, getDoc, writeBatch, serverTimestamp, updateDoc, setDoc
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -30,7 +30,7 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
-type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended';
+type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'overallRequested';
 
 interface ImportPreviewRow { name: string; email: string; }
 
@@ -163,11 +163,25 @@ export class ProductFunnelComponent implements OnInit {
   segment: SegmentKey = 'eligible';
   searchText = '';
   financeFilter = 'all';
+  // Sub-filter on the Potential segment by subscription (clicking the Active / Non-Active chips).
+  subFilter: 'all' | 'active' | 'non' = 'all';
   selection = new SelectionModel<PRow>(true, []);
 
   counts: Record<SegmentKey, number> = {
-    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0
+    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, overallRequested: 0
   };
+
+  // Everyone who ever raised their hand for this event. `requested` excludes the approved
+  // cohort (see loadData), so this is a clean total, not a double-count.
+  get overallRequested(): number { return this.counts.requested + this.counts.approved; }
+
+  // Potential split by subscription. Active = subscriptionend in the future; Non-Active = expired or none.
+  // Sourced from event_stats when the rollup has it, else an owner-set eager scan guarded by a size cap.
+  potentialActive: number | null = null;
+  potentialNonActive: number | null = null;
+  potentialSplitState: 'idle' | 'loading' | 'ready' | 'deferred' = 'idle';
+  private readonly POTENTIAL_SPLIT_MAX = 800;
+  private potentialOwnerIds: string[] = [];
 
   // owner email → row, and active-queue profile ids — used by bulk import categorisation
   private ownerByEmail = new Map<string, PRow>();
@@ -211,6 +225,9 @@ export class ProductFunnelComponent implements OnInit {
   async loadData() {
     this.loading = true;
     this.loadError = false;
+    this.potentialActive = null;
+    this.potentialNonActive = null;
+    this.potentialSplitState = 'idle';
     const arena = this.arena;
     try {
       const [ownSnap, eprSnap, scanSnap] = await Promise.all([
@@ -331,8 +348,13 @@ export class ProductFunnelComponent implements OnInit {
         approved: cohort.size,
         attended: rows.filter(r => r.attended).length,
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
-        unattended: rows.filter(r => r.isUnattended).length
+        unattended: rows.filter(r => r.isUnattended).length,
+        overallRequested: requestedData.size + cohort.size
       };
+
+      // Subscription split of the potential pool — non-blocking; fills in after the funnel renders.
+      this.potentialOwnerIds = [...owners.keys()];
+      this.computePotentialSplit(arena, this.potentialOwnerIds);
 
       this.deliverySetList = await this.loadDeliverySets(arena);
       await this.loadVariations(arena);
@@ -349,6 +371,60 @@ export class ProductFunnelComponent implements OnInit {
   }
 
   retry() { this.loadData(); }
+
+  // Tally the potential pool into Active / Non-Active by subscription.
+  // 1) Prefer the rollup's precomputed counts on event_stats. 2) Else eager-scan participant
+  // metadata for every owner — but only when under POTENTIAL_SPLIT_MAX, else defer to a button.
+  async computePotentialSplit(arena: any, ownerIds: string[], force = false) {
+    try {
+      const statsSnap = await getDoc(doc(this.firestore, 'event_stats', arena['docid']));
+      if (statsSnap.exists()) {
+        const s: any = statsSnap.data();
+        if (s['potentialActive'] != null && s['potentialNonActive'] != null) {
+          this.potentialActive = s['potentialActive'];
+          this.potentialNonActive = s['potentialNonActive'];
+          this.potentialSplitState = 'ready';
+          return;
+        }
+      }
+    } catch { /* no event_stats yet / not readable — fall back to the eager scan */ }
+
+    if (!ownerIds.length) {
+      this.potentialActive = 0; this.potentialNonActive = 0; this.potentialSplitState = 'ready'; return;
+    }
+    if (ownerIds.length > this.POTENTIAL_SPLIT_MAX && !force) {
+      this.potentialSplitState = 'deferred';
+      return;
+    }
+
+    this.potentialSplitState = 'loading';
+    const now = Date.now();
+    try {
+      const chunks: string[][] = [];
+      for (let i = 0; i < ownerIds.length; i += 10) chunks.push(ownerIds.slice(i, i + 10));
+      const snaps = await Promise.all(chunks.map(c =>
+        getDocs(query(collection(this.firestore, 'participant metadata'), where('profileid', 'in', c)))));
+      const subEndByPid = new Map<string, number>();
+      snaps.forEach(snap => snap.docs.forEach(d => {
+        const x = d.data();
+        if (x['profileid']) subEndByPid.set(x['profileid'], this.toMillis(x['subscriptionend']));
+      }));
+      let active = 0, nonActive = 0;
+      ownerIds.forEach(pid => {
+        const end = subEndByPid.get(pid) ?? 0;
+        if (end && end >= now) active++; else nonActive++;
+      });
+      this.potentialActive = active;
+      this.potentialNonActive = nonActive;
+      this.potentialSplitState = 'ready';
+    } catch (e) {
+      console.log('potential split load failed', e);
+      this.potentialSplitState = 'idle';
+    }
+  }
+
+  // On-demand trigger for products above the auto-scan cap.
+  showPotentialSplit() { this.computePotentialSplit(this.arena, this.potentialOwnerIds, true); }
 
   private async loadDeliverySets(arena: any): Promise<any[]> {
     const snap = await getDocs(query(collection(this.firestore, 'productToDeliverySequence'),
@@ -404,15 +480,33 @@ export class ProductFunnelComponent implements OnInit {
 
   private refreshMeta() {
     this.loadMeta(this.pagedRows);
-    if (this.financeFilter !== 'all') this.loadMeta(this.segmentMembers());
+    if (this.financeFilter !== 'all' || this.subFilter !== 'all') this.loadMeta(this.segmentMembers());
   }
 
   // ---- Segments ----
   setSegment(s: SegmentKey) {
     this.segment = s;
+    this.subFilter = 'all';
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
+  }
+
+  // Filter the Potential segment by subscription. Clicking the lit chip again clears it.
+  setSubFilter(f: 'active' | 'non') {
+    this.segment = 'potential';
+    this.subFilter = this.subFilter === f ? 'all' : f;
+    this.pageIndex = 0;
+    this.defaultSelection();
+    this.refreshMeta();
+  }
+
+  // True unless a subscription sub-filter is excluding this row. Only meaningful on Potential,
+  // and only decisive once the row's meta is loaded (so the table fills in as loadMeta resolves).
+  private subMatches(r: PRow): boolean {
+    if (this.subFilter === 'all' || this.segment !== 'potential') return true;
+    if (!r.metaLoaded) return false;
+    return this.subFilter === 'active' ? r.subActive : !r.subActive;
   }
 
   private inSegment(r: PRow): boolean {
@@ -427,6 +521,7 @@ export class ProductFunnelComponent implements OnInit {
       case 'attended': return r.attended;
       case 'noShow': return r.attendanceState === 'no_show';
       case 'unattended': return r.isUnattended;
+      case 'overallRequested': return r.isRequested || r.isApproved;
     }
     return false;
   }
@@ -444,7 +539,7 @@ export class ProductFunnelComponent implements OnInit {
   }
 
   get segmentRows(): PRow[] {
-    return this.segmentMembers().filter(r => this.financeMatches(r));
+    return this.segmentMembers().filter(r => this.financeMatches(r) && this.subMatches(r));
   }
 
   get pagedRows(): PRow[] {
@@ -452,7 +547,7 @@ export class ProductFunnelComponent implements OnInit {
     return this.segmentRows.slice(start, start + this.pageSize);
   }
 
-  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.searchText.trim().length > 0; }
+  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.searchText.trim().length > 0 || this.subFilter !== 'all'; }
 
   onPage(e: PageEvent) { this.pageIndex = e.pageIndex; this.pageSize = e.pageSize; this.refreshMeta(); }
   onSearch() { this.pageIndex = 0; this.refreshMeta(); }
@@ -494,6 +589,17 @@ export class ProductFunnelComponent implements OnInit {
   // ---- Display helpers ----
   formatMonthYear(ms: number): string {
     return ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '';
+  }
+  // Compact money for the table (Indian scale): 5000 -> 5K, 122000 -> 1.2L, 25000000 -> 2.5Cr.
+  shortAmount(v: any): string {
+    const n = +(v || 0);
+    if (!n) return '0';
+    const abs = Math.abs(n);
+    const fmt = (x: number, unit: number) => (x / unit).toFixed(abs % unit === 0 ? 0 : 1).replace(/\.0$/, '');
+    if (abs >= 1e7) return fmt(n, 1e7) + 'Cr';
+    if (abs >= 1e5) return fmt(n, 1e5) + 'L';
+    if (abs >= 1e3) return fmt(n, 1e3) + 'K';
+    return String(n);
   }
   financeDotClass(f: string): string {
     const n = (f || '').toLowerCase().replace('fullypaid', 'fully paid').replace(/\s+/g, ' ').trim();

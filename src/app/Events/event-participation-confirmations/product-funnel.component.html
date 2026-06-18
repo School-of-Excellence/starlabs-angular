@@ -22,17 +22,49 @@
 
     <!-- Grouped breakdown: bold total row + indented rows that are subsets of it -->
     <div class="sx-bd">
-      <div class="sx-bd-panel" *ngFor="let p of funnelTree">
-        <div class="sx-bd-about">{{ p.about }}</div>
-        <button *ngFor="let r of p.rows" type="button"
-          class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key].cls }}"
-          [class.on]="segment===r.key" [attr.aria-pressed]="segment===r.key"
-          [matTooltip]="cardMap[r.key].tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
-          <span class="sx-bd-dot"></span>
-          <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
-          <span class="sx-bd-bar"><span class="sx-bd-fill" [style.width.%]="barPct(r.key, p.total)"></span></span>
-          <span class="sx-bd-pct">{{ barPct(r.key, p.total) }}%</span>
-          <span class="sx-bd-num">{{ counts[r.key] | number }}</span>
+      <div class="sx-bd-stack" *ngFor="let p of funnelTree">
+        <div class="sx-bd-panel">
+          <div class="sx-bd-about">{{ p.about }}</div>
+          <ng-container *ngFor="let r of p.rows">
+            <button type="button"
+              class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key].cls }}"
+              [class.on]="segment===r.key" [attr.aria-pressed]="segment===r.key"
+              [matTooltip]="cardMap[r.key].tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
+              <span class="sx-bd-dot"></span>
+              <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
+              <span class="sx-bd-bar"><span class="sx-bd-fill" [style.width.%]="barPct(r.key, p.total)"></span></span>
+              <span class="sx-bd-pct">{{ barPct(r.key, p.total) }}%</span>
+              <span class="sx-bd-num">{{ counts[r.key] | number }}</span>
+            </button>
+
+            <!-- Subscription split of the potential pool, directly under the Potential card -->
+            <div class="sx-pot-split" *ngIf="r.key === 'potential'" [ngSwitch]="potentialSplitState">
+              <span *ngSwitchCase="'loading'" class="sx-pot-load"><mat-icon class="spin">progress_activity</mat-icon> subscription…</span>
+              <button *ngSwitchCase="'deferred'" type="button" class="sx-pot-more" (click)="showPotentialSplit()">Show subscription split</button>
+              <ng-container *ngSwitchCase="'ready'">
+                <button type="button" class="sx-pot-chip act" [class.on]="segment==='potential' && subFilter==='active'"
+                  (click)="setSubFilter('active')" matTooltipClass="sx-tip" matTooltip="Show only active-subscription participants in the table">
+                  Active <b>{{ potentialActive | number }}</b>
+                </button>
+                <button type="button" class="sx-pot-chip non" [class.on]="segment==='potential' && subFilter==='non'"
+                  (click)="setSubFilter('non')" matTooltipClass="sx-tip" matTooltip="Show only non-active-subscription participants in the table">
+                  Non-Active <b>{{ potentialNonActive | number }}</b>
+                </button>
+              </ng-container>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- Overall requested = still-requested + approved — its own clickable card below the Approved card -->
+        <button type="button" class="sx-overall-card" *ngIf="p.total === 'approved'"
+          [class.on]="segment==='overallRequested'" (click)="setSegment('overallRequested')"
+          matTooltip="Show everyone who raised their hand: still-requested + approved" matTooltipClass="sx-tip">
+          <span class="sx-oc-dot"></span>
+          <div class="sx-oc-text">
+            <div class="sx-oc-lab">Overall requested</div>
+            <div class="sx-oc-hint">requested + approved</div>
+          </div>
+          <div class="sx-oc-num">{{ overallRequested | number }}</div>
         </button>
       </div>
     </div>
@@ -58,11 +90,6 @@
           [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
           <mat-icon>check</mat-icon> Approve {{ readyCount }}
         </button>
-        <button mat-stroked-button class="sx-ghost" (click)="importParticipants()"
-          matTooltipClass="sx-tip" matTooltip="Import an Excel of name + email to initiate owners in bulk (non-requesters included)">
-          <mat-icon>upload_file</mat-icon> Import
-        </button>
-        <button mat-button class="sx-mark" (click)="downloadSampleExcel()">Sample</button>
         <span class="sx-hint" *ngIf="approveDisabledReason()">{{ approveDisabledReason() }}</span>
       </ng-container>
 
@@ -123,6 +150,7 @@
             <th>Current journey</th>
             <th>Subscription</th>
             <th>Finance</th>
+            <th>Paid</th>
             <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
           </tr>
         </thead>
@@ -170,6 +198,17 @@
               </span>
             </td>
             <td>
+              <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+              <span *ngIf="row.metaLoaded && row.metaError" class="sx-warn-i" matTooltip="Couldn't load" matTooltipClass="sx-tip" aria-label="Couldn't load" role="img"><mat-icon aria-hidden="true">warning</mat-icon></span>
+              <span *ngIf="row.metaLoaded && !row.metaError" class="sx-paid"
+                [matTooltip]="(row.purchaseValue || row.paid) ? ((+(row.paid||0)) | number) + ' / ' + ((+(row.purchaseValue||0)) | number) + ' paid' : ''" matTooltipClass="sx-tip">
+                <ng-container *ngIf="row.purchaseValue || row.paid; else dashPaid">
+                  {{ shortAmount(row.paid) }}<span class="tot"> / {{ shortAmount(row.purchaseValue) }}</span>
+                </ng-container>
+                <ng-template #dashPaid><span class="sx-mut">—</span></ng-template>
+              </span>
+            </td>
+            <td>
               <!-- Reason (no product / in queue) -->
               <ng-container *ngIf="segment==='noProduct' || segment==='inQueue'">
                 <span class="sx-reason" [class.sx-reason-mut]="segment==='inQueue'">{{ row.reason }}</span>
@@ -192,12 +231,13 @@
               </span>
               <!-- Status (other segments) -->
               <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && segment!=='unattended' && selectionMode!=='attend'">
-                {{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}
+                <ng-container *ngIf="segment==='overallRequested'; else stdStatus">{{ row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested' }}</ng-container>
+                <ng-template #stdStatus>{{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
               </span>
             </td>
           </tr>
           <tr *ngIf="segmentRows.length === 0">
-            <td [attr.colspan]="showSelect ? 7 : 6" class="sx-empty">
+            <td [attr.colspan]="showSelect ? 8 : 7" class="sx-empty">
               {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
               <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; onFinance()">Clear filter</button>
             </td>
