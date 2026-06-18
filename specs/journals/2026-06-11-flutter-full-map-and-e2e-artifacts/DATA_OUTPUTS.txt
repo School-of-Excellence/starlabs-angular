@@ -1,0 +1,184 @@
+# DATA_OUTPUTS — 200-user "sample journey" cohort recon (production fir-sample-aae4a, READ-ONLY, 2026-06-11)
+#
+# All probes are READ-ONLY (.get()/.count().get()/.where().limit().get() only). No writes, no deploys.
+# PII redacted (field NAMES + value TYPES/safe examples only — never real emails/names).
+# Harness: ~/solarcode/starlabs-svstats/  SA: ~/solarcode/serviceAccountKeyProduction.json
+# Probe sources are in this same dir (jb_probe1..5) and pasted into JOURNEY-DATA-BLUEPRINT.md appendix.
+
+================================================================================
+## jb_probe1_purchase.js — the purchase / journey-entry data model
+================================================================================
+profile_data (sample 5) — participantmode is the LIVE mode field; currentjourney* are undefined (dead, TD-003).
+  values seen: participantmode ∈ {"Journey Planning Mode","Early Preparation Mode","Journey Priority Planning Mode","Event Mode"}
+  key fields: profileid (==doc id), email, name, number, countrycode, role_ref->users_roles, user_ref->user_data (sometimes null), profileimg
+  NB currentjourney / currentjourneyref = undefined on all 5 (confirmed dead per validated/01).
+
+participantjourneyproduct (sample 5) — the PURCHASE RECORD OF TRUTH. FULL field shape:
+  profileid (str) | journeyref (ref->journey) | journeystatus (str: initiated/completed/upgraded/...) | journeytype (str:"new")
+  onboarded (bool) | onboardedby (array) | onboardedtime (ts) | onboardingreport(log) | orientationstatus (str)
+  participantproducts (array[6..17]) | productref (array, mirrors participantproducts) | paymentplan (str: enach-icici/manual)
+  purchaseref (ref->journeyproductpurchase) | salesleadsref (ref->salesleads) | salesperson (str)
+  subscriptionstart (ts = t0) | subscriptionend (ts) | purchasedate (ts) | opportunities (array)
+  optional: appointmentid (str), onboardingscheduled (ts), onreschedule (bool), updated (ts), generalnotes (array)
+
+participantsproduct (sample 5) — the DELIVERY/ENROLLMENT unit. FULL field shape:
+  profileid (str) | productref (ref->products) | packageref (ref->package) | status (str: cancelled/completed/shifted/null/ongoing/initiated)
+  mode (str|null) | nextmode (null) | nextmodedate (null) | deliverymode (str: "Big Mode"/"Event Mode"/"Installation Event Mode")
+  deliveryplanning (str:"normal") | deliverytype (str|null: "BiG Arena"/"Winning Heart") | minimumpayment (str|number)
+  sequenceorder (number) | statusdate (object — a MODE-PROGRESSION TRAIL: {journeyplanningmode,initiated,ongoing,preparationmode,cancelled})
+  subscriptionstart/end (ts) | unlimited (bool) | journeyref (null on all — product is journey-attributed via the PJP, not here)
+  EVENT-LINK fields (present when the product is an event/queue delivery):
+    eventref (ref->event collection OR ref->queue generation)  <-- can point at EITHER
+    arenaeventid (str) | eventparticipationid (str) | queuevariationid (str) | instantiated (str:"done")
+  NOTE the "shifted" status appears here too (one sample had status:"shifted").
+
+journeyproductpurchase (sample 5) — per-purchase, carries the Watson cross-key + the SHIFT/UPGRADE label:
+  profileid (str) | journeyref (ref->journey) | participantjourneyproductref (ref->participantjourneyproduct) | productref (array)
+  purchasetype (str:"journey") | watsonpurchaseid (str, 100%) | watsonpurchaselabel (str)
+  watsonpurchaselabel SAMPLES: "uP! Accelerate", "CTD to uP!", "FTM to BiG upgrade", "CPM upgrade to BiG", "Health Explorative"
+  ^ the "<A> to <B>" / "... upgrade" wording is where a SHIFT/UPGRADE is literally spelled out.
+
+JOIN walk (one real profileid from a PJP): profileid vQcPNOyqhRqH0Q7qAKv2
+  -> 1 participantjourneyproduct (journeyref->journey, journeystatus="initiated", onboarded=true, purchaseref->journeyproductpurchase, participantproducts=array[6])
+  -> 6 participantsproduct
+  => JOIN KEYS: profileid links profile_data<->PJP<->PSP; journeyref(ref)->journey; purchaseref(ref)->journeyproductpurchase; participantproducts[](ids) enumerate the PSP delivery units.
+
+counts: profile_data=3265 | participantjourneyproduct=5168 | participantsproduct=41234 | journeyproductpurchase=5162
+
+================================================================================
+## jb_probe2_shift.js — journey SHIFT/UPGRADE + multi-journey fraction
+================================================================================
+participantjourneyproduct journeystatus distribution (5168 docs):
+  {"initiated":439,"completed":1538,"upgraded":1127,"cancelled":520,"ongoing":818,"downgraded":344,"(none)":344,"shifted":38}
+
+multi-journey fraction (per profileid; 3258 distinct profiles with a PJP):
+  profiles with >1 PJP (any):            1078  (33%)
+  profiles with >1 DISTINCT journeyref:   944  (29%)
+  profiles with a "shifted" PJP:           35
+  profiles with an "upgraded" PJP:        784
+  PJPs flagged onreschedule:true:         186
+
+journeyproductpurchase.watsonpurchaselabel (5162 docs):
+  labels with a "<A> to <B>" transition shape: 1104
+  labels containing "upgrade":                  521
+  sample transition labels: ["CTD to uP!","FTM to BiG upgrade","CPM upgrade to BiG","uP! to CPM","CTD to FTM upgrade",
+    "uP! to FTM upgrade","BiG to BiG Continuity","CPM to BiG upgrade","uP! to BiG upgrade","CTD to BiG Upgrade"]
+
+participantsproduct.status distribution (41234 docs):
+  {"cancelled":11281,"completed":15335,"shifted":589,"(none)":12664,"ongoing":1330,"initiated":35}
+  with mode set: 28904 | with nextmode set: 2116 | with multi-key statusdate (mode-progression trail): 19983
+
+participantsproduct PER profileid (3258 profiles): min=1 p25=3 median=8 p75=17 p90=30 max=79
+  => real users accrue MANY delivery units; a median real user has ~8 participantsproduct.
+
+=> SHIFT/UPGRADE MANIFESTS as: (1) participantjourneyproduct.journeystatus ∈ {upgraded(1127),shifted(38),downgraded(344)};
+   (2) a NEW journeyproductpurchase whose watsonpurchaselabel is "<A> to <B>"/"... upgrade" (1104 transition labels);
+   (3) participantsproduct.status="shifted" (589); (4) PJP.onreschedule:true (186).
+   ~33% of real profiles carry >1 journey purchase (the "shifted/upgraded" population).
+
+================================================================================
+## jb_probe3_events.js — events-attended-per-profileid distribution
+================================================================================
+event participation request (15782) status: {"attended":7136,"unattended":3846,"approved":1704,"requested":3089,"initiated":4,"denied":3}
+
+REQUESTS per profileid (3072 distinct profiles registered for >=1 event):
+  min=1 p25=1 median=2 p75=6 p90=13 max=56
+
+ATTENDED events per profileid:
+  over ALL 3072 registered profiles:           min=0 p25=0 median=1 p75=3 p90=6 max=35
+  over the 1617 profiles who attended >=1:      min=1 p25=1 median=2 p75=5 p90=12 max=35
+  profiles attending >=4 events: 569 (19% of registered)
+
+sample ATTENDED event participation request docs (the "attended" shape):
+  EPR: doccreateddate(ts) | docid(str) | eventdate(ts) | eventref(ref->event collection) | eventtyperef(ref->delivery events)
+       | journeyref(null) | productref(ref->products) | profileid(str) | status="attended"
+  EPR (queue-origin): arenaeventid(str) | eventref(ref->queue generation) | initiatedfrom(str) | participantproductid(str)
+       | productref(ref->products) | profileid(str) | status="attended"
+  => an ATTENDED event = an `event participation request` with status:"attended" + eventref(->event collection OR queue generation)
+     + productref + (optional eventtyperef->delivery events / arenaeventid / participantproductid).
+
+event rsvp (8766) participantresponse: {"yes":8045,"no":596,"(null)":125} | type: {"queue":5194,"event":3572}
+  distinct profiles with an rsvp: 1345
+  sample rsvp keys: arenaeventid, docid, eventref, eventtyperef, message, participantresponse, productref, profileid, teamresponse, type, updated
+
+events_profiles sample keys: event_ref, eventrequest, profile_ref, pseudo_name, token
+arena e-ticket sample keys: active, createddate, docid, eventenddate, eventparticipationref, eventref, eventstartdate, producteligible, profileid
+event collection sample keys: address, addtocalendar, arenaeventidlist, atcmodel, bigdescription, bigmarathonref, description, end_date, event_id, hosts, image, lastregistrationdate, name, notifyparticipants, start_date, venue
+event collection count: 97
+
+=> REAL median attended is only 1 (all registered) / 2 (active attenders); just 19% attend >=4.
+   To make a SYNTHETIC MEDIAN user attend >=4, the cohort must seed ABOVE the real median (test-fixture target, NOT prod-realistic).
+
+================================================================================
+## jb_probe4_delivery.js — the delivery chain field shapes
+================================================================================
+queue_token (count 7541) — sample shape:
+  profile_id(str) | profileid? | profile_name(str) | queueref(ref->queue generation) | productref(ref->products) | productname(str)
+  currentstage(str) | previousstage(str) | stagestatus(str) | tokenstatus(str) | tokennumber(num) | queueposition(num) | variationid(str)
+  deliveryRef(ref->deliverables) | formref(ref->formsByClient) | participantproductid(str) | liveassignmentid(null) | people_involved(array)
+  createdon(ts) | logdate(ts) | status(null) | studioid(null) | preassigned(obj) | (stage-specific person/mentoring/shadowing nulls)
+
+participantdeliverysequence (count 3310) — doc id == profileid:
+  top keys: products, profileid
+  products[] each: {participantproductid, productref, delivery[]}
+  delivery[] each: {type, status, sequenceref(ref->deliverables)}
+  delivery type/status seen across ONE real doc:
+    {"queue/completed":1,"event/completed":1,"form/completed":2,"appointment/ready":8,"appointment/completed":6,
+     "form/ready":2,"report/ready":2}
+  => the per-participant DELIVERY LADDER. types: queue | event | form | appointment | report | fieldwork.
+
+deliverables (count 31883) — the leaf delivery item:
+  profileid(str) | type(str) | status(str: completed/ongoing/ready/null) | fileref(array — ->queue_token|appointments|EPR)
+  deliveryref(ref-> appointmenttype | delivery queue | ...) | participantproductid(str) | participantjourneyid(str)
+  status dist (1500-sample): {"completed":924,"(none)":298,"ongoing":106,"ready":172}
+  type   dist (1500-sample): {"appointment":561,"queue":505,"event":360,"fieldwork":30,"form":39,"report":5}
+
+appointments — sample shape (matches validated/05):
+  appointment(ref->appointmenttype) | appointmentrole(array) | hostRole(obj keyed by eisroles/<id>) | hosts(array) | bookedby(ref->profile_data)
+  starttime/endtime(ts) | appointmentstart/end(ts) | attended(bool) | cancelled(bool) | cancelledon/reason | totalminutes(num)
+  participantproductid(str) | slotdata(array) | created(ts) | zoomurl/zoomid/zoompassword(str) | (jc/onboarding: journeycoach,onboarding,journeyid,loggedid,participantjourneyproductid)
+
+availability — top: id,starttime,endtime,profileref,appointments,weeklyhours ; + one key PER appointment-type-id holding a slot array
+  (32 appt-type slot keys on the sampled doc).
+
+queue generation (count 96) — top keys:
+  arenaeventidlist, availabilitygivenby, created, description, docid, enablezoommeetingsdk, lastregistrationdate, modified,
+  queueadmin, queuedmessage, queueenddate, queuementor, queuename, queuestartdate, queuetargetcapacity, queuevariation,
+  queuewelcometemplate, stagegroup, stageproperty, stages, totalcapacity, venue, waitingmessage, zoomlinkrequired
+
+================================================================================
+## jb_probe5_content.js — content consumption + journey progression
+================================================================================
+content analytics (count 286960) — the per-video watch log:
+  profileid(str) | videoid(str) | videoname | type(str: solarvoice/eiflixcontent/generalcontent) | from(str) | playlistid(str)
+  status(str: "complete"/"watching"/"incomplete"/null) | totaltimespend(num) | totalruntime(num) | lastwatchedtime(str) | logdate(ts)
+  status dist (1000-sample): {"complete":235,"(none)":758,"watching":1,"incomplete":6}
+  type/platform dist: {"solarvoice":423,"eiflixcontent":149,"generalcontent":108,"eiflix":73,"Eiflixweb":9,TV-types small}
+
+participant content analytics (count 1197) — doc id == profileid; arrays keyed by content type:
+  {solarvoice:array, eiflixcontent:array, generalcontent:array}
+
+productconsumptionlog (count 2180): profileid | journeyref(ref) | productref(ref) | journeylogid | deliverysequence(array) | usagelog(array) | productstatus
+recommended mix playlist (count 9958): profileid | type(solarvoice) | bufferdocref(ref->buffermix archive) | list(array) | title | personalised
+
+participant mode checklist (count 29480) — the per-product mode checklist:
+  profileid(str) | mode(str e.g. "Integration Mode"/"Extended Performance Mode") | productref(ref->products) | participantproductid(str)
+  aelid(str|null) | createddate(ts) | widget(array[3..4])
+
+accelerated evolution level (count 11) — CONFIG ladder (reference): {startpoint,endpoint,sequence}
+  e.g. seq9 Taste of Legendary->Legendary, seq10 Legendary->Greater Legendary
+participant AEL (count 3580) — RUNTIME evolution record:
+  profileid | atcmodel(str:"uP!") | status(str:"completed") | evolutiontype(str:"full") | crossovermetric(obj{Health,Personal Genius,Family,Career,Business})
+  evolutionyearsaved/wasted(num) | productref(array) | tentativestart/end(ts) | arenaevents(array)
+
+modes catalog (15, ordered by sequence) — the list the mode engine rolls up (lowest sequence wins):
+  [Big Mode(0), Installation Event Mode(1), Event Mode(2), Integration Mode(3), Priority Mode(4), Preparation Mode(5),
+   Performance Mode(6), Journey Priority Planning Mode(7), Extended Performance Mode(8), Early Preparation Mode(9),
+   Journey Planning Mode(10), Exploration Mode(11), After Extended Performance Mode(12), Snooze Mode(13), Investment Mode(14)]
+
+participant metadata (count 3328) — the CQRS projection (rebuilt by participantmetadata.js). Key fields:
+  profileid | participantmode(str) | activejourney(journeyId str) | activejourneyname | lastcompletedjourney | higherorderpurchase
+  customerstatus(active/non active) | financialstatus | pp_totalpaid(str) | pp_totalpurchasevalue(str) | paymentplan
+  activeproduct/consumedproducts/unconsumedproducts(arrays) | productmode(array) | productcount(obj) | productevent/queueevent(obj)
+  solarvoice/generalcontent(obj) | purchase(array) | profiletags(array) | tier(array) | lasttouchpoint(obj) | firebaseuserref(ref->user_data)
+  evolutionyearsaved/wasted | totaladjustmentaware/unaware | completedael/currentael(arrays)

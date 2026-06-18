@@ -1,0 +1,200 @@
+[
+  {
+    "route": "addjourney",
+    "file": "src/app/Product Designer/addjourney/addjourney.component.ts",
+    "exists": true,
+    "reads": [{"c": "journey", "line": 74}],
+    "writes": [{"c": "journey", "line": 124}],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionData(query(journey, orderBy sequence)) read at L75; writeBatch L122, doc(afs,'journey',item.id) L124, batch.update sequence/updatedAt L125."
+  },
+  {
+    "route": "addpackage",
+    "file": "src/app/Product Designer/addpackage/addpackage.component.ts",
+    "exists": true,
+    "reads": [{"c": "package", "line": 72}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. collectionData(package,{idField:id}) at L73. Commented-out onSnapshot at L77."
+  },
+  {
+    "route": "packagedesign",
+    "file": "src/app/Product Designer/package-design/package-design.component.ts",
+    "exists": true,
+    "reads": [{"c": "journey", "line": 64}, {"c": "package design", "line": 79}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only despite importing setDoc/updateDoc/writeBatch/getDocs (unused). collectionData(journey, query) L64-66; collectionData('package design',{idField:id}) L79-80."
+  },
+  {
+    "route": "atcmodel",
+    "file": "src/app/Product Designer/product-atcmodel/view-atcmodel/view-atcmodel.component.ts",
+    "exists": true,
+    "reads": [{"c": "atc model", "line": 43}, {"c": "content_urls", "line": 49}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc model"],
+    "notes": "Read-only. collectionData(query('atc model', orderBy atcmodel),{idField:id}) L44; getDocs(content_urls) L50. 'atc model' is reference-only config per CLAUDE.md (safe), not operational ATC data."
+  },
+  {
+    "route": "journeyproductmap",
+    "file": "src/app/Product Designer/journey-product/journey-product/journey-product.component.ts",
+    "exists": true,
+    "reads": [{"c": "products", "line": 48}, {"c": "journey", "line": 57}, {"c": "journey-to-product", "line": 63}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. collectionSnapshots on products L49, journey L58, journey-to-product L64."
+  },
+  {
+    "route": "createaelnames",
+    "file": "src/app/Product Designer/create-ael-names/create-ael-names.component.ts",
+    "exists": true,
+    "reads": [{"c": "accelerated evolution level", "line": 40}],
+    "writes": [{"c": "accelerated evolution level", "line": 74}, {"c": "accelerated evolution level", "line": 93}],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionData('accelerated evolution level',{idField:id}) read L41 (new id generated L37/L78/L97). setDoc(merge) to 'accelerated evolution level/{docId}' L71+L74; deleteDoc L90+L93."
+  },
+  {
+    "route": "addproduct",
+    "file": "src/app/Product Designer/add-product/add-product.component.ts",
+    "exists": true,
+    "reads": [{"c": "products", "line": 66}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only in component. productsRef defined L50; collectionData(query(products, orderBy product),{idField:id}) read L66-68. Adds done via dialog (AddProductComponent/UpdateProductComponent) not in this file."
+  },
+  {
+    "route": "viewproductmodeplaylist",
+    "file": "src/app/Product Designer/view-product-mode-playlist/view-product-mode-playlist.component.ts",
+    "exists": true,
+    "reads": [{"c": "product mode playlist", "line": 47}, {"c": "products", "line": 63}, {"c": "series", "line": 64}, {"c": "solar voice playlist", "line": 65}, {"c": "content_urls", "line": 66}],
+    "writes": [{"c": "product mode playlist", "line": 143}],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionData('product mode playlist',{idField:id}) L48. getDocs on products L69, series L79, 'solar voice playlist' L89, content_urls L99. setDoc(merge) to 'product mode playlist' doc L141/L143 (new doc id from productmodeplaylistRef L136)."
+  },
+  {
+    "route": "productdelivery",
+    "file": "src/app/Product Designer/product-delivery/product-delivery.component.ts",
+    "exists": true,
+    "reads": [{"c": "products", "line": 50}, {"c": "appointmenttype", "line": 59}, {"c": "delivery forms", "line": 72}, {"c": "delivery report", "line": 85}, {"c": "delivery events", "line": 98}, {"c": "delivery queue", "line": 111}, {"c": "delivery fieldwork", "line": 124}, {"c": "productToDeliverySequence", "line": 139}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. Eight collection refs read (collectionData per source). Collections: products, appointmenttype, 'delivery forms', 'delivery report', 'delivery events', 'delivery queue', 'delivery fieldwork', productToDeliverySequence."
+  },
+  {
+    "route": "deliverysequence",
+    "file": "src/app/Product Designer/delivery-sequence/delivery-sequence.component.ts",
+    "exists": true,
+    "reads": [{"c": "productToDeliverySequence", "line": 61}, {"c": "products", "line": 95}, {"c": "productToDeliverySequence", "line": 97}, {"c": "appointmenttype", "line": 134}, {"c": "delivery forms", "line": 153}, {"c": "delivery report", "line": 172}, {"c": "delivery events", "line": 191}, {"c": "delivery queue", "line": 210}, {"c": "delivery fieldwork", "line": 229}],
+    "writes": [{"c": "productToDeliverySequence", "line": 302}],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "getDoc(productToDeliverySequence/{this.data}) L61-62; getDocs(productToDeliverySequence) L109. collectionData reads on products, appointmenttype, 'delivery forms', 'delivery report', 'delivery events', 'delivery queue', 'delivery fieldwork'. setDoc to productToDeliverySequence doc L300+L302 (id = this.data or new id L298); stores doc-refs into 'product' (L289) and 'activity' (L294) fields."
+  },
+  {
+    "route": "deliveryactivities",
+    "file": "src/app/Product Designer/delivery-set/delivery-set.component.ts",
+    "exists": true,
+    "reads": [{"c": "appointmenttype", "line": 53}, {"c": "delivery forms", "line": 71}, {"c": "delivery report", "line": 89}, {"c": "delivery events", "line": 103}, {"c": "delivery queue", "line": 118}, {"c": "delivery fieldwork", "line": 146}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. collectionData(query,{idField:docid}) on appointmenttype L55, 'delivery forms' L73, 'delivery report' L91, 'delivery events' L105, 'delivery queue' L120, 'delivery fieldwork' L148. Edits delegated to UpdateDeliveryComponent dialog (not this file)."
+  },
+  {
+    "route": "formtemplate",
+    "file": "src/app/Product Designer/delivery-set/formtemplate/formtemplate.component.ts",
+    "exists": true,
+    "reads": [{"c": "delivery forms", "line": 171}, {"c": "queue generation", "line": 292}, {"c": "queue_token", "line": 300}, {"c": "queue variation", "line": 573}, {"c": "queue generation", "line": 553}, {"c": "temporary_forms", "line": 856}],
+    "writes": [{"c": "formsByClient", "line": 597}, {"c": "temporary_forms", "line": 602}, {"c": "queue_token", "line": 646}, {"c": "queue stage log", "line": 654}, {"c": "formsByClient log", "line": 687}, {"c": "temporary_forms", "line": 814}],
+    "services": [],
+    "dynamic": [{"c": "queryParams['patchdata'] or formsByClient path", "line": 205}, {"c": "queryParams['data'] doc path (updateDoc status/fileref)", "line": 609}, {"c": "patchDataPath getDoc + setDoc(merge)", "line": 681}],
+    "atc": [],
+    "notes": "READS: getDoc('delivery forms'/{id}) L171-172; getDoc(queue generation/{queueId}) L292-293 & L553; collection(queue_token)+getDocs(query) L300/L309; getDoc(queue variation/{variationId}) L573-574; collection(temporary_forms)+getDocs(draftQuery) L856/L863. Dynamic read via doc(firestore, queryParams['patchdata'] ?? formsByClient path) L204-205. WRITES: draft id from temporary_forms L122; setDoc(formsByClient/{docid}) L596-597; deleteDoc(temporary_forms/{draftDocid}) L601-602; updateDoc on dynamic queryParams['data'] path (status:completed, fileref arrayUnion) L609-610; updateDoc(queue_token/{docid}) L645-646; setDoc(queue stage log/{newId}) L649-654; setDoc('formsByClient log'/{draftDocid}) L686-687; setDoc to existing formsByClient doc(patchDataPath) merge L753; setDoc(temporary_forms/{draftDocid}) merge L812-814."
+  },
+  {
+    "route": "monitorliveassignment",
+    "file": "src/app/OpenVidu/monitor-liveassignment/monitor-liveassignment.component.ts",
+    "exists": true,
+    "reads": [{"c": "openviduroom", "line": 75}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. collectionData(query(openviduroom, ...)) L75-77. The .update()/.delete() calls (L143-160) are on JS signal Maps for LiveKit tracks, not Firestore."
+  },
+  {
+    "route": "joinroom/:roomid",
+    "file": "src/app/OpenVidu/join-openvidu-call/join-openvidu-call.component.ts",
+    "exists": true,
+    "reads": [{"c": "openviduroom", "line": 210}, {"c": "openviduCallQuality", "line": 1356}],
+    "writes": [{"c": "openviduCallQuality", "line": 1377}, {"c": "openviduCallQuality", "line": 1572}, {"c": "openviduCallQuality", "line": 1592}],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "docData(doc(openviduroom,{id})) live read L210. collection(openviduCallQuality)+getDocs(q) L1356-1359. setDoc(openviduCallQuality/{qualityDocumentId}) L1377; updateDoc same doc L1571-1572 and L1592. LiveKit/OpenVidu media handled separately (not Firestore)."
+  },
+  {
+    "route": "participantstudio",
+    "file": "src/app/OpenVidu/list-openvidu-room/list-openvidu-room.component.ts",
+    "exists": true,
+    "reads": [{"c": "live assignment", "line": 55}, {"c": "queue studio pairing", "line": 65}, {"c": "profile_data", "line": 89}, {"c": "openviduroom", "line": 123}, {"c": "appointments", "line": 182}],
+    "writes": [{"c": "openviduroom", "line": 158}],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionData('live assignment') L55-58; collectionData('queue studio pairing') L65-67; getDocs(query(profile_data, where profileid in sublist)) L89; getDoc(doc(openviduroom,{docid})) L123-125; collectionData(query(appointments, where bookedby == doc(profile_data,{id}))) L182-194. WRITE: updateDoc(openviduroom doc, {active:true}) L158 (a setDoc was commented out L154)."
+  },
+  {
+    "route": "openvidurecordings",
+    "file": "src/app/OpenVidu/openvidu-recording/openvidu-recording.component.ts",
+    "exists": true,
+    "reads": [{"c": "openviduroom", "line": 89}, {"c": "openvidu event", "line": 124}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. collectionData(query(openviduroom,...)) L89-92; collection('openvidu event')+getDocs(eventQuery) L124-130. Commented-out setDoc at L237."
+  },
+  {
+    "route": "routeconfiguration",
+    "file": "src/app/route-configuration-duplicate/route-configuration.component.ts",
+    "exists": true,
+    "reads": [{"c": "dashboard", "line": 97}],
+    "writes": [{"c": "dashboard", "line": 210}, {"c": "dashboard", "line": 293}],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionSnapshots(collection(firestore,'dashboard')) read L97-98. updateDoc(doc(dashboard,{parentItem.docid}), {order...}) L208-210; deleteDoc(doc(dashboard,{element.docid})) L292-293."
+  },
+  {
+    "route": "appointment-dashboard",
+    "file": "src/app/appointment-dashboard/appointment-dashboard.component.ts",
+    "exists": true,
+    "reads": [{"c": "products", "line": 107}, {"c": "productToDeliverySequence", "line": 115}, {"c": "AppointmentType-To-Roles", "line": 204}, {"c": "Roles-To-EIS", "line": 223}, {"c": "availability", "line": 362}],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. getDocs(query(products,...)) L105-107; getDocs(query(productToDeliverySequence,...)) L113-115; getDoc(item.activityRef) L146 (dynamic doc-ref read). getDocs(query('AppointmentType-To-Roles', where assigned_appttype_ref == doc('appointmenttype/{id}'))) L204-211; getDocs(query('Roles-To-EIS', where assigned_role_ref == doc(role))) L223-228; getDocs(query('availability', where profileref/appointments...)) L360-364. Many doc(firestore, eisprofile) calls L479+ are ref-id parsing (.id), not collection reads. References appointmenttype path L207/L364."
+  }
+]

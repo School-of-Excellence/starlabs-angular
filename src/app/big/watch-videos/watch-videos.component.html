@@ -116,7 +116,7 @@
     </div>
     <div class="vd-footer-btns">
       <button mat-stroked-button class="vd-btn-secondary" (click)="closeDialog()">Close</button>
-      <button mat-flat-button class="vd-btn-primary" [disabled]="!allCompleted" (click)="completeAssignment()">
+      <button mat-flat-button class="vd-btn-primary" [disabled]="!allCompleted" (click)="completeAssignment()" data-testid="watchvideos-complete">
         <mat-icon>check</mat-icon>
         Complete assignment
       </button>

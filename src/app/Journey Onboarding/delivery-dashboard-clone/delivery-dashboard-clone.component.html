@@ -246,119 +246,139 @@
                   class="dd-meta-pulse-inline"></span> Live</span>
             </div>
           </div>
-          <div class="dd-products">
 
-            <!-- Column header row -->
-            <div class="dd-prow-colhead" aria-hidden="true">
-              <div class="dd-prow-colhead__cell">Product</div>
-              <div class="dd-prow-colhead__cell">Eligible</div>
-              <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
-                <span class="dd-colhead__grp-lbl">Participants</span>
-                <div class="dd-colhead__grp-tags">
-                  <span>Total</span><span>Not Elig.</span><span>Purch.</span><span>Bonus</span>
-                </div>
+          <!-- Column header row -->
+          <div class="dd-prow-colhead" aria-hidden="true">
+            <div class="dd-prow-colhead__cell">Product</div>
+            <div class="dd-prow-colhead__cell">uP! Confirmed</div>
+            <div class="dd-prow-colhead__cell">Eligible</div>
+            <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
+              <span class="dd-colhead__grp-lbl">Participants</span>
+              <div class="dd-colhead__grp-tags">
+                <span>Total</span><span>Not Elig.</span><span>Purch.</span><span>Bonus</span>
               </div>
-              <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
-                <span class="dd-colhead__grp-lbl">Journey Funnel</span>
-                <div class="dd-colhead__grp-tags">
-                  <span>Init</span><span>Await</span><span>Started</span><span>Ongoing</span><span>Done</span>
-                </div>
+            </div>
+            <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
+              <span class="dd-colhead__grp-lbl">Journey Funnel</span>
+              <div class="dd-colhead__grp-tags">
+                <span>Init</span><span>Await</span><span>Started</span><span>Ongoing</span><span>Done</span>
               </div>
-              <div class="dd-prow-colhead__cell">Avg. Time</div>
-              <div class="dd-prow-colhead__cell">Status</div>
+            </div>
+            <div class="dd-prow-colhead__cell">Avg. Time</div>
+            <div class="dd-prow-colhead__cell">Status</div>
+          </div>
+
+          <article class="dd-prow" *ngFor="let cardId of visibleCardIds; let i = index; trackBy: trackByCardId">
+
+            <!-- 1. Product -->
+            <div class="dd-prow__id">
+              <span class="dd-prow__dot" [ngClass]="productDotClass(i)"></span>
+              <div class="dd-prow__name-block"
+                [title]="getCardName(cardId) + (getCardSubNames(cardId).length > 0 ? '\n' + getCardSubNames(cardId).join(' · ') : '')">
+                <span class="dd-prow__name">{{ getCardName(cardId) }}</span>
+                <span class="dd-prow__sub" *ngIf="getCardSubNames(cardId).length > 0">{{
+                  getCardSubNames(cardId).join(' · ') }}</span>
+              </div>
             </div>
 
-            <article class="dd-prow" *ngFor="let cardId of visibleCardIds; let i = index; trackBy: trackByCardId">
-              <div class="dd-prow__id">
-                <span class="dd-prow__dot" [ngClass]="productDotClass(i)"></span>
-                <div class="dd-prow__name-block"
-                  [title]="getCardName(cardId) + (getCardSubNames(cardId).length > 0 ? '\n' + getCardSubNames(cardId).join(' · ') : '')">
-                  <span class="dd-prow__name">{{ getCardName(cardId) }}</span>
-                  <span class="dd-prow__sub" *ngIf="getCardSubNames(cardId).length > 0">{{
-                    getCardSubNames(cardId).join(' · ') }}</span>
-                </div>
+            <!-- 2. UP Confirmed -->
+            <div class="dd-prow__upconfirmed" (click)="openUPConfirmedModal(cardId)">
+              <span class="dd-upconfirmed-count">
+                {{ getUPConfirmedCount(cardId) }}
+              </span>
+            </div>
+
+            <!-- 3. Eligible -->
+            <div class="dd-prow__hero" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
+              <span class="dd-prow__hero-num" [class.zero]="getCardGroupedFiltered(cardId).length === 0">{{
+                getCardGroupedFiltered(cardId).length | number }}</span>
+              <span class="dd-prow__hero-lbl">Eligible</span>
+            </div>
+
+            <!-- 4. Participants chips -->
+            <div class="dd-prow__chips">
+              <div class="dd-prow__chip" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
+                <span class="dd-prow__chip-num">{{ getCardGroupedAll(cardId).length | number }}</span>
+                <span class="dd-prow__chip-lbl">Overall</span>
               </div>
-              <div class="dd-prow__hero" (click)="openCardModal(cardId, 'filtered'); $event.stopPropagation()">
-                <span class="dd-prow__hero-num" [class.zero]="getCardGroupedFiltered(cardId).length === 0">{{
-                  getCardGroupedFiltered(cardId).length | number }}</span>
-                <span class="dd-prow__hero-lbl">Eligible</span>
+              <div class="dd-prow__chip" (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
+                <span class="dd-prow__chip-num" [class.zero]="getCardGroupedNotEligible(cardId).length === 0"
+                  [class.alert]="getCardGroupedNotEligible(cardId).length > 0">{{
+                  getCardGroupedNotEligible(cardId).length | number }}</span>
+                <span class="dd-prow__chip-lbl">Not Elig.</span>
               </div>
-              <div class="dd-prow__chips">
-                <div class="dd-prow__chip" (click)="openCardModal(cardId, 'all'); $event.stopPropagation()">
-                  <span class="dd-prow__chip-num">{{ getCardGroupedAll(cardId).length | number }}</span>
-                  <span class="dd-prow__chip-lbl">Overall</span>
-                </div>
-                <div class="dd-prow__chip" (click)="openCardModal(cardId, 'noteligible'); $event.stopPropagation()">
-                  <span class="dd-prow__chip-num" [class.zero]="getCardGroupedNotEligible(cardId).length === 0"
-                    [class.alert]="getCardGroupedNotEligible(cardId).length > 0">{{
-                    getCardGroupedNotEligible(cardId).length | number }}</span>
-                  <span class="dd-prow__chip-lbl">Not Elig.</span>
-                </div>
-                <div class="dd-prow__chip" (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
-                  <span class="dd-prow__chip-num" [class.zero]="getCardGroupedPurchased(cardId).length === 0">{{
-                    getCardGroupedPurchased(cardId).length | number }}</span>
-                  <span class="dd-prow__chip-lbl">Purch.</span>
-                </div>
-                <div class="dd-prow__chip" (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
-                  <span class="dd-prow__chip-num" [class.zero]="getCardGroupedBonus(cardId).length === 0">{{
-                    getCardGroupedBonus(cardId).length | number }}</span>
-                  <span class="dd-prow__chip-lbl">Bonus</span>
-                </div>
+              <div class="dd-prow__chip" (click)="openCardModal(cardId, 'purchased'); $event.stopPropagation()">
+                <span class="dd-prow__chip-num" [class.zero]="getCardGroupedPurchased(cardId).length === 0">{{
+                  getCardGroupedPurchased(cardId).length | number }}</span>
+                <span class="dd-prow__chip-lbl">Purch.</span>
               </div>
-              <div class="dd-prow__funnel">
-                <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
-                  <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).initiated.length === 0">{{
-                    getCardFunnel(cardId).initiated.length }}</span>
-                  <span class="dd-fstep__lbl">Init</span>
-                </div>
-                <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
-                  <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{
-                    getCardFunnel(cardId).awaiting.length | number }}</span>
-                  <span class="dd-fstep__lbl">Await</span>
-                </div>
-                <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'started', $event)">
-                  <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).started.length === 0">{{
-                    getCardFunnel(cardId).started.length }}</span>
-                  <span class="dd-fstep__lbl">Started</span>
-                </div>
-                <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
-                  <span class="dd-fstep__pill" [class.empty]="(getCardFunnel(cardId).ongoing?.length || 0) === 0">{{
-                    getCardFunnel(cardId).ongoing?.length || 0 }}</span>
-                  <span class="dd-fstep__lbl">Ongoing</span>
-                </div>
-                <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'completed', $event)">
-                  <span class="dd-fstep__pill done" [class.empty]="getCardFunnel(cardId).completed.length === 0">{{
-                    getCardFunnel(cardId).completed.length }}</span>
-                  <span class="dd-fstep__lbl">Done</span>
-                </div>
+              <div class="dd-prow__chip" (click)="openCardModal(cardId, 'bonus'); $event.stopPropagation()">
+                <span class="dd-prow__chip-num" [class.zero]="getCardGroupedBonus(cardId).length === 0">{{
+                  getCardGroupedBonus(cardId).length | number }}</span>
+                <span class="dd-prow__chip-lbl">Bonus</span>
               </div>
-              <div class="dd-prow__time">
-                <div class="dd-ts" (click)="openCardAvgModal(cardId, 'initToStart', $event)">
-                  <span class="dd-ts__lbl">Init &rarr; Start</span>
-                  <span class="dd-ts__val" [class.zero]="getCardAvgInitToStart(cardId) === 0">{{
-                    getCardAvgInitToStart(cardId) }}<span class="u">d</span></span>
-                </div>
-                <div class="dd-ts" (click)="openCardAvgModal(cardId, 'startToComplete', $event)">
-                  <span class="dd-ts__lbl">Start &rarr; Done</span>
-                  <span class="dd-ts__val" [class.zero]="getCardAvgStartToComplete(cardId) === 0">{{
-                    getCardAvgStartToComplete(cardId) }}<span class="u">d</span></span>
-                </div>
+            </div>
+
+            <!-- 5. Journey Funnel -->
+            <div class="dd-prow__funnel">
+              <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
+                <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).initiated.length === 0">{{
+                  getCardFunnel(cardId).initiated.length }}</span>
+                <span class="dd-fstep__lbl">Init</span>
               </div>
-              <div class="dd-prow__status">
-                <button class="dd-statbadge dd-statbadge--active" type="button"
-                  [class.dd-statbadge--zero]="(getCardFunnel(cardId).ongoing?.length || 0) === 0"
-                  (click)="openCardFunnelModal(cardId, 'ongoing', $event); $event.stopPropagation()">
-                  <span class="dd-statbadge__count">{{ getCardFunnel(cardId).ongoing?.length || 0 }}</span>
-                  <span class="dd-statbadge__lbl">Ongoing</span>
-                </button>
-                <div class="dd-statbadge dd-statbadge--ended"
-                  [class.dd-statbadge--zero]="getCardNonActiveSub(cardId) === 0">
-                  <span class="dd-statbadge__count">{{ getCardNonActiveSub(cardId) }}</span>
-                  <span class="dd-statbadge__lbl">Sub. Ended</span>
-                </div>
+              <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
+                <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{
+                  getCardFunnel(cardId).awaiting.length | number }}</span>
+                <span class="dd-fstep__lbl">Await</span>
               </div>
-            </article>
-          </div>
+              <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'started', $event)">
+                <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).started.length === 0">{{
+                  getCardFunnel(cardId).started.length }}</span>
+                <span class="dd-fstep__lbl">Started</span>
+              </div>
+              <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'ongoing', $event)">
+                <span class="dd-fstep__pill" [class.empty]="(getCardFunnel(cardId).ongoing?.length || 0) === 0">{{
+                  getCardFunnel(cardId).ongoing?.length || 0 }}</span>
+                <span class="dd-fstep__lbl">Ongoing</span>
+              </div>
+              <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'completed', $event)">
+                <span class="dd-fstep__pill done" [class.empty]="getCardFunnel(cardId).completed.length === 0">{{
+                  getCardFunnel(cardId).completed.length }}</span>
+                <span class="dd-fstep__lbl">Done</span>
+              </div>
+            </div>
+
+            <!-- 6. Avg Time -->
+            <div class="dd-prow__time">
+              <div class="dd-ts" (click)="openCardAvgModal(cardId, 'initToStart', $event)">
+                <span class="dd-ts__lbl">Init → Start</span>
+                <span class="dd-ts__val" [class.zero]="getCardAvgInitToStart(cardId) === 0">{{
+                  getCardAvgInitToStart(cardId) }}<span class="u">d</span></span>
+              </div>
+              <div class="dd-ts" (click)="openCardAvgModal(cardId, 'startToComplete', $event)">
+                <span class="dd-ts__lbl">Start → Done</span>
+                <span class="dd-ts__val" [class.zero]="getCardAvgStartToComplete(cardId) === 0">{{
+                  getCardAvgStartToComplete(cardId) }}<span class="u">d</span></span>
+              </div>
+            </div>
+
+            <!-- 7. Status -->
+            <div class="dd-prow__status">
+              <button class="dd-statbadge dd-statbadge--active" type="button"
+                [class.dd-statbadge--zero]="(getCardFunnel(cardId).ongoing?.length || 0) === 0"
+                (click)="openCardFunnelModal(cardId, 'ongoing', $event); $event.stopPropagation()">
+                <span class="dd-statbadge__count">{{ getCardFunnel(cardId).ongoing?.length || 0 }}</span>
+                <span class="dd-statbadge__lbl">Ongoing</span>
+              </button>
+              <button class="dd-statbadge dd-statbadge--ended" type="button"
+                [class.dd-statbadge--zero]="getCardGroupedNonActive(cardId).length === 0"
+                (click)="openCardModal(cardId, 'nonactive'); $event.stopPropagation()">
+                <span class="dd-statbadge__count">{{ getCardGroupedNonActive(cardId).length | number }}</span>
+                <span class="dd-statbadge__lbl">Sub. Ended</span>
+              </button>
+            </div>
+
+          </article>
 
           <!-- ========== HIDDEN PRODUCTS TOGGLE ========== -->
           <div class="show-more-row" *ngIf="hiddenCardIds.length > 0">
@@ -407,6 +427,9 @@
                 </button>
               </div>
 
+              <ng-template #noParticipants>
+                <h6>No DFU participants found</h6>
+              </ng-template>
               <div class="funnel-section">
                 <div class="section-label">Journey Funnel</div>
                 <div class="funnel-bars">
@@ -518,15 +541,17 @@
                     <span class="participant-name">{{ mapMetaData[pid]?.['name'] || pid }}</span>
                     <span class="product-count">{{ currentGroupedByProfile[pid]?.length }} products</span>
                   </div>
-                  <div class="profile-products">
+
+                  <div class="profile-products flex-direction-column">
                     <div class="product-tag" *ngFor="let item of currentGroupedByProfile[pid]">
                       <span>{{ mapProductName[item['productref']?.id] || 'Unknown' }}</span>
                       <span class="status-tag" [ngClass]="item['status']?.toLowerCase() || 'na'">{{ item['status'] ||
                         'N/A'
                         }}</span>
                       <span *ngIf="!isParticipantEligible(pid, item)">
+                        <span class="fw-bold">Reason: </span>
                         <span>
-                          <span class="fw-bold">Mode: </span>
+                          <span class="fw-bold text-muted">Mode: </span>
                           <span>{{ mapMetaData[pid]?.['participantmode'] || pid }}</span>
                         </span>
                         <span class="ps-2"
@@ -537,7 +562,17 @@
                             }}</span>
                         </span>
                       </span>
-                      <button class="dd-initiate-btn" (click)="initiateProduct(pid)" *ngIf="!item['status']">
+                      <span class="ps-2" *ngIf="isSubscriptionEnded(item)">
+                        <span class="fw-bold text-danger">
+                          Subscription Ended:
+                        </span>
+
+                        <span class="text-muted">
+                          {{ (item['subscriptionend']?.toDate?.() || item['subscriptionend']) | date:'dd MMM yyyy' }}
+                        </span>
+                      </span>
+                      <button class="dd-initiate-btn" (click)="initiateProduct(pid)"
+                        *ngIf="!item['status'] && !isSubscriptionEnded(item)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                           <polygon points="5 3 19 12 5 21 5 3" />
@@ -681,6 +716,50 @@
                 </table>
                 <div class="no-data" *ngIf="avgModalDetails.length === 0">No participants have both dates recorded.
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-overlay" *ngIf="upConfirmedModalOpen" (click)="closeUPConfirmedModal()">
+
+            <div class="modal-content" (click)="$event.stopPropagation()">
+
+              <div class="modal-header">
+                <h3>{{ selectedUPConfirmedProduct }}</h3>
+
+                <span class="modal-count">
+                  {{ selectedUPConfirmedParticipants.length }}
+                  Participants
+                </span>
+                <button class="modal-export-btn" (click)="exportUPConfirmedParticipants()">Export</button>
+                <button class="modal-close" (click)="closeUPConfirmedModal()">
+                  ✕
+                </button>
+              </div>
+
+              <div class="modal-body">
+                <table class="avg-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Participant</th>
+                      <th>Product</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let p of selectedUPConfirmedParticipants; let i=index">
+                      <td>{{ i + 1 }}</td>
+                      <td style="cursor: pointer; text-decoration: underline;" (click)="openParticipant(p.profileid)">
+                        {{ mapMetaData[p.profileid]?.['name'] }}
+                      </td>
+                      <td>
+                        <span *ngFor="let productId of p.matchedDFUProducts; let last = last">
+                          {{ mapProductName[productId] }}<span *ngIf="!last">, </span>
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -947,6 +1026,9 @@
                                 <div class="detail-stage-label text-muted">
                                   {{ appointment?.appointmentTypeName || appointment?.formname || 'Appointment' }}
                                 </div>
+                                <!-- <div *ngIf="appointment?.appointmentTypeName" class="detail-stage-label text-muted">
+                                  Specialist: {{ mapMetaData[(appointment.hosts[0]?.path || appointment.hosts[0]).split('/').pop()]?.name || '—' }}
+                                </div> -->
                                 <div *ngIf="appointment?.starttime">
                                   <span class="detail-stage-label">Start: </span>
                                   <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
@@ -1543,6 +1625,24 @@
                       current period</p>
                   </div>
                 </header>
+
+                <div class="spec-field spec-field--activity mt-3">
+                  <span class="spec-field-label">Delivery Activity</span>
+                  <div class="spec-input-wrap pt-2">
+                    <select class="spec-input spec-select border" [(ngModel)]="selectedActivity"
+                      (ngModelChange)="onActivityChange($event)">
+                      <option [ngValue]="null" disabled>Select activity</option>
+                      <option *ngFor="let activity of specialistSequences" [ngValue]="activity.appointmentTypeId">
+                        {{ activity.appointmentType }}
+                      </option>
+                    </select>
+                    <svg class="spec-input-chevron" width="16" height="16" fill="none" stroke="currentColor"
+                      stroke-width="2" viewBox="0 0 24 24">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                </div>
+
                 <!-- Loading state while specialistData is being fetched -->
                 <div class="spec-util-loading" *ngIf="specialistLoading">
                   <div class="specialist-loading-spinner"></div>

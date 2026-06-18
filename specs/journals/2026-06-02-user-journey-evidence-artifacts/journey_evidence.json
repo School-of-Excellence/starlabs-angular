@@ -1,0 +1,3068 @@
+{
+  "journeys": [
+    {
+      "journey": "uP!",
+      "participants": 1696,
+      "participantsWithAppts": 720,
+      "apptEvents": 4039,
+      "status": {
+        "completed": 424,
+        "initiated": 125,
+        "cancelled": 295,
+        "upgraded": 394,
+        "ongoing": 378,
+        "downgraded": 63,
+        "shifted": 17
+      },
+      "stages": [
+        {
+          "stage": "Journey Onboarding",
+          "n": 258,
+          "medMonth": 0.25634780434795834,
+          "attendedPct": 70
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 355,
+          "medMonth": 0.38623339173601984,
+          "attendedPct": 69
+        },
+        {
+          "stage": "Excellence Installation Starter Pack",
+          "n": 23,
+          "medMonth": 1.4949457900636345,
+          "attendedPct": 83
+        },
+        {
+          "stage": "EI Starter Pack Clarity Call",
+          "n": 10,
+          "medMonth": 1.871162908894851,
+          "attendedPct": 70
+        },
+        {
+          "stage": "Starter Pack",
+          "n": 4,
+          "medMonth": 2.3341334240932374,
+          "attendedPct": 50
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 83,
+          "medMonth": 2.728325606003918,
+          "attendedPct": 99
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 149,
+          "medMonth": 3.4155270492650995,
+          "attendedPct": 74
+        },
+        {
+          "stage": "CTD Orientation",
+          "n": 1,
+          "medMonth": 3.902792082253492,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Review",
+          "n": 21,
+          "medMonth": 3.933767458829148,
+          "attendedPct": 95
+        },
+        {
+          "stage": "uP! ATC Completion Review",
+          "n": 27,
+          "medMonth": 4.002088478168954,
+          "attendedPct": 78
+        },
+        {
+          "stage": "CTD Diagnostics",
+          "n": 3,
+          "medMonth": 4.070471670514552,
+          "attendedPct": 67
+        },
+        {
+          "stage": "SMP Diagnostics ",
+          "n": 2,
+          "medMonth": 4.130047065112912,
+          "attendedPct": 50
+        },
+        {
+          "stage": "SMP Review",
+          "n": 1,
+          "medMonth": 4.231339224552246,
+          "attendedPct": 100
+        },
+        {
+          "stage": "SMP Implementation",
+          "n": 2,
+          "medMonth": 4.2503315044471215,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Custom Solutions Implementation",
+          "n": 7,
+          "medMonth": 4.284431967334039,
+          "attendedPct": 71
+        },
+        {
+          "stage": "Custom Solutions Diagnostics",
+          "n": 4,
+          "medMonth": 4.2960095067862705,
+          "attendedPct": 75
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 94,
+          "medMonth": 4.445963771132951,
+          "attendedPct": 70
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 57,
+          "medMonth": 4.455486202365309,
+          "attendedPct": 77
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 490,
+          "medMonth": 4.680313731931669,
+          "attendedPct": 73
+        },
+        {
+          "stage": "uP! ATC completion",
+          "n": 17,
+          "medMonth": 4.916665616482941,
+          "attendedPct": 76
+        },
+        {
+          "stage": "EI Extra Hour for Diagnostics",
+          "n": 1,
+          "medMonth": 5.058342139363411,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 39,
+          "medMonth": 5.96391809023215,
+          "attendedPct": 74
+        },
+        {
+          "stage": "SMP ATC Orientation",
+          "n": 2,
+          "medMonth": 6.646440527738234,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Review",
+          "n": 4,
+          "medMonth": 7.2910326286988365,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 56,
+          "medMonth": 7.5503723171265875,
+          "attendedPct": 77
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 387,
+          "medMonth": 7.5821363812995815,
+          "attendedPct": 78
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 72,
+          "medMonth": 7.85003629160431,
+          "attendedPct": 82
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 86,
+          "medMonth": 7.851480566848262,
+          "attendedPct": 74
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 72,
+          "medMonth": 7.869275135398416,
+          "attendedPct": 60
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 42,
+          "medMonth": 8.068361959585037,
+          "attendedPct": 88
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 55,
+          "medMonth": 8.36378794995924,
+          "attendedPct": 91
+        },
+        {
+          "stage": "CTD Implementation",
+          "n": 10,
+          "medMonth": 8.593788961740156,
+          "attendedPct": 90
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 43,
+          "medMonth": 9.274392247043364,
+          "attendedPct": 79
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 103,
+          "medMonth": 9.289603725984938,
+          "attendedPct": 80
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 10,
+          "medMonth": 9.34830814717477,
+          "attendedPct": 80
+        },
+        {
+          "stage": "SMP Pre Video Log",
+          "n": 2,
+          "medMonth": 9.731917980727113,
+          "attendedPct": 50
+        },
+        {
+          "stage": "CTD Implementation Appointment",
+          "n": 2,
+          "medMonth": 9.920180131983988,
+          "attendedPct": 100
+        },
+        {
+          "stage": "uP! Review",
+          "n": 4,
+          "medMonth": 10.209034443706807,
+          "attendedPct": 75
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 847,
+          "medMonth": 10.273120322081692,
+          "attendedPct": 75
+        },
+        {
+          "stage": "Critical Support Mid Review",
+          "n": 13,
+          "medMonth": 11.67665900131406,
+          "attendedPct": 77
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 134,
+          "medMonth": 12.365091467884607,
+          "attendedPct": 79
+        },
+        {
+          "stage": "FTO Implementation",
+          "n": 4,
+          "medMonth": 15.127749142590767,
+          "attendedPct": 75
+        },
+        {
+          "stage": "Complimentary Implementation",
+          "n": 5,
+          "medMonth": 17.80141261498029,
+          "attendedPct": 80
+        },
+        {
+          "stage": "EI Extra Hour",
+          "n": 5,
+          "medMonth": 20.615410647691878,
+          "attendedPct": 80
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 34,
+          "medMonth": 20.71757016021956,
+          "attendedPct": 91
+        },
+        {
+          "stage": "EI Review",
+          "n": 46,
+          "medMonth": 22.913470276036342,
+          "attendedPct": 85
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 266,
+          "medMonth": 24.417227879982477,
+          "attendedPct": 76
+        },
+        {
+          "stage": "uP or FTM Journey",
+          "n": 4,
+          "medMonth": 24.997604577310558,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Review Implementation",
+          "n": 75,
+          "medMonth": 28.325531099430574,
+          "attendedPct": 77
+        },
+        {
+          "stage": "EIT Journey",
+          "n": 6,
+          "medMonth": 35.821493101182654,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Sales Accelerator Diagnostics",
+          "n": 2,
+          "medMonth": 48.57335468681559,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "CTD",
+      "participants": 709,
+      "participantsWithAppts": 16,
+      "apptEvents": 102,
+      "status": {
+        "upgraded": 177,
+        "cancelled": 67,
+        "completed": 452,
+        "ongoing": 1,
+        "downgraded": 7,
+        "shifted": 5
+      },
+      "stages": [
+        {
+          "stage": "CTD Orientation",
+          "n": 1,
+          "medMonth": 1.0375602277704774,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Excellence Installation Starter Pack",
+          "n": 2,
+          "medMonth": 1.8773419777674356,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Implementation Appointment",
+          "n": 1,
+          "medMonth": 1.9560337275514674,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 2,
+          "medMonth": 2.241699984524809,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 18,
+          "medMonth": 3.180021272304047,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Health Review",
+          "n": 1,
+          "medMonth": 4.152294130530004,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 3,
+          "medMonth": 4.489130272971724,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 5,
+          "medMonth": 5.655935173017959,
+          "attendedPct": 80
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 3,
+          "medMonth": 5.740961271718499,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 2,
+          "medMonth": 5.9798843820722,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 4,
+          "medMonth": 6.096430592057235,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 18,
+          "medMonth": 6.535819553949482,
+          "attendedPct": 78
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 17,
+          "medMonth": 6.8762319316688565,
+          "attendedPct": 71
+        },
+        {
+          "stage": "CTD Implementation",
+          "n": 1,
+          "medMonth": 6.9528274154986125,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 2,
+          "medMonth": 7.454566816323551,
+          "attendedPct": 50
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 1,
+          "medMonth": 7.473034384581691,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 6,
+          "medMonth": 7.6181285589137095,
+          "attendedPct": 67
+        },
+        {
+          "stage": "A&H Review Implementation",
+          "n": 1,
+          "medMonth": 8.614624397722295,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Review",
+          "n": 2,
+          "medMonth": 9.180409160058343,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 1,
+          "medMonth": 9.24154073587385,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 3,
+          "medMonth": 10.883089684625492,
+          "attendedPct": 67
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 1,
+          "medMonth": 16.540735873850196,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 4,
+          "medMonth": 17.1101620674551,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Review",
+          "n": 3,
+          "medMonth": 17.239514892685065,
+          "attendedPct": 67
+        }
+      ]
+    },
+    {
+      "journey": "B!G",
+      "participants": 618,
+      "participantsWithAppts": 180,
+      "apptEvents": 1734,
+      "status": {
+        "completed": 87,
+        "upgraded": 191,
+        "initiated": 34,
+        "ongoing": 127,
+        "downgraded": 131,
+        "cancelled": 43,
+        "shifted": 5
+      },
+      "stages": [
+        {
+          "stage": "Journey Coaching",
+          "n": 67,
+          "medMonth": 0.46926981698970655,
+          "attendedPct": 72
+        },
+        {
+          "stage": "Journey Onboarding",
+          "n": 54,
+          "medMonth": 0.4934570740254052,
+          "attendedPct": 65
+        },
+        {
+          "stage": "Excellence Installation Starter Pack",
+          "n": 1,
+          "medMonth": 1.1406422584501388,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Review",
+          "n": 1,
+          "medMonth": 1.7658371660096364,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 4,
+          "medMonth": 3.3935791059826252,
+          "attendedPct": 100
+        },
+        {
+          "stage": "uP! ATC completion",
+          "n": 8,
+          "medMonth": 3.9105879610618337,
+          "attendedPct": 88
+        },
+        {
+          "stage": "uP! ATC Completion Review",
+          "n": 5,
+          "medMonth": 4.41499553881041,
+          "attendedPct": 80
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 6,
+          "medMonth": 6.020723828296101,
+          "attendedPct": 83
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 9,
+          "medMonth": 6.141714699074074,
+          "attendedPct": 78
+        },
+        {
+          "stage": "Complimentary Implementation",
+          "n": 2,
+          "medMonth": 7.116458607095927,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 70,
+          "medMonth": 7.762584244734633,
+          "attendedPct": 66
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 7,
+          "medMonth": 9.121435950959993,
+          "attendedPct": 57
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 60,
+          "medMonth": 10.577844393342094,
+          "attendedPct": 82
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 109,
+          "medMonth": 10.66305300043802,
+          "attendedPct": 84
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 6,
+          "medMonth": 11.199553144543607,
+          "attendedPct": 83
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 8,
+          "medMonth": 13.532450138136042,
+          "attendedPct": 75
+        },
+        {
+          "stage": "EI Extra Hour for Diagnostics",
+          "n": 1,
+          "medMonth": 14.115199299167761,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 74,
+          "medMonth": 20.744804204042865,
+          "attendedPct": 80
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 2,
+          "medMonth": 21.857547634691198,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Mid Review",
+          "n": 4,
+          "medMonth": 22.947790718763688,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 62,
+          "medMonth": 25.6091217696014,
+          "attendedPct": 85
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 94,
+          "medMonth": 27.238351401664474,
+          "attendedPct": 59
+        },
+        {
+          "stage": "EIT Journey",
+          "n": 7,
+          "medMonth": 27.509718572054314,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 27,
+          "medMonth": 27.615117170389837,
+          "attendedPct": 81
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 31,
+          "medMonth": 27.926301198167614,
+          "attendedPct": 94
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 169,
+          "medMonth": 28.061350197109068,
+          "attendedPct": 82
+        },
+        {
+          "stage": "EI Review",
+          "n": 9,
+          "medMonth": 30.204911300919843,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Review Implementation",
+          "n": 21,
+          "medMonth": 36.86692400350416,
+          "attendedPct": 71
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 106,
+          "medMonth": 40.54424003504161,
+          "attendedPct": 76
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 644,
+          "medMonth": 41.62491787122208,
+          "attendedPct": 69
+        },
+        {
+          "stage": "EI Extra Hour",
+          "n": 1,
+          "medMonth": 49.01992991677617,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 52,
+          "medMonth": 64.86291338151554,
+          "attendedPct": 87
+        },
+        {
+          "stage": "A&H Expanding Horizon Implementation",
+          "n": 5,
+          "medMonth": 70.34603591765222,
+          "attendedPct": 60
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 8,
+          "medMonth": 83.01371550591327,
+          "attendedPct": 75
+        }
+      ]
+    },
+    {
+      "journey": "(unknown)",
+      "participants": 394,
+      "participantsWithAppts": 20,
+      "apptEvents": 87,
+      "status": {
+        "completed": 8,
+        "(none)": 344,
+        "cancelled": 9,
+        "ongoing": 12,
+        "upgraded": 1,
+        "initiated": 20
+      },
+      "stages": [
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 1,
+          "medMonth": 0.11224266316250547,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 1,
+          "medMonth": 0.17110162067455104,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 5,
+          "medMonth": 0.40722185720543147,
+          "attendedPct": 80
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 2,
+          "medMonth": 0.42532440867279897,
+          "attendedPct": 50
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 1,
+          "medMonth": 0.5618749087458023,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 1,
+          "medMonth": 0.6248403051540371,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 4,
+          "medMonth": 0.9568002628120894,
+          "attendedPct": 75
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 2,
+          "medMonth": 2.1198588002886676,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 40,
+          "medMonth": 2.7585003285151117,
+          "attendedPct": 75
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 16,
+          "medMonth": 4.283015768725361,
+          "attendedPct": 75
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 2,
+          "medMonth": 4.807955540954884,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Starter Pack",
+          "n": 4,
+          "medMonth": 5.1903676631625055,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 4,
+          "medMonth": 6.193878668418748,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 1,
+          "medMonth": 6.446424660534385,
+          "attendedPct": 100
+        },
+        {
+          "stage": "HPC Implementation",
+          "n": 2,
+          "medMonth": 8.762113994743757,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 1,
+          "medMonth": 24.323121988611476,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "FTM with SLD CI",
+      "participants": 258,
+      "participantsWithAppts": 77,
+      "apptEvents": 636,
+      "status": {
+        "upgraded": 102,
+        "completed": 89,
+        "ongoing": 7,
+        "cancelled": 22,
+        "initiated": 1,
+        "downgraded": 37
+      },
+      "stages": [
+        {
+          "stage": "Excellence Installation Starter Pack",
+          "n": 1,
+          "medMonth": 1.2112005630383997,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 17,
+          "medMonth": 4.55751597556821,
+          "attendedPct": 88
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 43,
+          "medMonth": 4.738830486202366,
+          "attendedPct": 77
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 26,
+          "medMonth": 5.723079277464471,
+          "attendedPct": 58
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 138,
+          "medMonth": 6.420075010950503,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 3,
+          "medMonth": 6.907714629872975,
+          "attendedPct": 67
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 26,
+          "medMonth": 7.247594717674721,
+          "attendedPct": 73
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 25,
+          "medMonth": 8.063677179150242,
+          "attendedPct": 60
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 32,
+          "medMonth": 8.176064380596923,
+          "attendedPct": 81
+        },
+        {
+          "stage": "Starter Pack",
+          "n": 1,
+          "medMonth": 8.94620924321373,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 17,
+          "medMonth": 8.99324572093858,
+          "attendedPct": 82
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 1,
+          "medMonth": 13.19189069876381,
+          "attendedPct": 0
+        },
+        {
+          "stage": "A&H Vitality Booster",
+          "n": 1,
+          "medMonth": 16.132630698824645,
+          "attendedPct": 0
+        },
+        {
+          "stage": "EI Review",
+          "n": 2,
+          "medMonth": 17.08376174308445,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 1,
+          "medMonth": 18.700038326763032,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Mid Review",
+          "n": 1,
+          "medMonth": 22.38146079719667,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 2,
+          "medMonth": 22.881670681851364,
+          "attendedPct": 50
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 4,
+          "medMonth": 23.670449153161044,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 4,
+          "medMonth": 25.702885457731057,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Health Implementation",
+          "n": 1,
+          "medMonth": 26.715807052124397,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 1,
+          "medMonth": 29.88187144108629,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 1,
+          "medMonth": 29.883924660534383,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 2,
+          "medMonth": 30.226127901883487,
+          "attendedPct": 0
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 140,
+          "medMonth": 30.719584975908894,
+          "attendedPct": 79
+        },
+        {
+          "stage": "uP or FTM Journey",
+          "n": 7,
+          "medMonth": 31.39098773543583,
+          "attendedPct": 86
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 30,
+          "medMonth": 31.81463534822602,
+          "attendedPct": 70
+        },
+        {
+          "stage": "Health Review",
+          "n": 2,
+          "medMonth": 34.30313731931669,
+          "attendedPct": 50
+        },
+        {
+          "stage": "A&H Review Implementation",
+          "n": 70,
+          "medMonth": 36.71977660972405,
+          "attendedPct": 81
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 21,
+          "medMonth": 38.41162943495401,
+          "attendedPct": 67
+        },
+        {
+          "stage": "EIT Journey",
+          "n": 13,
+          "medMonth": 39.79481493648708,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 3,
+          "medMonth": 49.520915462111255,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "B!G Continuity",
+      "participants": 233,
+      "participantsWithAppts": 54,
+      "apptEvents": 176,
+      "status": {
+        "ongoing": 115,
+        "initiated": 68,
+        "upgraded": 13,
+        "cancelled": 9,
+        "downgraded": 27,
+        "completed": 1
+      },
+      "stages": [
+        {
+          "stage": "Journey Onboarding",
+          "n": 24,
+          "medMonth": 0.6933037669732808,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 30,
+          "medMonth": 1.2668363994743759,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Critical Support Mid Review",
+          "n": 1,
+          "medMonth": 3.325531099430574,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 2,
+          "medMonth": 3.4973057198131112,
+          "attendedPct": 50
+        },
+        {
+          "stage": "EI Starter Pack Review",
+          "n": 2,
+          "medMonth": 6.232376533070521,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 4,
+          "medMonth": 6.606575777485764,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 7,
+          "medMonth": 8.965509629599211,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 11,
+          "medMonth": 9.388003723171266,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Review",
+          "n": 1,
+          "medMonth": 10.07651664476566,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 62,
+          "medMonth": 10.385653081197985,
+          "attendedPct": 84
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 7,
+          "medMonth": 11.08601620674551,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 2,
+          "medMonth": 11.666050700832237,
+          "attendedPct": 50
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 3,
+          "medMonth": 13.458295985271572,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 3,
+          "medMonth": 13.462060220926412,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 1,
+          "medMonth": 21.773023434077967,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 12,
+          "medMonth": 21.803821725799388,
+          "attendedPct": 83
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 2,
+          "medMonth": 22.305149474375824,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 2,
+          "medMonth": 23.099060994305738,
+          "attendedPct": 50
+        }
+      ]
+    },
+    {
+      "journey": "CPM",
+      "participants": 176,
+      "participantsWithAppts": 50,
+      "apptEvents": 264,
+      "status": {
+        "upgraded": 45,
+        "ongoing": 37,
+        "completed": 35,
+        "cancelled": 9,
+        "initiated": 23,
+        "downgraded": 27
+      },
+      "stages": [
+        {
+          "stage": "Journey Coaching",
+          "n": 19,
+          "medMonth": 0.4852667246130822,
+          "attendedPct": 58
+        },
+        {
+          "stage": "Journey Onboarding",
+          "n": 24,
+          "medMonth": 0.5229688214824548,
+          "attendedPct": 71
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 1,
+          "medMonth": 0.7105964374361221,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 1,
+          "medMonth": 0.7112808439188203,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 5,
+          "medMonth": 1.2613611476127902,
+          "attendedPct": 100
+        },
+        {
+          "stage": "uP! ATC completion",
+          "n": 2,
+          "medMonth": 2.695349948821604,
+          "attendedPct": 50
+        },
+        {
+          "stage": "uP! ATC Completion Review",
+          "n": 1,
+          "medMonth": 2.9420784858343065,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 70,
+          "medMonth": 3.1024145860709593,
+          "attendedPct": 74
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 4,
+          "medMonth": 3.8080376697328076,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 5,
+          "medMonth": 7.531893342093737,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 5,
+          "medMonth": 8.57342748599248,
+          "attendedPct": 60
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 6,
+          "medMonth": 10.45355835534841,
+          "attendedPct": 83
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 5,
+          "medMonth": 12.367567345597898,
+          "attendedPct": 80
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 21,
+          "medMonth": 13.675103117243394,
+          "attendedPct": 81
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 2,
+          "medMonth": 13.686352376373375,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 3,
+          "medMonth": 14.232209994159732,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 8,
+          "medMonth": 14.322916666666668,
+          "attendedPct": 75
+        },
+        {
+          "stage": "ATC Orientation Call",
+          "n": 2,
+          "medMonth": 15.859721351505087,
+          "attendedPct": 50
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 2,
+          "medMonth": 16.2584296065119,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 3,
+          "medMonth": 18.020422689443713,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 8,
+          "medMonth": 18.391713206307493,
+          "attendedPct": 75
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 43,
+          "medMonth": 18.871801540370857,
+          "attendedPct": 67
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 16,
+          "medMonth": 19.61577420061323,
+          "attendedPct": 81
+        },
+        {
+          "stage": "EI Review",
+          "n": 3,
+          "medMonth": 20.454172141918527,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 5,
+          "medMonth": 23.573445941013286,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "FTO",
+      "participants": 147,
+      "participantsWithAppts": 54,
+      "apptEvents": 449,
+      "status": {
+        "initiated": 52,
+        "completed": 45,
+        "cancelled": 5,
+        "ongoing": 31,
+        "upgraded": 14
+      },
+      "stages": [
+        {
+          "stage": "Health Implementation",
+          "n": 3,
+          "medMonth": -0.18821178274200615,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Breakthrough Implementation",
+          "n": 9,
+          "medMonth": -0.05817455102934735,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Video Log",
+          "n": 1,
+          "medMonth": 0.0015400001368812966,
+          "attendedPct": 100
+        },
+        {
+          "stage": "FTO Implementation",
+          "n": 1,
+          "medMonth": 0.09323339173601985,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Sales Accelerator Diagnostics",
+          "n": 9,
+          "medMonth": 0.09815189983635081,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Covid Support Implementation",
+          "n": 4,
+          "medMonth": 0.10266097240473061,
+          "attendedPct": 50
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 2,
+          "medMonth": 0.1992862860910352,
+          "attendedPct": 50
+        },
+        {
+          "stage": "Journey Onboarding",
+          "n": 2,
+          "medMonth": 0.2606927606143841,
+          "attendedPct": 50
+        },
+        {
+          "stage": "Health Review",
+          "n": 1,
+          "medMonth": 0.27034056066579065,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 41,
+          "medMonth": 1.4426452439833066,
+          "attendedPct": 76
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 4,
+          "medMonth": 1.4734435357047257,
+          "attendedPct": 25
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 8,
+          "medMonth": 1.4772182707253494,
+          "attendedPct": 63
+        },
+        {
+          "stage": "Excellence Installation Starter Pack",
+          "n": 1,
+          "medMonth": 2.662517624227381,
+          "attendedPct": 0
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 5,
+          "medMonth": 2.9148872098116514,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 1,
+          "medMonth": 3.0147716439747896,
+          "attendedPct": 0
+        },
+        {
+          "stage": "Complimentary Implementation",
+          "n": 1,
+          "medMonth": 3.3800695151664475,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 27,
+          "medMonth": 3.586974375821288,
+          "attendedPct": 89
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 34,
+          "medMonth": 4.591242345483829,
+          "attendedPct": 82
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 7,
+          "medMonth": 5.4595105124835746,
+          "attendedPct": 86
+        },
+        {
+          "stage": "Discovery and Implementation",
+          "n": 2,
+          "medMonth": 5.7083358470062535,
+          "attendedPct": 50
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 4,
+          "medMonth": 6.4953251717860265,
+          "attendedPct": 75
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 238,
+          "medMonth": 8.218397165264394,
+          "attendedPct": 68
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 1,
+          "medMonth": 8.453104467805518,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Review",
+          "n": 28,
+          "medMonth": 12.999923914151093,
+          "attendedPct": 82
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 1,
+          "medMonth": 19.09699408672799,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 7,
+          "medMonth": 20.60542597459483,
+          "attendedPct": 86
+        },
+        {
+          "stage": "EI Extra Hour for Diagnostics",
+          "n": 3,
+          "medMonth": 21.67603796174624,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Extra Hour",
+          "n": 1,
+          "medMonth": 22.189441921265878,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 1,
+          "medMonth": 23.269136005256243,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 1,
+          "medMonth": 23.430655935173018,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 1,
+          "medMonth": 23.465560665790626,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "FTM",
+      "participants": 127,
+      "participantsWithAppts": 51,
+      "apptEvents": 415,
+      "status": {
+        "upgraded": 43,
+        "ongoing": 22,
+        "cancelled": 10,
+        "downgraded": 28,
+        "completed": 11,
+        "initiated": 12,
+        "shifted": 1
+      },
+      "stages": [
+        {
+          "stage": "Journey Coaching",
+          "n": 26,
+          "medMonth": 0.4867079430315253,
+          "attendedPct": 73
+        },
+        {
+          "stage": "Journey Onboarding",
+          "n": 18,
+          "medMonth": 0.6614788655278143,
+          "attendedPct": 44
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 4,
+          "medMonth": 0.9837926689419381,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 1,
+          "medMonth": 1.2558858957512045,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 4,
+          "medMonth": 1.7618395671357132,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 4,
+          "medMonth": 1.9204445904511607,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Clarity Call",
+          "n": 2,
+          "medMonth": 2.464205540954884,
+          "attendedPct": 0
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 2,
+          "medMonth": 2.800303131996155,
+          "attendedPct": 0
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 13,
+          "medMonth": 2.8540028262185477,
+          "attendedPct": 62
+        },
+        {
+          "stage": "uP! ATC Completion Review",
+          "n": 2,
+          "medMonth": 3.6862895575540224,
+          "attendedPct": 50
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 24,
+          "medMonth": 3.8070110600087603,
+          "attendedPct": 83
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 15,
+          "medMonth": 3.9894053876478317,
+          "attendedPct": 73
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 1,
+          "medMonth": 4.703925755584757,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 14,
+          "medMonth": 5.1332197218572055,
+          "attendedPct": 93
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 128,
+          "medMonth": 5.730535479632063,
+          "attendedPct": 78
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 36,
+          "medMonth": 7.146914695575997,
+          "attendedPct": 81
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 10,
+          "medMonth": 7.949213706304448,
+          "attendedPct": 70
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 8,
+          "medMonth": 8.420252956636006,
+          "attendedPct": 88
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 20,
+          "medMonth": 8.48321835304424,
+          "attendedPct": 85
+        },
+        {
+          "stage": "Covid Support Implementation",
+          "n": 1,
+          "medMonth": 15.119223609286028,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 9,
+          "medMonth": 16.5776938239159,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Critical Support Mid Review",
+          "n": 1,
+          "medMonth": 17.26757555847569,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 56,
+          "medMonth": 18.527567893123084,
+          "attendedPct": 79
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 1,
+          "medMonth": 20.14824244415243,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 7,
+          "medMonth": 20.44595926412615,
+          "attendedPct": 86
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 8,
+          "medMonth": 25.51056723609286,
+          "attendedPct": 88
+        }
+      ]
+    },
+    {
+      "journey": "Health Explorative",
+      "participants": 83,
+      "participantsWithAppts": 8,
+      "apptEvents": 68,
+      "status": {
+        "completed": 52,
+        "upgraded": 11,
+        "initiated": 14,
+        "ongoing": 2,
+        "cancelled": 4
+      },
+      "stages": [
+        {
+          "stage": "Journey Coaching",
+          "n": 1,
+          "medMonth": 0.028574184719788776,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Fertility Implementation",
+          "n": 10,
+          "medMonth": 0.4879818221638196,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Journey Onboarding",
+          "n": 1,
+          "medMonth": 0.6839358669300871,
+          "attendedPct": 0
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 1,
+          "medMonth": 0.9315304728184163,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 1,
+          "medMonth": 0.933583692266511,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Health Implementation",
+          "n": 29,
+          "medMonth": 1.4516261498028908,
+          "attendedPct": 62
+        },
+        {
+          "stage": "Health Review",
+          "n": 8,
+          "medMonth": 1.455048182216382,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Fertility Review",
+          "n": 1,
+          "medMonth": 2.33998576434516,
+          "attendedPct": 0
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 1,
+          "medMonth": 2.4173769467562174,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 10,
+          "medMonth": 2.761633407553414,
+          "attendedPct": 70
+        },
+        {
+          "stage": "EI Review",
+          "n": 2,
+          "medMonth": 4.322764594588017,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Health Diagnostics",
+          "n": 2,
+          "medMonth": 4.34803438458169,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 1,
+          "medMonth": 5.669676552538084,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "CTD Live",
+      "participants": 81,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "completed": 50,
+        "upgraded": 29,
+        "downgraded": 1,
+        "cancelled": 1
+      },
+      "stages": []
+    },
+    {
+      "journey": "uP! For Prodigies",
+      "participants": 74,
+      "participantsWithAppts": 40,
+      "apptEvents": 180,
+      "status": {
+        "ongoing": 46,
+        "cancelled": 14,
+        "initiated": 7,
+        "downgraded": 3,
+        "upgraded": 1,
+        "completed": 1,
+        "shifted": 2
+      },
+      "stages": [
+        {
+          "stage": "Journey Coaching",
+          "n": 18,
+          "medMonth": 0.4075430027802112,
+          "attendedPct": 72
+        },
+        {
+          "stage": "Journey Onboarding",
+          "n": 24,
+          "medMonth": 0.5581220798656739,
+          "attendedPct": 79
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 2,
+          "medMonth": 1.0973969247715603,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Mid Review",
+          "n": 1,
+          "medMonth": 2.9988627955115104,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 7,
+          "medMonth": 3.08311432325887,
+          "attendedPct": 71
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 13,
+          "medMonth": 3.6148981603153745,
+          "attendedPct": 46
+        },
+        {
+          "stage": "EI Review",
+          "n": 11,
+          "medMonth": 3.8633059198118946,
+          "attendedPct": 73
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 2,
+          "medMonth": 6.058808703825376,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 8,
+          "medMonth": 7.716272163743491,
+          "attendedPct": 88
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 69,
+          "medMonth": 8.166234852563635,
+          "attendedPct": 80
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 7,
+          "medMonth": 10.11248857307332,
+          "attendedPct": 86
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 18,
+          "medMonth": 10.168609904654573,
+          "attendedPct": 89
+        }
+      ]
+    },
+    {
+      "journey": "EI Starter Pack",
+      "participants": 72,
+      "participantsWithAppts": 39,
+      "apptEvents": 96,
+      "status": {
+        "upgraded": 12,
+        "completed": 42,
+        "cancelled": 3,
+        "ongoing": 8,
+        "downgraded": 2,
+        "shifted": 2,
+        "initiated": 3
+      },
+      "stages": [
+        {
+          "stage": "Starter Pack",
+          "n": 21,
+          "medMonth": 0.5072833153866745,
+          "attendedPct": 76
+        },
+        {
+          "stage": "Excellence Installation Starter Pack",
+          "n": 8,
+          "medMonth": 0.775200888131479,
+          "attendedPct": 88
+        },
+        {
+          "stage": "HPC Implementation",
+          "n": 1,
+          "medMonth": 0.939005694261936,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Diagnostics",
+          "n": 4,
+          "medMonth": 1.7753504161191414,
+          "attendedPct": 75
+        },
+        {
+          "stage": "EI Starter Pack Clarity Call",
+          "n": 1,
+          "medMonth": 1.8958059570740253,
+          "attendedPct": 0
+        },
+        {
+          "stage": "CTD Implementation",
+          "n": 3,
+          "medMonth": 1.9909384581690759,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Review",
+          "n": 1,
+          "medMonth": 2.31821459565265,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Orientation",
+          "n": 2,
+          "medMonth": 2.350251861585633,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Starter Pack Implementation",
+          "n": 7,
+          "medMonth": 2.3858409986859397,
+          "attendedPct": 86
+        },
+        {
+          "stage": "EI Starter Pack Diagnostics",
+          "n": 16,
+          "medMonth": 2.5975185822063436,
+          "attendedPct": 81
+        },
+        {
+          "stage": "EI Starter Pack Review",
+          "n": 1,
+          "medMonth": 3.1040115345305885,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 11,
+          "medMonth": 3.272831800262812,
+          "attendedPct": 55
+        },
+        {
+          "stage": "A&H Motherhood Implementation",
+          "n": 1,
+          "medMonth": 3.758760402978537,
+          "attendedPct": 0
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 3,
+          "medMonth": 8.134855453350854,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 14,
+          "medMonth": 8.786410424879545,
+          "attendedPct": 86
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 2,
+          "medMonth": 9.385950503723173,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "A&H Light 3months",
+      "participants": 65,
+      "participantsWithAppts": 55,
+      "apptEvents": 753,
+      "status": {
+        "completed": 45,
+        "cancelled": 4,
+        "upgraded": 14,
+        "initiated": 1,
+        "ongoing": 1
+      },
+      "stages": [
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 51,
+          "medMonth": 1.0916283399036355,
+          "attendedPct": 92
+        },
+        {
+          "stage": "Health Implementation",
+          "n": 1,
+          "medMonth": 1.4529949627682874,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 602,
+          "medMonth": 3.804957840560666,
+          "attendedPct": 74
+        },
+        {
+          "stage": "A&H Review Implementation",
+          "n": 1,
+          "medMonth": 4.515029566360052,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 56,
+          "medMonth": 6.275665243101182,
+          "attendedPct": 82
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 41,
+          "medMonth": 6.717449627682873,
+          "attendedPct": 78
+        },
+        {
+          "stage": "A&H Light Brief Call",
+          "n": 1,
+          "medMonth": 10.17130694261936,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "EI Solutions",
+      "participants": 63,
+      "participantsWithAppts": 41,
+      "apptEvents": 447,
+      "status": {
+        "initiated": 9,
+        "completed": 31,
+        "upgraded": 11,
+        "ongoing": 11,
+        "cancelled": 1
+      },
+      "stages": [
+        {
+          "stage": "Journey Onboarding",
+          "n": 3,
+          "medMonth": 0.14071216144692655,
+          "attendedPct": 67
+        },
+        {
+          "stage": "EI Diagnostics",
+          "n": 44,
+          "medMonth": 0.652280419396688,
+          "attendedPct": 84
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 4,
+          "medMonth": 0.8628565791995182,
+          "attendedPct": 50
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 316,
+          "medMonth": 1.504409938760829,
+          "attendedPct": 81
+        },
+        {
+          "stage": "EI Review",
+          "n": 65,
+          "medMonth": 2.319645570597289,
+          "attendedPct": 86
+        },
+        {
+          "stage": "CTD Orientation",
+          "n": 1,
+          "medMonth": 3.6300919842312744,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Diagnostics",
+          "n": 1,
+          "medMonth": 3.8641590013140603,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Implementation",
+          "n": 1,
+          "medMonth": 3.868949846692948,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Extra Hour",
+          "n": 1,
+          "medMonth": 4.367517155789166,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Celebration Call",
+          "n": 11,
+          "medMonth": 5.2422114542268945,
+          "attendedPct": 73
+        }
+      ]
+    },
+    {
+      "journey": "Research",
+      "participants": 47,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "completed": 25,
+        "initiated": 22
+      },
+      "stages": []
+    },
+    {
+      "journey": "W!SH",
+      "participants": 43,
+      "participantsWithAppts": 22,
+      "apptEvents": 310,
+      "status": {
+        "completed": 24,
+        "upgraded": 12,
+        "downgraded": 2,
+        "ongoing": 3,
+        "cancelled": 2
+      },
+      "stages": [
+        {
+          "stage": "Welcome To WiSH",
+          "n": 14,
+          "medMonth": 1.0214766754270697,
+          "attendedPct": 71
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 20,
+          "medMonth": 1.1740993210687694,
+          "attendedPct": 55
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 23,
+          "medMonth": 1.374867481034336,
+          "attendedPct": 87
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 1,
+          "medMonth": 2.1578284972410815,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 120,
+          "medMonth": 2.713752845229839,
+          "attendedPct": 80
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 14,
+          "medMonth": 3.0223390275952697,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 28,
+          "medMonth": 3.0589547744196235,
+          "attendedPct": 71
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 21,
+          "medMonth": 3.406870328165304,
+          "attendedPct": 76
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 1,
+          "medMonth": 4.6873948572936435,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 16,
+          "medMonth": 5.251793144984669,
+          "attendedPct": 75
+        },
+        {
+          "stage": "Custom Solutions Review",
+          "n": 2,
+          "medMonth": 7.020299496276829,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Custom Solutions Implementation",
+          "n": 9,
+          "medMonth": 7.058284056066579,
+          "attendedPct": 78
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 2,
+          "medMonth": 7.683831581252738,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 2,
+          "medMonth": 8.45206645130676,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 31,
+          "medMonth": 11.6999288217258,
+          "attendedPct": 65
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 4,
+          "medMonth": 11.788217257993868,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 2,
+          "medMonth": 18.234931550416423,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "CPM upgrade",
+      "participants": 39,
+      "participantsWithAppts": 11,
+      "apptEvents": 21,
+      "status": {
+        "downgraded": 9,
+        "ongoing": 12,
+        "initiated": 3,
+        "cancelled": 3,
+        "completed": 4,
+        "upgraded": 8
+      },
+      "stages": [
+        {
+          "stage": "A&H Light Implementation",
+          "n": 1,
+          "medMonth": 0.02990856329391152,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 1,
+          "medMonth": 0.21880475251861586,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Journey Onboarding",
+          "n": 7,
+          "medMonth": 0.3805300043802015,
+          "attendedPct": 71
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 2,
+          "medMonth": 0.5014304095488392,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 2,
+          "medMonth": 11.144843245820558,
+          "attendedPct": 50
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 2,
+          "medMonth": 18.57273316854346,
+          "attendedPct": 50
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 4,
+          "medMonth": 18.808168998591643,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 2,
+          "medMonth": 19.63733022859937,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "Super Metabolism Program",
+      "participants": 35,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "completed": 30,
+        "cancelled": 1,
+        "upgraded": 4
+      },
+      "stages": []
+    },
+    {
+      "journey": "Critical Support",
+      "participants": 30,
+      "participantsWithAppts": 10,
+      "apptEvents": 47,
+      "status": {
+        "completed": 18,
+        "upgraded": 5,
+        "initiated": 4,
+        "ongoing": 1,
+        "cancelled": 2
+      },
+      "stages": [
+        {
+          "stage": "Covid Support Implementation",
+          "n": 1,
+          "medMonth": 0.00898201265695722,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Diagnostics",
+          "n": 3,
+          "medMonth": 0.16592179591302866,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Critical Support Mid Review",
+          "n": 5,
+          "medMonth": 1.5723413097106633,
+          "attendedPct": 80
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 34,
+          "medMonth": 2.365438613681438,
+          "attendedPct": 82
+        },
+        {
+          "stage": "uP or FTM Journey",
+          "n": 1,
+          "medMonth": 4.35214082347788,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 1,
+          "medMonth": 5.19806723609286,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 2,
+          "medMonth": 6.716765221200175,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "uP! Continuity",
+      "participants": 25,
+      "participantsWithAppts": 6,
+      "apptEvents": 7,
+      "status": {
+        "ongoing": 13,
+        "initiated": 7,
+        "shifted": 2,
+        "cancelled": 1,
+        "upgraded": 2
+      },
+      "stages": [
+        {
+          "stage": "Journey Onboarding",
+          "n": 6,
+          "medMonth": 0.3333059570740254,
+          "attendedPct": 67
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 1,
+          "medMonth": 0.3590168272740546,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "Winning Heart",
+      "participants": 25,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "completed": 12,
+        "upgraded": 11,
+        "cancelled": 2
+      },
+      "stages": []
+    },
+    {
+      "journey": "B!G with SLD CI",
+      "participants": 15,
+      "participantsWithAppts": 5,
+      "apptEvents": 46,
+      "status": {
+        "upgraded": 8,
+        "downgraded": 2,
+        "initiated": 3,
+        "cancelled": 1,
+        "ongoing": 1
+      },
+      "stages": [
+        {
+          "stage": "Journey Onboarding",
+          "n": 1,
+          "medMonth": 0.4120127025843189,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 1,
+          "medMonth": 0.9349444927331241,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 1,
+          "medMonth": 1.2682780405138219,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 2,
+          "medMonth": 1.546489275730642,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 2,
+          "medMonth": 1.5642838442807951,
+          "attendedPct": 50
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 17,
+          "medMonth": 3.0347035816512142,
+          "attendedPct": 65
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 3,
+          "medMonth": 3.628795999339928,
+          "attendedPct": 67
+        },
+        {
+          "stage": "A&H Light Mid Review",
+          "n": 1,
+          "medMonth": 4.188612911480386,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 1,
+          "medMonth": 4.253659118043388,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 12,
+          "medMonth": 4.415521251201514,
+          "attendedPct": 75
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 2,
+          "medMonth": 4.516443616692826,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 1,
+          "medMonth": 5.403462008976371,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Journey Coaching",
+          "n": 2,
+          "medMonth": 9.19468290421047,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "W!SH Accelerator",
+      "participants": 13,
+      "participantsWithAppts": 12,
+      "apptEvents": 215,
+      "status": {
+        "cancelled": 2,
+        "completed": 9,
+        "upgraded": 2
+      },
+      "stages": [
+        {
+          "stage": "Welcome To WiSH",
+          "n": 9,
+          "medMonth": 1.6483930135786247,
+          "attendedPct": 89
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 13,
+          "medMonth": 1.6487352168199738,
+          "attendedPct": 85
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 11,
+          "medMonth": 2.2482752956636007,
+          "attendedPct": 64
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 111,
+          "medMonth": 3.9250711782742007,
+          "attendedPct": 81
+        },
+        {
+          "stage": "WiSH Review",
+          "n": 15,
+          "medMonth": 4.506816688567674,
+          "attendedPct": 87
+        },
+        {
+          "stage": "WiSH Implementation Validation",
+          "n": 34,
+          "medMonth": 5.553274200613228,
+          "attendedPct": 79
+        },
+        {
+          "stage": "WiSH Pre Final Review Call",
+          "n": 7,
+          "medMonth": 6.419048401226457,
+          "attendedPct": 86
+        },
+        {
+          "stage": "WiSH Final Review Call",
+          "n": 15,
+          "medMonth": 7.995920937363119,
+          "attendedPct": 73
+        }
+      ]
+    },
+    {
+      "journey": "CPM Continuity",
+      "participants": 9,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "initiated": 7,
+        "ongoing": 2
+      },
+      "stages": []
+    },
+    {
+      "journey": "A&H Light 6months",
+      "participants": 9,
+      "participantsWithAppts": 8,
+      "apptEvents": 122,
+      "status": {
+        "cancelled": 2,
+        "completed": 5,
+        "upgraded": 1,
+        "downgraded": 1
+      },
+      "stages": [
+        {
+          "stage": "Critical Support Implementation",
+          "n": 1,
+          "medMonth": 1.0587768287341217,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Light Diagnostics",
+          "n": 9,
+          "medMonth": 1.753449408672799,
+          "attendedPct": 78
+        },
+        {
+          "stage": "A&H Light Review",
+          "n": 16,
+          "medMonth": 3.3659110819097675,
+          "attendedPct": 81
+        },
+        {
+          "stage": "A&H Light Implementation",
+          "n": 96,
+          "medMonth": 3.4528307052124396,
+          "attendedPct": 69
+        }
+      ]
+    },
+    {
+      "journey": "Breakthrough Extreme",
+      "participants": 8,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "upgraded": 2,
+        "completed": 6
+      },
+      "stages": []
+    },
+    {
+      "journey": "Pattern Interrupt",
+      "participants": 7,
+      "participantsWithAppts": 1,
+      "apptEvents": 2,
+      "status": {
+        "cancelled": 2,
+        "completed": 3,
+        "upgraded": 2
+      },
+      "stages": [
+        {
+          "stage": "Pattern Interrupt Implementation",
+          "n": 2,
+          "medMonth": 2.906674332019273,
+          "attendedPct": 50
+        }
+      ]
+    },
+    {
+      "journey": "Launch Your Legacy L2",
+      "participants": 7,
+      "participantsWithAppts": 1,
+      "apptEvents": 1,
+      "status": {
+        "shifted": 4,
+        "downgraded": 2,
+        "completed": 1
+      },
+      "stages": [
+        {
+          "stage": "Journey Coaching",
+          "n": 1,
+          "medMonth": 0.2347175655965591,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "A la carte",
+      "participants": 6,
+      "participantsWithAppts": 2,
+      "apptEvents": 7,
+      "status": {
+        "completed": 2,
+        "upgraded": 3,
+        "cancelled": 1
+      },
+      "stages": [
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 2,
+          "medMonth": 6.49775514673675,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Review",
+          "n": 1,
+          "medMonth": 8.491431230836618,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Critical Support Implementation",
+          "n": 1,
+          "medMonth": 9.411273543583004,
+          "attendedPct": 0
+        },
+        {
+          "stage": "Welcome To WiSH",
+          "n": 1,
+          "medMonth": 12.950681668856767,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 1,
+          "medMonth": 12.960605562855891,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 1,
+          "medMonth": 16.474348445028472,
+          "attendedPct": 0
+        }
+      ]
+    },
+    {
+      "journey": "FTM Continuity",
+      "participants": 4,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "ongoing": 1,
+        "initiated": 1,
+        "upgraded": 1,
+        "downgraded": 1
+      },
+      "stages": []
+    },
+    {
+      "journey": "EI Subscription for Entrepreneurs",
+      "participants": 4,
+      "participantsWithAppts": 2,
+      "apptEvents": 12,
+      "status": {
+        "completed": 4
+      },
+      "stages": [
+        {
+          "stage": "EI Diagnostics",
+          "n": 1,
+          "medMonth": 0.475699085100623,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Implementation",
+          "n": 6,
+          "medMonth": 0.6734925586004039,
+          "attendedPct": 83
+        },
+        {
+          "stage": "CTD Diagnostics",
+          "n": 1,
+          "medMonth": 2.4152704774419624,
+          "attendedPct": 100
+        },
+        {
+          "stage": "CTD Implementation Appointment",
+          "n": 2,
+          "medMonth": 2.491581800262812,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Review",
+          "n": 2,
+          "medMonth": 2.666484236217574,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "A&H Custom Solutions",
+      "participants": 3,
+      "participantsWithAppts": 1,
+      "apptEvents": 9,
+      "status": {
+        "completed": 1,
+        "initiated": 1,
+        "cancelled": 1
+      },
+      "stages": [
+        {
+          "stage": "Custom Solutions Diagnostics",
+          "n": 1,
+          "medMonth": 0.020075923492480652,
+          "attendedPct": 100
+        },
+        {
+          "stage": "Custom Solutions Implementation",
+          "n": 5,
+          "medMonth": 0.44144218134034163,
+          "attendedPct": 80
+        },
+        {
+          "stage": "Custom Solutions Review",
+          "n": 3,
+          "medMonth": 0.7706416995181778,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "CTD Platinum",
+      "participants": 2,
+      "participantsWithAppts": 1,
+      "apptEvents": 2,
+      "status": {
+        "completed": 2
+      },
+      "stages": [
+        {
+          "stage": "CTD Implementation Appointment",
+          "n": 2,
+          "medMonth": 4.173510731493648,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "uP! Test",
+      "participants": 2,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "upgraded": 2
+      },
+      "stages": []
+    },
+    {
+      "journey": "uP! Lite",
+      "participants": 2,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "upgraded": 1,
+        "completed": 1
+      },
+      "stages": []
+    },
+    {
+      "journey": "A&H Legends",
+      "participants": 2,
+      "participantsWithAppts": 1,
+      "apptEvents": 6,
+      "status": {
+        "initiated": 2
+      },
+      "stages": [
+        {
+          "stage": "Welcome To WiSH",
+          "n": 1,
+          "medMonth": 0.6378668418747262,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Diagnostics",
+          "n": 1,
+          "medMonth": 0.6392356548401227,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Experience Call",
+          "n": 1,
+          "medMonth": 0.7158891809023215,
+          "attendedPct": 100
+        },
+        {
+          "stage": "WiSH Implementation",
+          "n": 3,
+          "medMonth": 0.7815922032413491,
+          "attendedPct": 33
+        }
+      ]
+    },
+    {
+      "journey": "up test 2024",
+      "participants": 1,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "upgraded": 1
+      },
+      "stages": []
+    },
+    {
+      "journey": "Change work Mastrey ",
+      "participants": 1,
+      "participantsWithAppts": 0,
+      "apptEvents": 0,
+      "status": {
+        "cancelled": 1
+      },
+      "stages": []
+    },
+    {
+      "journey": "High Performance Delivered",
+      "participants": 1,
+      "participantsWithAppts": 1,
+      "apptEvents": 1,
+      "status": {
+        "completed": 1
+      },
+      "stages": [
+        {
+          "stage": "Discovery and Implementation",
+          "n": 1,
+          "medMonth": 1.079727410403587,
+          "attendedPct": 100
+        }
+      ]
+    },
+    {
+      "journey": "A&H Motherhood Excellence Program",
+      "participants": 1,
+      "participantsWithAppts": 1,
+      "apptEvents": 38,
+      "status": {
+        "completed": 1
+      },
+      "stages": [
+        {
+          "stage": "A&H MotherHood Diagnostics",
+          "n": 3,
+          "medMonth": 1.7611375748284421,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Motherhood Review",
+          "n": 3,
+          "medMonth": 3.8951169878814427,
+          "attendedPct": 100
+        },
+        {
+          "stage": "A&H Motherhood Implementation",
+          "n": 30,
+          "medMonth": 4.471045043071982,
+          "attendedPct": 87
+        },
+        {
+          "stage": "Complimentary Review with A&H",
+          "n": 1,
+          "medMonth": 7.048862060154767,
+          "attendedPct": 100
+        },
+        {
+          "stage": "EI Review",
+          "n": 1,
+          "medMonth": 9.614017557307637,
+          "attendedPct": 100
+        }
+      ]
+    }
+  ],
+  "crossSell": {
+    "multiJourneyProfiles": 1072,
+    "topTransitions": [
+      [
+        "uP! ⇒ B!G",
+        200
+      ],
+      [
+        "B!G ⇒ B!G Continuity",
+        157
+      ],
+      [
+        "uP! ⇒ (unknown)",
+        125
+      ],
+      [
+        "CTD ⇒ uP!",
+        117
+      ],
+      [
+        "FTM with SLD CI ⇒ B!G",
+        98
+      ],
+      [
+        "B!G ⇒ (unknown)",
+        82
+      ],
+      [
+        "uP! ⇒ CPM",
+        76
+      ],
+      [
+        "uP! ⇒ FTM",
+        54
+      ],
+      [
+        "uP! ⇒ FTM with SLD CI",
+        52
+      ],
+      [
+        "FTM ⇒ B!G",
+        46
+      ],
+      [
+        "(unknown) ⇒ B!G Continuity",
+        39
+      ],
+      [
+        "CPM ⇒ B!G",
+        38
+      ],
+      [
+        "(unknown) ⇒ B!G",
+        26
+      ],
+      [
+        "EI Starter Pack ⇒ uP!",
+        26
+      ],
+      [
+        "uP! ⇒ CPM upgrade",
+        23
+      ],
+      [
+        "(unknown) ⇒ uP!",
+        21
+      ],
+      [
+        "(unknown) ⇒ CPM",
+        19
+      ],
+      [
+        "CTD Live ⇒ uP!",
+        18
+      ],
+      [
+        "CPM ⇒ (unknown)",
+        17
+      ],
+      [
+        "B!G Continuity ⇒ (unknown)",
+        17
+      ],
+      [
+        "CTD ⇒ B!G",
+        17
+      ],
+      [
+        "FTM with SLD CI ⇒ (unknown)",
+        16
+      ],
+      [
+        "FTM with SLD CI ⇒ uP!",
+        13
+      ],
+      [
+        "B!G ⇒ uP!",
+        12
+      ],
+      [
+        "uP! ⇒ uP! Continuity",
+        12
+      ]
+    ]
+  }
+}

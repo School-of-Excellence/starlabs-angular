@@ -39,8 +39,8 @@
   border-radius: 16px; padding: 8px 8px 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -18px rgba(0,0,0,.18); }
 .sx-bd-about { font-size: 11.5px; color: rgba(60,60,67,.5); padding: 2px 8px 8px; line-height: 1.3; }
 
-/* Rows — the depth-0 row is the total (Potential / Approved) */
-.sx-bd-row { display: flex; align-items: center; gap: 9px; width: 100%; border: none; background: none;
+/* Rows — two lines: metric on top, customer-status split below. d0 = total (Potential / Approved) */
+.sx-bd-row { display: flex; flex-direction: column; gap: 3px; width: 100%; border: none; background: none;
   cursor: pointer; text-align: left; padding: 7px 12px; border-radius: 9px; font: inherit; }
 .sx-bd-row:hover { background: #f6f6f9; }
 .sx-bd-row.on { background: linear-gradient(180deg, rgba(0,122,255,.08), rgba(0,122,255,.04)); }
@@ -48,28 +48,30 @@
   border-radius: 10px 10px 0 0; }
 .sx-bd-row.d1 { padding-left: 18px; }
 .sx-bd-row.d2 { padding-left: 34px; }
+.sx-bd-top { display: flex; align-items: center; gap: 9px; }
 .sx-bd-dot { width: 8px; height: 8px; border-radius: 3px; flex: 0 0 auto; background: rgba(60,60,67,.3); }
-.sx-bd-row.d0 .sx-bd-dot { width: 5px; height: 20px; border-radius: 3px; background: #8e8e93; }
+.sx-bd-row.d0 .sx-bd-dot { width: 5px; height: 18px; border-radius: 3px; background: #8e8e93; }
 .sx-bd-row.d0.app .sx-bd-dot { background: #0060df; }
-.sx-bd-lab { font-size: 13.5px; color: #1c1c1e; white-space: nowrap; }
+.sx-bd-lab { flex: 1 1 auto; font-size: 13.5px; color: #1c1c1e; white-space: nowrap; }
 .sx-bd-row.d0 .sx-bd-lab { font-size: 15px; font-weight: 700; }
-.sx-bd-bar { flex: 1 1 auto; min-width: 24px; height: 6px; border-radius: 4px;
-  background: rgba(60,60,67,.08); overflow: hidden; margin: 0 4px; }
-.sx-bd-fill { display: block; height: 100%; border-radius: 4px; background: rgba(60,60,67,.4);
-  transition: width .25s ease; }
-.sx-bd-row.d0 .sx-bd-bar { display: none; }
-.sx-bd-pct { font-size: 11.5px; color: rgba(60,60,67,.5); font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
-.sx-bd-row.d0 .sx-bd-pct { display: none; }
-.sx-bd-num { font-size: 15px; font-weight: 600; color: #1c1c1e; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+.sx-bd-pct { font-size: 11.5px; color: rgba(60,60,67,.5); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+.sx-bd-row.d0 .sx-bd-pct { visibility: hidden; }
+.sx-bd-num { font-size: 15px; font-weight: 600; color: #1c1c1e; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; margin-left: 10px; }
 .sx-bd-row.d0 .sx-bd-num { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
-/* per-segment accent on dot + bar fill (reuse card palette) */
-.sx-bd-row.elig .sx-bd-dot, .sx-bd-row.elig .sx-bd-fill { background: #1f8a3b; }
-.sx-bd-row.ne .sx-bd-dot, .sx-bd-row.ne .sx-bd-fill { background: #c25e00; }
-.sx-bd-row.inq .sx-bd-dot, .sx-bd-row.inq .sx-bd-fill { background: #8e8e93; }
-.sx-bd-row.att .sx-bd-dot, .sx-bd-row.att .sx-bd-fill { background: #1f8a3b; }
-.sx-bd-row.ns .sx-bd-dot, .sx-bd-row.ns .sx-bd-fill { background: #d70015; }
-.sx-bd-row.un .sx-bd-dot, .sx-bd-row.un .sx-bd-fill { background: #7a2638; }
-.sx-bd-row:focus-visible, .sx-bd-head:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
+/* customer-status split line (under the metric) */
+.sx-bd-cs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; padding-left: 17px; }
+.sx-bd-row.d0 .sx-bd-cs { padding-left: 14px; }
+.sx-bd-cs-i { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cs-dot { width: 6px; height: 6px; border-radius: 2px; flex: 0 0 auto; }
+.sx-bd-cs-load { font-size: 11px; color: rgba(60,60,67,.35); padding-left: 17px; }
+/* per-segment accent on the dot */
+.sx-bd-row.elig .sx-bd-dot { background: #1f8a3b; }
+.sx-bd-row.ne .sx-bd-dot { background: #c25e00; }
+.sx-bd-row.inq .sx-bd-dot { background: #8e8e93; }
+.sx-bd-row.att .sx-bd-dot { background: #1f8a3b; }
+.sx-bd-row.ns .sx-bd-dot { background: #d70015; }
+.sx-bd-row.un .sx-bd-dot { background: #7a2638; }
+.sx-bd-row:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
 
 /* Subscription split under the Potential card */
 .sx-pot-split { display: flex; align-items: center; gap: 7px; padding: 2px 12px 8px 30px; flex-wrap: wrap; }
@@ -78,10 +80,12 @@
   font-variant-numeric: tabular-nums; cursor: pointer; transition: filter .12s, box-shadow .12s; }
 .sx-pot-chip b { font-weight: 700; margin-left: 3px; }
 .sx-pot-chip.act { color: #1f8a3b; background: rgba(31,138,59,.1); }
-.sx-pot-chip.non { color: #6c6c70; background: rgba(60,60,67,.08); }
+.sx-pot-chip.non { color: #c25e00; background: rgba(194,94,0,.1); }
+.sx-pot-chip.disc { color: #d70015; background: rgba(215,0,21,.1); }
 .sx-pot-chip:hover { filter: brightness(.96); }
 .sx-pot-chip.act.on { border-color: #1f8a3b; box-shadow: inset 0 0 0 1px #1f8a3b; }
-.sx-pot-chip.non.on { border-color: #8e8e93; box-shadow: inset 0 0 0 1px #8e8e93; }
+.sx-pot-chip.non.on { border-color: #c25e00; box-shadow: inset 0 0 0 1px #c25e00; }
+.sx-pot-chip.disc.on { border-color: #d70015; box-shadow: inset 0 0 0 1px #d70015; }
 .sx-pot-chip:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
 .sx-pot-load { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: rgba(60,60,67,.5); }
 .sx-pot-load mat-icon { font-size: 14px; height: 14px; width: 14px; }

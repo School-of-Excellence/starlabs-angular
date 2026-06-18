@@ -1,0 +1,499 @@
+[
+  {
+    "route": "profilelist",
+    "file": "src/app/Participants Profile Management/profilelist/profilelist.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 89},
+      {"c": "users_roles", "line": 136},
+      {"c": "atc model", "line": 143},
+      {"c": "starlabs roles", "line": 147},
+      {"c": "atc_alpha", "line": 290},
+      {"c": "appointments", "line": 291},
+      {"c": "Roles-To-EIS", "line": 292},
+      {"c": "profile_data", "line": 293},
+      {"c": "journeyproductpurchase", "line": 306},
+      {"c": "participantsproduct", "line": 307},
+      {"c": "EISzoomcontact", "line": 308},
+      {"c": "aggregate_EITParticipant", "line": 309},
+      {"c": "aggregate_ReviewParticipant", "line": 310},
+      {"c": "availability", "line": 311},
+      {"c": "events_profiles", "line": 312},
+      {"c": "formsByClient", "line": 313}
+    ],
+    "writes": [
+      {"c": "profile_data", "line": 216},
+      {"c": "dynamic (role_ref path, e.g. Roles-To-EIS)", "line": 241},
+      {"c": "dynamic (role_ref path)", "line": 333},
+      {"c": "profile_data", "line": 334}
+    ],
+    "services": [],
+    "dynamic": ["dynamic role_ref path doc(this.firestore, profile['role_ref']['path']) read@300/331 write@241/333", "profileref = doc(this.firestore, profilepath) where profilepath='profile_data/'+id @271"],
+    "atc": ["atc model (reference-only, line 143)", "atc_alpha (line 290 - getDocs query for atcPrescribed/atcGiven/atcAssigned status)"],
+    "notes": "profilelist queries atc_alpha read-only to compute status flags (author/profileid/implementationagent). atc model is reference-only taxonomy. Deletes (333-334) cascade role doc + profile_data."
+  },
+  {
+    "route": "app-flow-breaks",
+    "file": "src/app/Participants Profile Management/app-flow-breaks/app-flow-breaks.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appflowbreaks", "line": 77},
+      {"c": "profile_data", "line": 117}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only screen. Lists appflowbreaks ordered by date desc; resolves profile_data per row by id."
+  },
+  {
+    "route": "participantproduct",
+    "file": "src/app/Participants Profile Management/participant-product/participant-product.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "products", "line": 98},
+      {"c": "journey", "line": 116},
+      {"c": "participantsproduct", "line": 132},
+      {"c": "participantsproduct", "line": 180}
+    ],
+    "writes": [
+      {"c": "Atestdate", "line": 437},
+      {"c": "participantsproduct", "line": 468}
+    ],
+    "services": [],
+    "dynamic": ["productref filter built from doc(firestore,'products',id) @129/183"],
+    "atc": [],
+    "notes": "Reads products/journey to build filters, lists participantsproduct via collectionData query. setDoc to '/Atestdate/date' (line 437) appears to be a test/debug write. Updates participantsproduct statusdate (468)."
+  },
+  {
+    "route": "ProfileScreen",
+    "file": "src/app/Participants Profile Management/new-profile/new-profile.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 1122}
+    ],
+    "writes": [
+      {"c": "filteredtimeline profile", "line": 1768}
+    ],
+    "services": [],
+    "dynamic": ["docid = doc(collection(this.firestore,'filteredtimeline profile')).id @1767"],
+    "atc": [],
+    "notes": "Large new-profile form (1819 lines) but minimal direct Firestore: reads 'participant metadata', writes a 'filteredtimeline profile' doc (setDoc) on creation. Most data likely via injected services/inputs not surfaced as collection() calls."
+  },
+  {
+    "route": "participantdeliverysequence/:pid",
+    "file": "src/app/Participants Profile Management/participant-delivery-sequence/participant-delivery-sequence.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointments", "line": 102},
+      {"c": "profile_data", "line": 131},
+      {"c": "journey", "line": 147},
+      {"c": "products", "line": 154},
+      {"c": "appointmenttype", "line": 161},
+      {"c": "delivery forms", "line": 173},
+      {"c": "delivery report", "line": 185},
+      {"c": "delivery events", "line": 197},
+      {"c": "delivery queue", "line": 209},
+      {"c": "delivery fieldwork", "line": 221},
+      {"c": "participantdeliverysequence", "line": 260},
+      {"c": "participantsproduct", "line": 269},
+      {"c": "participantdeliverysequence", "line": 288},
+      {"c": "deliverables", "line": 313}
+    ],
+    "writes": [
+      {"c": "dynamic (key path)", "line": 445},
+      {"c": "participantsproduct", "line": 473},
+      {"c": "dynamic (delivery['sequenceref'].path)", "line": 521},
+      {"c": "participantdeliverysequence", "line": 541},
+      {"c": "profile_data", "line": 551}
+    ],
+    "services": [],
+    "dynamic": ["deliverables new id @365-366", "deliveryref = doc(this.firestore, activity['path']) @374", "appointments ref.push doc by element @422", "deleteDoc(doc(this.firestore, key)) @445 - key is a dynamic doc path", "setDoc(doc(this.firestore, delivery['sequenceref'].path)) @521 (deliverables ref)"],
+    "atc": [],
+    "notes": "Heavy delivery-sequence editor. Line 288 uses legacy AngularFire compat (this.firestore.collection('participantdeliverysequence').doc().get()). Writes: deliverables (via sequenceref path), participantsproduct, participantdeliverysequence, profile_data; deletes dynamic doc paths (445)."
+  },
+  {
+    "route": "participantpurchase/:pid",
+    "file": "src/app/Participants Profile Management/journey-product-purchase/journey-product-purchase.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "journey", "line": 149},
+      {"c": "products", "line": 156},
+      {"c": "package", "line": 164},
+      {"c": "journey-to-product", "line": 176},
+      {"c": "productToDeliverySequence", "line": 182},
+      {"c": "profile_data", "line": 211},
+      {"c": "Participants (watsonDatabase - separate Firestore app 'watson')", "line": 213},
+      {"c": "ParticipantPurchases (watsonDatabase - separate Firestore app 'watson')", "line": 227},
+      {"c": "participantsproduct", "line": 247},
+      {"c": "journeyproductpurchase", "line": 256},
+      {"c": "participantjourneyproduct", "line": 262},
+      {"c": "deliverables", "line": 468}
+    ],
+    "writes": [
+      {"c": "participantsproduct", "line": 614},
+      {"c": "journeyproductpurchase", "line": 674},
+      {"c": "participantjourneyproduct", "line": 684},
+      {"c": "dynamic (path)", "line": 741}
+    ],
+    "services": [],
+    "dynamic": ["participantproductid new id @607", "participantjourneyproductref/purchaseref new ids @653-655", "documentToDelete collects journeyproductpurchase/participantjourneyproduct/participantsproduct paths @407-453 then deleteDoc(doc(this.firestore,path)) @741"],
+    "atc": [],
+    "notes": "CROSS-DATABASE READS: 'Participants' and 'ParticipantPurchases' come from getFirestore(getApp('watson')) (this.watsonDatabase, lines 213/227), NOT the main firestore. Main-db writes: participantsproduct, journeyproductpurchase, participantjourneyproduct (all setDoc merge), plus dynamic deletes."
+  },
+  {
+    "route": "profilesummary/:profileid",
+    "file": "src/app/Participants Profile Management/profile-summary/profile-summary.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 178},
+      {"c": "participant metadata", "line": 207},
+      {"c": "appointments", "line": 216},
+      {"c": "appointmenttype", "line": 225},
+      {"c": "fullfillmentchallenges", "line": 238},
+      {"c": "clientissue", "line": 252},
+      {"c": "products", "line": 271},
+      {"c": "journey", "line": 283},
+      {"c": "profile_data", "line": 295},
+      {"c": "users_roles", "line": 309},
+      {"c": "fullfillmentchallenges", "line": 337},
+      {"c": "clientissue", "line": 386}
+    ],
+    "writes": [
+      {"c": "profile_data", "line": 463},
+      {"c": "profile_data", "line": 501}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Profile summary dashboard. Reads fullfillmentchallenges/clientissue by clientid for issue history; updates profile_data (two updateDoc paths via '/profile_data/'+id)."
+  },
+  {
+    "route": "userprofile/:id",
+    "file": "src/app/Participants Profile Management/userprofile/userprofile.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 436},
+      {"c": "participant metadata", "line": 437},
+      {"c": "participantjourneyproduct", "line": 438},
+      {"c": "participantsproduct", "line": 439},
+      {"c": "interim crossover", "line": 475},
+      {"c": "event collection", "line": 505},
+      {"c": "queue generation", "line": 507},
+      {"c": "event participation request", "line": 539},
+      {"c": "event collection", "line": 577},
+      {"c": "queue generation", "line": 589},
+      {"c": "clientissue", "line": 624},
+      {"c": "queue generation", "line": 636},
+      {"c": "formsByClient", "line": 645},
+      {"c": "interimreport log", "line": 659},
+      {"c": "Achievements/posts/postcollection", "line": 685},
+      {"c": "Achievements/posts/postcollection/{id}/likes", "line": 695},
+      {"c": "evolutionmappingvideo", "line": 717},
+      {"c": "liveevolutionmapping", "line": 718},
+      {"c": "appointments", "line": 735},
+      {"c": "profile_data", "line": 750},
+      {"c": "classify", "line": 763},
+      {"c": "participant touchpoint", "line": 772},
+      {"c": "participant mode checklist", "line": 814},
+      {"c": "notifications/{uid}/logs", "line": 823},
+      {"c": "post_categories", "line": 842},
+      {"c": "participantsproduct", "line": 1081},
+      {"c": "deliverables", "line": 1108},
+      {"c": "event collection", "line": 1181},
+      {"c": "queue generation/{queueDocId}/stagechat", "line": 1251}
+    ],
+    "writes": [
+      {"c": "filteredtimeline profile", "line": 969},
+      {"c": "queue generation/{docid}/stagechat", "line": 1284},
+      {"c": "queue generation/{docid}/stagechat", "line": 1363},
+      {"c": "participant metadata", "line": 1541}
+    ],
+    "services": [],
+    "dynamic": ["queueToken tokenPath getDoc @1130", "queueref path getDoc @1144", "eventPath getDoc @1164/1206", "filteredtimeline profile new doc @967-968", "stagechat new id @1361"],
+    "atc": [],
+    "notes": "Large participant 360 view (1555 lines). Reads ~25 collections incl subcollections (Achievements postcollection+likes, notifications/{uid}/logs, queue generation stagechat). Writes: filteredtimeline profile (setDoc 969), stagechat messages (setDoc 1363 + updateDoc 1284 pin), participant metadata (updateDoc 1541). 'classify' doc 'touchpoint' read @763."
+  },
+  {
+    "route": "userprofile_old",
+    "file": "src/app/Participants Profile Management/userprofile_old/userprofile_old.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "journey", "line": 201},
+      {"c": "package", "line": 209},
+      {"c": "products", "line": 216},
+      {"c": "eiflix workshop", "line": 224},
+      {"c": "queue generation", "line": 232},
+      {"c": "post_categories", "line": 242},
+      {"c": "evolutionmappingvideo", "line": 274},
+      {"c": "liveevolutionmapping", "line": 284},
+      {"c": "participantsproduct", "line": 298},
+      {"c": "deliverables", "line": 316},
+      {"c": "event collection", "line": 372},
+      {"c": "queue generation/{docid}/stagechat", "line": 438},
+      {"c": "interim crossover", "line": 476},
+      {"c": "Achievements/posts/postcollection", "line": 504},
+      {"c": "interimreport log", "line": 515},
+      {"c": "formsByClient", "line": 532},
+      {"c": "event collection", "line": 540},
+      {"c": "events_profiles", "line": 548},
+      {"c": "clientissue", "line": 559},
+      {"c": "participantjourneyproduct", "line": 568},
+      {"c": "participantsproduct", "line": 582},
+      {"c": "clientissue/{id}/messages", "line": 599},
+      {"c": "clientissue/{chatid}/messages", "line": 779}
+    ],
+    "writes": [
+      {"c": "clientissue", "line": 700},
+      {"c": "clientissue", "line": 708},
+      {"c": "clientissue/{id}/messages", "line": 718},
+      {"c": "clientissue/{id}/messages", "line": 758},
+      {"c": "clientissue", "line": 765},
+      {"c": "clientissue/{chatid}/messages", "line": 787},
+      {"c": "queue generation/{queuedocid}/stagechat", "line": 828}
+    ],
+    "services": [],
+    "dynamic": ["ongoingQueuepath getDoc @360", "ongoingEventpath getDoc @389", "queueDataSnap getDoc @343", "lastFileref getDoc @334"],
+    "atc": [],
+    "notes": "Legacy userprofile (948 lines). Chat-heavy: writes clientissue ticket status (updateDoc 700/708/765), clientissue messages subcollection (batch.set 718, updateDoc 758/787), queue generation stagechat subcollection (batch.set 828). New ids generated via doc(collection(...)).id."
+  },
+  {
+    "route": "view-participants-form",
+    "file": "src/app/Participants Profile Management/view-participants-form/view-participants-form.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue generation", "line": 203},
+      {"c": "delivery forms", "line": 215},
+      {"c": "eiflix workshop", "line": 224},
+      {"c": "workshopconfiguration", "line": 236},
+      {"c": "formsByClient", "line": 348},
+      {"c": "delivery forms", "line": 618},
+      {"c": "formsByClient", "line": 619},
+      {"c": "delivery forms", "line": 655},
+      {"c": "formsByClient", "line": 656},
+      {"c": "delivery forms", "line": 935},
+      {"c": "formsByClient", "line": 939},
+      {"c": "delivery forms", "line": 1039},
+      {"c": "formsByClient", "line": 1042},
+      {"c": "delivery forms", "line": 1203},
+      {"c": "formsByClient", "line": 1209}
+    ],
+    "writes": [
+      {"c": "formsByClient", "line": 791},
+      {"c": "formsByClient", "line": 794},
+      {"c": "formsByClient", "line": 808},
+      {"c": "formsByClient", "line": 811},
+      {"c": "formsByClient", "line": 825},
+      {"c": "formsByClient", "line": 828},
+      {"c": "formsByClient", "line": 862}
+    ],
+    "writes_note": "All formsByClient updateDoc",
+    "services": [],
+    "dynamic": ["submittedFormPath = doc(this.firestore,'formsByClient',form.docid).path then getDoc @1208-1209"],
+    "atc": [],
+    "notes": "Submitted-forms viewer. Reads delivery forms (templates) + formsByClient (submissions) + queue generation/eiflix workshop/workshopconfiguration for filters. Writes only updateDoc to formsByClient (liked/tagged/opportunity/notes flags)."
+  },
+  {
+    "route": "participants-analytics",
+    "file": "src/app/Participants Profile Management/participants-analytics/participants-analytics.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "static meta data", "line": 311},
+      {"c": "email archive", "line": 374},
+      {"c": "wati archive", "line": 386},
+      {"c": "searchquery", "line": 420},
+      {"c": "event collection", "line": 421},
+      {"c": "queue generation", "line": 422},
+      {"c": "queue_token", "line": 423},
+      {"c": "tier", "line": 424},
+      {"c": "journey", "line": 425},
+      {"c": "modes", "line": 426},
+      {"c": "products", "line": 427},
+      {"c": "participant tags", "line": 428},
+      {"c": "participantsproduct", "line": 429},
+      {"c": "participant metadata", "line": 430},
+      {"c": "series", "line": 626},
+      {"c": "recommended mix playlist", "line": 626},
+      {"c": "solar voice playlist", "line": 626},
+      {"c": "content_urls", "line": 626},
+      {"c": "participant metadata", "line": 722},
+      {"c": "profile_data", "line": 984},
+      {"c": "searchquery", "line": 986},
+      {"c": "dynamic (defaultsearchref path)", "line": 1017},
+      {"c": "email validators", "line": 1504},
+      {"c": "participantjourneyproduct", "line": 1585},
+      {"c": "profile_data", "line": 1693},
+      {"c": "content analytics", "line": 2245},
+      {"c": "participant tag logs", "line": 2463}
+    ],
+    "writes": [
+      {"c": "profile_data", "line": 985},
+      {"c": "searchquery", "line": 1000},
+      {"c": "profile_data", "line": 1004},
+      {"c": "searchquery", "line": 1277},
+      {"c": "participant metadata", "line": 1367},
+      {"c": "participant metadata", "line": 1394},
+      {"c": "buffermix archive", "line": 1431},
+      {"c": "email archive", "line": 1458},
+      {"c": "email validators", "line": 1494},
+      {"c": "wati archive", "line": 1534},
+      {"c": "subscription extend log", "line": 1598},
+      {"c": "participantjourneyproduct", "line": 1599},
+      {"c": "broadcast_analytics", "line": 1704},
+      {"c": "supportdesk", "line": 1767},
+      {"c": "supportdesk/{uid}/messages", "line": 1768},
+      {"c": "broadcast_participants", "line": 1769}
+    ],
+    "services": [],
+    "dynamic": ["loadMapPlaylist iterates collectionMap keys series/recommended mix playlist/solar voice playlist/content_urls @626", "defaultsearchref path getDoc @1017", "searchquery new id @1275", "buffermix archive id @1429", "email archive docRef @1456", "wati archive docRef @1533", "broadcast writeBatch (setbatchArray/2/3) commits supportdesk + supportdesk messages + broadcast_participants @1727-1769"],
+    "atc": [],
+    "notes": "Largest screen (3034 lines) - analytics + broadcast tool. Main dataset loaded via Promise.all of ~11 collections (420-430). loadMapPlaylist (626) reads playlist collections incl 'solar voice playlist' & 'content_urls'. Broadcast batch writes supportdesk(+messages subcoll), broadcast_participants, broadcast_analytics. Also writes searchquery (saved searches), participant metadata (tags), buffermix/email/wati archive, subscription extend log + participantjourneyproduct extend."
+  },
+  {
+    "route": "participant-evolution-summary",
+    "file": "src/app/Participants Profile Management/participants-analytics/participants-evolution-summary/participants-evolution-summary.component.ts",
+    "exists": true,
+    "reads": [],
+    "writes": [],
+    "services": ["DataTransferService (data-transfer.service) - receives evolution table data from parent participants-analytics; no direct Firestore"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Child/presentational component (162 lines). Injects Firestore but makes NO collection()/getDocs/write calls; consumes data via DataTransferService and renders/exports CSV. No direct Firestore reads or writes."
+  },
+  {
+    "route": "participant-form-tracker",
+    "file": "src/app/Participants Profile Management/participant-form-tracker/participant-form-tracker.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 99},
+      {"c": "ask AH", "line": 124},
+      {"c": "love letter", "line": 124},
+      {"c": "formsByClient", "line": 124},
+      {"c": "delivery forms", "line": 306},
+      {"c": "formsByClient", "line": 307},
+      {"c": "delivery forms", "line": 409},
+      {"c": "formsByClient", "line": 410}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": ["buildQuery uses collectionName from collectionMap=['ask AH','love letter','formsByClient'] indexed by activeTab @58/124"],
+    "atc": [],
+    "notes": "Read-only form tracker. Tabbed query over 'ask AH' / 'love letter' / 'formsByClient' (collectionMap line 58, resolved in buildQuery line 124). Also reads profile_data list and delivery forms templates for display. No writes."
+  },
+  {
+    "route": "zoom-recording-dashboard",
+    "file": "src/app/Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "zoom recordings backup", "line": 27}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Small read-only dashboard (128 lines). Reads 'zoom recordings backup' collection (collRef line 27, getDocs of a query line 50). No writes."
+  },
+  {
+    "route": "email-templates",
+    "file": "src/app/Communication Center/create-email-template/create-email-template.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "email templates", "line": 443},
+      {"c": "email templates", "line": 460},
+      {"c": "email validators", "line": 556},
+      {"c": "classify", "line": 574},
+      {"c": "email templates", "line": 589}
+    ],
+    "writes": [
+      {"c": "email templates", "line": 653},
+      {"c": "email templates", "line": 672},
+      {"c": "email templates", "line": 701},
+      {"c": "email templates", "line": 1125},
+      {"c": "email templates", "line": 1155},
+      {"c": "email validators", "line": 1409}
+    ],
+    "services": [],
+    "dynamic": ["email validators doc 'templateCategories' @556/1408", "classify doc 'postmarkserver' @574", "new email templates docRef @699/1129"],
+    "atc": [],
+    "notes": "Email template editor. Reads email templates (dup-name/alias checks + list), email validators doc 'templateCategories' (categories), classify doc 'postmarkserver' (server names). Writes: create/update/soft-delete email templates (setDoc/updateDoc), and updateDoc email validators templateCategories (1409)."
+  },
+  {
+    "route": "communication",
+    "file": "src/app/Communication Center/communication/communication.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "email archive", "line": 794},
+      {"c": "myoperator calls", "line": 808},
+      {"c": "wati archive", "line": 830},
+      {"c": "notificationrecord", "line": 843},
+      {"c": "email log", "line": 931},
+      {"c": "inapp templates", "line": 950},
+      {"c": "notification templates", "line": 1014},
+      {"c": "email templates", "line": 1093},
+      {"c": "email templates", "line": 1286},
+      {"c": "wati templates", "line": 1300},
+      {"c": "notification templates", "line": 1315},
+      {"c": "inapp templates", "line": 1327},
+      {"c": "profile_data", "line": 1360},
+      {"c": "email validators", "line": 1562},
+      {"c": "email logs", "line": 1741}
+    ],
+    "writes": [
+      {"c": "inapp templates", "line": 996},
+      {"c": "notification templates", "line": 1073},
+      {"c": "email templates", "line": 1143},
+      {"c": "email templates", "line": 1179},
+      {"c": "email validators", "line": 1194},
+      {"c": "email validators", "line": 1207},
+      {"c": "dynamic (email/wati/notification/inapp templates)", "line": 1419},
+      {"c": "email validators", "line": 1464},
+      {"c": "email templates", "line": 1536},
+      {"c": "email archive", "line": 1570}
+    ],
+    "services": [],
+    "dynamic": ["collection refs assigned to this.*Collection props @352-361 (email archive, email templates, myoperator calls, wati archive, wati templates, notificationrecord, notification templates, inapp templates) then read via getDocs/collectionData", "collectionname @1400-1419 resolves to email/wati/notification/inapp templates"],
+    "atc": [],
+    "notes": "Communication hub (1897 lines). NOTE two distinct collections: 'email log' (931) and 'email logs' (1741). email validators has two docs read/written: 'templateCategories' (360/1194/1207) and 'validators' (361/1464/1562). Approve-template updateDoc (1419) targets one of email/wati/notification/inapp templates. Writes new 'email archive' doc (1570) to queue a send."
+  },
+  {
+    "route": "login",
+    "file": "src/app/login/login.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 137},
+      {"c": "dynamic (role_ref path)", "line": 157}
+    ],
+    "writes": [
+      {"c": "user", "line": 274},
+      {"c": "user_data", "line": 282}
+    ],
+    "services": [],
+    "dynamic": ["roleDocRef = doc(this.firestore, profileDocData['role_ref']['path']) getDoc @157-158"],
+    "atc": [],
+    "notes": "Login screen. Reads profile_data by email query (137) and the linked role doc via dynamic role_ref path (157). On auth, writes user (uid) and user_data (uid) docs via setDoc (274/282)."
+  },
+  {
+    "route": "eventzonemanagement",
+    "file": "src/app/Zone Management/event-zone-management/event-zone-management.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 126},
+      {"c": "users_roles", "line": 136},
+      {"c": "event zones", "line": 172},
+      {"c": "big cohorts", "line": 203},
+      {"c": "event participant zones", "line": 623},
+      {"c": "event participant zones", "line": 902}
+    ],
+    "writes": [
+      {"c": "event zones", "line": 517},
+      {"c": "event zones", "line": 598},
+      {"c": "event zones", "line": 607},
+      {"c": "event participant zones", "line": 861},
+      {"c": "event participant zones logs", "line": 865}
+    ],
+    "services": [],
+    "dynamic": ["eventref = doc(this.firestore,'event collection',selectedEvent.docid) embedded in zone/participant docs @588/851"],
+    "atc": [],
+    "notes": "Event zone manager. Reads event collection, users_roles, event zones, big cohorts, event participant zones. Writes event zones (updateDoc 517/607, setDoc merge 598) and batch-writes event participant zones + event participant zones logs (batch.set 861/865)."
+  }
+]
