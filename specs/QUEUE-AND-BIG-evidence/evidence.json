@@ -1,0 +1,3341 @@
+{
+  "doc": "QUEUE-AND-BIG",
+  "provenance": "READ-ONLY production probes (fir-sample-aae4a), 2026-06-02. Regenerate: specs/evidence/probe_*.js then split_evidence.js. ATC denylist enforced.",
+  "now": "2026-06-02",
+  "schema": {
+    "queue generation": {
+      "collection": "queue generation",
+      "count": 96,
+      "sampled": 96,
+      "sampleDocIds": [
+        "0McTJFfjLZW6Tc3X0cGc",
+        "12sDrzNScSnpNoeXjkbZ",
+        "1vlcaZU8rYvfLZs4hZ6u"
+      ],
+      "tsField": "modified",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 96
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 96
+          }
+        },
+        "stages": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 96
+          }
+        },
+        "queueadmin": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 96
+          }
+        },
+        "queuename": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 96
+          }
+        },
+        "queuestartdate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 96
+          }
+        },
+        "queueenddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 96
+          }
+        },
+        "queuementor": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "array",
+          "types": {
+            "array": 95
+          }
+        },
+        "modified": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "ts",
+          "types": {
+            "ts": 95
+          }
+        },
+        "queuevariation": {
+          "fillPct": 92,
+          "presentPct": 98,
+          "type": "array",
+          "types": {
+            "array": 88,
+            "null": 6
+          }
+        },
+        "venue": {
+          "fillPct": 90,
+          "presentPct": 90,
+          "type": "string",
+          "types": {
+            "string": 86
+          }
+        },
+        "lastregistrationdate": {
+          "fillPct": 90,
+          "presentPct": 90,
+          "type": "ts",
+          "types": {
+            "ts": 86
+          }
+        },
+        "queuetargetcapacity": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "number",
+          "types": {
+            "number": 85
+          }
+        },
+        "stagegroup": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "zoomlinkrequired": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "boolean",
+          "types": {
+            "boolean": 85
+          }
+        },
+        "stageproperty": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "map",
+          "types": {
+            "map": 85
+          }
+        },
+        "queuewelcometemplate": {
+          "fillPct": 81,
+          "presentPct": 81,
+          "type": "string",
+          "types": {
+            "string": 78
+          }
+        },
+        "availabilitygivenby": {
+          "fillPct": 78,
+          "presentPct": 78,
+          "type": "array",
+          "types": {
+            "array": 75
+          }
+        },
+        "description": {
+          "fillPct": 75,
+          "presentPct": 75,
+          "type": "string",
+          "types": {
+            "string": 72
+          }
+        },
+        "arenaeventidlist": {
+          "fillPct": 67,
+          "presentPct": 67,
+          "type": "array",
+          "types": {
+            "array": 64
+          }
+        },
+        "totalcapacity": {
+          "fillPct": 65,
+          "presentPct": 65,
+          "type": "number",
+          "types": {
+            "number": 62
+          }
+        },
+        "queuedmessage": {
+          "fillPct": 60,
+          "presentPct": 60,
+          "type": "string",
+          "types": {
+            "string": 58
+          }
+        },
+        "waitingmessage": {
+          "fillPct": 60,
+          "presentPct": 60,
+          "type": "string",
+          "types": {
+            "string": 58
+          }
+        },
+        "enablezoommeetingsdk": {
+          "fillPct": 59,
+          "presentPct": 59,
+          "type": "boolean",
+          "types": {
+            "boolean": 57
+          }
+        },
+        "ischangeworkreq": {
+          "fillPct": 52,
+          "presentPct": 52,
+          "type": "array",
+          "types": {
+            "array": 50
+          }
+        },
+        "isreviewrequired": {
+          "fillPct": 51,
+          "presentPct": 51,
+          "type": "array",
+          "types": {
+            "array": 49
+          }
+        },
+        "isdiagnosticsrequired": {
+          "fillPct": 51,
+          "presentPct": 51,
+          "type": "array",
+          "types": {
+            "array": 49
+          }
+        },
+        "diagnosticsperson": {
+          "fillPct": 51,
+          "presentPct": 51,
+          "type": "array",
+          "types": {
+            "array": 49
+          }
+        },
+        "changeworkperson": {
+          "fillPct": 51,
+          "presentPct": 51,
+          "type": "array",
+          "types": {
+            "array": 49
+          }
+        },
+        "ahperson": {
+          "fillPct": 50,
+          "presentPct": 50,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "isconsultationrequired": {
+          "fillPct": 50,
+          "presentPct": 50,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "reviewperson": {
+          "fillPct": 50,
+          "presentPct": 50,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "consultationperson": {
+          "fillPct": 50,
+          "presentPct": 50,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "isahrequired": {
+          "fillPct": 50,
+          "presentPct": 50,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "videologperson": {
+          "fillPct": 41,
+          "presentPct": 41,
+          "type": "array",
+          "types": {
+            "array": 39
+          }
+        },
+        "isvideologrequired": {
+          "fillPct": 41,
+          "presentPct": 41,
+          "type": "array",
+          "types": {
+            "array": 39
+          }
+        },
+        "queuestudio": {
+          "fillPct": 40,
+          "presentPct": 40,
+          "type": "array",
+          "types": {
+            "array": 38
+          }
+        },
+        "avtestlink": {
+          "fillPct": 35,
+          "presentPct": 35,
+          "type": "string",
+          "types": {
+            "string": 34
+          }
+        },
+        "showsnippet": {
+          "fillPct": 25,
+          "presentPct": 25,
+          "type": "boolean",
+          "types": {
+            "boolean": 24
+          }
+        },
+        "delete": {
+          "fillPct": 23,
+          "presentPct": 23,
+          "type": "boolean",
+          "types": {
+            "boolean": 22
+          }
+        },
+        "iscommunicationsdisabled": {
+          "fillPct": 23,
+          "presentPct": 23,
+          "type": "boolean",
+          "types": {
+            "boolean": 22
+          }
+        },
+        "eventid": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "string",
+          "types": {
+            "string": 19
+          }
+        },
+        "id": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        },
+        "introdescription": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        },
+        "queueavailability": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "array",
+          "types": {
+            "array": 9
+          }
+        },
+        "packageeligibility": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "array",
+          "types": {
+            "array": 8
+          }
+        },
+        "queuewelcomemessage": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "map",
+          "types": {
+            "map": 7
+          }
+        },
+        "queuedates": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "atcrequiredstages": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "queueeventname": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        }
+      },
+      "fieldCount": 50,
+      "lastWrite": "2026-06-02",
+      "writes90d": 7,
+      "writes365d": 21
+    },
+    "queue variation": {
+      "collection": "queue variation",
+      "count": 183,
+      "sampled": 100,
+      "sampleDocIds": [
+        "0L0CpsqppJEFGUjg95ER",
+        "0bH0Tm5SflXdjc7mZUYm",
+        "0cTWROY4P6xD4El0GQ33"
+      ],
+      "tsField": null,
+      "fields": {
+        "variationname": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "queueref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "stages": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "atcmodel": {
+          "fillPct": 65,
+          "presentPct": 71,
+          "type": "string",
+          "types": {
+            "string": 65,
+            "null": 6
+          }
+        }
+      },
+      "fieldCount": 4
+    },
+    "queue_token": {
+      "collection": "queue_token",
+      "count": 7046,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00dyh4CxBHvM0NjWivlu",
+        "039WJ8PpyNKV0JNGKb8f",
+        "03E7evgXvAKSRzGXv6pX"
+      ],
+      "tsField": "updatedAt",
+      "fields": {
+        "queuename": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "tokenstatus": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profile_name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "tokennumber": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "queueref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "profile_id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "productref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "stagestatus": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "createdon": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "logdate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "currentstage": {
+          "fillPct": 99,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 99,
+            "null": 1
+          }
+        },
+        "productname": {
+          "fillPct": 97,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 97,
+            "null": 3
+          }
+        },
+        "people_involved": {
+          "fillPct": 94,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 94,
+            "null": 6
+          }
+        },
+        "previousstage": {
+          "fillPct": 94,
+          "presentPct": 94,
+          "type": "string",
+          "types": {
+            "string": 94
+          }
+        },
+        "variationid": {
+          "fillPct": 87,
+          "presentPct": 95,
+          "type": "string",
+          "types": {
+            "string": 87,
+            "null": 8
+          }
+        },
+        "queueposition": {
+          "fillPct": 78,
+          "presentPct": 85,
+          "type": "number",
+          "types": {
+            "number": 78,
+            "null": 7
+          }
+        },
+        "formref": {
+          "fillPct": 61,
+          "presentPct": 61,
+          "type": "ref",
+          "types": {
+            "ref": 61
+          }
+        },
+        "preassigned": {
+          "fillPct": 39,
+          "presentPct": 39,
+          "type": "map",
+          "types": {
+            "map": 39
+          }
+        },
+        "participantproductid": {
+          "fillPct": 36,
+          "presentPct": 36,
+          "type": "string",
+          "types": {
+            "string": 36
+          }
+        },
+        "deliveryRef": {
+          "fillPct": 36,
+          "presentPct": 36,
+          "type": "ref",
+          "types": {
+            "ref": 30,
+            "string": 6
+          }
+        },
+        "manuallymoved": {
+          "fillPct": 31,
+          "presentPct": 31,
+          "type": "boolean",
+          "types": {
+            "boolean": 31
+          }
+        },
+        "bigactivityreview": {
+          "fillPct": 29,
+          "presentPct": 29,
+          "type": "boolean",
+          "types": {
+            "boolean": 29
+          }
+        },
+        "transferredfrom": {
+          "fillPct": 22,
+          "presentPct": 22,
+          "type": "ref",
+          "types": {
+            "ref": 22
+          }
+        },
+        "tokentransferredfrom": {
+          "fillPct": 22,
+          "presentPct": 22,
+          "type": "ref",
+          "types": {
+            "ref": 22
+          }
+        },
+        "status": {
+          "fillPct": 19,
+          "presentPct": 74,
+          "type": "null",
+          "types": {
+            "null": 55,
+            "string": 19
+          }
+        },
+        "tokentransferredto": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "ref",
+          "types": {
+            "ref": 16
+          }
+        },
+        "transferredto": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "ref",
+          "types": {
+            "ref": 16
+          }
+        },
+        "avtest": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "string",
+          "types": {
+            "string": 16
+          }
+        },
+        "createdAttempt": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "number",
+          "types": {
+            "number": 16
+          }
+        },
+        "selectedstageslot": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "map",
+          "types": {
+            "map": 12
+          }
+        },
+        "journeyname": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        },
+        "journeyref": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "ref",
+          "types": {
+            "ref": 12
+          }
+        },
+        "notesList": {
+          "fillPct": 11,
+          "presentPct": 11,
+          "type": "array",
+          "types": {
+            "array": 11
+          }
+        },
+        "updatedAt": {
+          "fillPct": 11,
+          "presentPct": 11,
+          "type": "ts",
+          "types": {
+            "ts": 11
+          }
+        },
+        "notes": {
+          "fillPct": 8,
+          "presentPct": 11,
+          "type": "string",
+          "types": {
+            "string": 8,
+            "null": 3
+          }
+        },
+        "liveassignmentid": {
+          "fillPct": 6,
+          "presentPct": 89,
+          "type": "null",
+          "types": {
+            "null": 83,
+            "string": 6
+          }
+        },
+        "arenaid": {
+          "fillPct": 5,
+          "presentPct": 89,
+          "type": "null",
+          "types": {
+            "null": 84,
+            "array": 5
+          }
+        },
+        "readyimplementation": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "cwmentoring": {
+          "fillPct": 2,
+          "presentPct": 94,
+          "type": "null",
+          "types": {
+            "null": 92,
+            "array": 2
+          }
+        },
+        "cwperson": {
+          "fillPct": 2,
+          "presentPct": 94,
+          "type": "null",
+          "types": {
+            "null": 92,
+            "array": 2
+          }
+        },
+        "cwshadowing": {
+          "fillPct": 2,
+          "presentPct": 94,
+          "type": "null",
+          "types": {
+            "null": 92,
+            "array": 2
+          }
+        },
+        "tags": {
+          "fillPct": 2,
+          "presentPct": 11,
+          "type": "null",
+          "types": {
+            "null": 9,
+            "array": 2
+          }
+        },
+        "denynote": {
+          "fillPct": 1,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 99,
+            "string": 1
+          }
+        },
+        "quicknotes": {
+          "fillPct": 1,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 99,
+            "string": 1
+          }
+        },
+        "studioid": {
+          "fillPct": 1,
+          "presentPct": 74,
+          "type": "null",
+          "types": {
+            "null": 73,
+            "string": 1
+          }
+        },
+        "ref": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "ref",
+          "types": {
+            "ref": 1
+          }
+        },
+        "author": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "videoaskref": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "tokendeniednote": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "diagnosticshadowing": {
+          "fillPct": 0,
+          "presentPct": 92,
+          "type": "null",
+          "types": {
+            "null": 92
+          }
+        },
+        "diagnosticmentoring": {
+          "fillPct": 0,
+          "presentPct": 92,
+          "type": "null",
+          "types": {
+            "null": 92
+          }
+        },
+        "diagnosticperson": {
+          "fillPct": 0,
+          "presentPct": 92,
+          "type": "null",
+          "types": {
+            "null": 92
+          }
+        }
+      },
+      "fieldCount": 53,
+      "lastWrite": "2026-06-02",
+      "writes90d": 268,
+      "writes365d": 767
+    },
+    "queue stage log": {
+      "collection": "queue stage log",
+      "count": 68662,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00176065-bf24-4c5c-92b6-561360b8d886",
+        "005wovd5ODpiAI1eWuu6",
+        "007qKs9m4irpQodo8c2C"
+      ],
+      "tsField": "updatedAt",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "queueref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "people_involved": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "profile_id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "productref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "queuename": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "createdon": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "currentstage": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "stagestatus": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "tokenstatus": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "tokennumber": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "productname": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "previousstage": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profile_name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "logdocid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "logdate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "variationid": {
+          "fillPct": 86,
+          "presentPct": 94,
+          "type": "string",
+          "types": {
+            "string": 86,
+            "null": 8
+          }
+        },
+        "queueposition": {
+          "fillPct": 81,
+          "presentPct": 87,
+          "type": "number",
+          "types": {
+            "number": 81,
+            "null": 6
+          }
+        },
+        "formref": {
+          "fillPct": 69,
+          "presentPct": 69,
+          "type": "ref",
+          "types": {
+            "ref": 69
+          }
+        },
+        "status": {
+          "fillPct": 40,
+          "presentPct": 76,
+          "type": "string",
+          "types": {
+            "null": 36,
+            "string": 40
+          }
+        },
+        "manuallymoved": {
+          "fillPct": 31,
+          "presentPct": 31,
+          "type": "boolean",
+          "types": {
+            "boolean": 31
+          }
+        },
+        "avtest": {
+          "fillPct": 24,
+          "presentPct": 24,
+          "type": "string",
+          "types": {
+            "string": 24
+          }
+        },
+        "movedby": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        },
+        "movedthrough": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        },
+        "preassigned": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "map",
+          "types": {
+            "map": 20
+          }
+        },
+        "liveassignmentid": {
+          "fillPct": 19,
+          "presentPct": 99,
+          "type": "null",
+          "types": {
+            "null": 80,
+            "string": 19
+          }
+        },
+        "transferredfrom": {
+          "fillPct": 17,
+          "presentPct": 17,
+          "type": "ref",
+          "types": {
+            "ref": 17
+          }
+        },
+        "tokentransferredfrom": {
+          "fillPct": 17,
+          "presentPct": 17,
+          "type": "ref",
+          "types": {
+            "ref": 17
+          }
+        },
+        "deliveryRef": {
+          "fillPct": 14,
+          "presentPct": 14,
+          "type": "string",
+          "types": {
+            "string": 13,
+            "ref": 1
+          }
+        },
+        "studioid": {
+          "fillPct": 14,
+          "presentPct": 76,
+          "type": "null",
+          "types": {
+            "null": 62,
+            "string": 14
+          }
+        },
+        "createdAttempt": {
+          "fillPct": 14,
+          "presentPct": 14,
+          "type": "number",
+          "types": {
+            "number": 14
+          }
+        },
+        "selectedstageslot": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "map",
+          "types": {
+            "map": 10
+          }
+        },
+        "participantproductid": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "string",
+          "types": {
+            "string": 10
+          }
+        },
+        "updatedAt": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "ts",
+          "types": {
+            "ts": 10
+          }
+        },
+        "notesList": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "array",
+          "types": {
+            "array": 10
+          }
+        },
+        "notes": {
+          "fillPct": 7,
+          "presentPct": 10,
+          "type": "string",
+          "types": {
+            "string": 7,
+            "null": 3
+          }
+        },
+        "arenaid": {
+          "fillPct": 5,
+          "presentPct": 99,
+          "type": "null",
+          "types": {
+            "null": 94,
+            "array": 5
+          }
+        },
+        "diagnosticperson": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 97,
+            "array": 3
+          }
+        },
+        "cwshadowing": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 97,
+            "array": 3
+          }
+        },
+        "diagnosticmentoring": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 97,
+            "array": 3
+          }
+        },
+        "cwperson": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 97,
+            "array": 3
+          }
+        },
+        "cwmentoring": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 97,
+            "array": 3
+          }
+        },
+        "diagnosticshadowing": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 97,
+            "array": 3
+          }
+        },
+        "tags": {
+          "fillPct": 3,
+          "presentPct": 10,
+          "type": "null",
+          "types": {
+            "array": 3,
+            "null": 7
+          }
+        },
+        "ref": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "ref",
+          "types": {
+            "ref": 3
+          }
+        },
+        "readyimplementation": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "author": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "journeyref": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "ref",
+          "types": {
+            "ref": 1
+          }
+        },
+        "journeyname": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "quicknotes": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 100
+          }
+        },
+        "denynote": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 100
+          }
+        }
+      },
+      "fieldCount": 51,
+      "lastWrite": "2026-06-02",
+      "writes90d": 1060,
+      "writes365d": 4199
+    },
+    "queue activity log": {
+      "collection": "queue activity log",
+      "count": 8283,
+      "sampled": 100,
+      "sampleDocIds": [
+        "01IYCeI0N9mMp5K5fKHM",
+        "01RNEN0Z6h2giwWZHtsx",
+        "01pr9gbZ0VsUAh8rC0BW"
+      ],
+      "tsField": "activitydate",
+      "fields": {
+        "participantid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "activitydate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "atcmodel": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "queueid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "activity": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "source": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "sourceref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "stagename": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "string",
+          "types": {
+            "string": 46
+          }
+        }
+      },
+      "fieldCount": 10,
+      "lastWrite": "2026-05-30",
+      "writes90d": 299,
+      "writes365d": 1720
+    },
+    "queue studio pairing": {
+      "collection": "queue studio pairing",
+      "count": 2335,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00Brn3Tg7lYRmwGEE1bE",
+        "00gQ1xpBSRhDbBKJil2r",
+        "01tUOIVjtuiiLJtelCuv"
+      ],
+      "tsField": "created",
+      "fields": {
+        "participantsactivity": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 100
+          }
+        },
+        "queueref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "participants": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "studioin": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "checkin": {
+          "fillPct": 87,
+          "presentPct": 87,
+          "type": "boolean",
+          "types": {
+            "boolean": 87
+          }
+        },
+        "atcmodel": {
+          "fillPct": 50,
+          "presentPct": 50,
+          "type": "array",
+          "types": {
+            "array": 50
+          }
+        },
+        "openvidu": {
+          "fillPct": 28,
+          "presentPct": 28,
+          "type": "boolean",
+          "types": {
+            "boolean": 28
+          }
+        },
+        "mandatoryactivities": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "array",
+          "types": {
+            "array": 12
+          }
+        },
+        "status": {
+          "fillPct": 0,
+          "presentPct": 76,
+          "type": "null",
+          "types": {
+            "null": 76
+          }
+        }
+      },
+      "fieldCount": 11,
+      "lastWrite": "2026-05-21",
+      "writes90d": 180,
+      "writes365d": 790
+    },
+    "cohorts queue planner": {
+      "collection": "cohorts queue planner",
+      "count": 46,
+      "sampled": 46,
+      "sampleDocIds": [
+        "11NufP66nY87D3GtwWbu",
+        "2McL5xSeW59V2eh00ZvL",
+        "2rElS0g02TVRe0UmOdlQ"
+      ],
+      "tsField": null,
+      "fields": {
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 46
+          }
+        },
+        "queueid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 46
+          }
+        },
+        "selectedslots": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 46
+          }
+        },
+        "docid": {
+          "fillPct": 89,
+          "presentPct": 89,
+          "type": "string",
+          "types": {
+            "string": 41
+          }
+        }
+      },
+      "fieldCount": 4
+    },
+    "big cohorts": {
+      "collection": "big cohorts",
+      "count": 345,
+      "sampled": 100,
+      "sampleDocIds": [
+        "07DwzrCBoDRPJxN57o5M",
+        "0Ck510AaNaprkWbwL2j2",
+        "0JU1O8nVcxpkbucDYZow"
+      ],
+      "tsField": "createddate",
+      "fields": {
+        "createddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "marathonref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "participantidlist": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "udpateddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "eventref": {
+          "fillPct": 80,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 80,
+            "null": 20
+          }
+        },
+        "isTemporary": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "boolean",
+          "types": {
+            "boolean": 46
+          }
+        },
+        "enableGroupChat": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "boolean",
+          "types": {
+            "boolean": 46
+          }
+        },
+        "cohortCategory": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "string",
+          "types": {
+            "string": 46
+          }
+        },
+        "tags": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "array",
+          "types": {
+            "array": 46
+          }
+        },
+        "mentors": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "array",
+          "types": {
+            "array": 46
+          }
+        },
+        "cohortType": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "string",
+          "types": {
+            "string": 46
+          }
+        },
+        "status": {
+          "fillPct": 46,
+          "presentPct": 46,
+          "type": "string",
+          "types": {
+            "string": 46
+          }
+        },
+        "team": {
+          "fillPct": 45,
+          "presentPct": 45,
+          "type": "array",
+          "types": {
+            "array": 45
+          }
+        },
+        "description": {
+          "fillPct": 31,
+          "presentPct": 45,
+          "type": "string",
+          "types": {
+            "string": 31,
+            "null": 14
+          }
+        },
+        "level": {
+          "fillPct": 24,
+          "presentPct": 46,
+          "type": "string",
+          "types": {
+            "string": 24,
+            "null": 22
+          }
+        },
+        "chatref": {
+          "fillPct": 19,
+          "presentPct": 19,
+          "type": "ref",
+          "types": {
+            "ref": 19
+          }
+        },
+        "bigactivity": {
+          "fillPct": 10,
+          "presentPct": 45,
+          "type": "null",
+          "types": {
+            "string": 10,
+            "null": 35
+          }
+        },
+        "endDate": {
+          "fillPct": 0,
+          "presentPct": 46,
+          "type": "null",
+          "types": {
+            "null": 46
+          }
+        },
+        "startDate": {
+          "fillPct": 0,
+          "presentPct": 46,
+          "type": "null",
+          "types": {
+            "null": 46
+          }
+        }
+      },
+      "fieldCount": 21,
+      "lastWrite": "2026-05-21",
+      "writes90d": 76,
+      "writes365d": 162
+    },
+    "big cohorts log": {
+      "collection": "big cohorts log",
+      "count": 6107,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00JZJYs2c7Ocjfu22b2A",
+        "00c8NzgXW86tSLoHXVuJ",
+        "01kBXw07QlkWxfvUoc4T"
+      ],
+      "tsField": "createddate",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "createddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "cohortid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "addedby": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "level": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "marathonref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "cohortType": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "cohortCategory": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "cohortname": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "addeddate": {
+          "fillPct": 99,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 99,
+            "null": 1
+          }
+        },
+        "eventref": {
+          "fillPct": 56,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 56,
+            "null": 44
+          }
+        },
+        "bigactivity": {
+          "fillPct": 2,
+          "presentPct": 70,
+          "type": "null",
+          "types": {
+            "null": 68,
+            "string": 2
+          }
+        },
+        "removedby": {
+          "fillPct": 1,
+          "presentPct": 24,
+          "type": "null",
+          "types": {
+            "null": 23,
+            "string": 1
+          }
+        },
+        "removeddate": {
+          "fillPct": 1,
+          "presentPct": 24,
+          "type": "null",
+          "types": {
+            "null": 23,
+            "ts": 1
+          }
+        },
+        "participantid": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "fromcohortid": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "fromcohortname": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "tocohortname": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        }
+      },
+      "fieldCount": 20,
+      "lastWrite": "2026-05-21",
+      "writes90d": 1392,
+      "writes365d": 6107
+    },
+    "big assignment": {
+      "collection": "big assignment",
+      "count": 63,
+      "sampled": 63,
+      "sampleDocIds": [
+        "02RaHtHAy4kZVX0wtKWd",
+        "06NIPlo8GJz51nLDn5tf",
+        "1vbS5xXCIuwQCQXPgBWk"
+      ],
+      "tsField": "createddate",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 63
+          }
+        },
+        "description": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 63
+          }
+        },
+        "startdate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 63
+          }
+        },
+        "enddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 63
+          }
+        },
+        "createddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 63
+          }
+        },
+        "assignmenttype": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 63
+          }
+        },
+        "regeneratemeeting": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 63
+          }
+        },
+        "notification": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 63
+          }
+        },
+        "participantlist": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 63
+          }
+        },
+        "participantidlist": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 63
+          }
+        },
+        "watinotification": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 63
+          }
+        },
+        "selectionMode": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 63
+          }
+        },
+        "mandatorycohortsid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 63
+          }
+        },
+        "optionalcohortsid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 63
+          }
+        },
+        "touchpoints": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 63
+          }
+        },
+        "mentoringpivots": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 63
+          }
+        },
+        "cohortsref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 63
+          }
+        },
+        "marathonref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 63
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 63
+          }
+        },
+        "participantidbycohorts": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 63
+          }
+        },
+        "lastupdateddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 63
+          }
+        },
+        "title": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 63
+          }
+        },
+        "selectedAdmin": {
+          "fillPct": 76,
+          "presentPct": 76,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "createdprofileref": {
+          "fillPct": 67,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "null": 21,
+            "ref": 42
+          }
+        },
+        "editedprofileref": {
+          "fillPct": 33,
+          "presentPct": 33,
+          "type": "array",
+          "types": {
+            "array": 21
+          }
+        },
+        "selectedform": {
+          "fillPct": 24,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 48,
+            "string": 15
+          }
+        },
+        "directive": {
+          "fillPct": 19,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "string": 12,
+            "null": 51
+          }
+        },
+        "selectedvideos": {
+          "fillPct": 19,
+          "presentPct": 63,
+          "type": "null",
+          "types": {
+            "array": 12,
+            "null": 28
+          }
+        },
+        "signature": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "string",
+          "types": {
+            "string": 3
+          }
+        },
+        "zoomdata": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "map",
+          "types": {
+            "map": 3
+          }
+        },
+        "hostid": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "string",
+          "types": {
+            "string": 3
+          }
+        },
+        "participantsignature": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "string",
+          "types": {
+            "string": 3
+          }
+        },
+        "zoomhostemail": {
+          "fillPct": 3,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 61,
+            "string": 2
+          }
+        },
+        "summary": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "actionlink": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 63
+          }
+        },
+        "product": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 63
+          }
+        },
+        "requireregistration": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 63
+          }
+        },
+        "requirevalidation": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 63
+          }
+        }
+      },
+      "fieldCount": 38,
+      "lastWrite": "2026-05-19",
+      "writes90d": 25,
+      "writes365d": 47
+    },
+    "big participants assignments": {
+      "collection": "big participants assignments",
+      "count": 484,
+      "sampled": 100,
+      "sampleDocIds": [
+        "09Vc0uKNuwbi0C2SxMGy",
+        "0B8qBz4Z9wz8UQ8f9lGg",
+        "0TelpZbjVkOm2ezZLv6A"
+      ],
+      "tsField": "createddate",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "assignmentref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "cohortsref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "marathonref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "watinotification": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "createddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "activityref": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "ref",
+          "types": {
+            "ref": 2
+          }
+        },
+        "formtemplate": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        }
+      },
+      "fieldCount": 10,
+      "lastWrite": "2026-05-19",
+      "writes90d": 63,
+      "writes365d": 157
+    },
+    "biginvitation": {
+      "collection": "biginvitation",
+      "count": 1601,
+      "sampled": 100,
+      "sampleDocIds": [
+        "03qEeM6etxwk205UJhyK",
+        "09dvU6TrOsBNebbDqEre",
+        "09pNwxIjfJFHf2i3Ejz0"
+      ],
+      "tsField": "created",
+      "fields": {
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "eventref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "eventtype": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "expirydate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "productref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "bigmarathonref": {
+          "fillPct": 48,
+          "presentPct": 49,
+          "type": "ref",
+          "types": {
+            "ref": 48,
+            "null": 1
+          }
+        },
+        "attended": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        }
+      },
+      "fieldCount": 10,
+      "lastWrite": "2026-03-19",
+      "writes90d": 5,
+      "writes365d": 314
+    },
+    "bigactivity": {
+      "collection": "bigactivity",
+      "count": 33,
+      "sampled": 33,
+      "sampleDocIds": [
+        "07NwjaW5NskTshGpI1n8",
+        "2RMOEd6qio0yTlTfSSxi",
+        "54toXo6Nl3UU03ehuV7V"
+      ],
+      "tsField": null,
+      "fields": {
+        "activity": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 33
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 33
+          }
+        },
+        "shadow": {
+          "fillPct": 82,
+          "presentPct": 82,
+          "type": "boolean",
+          "types": {
+            "boolean": 27
+          }
+        },
+        "atcproperty": {
+          "fillPct": 36,
+          "presentPct": 94,
+          "type": "null",
+          "types": {
+            "string": 12,
+            "null": 19
+          }
+        },
+        "activitytype": {
+          "fillPct": 24,
+          "presentPct": 52,
+          "type": "null",
+          "types": {
+            "null": 9,
+            "string": 8
+          }
+        },
+        "assignmentproperty": {
+          "fillPct": 0,
+          "presentPct": 12,
+          "type": "null",
+          "types": {
+            "null": 4
+          }
+        },
+        "procedureproperty": {
+          "fillPct": 0,
+          "presentPct": 12,
+          "type": "null",
+          "types": {
+            "null": 4
+          }
+        }
+      },
+      "fieldCount": 7
+    },
+    "biglevel": {
+      "collection": "biglevel",
+      "count": 20,
+      "sampled": 20,
+      "sampleDocIds": [
+        "0FlcZH4ieiIxoDZVqO6P",
+        "1JADr64ZDZdhqs434jCO",
+        "29xODd8xlIrzQEXoRyeA"
+      ],
+      "tsField": null,
+      "fields": {
+        "level": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        },
+        "sequence": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 20
+          }
+        },
+        "category": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 20
+          }
+        }
+      },
+      "fieldCount": 4
+    },
+    "accelerated evolution level": {
+      "collection": "accelerated evolution level",
+      "count": 11,
+      "sampled": 11,
+      "sampleDocIds": [
+        "4euiGI3BxdvjhOjmM09k",
+        "6dNlBd0kaKObyN2XN8fQ",
+        "LQqQjCPhMaEoTCAJGtDh"
+      ],
+      "tsField": null,
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 11
+          }
+        },
+        "sequence": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 11
+          }
+        },
+        "endpoint": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 11
+          }
+        },
+        "startpoint": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 11
+          }
+        }
+      },
+      "fieldCount": 4
+    }
+  },
+  "config": {
+    "queue generation": {
+      "collection": "queue generation",
+      "count": 96,
+      "sampled": 96,
+      "variantCount": 60,
+      "variants": [
+        {
+          "count": 6,
+          "exampleId": "9veKxEiF8f233RJ7RM3R",
+          "keys": [
+            "ahperson",
+            "availabilitygivenby",
+            "changeworkperson",
+            "consultationperson",
+            "created",
+            "description",
+            "diagnosticsperson",
+            "docid",
+            "isahrequired",
+            "ischangeworkreq",
+            "isconsultationrequired",
+            "isdiagnosticsrequired",
+            "isreviewrequired",
+            "isvideologrequired",
+            "lastregistrationdate",
+            "modified",
+            "queueadmin",
+            "queueenddate",
+            "queuementor",
+            "queuename",
+            "queuestartdate",
+            "queuestudio",
+            "queuetargetcapacity",
+            "queuevariation",
+            "queuewelcometemplate",
+            "reviewperson",
+            "stagegroup",
+            "stageproperty",
+            "stages",
+            "venue",
+            "videologperson",
+            "zoomlinkrequired"
+          ],
+          "shape": "{ahperson:array[0], queuename:str(24), venue:str(6), videologperson:array[0], queuetargetcapacity:number, isconsultationrequired:array[0], isvideologrequired:array[0], queuementor:array[2]<str(20)>, created:ts, docid:str(20), consultationperson:array[0], zoomlinkrequired:boolean, isahrequired:array[0], lastregistrationdate:ts, description:str(67), stages:array[14]<str(12)>, isdiagnosticsrequired:array[1]<str(14)>, isreviewrequired:array[1]<str(9)>, ischangeworkreq:array[1]<str(17)>, stagegroup:array[2]<str(11)>, stageproperty:{Yet to start:{actiontype:null, maxwatingminutes:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(11), stageexplanation:str(111), stagemessage:str(29)}, ATC Orientation Zoom Call:{actiontype:null, maxwatingminutes:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(11), stageexplanation:str(114), stagemessage:str(36)}, Pre Event:{actiontype:null, maxwatingminutes:null, stagemessage:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), stageexplanation:str(125)}, In Diagnostics:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, calltoaction:null, nextcalltoaction:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), participantform:array[1]<str(20)>, cwcalltoaction:str(31), cwstage:str(24)}, Ready for Diagnostics:{actiontype:null, maxwatingminutes:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), stageexplanation:str(75), stagemessage:str(41)}, In Review:{actiontype:null, maxwatingminutes:null, stagemessage:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), stageexplanation:str(22)}, Ready for Review:{actiontype:null, maxwatingminutes:null, stagemessage:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), stageexplanation:str(128)}, Completed:{actiontype:null, maxwatingminutes:null, stagemessage:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), stageexplanation:str(63)}, In Implementation:{actiontype:null, maxwatingminutes:null, stagemessage:null, consultationstage:null, actionresource:null, selfmovable:boolean, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), stageexplanation:str(92), nextcalltoaction:str(27), nextstage:str(16)}, Ready for Implementation:{actiontype:null, maxwatingminutes:null, stagemessage:null, consultationstage:null, actionresource:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, calltoaction:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(28), stageexplanation:str(150)}, Pre Video Log:{maxwatingminutes:null, consultationstage:null, selfmovable:boolean, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(11), stageexplanation:str(50), stagemessage:str(35), actiontype:str(4), actionresource:str(34), calltoaction:str(20)}, ATC Understanding Q&A:{maxwatingminutes:null, consultationstage:null, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, actiontype:str(4), actionresource:ref, stagegroup:str(11), stageexplanation:str(50), stagemessage:str(58), selfmovable:boolean, calltoaction:str(21)}, Self ATC Form:{maxwatingminutes:null, consultationstage:null, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, stagegroup:str(11), actiontype:str(4), stageexplanation:str(50), stagemessage:str(40), actionresource:ref, selfmovable:boolean, calltoaction:str(13)}, Super Metabolism Aspiration Form:{maxwatingminutes:null, consultationstage:null, nextstage:null, minwatingminutes:null, cwcalltoaction:null, cwstage:null, nextcalltoaction:null, participantform:null, consultationcalltoaction:null, messageheader:null, actiontype:str(4), actionresource:ref, stagegroup:str(11), stageexplanation:str(50), stagemessage:str(58), selfmovable:boolean, calltoaction:str(19)}}, queuevariation:array[2]<str(20)>, queuewelcometemplate:str(37), queuestartdate:ts, reviewperson:array[16]<str(20)>, diagnosticsperson:array[16]<str(20)>, availabilitygivenby:array[16]<str(20)>, changeworkperson:array[23]<str(20)>, queueadmin:array[5]<str(20)>, modified:ts, queueenddate:ts, queuestudio:array[29]<{checkin:boolean, pairing:array[1]<str(20)>, studioin:boolean}>}"
+        },
+        {
+          "count": 5,
+          "exampleId": "0McTJFfjLZW6Tc3X0cGc",
+          "keys": [
+            "arenaeventidlist",
+            "availabilitygivenby",
+            "created",
+            "description",
+            "docid",
+            "enablezoommeetingsdk",
+            "lastregistrationdate",
+            "modified",
+            "queueadmin",
+            "queuedmessage",
+            "queueenddate",
+            "queuementor",
+            "queuename",
+            "queuestartdate",
+            "queuetargetcapacity",
+            "queuevariation",
+            "queuewelcometemplate",
+            "stagegroup",
+            "stageproperty",
+            "stages",
+            "totalcapacity",
+            "venue",
+            "waitingmessage",
+            "zoomlinkrequired"
+          ],
+          "shape": "{venue:str(7), queuedmessage:str(85), docid:str(20), created:ts, queuewelcometemplate:str(4), description:str(122), queuetargetcapacity:number, stagegroup:array[0], enablezoommeetingsdk:boolean, totalcapacity:number, queuementor:array[4]<str(20)>, stages:array[20]<str(11)>, zoomlinkrequired:boolean, lastregistrationdate:ts, waitingmessage:str(163), queueadmin:array[4]<str(20)>, availabilitygivenby:array[6]<str(20)>, queuename:str(24), queuestartdate:ts, queueenddate:ts, arenaeventidlist:array[2]<str(20)>, queuevariation:array[2]<str(20)>, modified:ts, stageproperty:{Diagnostics:{actiontype:null, stageexplanation:str(100), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, mandatorystagegrouping:array[0], implementationstages:array[1]<str(14)>, nextstage:array[1]<map>, minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[5]<str(17)>, transferactivity:map, participantform:array[3]<str(20)>, transferactivityproperty:array[0], messageheader:null}, Review 4:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[3]<str(22)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Evolution Mapping Activity:{actiontype:null, stageexplanation:str(65), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Implementation:{actiontype:null, maxwatingminutes:null, stageexplanation:str(56), stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[1]<map>, minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[1]<str(11)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, At the Venue:{actiontype:null, stageexplanation:str(48), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Yet to Come:{actiontype:null, stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Consultation:{actiontype:null, stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, ATC Orientation:{actiontype:null, maxwatingminutes:null, stageexplanation:str(44), stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, ATC Assessment:{actiontype:str(4), stageexplanation:str(115), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:str(9), studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Self ATC:{actiontype:str(4), maxwatingminutes:null, stageexplanation:str(126), stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Self ATC Next Cycle:{actiontype:str(4), stageexplanation:str(126), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:str(9), studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Post Video Log:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[1]<map>, minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Completed:{actiontype:null, stageexplanation:str(102), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, uP! Life Report:{actiontype:str(4), stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Diagnostics 2:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, mandatorystagegrouping:array[0], implementationstages:array[1]<str(16)>, minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[4]<str(15)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Diagnostics 3:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[1]<str(16)>, minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[4]<str(15)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Review 1:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[3]<str(22)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Review 2:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[3]<str(22)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Diagnostics 1:{actiontype:null, stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, mandatorystagegrouping:array[0], implementationstages:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[4]<str(15)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Review 3:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Review:{actiontype:null, stageexplanation:str(59), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[3]<str(22)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Video Log:{actiontype:null, stageexplanation:str(77), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[1]<str(14)>, minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[4]<str(15)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[2]<map>}, Implementation 3:{actiontype:null, stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[1]<str(11)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Implementation 2:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, mandatorystagegrouping:array[0], implementationstages:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[1]<str(11)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Implementation 4:{actiontype:null, stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[1]<str(11)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Diagnostics 4:{actiontype:null, stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, mandatorystagegrouping:array[0], implementationstages:array[1]<str(16)>, minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[4]<str(15)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}, Implementation 1:{actiontype:null, stageexplanation:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[1]<str(11)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, nextstage:array[1]<map>}}}"
+        },
+        {
+          "count": 5,
+          "exampleId": "J4wxaa94s6a3NCNvhd03",
+          "keys": [
+            "arenaeventidlist",
+            "availabilitygivenby",
+            "avtestlink",
+            "created",
+            "description",
+            "docid",
+            "enablezoommeetingsdk",
+            "lastregistrationdate",
+            "modified",
+            "queueadmin",
+            "queuedmessage",
+            "queueenddate",
+            "queuementor",
+            "queuename",
+            "queuestartdate",
+            "queuetargetcapacity",
+            "queuevariation",
+            "queuewelcometemplate",
+            "showsnippet",
+            "stagegroup",
+            "stageproperty",
+            "stages",
+            "totalcapacity",
+            "venue",
+            "waitingmessage",
+            "zoomlinkrequired"
+          ],
+          "shape": "{venue:str(6), queuedmessage:str(85), docid:str(20), created:ts, queuewelcometemplate:str(22), description:str(141), queuetargetcapacity:number, stagegroup:array[0], queuementor:array[5]<str(20)>, zoomlinkrequired:boolean, waitingmessage:str(163), queueadmin:array[6]<str(20)>, queuename:str(54), lastregistrationdate:ts, queuevariation:array[3]<str(20)>, arenaeventidlist:array[3]<str(20)>, enablezoommeetingsdk:boolean, queuestartdate:ts, stages:array[22]<str(12)>, availabilitygivenby:array[11]<str(20)>, showsnippet:boolean, stageproperty:{Yet to Start:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, In Evolution Mapping Activity:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Evolution Mapping Activity:{actiontype:null, maxwatingminutes:null, stageexplanation:str(256), stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Implementation:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, messageheader:null}, ATC Orientation:{actiontype:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, messageheader:null}, Completed:{actiontype:null, stageexplanation:str(83), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, ATC Orientation Group Call:{actiontype:null, maxwatingminutes:null, stagemessage:null, selfmovable:boolean, actionresource:null, mandatorystagegrouping:array[0], implementationstages:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, compulsoryactivity:map, nextstage:array[0], stageexplanation:str(242)}, uP! Life Aspiration Report:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(241)}, ATC Orientation Form:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:ref, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(98)}, Diagnostics:{actiontype:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[2]<map>, minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[5]<str(17)>, transferactivity:map, participantform:array[2]<str(20)>, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(182)}, Self Evolution Report:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(175)}, Video Log:{actiontype:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[2]<map>, minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(208)}, Self ATC:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:ref, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:str(9), optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(166)}, Wellness Scaling Form:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(173)}, Self Evaluation Form:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, stagegroup:null, calltoaction:str(9), studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(214)}, Self ATC Next Cycle:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(225)}, uP! Life Report:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:ref, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:str(9), stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(130)}, Triple ATC:{actiontype:str(4), maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(199)}, Triple ATC Validation:{actiontype:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, selfmovable:boolean, actionresource:null, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[1]<str(13)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(187)}, uP! Readiness Changework:{actiontype:null, maxwatingminutes:null, stagemessage:null, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[2]<map>, minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[1]<str(11)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(328), compulsoryactivity:map}, Diagnostics Readiness Changework:{actiontype:null, maxwatingminutes:null, stagemessage:null, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[1]<map>, minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[2]<str(22)>, transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(320), compulsoryactivity:map}, Review:{actiontype:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], minwatingminutes:null, stagegroup:null, calltoaction:null, studiowidgets:array[0], participantform:null, messageheader:null, stageexplanation:str(240), optionalstagegrouping:array[2]<str(11)>, mandatorystagegrouping:array[1]<str(12)>, transferactivity:map, transferactivityproperty:array[11]<map>, nextstage:array[2]<map>}, In ATC Orientation Group Call:{actiontype:null, maxwatingminutes:null, stageexplanation:str(87), stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null}, Consultation:{actiontype:null, maxwatingminutes:null, stagemessage:null, compulsoryactivity:map, actionresource:null, selfmovable:boolean, mandatorystagegrouping:array[0], implementationstages:array[1]<str(24)>, nextstage:array[2]<map>, minwatingminutes:null, stagegroup:null, calltoaction:null, optionalstagegrouping:array[0], transferactivity:map, participantform:array[2]<str(20)>, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(147), studiowidgets:array[6]<str(17)>}}, avtestlink:str(74), totalcapacity:number, modified:ts, queueenddate:ts}"
+        },
+        {
+          "count": 3,
+          "exampleId": "1vlcaZU8rYvfLZs4hZ6u",
+          "keys": [
+            "ahperson",
+            "arenaeventidlist",
+            "availabilitygivenby",
+            "avtestlink",
+            "changeworkperson",
+            "consultationperson",
+            "created",
+            "delete",
+            "description",
+            "diagnosticsperson",
+            "docid",
+            "enablezoommeetingsdk",
+            "isahrequired",
+            "ischangeworkreq",
+            "isconsultationrequired",
+            "isdiagnosticsrequired",
+            "isreviewrequired",
+            "isvideologrequired",
+            "lastregistrationdate",
+            "modified",
+            "queueadmin",
+            "queuedmessage",
+            "queueenddate",
+            "queuementor",
+            "queuename",
+            "queuestartdate",
+            "queuestudio",
+            "queuetargetcapacity",
+            "queuevariation",
+            "queuewelcometemplate",
+            "reviewperson",
+            "stagegroup",
+            "stageproperty",
+            "stages",
+            "totalcapacity",
+            "venue",
+            "videologperson",
+            "waitingmessage",
+            "zoomlinkrequired"
+          ],
+          "shape": "{isvideologrequired:array[0], isahrequired:array[0], ahperson:array[0], isconsultationrequired:array[0], consultationperson:array[0], videologperson:array[0], ischangeworkreq:array[1]<str(17)>, stagegroup:array[2]<str(14)>, created:ts, queuewelcometemplate:str(10), isreviewrequired:array[1]<str(9)>, totalcapacity:number, queuedmessage:str(85), zoomlinkrequired:boolean, queuetargetcapacity:number, waitingmessage:str(163), venue:str(6), description:str(130), queuementor:array[2]<str(20)>, avtestlink:str(66), reviewperson:array[27]<str(20)>, enablezoommeetingsdk:boolean, diagnosticsperson:array[14]<str(20)>, changeworkperson:array[40]<str(20)>, queueadmin:array[5]<str(20)>, isdiagnosticsrequired:array[1]<str(14)>, lastregistrationdate:ts, queuestudio:array[37]<{studioin:boolean, checkin:boolean, pairing:array[1]<str(20)>}>, docid:str(20), queuename:str(24), queuestartdate:ts, queueenddate:ts, queuevariation:array[2]<str(20)>, arenaeventidlist:array[2]<str(20)>, delete:boolean, availabilitygivenby:array[40]<str(20)>, stageproperty:{ATC Orientation:{nextstage:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], transferactivityproperty:array[0], studiowidgets:array[0], cwstage:null, cwcalltoaction:null, maxwatingminutes:null, stagegroup:str(14), messageheader:null, calltoaction:null, nextcalltoaction:null, consultationstage:null, transferactivity:map, stageexplanation:str(242), actiontype:null, selfmovable:boolean, participantform:null, actionresource:null, minwatingminutes:null, stagemessage:null, consultationcalltoaction:null, compulsoryactivity:map}, In Diagnostics:{implementationstages:array[0], transferactivityproperty:array[0], mandatorystagegrouping:array[0], studiowidgets:array[0], optionalstagegrouping:array[0], nextstage:array[0], consultationstage:null, stagegroup:str(27), messageheader:null, minwatingminutes:null, stagemessage:null, actiontype:null, compulsoryactivity:map, participantform:array[1]<str(20)>, transferactivity:map, actionresource:null, maxwatingminutes:null, selfmovable:boolean, stageexplanation:null, cwcalltoaction:str(31), nextcalltoaction:null, calltoaction:null, consultationcalltoaction:null, cwstage:str(24)}, In Review:{transferactivityproperty:array[0], studiowidgets:array[0], implementationstages:array[0], nextstage:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], transferactivity:map, minwatingminutes:null, messageheader:null, stagemessage:null, selfmovable:boolean, actiontype:null, cwcalltoaction:null, stagegroup:str(27), actionresource:null, cwstage:null, participantform:null, compulsoryactivity:map, nextcalltoaction:null, consultationstage:null, consultationcalltoaction:null, maxwatingminutes:null, calltoaction:null, stageexplanation:null}, Ready for Diagnostic:{optionalstagegrouping:array[0], nextstage:array[0], implementationstages:array[0], transferactivityproperty:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], stageexplanation:null, cwstage:null, consultationcalltoaction:null, compulsoryactivity:map, participantform:null, transferactivity:map, selfmovable:boolean, messageheader:null, stagemessage:null, nextcalltoaction:null, consultationstage:null, maxwatingminutes:null, actionresource:null, minwatingminutes:null, stagegroup:str(27), cwcalltoaction:null, calltoaction:null, actiontype:null}, CTD Aspiration Form:{studiowidgets:array[0], transferactivityproperty:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], nextstage:array[0], stagemessage:null, transferactivity:map, stageexplanation:str(83), minwatingminutes:null, stagegroup:str(14), calltoaction:str(9), messageheader:null, maxwatingminutes:null, selfmovable:boolean, actionresource:ref, actiontype:str(4), compulsoryactivity:map, participantform:null}, Self ATC:{nextstage:array[0], optionalstagegrouping:array[0], transferactivityproperty:array[0], mandatorystagegrouping:array[0], studiowidgets:array[0], implementationstages:array[0], nextcalltoaction:null, actionresource:ref, participantform:null, cwstage:null, cwcalltoaction:null, messageheader:null, selfmovable:boolean, calltoaction:str(9), actiontype:str(4), consultationstage:null, maxwatingminutes:null, consultationcalltoaction:null, stagemessage:null, stagegroup:str(14), transferactivity:map, compulsoryactivity:map, minwatingminutes:null, stageexplanation:str(161)}, Diagnostics:{optionalstagegrouping:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], stageexplanation:str(183), studiowidgets:array[4]<str(15)>, minwatingminutes:null, maxwatingminutes:null, stagemessage:null, actionresource:null, compulsoryactivity:map, actiontype:null, selfmovable:boolean, implementationstages:array[2]<str(11)>, nextstage:array[2]<map>, participantform:array[3]<str(20)>, transferactivity:map, messageheader:null, stagegroup:str(27), calltoaction:null}, In Implementation:{transferactivityproperty:array[0], optionalstagegrouping:array[0], implementationstages:array[0], nextstage:array[0], mandatorystagegrouping:array[0], studiowidgets:array[0], actiontype:null, stagemessage:null, stageexplanation:null, actionresource:null, maxwatingminutes:null, stagegroup:str(27), messageheader:null, participantform:null, selfmovable:boolean, transferactivity:map, calltoaction:null, nextcalltoaction:str(27), consultationstage:null, cwstage:null, minwatingminutes:null, consultationcalltoaction:null, compulsoryactivity:map, cwcalltoaction:null}, Self ATC Next Cycle:{transferactivityproperty:array[0], nextstage:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], studiowidgets:array[0], implementationstages:array[0], participantform:null, transferactivity:map, stageexplanation:str(226), cwstage:null, maxwatingminutes:null, minwatingminutes:null, stagegroup:str(14), actionresource:ref, cwcalltoaction:null, consultationstage:null, consultationcalltoaction:null, stagemessage:null, calltoaction:str(9), actiontype:str(4), compulsoryactivity:map, selfmovable:boolean, nextcalltoaction:null, messageheader:null}, Review:{mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], transferactivityproperty:array[0], transferactivity:map, maxwatingminutes:null, calltoaction:null, minwatingminutes:null, nextstage:array[2]<map>, studiowidgets:array[4]<str(15)>, messageheader:null, actiontype:null, stageexplanation:str(59), stagegroup:str(27), compulsoryactivity:map, participantform:null, selfmovable:boolean, actionresource:null, stagemessage:null}, In ATC Orientation:{nextstage:array[0], optionalstagegrouping:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], implementationstages:array[0], stageexplanation:str(87), calltoaction:null, actionresource:null, maxwatingminutes:null, stagemessage:null, stagegroup:str(14), selfmovable:boolean, participantform:null, messageheader:null, compulsoryactivity:map, minwatingminutes:null, actiontype:null, transferactivity:map}, Pre Event:{optionalstagegrouping:array[0], studiowidgets:array[0], nextstage:array[0], transferactivityproperty:array[0], mandatorystagegrouping:array[0], implementationstages:array[0], messageheader:null, selfmovable:boolean, consultationstage:null, stagegroup:str(27), cwcalltoaction:null, stagemessage:null, consultationcalltoaction:null, actiontype:null, calltoaction:null, minwatingminutes:null, participantform:null, nextcalltoaction:null, compulsoryactivity:map, cwstage:null, transferactivity:map, maxwatingminutes:null, stageexplanation:str(124), actionresource:null}, Post Video Log:{nextstage:array[0], optionalstagegrouping:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], implementationstages:array[0], maxwatingminutes:null, messageheader:null, consultationcalltoaction:null, actionresource:str(34), stagegroup:str(14), cwcalltoaction:null, stagemessage:null, transferactivity:map, calltoaction:str(17), cwstage:null, minwatingminutes:null, compulsoryactivity:map, nextcalltoaction:null, stageexplanation:str(70), selfmovable:boolean, participantform:null, actiontype:str(4), consultationstage:null}, Implementation:{mandatorystagegrouping:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], implementationstages:array[0], participantform:null, transferactivity:map, messageheader:null, actiontype:null, minwatingminutes:null, selfmovable:boolean, actionresource:null, maxwatingminutes:null, nextstage:array[2]<map>, calltoaction:null, stagemessage:null, studiowidgets:array[1]<str(11)>, stageexplanation:str(67), stagegroup:str(27), compulsoryactivity:map}, Completed:{implementationstages:array[0], nextstage:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], messageheader:null, consultationstage:null, selfmovable:boolean, cwstage:null, minwatingminutes:null, actiontype:null, transferactivity:map, nextcalltoaction:null, consultationcalltoaction:null, stagegroup:str(27), stageexplanation:str(87), maxwatingminutes:null, actionresource:null, compulsoryactivity:map, calltoaction:null, cwcalltoaction:null, participantform:null, stagemessage:null}, ATC Understanding Validation:{implementationstages:array[0], optionalstagegrouping:array[0], nextstage:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], consultationstage:null, stageexplanation:str(84), participantform:null, transferactivity:map, cwcalltoaction:null, consultationcalltoaction:null, stagemessage:null, selfmovable:boolean, nextcalltoaction:null, messageheader:null, calltoaction:str(9), actiontype:str(4), compulsoryactivity:map, cwstage:null, actionresource:ref, minwatingminutes:null, stagegroup:str(14), maxwatingminutes:null}, Ready for Implementation:{mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], studiowidgets:array[0], cwstage:null, messageheader:null, stagegroup:str(27), participantform:null, consultationcalltoaction:null, transferactivity:map, compulsoryactivity:map, selfmovable:boolean, nextcalltoaction:null, actiontype:null, minwatingminutes:null, cwcalltoaction:null, calltoaction:null, maxwatingminutes:null, stageexplanation:null, stagemessage:null, actionresource:null, consultationstage:null}, Yet to start:{implementationstages:array[0], nextstage:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], stagegroup:str(14), consultationstage:null, calltoaction:null, nextcalltoaction:null, maxwatingminutes:null, actionresource:null, minwatingminutes:null, consultationcalltoaction:null, stageexplanation:null, compulsoryactivity:map, stagemessage:null, cwstage:null, actiontype:null, transferactivity:map, cwcalltoaction:null, selfmovable:boolean, messageheader:null, participantform:null}, Video Ask:{studiowidgets:array[0], transferactivityproperty:array[0], nextstage:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], actiontype:str(8), stagegroup:null, transferactivity:map, selfmovable:boolean, calltoaction:str(17), actionresource:array[1]<ref>, compulsoryactivity:map, minwatingminutes:number, stagemessage:null, messageheader:null, maxwatingminutes:number, participantform:null, stageexplanation:str(60)}, Ready for Review:{mandatorystagegrouping:array[0], transferactivityproperty:array[0], nextstage:array[0], optionalstagegrouping:array[0], implementationstages:array[0], studiowidgets:array[0], nextcalltoaction:null, stagegroup:str(27), transferactivity:map, participantform:null, cwcalltoaction:null, actiontype:null, messageheader:null, cwstage:null, stageexplanation:null, consultationcalltoaction:null, maxwatingminutes:null, consultationstage:null, stagemessage:null, calltoaction:null, minwatingminutes:null, selfmovable:boolean, actionresource:null, compulsoryactivity:map}, Video Log:{studiowidgets:array[0], nextstage:array[0], transferactivityproperty:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], stagegroup:str(14), actionresource:array[4]<ref>, participantform:null, transferactivity:map, minwatingminutes:number, actiontype:str(8), messageheader:null, maxwatingminutes:number, consultationstage:null, cwstage:null, cwcalltoaction:null, calltoaction:str(16), nextcalltoaction:null, selfmovable:boolean, consultationcalltoaction:null, stagemessage:null, stageexplanation:str(70), compulsoryactivity:map}, Evolution Mapping:{actiontype:str(16), maxwatingminutes:null, stageexplanation:str(46), stagemessage:null, compulsoryactivity:map, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], nextstage:array[0], minwatingminutes:null, calltoaction:null, stagegroup:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, actionresource:str(43)}}, stages:array[13]<str(12)>, modified:ts}"
+        },
+        {
+          "count": 3,
+          "exampleId": "39UWZvnDNZBnKTYu0S0O",
+          "keys": [
+            "arenaeventidlist",
+            "availabilitygivenby",
+            "avtestlink",
+            "created",
+            "delete",
+            "description",
+            "docid",
+            "enablezoommeetingsdk",
+            "lastregistrationdate",
+            "modified",
+            "queueadmin",
+            "queuedmessage",
+            "queueenddate",
+            "queuementor",
+            "queuename",
+            "queuestartdate",
+            "queuetargetcapacity",
+            "queuevariation",
+            "queuewelcometemplate",
+            "showsnippet",
+            "stagegroup",
+            "stageproperty",
+            "stages",
+            "totalcapacity",
+            "venue",
+            "waitingmessage",
+            "zoomlinkrequired"
+          ],
+          "shape": "{docid:str(20), zoomlinkrequired:boolean, queuestartdate:ts, queuevariation:null, queueadmin:array[7]<str(20)>, venue:str(6), stages:array[25]<str(12)>, waitingmessage:str(163), queuewelcometemplate:str(22), queuename:str(52), queuedmessage:str(85), totalcapacity:number, showsnippet:boolean, arenaeventidlist:array[0], stagegroup:array[2]<str(14)>, stageproperty:{Implementation:{selfmovable:boolean, actiontype:null, minwatingminutes:null, nextstage:array[0], optionalstagegrouping:array[0], actionresource:null, compulsoryactivity:map, calltoaction:null, stagegroup:null, maxwatingminutes:null, studiowidgets:array[0], stageexplanation:null, transferactivity:map, stagemessage:null, messageheader:null, mandatorystagegrouping:array[0], implementationstages:array[0]}, Self Evolution Report:{selfmovable:boolean, minwatingminutes:null, transferactivityproperty:array[0], stagegroup:str(26), implementationstages:array[0], maxwatingminutes:null, calltoaction:str(9), stageexplanation:str(175), actiontype:str(4), mandatorystagegrouping:array[0], nextstage:array[0], actionresource:ref, transferactivity:map, studiowidgets:array[0], messageheader:null, participantform:null, compulsoryactivity:map, optionalstagegrouping:array[0], stagemessage:null}, ATC Orientation Form:{stagemessage:null, stagegroup:str(14), selfmovable:boolean, actionresource:ref, participantform:null, nextstage:array[0], calltoaction:str(9), studiowidgets:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], minwatingminutes:null, maxwatingminutes:null, transferactivity:map, actiontype:str(4), messageheader:null, mandatorystagegrouping:array[0], stageexplanation:str(98), compulsoryactivity:map, implementationstages:array[0]}, uP! Life Aspiration Report:{calltoaction:str(9), messageheader:null, participantform:null, nextstage:array[0], studiowidgets:array[0], transferactivity:map, stagemessage:null, actiontype:str(4), optionalstagegrouping:array[0], stageexplanation:str(241), transferactivityproperty:array[0], implementationstages:array[0], compulsoryactivity:map, maxwatingminutes:null, actionresource:ref, mandatorystagegrouping:array[0], stagegroup:str(14), selfmovable:boolean, minwatingminutes:null}, Junk:{stagemessage:null, studiowidgets:array[0], nextstage:array[0], transferactivity:map, compulsoryactivity:map, calltoaction:str(4), messageheader:null, minwatingminutes:null, transferactivityproperty:array[0], selfmovable:boolean, participantform:null, optionalstagegrouping:array[0], actiontype:null, stagegroup:null, stageexplanation:str(4), maxwatingminutes:null, implementationstages:array[0], mandatorystagegrouping:array[0]}, In ATC Orientation Group Call:{participantform:null, minwatingminutes:null, calltoaction:null, optionalstagegrouping:array[0], studiowidgets:array[0], implementationstages:array[0], selfmovable:boolean, actiontype:null, nextstage:array[0], stageexplanation:str(87), transferactivity:map, stagemessage:null, mandatorystagegrouping:array[0], transferactivityproperty:array[0], actionresource:null, compulsoryactivity:map, stagegroup:str(14), messageheader:null, maxwatingminutes:null}, Evolution Mapping Activity:{minwatingminutes:null, stagegroup:str(14), transferactivity:map, compulsoryactivity:map, stageexplanation:str(256), messageheader:null, implementationstages:array[0], calltoaction:null, maxwatingminutes:null, studiowidgets:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], actiontype:null, selfmovable:boolean, nextstage:array[0], participantform:null, transferactivityproperty:array[0], actionresource:null, stagemessage:null}, Wellness Scaling Form:{optionalstagegrouping:array[0], calltoaction:str(9), actiontype:str(4), compulsoryactivity:map, stageexplanation:str(173), actionresource:ref, transferactivityproperty:array[0], selfmovable:boolean, nextstage:array[0], minwatingminutes:null, stagegroup:str(14), messageheader:null, mandatorystagegrouping:array[0], participantform:null, stagemessage:null, implementationstages:array[0], studiowidgets:array[0], transferactivity:map, maxwatingminutes:null}, ATC Orientation:{stagemessage:null, actiontype:null, messageheader:null, selfmovable:boolean, mandatorystagegrouping:array[0], nextstage:array[0], maxwatingminutes:null, minwatingminutes:null, stagegroup:null, studiowidgets:array[0], calltoaction:null, implementationstages:array[0], compulsoryactivity:map, optionalstagegrouping:array[0], transferactivity:map, stageexplanation:null, actionresource:null}, Ready for Diagnostics:{messageheader:null, transferactivity:map, mandatorystagegrouping:array[0], minwatingminutes:null, selfmovable:boolean, transferactivityproperty:array[0], studiowidgets:array[0], actiontype:null, nextstage:array[0], stagegroup:str(14), optionalstagegrouping:array[0], participantform:null, maxwatingminutes:null, compulsoryactivity:map, implementationstages:array[0], stagemessage:null, stageexplanation:null, calltoaction:null}, Diagnostics Readiness Changework:{minwatingminutes:null, transferactivityproperty:array[0], optionalstagegrouping:array[0], actionresource:null, studiowidgets:array[2]<str(22)>, compulsoryactivity:map, stagemessage:null, implementationstages:array[0], transferactivity:map, mandatorystagegrouping:array[0], stagegroup:str(26), selfmovable:boolean, maxwatingminutes:null, actiontype:str(4), participantform:null, messageheader:null, calltoaction:null, stageexplanation:str(320), nextstage:array[1]<map>}, In Evolution Mapping Activity:{stagemessage:null, actionresource:null, studiowidgets:array[0], nextstage:array[0], minwatingminutes:null, messageheader:null, optionalstagegrouping:array[0], implementationstages:array[0], stagegroup:str(14), calltoaction:null, maxwatingminutes:null, actiontype:null, transferactivityproperty:array[0], selfmovable:boolean, stageexplanation:null, mandatorystagegrouping:array[0], transferactivity:map, compulsoryactivity:map, participantform:null}, In-person Completed:{stagegroup:null, compulsoryactivity:map, stageexplanation:null, transferactivityproperty:array[0], stagemessage:null, studiowidgets:array[0], optionalstagegrouping:array[0], transferactivity:map, mandatorystagegrouping:array[0], minwatingminutes:null, nextstage:array[0], messageheader:null, calltoaction:null, maxwatingminutes:null, participantform:null, selfmovable:boolean, implementationstages:array[0], actiontype:null}, Review:{maxwatingminutes:null, stageexplanation:str(240), studiowidgets:array[0], mandatorystagegrouping:array[1]<str(12)>, actiontype:str(4), stagegroup:str(26), minwatingminutes:null, stagemessage:null, participantform:null, compulsoryactivity:map, implementationstages:array[0], optionalstagegrouping:array[2]<str(11)>, actionresource:null, calltoaction:null, transferactivityproperty:array[11]<map>, transferactivity:map, nextstage:array[2]<map>, selfmovable:boolean, messageheader:null}, Video Log:{actionresource:str(84), actiontype:null, nextstage:array[2]<map>, maxwatingminutes:null, participantform:null, mandatorystagegrouping:array[0], calltoaction:null, transferactivity:map, compulsoryactivity:map, messageheader:null, minwatingminutes:null, selfmovable:boolean, implementationstages:array[0], stagegroup:str(14), stagemessage:null, stageexplanation:str(208), studiowidgets:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0]}, Diagnostics:{studiowidgets:array[4]<str(17)>, selfmovable:boolean, transferactivityproperty:array[0], stagemessage:null, participantform:array[2]<str(20)>, stageexplanation:str(182), maxwatingminutes:null, compulsoryactivity:map, stagegroup:str(26), implementationstages:array[0], mandatorystagegrouping:array[0], transferactivity:map, minwatingminutes:null, calltoaction:null, nextstage:array[3]<map>, actiontype:str(4), optionalstagegrouping:array[0], actionresource:null, messageheader:null}, uP! Life Report:{transferactivity:map, calltoaction:str(9), stagegroup:str(14), optionalstagegrouping:array[0], studiowidgets:array[0], maxwatingminutes:null, nextstage:array[0], selfmovable:boolean, mandatorystagegrouping:array[0], compulsoryactivity:map, implementationstages:array[0], actionresource:ref, minwatingminutes:null, actiontype:str(4), participantform:null, stageexplanation:str(130), transferactivityproperty:array[0], messageheader:null, stagemessage:null}, Self ATC Next Cycle:{stageexplanation:str(225), transferactivity:map, participantform:null, transferactivityproperty:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, stagemessage:null, messageheader:null, actionresource:ref, implementationstages:array[0], studiowidgets:array[0], selfmovable:boolean, nextstage:array[0], optionalstagegrouping:array[0], actiontype:str(4), compulsoryactivity:map, maxwatingminutes:null, calltoaction:str(9), stagegroup:str(14)}, uP! Readiness Changework:{calltoaction:null, transferactivity:map, mandatorystagegrouping:array[0], compulsoryactivity:map, transferactivityproperty:array[0], maxwatingminutes:null, optionalstagegrouping:array[0], implementationstages:array[0], selfmovable:boolean, actionresource:null, actiontype:str(4), stagegroup:str(26), minwatingminutes:null, nextstage:array[2]<map>, messageheader:null, participantform:null, stagemessage:null, stageexplanation:str(328), studiowidgets:array[1]<str(11)>}, Triple ATC:{transferactivity:map, actionresource:str(44), mandatorystagegrouping:array[0], maxwatingminutes:null, compulsoryactivity:map, selfmovable:boolean, participantform:null, implementationstages:array[0], calltoaction:str(10), minwatingminutes:null, messageheader:null, stagegroup:null, stagemessage:null, optionalstagegrouping:array[0], studiowidgets:array[0], transferactivityproperty:array[0], actiontype:str(4), nextstage:array[0], stageexplanation:str(285)}, Consultation:{mandatorystagegrouping:array[0], actiontype:str(4), actionresource:null, stagemessage:null, optionalstagegrouping:array[0], transferactivity:map, participantform:array[3]<str(20)>, transferactivityproperty:array[0], stageexplanation:str(147), minwatingminutes:null, nextstage:array[3]<map>, selfmovable:boolean, compulsoryactivity:map, maxwatingminutes:null, messageheader:null, implementationstages:array[1]<str(24)>, calltoaction:null, stagegroup:str(26), studiowidgets:array[8]<str(17)>}, Completed:{compulsoryactivity:map, stagegroup:str(26), participantform:null, messageheader:null, nextstage:array[0], transferactivity:map, transferactivityproperty:array[0], stageexplanation:str(83), actionresource:null, calltoaction:null, minwatingminutes:null, studiowidgets:array[0], stagemessage:null, mandatorystagegrouping:array[0], maxwatingminutes:null, selfmovable:boolean, implementationstages:array[0], optionalstagegrouping:array[0], actiontype:null}, Triple ATC Validation:{nextstage:array[0], maxwatingminutes:null, stagegroup:null, stagemessage:null, transferactivity:map, participantform:null, mandatorystagegrouping:array[0], calltoaction:null, selfmovable:boolean, actiontype:str(4), minwatingminutes:null, transferactivityproperty:array[0], messageheader:null, implementationstages:array[0], studiowidgets:array[1]<str(13)>, optionalstagegrouping:array[0], actionresource:null, compulsoryactivity:map, stageexplanation:str(187)}, Accelerated Evolution Level Form:{studiowidgets:array[0], maxwatingminutes:null, messageheader:null, actionresource:ref, actiontype:str(4), implementationstages:array[0], transferactivity:map, optionalstagegrouping:array[0], calltoaction:str(9), transferactivityproperty:array[0], mandatorystagegrouping:array[0], stagemessage:null, stagegroup:null, participantform:null, selfmovable:boolean, nextstage:array[0], minwatingminutes:null, compulsoryactivity:map, stageexplanation:null}, ATC Orientation Group Call:{transferactivityproperty:array[0], nextstage:array[0], compulsoryactivity:map, minwatingminutes:null, maxwatingminutes:null, implementationstages:array[0], selfmovable:boolean, optionalstagegrouping:array[0], mandatorystagegrouping:array[0], stageexplanation:str(242), calltoaction:null, actionresource:null, studiowidgets:array[0], stagemessage:null, actiontype:null, stagegroup:str(14), participantform:null, transferactivity:map, messageheader:null}, Diagnostics In-person:{stageexplanation:null, selfmovable:boolean, participantform:null, stagemessage:null, transferactivityproperty:array[0], messageheader:null, studiowidgets:array[4]<str(17)>, mandatorystagegrouping:array[0], calltoaction:null, implementationstages:array[0], compulsoryactivity:map, minwatingminutes:null, stagegroup:null, nextstage:array[2]<map>, maxwatingminutes:null, transferactivity:map, optionalstagegrouping:array[0], actiontype:null}, Self ATC:{participantform:null, optionalstagegrouping:array[0], stagemessage:null, nextstage:array[0], mandatorystagegrouping:array[0], studiowidgets:array[0], actionresource:ref, actiontype:str(4), maxwatingminutes:null, stagegroup:str(14), transferactivity:map, minwatingminutes:null, compulsoryactivity:map, transferactivityproperty:array[0], calltoaction:str(9), messageheader:null, implementationstages:array[0], stageexplanation:str(166), selfmovable:boolean}, Consultation In-person:{studiowidgets:array[6]<str(17)>, transferactivityproperty:array[0], minwatingminutes:null, actiontype:null, maxwatingminutes:null, selfmovable:boolean, stagegroup:null, mandatorystagegrouping:array[0], participantform:null, calltoaction:null, implementationstages:array[0], stageexplanation:null, compulsoryactivity:map, messageheader:null, nextstage:array[1]<map>, stagemessage:null, transferactivity:map, optionalstagegrouping:array[0]}, Expanding Horizon Consultation:{compulsoryactivity:map, participantform:null, studiowidgets:array[4]<str(17)>, mandatorystagegrouping:array[0], selfmovable:boolean, stageexplanation:null, messageheader:null, maxwatingminutes:null, implementationstages:array[0], actiontype:null, transferactivityproperty:array[0], stagemessage:null, nextstage:array[0], calltoaction:null, transferactivity:map, minwatingminutes:null, stagegroup:null, optionalstagegrouping:array[0]}, Yet to Start:{transferactivityproperty:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, nextstage:array[0], compulsoryactivity:map, studiowidgets:array[0], actiontype:null, stagemessage:null, selfmovable:boolean, optionalstagegrouping:array[0], calltoaction:null, stagegroup:str(14), participantform:null, stageexplanation:null, actionresource:null, implementationstages:array[0], maxwatingminutes:null, messageheader:null, transferactivity:map}, Self Evaluation Form:{studiowidgets:array[0], compulsoryactivity:map, maxwatingminutes:null, selfmovable:boolean, actionresource:ref, optionalstagegrouping:array[0], minwatingminutes:null, messageheader:null, participantform:null, actiontype:str(4), stageexplanation:str(214), transferactivity:map, nextstage:array[0], transferactivityproperty:array[0], stagegroup:str(14), stagemessage:null, implementationstages:array[0], mandatorystagegrouping:array[0], calltoaction:str(9)}}, lastregistrationdate:ts, created:ts, queuementor:array[4]<str(20)>, queuetargetcapacity:number, description:str(141), queueenddate:ts, avtestlink:str(73), modified:ts, availabilitygivenby:array[31]<str(20)>, enablezoommeetingsdk:boolean, delete:boolean}"
+        },
+        {
+          "count": 3,
+          "exampleId": "FqhdbSOPtLN7CWzgY2Pi",
+          "keys": [
+            "arenaeventidlist",
+            "availabilitygivenby",
+            "avtestlink",
+            "created",
+            "description",
+            "docid",
+            "enablezoommeetingsdk",
+            "iscommunicationsdisabled",
+            "lastregistrationdate",
+            "modified",
+            "queueadmin",
+            "queuedmessage",
+            "queueenddate",
+            "queuementor",
+            "queuename",
+            "queuestartdate",
+            "queuetargetcapacity",
+            "queuevariation",
+            "queuewelcometemplate",
+            "showsnippet",
+            "stagegroup",
+            "stageproperty",
+            "stages",
+            "totalcapacity",
+            "venue",
+            "waitingmessage",
+            "zoomlinkrequired"
+          ],
+          "shape": "{venue:str(6), lastregistrationdate:ts, docid:str(20), created:ts, enablezoommeetingsdk:boolean, showsnippet:boolean, totalcapacity:number, queuementor:array[5]<str(20)>, queuewelcometemplate:str(22), queuetargetcapacity:number, waitingmessage:str(163), queuedmessage:str(85), queuename:str(48), description:str(122), stagegroup:array[1]<str(26)>, avtestlink:str(65), stages:array[16]<str(12)>, availabilitygivenby:array[36]<str(20)>, stageproperty:{uP! Life Report:{implementationstages:array[0], studiowidgets:array[0], transferactivityproperty:array[0], nextstage:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], stagemessage:null, minwatingminutes:null, calltoaction:str(9), actiontype:str(4), maxwatingminutes:null, selfmovable:boolean, stageexplanation:str(130), transferactivity:map, messageheader:null, actionresource:ref, participantform:null, compulsoryactivity:map, stagegroup:str(14)}, Consultation In-person:{transferactivityproperty:array[0], implementationstages:array[0], optionalstagegrouping:array[0], mandatorystagegrouping:array[0], messageheader:null, compulsoryactivity:map, selfmovable:boolean, minwatingminutes:null, stageexplanation:null, calltoaction:null, transferactivity:map, participantform:null, actiontype:null, stagemessage:null, stagegroup:null, maxwatingminutes:null, studiowidgets:array[6]<str(17)>, nextstage:array[1]<map>}, Self Evolution Report:{mandatorystagegrouping:array[0], implementationstages:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], nextstage:array[0], studiowidgets:array[0], compulsoryactivity:map, calltoaction:str(9), transferactivity:map, participantform:null, stagemessage:null, messageheader:null, selfmovable:boolean, minwatingminutes:null, actiontype:str(4), stagegroup:str(26), stageexplanation:str(175), maxwatingminutes:null, actionresource:ref}, Accelerated Evolution Level Form:{optionalstagegrouping:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], nextstage:array[0], implementationstages:array[0], transferactivityproperty:array[0], participantform:null, actiontype:str(4), compulsoryactivity:map, stagemessage:null, actionresource:ref, stageexplanation:null, transferactivity:map, selfmovable:boolean, maxwatingminutes:null, calltoaction:str(9), stagegroup:str(14), minwatingminutes:null, messageheader:null}, uP! Life Aspiration Report:{transferactivityproperty:array[0], nextstage:array[0], optionalstagegrouping:array[0], mandatorystagegrouping:array[0], studiowidgets:array[0], implementationstages:array[0], actionresource:ref, messageheader:null, maxwatingminutes:null, minwatingminutes:null, calltoaction:str(9), stagegroup:str(14), transferactivity:map, actiontype:str(4), compulsoryactivity:map, selfmovable:boolean, stageexplanation:str(244), participantform:null, stagemessage:null}, Completed:{transferactivityproperty:array[0], nextstage:array[0], optionalstagegrouping:array[0], implementationstages:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], stagemessage:null, participantform:null, transferactivity:map, compulsoryactivity:map, calltoaction:null, selfmovable:boolean, messageheader:null, actionresource:null, actiontype:null, stagegroup:str(26), stageexplanation:str(83), minwatingminutes:null, maxwatingminutes:null}, In ATC Orientation Group Call:{nextstage:array[0], mandatorystagegrouping:array[0], implementationstages:array[0], transferactivityproperty:array[0], studiowidgets:array[0], optionalstagegrouping:array[0], minwatingminutes:null, actiontype:null, stageexplanation:str(87), selfmovable:boolean, calltoaction:null, participantform:null, transferactivity:map, stagemessage:null, actionresource:null, compulsoryactivity:map, stagegroup:str(14), maxwatingminutes:null, messageheader:null}, ATC Orientation Form:{mandatorystagegrouping:array[0], implementationstages:array[0], studiowidgets:array[0], transferactivityproperty:array[0], nextstage:array[0], optionalstagegrouping:array[0], actionresource:ref, stagegroup:str(14), actiontype:str(4), stageexplanation:str(99), minwatingminutes:null, maxwatingminutes:null, transferactivity:map, stagemessage:null, participantform:null, compulsoryactivity:map, calltoaction:str(9), selfmovable:boolean, messageheader:null}, In-person Completed:{nextstage:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], mandatorystagegrouping:array[0], implementationstages:array[0], studiowidgets:array[0], maxwatingminutes:null, stagegroup:null, compulsoryactivity:map, minwatingminutes:null, transferactivity:map, participantform:null, stagemessage:null, calltoaction:null, messageheader:null, actiontype:null, selfmovable:boolean, stageexplanation:null}, Self ATC Next Cycle:{implementationstages:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], studiowidgets:array[0], nextstage:array[0], transferactivity:map, maxwatingminutes:null, stageexplanation:str(225), compulsoryactivity:map, stagemessage:null, minwatingminutes:null, selfmovable:boolean, actionresource:ref, participantform:null, actiontype:str(4), calltoaction:str(9), messageheader:null, stagegroup:str(14)}, ATC Orientation:{studiowidgets:array[0], mandatorystagegrouping:array[0], implementationstages:array[0], nextstage:array[0], optionalstagegrouping:array[0], stagemessage:null, transferactivity:map, calltoaction:null, actiontype:null, selfmovable:boolean, minwatingminutes:null, compulsoryactivity:map, stageexplanation:null, actionresource:null, stagegroup:null, maxwatingminutes:null, messageheader:null}, Wellness Scaling Form:{studiowidgets:array[0], nextstage:array[0], mandatorystagegrouping:array[0], implementationstages:array[0], optionalstagegrouping:array[0], transferactivityproperty:array[0], calltoaction:str(9), maxwatingminutes:null, transferactivity:map, stageexplanation:str(173), stagegroup:str(14), selfmovable:boolean, compulsoryactivity:map, minwatingminutes:null, actiontype:str(4), messageheader:null, stagemessage:null, actionresource:ref, participantform:null}, Self Evaluation Form:{transferactivityproperty:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], nextstage:array[0], studiowidgets:array[0], actiontype:str(4), stagegroup:str(14), participantform:null, minwatingminutes:null, stageexplanation:str(214), messageheader:null, compulsoryactivity:map, selfmovable:boolean, stagemessage:null, transferactivity:map, calltoaction:str(9), maxwatingminutes:null, actionresource:ref}, Ready for Diagnostics:{mandatorystagegrouping:array[0], studiowidgets:array[0], implementationstages:array[0], transferactivityproperty:array[0], nextstage:array[0], optionalstagegrouping:array[0], stagemessage:null, minwatingminutes:null, calltoaction:null, transferactivity:map, stageexplanation:null, maxwatingminutes:null, compulsoryactivity:map, messageheader:null, selfmovable:boolean, stagegroup:null, actiontype:null, participantform:null}, Diagnostics In-person:{transferactivityproperty:array[0], mandatorystagegrouping:array[0], implementationstages:array[0], optionalstagegrouping:array[0], minwatingminutes:null, stageexplanation:null, stagegroup:null, transferactivity:map, stagemessage:null, selfmovable:boolean, nextstage:array[2]<map>, messageheader:null, studiowidgets:array[4]<str(17)>, participantform:null, maxwatingminutes:null, compulsoryactivity:map, calltoaction:null, actiontype:null}, Video Log:{studiowidgets:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], transferactivityproperty:array[0], selfmovable:boolean, transferactivity:map, participantform:null, compulsoryactivity:map, minwatingminutes:null, calltoaction:null, stageexplanation:str(208), actiontype:null, maxwatingminutes:null, stagegroup:str(14), stagemessage:null, nextstage:array[2]<map>, messageheader:null, actionresource:null}, Expanding Horizon Consultation:{optionalstagegrouping:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], nextstage:array[0], implementationstages:array[0], stagemessage:null, messageheader:null, selfmovable:boolean, actiontype:null, stagegroup:null, minwatingminutes:null, maxwatingminutes:null, studiowidgets:array[4]<str(17)>, compulsoryactivity:map, participantform:null, calltoaction:null, transferactivity:map, stageexplanation:null}, Diagnostics Readiness Changework:{optionalstagegrouping:array[0], transferactivityproperty:array[0], implementationstages:array[0], mandatorystagegrouping:array[0], actionresource:null, compulsoryactivity:map, minwatingminutes:null, nextstage:array[1]<map>, studiowidgets:array[2]<str(22)>, selfmovable:boolean, messageheader:null, stagegroup:str(26), stagemessage:null, stageexplanation:str(320), participantform:null, calltoaction:null, actiontype:null, transferactivity:map, maxwatingminutes:null}, Evolution Mapping Activity:{transferactivityproperty:array[0], nextstage:array[0], optionalstagegrouping:array[0], mandatorystagegrouping:array[0], studiowidgets:array[0], implementationstages:array[0], actiontype:null, stageexplanation:str(256), actionresource:null, stagemessage:null, participantform:null, stagegroup:str(14), messageheader:null, compulsoryactivity:map, transferactivity:map, maxwatingminutes:null, selfmovable:boolean, calltoaction:null, minwatingminutes:null}, In Evolution Mapping Activity:{nextstage:array[0], implementationstages:array[0], studiowidgets:array[0], transferactivityproperty:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], stagegroup:str(14), calltoaction:null, minwatingminutes:null, participantform:null, stageexplanation:null, compulsoryactivity:map, messageheader:null, actionresource:null, actiontype:null, selfmovable:boolean, maxwatingminutes:null, stagemessage:null, transferactivity:map}, Review:{implementationstages:array[0], studiowidgets:array[0], nextstage:array[2]<map>, stagemessage:null, calltoaction:null, actiontype:null, actionresource:null, stagegroup:str(26), minwatingminutes:null, compulsoryactivity:map, stageexplanation:str(240), participantform:null, transferactivityproperty:array[11]<map>, transferactivity:map, selfmovable:boolean, messageheader:null, mandatorystagegrouping:array[1]<str(12)>, optionalstagegrouping:array[2]<str(11)>, maxwatingminutes:null}, ATC Orientation Group Call:{transferactivityproperty:array[0], implementationstages:array[0], studiowidgets:array[0], optionalstagegrouping:array[0], nextstage:array[0], mandatorystagegrouping:array[0], selfmovable:boolean, compulsoryactivity:map, transferactivity:map, actionresource:null, calltoaction:null, messageheader:null, participantform:null, actiontype:null, stagegroup:str(14), stageexplanation:str(242), minwatingminutes:null, stagemessage:null, maxwatingminutes:null}, Self ATC:{implementationstages:array[0], mandatorystagegrouping:array[0], studiowidgets:array[0], transferactivityproperty:array[0], nextstage:array[0], optionalstagegrouping:array[0], transferactivity:map, maxwatingminutes:null, minwatingminutes:null, participantform:null, messageheader:null, stagemessage:null, actionresource:ref, calltoaction:str(9), selfmovable:boolean, compulsoryactivity:map, actiontype:str(4), stageexplanation:str(166), stagegroup:str(14)}, Implementation:{nextstage:array[0], studiowidgets:array[0], implementationstages:array[0], optionalstagegrouping:array[0], mandatorystagegrouping:array[0], actiontype:null, compulsoryactivity:map, transferactivity:map, calltoaction:null, stagegroup:null, messageheader:null, maxwatingminutes:null, stagemessage:null, stageexplanation:null, selfmovable:boolean, actionresource:null, minwatingminutes:null}, Yet to Start:{nextstage:array[0], implementationstages:array[0], transferactivityproperty:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], participantform:null, actiontype:null, compulsoryactivity:map, actionresource:null, transferactivity:map, stagemessage:null, messageheader:null, selfmovable:boolean, stageexplanation:null, maxwatingminutes:null, calltoaction:null, minwatingminutes:null, stagegroup:null}, uP! Readiness Changework:{implementationstages:array[0], transferactivityproperty:array[0], optionalstagegrouping:array[0], mandatorystagegrouping:array[0], stagegroup:str(26), minwatingminutes:null, actiontype:null, participantform:null, actionresource:null, selfmovable:boolean, studiowidgets:array[1]<str(11)>, maxwatingminutes:null, compulsoryactivity:map, stagemessage:null, transferactivity:map, calltoaction:null, messageheader:null, stageexplanation:str(328), nextstage:array[2]<map>}, Consultation:{transferactivityproperty:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], actiontype:null, selfmovable:boolean, maxwatingminutes:null, studiowidgets:array[8]<str(17)>, minwatingminutes:null, transferactivity:map, actionresource:null, messageheader:null, stageexplanation:str(147), stagegroup:str(26), nextstage:array[3]<map>, implementationstages:array[1]<str(24)>, compulsoryactivity:map, calltoaction:null, stagemessage:null, participantform:array[4]<str(20)>}, ATC Briefing:{actiontype:null, maxwatingminutes:null, stagemessage:null, selfmovable:boolean, implementationstages:array[0], mandatorystagegrouping:array[0], minwatingminutes:null, calltoaction:null, optionalstagegrouping:array[0], transferactivity:map, participantform:null, transferactivityproperty:array[0], messageheader:null, stageexplanation:str(174), stagegroup:str(26), nextstage:array[3]<map>, studiowidgets:array[2]<str(22)>, compulsoryactivity:map}, Triple ATC Validation:{transferactivityproperty:array[0], implementationstages:array[0], optionalstagegrouping:array[0], mandatorystagegrouping:array[0], stagemessage:null, actiontype:null, selfmovable:boolean, calltoaction:null, maxwatingminutes:null, transferactivity:map, messageheader:null, stagegroup:null, participantform:null, actionresource:null, studiowidgets:array[1]<str(13)>, minwatingminutes:null, stageexplanation:str(187), compulsoryactivity:map, nextstage:array[2]<map>}, Triple ATC:{optionalstagegrouping:array[0], implementationstages:array[0], studiowidgets:array[0], mandatorystagegrouping:array[0], transferactivityproperty:array[0], minwatingminutes:null, maxwatingminutes:null, stagemessage:null, transferactivity:map, calltoaction:str(10), selfmovable:boolean, messageheader:null, actionresource:str(44), stagegroup:null, actiontype:str(4), participantform:null, stageexplanation:str(284), compulsoryactivity:map, nextstage:array[1]<map>}, Diagnostics:{transferactivityproperty:array[0], mandatorystagegrouping:array[0], optionalstagegrouping:array[0], implementationstages:array[0], minwatingminutes:null, calltoaction:null, actionresource:null, stagemessage:null, transferactivity:map, actiontype:null, maxwatingminutes:null, stageexplanation:str(182), messageheader:null, selfmovable:boolean, stagegroup:str(26), studiowidgets:array[4]<str(17)>, compulsoryactivity:map, nextstage:array[5]<map>, participantform:array[9]<str(20)>}}, zoomlinkrequired:boolean, iscommunicationsdisabled:boolean, queuevariation:array[7]<str(20)>, arenaeventidlist:array[4]<str(20)>, queueadmin:array[8]<str(20)>, queuestartdate:ts, modified:ts, queueenddate:ts}"
+        }
+      ]
+    },
+    "queue variation": {
+      "collection": "queue variation",
+      "count": 183,
+      "sampled": 183,
+      "variantCount": 2,
+      "variants": [
+        {
+          "count": 134,
+          "exampleId": "0bH0Tm5SflXdjc7mZUYm",
+          "keys": [
+            "atcmodel",
+            "queueref",
+            "stages",
+            "variationname"
+          ],
+          "shape": "{variationname:str(23), stages:array[12]<str(12)>, queueref:ref, atcmodel:str(3)}"
+        },
+        {
+          "count": 49,
+          "exampleId": "0L0CpsqppJEFGUjg95ER",
+          "keys": [
+            "queueref",
+            "stages",
+            "variationname"
+          ],
+          "shape": "{variationname:str(18), queueref:ref, stages:array[14]<str(11)>}"
+        }
+      ]
+    },
+    "bigactivity": {
+      "collection": "bigactivity",
+      "count": 33,
+      "sampled": 33,
+      "variantCount": 4,
+      "variants": [
+        {
+          "count": 17,
+          "exampleId": "07NwjaW5NskTshGpI1n8",
+          "keys": [
+            "activity",
+            "activitytype",
+            "atcproperty",
+            "docid",
+            "shadow"
+          ],
+          "shape": "{activity:str(22), atcproperty:str(8), docid:str(20), activitytype:null, shadow:boolean}"
+        },
+        {
+          "count": 10,
+          "exampleId": "EHNmowmRdsWB5gQmJwxk",
+          "keys": [
+            "activity",
+            "atcproperty",
+            "docid",
+            "shadow"
+          ],
+          "shape": "{activity:str(25), shadow:boolean, atcproperty:null, docid:str(20)}"
+        },
+        {
+          "count": 4,
+          "exampleId": "HFWFwv7YFPTNtcwkwAGK",
+          "keys": [
+            "activity",
+            "assignmentproperty",
+            "atcproperty",
+            "docid",
+            "procedureproperty"
+          ],
+          "shape": "{assignmentproperty:null, procedureproperty:null, activity:str(16), atcproperty:str(6), docid:str(20)}"
+        },
+        {
+          "count": 2,
+          "exampleId": "MOt60i7xvRhOu0twmIIG",
+          "keys": [
+            "activity",
+            "docid"
+          ],
+          "shape": "{activity:str(29), docid:str(20)}"
+        }
+      ]
+    },
+    "biglevel": {
+      "collection": "biglevel",
+      "count": 20,
+      "sampled": 20,
+      "variantCount": 1,
+      "variants": [
+        {
+          "count": 20,
+          "exampleId": "0FlcZH4ieiIxoDZVqO6P",
+          "keys": [
+            "category",
+            "docid",
+            "level",
+            "sequence"
+          ],
+          "shape": "{level:str(24), docid:str(20), sequence:number, category:str(11)}"
+        }
+      ]
+    },
+    "accelerated evolution level": {
+      "collection": "accelerated evolution level",
+      "count": 11,
+      "sampled": 11,
+      "variantCount": 1,
+      "variants": [
+        {
+          "count": 11,
+          "exampleId": "4euiGI3BxdvjhOjmM09k",
+          "keys": [
+            "docid",
+            "endpoint",
+            "sequence",
+            "startpoint"
+          ],
+          "shape": "{docid:str(20), sequence:number, endpoint:str(17), startpoint:str(9)}"
+        }
+      ]
+    }
+  },
+  "traces": {
+    "queueTrace": {
+      "queueGeneration": {
+        "id": "vuvS7eBgTxLKufnesLQT",
+        "queuename": "A&H Evolution Preparation Event - April 2026",
+        "stages": [
+          "Evolution Prep Orientation",
+          "uP! Preparation Hold",
+          "Accelerated Evolution Level Form",
+          "uP! Life Aspiration Report",
+          "ATC Orientation Form",
+          "Prodigies Preparation Form",
+          "uP! Life Report",
+          "Scope Enhancement",
+          "Evolution Mapping Activity",
+          "In Evolution Mapping Activity",
+          "Self Evaluation Form",
+          "Scope Enhancement Changework",
+          "Transfered",
+          "Completed"
+        ],
+        "stageCount": 14,
+        "stagepropertyKeys": [
+          "Transfer queue",
+          "Transfer Queue",
+          "uP! Readiness Changework",
+          "Diagnostics",
+          "In-person Completed",
+          "Guided Self ATC",
+          "Ready for Diagnostics",
+          "ATC Orientation Group Call",
+          "Triple ATC Validation",
+          "Guided Self ATC Orientation",
+          "Triple ATC",
+          "In ATC Orientation Group Call",
+          "Consultation",
+          "Diagnostics In-person",
+          "Consultation In-person",
+          "Wellness Scaling Form",
+          "Review",
+          "Guided Pre ATC Orientation",
+          "uP! Prep Process - Hold",
+          "Self ATC Next Cycle",
+          "ATC Orientation",
+          "My Pocket ATC",
+          "Implementation",
+          "Diagnostics Readiness Changework",
+          "Expanding Horizon Consultation",
+          "Queue Transferred",
+          "Evolution Prep Completed",
+          "Self ATC",
+          "Self Evolution Report",
+          "My Evolution Wishlist"
+        ],
+        "sampleStageProperty": {
+          "Transfer queue": [
+            "calltoaction",
+            "transferactivityproperty",
+            "stagegroup",
+            "participantform",
+            "optionalstagegrouping",
+            "transferactivity",
+            "minwatingminutes",
+            "actiontype",
+            "messageheader",
+            "nextstage",
+            "studiowidgets",
+            "mandatorystagegrouping",
+            "selfmovable",
+            "stageexplanation",
+            "maxwatingminutes",
+            "compulsoryactivity",
+            "stagemessage",
+            "implementationstages"
+          ]
+        },
+        "queuevariationCount": 10,
+        "queueadmin": 19,
+        "modified": "2026-06-02 15:49:01",
+        "created": "2023-11-07 06:16:09",
+        "hasBooleanToggles": []
+      },
+      "tokenTrace": {
+        "tokenId": "0B1inpSgA668vdsLMOJu",
+        "profile_id": "9na6zpzgaEQAoklCUnpC",
+        "queuename": "uP!/Legacy Diagnostics & Consultation - ONLINE",
+        "queueref": "queue generation/UfglSsK3GurM3KiRJrdS",
+        "currentstage": "Completed",
+        "previousstage": "Self Evolution Report",
+        "tokenstatus": "Active",
+        "variationid": "RNOFi3yRZeRGSuRQZQJm",
+        "studioid": null,
+        "liveassignmentid": null,
+        "productname": "Legacy Consultation",
+        "resolvedVariation": {
+          "variationname": "Old Participant",
+          "stages": [
+            "Yet to Start",
+            "Wellness Scaling Form",
+            "uP! Life Report",
+            "Video Log",
+            "Evolution Mapping Activity",
+            "In Evolution Mapping Activity",
+            "Self Evaluation Form",
+            "Self ATC Next Cycle",
+            "Diagnostics",
+            "Diagnostics Readiness Changework",
+            "Consultation",
+            "uP! Readiness Changework",
+            "Review",
+            "Self Evolution Report",
+            "Completed"
+          ],
+          "atcmodel": null
+        },
+        "stageHistoryCount": 17,
+        "stageHistory": [
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Evolution Mapping Activity",
+            "to": "In Evolution Mapping Activity",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 8
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Video Log",
+            "to": "Video Log",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 7
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "In Evolution Mapping Activity",
+            "to": "Self Evaluation Form",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 1
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "uP! Life Report",
+            "to": "Video Log",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 5
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Consultation",
+            "to": "Consultation",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 31
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Diagnostics",
+            "to": "Diagnostics",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 15
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Wellness Scaling Form",
+            "to": "uP! Life Report",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 23
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Video Log",
+            "to": "Evolution Mapping Activity",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 7
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Consultation",
+            "to": "Consultation",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 2
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Self Evolution Report",
+            "to": "Completed",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 10
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Self ATC Next Cycle",
+            "to": "Diagnostics",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 9
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Self Evaluation Form",
+            "to": "Self ATC Next Cycle",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 15
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Diagnostics",
+            "to": "Diagnostics",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 1
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Diagnostics",
+            "to": "Diagnostics",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 15
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Yet to Start",
+            "to": "Wellness Scaling Form",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": null
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Diagnostics",
+            "to": "Consultation",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 1
+          },
+          {
+            "at": "2023-11-30 07:54:44",
+            "from": "Consultation",
+            "to": "Self Evolution Report",
+            "status": "Approved",
+            "manuallymoved": null,
+            "pos": 2
+          }
+        ]
+      }
+    },
+    "recencyNuance": {
+      "queue generation/created/90d": 0,
+      "queue generation/created/365d": 2,
+      "queue generation/created/last": "2025-08-06 08:10:00",
+      "queue generation/modified/90d": 7,
+      "queue generation/modified/365d": 21,
+      "queue generation/modified/last": "2026-06-02 15:49:01",
+      "queue stage log/createdon/90d": 3552,
+      "queue stage log/updatedAt/90d": 1060,
+      "participantjourneyproduct/subscriptionstart/90d": 336,
+      "participantjourneyproduct/purchasedate/90d": 265,
+      "participantjourneyproduct/updated/90d": 0
+    },
+    "tokenQueueRef": {
+      "tokenId": "00dyh4CxBHvM0NjWivlu",
+      "queueref": "queue generation/TmUKHbQaFVhYrpGHH1Z8",
+      "resolvesToQueueGeneration": true,
+      "queuename": "CTD D&I Dec 2022",
+      "hasStages": true
+    }
+  },
+  "tierC": {
+    "big aggregate level": {
+      "collection": "big aggregate level",
+      "count": 695,
+      "tsField": "lastupdated",
+      "lastWrite": "2026-05-30",
+      "writes365d": 506
+    },
+    "big aggregate levelv2": {
+      "collection": "big aggregate levelv2",
+      "count": 632,
+      "tsField": "lastupdated",
+      "lastWrite": "2025-04-26",
+      "writes365d": 0
+    },
+    "big aggregate level archives": {
+      "collection": "big aggregate level archives",
+      "count": 6,
+      "tsField": "lastupdated",
+      "lastWrite": "2025-06-19",
+      "writes365d": 6
+    },
+    "big aggregate level archivesv2": {
+      "collection": "big aggregate level archivesv2",
+      "count": 5,
+      "tsField": "lastupdated",
+      "lastWrite": "2025-04-26",
+      "writes365d": 0
+    },
+    "big aggregate event level": {
+      "collection": "big aggregate event level",
+      "count": 1145,
+      "tsField": "lastupdated",
+      "lastWrite": "2025-06-13",
+      "writes365d": 3
+    },
+    "big marathon": {
+      "collection": "big marathon",
+      "count": 10,
+      "tsField": "enddate",
+      "lastWrite": "2026-08-01",
+      "writes365d": 2
+    }
+  }
+}

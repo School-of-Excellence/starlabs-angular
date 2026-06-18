@@ -1,0 +1,983 @@
+[
+  {
+    "anon": "P-4F5BB",
+    "dominant": "Critical Support",
+    "totalAppts": 45,
+    "journeys": [
+      {
+        "j": "FTM with SLD CI",
+        "s": "upgraded",
+        "mo": 0
+      },
+      {
+        "j": "B!G",
+        "s": "upgraded",
+        "mo": 0.6576703746288995
+      }
+    ],
+    "content": {
+      "sv": 368,
+      "svH": 121.8,
+      "ef": 73,
+      "firstMo": 0.44560134691195796,
+      "lastMo": 19.73461021073636
+    },
+    "runs": [
+      {
+        "type": "Welcome To WiSH",
+        "a": 0.9348550001216722,
+        "b": 0.9348550001216722,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Diagnostics",
+        "a": 0.9355394066043705,
+        "b": 0.9355394066043705,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Experience Call",
+        "a": 0.9683909177738843,
+        "b": 0.9683909177738843,
+        "k": 1,
+        "att": 0,
+        "canc": 1
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 1.138123725483039,
+        "b": 1.2038267478220666,
+        "k": 2,
+        "att": 2,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Diagnostics",
+        "a": 1.2640545182995084,
+        "b": 1.2640545182995084,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Experience Call",
+        "a": 1.2708985831264905,
+        "b": 1.2708985831264905,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 2.1565205717379667,
+        "b": 2.2797137386236432,
+        "k": 2,
+        "att": 2,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation Validation",
+        "a": 2.3782682721321846,
+        "b": 2.3782682721321846,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Review",
+        "a": 2.8765161915364774,
+        "b": 2.8765161915364774,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 3.1078455826884706,
+        "b": 3.9305021748917115,
+        "k": 7,
+        "att": 6,
+        "canc": 1
+      },
+      {
+        "type": "WiSH Final Review Call",
+        "a": 4.4835026129118605,
+        "b": 4.4835026129118605,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Diagnostics",
+        "a": 8.135495604589478,
+        "b": 8.564595655691829,
+        "k": 2,
+        "att": 1,
+        "canc": 1
+      },
+      {
+        "type": "Critical Support Implementation",
+        "a": 8.622108613787901,
+        "b": 9.280507650143573,
+        "k": 5,
+        "att": 5,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Review",
+        "a": 9.414651320752421,
+        "b": 12.039350181900033,
+        "k": 2,
+        "att": 2,
+        "canc": 0
+      },
+      {
+        "type": "Journey Coaching",
+        "a": 13.19189069876381,
+        "b": 13.19189069876381,
+        "k": 1,
+        "att": 0,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Diagnostics",
+        "a": 17.75756634484353,
+        "b": 17.75756634484353,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Implementation",
+        "a": 17.98547370358203,
+        "b": 19.661585179709935,
+        "k": 15,
+        "att": 8,
+        "canc": 7
+      }
+    ]
+  },
+  {
+    "anon": "P-B54D2",
+    "dominant": "A&H Light",
+    "totalAppts": 42,
+    "journeys": [
+      {
+        "j": "A&H Light 3months",
+        "s": "upgraded",
+        "mo": 0
+      },
+      {
+        "j": "uP!",
+        "s": "upgraded",
+        "mo": 6.6767434517508635
+      },
+      {
+        "j": "B!G",
+        "s": "downgraded",
+        "mo": 6.986889760746703
+      },
+      {
+        "j": "B!G",
+        "s": "ongoing",
+        "mo": 15.61237667527498
+      }
+    ],
+    "content": {
+      "sv": 198,
+      "svH": 56.1,
+      "ef": 23,
+      "firstMo": 0.697444639500292,
+      "lastMo": 20.009983001624324
+    },
+    "runs": [
+      {
+        "type": "A&H Light Diagnostics",
+        "a": 0.5164228864006911,
+        "b": 0.5212137317795785,
+        "k": 2,
+        "att": 1,
+        "canc": 1
+      },
+      {
+        "type": "A&H Light Implementation",
+        "a": 0.6560418088711247,
+        "b": 1.1809815811006472,
+        "k": 9,
+        "att": 8,
+        "canc": 1
+      },
+      {
+        "type": "A&H Light Review",
+        "a": 1.410942159287244,
+        "b": 1.410942159287244,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "A&H Light Implementation",
+        "a": 1.478013994591668,
+        "b": 2.038542903921497,
+        "k": 6,
+        "att": 4,
+        "canc": 2
+      },
+      {
+        "type": "A&H Light Mid Review",
+        "a": 2.328046846102837,
+        "b": 2.328046846102837,
+        "k": 1,
+        "att": 0,
+        "canc": 1
+      },
+      {
+        "type": "A&H Light Review",
+        "a": 2.5251559131199204,
+        "b": 2.5251559131199204,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Journey Coaching",
+        "a": 6.929996035765562,
+        "b": 7.587026259155838,
+        "k": 2,
+        "att": 2,
+        "canc": 0
+      },
+      {
+        "type": "Welcome To WiSH",
+        "a": 8.772418287189128,
+        "b": 8.772418287189128,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Diagnostics",
+        "a": 8.799110140014358,
+        "b": 8.799110140014358,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Experience Call",
+        "a": 8.80526979835864,
+        "b": 8.80526979835864,
+        "k": 1,
+        "att": 0,
+        "canc": 1
+      },
+      {
+        "type": "WiSH Diagnostics",
+        "a": 9.258346889904852,
+        "b": 9.258346889904852,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Experience Call",
+        "a": 9.26313773528374,
+        "b": 9.26313773528374,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 9.525265418157153,
+        "b": 9.755225996343748,
+        "k": 5,
+        "att": 4,
+        "canc": 1
+      },
+      {
+        "type": "WiSH Implementation Validation",
+        "a": 9.88389441509101,
+        "b": 9.88389441509101,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Review",
+        "a": 10.180265235648756,
+        "b": 10.180265235648756,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 10.379404708564511,
+        "b": 10.54366226441208,
+        "k": 3,
+        "att": 3,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation Validation",
+        "a": 10.796892663010414,
+        "b": 10.796892663010414,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Final Review Call",
+        "a": 11.034381712506692,
+        "b": 11.034381712506692,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 11.300615834276293,
+        "b": 11.300615834276293,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Final Review Call",
+        "a": 11.534112512623498,
+        "b": 11.75095529989171,
+        "k": 2,
+        "att": 1,
+        "canc": 1
+      }
+    ]
+  },
+  {
+    "anon": "P-29DDF",
+    "dominant": "WiSH",
+    "totalAppts": 40,
+    "journeys": [
+      {
+        "j": "uP!",
+        "s": "upgraded",
+        "mo": 0
+      },
+      {
+        "j": "B!G",
+        "s": "ongoing",
+        "mo": 2.4197519136765706
+      }
+    ],
+    "content": {
+      "sv": 94,
+      "svH": 20.4,
+      "ef": 130,
+      "firstMo": 1.4568706654256096,
+      "lastMo": 13.908640540589866
+    },
+    "runs": [
+      {
+        "type": "Journey Coaching",
+        "a": 0.04688912919160948,
+        "b": 0.11190774504793888,
+        "k": 2,
+        "att": 1,
+        "canc": 1
+      },
+      {
+        "type": "uP! ATC Completion Review",
+        "a": 1.6230772588455735,
+        "b": 1.6230772588455735,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "uP! ATC completion",
+        "a": 1.62444607181097,
+        "b": 1.62444607181097,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "uP! ATC Completion Review",
+        "a": 1.688780281184601,
+        "b": 1.688780281184601,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Welcome To WiSH",
+        "a": 4.114316855867036,
+        "b": 4.114316855867036,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Diagnostics",
+        "a": 4.119792107728622,
+        "b": 4.119792107728622,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Experience Call",
+        "a": 4.14716836703655,
+        "b": 4.14716836703655,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 4.383288603567431,
+        "b": 4.842502539908502,
+        "k": 4,
+        "att": 3,
+        "canc": 1
+      },
+      {
+        "type": "WiSH Diagnostics",
+        "a": 5.110835508225045,
+        "b": 5.110835508225045,
+        "k": 1,
+        "att": 0,
+        "canc": 1
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 5.302446509831119,
+        "b": 5.302446509831119,
+        "k": 1,
+        "att": 0,
+        "canc": 1
+      },
+      {
+        "type": "WiSH Diagnostics",
+        "a": 5.303838136345939,
+        "b": 5.303838136345939,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Experience Call",
+        "a": 5.34008886637952,
+        "b": 5.34008886637952,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 5.531038275052319,
+        "b": 6.970345108166643,
+        "k": 8,
+        "att": 6,
+        "canc": 2
+      },
+      {
+        "type": "WiSH Review",
+        "a": 7.137340289945004,
+        "b": 7.137340289945004,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Implementation",
+        "a": 7.1674541751837255,
+        "b": 7.332396137513992,
+        "k": 3,
+        "att": 1,
+        "canc": 2
+      },
+      {
+        "type": "WiSH Implementation Validation",
+        "a": 7.430266264539836,
+        "b": 7.430266264539836,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "WiSH Final Review Call",
+        "a": 7.469277434053633,
+        "b": 7.469277434053633,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Diagnostics",
+        "a": 11.119217206283155,
+        "b": 11.119217206283155,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Implementation",
+        "a": 11.277999510269138,
+        "b": 11.54423363203874,
+        "k": 6,
+        "att": 5,
+        "canc": 1
+      },
+      {
+        "type": "Critical Support Mid Review",
+        "a": 12.297080763006765,
+        "b": 12.297080763006765,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Implementation",
+        "a": 13.181333938652845,
+        "b": 13.643992720956831,
+        "k": 2,
+        "att": 2,
+        "canc": 0
+      }
+    ]
+  },
+  {
+    "anon": "P-97D20",
+    "dominant": "EI",
+    "totalAppts": 25,
+    "journeys": [
+      {
+        "j": "EI Solutions",
+        "s": "ongoing",
+        "mo": 0
+      },
+      {
+        "j": "uP!",
+        "s": "downgraded",
+        "mo": 0.0015969484596291428
+      }
+    ],
+    "content": {
+      "sv": 17,
+      "svH": 3.5,
+      "ef": 0,
+      "firstMo": 0.3855299739621356,
+      "lastMo": 2.922266252372609
+    },
+    "runs": [
+      {
+        "type": "Journey Coaching",
+        "a": 0.38463644327639074,
+        "b": 0.38463644327639074,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "EI Diagnostics",
+        "a": 1.5330705212439772,
+        "b": 1.5330705212439772,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "EI Implementation",
+        "a": 1.565922032413491,
+        "b": 3.606822163819536,
+        "k": 19,
+        "att": 9,
+        "canc": 10
+      },
+      {
+        "type": "EI Review",
+        "a": 5.636771791502409,
+        "b": 5.868101182654402,
+        "k": 2,
+        "att": 1,
+        "canc": 1
+      },
+      {
+        "type": "EI Celebration Call",
+        "a": 6.130913272010512,
+        "b": 6.19661629434954,
+        "k": 2,
+        "att": 0,
+        "canc": 2
+      }
+    ]
+  },
+  {
+    "anon": "P-DE0F0",
+    "dominant": "Fertility(FTM)",
+    "totalAppts": 15,
+    "journeys": [
+      {
+        "j": "Health Explorative",
+        "s": "completed",
+        "mo": 0
+      }
+    ],
+    "content": {
+      "sv": 0,
+      "svH": 0,
+      "ef": 0,
+      "firstMo": null,
+      "lastMo": null
+    },
+    "runs": [
+      {
+        "type": "Health Implementation",
+        "a": 0.2128504161191415,
+        "b": 0.2128504161191415,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Fertility Implementation",
+        "a": 0.24159548839246606,
+        "b": 1.851319535698642,
+        "k": 10,
+        "att": 10,
+        "canc": 0
+      },
+      {
+        "type": "Fertility Review",
+        "a": 2.33998576434516,
+        "b": 2.33998576434516,
+        "k": 1,
+        "att": 0,
+        "canc": 1
+      },
+      {
+        "type": "Health Implementation",
+        "a": 3.363857862461673,
+        "b": 5.2637702584318875,
+        "k": 3,
+        "att": 1,
+        "canc": 2
+      }
+    ]
+  },
+  {
+    "anon": "P-726F1",
+    "dominant": "Health",
+    "totalAppts": 13,
+    "journeys": [
+      {
+        "j": "Health Explorative",
+        "s": "completed",
+        "mo": 0
+      }
+    ],
+    "content": {
+      "sv": 0,
+      "svH": 0,
+      "ef": 0,
+      "firstMo": null,
+      "lastMo": null
+    },
+    "runs": [
+      {
+        "type": "Health Implementation",
+        "a": 0.10471419185282523,
+        "b": 0.399008979413053,
+        "k": 5,
+        "att": 3,
+        "canc": 2
+      },
+      {
+        "type": "Health Review",
+        "a": 0.40585304424003504,
+        "b": 0.40585304424003504,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Health Implementation",
+        "a": 0.4647120017520806,
+        "b": 0.6289695575996496,
+        "k": 3,
+        "att": 0,
+        "canc": 3
+      },
+      {
+        "type": "Health Review",
+        "a": 1.2552014892685064,
+        "b": 1.2552014892685064,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Health Implementation",
+        "a": 1.4516261498028908,
+        "b": 1.4516261498028908,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Health Review",
+        "a": 1.6548948751642576,
+        "b": 1.6548948751642576,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Health Implementation",
+        "a": 2.140139071397284,
+        "b": 2.140139071397284,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      }
+    ]
+  },
+  {
+    "anon": "P-AF5D4",
+    "dominant": "Breakthrough",
+    "totalAppts": 12,
+    "journeys": [
+      {
+        "j": "FTO",
+        "s": "completed",
+        "mo": 0
+      }
+    ],
+    "content": {
+      "sv": 0,
+      "svH": 0,
+      "ef": 0,
+      "firstMo": null,
+      "lastMo": null
+    },
+    "runs": [
+      {
+        "type": "Health Implementation",
+        "a": -0.19094940867279894,
+        "b": -0.18547415681121332,
+        "k": 3,
+        "att": 3,
+        "canc": 0
+      },
+      {
+        "type": "Breakthrough Implementation",
+        "a": -0.15672908453788875,
+        "b": 0.30798291721419185,
+        "k": 9,
+        "att": 9,
+        "canc": 0
+      }
+    ]
+  },
+  {
+    "anon": "P-CAEC2",
+    "dominant": "uP!",
+    "totalAppts": 10,
+    "journeys": [
+      {
+        "j": "B!G",
+        "s": "upgraded",
+        "mo": 0
+      },
+      {
+        "j": "B!G Continuity",
+        "s": "ongoing",
+        "mo": 10.343324491942255
+      }
+    ],
+    "content": {
+      "sv": 117,
+      "svH": 18.6,
+      "ef": 349,
+      "firstMo": 1.5855386077499147,
+      "lastMo": 14.678819391973281
+    },
+    "runs": [
+      {
+        "type": "Journey Coaching",
+        "a": 0.8684011454683166,
+        "b": 0.9341041678073442,
+        "k": 2,
+        "att": 1,
+        "canc": 1
+      },
+      {
+        "type": "uP! ATC Completion Review",
+        "a": 3.1652693014034896,
+        "b": 3.1652693014034896,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "uP! ATC completion",
+        "a": 3.2645082413947293,
+        "b": 3.9571276018853117,
+        "k": 5,
+        "att": 5,
+        "canc": 0
+      },
+      {
+        "type": "Critical Support Implementation",
+        "a": 4.348608109988684,
+        "b": 4.348608109988684,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "uP! ATC Completion Review",
+        "a": 4.41499553881041,
+        "b": 4.41499553881041,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      }
+    ]
+  },
+  {
+    "anon": "P-CB262",
+    "dominant": "Custom Solutions",
+    "totalAppts": 9,
+    "journeys": [
+      {
+        "j": "A&H Custom Solutions",
+        "s": "completed",
+        "mo": 0
+      }
+    ],
+    "content": {
+      "sv": 0,
+      "svH": 0,
+      "ef": 0,
+      "firstMo": null,
+      "lastMo": null
+    },
+    "runs": [
+      {
+        "type": "Custom Solutions Diagnostics",
+        "a": 0.020075923492480652,
+        "b": 0.020075923492480652,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Custom Solutions Implementation",
+        "a": 0.11771791502409111,
+        "b": 0.15056942619360492,
+        "k": 2,
+        "att": 2,
+        "canc": 0
+      },
+      {
+        "type": "Custom Solutions Review",
+        "a": 0.4140659220324135,
+        "b": 0.4140659220324135,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Custom Solutions Implementation",
+        "a": 0.44144218134034163,
+        "b": 0.6056997371879106,
+        "k": 2,
+        "att": 2,
+        "canc": 0
+      },
+      {
+        "type": "Custom Solutions Review",
+        "a": 0.7706416995181778,
+        "b": 0.7706416995181778,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "Custom Solutions Implementation",
+        "a": 1.5262264564169952,
+        "b": 1.5262264564169952,
+        "k": 1,
+        "att": 0,
+        "canc": 1
+      },
+      {
+        "type": "Custom Solutions Review",
+        "a": 1.7240199299167762,
+        "b": 1.7240199299167762,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      }
+    ]
+  },
+  {
+    "anon": "P-1D89C",
+    "dominant": "CHURN / early-cancel (EI)",
+    "totalAppts": 5,
+    "journeys": [
+      {
+        "j": "uP! For Prodigies",
+        "s": "cancelled",
+        "mo": 0
+      }
+    ],
+    "content": {
+      "sv": 0,
+      "svH": 0,
+      "ef": 0,
+      "firstMo": null,
+      "lastMo": null
+    },
+    "runs": [
+      {
+        "type": "Journey Onboarding",
+        "a": 0.26332795579950846,
+        "b": 0.26332795579950846,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "EI Starter Pack Diagnostics",
+        "a": 1.1448435055147954,
+        "b": 1.1448435055147954,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "EI Starter Pack Implementation",
+        "a": 1.1468967249628899,
+        "b": 1.1468967249628899,
+        "k": 1,
+        "att": 1,
+        "canc": 0
+      },
+      {
+        "type": "EI Celebration Call",
+        "a": 1.214652966750012,
+        "b": 1.3132075002585535,
+        "k": 2,
+        "att": 1,
+        "canc": 1
+      }
+    ]
+  }
+]

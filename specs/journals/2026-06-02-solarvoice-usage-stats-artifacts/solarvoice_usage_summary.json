@@ -1,0 +1,476 @@
+{
+  "source": "Firestore \"content analytics\" where type==\"solarvoice\" (project fir-sample-aae4a / production)",
+  "generatedDateRange": {
+    "from": "2023-08-29",
+    "to": "2026-06-02"
+  },
+  "catalog": {
+    "audioTracks": 49,
+    "playlists": 56
+  },
+  "totals": {
+    "events": 119909,
+    "eventsWithTime": 119907,
+    "uniqueListeners": 1463,
+    "totalSeconds": 94153008,
+    "totalHours": 26153.6,
+    "avgSecondsPerEvent": 785.2,
+    "avgEventsPerListener": 82,
+    "distinctAudiosPlayed": 39,
+    "distinctPlaylistsPlayed": 55
+  },
+  "statusDistribution": {
+    "complete": 28799,
+    "(none)": 91024,
+    "": 83,
+    "completed": 3
+  },
+  "monthly": [
+    {
+      "month": "2023-08",
+      "events": 90,
+      "hours": 1.67,
+      "uniqueListeners": 6
+    },
+    {
+      "month": "2023-09",
+      "events": 1849,
+      "hours": 340.22,
+      "uniqueListeners": 154
+    },
+    {
+      "month": "2023-10",
+      "events": 965,
+      "hours": 246.51,
+      "uniqueListeners": 115
+    },
+    {
+      "month": "2023-11",
+      "events": 783,
+      "hours": 171.22,
+      "uniqueListeners": 96
+    },
+    {
+      "month": "2023-12",
+      "events": 744,
+      "hours": 196.21,
+      "uniqueListeners": 74
+    },
+    {
+      "month": "2024-01",
+      "events": 839,
+      "hours": 212.1,
+      "uniqueListeners": 112
+    },
+    {
+      "month": "2024-02",
+      "events": 1412,
+      "hours": 407.39,
+      "uniqueListeners": 137
+    },
+    {
+      "month": "2024-03",
+      "events": 3383,
+      "hours": 990.19,
+      "uniqueListeners": 209
+    },
+    {
+      "month": "2024-04",
+      "events": 2280,
+      "hours": 697.63,
+      "uniqueListeners": 160
+    },
+    {
+      "month": "2024-05",
+      "events": 1295,
+      "hours": 343.55,
+      "uniqueListeners": 155
+    },
+    {
+      "month": "2024-06",
+      "events": 2063,
+      "hours": 450.75,
+      "uniqueListeners": 178
+    },
+    {
+      "month": "2024-07",
+      "events": 1729,
+      "hours": 418.76,
+      "uniqueListeners": 162
+    },
+    {
+      "month": "2024-08",
+      "events": 1503,
+      "hours": 388.31,
+      "uniqueListeners": 201
+    },
+    {
+      "month": "2024-09",
+      "events": 3062,
+      "hours": 816.89,
+      "uniqueListeners": 228
+    },
+    {
+      "month": "2024-10",
+      "events": 1400,
+      "hours": 493.81,
+      "uniqueListeners": 182
+    },
+    {
+      "month": "2024-11",
+      "events": 1204,
+      "hours": 408.28,
+      "uniqueListeners": 145
+    },
+    {
+      "month": "2024-12",
+      "events": 1187,
+      "hours": 566.71,
+      "uniqueListeners": 128
+    },
+    {
+      "month": "2025-01",
+      "events": 1120,
+      "hours": 418.54,
+      "uniqueListeners": 136
+    },
+    {
+      "month": "2025-02",
+      "events": 1683,
+      "hours": 512.76,
+      "uniqueListeners": 161
+    },
+    {
+      "month": "2025-03",
+      "events": 3820,
+      "hours": 752.06,
+      "uniqueListeners": 287
+    },
+    {
+      "month": "2025-04",
+      "events": 2687,
+      "hours": 622.63,
+      "uniqueListeners": 279
+    },
+    {
+      "month": "2025-05",
+      "events": 3485,
+      "hours": 845.47,
+      "uniqueListeners": 314
+    },
+    {
+      "month": "2025-06",
+      "events": 3075,
+      "hours": 845.87,
+      "uniqueListeners": 262
+    },
+    {
+      "month": "2025-07",
+      "events": 6885,
+      "hours": 1082.03,
+      "uniqueListeners": 246
+    },
+    {
+      "month": "2025-08",
+      "events": 3287,
+      "hours": 801.58,
+      "uniqueListeners": 242
+    },
+    {
+      "month": "2025-09",
+      "events": 6061,
+      "hours": 1159.76,
+      "uniqueListeners": 308
+    },
+    {
+      "month": "2025-10",
+      "events": 12351,
+      "hours": 1032.1,
+      "uniqueListeners": 297
+    },
+    {
+      "month": "2025-11",
+      "events": 6299,
+      "hours": 1035.36,
+      "uniqueListeners": 291
+    },
+    {
+      "month": "2025-12",
+      "events": 4024,
+      "hours": 936,
+      "uniqueListeners": 384
+    },
+    {
+      "month": "2026-01",
+      "events": 7466,
+      "hours": 1604.63,
+      "uniqueListeners": 459
+    },
+    {
+      "month": "2026-02",
+      "events": 9158,
+      "hours": 1926.34,
+      "uniqueListeners": 420
+    },
+    {
+      "month": "2026-03",
+      "events": 10700,
+      "hours": 1980.97,
+      "uniqueListeners": 409
+    },
+    {
+      "month": "2026-04",
+      "events": 5820,
+      "hours": 1678.63,
+      "uniqueListeners": 373
+    },
+    {
+      "month": "2026-05",
+      "events": 5028,
+      "hours": 1551.31,
+      "uniqueListeners": 330
+    },
+    {
+      "month": "2026-06",
+      "events": 301,
+      "hours": 72.38,
+      "uniqueListeners": 47
+    }
+  ],
+  "topAudios": [
+    {
+      "id": "6tKLLnhwhZBbSkdumm6O",
+      "name": "GONG Trance Induction",
+      "plays": 12765,
+      "hours": 4063.6
+    },
+    {
+      "id": "Mq0E7pzeLWDRxrrUYkPj",
+      "name": "Crossover",
+      "plays": 12627,
+      "hours": 4104.09
+    },
+    {
+      "id": "rJxWuRLx4SftCDUTwOKj",
+      "name": "Integrated Life Outcomes",
+      "plays": 10545,
+      "hours": 2421.07
+    },
+    {
+      "id": "tY9CFRmsvpHl90AkUxOL",
+      "name": "Something Special",
+      "plays": 8190,
+      "hours": 2182.99
+    },
+    {
+      "id": "jPEDaBfr5ljqd3P20VDo",
+      "name": "Tribe",
+      "plays": 7818,
+      "hours": 427.43
+    },
+    {
+      "id": "dYs4zJcvyBbCtbK4RZMf",
+      "name": "The Extraordinary Vibe",
+      "plays": 6685,
+      "hours": 1180.58
+    },
+    {
+      "id": "EonYeY7xZstJzZPPxKBu",
+      "name": "Power of Context",
+      "plays": 5911,
+      "hours": 1371.36
+    },
+    {
+      "id": "WCUAgH7g6vFcuEV0uYFv",
+      "name": "Sowing Seeds",
+      "plays": 5816,
+      "hours": 1284.31
+    },
+    {
+      "id": "veyd4PvH6uGrSkTn1sab",
+      "name": "Filter Installation Part 1",
+      "plays": 5737,
+      "hours": 581.21
+    },
+    {
+      "id": "ydPc1u2qklcA4rYgvXv0",
+      "name": "Significance Of FIRST Success",
+      "plays": 4230,
+      "hours": 382.01
+    },
+    {
+      "id": "DtfYXABaJDKDn7Dklqz6",
+      "name": "Predictive Intelligence",
+      "plays": 4052,
+      "hours": 1118.09
+    },
+    {
+      "id": "afCbvIbKUG593872jX1A",
+      "name": "When to Leap, When to Layer",
+      "plays": 3203,
+      "hours": 164.53
+    },
+    {
+      "id": "WkttNp4qlYtdgHPtj4Ha",
+      "name": "Betty Erickson technique",
+      "plays": 2926,
+      "hours": 497.23
+    },
+    {
+      "id": "hJW35np3iedCHIVnd7zD",
+      "name": "Filter Installations Part 2",
+      "plays": 2819,
+      "hours": 895.65
+    },
+    {
+      "id": "3ULyfgZ9RmoH8BnM10sV",
+      "name": "Timeless Passions & Everlasting Pursuits",
+      "plays": 2501,
+      "hours": 359.38
+    },
+    {
+      "id": "mI53SQzOYHOBntWaQPrk",
+      "name": "DJEMBE Trance Induction",
+      "plays": 2121,
+      "hours": 673.97
+    },
+    {
+      "id": "yvkHbarHtYZNK6RMaJsQ",
+      "name": "The Pursuit of Purpose",
+      "plays": 2093,
+      "hours": 395.72
+    },
+    {
+      "id": "FBV1tkMVgRMe927jupN4",
+      "name": "The Business of Evolving people",
+      "plays": 2019,
+      "hours": 700.62
+    },
+    {
+      "id": "4P79rny7O7bWMskz6dvo",
+      "name": "Transferring Experiences",
+      "plays": 1884,
+      "hours": 106.9
+    },
+    {
+      "id": "FQLp0WKTQ5q7criDwDRA",
+      "name": "Multiply Success",
+      "plays": 1729,
+      "hours": 277.39
+    },
+    {
+      "id": "A12oHDrYIcpT2eEXuigE",
+      "name": "Doing Great things",
+      "plays": 1573,
+      "hours": 150.26
+    },
+    {
+      "id": "2FfEsk4Uq2ftHirXg2ml",
+      "name": "Convince like a Charm",
+      "plays": 1556,
+      "hours": 301.73
+    },
+    {
+      "id": "bVE7NgJkn11Vv3yFF5ji",
+      "name": "Hierarchy",
+      "plays": 1502,
+      "hours": 416.48
+    },
+    {
+      "id": "iZrL0nzVMPwZscBuzRKf",
+      "name": "The Magic Love Potion",
+      "plays": 1471,
+      "hours": 246.41
+    },
+    {
+      "id": "QTg0n57Jr6udF22Q5PyG",
+      "name": "Perfect Match",
+      "plays": 1431,
+      "hours": 543.3
+    },
+    {
+      "id": "xT7ooiFtdxJHKoH2sdeO",
+      "name": "MRIDANGAM Trance Induction",
+      "plays": 1249,
+      "hours": 545.9
+    },
+    {
+      "id": "cx3PkeNsg0WbcPyaP9Ap",
+      "name": "Expressive Gains",
+      "plays": 1042,
+      "hours": 113.61
+    },
+    {
+      "id": "0HrDGJXQU52BvW7iLKQF",
+      "name": "Material & Energy",
+      "plays": 1027,
+      "hours": 103.5
+    },
+    {
+      "id": "xrtHmVIGIlx8dAh1jpKp",
+      "name": "Forge old passions with new passions",
+      "plays": 807,
+      "hours": 138.33
+    },
+    {
+      "id": "DzPQ9zmqFDo6lauI3dcn",
+      "name": " Nullifying the Nullifiers",
+      "plays": 804,
+      "hours": 94.23
+    },
+    {
+      "id": "3dLlKGXOof7GV7iazjmK",
+      "name": "Category Shift",
+      "plays": 721,
+      "hours": 129.12
+    },
+    {
+      "id": "dSqhMhUfAUnBjWzzR0jV",
+      "name": "Earn it!",
+      "plays": 570,
+      "hours": 119.12
+    },
+    {
+      "id": "1gDKh2uGbz4BIGVWwyQJ",
+      "name": "Get it, again!",
+      "plays": 166,
+      "hours": 25.55
+    },
+    {
+      "id": "1zesRIKpG0CAnJQMWTGS",
+      "name": "The Magic 10 Minutes to Create New Habits",
+      "plays": 128,
+      "hours": 16.14
+    },
+    {
+      "id": "XUAquxbg2oGLSQbE35Xy",
+      "name": "Unlimited Access to Self",
+      "plays": 83,
+      "hours": 7.59
+    },
+    {
+      "id": "7Kvk1bFlloZXuxLUi9F2",
+      "name": "Training Your Intuition to Make Better Decisions",
+      "plays": 46,
+      "hours": 6.09
+    },
+    {
+      "id": "puHQSqRg8PqsaXDguIpv",
+      "name": "Be Your Own Coach, Effectively",
+      "plays": 45,
+      "hours": 6.68
+    },
+    {
+      "id": "dv0a1hTgECF7PhToc4ad",
+      "name": "Can Personal Mastery Help in Fighting Allergies?",
+      "plays": 14,
+      "hours": 1.4
+    },
+    {
+      "id": "0oCsSH6eUnRhYJsvkqw5",
+      "name": "A Framework for Finer Exploration of Human Behaviour ",
+      "plays": 3,
+      "hours": 0.08
+    }
+  ]
+}

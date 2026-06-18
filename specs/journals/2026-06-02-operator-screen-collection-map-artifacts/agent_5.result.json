@@ -1,0 +1,300 @@
+[
+  {
+    "route": "EISzoom",
+    "file": "src/app/Scheduling/eis-zoom-account/eis-zoom-account.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "EISzoomcontact", "line": 57}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionData subscription on EISzoomcontact (57-58). No writes in component."
+  },
+  {
+    "route": "appointmentavailability",
+    "file": "src/app/Scheduling/appointment-availability/appointment-availability.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "availability", "line": 110},
+      {"c": "profile_data", "line": 119}
+    ],
+    "writes": [
+      {"c": "availability", "line": 194}
+    ],
+    "services": ["guard.getAppointmentMap (100)", "guard.getProfileMap (105)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads availability via collectionData query (110-121); profile_data only used as doc() ref inside where() at 119. Write: deleteDoc availability/{id} at 194-195."
+  },
+  {
+    "route": "bookappointment",
+    "file": "src/app/Scheduling/book-appointment/book-appointment.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participantsproduct", "line": 149},
+      {"c": "deliverables", "line": 154},
+      {"c": "participantdeliverysequence", "line": 168},
+      {"c": "AppointmentType-To-Roles", "line": 224},
+      {"c": "customer_eismapping", "line": 240},
+      {"c": "Roles-To-EIS", "line": 286},
+      {"c": "availability", "line": 334},
+      {"c": "availability", "line": 506}
+    ],
+    "writes": [
+      {"c": "availability", "line": 567},
+      {"c": "appointments", "line": 607},
+      {"c": "participantsproduct", "line": 643},
+      {"c": "participantdeliverysequence", "line": 657}
+    ],
+    "services": ["guard.getAppointmentMap (125)", "guard.getProductMap (126)", "guard.getProfileMap (127)"],
+    "dynamic": ["updateDoc on this.selectedAppointment.deliverypath (660-661) — deliverable doc path resolved at runtime; arrayUnion adds appointment ref"],
+    "atc": [],
+    "notes": "READS via getDocs/getDoc: participantsproduct(149-151), deliverables(154-162), participantdeliverysequence/{uid}(168-169), AppointmentType-To-Roles(224-226), customer_eismapping/{uid}(240-241), Roles-To-EIS(286-288), availability(334-336 & getDoc 506-507). WRITES via writeBatch (480, commit 608): batch.update availability/{id} (567), batch.set appointments/{docid} (607). Plus updateDoc participantsproduct(643), participantdeliverysequence(657), and dynamic deliverypath(660)."
+  },
+  {
+    "route": "appointmentcalendar",
+    "file": "src/app/Scheduling/appointment-calendar/appointment-calendar.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointments", "line": 151},
+      {"c": "profile_data", "line": 157}
+    ],
+    "writes": [],
+    "services": ["guard.getAppointmentRolesMap (106)", "guard.getAppointmentMap (107)", "guard.getProfileMap (108)", "guard.cancelAppointment (244)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads appointments via query (151-159); profile_data only as doc() ref in where() at 157. Cancellation delegated to guard.cancelAppointment (244) — write is service-mediated, not direct."
+  },
+  {
+    "route": "mycalendar",
+    "file": "src/app/Scheduling/appointment-calendar/appointment-calendar.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointments", "line": 151},
+      {"c": "profile_data", "line": 157}
+    ],
+    "writes": [],
+    "services": ["guard.getAppointmentRolesMap (106)", "guard.getAppointmentMap (107)", "guard.getProfileMap (108)", "guard.cancelAppointment (244)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Same component as appointmentcalendar (appointment-calendar.component.ts). Reads appointments query (151); profile_data as where() doc ref (157). Cancellation via guard.cancelAppointment (244)."
+  },
+  {
+    "route": "roster",
+    "file": "src/app/Scheduling/roaster/roaster.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointment session", "line": 101},
+      {"c": "appointments", "line": 133}
+    ],
+    "writes": [],
+    "services": ["guard.getAppointmentMap (104)", "guard.getProfileMap (105)", "guard.getProductMap (106)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads 'appointment session' via getDocs (101-107) and appointments via collectionData query (133-135). No writes in component."
+  },
+  {
+    "route": "appointmentstatuspending",
+    "file": "src/app/Scheduling/appointment-status-pending/appointment-status-pending.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointments", "line": 92},
+      {"c": "profile_data", "line": 99}
+    ],
+    "writes": [],
+    "services": ["guard.getAppointmentRolesMap (68)", "guard.getAppointmentMap (69)", "guard.getProfileMap (70)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads appointments via query (92-101); profile_data only as doc() ref in where() at 99. No writes."
+  },
+  {
+    "route": "appointmentrole",
+    "file": "src/app/Scheduling/appointment-roles/appointment-roles.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "eisroles", "line": 58}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads eisroles via collectionData query (58-60). No writes in component."
+  },
+  {
+    "route": "eisappointmentrole",
+    "file": "src/app/Scheduling/eis-appointment-role/eis-appointment-role.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "Roles-To-EIS", "line": 82}
+    ],
+    "writes": [],
+    "services": ["guard.getAppointmentRolesMap (67)", "guard.getProfileMap (68)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads Roles-To-EIS via collectionData (82-83). No writes in component."
+  },
+  {
+    "route": "mapappointmentrole",
+    "file": "src/app/Scheduling/map-appointment-role/map-appointment-role.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "AppointmentType-To-Roles", "line": 81}
+    ],
+    "writes": [],
+    "services": ["guard.getAppointmentMap (66)", "guard.getAppointmentRolesMap (67)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads AppointmentType-To-Roles via collectionData (81-82). No writes in component."
+  },
+  {
+    "route": "mapclienteis",
+    "file": "src/app/Scheduling/map-client-eis/map-client-eis.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "customer_eismapping", "line": 80}
+    ],
+    "writes": [
+      {"c": "customer_eismapping", "line": 135}
+    ],
+    "services": ["guard.getAppointmentRolesMap (65)", "guard.getProfileMap (66)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads customer_eismapping via collectionData (80-81). Write: deleteDoc customer_eismapping/{id} (135)."
+  },
+  {
+    "route": "teamdeliveryhours",
+    "file": "src/app/Scheduling/team-delivery-hours/team-delivery-hours.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "deliverytime", "line": 75}
+    ],
+    "writes": [],
+    "services": ["guard.getProfileMap (71)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads deliverytime via collectionData (75-80), optionally filtered by profileid. No writes in component."
+  },
+  {
+    "route": "capacityutilization",
+    "file": "src/app/Scheduling/capacity-utilization/capacity-utilization.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "availability", "line": 93},
+      {"c": "profile_data", "line": 131}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads availability via getDocs query (93-95) and profile_data via getDocs query (131-133). No writes."
+  },
+  {
+    "route": "appointmentstudio",
+    "file": "src/app/Scheduling/appointment-studio/appointment-studio.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointments", "line": 119},
+      {"c": "products", "line": 208},
+      {"c": "appointments", "line": 226},
+      {"c": "appointments", "line": 389},
+      {"c": "openviduroom", "line": 649}
+    ],
+    "writes": [
+      {"c": "openviduroom", "line": 682},
+      {"c": "appointments", "line": 768}
+    ],
+    "services": ["guard.getAppointmentRolesMap (89)", "guard.getAppointmentMap (90)", "guard.getParticipantMetaMap (91)", "guard.getJourneyMap (92)", "guard.createOpenViduRoom (651)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "READS: appointments via query (119-127, 226-234, 389-398); products query filtered by atcmodel field (208) — products is a normal collection, atcmodel is a field, NOT an ATC collection; openviduroom getDoc (649). WRITES: updateDoc openviduroom {active:true} (682); updateDoc appointments platform field (768). Room creation now via guard.createOpenViduRoom (651). NOTE: a deliverables(310)+participantsproduct(323) read block (307-348) and an openviduroom setDoc(738)/updateDoc(742) block (705-763) are both commented out (/* */) — not live."
+  },
+  {
+    "route": "openappointmentzoom/:id",
+    "file": "src/app/Scheduling/appointment-zoom-view/appointment-zoom-view.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointments", "line": 51},
+      {"c": "profile_data", "line": 81},
+      {"c": "appointments", "line": 147}
+    ],
+    "writes": [
+      {"c": "appointments", "line": 158}
+    ],
+    "services": ["guard.getRoles (77)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "READS via getDoc appointments/{id} (51, 147) and getDocs profile_data query (81). WRITE: updateDoc appointments/{docid} setting cliptimings (158)."
+  },
+  {
+    "route": "appointment-status-update",
+    "file": "src/app/Scheduling/appointment-zoom-view/appointment-status-update/appointment-status-update.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "appointments", "line": 93},
+      {"c": "products", "line": 117},
+      {"c": "zoomaccount", "line": 234},
+      {"c": "logs", "line": 255}
+    ],
+    "writes": [
+      {"c": "appointments", "line": 193},
+      {"c": "zoomaccount", "line": 241},
+      {"c": "logs", "line": 262}
+    ],
+    "services": ["guard.getAppointmentMap (74)", "guard.updateDeliveryStatus (203)"],
+    "dynamic": ["batch.update on procedure.procedurepath (210) committed at 217 — procedure doc paths resolved at runtime"],
+    "atc": [],
+    "notes": "READS via getDoc appointments/{id} (93), getDocs products (117-118), getDocs zoomaccount query (233-238), collectionGroup('logs') query getDocs (254-259). WRITES: updateDoc appointments/{docid} (192-193); writeBatch (207, commit 217) batch.update on dynamic procedurepath docs (210); updateDoc zoomaccount doc inuse:false (241); updateDoc logs doc read:true (262). Delivery status update delegated to guard.updateDeliveryStatus (203)."
+  },
+  {
+    "route": "journeyonboardingdetail",
+    "file": "src/app/journey-onboarding-detail/journey-onboarding-detail.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 186},
+      {"c": "journey", "line": 202},
+      {"c": "series", "line": 411},
+      {"c": "classify/applockedcontent", "line": 455},
+      {"c": "classify/journeyorientation", "line": 469},
+      {"c": "classify/timecompression", "line": 486},
+      {"c": "content_urls", "line": 522},
+      {"c": "solar voice playlist", "line": 543},
+      {"c": "journeyonboardingdetail", "line": 1002},
+      {"c": "journeyonboardingdetail", "line": 1198}
+    ],
+    "writes": [
+      {"c": "classify/applockedcontent", "line": 445},
+      {"c": "classify/journeyorientation", "line": 1048},
+      {"c": "classify/timecompression", "line": 1071},
+      {"c": "journeyonboardingdetail", "line": 1174},
+      {"c": "journeyonboardingdetail", "line": 1201}
+    ],
+    "services": [],
+    "dynamic": ["getDoc on rawRef.path / rawRef string (journeyref) at 1011 and 1017 — resolves a journey doc by runtime path", "doc() built from cleaned runtime path string at 1246 (DocumentReference helper)"],
+    "atc": [],
+    "notes": "Pure direct-Firestore component (no AuthguardService; uses inject()). READS: profile_data collectionData (186), journey getDocs (202), series getDocs (411), classify singleton docs getDoc applockedcontent(455)/journeyorientation(469)/timecompression(486), content_urls getDocs (522), 'solar voice playlist' getDocs (543), journeyonboardingdetail collectionData (1002) & getDocs (1198). WRITES (setDoc): classify/applockedcontent (445-446), classify/journeyorientation (1048), classify/timecompression (1071), journeyonboardingdetail/{docid} merge (1174), journeyonboardingdetail/{id} (1201). Dynamic journeyref reads at 1011/1017."
+  },
+  {
+    "route": "hpc",
+    "file": "src/app/hpc/hpc.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "3minuteshpc", "line": 143},
+      {"c": "classify/3minuteshpc", "line": 187},
+      {"c": "static meta data/Accelerator", "line": 195},
+      {"c": "static meta data/HPC Config", "line": 200}
+    ],
+    "writes": [
+      {"c": "classify/3minuteshpc", "line": 229},
+      {"c": "static meta data/HPC Config", "line": 253},
+      {"c": "static meta data/Accelerator", "line": 282},
+      {"c": "static meta data/Accelerator", "line": 296},
+      {"c": "3minuteshpc", "line": 660}
+    ],
+    "services": ["guard.getRoles (104)", "guard.getProfileMap (107)"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "READS via getDocs 3minuteshpc ordered query (143-145) and getDoc singleton docs: classify/3minuteshpc (186-187), 'static meta data'/Accelerator (194-195), 'static meta data'/'HPC Config' (199-200). WRITES via updateDoc: classify/3minuteshpc (227-229), 'static meta data'/'HPC Config' (252-253), 'static meta data'/Accelerator (281-282 and 295-296); deleteDoc 3minuteshpc/{id} (660)."
+  }
+]

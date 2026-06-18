@@ -1,213 +1,221 @@
-<div class="zoom-records-cnt">
-  <h1>Zoom Backup Recordings</h1>
-
-  <!-- filtering options -->
-  <div class="filters-container">
-    <p>Filter By</p>
-    <form [formGroup]="form" class="filters">
-      <!-- text search filter -->
-      <div>
-        <mat-form-field appearance="outline" style="min-width: 300px">
-          <mat-label>Meeting ID or Topic or Email</mat-label>
-          <input
-            type="text"
-            placeholder="Ex..."
-            matInput
-            (keyup)="applyFilter()"
-            formControlName="search"
-          />
-        </mat-form-field>
-      </div>
-      <!-- filter by start time-->
-      <div>
-        <mat-form-field appearance="outline">
-          <mat-label>Enter a date range</mat-label>
-          <mat-date-range-input [rangePicker]="picker">
-            <input
-              matStartDate
-              placeholder="Start date"
-              formControlName="startDate"
-              (dateChange)="applyFilter()"
-            />
-            <input
-              matEndDate
-              placeholder="End date"
-              formControlName="endDate"
-              (dateChange)="applyFilter()"
-            />
-          </mat-date-range-input>
-          <mat-datepicker-toggle
-            matIconSuffix
-            [for]="picker"
-          ></mat-datepicker-toggle>
-          <mat-date-range-picker #picker></mat-date-range-picker>
-        </mat-form-field>
-      </div>
-
-      <!-- filter by status -->
-      <div>
-        <mat-form-field appearance="outline">
-          <mat-label>Status</mat-label>
-          <mat-select
-            (selectionChange)="applyFilter()"
-            formControlName="status"
-          >
-            <mat-option>--</mat-option>
-            <mat-option [value]="'completed'">Completed</mat-option>
-            <mat-option [value]="'failed'">Failed</mat-option>
-            <mat-option [value]="'partial_success'">Partial Success</mat-option>
-          </mat-select>
-        </mat-form-field>
-      </div>
-    </form>
-    <div>
-      <!-- table to display zoom records -->
-      <table mat-table [dataSource]="recordsBackup" class="mat-elevation-z8">
-        <ng-container matColumnDef="meetingId">
-          <th mat-header-cell *matHeaderCellDef>MeetingId</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "meetingId") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="meetingTopic">
-          <th mat-header-cell *matHeaderCellDef>Meeting Topic</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "meetingTopic") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="hostEmail">
-          <th mat-header-cell *matHeaderCellDef>Host Email</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "hostEmail") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="duration">
-          <th mat-header-cell *matHeaderCellDef>Duration</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "duration") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef>Status</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "status") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="successCount">
-          <th mat-header-cell *matHeaderCellDef>Success Count</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "successCount") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="failedCount">
-          <th mat-header-cell *matHeaderCellDef>Failed Count</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "failedCount") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="startTime">
-          <th mat-header-cell *matHeaderCellDef>Start Time</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "startTime") | date : "medium" }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="totalSize">
-          <th mat-header-cell *matHeaderCellDef>TotalSize</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "totalSize") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="totalFiles">
-          <th mat-header-cell *matHeaderCellDef>TotalFiles</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "totalFiles") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="file">
-          <th mat-header-cell *matHeaderCellDef>View File</th>
-          <td mat-cell *matCellDef="let element">
-            <button
-              mat-icon-button
-              class="file-popup-btn"
-              (click)="openFileModel(element.id)"
-            >
-              <i class="fa-regular fa-file"></i>
-            </button>
-          </td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="tableHeaders"></tr>
-        <tr mat-row *matRowDef="let row; columns: tableHeaders"></tr>
-      </table>
-
-      <!-- paginator -->
-      <mat-paginator
-        [pageSizeOptions]="[10, 20, 25, 50, 100, 200]"
-        showFirstLastButtons
-      >
-      </mat-paginator>
+<div class="zoom-dash">
+  <!-- ===== header ===== -->
+  <header class="dash-head">
+    <div class="dash-head__title">
+      <span class="dash-eyebrow">Communication Center</span>
+      <h1>Zoom&nbsp;<em>Backup</em>&nbsp;Recordings</h1>
+      <p class="dash-sub">Live view of recordings flowing from Zoom into Dropbox.</p>
     </div>
+    <div class="live-pill" [class.live-pill--idle]="loading">
+      <span class="live-dot"></span>{{ loading ? 'Syncing…' : 'Live' }}
+    </div>
+  </header>
+
+  <!-- ===== summary stat cards ===== -->
+  <section class="stat-row">
+    <div class="stat-card stat-card--total">
+      <span class="stat-label">In view</span>
+      <span class="stat-num">{{ stats.total }}</span>
+    </div>
+    <div class="stat-card stat-card--ok">
+      <span class="stat-label">Completed</span>
+      <span class="stat-num">{{ stats.completed }}</span>
+    </div>
+    <div class="stat-card stat-card--run">
+      <span class="stat-label">Processing</span>
+      <span class="stat-num">{{ stats.processing }}</span>
+    </div>
+    <div class="stat-card stat-card--warn">
+      <span class="stat-label">Partial</span>
+      <span class="stat-num">{{ stats.partial }}</span>
+    </div>
+    <div class="stat-card stat-card--bad">
+      <span class="stat-label">Failed</span>
+      <span class="stat-num">{{ stats.failed }}</span>
+    </div>
+  </section>
+
+  <!-- ===== filters ===== -->
+  <form [formGroup]="form" class="filters">
+    <mat-form-field appearance="outline" class="f-search">
+      <mat-label>Search topic, host or meeting ID</mat-label>
+      <input type="text" matInput (keyup)="applyFilter()" formControlName="search" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Date range</mat-label>
+      <mat-date-range-input [rangePicker]="picker">
+        <input matStartDate placeholder="Start" formControlName="startDate" (dateChange)="onDateChange()" />
+        <input matEndDate placeholder="End" formControlName="endDate" (dateChange)="onDateChange()" />
+      </mat-date-range-input>
+      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-date-range-picker #picker></mat-date-range-picker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="f-status">
+      <mat-label>Status</mat-label>
+      <mat-select (selectionChange)="applyFilter()" formControlName="status">
+        <mat-option [value]="''">All</mat-option>
+        <mat-option [value]="'completed'">Completed</mat-option>
+        <mat-option [value]="'processing'">Processing</mat-option>
+        <mat-option [value]="'partial_success'">Partial Success</mat-option>
+        <mat-option [value]="'failed'">Failed</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </form>
+
+  <!-- ===== table ===== -->
+  <div class="table-card">
+    <table mat-table [dataSource]="recordsBackup">
+      <ng-container matColumnDef="meetingTopic">
+        <th mat-header-cell *matHeaderCellDef>Meeting</th>
+        <td mat-cell *matCellDef="let el">
+          <div class="cell-topic">{{ el.meetingTopic }}</div>
+          <div class="cell-sub mono">#{{ el.meetingId }}</div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="hostEmail">
+        <th mat-header-cell *matHeaderCellDef>Host</th>
+        <td mat-cell *matCellDef="let el"><span class="cell-host">{{ el.hostEmail }}</span></td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let el">
+          <span class="status-badge status-{{ el.status }}">
+            <span class="badge-dot"></span>{{ el.status }}
+          </span>
+          <div class="cell-sub" *ngIf="el.successCount !== undefined">
+            {{ el.successCount }}/{{ el.totalFiles }} files
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="progress">
+        <th mat-header-cell *matHeaderCellDef>Progress</th>
+        <td mat-cell *matCellDef="let el">
+          <div class="row-progress">
+            <div class="progress-bar">
+              <div class="progress-fill progress-{{ el.status }}"
+                   [style.width.%]="recordPercent(el)"></div>
+            </div>
+            <span class="mono progress-text">{{ recordPercent(el) }}%</span>
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="totalSize">
+        <th mat-header-cell *matHeaderCellDef>Size</th>
+        <td mat-cell *matCellDef="let el"><span class="mono">{{ formatBytes(el.totalSize) }}</span></td>
+      </ng-container>
+
+      <ng-container matColumnDef="totalFiles">
+        <th mat-header-cell *matHeaderCellDef>Files</th>
+        <td mat-cell *matCellDef="let el"><span class="mono">{{ el.totalFiles }}</span></td>
+      </ng-container>
+
+      <ng-container matColumnDef="startTime">
+        <th mat-header-cell *matHeaderCellDef>Meeting (start&ndash;end)</th>
+        <td mat-cell *matCellDef="let el">
+          <div>{{ el.startTime | date : "MMM d, y" }}</div>
+          <div class="cell-sub">
+            {{ el.startTime | date : "h:mm a" }} &ndash;
+            {{ endTime(el) | date : "h:mm a" }}
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="processingTime">
+        <th mat-header-cell *matHeaderCellDef>Processing (start&ndash;end)</th>
+        <td mat-cell *matCellDef="let el">
+          <div class="cell-sub">
+            {{ processingStart(el) | date : "h:mm:ss a" }} &ndash;
+            {{ processingEnd(el) | date : "h:mm:ss a" }}
+          </div>
+          <div class="cell-sub mono">{{ formatDuration(el.processingDuration) }}</div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="file">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let el">
+          <button class="view-btn" (click)="openFileModel(el.id)">View files →</button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="tableHeaders"></tr>
+      <tr mat-row *matRowDef="let row; columns: tableHeaders"></tr>
+    </table>
+
+    @if (!loading && recordsBackup.filteredData.length === 0) {
+    <div class="empty-state">
+      <div class="empty-mark">∅</div>
+      <p>No recordings for this range.</p>
+    </div>
+    }
+
+    <mat-paginator [pageSizeOptions]="[10, 20, 25, 50, 100]" showFirstLastButtons></mat-paginator>
   </div>
 </div>
 
-<!-- file popup box -->
-
+<!-- ===== file modal ===== -->
 @if (files !== null) {
-<div class="model-overlay">
-  <div class="file-container">
-    <h1>File</h1>
-    <div>
-      <!-- table to display files -->
-      @if (files.length > 0) {
-      <table mat-table [dataSource]="files">
-        <ng-container matColumnDef="fileName">
-          <th mat-header-cell *matHeaderCellDef>File Name</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "fileName") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="fileSize">
-          <th mat-header-cell *matHeaderCellDef>File Size</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "fileSize") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="fileType">
-          <th mat-header-cell *matHeaderCellDef>File Type</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "fileType") }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="status">
-          <th mat-header-cell *matHeaderCellDef>Status</th>
-          <td mat-cell *matCellDef="let element">
-            {{ formatDisplayData(element, "status") }}
-          </td>
-        </ng-container>
-
-        <tr mat-header-row *matHeaderRowDef="filetableHeaders"></tr>
-        <tr mat-row *matRowDef="let row; columns: filetableHeaders"></tr>
-      </table>
-      } @else{
-      <p>No files For this Record</p>
-      }
+<div class="model-overlay" (click)="closeFileModel()">
+  <div class="file-container" (click)="$event.stopPropagation()">
+    <div class="modal-head">
+      <div>
+        <span class="dash-eyebrow">Files</span>
+        <h2>{{ activeRecord?.meetingTopic }}</h2>
+        <p class="modal-meta">
+          <span class="status-badge status-{{ activeRecord?.status }}">
+            <span class="badge-dot"></span>{{ activeRecord?.status }}</span>
+          <span class="mono">{{ formatBytes(activeRecord?.totalSize) }}</span>
+          <span>· {{ formatDuration(activeRecord?.processingDuration) }}</span>
+        </p>
+        <p class="modal-meta">
+          <span><b>Meeting:</b> {{ activeRecord?.startTime | date : "MMM d, y, h:mm a" }}
+            &ndash; {{ endTime(activeRecord) | date : "h:mm a" }}</span>
+        </p>
+        <p class="modal-meta">
+          <span><b>Processing:</b>
+            {{ processingStart(activeRecord) | date : "MMM d, y, h:mm:ss a" }}
+            &ndash; {{ processingEnd(activeRecord) | date : "h:mm:ss a" }}</span>
+        </p>
+      </div>
+      <button class="close-x" (click)="closeFileModel()">✕</button>
     </div>
 
-    <!-- close button -->
-    <button mat-button (click)="closeFileModel()">Cancel</button>
+    @if (files.length > 0) {
+    <div class="file-list">
+      @for (f of files; track f.fileType) {
+      <div class="file-item">
+        <div class="file-item__top">
+          <span class="file-type mono">{{ f.fileType }}</span>
+          <span class="status-badge status-{{ f.status }}">
+            <span class="badge-dot"></span>{{ f.status }}</span>
+        </div>
+        <div class="file-name">{{ f.fileName }}</div>
+        <div class="progress-wrap">
+          <div class="progress-bar">
+            <div class="progress-fill progress-{{ f.status }}"
+                 [style.width.%]="f.status === 'success' ? 100 : (f.percent || 0)"></div>
+          </div>
+          <span class="mono progress-text">{{ f.status === 'success' ? 100 : (f.percent || 0) }}%</span>
+        </div>
+        <div class="file-bytes mono">
+          {{ formatBytes(f.status === 'success' ? f.fileSize : (f.uploadedBytes || 0)) }}
+          / {{ formatBytes(f.fileSize) }}
+        </div>
+        @if (f.status === 'failed' && f.error) {
+        <div class="file-error">⚠ {{ f.error }}</div>
+        }
+      </div>
+      }
+    </div>
+    } @else {
+    <p class="no-files">No files recorded for this meeting.</p>
+    }
   </div>
 </div>
 }

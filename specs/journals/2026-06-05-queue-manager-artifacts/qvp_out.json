@@ -1,0 +1,152 @@
+{
+  "base": [
+    "Evolution Prep Orientation",
+    "uP! Preparation Hold",
+    "Accelerated Evolution Level Form",
+    "uP! Life Aspiration Report",
+    "ATC Orientation Form",
+    "Prodigies Preparation Form",
+    "uP! Life Report",
+    "Scope Enhancement",
+    "Evolution Mapping Activity",
+    "In Evolution Mapping Activity",
+    "Self Evaluation Form",
+    "Scope Enhancement Changework",
+    "Transfered",
+    "Completed"
+  ],
+  "vars": [
+    {
+      "id": "rkx1mx2bkzpjHjSKF860",
+      "name": "uP! Next Cycle",
+      "participants": 421,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Completed"
+      ]
+    },
+    {
+      "id": "zDSNSEe2mF23g6NIqhm3",
+      "name": "uP! First Cycle",
+      "participants": 83,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "Scope Enhancement",
+        "Completed"
+      ]
+    },
+    {
+      "id": "xyZTFI2Pc6yGpYMvdK0X",
+      "name": "B!G Next Cycle",
+      "participants": 32,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Completed"
+      ]
+    },
+    {
+      "id": "oP0QUBFZ7TzlWtTsr1J3",
+      "name": "Prodigies Next Cycle",
+      "participants": 21,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Prodigies Preparation Form",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Completed"
+      ]
+    },
+    {
+      "id": "PJn62qQjVNtS2zfCQtTU",
+      "name": "Scope Enhancement Changework ",
+      "participants": 20,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "Prodigies Preparation Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Scope Enhancement Changework",
+        "Completed"
+      ]
+    },
+    {
+      "id": "HktZMrU1qx9SzXGc6nxx",
+      "name": "LYL Next Cycle",
+      "participants": 13,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Completed"
+      ]
+    },
+    {
+      "id": "YdR8kPr4hc2cRyr8cokx",
+      "name": "LYL First Cycle",
+      "participants": 8,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "Scope Enhancement",
+        "Completed"
+      ]
+    },
+    {
+      "id": "a7vbJz0GJBOBzXN4chmF",
+      "name": "Transfer",
+      "participants": 1,
+      "stages": [
+        "Transfered"
+      ]
+    },
+    {
+      "id": "zUuoZoJHHDQnPTA6Ap68",
+      "name": "Prodigies first cycle",
+      "participants": 0,
+      "stages": [
+        "Evolution Prep Orientation",
+        "Accelerated Evolution Level Form",
+        "ATC Orientation Form",
+        "Scope Enhancement",
+        "Completed"
+      ]
+    },
+    {
+      "id": "Dy1dEimoqjm5KFoy6Y8j",
+      "name": "uP! Prep Hold",
+      "participants": 0,
+      "stages": [
+        "uP! Preparation Hold"
+      ]
+    }
+  ]
+}
