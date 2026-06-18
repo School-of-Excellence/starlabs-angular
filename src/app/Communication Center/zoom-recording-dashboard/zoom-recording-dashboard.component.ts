@@ -170,6 +170,14 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     return null
   }
 
+  // meeting end = start + duration (Zoom duration is in minutes)
+  endTime(record: any): Date | null {
+    const start = this.toDate(record?.startTime)
+    if (!start) return null
+    const mins = Number(record?.duration) || 0
+    return new Date(start.getTime() + mins * 60000)
+  }
+
   // overall % across a record's files (for the inline progress in the table)
   recordPercent(record: any): number {
     const files = this.normalizeFiles(record?.files)

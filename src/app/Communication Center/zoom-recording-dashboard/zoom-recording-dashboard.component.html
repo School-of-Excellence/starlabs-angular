@@ -116,10 +116,13 @@
       </ng-container>
 
       <ng-container matColumnDef="startTime">
-        <th mat-header-cell *matHeaderCellDef>Started</th>
+        <th mat-header-cell *matHeaderCellDef>Start &amp; End</th>
         <td mat-cell *matCellDef="let el">
           <div>{{ el.startTime | date : "MMM d, y" }}</div>
-          <div class="cell-sub">{{ el.startTime | date : "h:mm a" }}</div>
+          <div class="cell-sub">
+            {{ el.startTime | date : "h:mm a" }} &ndash;
+            {{ endTime(el) | date : "h:mm a" }}
+          </div>
         </td>
       </ng-container>
 
@@ -163,6 +166,10 @@
             <span class="badge-dot"></span>{{ activeRecord?.status }}</span>
           <span class="mono">{{ formatBytes(activeRecord?.totalSize) }}</span>
           <span>· {{ formatDuration(activeRecord?.processingDuration) }}</span>
+        </p>
+        <p class="modal-meta">
+          <span>{{ activeRecord?.startTime | date : "MMM d, y, h:mm a" }}
+            &ndash; {{ endTime(activeRecord) | date : "h:mm a" }}</span>
         </p>
       </div>
       <button class="close-x" (click)="closeFileModel()">✕</button>
