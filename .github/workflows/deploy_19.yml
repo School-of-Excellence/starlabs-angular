@@ -124,10 +124,8 @@ jobs:
             echo '${{ secrets.GOOGLE_SERVICE_TEST }}' > $HOME/firebase-key.json
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json
             firebase use --add starlabs-test
-            firebase deploy
-          elif [ "${{ github.ref }}" == "refs/heads/production" ]; then
+            firebase deploy --only hosting          elif [ "${{ github.ref }}" == "refs/heads/production" ]; then
             echo '${{ secrets.GOOGLE_SERVICE_PROD }}' > $HOME/firebase-key.json
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json
             firebase use --add fir-sample-aae4a
-            firebase deploy
-          fi
+            firebase deploy --only hosting          fi
