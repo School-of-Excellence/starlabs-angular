@@ -18,7 +18,16 @@ on:
       - 'angular.json'
       - 'package.json'
       - '.github/workflows/queue-e2e.yml'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Spec subset (space-separated). Empty = the default green smoke subset.'
+        type: string
+        default: ''
+      evidence:
+        description: '1 = capture screenshots + traces (to debug a CI-only failure)'
+        type: string
+        default: '0'
 
 jobs:
   gate:
@@ -32,4 +41,8 @@ jobs:
     with:
       cf_branch: development
       e2e_ref: main
+      # PR runs a FAST GREEN SMOKE (self-tests) so the flow proves end-to-end now; the full UI suite is the
+      # parallel "green-in-CI" track. A manual workflow_dispatch can override `only`/`evidence` to debug a spec.
+      only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || 'queue/invariants-selftest.spec.ts queue/oracle-selftest.spec.ts' }}
+      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '0' }}
     secrets: inherit
