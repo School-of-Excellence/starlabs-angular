@@ -1,0 +1,134 @@
+<div class="planning-tab">
+
+  <div *ngIf="selectedQueueList.length === 0" class="planning-empty">
+    <mat-icon>insights</mat-icon>
+    <p>Select a queue to start planning.</p>
+  </div>
+
+  <ng-container *ngIf="selectedQueueList.length > 0">
+
+    <!-- Summary strip -->
+    <div class="pl-summary">
+      <div class="sum"><div class="sum-val">{{ cohortTotal }}</div><div class="sum-lbl">In cohort</div></div>
+      <div class="sum"><div class="sum-val ok">{{ confirmedTotal }}</div><div class="sum-lbl">uP! confirmed</div></div>
+      <div class="sum"><div class="sum-val muted">{{ potentialTotal }}</div><div class="sum-lbl">Potential</div></div>
+      <div class="sum-spacer"></div>
+      <button class="ios-btn filled" (click)="openAddPhase()" *ngIf="!showPhaseForm">
+        <mat-icon>add</mat-icon><span>Add phase</span>
+      </button>
+    </div>
+
+    <div *ngIf="rosterLoading" class="pl-note"><mat-icon>autorenew</mat-icon><span>Loading cohort from Starlabs…</span></div>
+
+    <!-- Create / edit phase form -->
+    <div class="phase-form ios-card" *ngIf="showPhaseForm">
+      <form [formGroup]="phaseForm">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Phase name</mat-label>
+          <input matInput type="text" formControlName="phasename" placeholder="e.g. Phase 1 · Orientation">
+          <mat-error *ngIf="phaseForm.get('phasename')?.touched && phaseForm.get('phasename')?.invalid">Name is required</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Stages in this phase</mat-label>
+          <mat-select [compareWith]="comparePhaseStage" formControlName="stages" multiple>
+            <mat-option *ngFor="let opt of stageOptions" [value]="opt">
+              {{ opt.stagename }} <span class="opt-queue-hint">({{ queueName(opt.queueid) }})</span>
+            </mat-option>
+          </mat-select>
+          <mat-error *ngIf="phaseForm.get('stages')?.touched && phaseForm.get('stages')?.invalid">Select at least one stage</mat-error>
+        </mat-form-field>
+        <div class="phase-form-actions">
+          <button mat-button type="button" (click)="closePhaseForm()">Cancel</button>
+          <button class="ios-btn filled" type="button" [disabled]="!phaseForm.valid" (click)="submitPhase()">{{ isEditMode ? 'Update' : 'Create' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Empty phases -->
+    <div class="pl-note" *ngIf="planningPhases.length === 0 && !showPhaseForm">
+      <mat-icon>layers</mat-icon>
+      <span>No phases yet. Add a phase (a group of stages) — the matrix and lists below fill in from live data.</span>
+    </div>
+
+    <!-- Readiness matrix -->
+    <div class="matrix-wrap" *ngIf="planningPhases.length > 0">
+      <table class="pmx">
+        <thead>
+          <tr>
+            <th class="lbl">Phase / readiness</th>
+            <th *ngFor="let c of segCols">{{ c.label }}</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let row of matrixRows">
+            <tr class="grp" [class.sel]="selectedPhaseKey === row.phase.docid" (click)="selectPhase(row.phase)">
+              <td class="lbl">
+                <span class="grp-ring">
+                  <svg viewBox="0 0 60 60" aria-hidden="true">
+                    <circle cx="30" cy="30" r="26" class="rt"></circle>
+                    <circle cx="30" cy="30" r="26" class="rv" [attr.stroke-dasharray]="ringDash(row.pct)" transform="rotate(-90 30 30)"></circle>
+                  </svg>
+                  <span class="grp-pct">{{ row.pct }}%</span>
+                </span>
+                <span class="grp-name">
+                  <span class="grp-title">{{ row.phase.phasename }}</span>
+                  <span class="grp-stages">{{ phaseStageLabel(row.phase) || 'no stages in current queues' }}</span>
+                </span>
+              </td>
+              <td [attr.colspan]="segCols.length"></td>
+              <td class="grp-actions">
+                <button class="ios-icon" (click)="editPhase(row.phase); $event.stopPropagation()" matTooltip="Edit"><mat-icon>edit</mat-icon></button>
+                <button class="ios-icon danger" (click)="deletePhase(row.phase); $event.stopPropagation()" matTooltip="Delete"><mat-icon>delete_outline</mat-icon></button>
+                <mat-icon class="chev">{{ selectedPhaseKey === row.phase.docid ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </td>
+            </tr>
+            <tr class="line" *ngFor="let ln of row.lines">
+              <td class="lbl">{{ ln.label }}</td>
+              <td *ngFor="let c of segCols" [class.zero]="ln.cells[c.k] === 0">{{ ln.cells[c.k] }}</td>
+              <td class="tot" [class.zero]="ln.cells.total === 0">{{ ln.cells.total }}</td>
+            </tr>
+          </ng-container>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Drill-down -->
+    <div class="dd" *ngIf="selectedPhase">
+      <div class="dd-head">
+        <div class="dd-title">{{ selectedPhase.phasename }} — {{ drillRows().length }} participants</div>
+        <div class="filters">
+          <button class="fil" [class.on]="drillSeg==='all'" (click)="setDrillSeg('all')">All</button>
+          <button class="fil" [class.on]="drillSeg==='ca'" (click)="setDrillSeg('ca')">Confirmed · Active</button>
+          <button class="fil" [class.on]="drillSeg==='na'" (click)="setDrillSeg('na')">Non-active</button>
+          <button class="fil" [class.on]="drillSeg==='nc'" (click)="setDrillSeg('nc')">Not confirmed</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="t">
+          <thead><tr><th>#</th><th>Participant</th><th>Segment</th><th>uP!</th><th>{{ selectedPhase.phasename }}</th><th>Slot</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let r of drillRows(); let i = index">
+              <td class="meta">{{ i + 1 }}</td>
+              <td><div class="nm">{{ r.name }}</div><div class="meta">{{ r.phone }}</div></td>
+              <td><span class="chip seg-{{ r.seg }}">{{ segLabel(r.seg) }}</span></td>
+              <td>
+                <span class="pill" [class.ok]="r.confirmed" [class.mut]="!r.confirmed">
+                  <span class="dot"></span>{{ r.confirmed ? 'Confirmed' : 'Not' }}
+                </span>
+              </td>
+              <td>
+                <span class="pill" [class.ok]="r.completed" [class.mut]="!r.completed">
+                  <span class="dot"></span>{{ r.completed ? 'Completed' : 'Not completed' }}
+                </span>
+              </td>
+              <td><span class="pill" [class.tint]="r.booked" [class.mut]="!r.booked"><span class="dot"></span>{{ r.booked ? 'Booked' : 'Not booked' }}</span></td>
+            </tr>
+            <tr *ngIf="drillRows().length === 0"><td colspan="6" class="empty-cell">No participants in this segment.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </ng-container>
+</div>

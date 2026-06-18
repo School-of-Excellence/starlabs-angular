@@ -6,6 +6,7 @@ import { Auth, authState } from '@angular/fire/auth';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ConfirmComponent } from './DialogBox/confirm/confirm.component';
 import { MatDialog } from '@angular/material/dialog';
+import { environment } from '../environments/environment';
 
 export const authGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthguardService);
@@ -26,6 +27,12 @@ export const authGuard: CanActivateFn = (route, state) => {
         return false;
       }
       if (state.url === '/EISDashboard') {
+        return true;
+      }
+      // Test-only bypass for the new Arena Event Planning screen while it has no
+      // role/profile config. Active only on starlabs-test, never in production.
+      if (environment.firebase.projectId === 'starlabs-test'
+          && ('/' + state.url.split('?')[0].split('/')[1]) === '/arena-event-planning') {
         return true;
       }
       try {
