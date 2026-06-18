@@ -9,8 +9,6 @@ name: Deploy to Firebase
 on:
   push:
     branches:
-      - development
-      - production
       - cicd-dev      # TEST stand-in for development → deploys to starlabs-test. Remove after validation.
       - cicd-prod     # TEST stand-in for production → also deploys to starlabs-test (NOT live). Remove after validation.
 
