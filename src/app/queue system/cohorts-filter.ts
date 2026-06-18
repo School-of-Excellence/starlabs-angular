@@ -18,3 +18,4 @@ export class CohortsFilterPipe implements PipeTransform {
     });
   }
 }
+// cicd pipeline proof — exercising preview + gate + deploy on sudo branches
