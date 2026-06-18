@@ -10,7 +10,7 @@ name: queue-e2e (emulator gate)
 
 on:
   pull_request:
-    branches: [development, cicd-dev]   # cicd-dev = TEST stand-in for development. Remove after validation.
+    branches: [cicd-dev, cicd-prod]   # sudo branches â€” gate runs on PR to either
     types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - 'src/app/queue system/**'
@@ -41,6 +41,7 @@ jobs:
     with:
       cf_branch: development
       e2e_ref: main
+      firebase_project: starlabs-cicd   # MUST match app projectId or auth silently fails (SETUP §3)
       # PR runs a FAST GREEN SMOKE (self-tests) so the flow proves end-to-end now; the full UI suite is the
       # parallel "green-in-CI" track. A manual workflow_dispatch can override `only`/`evidence` to debug a spec.
       only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || 'queue/invariants-selftest.spec.ts queue/oracle-selftest.spec.ts' }}
