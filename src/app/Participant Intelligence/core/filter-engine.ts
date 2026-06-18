@@ -19,6 +19,16 @@ function arrayIntersects<T>(selected: T[], values: T[]): boolean {
   return values.some((v) => selected.includes(v));
 }
 
+// True if the productId->ids[] map contains any of the selected ids (used for events/queues).
+function mapHasAny(selected: string[], map: Record<string, string[]> | undefined): boolean {
+  if (!selected.length) return true;
+  if (!map) return false;
+  for (const ids of Object.values(map)) {
+    if (Array.isArray(ids) && ids.some((id) => selected.includes(id))) return true;
+  }
+  return false;
+}
+
 function dateInRange(value: string | null, start: string | null, end: string | null): boolean {
   if (!start && !end) return true;
   if (!value) return false;
@@ -60,6 +70,11 @@ export function applyFilters(participants: Participant[], f: FilterModel): Parti
     if (!inAny(f.activejourney, p.activejourney)) return false;
     if (!inAny(f.lastcompletedjourney, p.lastcompletedjourney)) return false;
     if (!arrayIntersects(f.activeproduct, p.activeproduct)) return false;
+    if (!arrayIntersects(f.addons, p.addons)) return false;
+    if (!arrayIntersects(f.gifts, p.gifts)) return false;
+    if (!arrayIntersects(f.bonus, p.bonus)) return false;
+    if (!mapHasAny(f.events, p.productevent)) return false;
+    if (!mapHasAny(f.queues, p.queueevent)) return false;
     if (!arrayIntersects(f.profiletags, p.profiletags)) return false;
     if (!arrayIntersects(f.tier, p.tier)) return false;
     if (f.registered.length) {
@@ -84,6 +99,8 @@ export function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
   const modeName = (id: string) => ref.modes.find((m) => m.id === id)?.name ?? id;
   const tierName = (id: string) => ref.tiers.find((t) => t.id === id)?.name ?? id;
   const tagName = (id: string) => ref.tags.find((t) => t.id === id)?.name ?? id;
+  const eventName = (id: string) => ref.events.find((e) => e.id === id)?.name ?? id;
+  const queueName = (id: string) => ref.queues.find((q) => q.id === id)?.name ?? id;
 
   const addEach = (group: keyof FilterModel, values: string[], prefix: string, fmt: (v: string) => string = (v) => v) => {
     for (const v of values) chips.push({ group, value: v, label: `${prefix}: ${fmt(v)}` });
@@ -95,6 +112,11 @@ export function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
   addEach('activejourney', f.activejourney, 'Journey', journeyName);
   addEach('lastcompletedjourney', f.lastcompletedjourney, 'Completed', journeyName);
   addEach('activeproduct', f.activeproduct, 'Product', productName);
+  addEach('addons', f.addons, 'Add-on', productName);
+  addEach('gifts', f.gifts, 'Gift', productName);
+  addEach('bonus', f.bonus, 'Bonus', productName);
+  addEach('events', f.events, 'Event', eventName);
+  addEach('queues', f.queues, 'Queue', queueName);
   addEach('tier', f.tier, 'Tier', tierName);
   addEach('profiletags', f.profiletags, 'Tag', tagName);
   addEach('registered', f.registered, 'Registered');
@@ -116,5 +138,5 @@ function cmp(c: string): string {
 }
 
 export function countActiveFilters(f: FilterModel): number {
-  return deriveChips(f, { journeys: [], products: [], modes: [], tiers: [], tags: [], supportCategories: [] }).length;
+  return deriveChips(f, { journeys: [], products: [], modes: [], tiers: [], tags: [], events: [], queues: [], supportCategories: [] }).length;
 }

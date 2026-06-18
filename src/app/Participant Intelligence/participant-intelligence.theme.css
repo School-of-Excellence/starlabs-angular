@@ -2,41 +2,43 @@
    Tokens are --pi-* prefixed; dialog-kit classes are namespaced under .pi-dialog
    (the panelClass on every dialog) so nothing leaks into the rest of starlabs. */
 
+/* iOS design tokens (A3) */
 :root {
-  --pi-bg: #f4f6f8;
+  --pi-bg: #f2f2f7;
   --pi-surface: #ffffff;
-  --pi-surface-2: #fafbfc;
-  --pi-surface-3: #f1f4f6;
-  --pi-border: #e3e7eb;
-  --pi-border-strong: #ccd3da;
+  --pi-surface-2: #fafafc;
+  --pi-surface-3: #ececf1;
+  --pi-fill: rgba(118, 118, 128, 0.12);
+  --pi-border: rgba(60, 60, 67, 0.1);
+  --pi-border-strong: rgba(60, 60, 67, 0.18);
 
-  --pi-text: #18222d;
-  --pi-text-2: #56626f;
-  --pi-text-3: #8a95a1;
+  --pi-text: #1c1c1e;
+  --pi-text-2: rgba(60, 60, 67, 0.62);
+  --pi-text-3: rgba(60, 60, 67, 0.34);
 
-  --pi-accent: #00696e;
-  --pi-accent-2: #0c8b8f;
-  --pi-accent-bg: #dcefef;
-  --pi-accent-text: #00474b;
+  --pi-accent: #007aff;
+  --pi-accent-2: #0a84ff;
+  --pi-accent-bg: rgba(0, 122, 255, 0.1);
+  --pi-accent-text: #0060df;
 
-  --pi-radius: 10px;
-  --pi-radius-sm: 7px;
-  --pi-radius-lg: 14px;
+  --pi-radius: 12px;
+  --pi-radius-sm: 8px;
+  --pi-radius-lg: 16px;
 
-  --pi-shadow-sm: 0 1px 2px rgba(20, 30, 40, 0.06), 0 1px 1px rgba(20, 30, 40, 0.04);
-  --pi-shadow: 0 4px 16px rgba(20, 30, 40, 0.08), 0 1px 3px rgba(20, 30, 40, 0.05);
-  --pi-shadow-lg: 0 12px 40px rgba(20, 30, 40, 0.14);
+  --pi-shadow-sm: 0 0.5px 2px rgba(20, 30, 40, 0.05);
+  --pi-shadow: 0 4px 16px rgba(20, 30, 40, 0.07), 0 1px 3px rgba(20, 30, 40, 0.05);
+  --pi-shadow-lg: 0 14px 44px rgba(20, 30, 40, 0.16);
 
-  --pi-status-active: #0e8a5f;
-  --pi-status-active-bg: #e2f5ec;
-  --pi-status-late: #b5740a;
-  --pi-status-late-bg: #fbefda;
-  --pi-status-discontinued: #6b7682;
-  --pi-status-discontinued-bg: #eef1f4;
-  --pi-status-banned: #c0392b;
-  --pi-status-banned-bg: #fbe9e7;
-  --pi-status-none: #8a95a1;
-  --pi-status-none-bg: #f1f4f6;
+  --pi-status-active: #30b85a;
+  --pi-status-active-bg: rgba(52, 199, 89, 0.14);
+  --pi-status-late: #e8870e;
+  --pi-status-late-bg: rgba(255, 149, 0, 0.16);
+  --pi-status-discontinued: #8a8a8e;
+  --pi-status-discontinued-bg: rgba(142, 142, 147, 0.18);
+  --pi-status-banned: #e8443a;
+  --pi-status-banned-bg: rgba(255, 59, 48, 0.13);
+  --pi-status-none: #a0a0a6;
+  --pi-status-none-bg: rgba(142, 142, 147, 0.12);
 }
 
 .material-symbols-rounded {
@@ -74,7 +76,7 @@
   display: flex;
   flex-direction: column;
   max-height: 84vh;
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
   color: var(--pi-text);
 }
 .pi-dialog .dlg-head {
@@ -223,4 +225,12 @@
   background: var(--pi-status-active-bg);
   color: var(--pi-status-active);
   margin-left: 8px;
+}
+
+/* communications analytics popover (mat-menu hosting the panel) */
+.pi-comms-menu.mat-mdc-menu-panel {
+  max-width: 420px;
+}
+.pi-comms-menu .mat-mdc-menu-content {
+  padding: 0;
 }

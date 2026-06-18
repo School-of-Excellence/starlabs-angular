@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ScrollingModule } from '@angular/cdk/scrolling';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ParticipantStore } from '../../core/participant.store';
 import { COLUMN_DEF_MAP } from '../../data/column-catalog';
@@ -11,7 +10,7 @@ type SortDir = 'asc' | 'desc' | null;
 @Component({
   selector: 'app-participant-table',
   standalone: true,
-  imports: [CommonModule, ScrollingModule, MatTooltipModule],
+  imports: [CommonModule, MatTooltipModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './participant-table.component.html',
   styleUrl: './participant-table.component.css',
@@ -36,11 +35,52 @@ export class ParticipantTableComponent {
     this.store.displayedColumns().filter((k) => k !== 'select').map((k) => COLUMN_DEF_MAP[k])
   );
 
+  private colWidth(c: string): number {
+    if (c === 'select') return 44;
+    if (c === 'name') return 240;
+    if (c === 'atccount') return 110;
+    return 150;
+  }
+
+  // Frozen (sticky-left) columns = the select column + any pinned columns, taken contiguously
+  // from the front of displayedColumns. Maps each frozen column key to its left offset in px.
+  readonly frozenLefts = computed<Record<string, number>>(() => {
+    const cols = this.store.displayedColumns();
+    const pin = this.store.pinned();
+    const map: Record<string, number> = {};
+    let left = 0;
+    for (const c of cols) {
+      if (c !== 'select' && !pin.has(c)) break;
+      map[c] = left;
+      left += this.colWidth(c);
+    }
+    return map;
+  });
+
+  readonly lastFrozenKey = computed<string | null>(() => {
+    const keys = Object.keys(this.frozenLefts());
+    return keys.length ? keys[keys.length - 1] : null;
+  });
+
+  isFrozen(c: string): boolean {
+    return c in this.frozenLefts();
+  }
+  leftOf(c: string): number {
+    return this.frozenLefts()[c] ?? 0;
+  }
+
+  // Profile drill-down — opens the participant's profile in a new tab (without toggling row selection).
+  openProfile(p: Participant, ev?: Event): void {
+    ev?.stopPropagation();
+    window.open(`/userprofile/${p.profileid}`, '_blank');
+  }
+
   readonly gridTemplate = computed(() => {
     const cols = this.store.displayedColumns();
+    const frozen = this.frozenLefts();
     return cols
       .map((c) => {
-        if (c === 'select') return '44px';
+        if (c in frozen) return `${this.colWidth(c)}px`;
         if (c === 'name') return 'minmax(240px, 1.4fr)';
         if (c === 'atccount') return '110px';
         return 'minmax(150px, 1fr)';
@@ -48,17 +88,7 @@ export class ParticipantTableComponent {
       .join(' ');
   });
 
-  readonly minWidth = computed(() => {
-    const cols = this.store.displayedColumns();
-    let w = 0;
-    for (const c of cols) {
-      if (c === 'select') w += 44;
-      else if (c === 'name') w += 240;
-      else if (c === 'atccount') w += 110;
-      else w += 150;
-    }
-    return w;
-  });
+  readonly minWidth = computed(() => this.store.displayedColumns().reduce((w, c) => w + this.colWidth(c), 0));
 
   readonly rows = computed<Participant[]>(() => {
     const data = [...this.store.filtered()];

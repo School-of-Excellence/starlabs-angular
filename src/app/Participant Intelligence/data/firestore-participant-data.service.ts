@@ -16,6 +16,9 @@ import { AuthguardService } from '../../authguard.service';
 import { ParticipantDataService } from './participant-data.service';
 import {
   Audience,
+  CommsAnalytics,
+  CommsCampaign,
+  CommsChannelStats,
   CustomerStatus,
   EmiStatus,
   FilterModel,
@@ -26,6 +29,7 @@ import {
   Remark,
   SupportStatus,
   Tag,
+  emptyChannelStats,
   emptyFilter,
 } from '../models/participant.model';
 
@@ -67,28 +71,97 @@ export class FirestoreParticipantDataService extends ParticipantDataService {
   getAudiences(): Observable<Audience[]> {
     return from(this.loadAudiences());
   }
+  getCommsAnalytics(): Observable<CommsAnalytics> {
+    return from(this.loadCommsAnalytics());
+  }
+
+  private async loadCommsAnalytics(): Promise<CommsAnalytics> {
+    const [email, whatsapp, notification] = await Promise.all([
+      this.channelStats('email archive'),
+      this.channelStats('wati archive'),
+      this.channelStats('notificationrecord'),
+    ]);
+    return { email, whatsapp, notification };
+  }
+
+  // Defensive aggregation — collections/field names vary, so degrade gracefully.
+  // email archive / wati archive carry a string `status`; notificationrecord does NOT —
+  // it stores success(boolean) + profilefailed[]/profilesuccess[], so classify it differently.
+  private async channelStats(collectionName: string): Promise<CommsChannelStats> {
+    try {
+      const snap = await getDocs(collection(this.firestore, collectionName));
+      const docs = snap.docs.map((d) => d.data() as Dict);
+      const isNotif = collectionName === 'notificationrecord';
+      let queued = 0;
+      let sent = 0;
+      let failed = 0;
+      for (const d of docs) {
+        if (isNotif) {
+          if (this.notifFailed(d)) failed++;
+          else sent++;
+        } else {
+          const status = (d['status'] ?? '').toString().toLowerCase();
+          if (status === 'queued' || status === 'scheduled' || status === 'pending') queued++;
+          else if (status === 'failed' || status === 'rejected' || status === 'error') failed++;
+          else sent++;
+        }
+      }
+      const recent: CommsCampaign[] = docs
+        .map((d) => ({
+          name: d['broadcastname'] ?? d['subject'] ?? d['name'] ?? d['title'] ?? '(untitled)',
+          status: isNotif ? (this.notifFailed(d) ? 'failed' : 'sent') : (d['status'] ?? 'sent').toString(),
+          recipients: this.recipientCount(d),
+          date: tsToIso(d['date'] ?? d['queuedAt'] ?? d['scheduledAt'] ?? d['createdAt'] ?? d['created']),
+        }))
+        .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+        .slice(0, 6);
+      return { total: docs.length, queued, sent, failed, recent };
+    } catch (e) {
+      console.warn(`comms analytics: could not read "${collectionName}"`, e);
+      return emptyChannelStats();
+    }
+  }
+
+  private notifFailed(d: Dict): boolean {
+    return d['success'] === false || (Array.isArray(d['profilefailed']) && d['profilefailed'].length > 0);
+  }
+
+  private recipientCount(d: Dict): number {
+    for (const k of ['pending', 'profileid', 'numbers', 'recipients', 'profilelist', 'users']) {
+      if (Array.isArray(d[k])) return d[k].length;
+    }
+    if (typeof d['count'] === 'number') return d['count'];
+    if (typeof d['totalNumbers'] === 'number') return d['totalNumbers'];
+    return 0;
+  }
 
   private async loadReference(): Promise<ReferenceData> {
-    const col = (name: string) => getDocs(collection(this.firestore, name));
-    const [journeys, products, modes, tiers, tags] = await Promise.all([
+    const col = (name: string) => getDocs(collection(this.firestore, name)).catch(() => null);
+    const [journeys, products, modes, tiers, tags, events, queues] = await Promise.all([
       col('journey'),
       col('products'),
       col('modes'),
       col('tier'),
       col('participant tags'),
+      col('event collection'),
+      col('queue generation'),
     ]);
     const named = (snap: any, field: string): NamedRef[] =>
-      snap.docs.map((d: any) => ({ id: d.id, name: d.data()[field] ?? d.id }));
-    const tagList: Tag[] = tags.docs.map((d: any) => {
-      const data = d.data();
-      return { id: d.id, name: data['name'] ?? d.id, tagsfor: arr(data['tagsfor']), isActive: data['isActive'] !== false };
-    });
+      snap ? snap.docs.map((d: any) => ({ id: d.id, name: d.data()[field] ?? d.id })) : [];
+    const tagList: Tag[] = tags
+      ? tags.docs.map((d: any) => {
+          const data = d.data();
+          return { id: d.id, name: data['name'] ?? d.id, tagsfor: arr(data['tagsfor']), isActive: data['isActive'] !== false };
+        })
+      : [];
     return {
       journeys: named(journeys, 'journey'),
       products: named(products, 'product'),
       modes: named(modes, 'mode'),
       tiers: named(tiers, 'tier'),
       tags: tagList,
+      events: named(events, 'name'),
+      queues: named(queues, 'queuename'),
       supportCategories: [],
     };
   }
@@ -136,6 +209,8 @@ export class FirestoreParticipantDataService extends ParticipantDataService {
       purchasedate: tsToIso(d['purchasedate']),
       dateofbirth: tsToIso(d['dateofbirth']),
       emiStatus: this.mapEmi(d['financedata']?.['paymentstatus']),
+      productevent: d['productevent'] && typeof d['productevent'] === 'object' ? d['productevent'] : {},
+      queueevent: d['queueevent'] && typeof d['queueevent'] === 'object' ? d['queueevent'] : {},
       eiflix: [],
       solarvoice: [],
       generalcontent: [],
@@ -217,7 +292,7 @@ export class FirestoreParticipantDataService extends ParticipantDataService {
         kind: 'segment',
         isDefault: false,
         createdBy: '—',
-        createdDate: '',
+        createdDate: tsToIso(data['createddate']) ?? '',
         count: 0,
         memberAudienceIds: arr(data['participantlistid']),
       });

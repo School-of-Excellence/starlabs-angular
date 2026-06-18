@@ -14,7 +14,10 @@ export type BulkAction =
   | 'playlist'
   | 'export'
   | 'checklist'
-  | 'evolution';
+  | 'evolution'
+  | 'broadcast'
+  | 'interim'
+  | 'wishlist';
 
 @Component({
   selector: 'app-bulk-action-bar',
@@ -27,6 +30,9 @@ export type BulkAction =
         <div class="count">
           <span class="num">{{ store.selectedCount() }}</span>
           <span>selected</span>
+          @if (store.hiddenSelectedCount() > 0) {
+            <span class="hidden">{{ store.hiddenSelectedCount() }} hidden by filters</span>
+          }
           <button class="link" (click)="store.clearSelection()">Clear</button>
         </div>
 
@@ -43,14 +49,26 @@ export type BulkAction =
             <span class="material-symbols-rounded">edit_note</span> Update
             <span class="material-symbols-rounded chev">expand_more</span>
           </button>
-          <button class="act" (click)="action.emit('evolution')">
+          <button class="act primary" (click)="action.emit('evolution')">
             <span class="material-symbols-rounded">insights</span> Evolution
           </button>
-          <button class="act primary" (click)="action.emit('export')">
-            <span class="material-symbols-rounded">download</span> Export
+          <button class="act" [matMenuTriggerFor]="more" aria-label="More actions">
+            <span class="material-symbols-rounded">more_horiz</span>
           </button>
         </div>
       </div>
+
+      <mat-menu #more="matMenu">
+        <button mat-menu-item (click)="action.emit('broadcast')">
+          <span class="material-symbols-rounded mi">podcasts</span> Broadcast in Breakthroughs
+        </button>
+        <button mat-menu-item (click)="action.emit('interim')">
+          <span class="material-symbols-rounded mi">description</span> Manage interim report
+        </button>
+        <button mat-menu-item (click)="action.emit('wishlist')">
+          <span class="material-symbols-rounded mi">favorite</span> Evolution wishlist
+        </button>
+      </mat-menu>
 
       <mat-menu #comm="matMenu">
         <button mat-menu-item (click)="action.emit('email')">
@@ -124,6 +142,13 @@ export type BulkAction =
         font-size: 13.5px;
         color: #c4ced8;
         white-space: nowrap;
+      }
+      .hidden {
+        font-size: 11.5px;
+        color: #f0b34a;
+        background: rgba(240, 149, 0, 0.16);
+        padding: 2px 8px;
+        border-radius: 999px;
       }
       .num {
         background: var(--pi-accent-2);

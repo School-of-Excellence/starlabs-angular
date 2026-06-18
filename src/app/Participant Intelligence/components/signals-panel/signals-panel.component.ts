@@ -105,20 +105,11 @@ import { SIGNALS, SIGNAL_CATEGORIES, SignalCategory, SignalDef } from '../../cor
       .sev-critical {
         border-left-color: var(--pi-status-banned);
       }
-      .sev-critical .count {
-        color: var(--pi-status-banned);
-      }
       .sev-warn {
         border-left-color: var(--pi-status-late);
       }
-      .sev-warn .count {
-        color: var(--pi-status-late);
-      }
       .sev-opportunity {
         border-left-color: var(--pi-accent);
-      }
-      .sev-opportunity .count {
-        color: var(--pi-accent);
       }
       .card.empty .count {
         color: var(--pi-text-3);

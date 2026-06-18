@@ -4,6 +4,8 @@ import { delay } from 'rxjs/operators';
 import { ParticipantDataService } from './participant-data.service';
 import {
   Audience,
+  CommsAnalytics,
+  CommsCampaign,
   CustomerStatus,
   EmiStatus,
   FinancialStatus,
@@ -190,6 +192,8 @@ function makeParticipant(i: number): Participant {
       ['overdue', 10],
       ['none', 20],
     ]),
+    productevent: {},
+    queueevent: {},
     eiflix: sample(['Series A', 'Series B', 'Series C'], 2),
     solarvoice: sample(['SV Morning', 'SV Focus', 'SV Calm'], 2),
     generalcontent: sample(['GC Mindset', 'GC Health', 'GC Wealth'], 2),
@@ -204,6 +208,8 @@ export class MockParticipantDataService extends ParticipantDataService {
     modes: MODES,
     tiers: TIERS,
     tags: TAGS,
+    events: [],
+    queues: [],
     supportCategories: SUPPORT_CATEGORIES,
   };
 
@@ -234,5 +240,39 @@ export class MockParticipantDataService extends ParticipantDataService {
       { id: 'aud-q3-segment', name: 'Q3 renewal segment', kind: 'segment', isDefault: false, createdBy: 'You', createdDate: isoDaysFromNow(-8), count: 0, memberAudienceIds: ['aud-late', 'aud-vip-list'] },
     ];
     return of(seedAudiences).pipe(delay(150));
+  }
+
+  getCommsAnalytics(): Observable<CommsAnalytics> {
+    const campaigns = (channel: string, names: string[]): CommsCampaign[] =>
+      names.map((name, i) => ({
+        name,
+        status: pick(['sent', 'sent', 'sent', 'queued', 'scheduled', 'failed']),
+        recipients: 40 + Math.floor(rnd() * 1200),
+        date: isoDaysFromNow(-i * 3 - Math.floor(rnd() * 3)),
+      }));
+
+    return of({
+      email: {
+        total: 184,
+        queued: 2,
+        sent: 176,
+        failed: 6,
+        recent: campaigns('email', ['Renewal reminder — June', 'Welcome series wk1', 'Win-back offer', 'Event invite: Breakthrough', 'Monthly digest']),
+      },
+      whatsapp: {
+        total: 121,
+        queued: 0,
+        sent: 118,
+        failed: 3,
+        recent: campaigns('whatsapp', ['renewal_reminder', 'event_invite', 'winback_offer', 'payment_followup']),
+      },
+      notification: {
+        total: 67,
+        queued: 0,
+        sent: 67,
+        failed: 0,
+        recent: campaigns('notification', ['New content drop', 'Live session today', 'Streak nudge', 'Survey request']),
+      },
+    }).pipe(delay(200));
   }
 }

@@ -1,11 +1,12 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { ParticipantDataService } from '../data/participant-data.service';
-import { COLUMN_DEF_MAP, DEFAULT_VISIBLE_COLUMNS } from '../data/column-catalog';
+import { COLUMN_DEF_MAP, DEFAULT_PINNED_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from '../data/column-catalog';
 import { applyFilters, deriveChips } from './filter-engine';
 import { SIGNALS, SIGNAL_MAP, SignalDef } from './signals';
 import {
   Audience,
+  CommsAnalytics,
   FilterChip,
   FilterModel,
   Participant,
@@ -21,6 +22,8 @@ const EMPTY_REF: ReferenceData = {
   modes: [],
   tiers: [],
   tags: [],
+  events: [],
+  queues: [],
   supportCategories: [],
 };
 
@@ -36,11 +39,12 @@ export class ParticipantStore {
   readonly filter = signal<FilterModel>(emptyFilter());
   readonly audiences = signal<Audience[]>([]);
   readonly activeAudienceId = signal<string | null>(null);
+  readonly commsAnalytics = signal<CommsAnalytics | null>(null);
 
   private readonly membership = signal<Set<string> | null>(null);
   readonly signalId = signal<string | null>(null);
   readonly columnOrder = signal<string[]>([...DEFAULT_VISIBLE_COLUMNS]);
-  readonly pinned = signal<Set<string>>(new Set(['name']));
+  readonly pinned = signal<Set<string>>(new Set(DEFAULT_PINNED_COLUMNS));
   readonly selectedIds = signal<Set<string>>(new Set());
 
   // --- derived state ---
@@ -74,16 +78,28 @@ export class ParticipantStore {
     return id ? SIGNAL_MAP[id] ?? null : null;
   });
 
+  readonly queuedTotal = computed<number>(() => {
+    const c = this.commsAnalytics();
+    return c ? c.email.queued + c.whatsapp.queued + c.notification.queued : 0;
+  });
+
   readonly chips = computed<FilterChip[]>(() => deriveChips(this.filter(), this.reference()));
   readonly activeFilterCount = computed(() => this.chips().length);
   readonly totalCount = computed(() => this.all().length);
   readonly filteredCount = computed(() => this.filtered().length);
-  readonly selectedCount = computed(() => this.selectedIds().size);
 
   readonly selectedParticipants = computed<Participant[]>(() => {
     const ids = this.selectedIds();
     return this.filtered().filter((p) => ids.has(p.profileid));
   });
+
+  // Scope is filtered ∩ selected EVERYWHERE — count, bar, and every bulk action — so a tag/remark/extend
+  // can never silently hit rows hidden by the current filter/search/signal.
+  readonly selectedCount = computed(() => this.selectedParticipants().length);
+  private selectedProfileIds(): string[] {
+    return this.selectedParticipants().map((p) => p.profileid);
+  }
+  readonly hiddenSelectedCount = computed(() => this.selectedIds().size - this.selectedParticipants().length);
 
   readonly displayedColumns = computed<string[]>(() => {
     const order = this.columnOrder();
@@ -126,6 +142,12 @@ export class ParticipantStore {
         this.loading.set(false);
       },
     });
+
+    // comms analytics loads independently so it never blocks the table
+    this.data.getCommsAnalytics().subscribe({
+      next: (c) => this.commsAnalytics.set(c),
+      error: (e) => console.warn('comms analytics load failed', e),
+    });
   }
 
   // --- filtering ---
@@ -161,6 +183,15 @@ export class ParticipantStore {
 
   clearSignal(): void {
     this.signalId.set(null);
+  }
+
+  // optimistic bump so the Communications badge reflects a just-queued broadcast
+  bumpQueued(channel: 'email' | 'whatsapp' | 'notification'): void {
+    this.commsAnalytics.update((c) => {
+      if (!c) return c;
+      const ch = c[channel];
+      return { ...c, [channel]: { ...ch, queued: ch.queued + 1, total: ch.total + 1 } };
+    });
   }
 
   removeChip(chip: FilterChip): void {
@@ -250,7 +281,7 @@ export class ParticipantStore {
 
   resetColumns(): void {
     this.columnOrder.set([...DEFAULT_VISIBLE_COLUMNS]);
-    this.pinned.set(new Set(['name']));
+    this.pinned.set(new Set(DEFAULT_PINNED_COLUMNS));
   }
 
   // --- audiences ---
@@ -286,7 +317,7 @@ export class ParticipantStore {
   }
 
   saveSelectionAsList(name: string): Audience {
-    const ids = [...this.selectedIds()];
+    const ids = this.selectedProfileIds();
     const aud: Audience = {
       id: `aud-${Date.now()}`,
       name,
@@ -340,17 +371,18 @@ export class ParticipantStore {
   }
 
   // --- bulk mutations (optimistic local update + persisted via the data service) ---
+  // Scope = filtered ∩ selected (selectedProfileIds), so hidden rows are never silently mutated.
   addRemarkToSelected(note: string, givenby = 'You'): void {
-    const idList = [...this.selectedIds()];
-    const ids = this.selectedIds();
+    const idList = this.selectedProfileIds();
+    const ids = new Set(idList);
     const remark: Remark = { date: new Date().toISOString(), note, givenby };
     this.all.update((list) => list.map((p) => (ids.has(p.profileid) ? { ...p, remarks: [...p.remarks, remark] } : p)));
     this.data.persistRemark(idList, remark).catch((e) => console.error('persistRemark failed', e));
   }
 
   addTagsToSelected(tagIds: string[]): void {
-    const idList = [...this.selectedIds()];
-    const ids = this.selectedIds();
+    const idList = this.selectedProfileIds();
+    const ids = new Set(idList);
     this.all.update((list) =>
       list.map((p) =>
         ids.has(p.profileid) ? { ...p, profiletags: Array.from(new Set([...p.profiletags, ...tagIds])) } : p
@@ -360,8 +392,8 @@ export class ParticipantStore {
   }
 
   removeTagsFromSelected(tagIds: string[]): void {
-    const idList = [...this.selectedIds()];
-    const ids = this.selectedIds();
+    const idList = this.selectedProfileIds();
+    const ids = new Set(idList);
     this.all.update((list) =>
       list.map((p) => (ids.has(p.profileid) ? { ...p, profiletags: p.profiletags.filter((t) => !tagIds.includes(t)) } : p))
     );
@@ -369,7 +401,7 @@ export class ParticipantStore {
   }
 
   extendSubscriptionForSelected(newEndIso: string): void {
-    const ids = this.selectedIds();
+    const ids = new Set(this.selectedProfileIds());
     this.all.update((list) => list.map((p) => (ids.has(p.profileid) ? { ...p, subscriptionend: newEndIso } : p)));
   }
 
