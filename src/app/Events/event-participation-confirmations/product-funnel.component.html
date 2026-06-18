@@ -163,8 +163,8 @@
             <th>Customer status</th>
             <th>Finance</th>
             <th>Paid</th>
-            <th *ngIf="showApprovalChecks">Clearance</th>
-            <th *ngIf="showApprovalChecks">Venue</th>
+            <th *ngIf="showApprovalChecks">Finance clearance</th>
+            <th *ngIf="showApprovalChecks">Venue fee</th>
             <th *ngIf="showApprovalChecks">Contract</th>
             <th *ngIf="showApprovalChecks">Queue stage</th>
             <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
@@ -226,15 +226,21 @@
               </span>
             </td>
             <td *ngIf="showApprovalChecks">
-              <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-              <span *ngIf="row.metaLoaded" class="sx-clr" [class.no]="!financeCleared(row)">
-                <span class="dot" [ngClass]="financeCleared(row) ? 'd-ok' : 'd-bad'"></span>{{ financeCleared(row) ? 'Cleared' : 'Pending' }}
-              </span>
+              <div class="sx-fin">
+                <mat-checkbox [checked]="financeClearedByPid.get(row.profileid) === true"
+                  (change)="toggleFinanceCleared(row, $event.checked)"
+                  [attr.aria-label]="'Finance cleared for ' + row.name"></mat-checkbox>
+                <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+                <span *ngIf="row.metaLoaded" class="sx-fin-hint" [class.no]="!meetsMinPayment(row)"
+                  [matTooltip]="meetsMinPayment(row) ? 'Paid at least the product minimum' : 'Below the product minimum'" matTooltipClass="sx-tip">
+                  {{ meetsMinPayment(row) ? 'paid' : 'short' }}
+                </span>
+              </div>
             </td>
             <td *ngIf="showApprovalChecks" class="sx-c-check">
               <mat-checkbox [checked]="venuePaidByPid.get(row.profileid) === true"
                 (change)="toggleVenuePaid(row, $event.checked)"
-                [attr.aria-label]="'Venue expenses paid for ' + row.name"></mat-checkbox>
+                [attr.aria-label]="'Venue fee paid for ' + row.name"></mat-checkbox>
             </td>
             <td *ngIf="showApprovalChecks">
               <span class="sx-mut" matTooltip="Contract status — automated later" matTooltipClass="sx-tip">—</span>

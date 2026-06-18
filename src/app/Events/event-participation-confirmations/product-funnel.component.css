@@ -227,6 +227,9 @@ table.sx-t { width: 100%; border-collapse: collapse; }
 .sx-paid .tot { color: rgba(60,60,67,.5); font-weight: 400; }
 .sx-clr { color: #1f8a3b; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
 .sx-clr.no { color: #d70015; }
+.sx-fin { display: inline-flex; align-items: center; gap: 7px; }
+.sx-fin-hint { font-size: 11px; font-weight: 600; color: #1f8a3b; }
+.sx-fin-hint.no { color: #c25e00; }
 .sx-stage { font-size: 13px; color: #1c1c1e; }
 
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }

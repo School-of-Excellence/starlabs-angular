@@ -244,8 +244,9 @@ export class ProductFunnelComponent implements OnInit {
   }
 
   // Post-approval checks (Clearance / Venue / Contract / Queue stage) — shown only on the approved cohort.
-  productMinimum: number | null = null;                 // product.minimumrequiredamount, for finance clearance
-  venuePaidByPid = new Map<string, boolean>();          // from the venue_clearance collection
+  productMinimum: number | null = null;                 // product.minimumrequiredamount, for the auto finance hint
+  financeClearedByPid = new Map<string, boolean>();     // manual finance sign-off, from the finance_clearance collection
+  venuePaidByPid = new Map<string, boolean>();          // manual venue-fee sign-off, from the venue_clearance collection
   queueStageByPid = new Map<string, string>();          // queue_token.currentstage per participant (queue events)
   queueStagesLoaded = false;
   private queueStagesLoading = false;
@@ -300,7 +301,7 @@ export class ProductFunnelComponent implements OnInit {
     this.queueStagesLoaded = false;
     const arena = this.arena;
     try {
-      const [ownSnap, eprSnap, scanSnap, venueSnap, productSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap, financeSnap, venueSnap, productSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
@@ -308,14 +309,18 @@ export class ProductFunnelComponent implements OnInit {
           where('status', 'in', ['requested', 'approved', 'attended', 'unattended']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
           where('eventref', '==', arena['eventref']))),
-        // Venue clearance is an isolated collection — tolerate it being absent / not yet ruled.
+        // Finance + venue clearance are isolated collections — tolerate them being absent / not yet ruled.
+        getDocs(query(collection(this.firestore, 'finance_clearance'),
+          where('arenaeventid', '==', arena['docid']))).catch(() => null),
         getDocs(query(collection(this.firestore, 'venue_clearance'),
           where('arenaeventid', '==', arena['docid']))).catch(() => null),
         getDoc(arena['productref']).catch(() => null)
       ]);
 
-      // Finance-clearance baseline (product minimum) + venue-paid map.
+      // Product minimum (for the auto finance hint) + the two manual sign-off maps.
       this.productMinimum = (productSnap && productSnap.exists()) ? Number(productSnap.data()?.['minimumrequiredamount'] ?? 0) : 0;
+      this.financeClearedByPid = new Map<string, boolean>();
+      financeSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.financeClearedByPid.set(x['profileid'], x['financeCleared'] === true); });
       this.venuePaidByPid = new Map<string, boolean>();
       venueSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.venuePaidByPid.set(x['profileid'], x['venuePaid'] === true); });
 
@@ -560,8 +565,8 @@ export class ProductFunnelComponent implements OnInit {
   get colSpan(): number {
     return (this.showSelect ? 1 : 0) + 7 + (this.showApprovalChecks ? 4 : 0);
   }
-  // Cleared when the participant has paid at least the product's minimum required amount.
-  financeCleared(r: PRow): boolean {
+  // Auto hint beside the Finance checkbox: has the participant paid at least the product minimum?
+  meetsMinPayment(r: PRow): boolean {
     return (+(r.paid || 0)) >= (this.productMinimum ?? 0);
   }
   // Lazily load queue_token.currentstage for the whole event once (queue events only).
@@ -593,6 +598,23 @@ export class ProductFunnelComponent implements OnInit {
       console.log('venue clearance write failed', e);
       this.venuePaidByPid.set(r.profileid, prev);
       this.snackbar.open('Could not save venue status', 'OK', { duration: 4000 });
+    }
+  }
+
+  // Manual finance sign-off — persisted to the isolated finance_clearance collection (optimistic, reverts on failure).
+  async toggleFinanceCleared(r: PRow, checked: boolean) {
+    const prev = this.financeClearedByPid.get(r.profileid) === true;
+    this.financeClearedByPid.set(r.profileid, checked);
+    try {
+      const id = `${this.arena['docid']}_${r.profileid}`;
+      await setDoc(doc(this.firestore, 'finance_clearance', id), {
+        arenaeventid: this.arena['docid'], profileid: r.profileid,
+        financeCleared: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
+      }, { merge: true });
+    } catch (e) {
+      console.log('finance clearance write failed', e);
+      this.financeClearedByPid.set(r.profileid, prev);
+      this.snackbar.open('Could not save finance status', 'OK', { duration: 4000 });
     }
   }
 
