@@ -1,5 +1,5 @@
 :host {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 .shell {
   position: relative;
@@ -11,16 +11,18 @@
   background: var(--pi-bg);
 }
 
-/* topbar */
+/* topbar — translucent iOS navigation bar */
 .topbar {
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 64px;
+  gap: 16px;
+  height: 60px;
   flex-shrink: 0;
-  padding: 0 18px;
-  background: var(--pi-surface);
-  border-bottom: 1px solid var(--pi-border);
+  padding: 0 20px;
+  background: rgba(242, 242, 247, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--pi-border-strong);
   z-index: 10;
 }
 
@@ -31,28 +33,28 @@
   min-width: 0;
 }
 .brand .logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   background: var(--pi-accent);
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
   flex-shrink: 0;
 }
 .titles {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  line-height: 1.15;
   min-width: 0;
 }
 .titles h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 .titles .sub {

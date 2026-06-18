@@ -39,6 +39,7 @@ export const COLUMN_DEF_MAP: Record<string, ColumnDef> = COLUMN_CATALOG.reduce(
 // What the table shows on first load.
 export const DEFAULT_VISIBLE_COLUMNS = [
   'name',
+  'financialstatus',
   'customerstatus',
   'activejourney',
   'activeproduct',
@@ -46,3 +47,6 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'atccount',
   'subscriptionend',
 ];
+
+// Columns frozen (sticky-left) by default — Participant + Financial status.
+export const DEFAULT_PINNED_COLUMNS = ['name', 'financialstatus'];

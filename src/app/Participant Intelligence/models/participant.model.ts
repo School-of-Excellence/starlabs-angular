@@ -60,6 +60,8 @@ export interface Participant {
   purchasedate: string | null;
   dateofbirth: string | null;
   emiStatus: EmiStatus;
+  productevent: Record<string, string[]>; // productId -> event ids
+  queueevent: Record<string, string[]>; // productId -> queue ids
   eiflix: string[];
   solarvoice: string[];
   generalcontent: string[];
@@ -84,6 +86,8 @@ export interface ReferenceData {
   modes: NamedRef[];
   tiers: NamedRef[];
   tags: Tag[];
+  events: NamedRef[];
+  queues: NamedRef[];
   supportCategories: string[];
 }
 
@@ -111,6 +115,11 @@ export interface FilterModel {
   activejourney: string[];
   lastcompletedjourney: string[];
   activeproduct: string[];
+  addons: string[];
+  gifts: string[];
+  bonus: string[];
+  events: string[];
+  queues: string[];
   profiletags: string[];
   tier: string[];
   registered: RegisteredFilter[];
@@ -131,6 +140,11 @@ export function emptyFilter(): FilterModel {
     activejourney: [],
     lastcompletedjourney: [],
     activeproduct: [],
+    addons: [],
+    gifts: [],
+    bonus: [],
+    events: [],
+    queues: [],
     profiletags: [],
     tier: [],
     registered: [],
@@ -189,4 +203,32 @@ export interface FilterChip {
   group: keyof FilterModel;
   label: string;
   value: string; // identifies the specific value to remove (or '' for whole-group resets)
+}
+
+// --- communications analytics (email / whatsapp / notification) ---
+export type CommsChannel = 'email' | 'whatsapp' | 'notification';
+
+export interface CommsCampaign {
+  name: string;
+  status: string; // queued | sent | scheduled | failed | ...
+  recipients: number;
+  date: string | null; // ISO
+}
+
+export interface CommsChannelStats {
+  total: number;
+  queued: number;
+  sent: number;
+  failed: number;
+  recent: CommsCampaign[];
+}
+
+export interface CommsAnalytics {
+  email: CommsChannelStats;
+  whatsapp: CommsChannelStats;
+  notification: CommsChannelStats;
+}
+
+export function emptyChannelStats(): CommsChannelStats {
+  return { total: 0, queued: 0, sent: 0, failed: 0, recent: [] };
 }

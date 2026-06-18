@@ -80,6 +80,12 @@ export class FilterRailComponent {
       { group: 'tier', label: 'Tier', options: this.opt(ref.tiers) },
       { group: 'participantmode', label: 'Mode', options: this.opt(ref.modes) },
       { group: 'profiletags', label: 'Tags', options: ref.tags.map((t) => ({ value: t.id, label: t.name })) },
+      // Advanced
+      { group: 'addons', label: 'Add-ons', options: this.opt(ref.products) },
+      { group: 'gifts', label: 'Gifts', options: this.opt(ref.products) },
+      { group: 'bonus', label: 'Bonus', options: this.opt(ref.products) },
+      { group: 'events', label: 'Event', options: this.opt(ref.events) },
+      { group: 'queues', label: 'Queue', options: this.opt(ref.queues) },
     ];
   });
 

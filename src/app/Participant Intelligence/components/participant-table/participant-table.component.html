@@ -26,7 +26,12 @@
   <div class="table-scroll">
     <div class="table-inner" [style.min-width.px]="minWidth()">
       <div class="thead" [style.grid-template-columns]="gridTemplate()">
-        <div class="th th-select">
+        <div
+          class="th th-select"
+          [class.frozen]="isFrozen('select')"
+          [class.frozen-edge]="lastFrozenKey() === 'select'"
+          [style.left.px]="leftOf('select')"
+        >
           <label class="cbx" (click)="$event.stopPropagation()">
             <input
               type="checkbox"
@@ -37,7 +42,14 @@
           </label>
         </div>
         @for (def of columnDefs(); track def.key) {
-          <div class="th" [class.num]="def.type === 'number'" (click)="toggleSort(def.key)">
+          <div
+            class="th"
+            [class.num]="def.type === 'number'"
+            [class.frozen]="isFrozen(def.key)"
+            [class.frozen-edge]="lastFrozenKey() === def.key"
+            [style.left.px]="leftOf(def.key)"
+            (click)="toggleSort(def.key)"
+          >
             <span class="th-label">{{ def.label }}</span>
             @if (sortKey() === def.key && sortDir()) {
               <span class="material-symbols-rounded sort">{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
@@ -46,15 +58,21 @@
         }
       </div>
 
-      <cdk-virtual-scroll-viewport itemSize="52" minBufferPx="600" maxBufferPx="1200" class="tbody">
+      <div class="tbody">
+        @for (p of rows(); track p.profileid) {
         <div
           class="tr"
-          *cdkVirtualFor="let p of rows(); trackBy: trackById"
           [class.selected]="store.isSelected(p.profileid)"
           [style.grid-template-columns]="gridTemplate()"
           (click)="store.toggleOne(p.profileid)"
         >
-          <div class="td td-select" (click)="$event.stopPropagation()">
+          <div
+            class="td td-select"
+            [class.frozen]="isFrozen('select')"
+            [class.frozen-edge]="lastFrozenKey() === 'select'"
+            [style.left.px]="leftOf('select')"
+            (click)="$event.stopPropagation()"
+          >
             <label class="cbx">
               <input type="checkbox" [checked]="store.isSelected(p.profileid)" (change)="store.toggleOne(p.profileid)" />
               <span class="box"></span>
@@ -62,25 +80,28 @@
           </div>
 
           @for (def of columnDefs(); track def.key) {
-            <div class="td" [class.num]="def.type === 'number'" [ngSwitch]="def.type">
+            <div
+              class="td"
+              [class.num]="def.type === 'number'"
+              [class.frozen]="isFrozen(def.key)"
+              [class.frozen-edge]="lastFrozenKey() === def.key"
+              [style.left.px]="leftOf(def.key)"
+              [ngSwitch]="def.type"
+            >
               <ng-container *ngSwitchCase="'name'">
-                <span class="avatar" [style.background]="avatarHue(p)">{{ initials(p) }}</span>
+                <span class="avatar">{{ initials(p) }}</span>
                 <span class="name-block">
-                  <span class="name-row">
-                    <span class="name">{{ p.name }}</span>
-                    <a class="link" [matTooltip]="'Open profile'" (click)="$event.stopPropagation()">
-                      <span class="material-symbols-rounded">open_in_new</span>
-                    </a>
-                  </span>
+                  <span class="name" (click)="openProfile(p, $event)">{{ p.name }}</span>
                   <span class="email">{{ p.email }}</span>
                 </span>
+                <span class="disc material-symbols-rounded" matTooltip="Open profile" (click)="openProfile(p, $event)">chevron_right</span>
               </ng-container>
 
               <ng-container *ngSwitchCase="'status'">
                 @if (statusValue(p, def.key) === 'none') {
-                  <span class="muted">—</span>
+                  <span class="st muted"><span class="d"></span>—</span>
                 } @else {
-                  <span class="pi-badge tone-{{ tone(statusValue(p, def.key)) }}">{{ statusLabel(p, def.key) }}</span>
+                  <span class="st tone-{{ tone(statusValue(p, def.key)) }}"><span class="d"></span>{{ statusLabel(p, def.key) }}</span>
                 }
               </ng-container>
 
@@ -129,7 +150,8 @@
             </div>
           }
         </div>
-      </cdk-virtual-scroll-viewport>
+        }
+      </div>
     </div>
   </div>
 }

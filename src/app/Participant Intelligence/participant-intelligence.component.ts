@@ -1,26 +1,25 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  ElementRef,
-  Injector,
-  OnInit,
-  inject,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogConfig } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import * as XLSX from 'xlsx';
 
 import { ParticipantStore } from './core/participant.store';
 import { ParticipantDataService } from './data/participant-data.service';
 import { FirestoreParticipantDataService } from './data/firestore-participant-data.service';
+import { MockParticipantDataService } from './data/mock-participant-data.service';
 import { COLUMN_DEF_MAP } from './data/column-catalog';
-import { Participant } from './models/participant.model';
+import { environment } from '../../environments/environment';
+
+// Only talk to live Firestore on the starlabs-test project; anywhere else fall back to mock data
+// so a production build (environment.ts → fir-sample-aae4a) can never read/write the wrong project.
+export function participantDataServiceFactory(): ParticipantDataService {
+  return environment.firebase?.projectId === 'starlabs-test'
+    ? inject(FirestoreParticipantDataService)
+    : inject(MockParticipantDataService);
+}
 
 import { FilterRailComponent } from './components/filter-rail/filter-rail.component';
 import { ActiveFilterChipsComponent } from './components/active-filter-chips/active-filter-chips.component';
@@ -29,6 +28,7 @@ import { ParticipantTableComponent } from './components/participant-table/partic
 import { BulkActionBarComponent, BulkAction } from './components/bulk-action-bar/bulk-action-bar.component';
 import { ColumnConfigComponent } from './components/column-config/column-config.component';
 import { SignalsPanelComponent } from './components/signals-panel/signals-panel.component';
+import { CommsAnalyticsPanelComponent } from './components/comms-analytics-panel/comms-analytics-panel.component';
 
 import { PromptDialogComponent } from './dialogs/prompt-dialog.component';
 import { RemarksDialogComponent } from './dialogs/remarks-dialog.component';
@@ -39,6 +39,8 @@ import { WhatsappComposerDialogComponent } from './dialogs/whatsapp-composer-dia
 import { ManageAudiencesDialogComponent } from './dialogs/manage-audiences-dialog.component';
 import { QuickComposeDialogComponent, QuickComposeData } from './dialogs/quick-compose-dialog.component';
 import { EvolutionDialogComponent } from './dialogs/evolution-dialog.component';
+import { ChecklistViewerDialogComponent } from './dialogs/checklist-viewer-dialog.component';
+import { CHECKLISTS, ChecklistDef } from './core/checklists';
 
 @Component({
   selector: 'app-participant-intelligence',
@@ -55,11 +57,17 @@ import { EvolutionDialogComponent } from './dialogs/evolution-dialog.component';
     BulkActionBarComponent,
     ColumnConfigComponent,
     SignalsPanelComponent,
+    CommsAnalyticsPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './participant-intelligence.component.html',
   styleUrl: './participant-intelligence.component.css',
-  providers: [ParticipantStore, { provide: ParticipantDataService, useClass: FirestoreParticipantDataService }],
+  providers: [
+    ParticipantStore,
+    MockParticipantDataService,
+    FirestoreParticipantDataService,
+    { provide: ParticipantDataService, useFactory: participantDataServiceFactory },
+  ],
 })
 export class ParticipantIntelligenceComponent implements OnInit {
   readonly store = inject(ParticipantStore);
@@ -74,13 +82,15 @@ export class ParticipantIntelligenceComponent implements OnInit {
 
   readonly railOpen = signal(true);
   readonly insightsOpen = signal(true);
-  readonly pendingEmails = signal(2);
-  readonly pendingWati = signal(0);
-
-  private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+  readonly checklists = CHECKLISTS;
 
   ngOnInit(): void {
     this.store.init();
+  }
+
+  openChecklist(def: ChecklistDef): void {
+    const participants = def.wired && def.predicate ? this.store.all().filter(def.predicate) : [];
+    this.dialog.open(ChecklistViewerDialogComponent, { ...this.dlg('720px'), data: { def, participants } });
   }
 
   get search(): string {
@@ -101,12 +111,6 @@ export class ParticipantIntelligenceComponent implements OnInit {
   refresh(): void {
     this.store.init();
     this.snack.open('Refreshed', '', { duration: 1500 });
-  }
-
-  snackQueued(channel: 'email' | 'whatsapp'): void {
-    const n = channel === 'email' ? this.pendingEmails() : this.pendingWati();
-    const label = channel === 'email' ? 'email' : 'WhatsApp';
-    this.snack.open(n ? `${n} ${label} broadcast(s) queued` : `No ${label} broadcasts queued`, 'Dismiss', { duration: 2500 });
   }
 
   saveAudience(): void {
@@ -166,11 +170,69 @@ export class ParticipantIntelligenceComponent implements OnInit {
           data: { participants: this.store.selectedParticipants() },
         });
         return;
-      case 'export':
-        return this.export(true);
+      case 'broadcast':
+        return this.broadcast();
+      case 'interim':
+        return this.interimReport();
+      case 'wishlist':
+        return this.evolutionWishlist();
       default:
         return;
     }
+  }
+
+  private composeStub(data: QuickComposeData, doneMsg: string): void {
+    this.dialog
+      .open(QuickComposeDialogComponent, { ...this.dlg('480px'), data })
+      .afterClosed()
+      .subscribe((r) => {
+        if (r) this.snack.open(doneMsg.replace('{n}', String(this.store.selectedCount())), 'Dismiss', { duration: 3500 });
+      });
+  }
+
+  private broadcast(): void {
+    this.composeStub(
+      {
+        icon: 'podcasts',
+        title: 'Broadcast in Breakthroughs',
+        subtitle: `Send an in-app broadcast to ${this.store.selectedCount()} participants.`,
+        fields: [{ key: 'message', label: 'Message', type: 'textarea', placeholder: 'What do you want to broadcast?' }],
+        confirmText: 'Queue broadcast',
+        confirmIcon: 'send',
+        note: 'UI prototype on mock/test data — nothing is actually broadcast.',
+      },
+      'Broadcast drafted for {n} — delivery isn’t wired up yet'
+    );
+  }
+
+  private interimReport(): void {
+    this.composeStub(
+      {
+        icon: 'description',
+        title: 'Manage interim report',
+        subtitle: `Generate an interim report for ${this.store.selectedCount()} participants.`,
+        fields: [{ key: 'period', label: 'Reporting period', type: 'text', placeholder: 'e.g. Q3 2026' }],
+        confirmText: 'Generate',
+        confirmIcon: 'check',
+        note: 'UI prototype — report generation isn’t wired up yet.',
+      },
+      'Interim report drafted for {n} participants (prototype)'
+    );
+  }
+
+  private evolutionWishlist(): void {
+    this.composeStub(
+      {
+        icon: 'favorite',
+        title: 'Evolution wishlist',
+        subtitle: `Log an evolution wishlist note for ${this.store.selectedCount()} participants.`,
+        fields: [{ key: 'note', label: 'Wishlist note', type: 'textarea', placeholder: 'What evolution outcome are we aiming for?' }],
+        confirmText: 'Add to wishlist',
+        confirmIcon: 'check',
+        note: 'UI prototype — wishlist persistence isn’t wired up yet.',
+      },
+      'Wishlist note drafted for {n} participants (prototype)'
+    );
   }
 
   private composeEmail(): void {
@@ -179,11 +241,12 @@ export class ParticipantIntelligenceComponent implements OnInit {
       .afterClosed()
       .subscribe((r?: ComposerResult) => {
         if (!r) return;
+        const n = this.store.selectedCount();
         if (r.action === 'queue') {
-          this.pendingEmails.update((n) => n + 1);
-          this.snack.open(`Queued email to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
+          this.store.bumpQueued('email');
+          this.snack.open(`Email draft queued for ${n} participants`, 'Dismiss', { duration: 3000 });
         } else {
-          this.snack.open(`Email sent to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
+          this.snack.open(`Email draft composed for ${n} — sending isn't wired up yet`, 'Dismiss', { duration: 4000 });
         }
       });
   }
@@ -194,11 +257,12 @@ export class ParticipantIntelligenceComponent implements OnInit {
       .afterClosed()
       .subscribe((r?: ComposerResult) => {
         if (!r) return;
+        const n = this.store.selectedCount();
         if (r.action === 'queue') {
-          this.pendingWati.update((n) => n + 1);
-          this.snack.open(`Queued WhatsApp to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
+          this.store.bumpQueued('whatsapp');
+          this.snack.open(`WhatsApp draft queued for ${n} participants`, 'Dismiss', { duration: 3000 });
         } else {
-          this.snack.open(`WhatsApp sent to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
+          this.snack.open(`WhatsApp draft composed for ${n} — sending isn't wired up yet`, 'Dismiss', { duration: 4000 });
         }
       });
   }
@@ -325,7 +389,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
       });
   }
 
-  // ---- export / import ----
+  /* ---- export / import: DISABLED & revivable per JX brief — see REMOVED-FEATURES.md ----
   export(selectedOnly: boolean): void {
     const source = selectedOnly ? this.store.selectedParticipants() : this.store.filtered();
     if (!source.length) {
@@ -402,6 +466,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
     };
     reader.readAsArrayBuffer(file);
   }
+  ---- end disabled export / import ---- */
 
   protected readonly columnMap = COLUMN_DEF_MAP;
 }

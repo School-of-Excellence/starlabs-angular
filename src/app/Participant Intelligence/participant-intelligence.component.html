@@ -45,27 +45,17 @@
 
       <app-column-config />
 
-      <button class="tbtn" [matMenuTriggerFor]="exportMenu">
-        <span class="material-symbols-rounded">download</span>
-        <span class="lbl">Export</span>
-      </button>
-
-      <button class="tbtn icon-only" [matMenuTriggerFor]="importMenu" matTooltip="Import">
-        <span class="material-symbols-rounded">upload</span>
+      <button class="tbtn" [matMenuTriggerFor]="checklistsMenu" matTooltip="Reconciliation checklists">
+        <span class="material-symbols-rounded">checklist</span>
+        <span class="lbl">Checklists</span>
       </button>
 
       <span class="sep"></span>
 
-      <button class="iconbtn" matTooltip="Queued emails" (click)="snackQueued('email')">
-        <span class="material-symbols-rounded">mail</span>
-        @if (pendingEmails()) {
-          <span class="badge">{{ pendingEmails() }}</span>
-        }
-      </button>
-      <button class="iconbtn" matTooltip="Queued WhatsApp" (click)="snackQueued('whatsapp')">
-        <span class="material-symbols-rounded">chat</span>
-        @if (pendingWati()) {
-          <span class="badge">{{ pendingWati() }}</span>
+      <button class="iconbtn" matTooltip="Communications analytics" [matMenuTriggerFor]="commsMenu">
+        <span class="material-symbols-rounded">campaign</span>
+        @if (store.queuedTotal()) {
+          <span class="badge">{{ store.queuedTotal() }}</span>
         }
       </button>
       <button class="iconbtn" matTooltip="Refresh" (click)="refresh()">
@@ -94,26 +84,15 @@
   <app-bulk-action-bar (action)="handleBulk($event)" />
 </div>
 
-<input #fileInput type="file" accept=".xlsx,.xls" hidden (change)="onImportFile($event)" />
-
-<mat-menu #exportMenu="matMenu" xPosition="before">
-  <button mat-menu-item (click)="export(false)">
-    <span class="material-symbols-rounded mi">table_view</span>
-    Export all filtered ({{ store.filteredCount() | number }})
-  </button>
-  <button mat-menu-item (click)="export(true)" [disabled]="!store.selectedCount()">
-    <span class="material-symbols-rounded mi">checklist</span>
-    Export selected ({{ store.selectedCount() }})
-  </button>
+<mat-menu #commsMenu="matMenu" xPosition="before" class="pi-comms-menu">
+  <app-comms-analytics-panel />
 </mat-menu>
 
-<mat-menu #importMenu="matMenu" xPosition="before">
-  <button mat-menu-item (click)="downloadSample()">
-    <span class="material-symbols-rounded mi">file_download</span>
-    Download sample
-  </button>
-  <button mat-menu-item (click)="triggerImport()">
-    <span class="material-symbols-rounded mi">upload_file</span>
-    Upload &amp; select by email
-  </button>
+<mat-menu #checklistsMenu="matMenu" xPosition="before">
+  @for (c of checklists; track c.id) {
+    <button mat-menu-item (click)="openChecklist(c)">
+      <span class="material-symbols-rounded mi">{{ c.wired ? 'fact_check' : 'lock' }}</span>
+      {{ c.label }}
+    </button>
+  }
 </mat-menu>

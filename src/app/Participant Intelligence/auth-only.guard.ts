@@ -3,12 +3,18 @@ import { CanActivateFn, Router } from '@angular/router';
 import { map, take } from 'rxjs';
 import { Auth, authState } from '@angular/fire/auth';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { authGuard } from '../auth.guard';
+import { environment } from '../../environments/environment';
 
-// TEMPORARY guard for /participant-intelligence.
-// Requires the user to be signed in (so Firestore reads are permitted) but skips the
-// dashboard-role/permission check. Swap this back to `authGuard` once a `dashboard`
-// document for route '/participant-intelligence' is configured.
-export const loggedInGuard: CanActivateFn = (_route, state) => {
+// Guard for /participant-intelligence.
+// On the starlabs-test project (active development), allow any signed-in user so the screen can be
+// demoed/tested before a `dashboard` doc exists. On any other project, defer to the full `authGuard`
+// (Firebase auth + dashboard role/profile authorization) so production never exposes the screen role-free.
+export const loggedInGuard: CanActivateFn = (route, state) => {
+  if (environment.firebase?.projectId !== 'starlabs-test') {
+    return authGuard(route, state);
+  }
+
   const router = inject(Router);
   const auth = inject(Auth);
   const snackbar = inject(MatSnackBar);

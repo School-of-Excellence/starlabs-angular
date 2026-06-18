@@ -1,5 +1,5 @@
 import { Observable } from 'rxjs';
-import { Audience, Participant, ReferenceData, Remark, Tag } from '../models/participant.model';
+import { Audience, CommsAnalytics, Participant, ReferenceData, Remark, Tag } from '../models/participant.model';
 
 // Implementation-agnostic contract the store depends on.
 // MockParticipantDataService serves generated data; FirestoreParticipantDataService serves
@@ -8,6 +8,7 @@ export abstract class ParticipantDataService {
   abstract getReferenceData(): Observable<ReferenceData>;
   abstract getParticipants(): Observable<Participant[]>;
   abstract getAudiences(): Observable<Audience[]>;
+  abstract getCommsAnalytics(): Observable<CommsAnalytics>;
 
   persistRemark(_profileIds: string[], _remark: Remark): Promise<void> {
     return Promise.resolve();
