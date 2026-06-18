@@ -1,16 +1,16 @@
-# queue-e2e — THIN CALLER for the Stage-2 hermetic Playwright gate.
+# queue-e2e â€” THIN CALLER for the Stage-2 hermetic Playwright gate.
 #
 # The gate logic now lives in the hub (starlabs-e2e-tests/.github/workflows/web-e2e.yml). This file just
 # wires the app's PR triggers + path filters to it. To change boot/seed/run behavior, edit the hub workflow
-# once and every repo inherits it — no per-repo copy to keep in sync (SETUP.md §6.3 "invert to reusable").
+# once and every repo inherits it â€” no per-repo copy to keep in sync (SETUP.md Â§6.3 "invert to reusable").
 #
 # Requires: org secret CICD_PAT (read access to the private e2e + cloud-function repos), passed via
-# `secrets: inherit`. The hub repo must allow its workflows to be reused org-wide (Settings → Actions → Access).
+# `secrets: inherit`. The hub repo must allow its workflows to be reused org-wide (Settings â†’ Actions â†’ Access).
 name: queue-e2e (emulator gate)
 
 on:
   pull_request:
-    branches: [cicd-dev, cicd-prod]   # sudo branches — gate runs on PR to either
+    branches: [cicd-dev, cicd-prod]   # sudo branches â€” gate runs on PR to either
     types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - 'src/app/queue system/**'
@@ -41,9 +41,9 @@ jobs:
     with:
       cf_branch: development
       e2e_ref: main
-      firebase_project: starlabs-cicd   # MUST match app projectId or auth silently fails (SETUP �3)
+      firebase_project: starlabs-cicd   # MUST match app projectId or auth silently fails (SETUP §3)
       # PR runs a FAST GREEN SMOKE (self-tests) so the flow proves end-to-end now; the full UI suite is the
       # parallel "green-in-CI" track. A manual workflow_dispatch can override `only`/`evidence` to debug a spec.
-      only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || 'queue/invariants-selftest.spec.ts queue/oracle-selftest.spec.ts' }}
+      only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || 'queue/operator.spec.ts queue/invariants-selftest.spec.ts queue/oracle-selftest.spec.ts' }}
       evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '0' }}
     secrets: inherit
