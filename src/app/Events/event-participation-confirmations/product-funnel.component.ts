@@ -183,6 +183,14 @@ export class ProductFunnelComponent implements OnInit {
   private readonly POTENTIAL_SPLIT_MAX = 800;
   private potentialOwnerIds: string[] = [];
 
+  // Post-approval checks (Clearance / Venue / Contract / Queue stage) — shown only on the approved cohort.
+  productMinimum: number | null = null;                 // product.minimumrequiredamount, for finance clearance
+  venuePaidByPid = new Map<string, boolean>();          // from the venue_clearance collection
+  queueStageByPid = new Map<string, string>();          // queue_token.currentstage per participant (queue events)
+  queueStagesLoaded = false;
+  private queueStagesLoading = false;
+  private currentUserId: string | null = null;          // for the venue_clearance audit field
+
   // owner email → row, and active-queue profile ids — used by bulk import categorisation
   private ownerByEmail = new Map<string, PRow>();
   private activeProfileIds = new Set<string>();
@@ -213,6 +221,8 @@ export class ProductFunnelComponent implements OnInit {
     this.mapEmailData = profile.mapEmailData;
     this.mapProduct = await this.guard.getProductMap();
     this.mapJourney = await this.guard.getJourneyMap();
+    const u: any = await this.guard.getUser();
+    this.currentUserId = u?.email ?? u?.uid ?? null;
     await this.loadData();
   }
 
@@ -228,17 +238,28 @@ export class ProductFunnelComponent implements OnInit {
     this.potentialActive = null;
     this.potentialNonActive = null;
     this.potentialSplitState = 'idle';
+    this.queueStageByPid = new Map<string, string>();
+    this.queueStagesLoaded = false;
     const arena = this.arena;
     try {
-      const [ownSnap, eprSnap, scanSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap, venueSnap, productSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
           where('arenaeventid', '==', arena['docid']),
           where('status', 'in', ['requested', 'approved', 'attended', 'unattended']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
-          where('eventref', '==', arena['eventref'])))
+          where('eventref', '==', arena['eventref']))),
+        // Venue clearance is an isolated collection — tolerate it being absent / not yet ruled.
+        getDocs(query(collection(this.firestore, 'venue_clearance'),
+          where('arenaeventid', '==', arena['docid']))).catch(() => null),
+        getDoc(arena['productref']).catch(() => null)
       ]);
+
+      // Finance-clearance baseline (product minimum) + venue-paid map.
+      this.productMinimum = (productSnap && productSnap.exists()) ? Number(productSnap.data()?.['minimumrequiredamount'] ?? 0) : 0;
+      this.venuePaidByPid = new Map<string, boolean>();
+      venueSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.venuePaidByPid.set(x['profileid'], x['venuePaid'] === true); });
 
       const owners = new Map<string, string>();
       ownSnap.docs.forEach(d => {
@@ -490,6 +511,7 @@ export class ProductFunnelComponent implements OnInit {
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
+    if (this.showApprovalChecks) this.ensureQueueStages();
   }
 
   // Filter the Potential segment by subscription. Clicking the lit chip again clears it.
@@ -507,6 +529,49 @@ export class ProductFunnelComponent implements OnInit {
     if (this.subFilter === 'all' || this.segment !== 'potential') return true;
     if (!r.metaLoaded) return false;
     return this.subFilter === 'active' ? r.subActive : !r.subActive;
+  }
+
+  // ---- Post-approval checks (Clearance / Venue / Contract / Queue stage) ----
+  get showApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
+  }
+  get colSpan(): number {
+    return (this.showSelect ? 1 : 0) + 7 + (this.showApprovalChecks ? 4 : 0);
+  }
+  // Cleared when the participant has paid at least the product's minimum required amount.
+  financeCleared(r: PRow): boolean {
+    return (+(r.paid || 0)) >= (this.productMinimum ?? 0);
+  }
+  // Lazily load queue_token.currentstage for the whole event once (queue events only).
+  async ensureQueueStages() {
+    if (this.queueStagesLoaded || this.queueStagesLoading || this.arena?.['type'] !== 'queue') return;
+    this.queueStagesLoading = true;
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'queue_token'),
+        where('queueref', '==', this.arena['eventref'])));
+      snap.docs.forEach(d => { const x = d.data(); if (x['profile_id'] && x['currentstage']) this.queueStageByPid.set(x['profile_id'], x['currentstage']); });
+      this.queueStagesLoaded = true;
+    } catch (e) {
+      console.log('queue stage load failed', e);
+    } finally {
+      this.queueStagesLoading = false;
+    }
+  }
+  // Manual AR toggle — persisted to the isolated venue_clearance collection (optimistic, reverts on failure).
+  async toggleVenuePaid(r: PRow, checked: boolean) {
+    const prev = this.venuePaidByPid.get(r.profileid) === true;
+    this.venuePaidByPid.set(r.profileid, checked);
+    try {
+      const id = `${this.arena['docid']}_${r.profileid}`;
+      await setDoc(doc(this.firestore, 'venue_clearance', id), {
+        arenaeventid: this.arena['docid'], profileid: r.profileid,
+        venuePaid: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
+      }, { merge: true });
+    } catch (e) {
+      console.log('venue clearance write failed', e);
+      this.venuePaidByPid.set(r.profileid, prev);
+      this.snackbar.open('Could not save venue status', 'OK', { duration: 4000 });
+    }
   }
 
   private inSegment(r: PRow): boolean {

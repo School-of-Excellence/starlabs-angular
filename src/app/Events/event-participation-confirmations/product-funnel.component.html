@@ -151,6 +151,10 @@
             <th>Subscription</th>
             <th>Finance</th>
             <th>Paid</th>
+            <th *ngIf="showApprovalChecks">Clearance</th>
+            <th *ngIf="showApprovalChecks">Venue</th>
+            <th *ngIf="showApprovalChecks">Contract</th>
+            <th *ngIf="showApprovalChecks">Queue stage</th>
             <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
           </tr>
         </thead>
@@ -208,6 +212,27 @@
                 <ng-template #dashPaid><span class="sx-mut">—</span></ng-template>
               </span>
             </td>
+            <td *ngIf="showApprovalChecks">
+              <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
+              <span *ngIf="row.metaLoaded" class="sx-clr" [class.no]="!financeCleared(row)">
+                <span class="dot" [ngClass]="financeCleared(row) ? 'd-ok' : 'd-bad'"></span>{{ financeCleared(row) ? 'Cleared' : 'Pending' }}
+              </span>
+            </td>
+            <td *ngIf="showApprovalChecks" class="sx-c-check">
+              <mat-checkbox [checked]="venuePaidByPid.get(row.profileid) === true"
+                (change)="toggleVenuePaid(row, $event.checked)"
+                [attr.aria-label]="'Venue expenses paid for ' + row.name"></mat-checkbox>
+            </td>
+            <td *ngIf="showApprovalChecks">
+              <span class="sx-mut" matTooltip="Contract status — automated later" matTooltipClass="sx-tip">—</span>
+            </td>
+            <td *ngIf="showApprovalChecks">
+              <ng-container *ngIf="arena?.type === 'queue'; else noQueue">
+                <span *ngIf="!queueStagesLoaded" class="sx-mut">…</span>
+                <span *ngIf="queueStagesLoaded" class="sx-stage">{{ queueStageByPid.get(row.profileid) || '—' }}</span>
+              </ng-container>
+              <ng-template #noQueue><span class="sx-mut">—</span></ng-template>
+            </td>
             <td>
               <!-- Reason (no product / in queue) -->
               <ng-container *ngIf="segment==='noProduct' || segment==='inQueue'">
@@ -237,7 +262,7 @@
             </td>
           </tr>
           <tr *ngIf="segmentRows.length === 0">
-            <td [attr.colspan]="showSelect ? 8 : 7" class="sx-empty">
+            <td [attr.colspan]="colSpan" class="sx-empty">
               {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
               <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; onFinance()">Clear filter</button>
             </td>
