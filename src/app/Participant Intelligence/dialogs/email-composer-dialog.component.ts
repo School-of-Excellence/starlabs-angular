@@ -21,7 +21,7 @@ const SENDERS = ['hello@breakthroughs.app', 'coach@breakthroughs.app', 'support@
         <span class="ic"><span class="material-symbols-rounded">mail</span></span>
         <div>
           <h2>Email campaign composer</h2>
-          <p>Sending to <b>{{ data.count }}</b> selected participant{{ data.count === 1 ? '' : 's' }}.</p>
+          <p>Composing a draft for <b>{{ data.count }}</b> selected participant{{ data.count === 1 ? '' : 's' }}.</p>
         </div>
         <button class="x" (click)="ref.close()"><span class="material-symbols-rounded">close</span></button>
       </div>
@@ -68,7 +68,7 @@ const SENDERS = ['hello@breakthroughs.app', 'coach@breakthroughs.app', 'support@
           <span class="material-symbols-rounded">schedule</span> Add to queue
         </button>
         <button class="btn btn-primary" [disabled]="!valid()" (click)="close('send')">
-          <span class="material-symbols-rounded">send</span> Send to {{ data.count }}
+          <span class="material-symbols-rounded">edit_note</span> Compose draft
         </button>
       </div>
     </div>

@@ -35,6 +35,7 @@
           <label class="cbx" (click)="$event.stopPropagation()">
             <input
               type="checkbox"
+              aria-label="Select all participants"
               [checked]="store.allFilteredSelected()"
               (change)="store.toggleAllFiltered($any($event.target).checked)"
             />
@@ -74,7 +75,7 @@
             (click)="$event.stopPropagation()"
           >
             <label class="cbx">
-              <input type="checkbox" [checked]="store.isSelected(p.profileid)" (change)="store.toggleOne(p.profileid)" />
+              <input type="checkbox" [attr.aria-label]="'Select ' + p.name" [checked]="store.isSelected(p.profileid)" (change)="store.toggleOne(p.profileid)" />
               <span class="box"></span>
             </label>
           </div>

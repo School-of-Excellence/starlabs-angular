@@ -27,7 +27,7 @@ const TEMPLATES: WaTemplate[] = [
         <span class="ic"><span class="material-symbols-rounded">chat</span></span>
         <div>
           <h2>WhatsApp campaign composer</h2>
-          <p>Sending to <b>{{ data.count }}</b> selected participant{{ data.count === 1 ? '' : 's' }} via WATI.</p>
+          <p>Composing a draft for <b>{{ data.count }}</b> selected participant{{ data.count === 1 ? '' : 's' }} via WATI.</p>
         </div>
         <button class="x" (click)="ref.close()"><span class="material-symbols-rounded">close</span></button>
       </div>
@@ -79,7 +79,7 @@ const TEMPLATES: WaTemplate[] = [
           <span class="material-symbols-rounded">schedule</span> Add to queue
         </button>
         <button class="btn btn-primary" (click)="close('send')">
-          <span class="material-symbols-rounded">send</span> Send to {{ data.count }}
+          <span class="material-symbols-rounded">edit_note</span> Compose draft
         </button>
       </div>
     </div>
