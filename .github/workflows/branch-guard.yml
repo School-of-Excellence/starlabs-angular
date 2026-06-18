@@ -3,7 +3,7 @@ name: branch-guard
 # Thin caller — detects stray direct pushes to protected branches. Logic lives in the hub.
 on:
   push:
-    branches: [development, production, cicd-dev, cicd-prod]   # include TEST stand-ins. Remove after validation.
+    branches: [cicd-dev, cicd-prod]   # ISOLATED to sudo branches during Phase A/B validation
 
 jobs:
   guard:
