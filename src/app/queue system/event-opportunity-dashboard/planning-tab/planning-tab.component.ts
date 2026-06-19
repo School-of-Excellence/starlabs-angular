@@ -121,14 +121,51 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   readonly pageSize = 15;
   drillPage = 0;
   cellPage = 0;
-  get drillPageCount(): number { return Math.max(1, Math.ceil(this.drillList.length / this.pageSize)); }
-  get cellPageCount(): number { return Math.max(1, Math.ceil(this.cellDrillRows.length / this.pageSize)); }
-  get pagedDrill(): DrillRow[] { const s = this.drillPage * this.pageSize; return this.drillList.slice(s, s + this.pageSize); }
-  get pagedCellDrill(): CellDrillRow[] { const s = this.cellPage * this.pageSize; return this.cellDrillRows.slice(s, s + this.pageSize); }
-  get drillRangeStart(): number { return this.drillList.length ? this.drillPage * this.pageSize + 1 : 0; }
-  get drillRangeEnd(): number { return Math.min(this.drillList.length, (this.drillPage + 1) * this.pageSize); }
-  get cellRangeStart(): number { return this.cellDrillRows.length ? this.cellPage * this.pageSize + 1 : 0; }
-  get cellRangeEnd(): number { return Math.min(this.cellDrillRows.length, (this.cellPage + 1) * this.pageSize); }
+
+  // Search + filter state for both drill tables
+  drillSearch = '';
+  cellSearch = '';
+  drillFilters = new Set<string>();
+  cellFilters = new Set<string>();
+
+  private statusKey(status: string): 'a' | 'na' | 'd' {
+    const s = (status || '').toLowerCase();
+    return s === 'active' ? 'a' : s === 'discontinued' ? 'd' : 'na';
+  }
+  /** active tokens are "dim:value"; within a dimension OR, across dimensions AND; empty = pass all. */
+  private passesFilters(active: Set<string>, dims: Record<string, string>): boolean {
+    if (!active.size) return true;
+    const byDim: Record<string, string[]> = {};
+    active.forEach(t => { const d = t.split(':')[0]; (byDim[d] = byDim[d] || []).push(t); });
+    return Object.keys(byDim).every(d => byDim[d].includes(d + ':' + dims[d]));
+  }
+  get filteredDrill(): DrillRow[] {
+    const q = this.drillSearch.trim().toLowerCase();
+    return this.drillList.filter(r =>
+      (!q || String(r.name ?? '').toLowerCase().includes(q) || String(r.phone ?? '').toLowerCase().includes(q)) &&
+      this.passesFilters(this.drillFilters, { conf: r.confirmed ? 'yes' : 'no', st: this.statusKey(r.status), inq: r.inQueue ? 'in' : 'out' }));
+  }
+  get filteredCellDrill(): CellDrillRow[] {
+    const q = this.cellSearch.trim().toLowerCase();
+    return this.cellDrillRows.filter(r =>
+      (!q || String(r.name ?? '').toLowerCase().includes(q) || String(r.phone ?? '').toLowerCase().includes(q)) &&
+      this.passesFilters(this.cellFilters, { conf: r.confirmed ? 'yes' : 'no', st: this.statusKey(r.status), slot: (r.slot && r.slot !== '—') ? 'has' : 'none' }));
+  }
+  toggleDrillFilter(t: string): void { this.drillFilters.has(t) ? this.drillFilters.delete(t) : this.drillFilters.add(t); this.drillPage = 0; }
+  toggleCellFilter(t: string): void { this.cellFilters.has(t) ? this.cellFilters.delete(t) : this.cellFilters.add(t); this.cellPage = 0; }
+  isDrillFilter(t: string): boolean { return this.drillFilters.has(t); }
+  isCellFilter(t: string): boolean { return this.cellFilters.has(t); }
+  onDrillSearch(): void { this.drillPage = 0; }
+  onCellSearch(): void { this.cellPage = 0; }
+
+  get drillPageCount(): number { return Math.max(1, Math.ceil(this.filteredDrill.length / this.pageSize)); }
+  get cellPageCount(): number { return Math.max(1, Math.ceil(this.filteredCellDrill.length / this.pageSize)); }
+  get pagedDrill(): DrillRow[] { const s = this.drillPage * this.pageSize; return this.filteredDrill.slice(s, s + this.pageSize); }
+  get pagedCellDrill(): CellDrillRow[] { const s = this.cellPage * this.pageSize; return this.filteredCellDrill.slice(s, s + this.pageSize); }
+  get drillRangeStart(): number { return this.filteredDrill.length ? this.drillPage * this.pageSize + 1 : 0; }
+  get drillRangeEnd(): number { return Math.min(this.filteredDrill.length, (this.drillPage + 1) * this.pageSize); }
+  get cellRangeStart(): number { return this.filteredCellDrill.length ? this.cellPage * this.pageSize + 1 : 0; }
+  get cellRangeEnd(): number { return Math.min(this.filteredCellDrill.length, (this.cellPage + 1) * this.pageSize); }
   prevDrillPage(): void { this.drillPage = Math.max(0, this.drillPage - 1); }
   nextDrillPage(): void { this.drillPage = Math.min(this.drillPageCount - 1, this.drillPage + 1); }
   prevCellPage(): void { this.cellPage = Math.max(0, this.cellPage - 1); }
@@ -346,6 +383,8 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   selectCard(key: string): void {
     this.selectedCardKey = this.selectedCardKey === key ? null : key;
     this.drillPage = 0;
+    this.drillSearch = '';
+    this.drillFilters.clear();
     this.refreshDrill();
   }
 
@@ -394,6 +433,8 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     const count = line.cells[col];
     if (this.isCellSel(phase, line, col) || !count) { this.closeCell(); return; }
     this.cellPage = 0;
+    this.cellSearch = '';
+    this.cellFilters.clear();
     this.selectedCell = {
       phaseDocid: phase['docid'],
       lineKey: line.key,
@@ -403,7 +444,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     this.computeCellDrill(phase, line.key, col);
   }
 
-  closeCell(): void { this.selectedCell = null; this.cellDrillRows = []; }
+  closeCell(): void { this.selectedCell = null; this.cellDrillRows = []; this.cellSearch = ''; this.cellFilters.clear(); }
 
   colLabel(col: Col | 'total'): string {
     if (col === 'total') return 'Total';

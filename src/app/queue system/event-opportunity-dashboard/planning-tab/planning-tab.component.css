@@ -311,3 +311,20 @@ table.t.t--slot { min-width:720px; }
   }
   .pl-card:hover { transform:none; }
 }
+
+/* ============================================================
+   DRILL TOOLS — search + filter chips
+   ============================================================ */
+.dd-tools{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:0 2px 10px; }
+.dd-search{ display:flex; align-items:center; gap:6px; flex:1 1 200px; min-width:160px; max-width:280px; background:var(--surface-sunk); border:0.5px solid var(--hairline); border-radius:var(--r-control); padding:0 8px; height:34px; }
+.dd-search mat-icon{ font-size:18px; width:18px; height:18px; color:var(--secondary); flex:none; }
+.dd-search input{ flex:1; min-width:0; border:0; background:transparent; outline:0; font:inherit; font-size:13px; color:var(--label); }
+.dd-search input::placeholder{ color:var(--tertiary); }
+.dd-clear{ display:inline-flex; align-items:center; border:0; background:transparent; color:var(--secondary); cursor:pointer; padding:0; }
+.dd-clear mat-icon{ font-size:16px; width:16px; height:16px; }
+.dd-chips{ display:flex; gap:6px; flex-wrap:wrap; }
+.fchip{ border:0.5px solid var(--hairline); background:var(--surface); color:var(--label-2); font:inherit; font-size:11.5px; font-weight:600; padding:5px 11px; border-radius:var(--r-pill); cursor:pointer; transition:background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease); }
+.fchip:hover{ background:var(--track); }
+.fchip.on{ background:var(--tint); border-color:var(--tint); color:#fff; }
+.fchip:focus-visible{ outline:2px solid var(--tint); outline-offset:2px; }
+@media (prefers-reduced-motion:reduce){ .fchip{ transition:none !important; } }

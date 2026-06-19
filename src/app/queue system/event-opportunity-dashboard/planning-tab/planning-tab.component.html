@@ -34,6 +34,22 @@
       <div class="dd-title">{{ cardLabel(selectedCardKey) }} — {{ drillList.length }}</div>
       <button class="ios-icon" (click)="selectCard(selectedCardKey)" matTooltip="Close"><mat-icon>close</mat-icon></button>
     </div>
+    <div class="dd-tools">
+      <div class="dd-search">
+        <mat-icon>search</mat-icon>
+        <input type="text" [(ngModel)]="drillSearch" (ngModelChange)="onDrillSearch()" placeholder="Search name…" aria-label="Search participants">
+        <button *ngIf="drillSearch" type="button" class="dd-clear" (click)="drillSearch=''; onDrillSearch()" aria-label="Clear search"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dd-chips">
+        <button type="button" class="fchip" [class.on]="isDrillFilter('conf:yes')" (click)="toggleDrillFilter('conf:yes')">Confirmed</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('conf:no')" (click)="toggleDrillFilter('conf:no')">Not confirmed</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('st:a')" (click)="toggleDrillFilter('st:a')">Active</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('st:na')" (click)="toggleDrillFilter('st:na')">Non-Active</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('st:d')" (click)="toggleDrillFilter('st:d')">Discont</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('inq:in')" (click)="toggleDrillFilter('inq:in')">In queue</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('inq:out')" (click)="toggleDrillFilter('inq:out')">Not in queue</button>
+      </div>
+    </div>
     <div class="tbl-wrap">
       <table class="t">
         <thead><tr><th class="col-idx">#</th><th>Participant</th><th>Status</th><th>uP!</th><th>In queue</th></tr></thead>
@@ -45,7 +61,7 @@
             <td><span class="pill" [class.ok]="r.confirmed" [class.mut]="!r.confirmed"><span class="dot"></span>{{ r.confirmed ? 'Confirmed' : 'Not' }}</span></td>
             <td><span class="pill" [class.tint]="r.inQueue" [class.mut]="!r.inQueue"><span class="dot"></span>{{ r.inQueue ? 'In queue' : 'Not' }}</span></td>
           </tr>
-          <tr *ngIf="drillList.length === 0"><td colspan="5" class="empty-cell">No participants.</td></tr>
+          <tr *ngIf="filteredDrill.length === 0"><td colspan="5" class="empty-cell">No participants.</td></tr>
         </tbody>
       </table>
       <div class="dd-pager" *ngIf="drillPageCount > 1">
@@ -167,6 +183,22 @@
           <div class="dd-title">{{ selectedCell.label }} — {{ cellDrillRows.length }}</div>
           <button class="ios-icon" (click)="closeCell()" matTooltip="Close"><mat-icon>close</mat-icon></button>
         </div>
+        <div class="dd-tools">
+          <div class="dd-search">
+            <mat-icon>search</mat-icon>
+            <input type="text" [(ngModel)]="cellSearch" (ngModelChange)="onCellSearch()" placeholder="Search name…" aria-label="Search participants">
+            <button *ngIf="cellSearch" type="button" class="dd-clear" (click)="cellSearch=''; onCellSearch()" aria-label="Clear search"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="dd-chips">
+            <button type="button" class="fchip" [class.on]="isCellFilter('conf:yes')" (click)="toggleCellFilter('conf:yes')">Confirmed</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('conf:no')" (click)="toggleCellFilter('conf:no')">Not confirmed</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('st:a')" (click)="toggleCellFilter('st:a')">Active</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('st:na')" (click)="toggleCellFilter('st:na')">Non-Active</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('st:d')" (click)="toggleCellFilter('st:d')">Discont</button>
+            <button *ngIf="cellIsSlot" type="button" class="fchip" [class.on]="isCellFilter('slot:has')" (click)="toggleCellFilter('slot:has')">Has slot</button>
+            <button *ngIf="cellIsSlot" type="button" class="fchip" [class.on]="isCellFilter('slot:none')" (click)="toggleCellFilter('slot:none')">No slot</button>
+          </div>
+        </div>
         <div class="tbl-wrap">
           <table class="t" [class.t--slot]="cellIsSlot">
             <thead><tr><th class="col-idx">#</th><th>Participant</th><th>Current queue</th><th>Current stage</th><th *ngIf="cellIsSlot" class="col-slot">Selected slot</th><th>Status</th><th class="col-up">uP!</th></tr></thead>
@@ -180,7 +212,7 @@
                 <td>{{ r.status }}</td>
                 <td class="col-up"><span class="pill" [class.ok]="r.confirmed" [class.mut]="!r.confirmed"><span class="dot"></span>{{ r.confirmed ? 'Confirmed' : 'Not' }}</span></td>
               </tr>
-              <tr *ngIf="cellDrillRows.length === 0"><td [attr.colspan]="cellIsSlot ? 7 : 6" class="empty-cell">No participants.</td></tr>
+              <tr *ngIf="filteredCellDrill.length === 0"><td [attr.colspan]="cellIsSlot ? 7 : 6" class="empty-cell">No participants.</td></tr>
             </tbody>
           </table>
           <div class="dd-pager" *ngIf="cellPageCount > 1">
