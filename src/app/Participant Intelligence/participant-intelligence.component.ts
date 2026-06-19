@@ -31,6 +31,9 @@ import { EmailInputComponent } from '../Participants Profile Management/particip
 import { WatiInputComponent } from '../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { SendInterimReportComponent } from '../Participants Profile Management/participants-analytics/send-interim-report/send-interim-report.component';
 import { EvolutionWishlistLogComponent } from '../Participants Profile Management/participants-analytics/evolution-wishlist-log/evolution-wishlist-log.component';
+import { AhNotificationComponent } from '../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { AuthguardService } from '../authguard.service';
+import { getStorage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { ManageAudiencesDialogComponent } from './dialogs/manage-audiences-dialog.component';
 import { QuickComposeDialogComponent, QuickComposeData } from './dialogs/quick-compose-dialog.component';
 import { EvolutionDialogComponent } from './dialogs/evolution-dialog.component';
@@ -70,6 +73,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
   private readonly injector = inject(Injector);
   private readonly firestore = inject(Firestore);
   private readonly http = inject(HttpClient);
+  private readonly authguard = inject(AuthguardService);
 
   // dialogs that inject ParticipantStore must resolve THIS screen's store instance
   private dlg(width: string): MatDialogConfig {
@@ -281,24 +285,45 @@ export class ParticipantIntelligenceComponent implements OnInit {
       });
   }
 
+  // Reuses the production in-app notification composer (ah-notification). It saves the template;
+  // the parent (here) uploads any image and pushes via authguard.saveNotificationRecord to the
+  // registered (firebaseuserref) profiles — mirrors the old analytics screen's afterClosed.
   private notify(): void {
-    const data: QuickComposeData = {
-      icon: 'notifications',
-      title: 'In-app notification',
-      subtitle: `${this.store.selectedCount()} registered participants will receive this.`,
-      fields: [
-        { key: 'title', label: 'Title', type: 'text', placeholder: 'Notification title' },
-        { key: 'body', label: 'Message', type: 'textarea', placeholder: 'What do you want them to know?' },
-      ],
-      confirmText: 'Send notification',
-      confirmIcon: 'send',
-      note: 'UI prototype on mock data — nothing is actually delivered.',
-    };
     this.dialog
-      .open(QuickComposeDialogComponent, { panelClass: 'pi-dialog', width: '480px', data })
+      .open(AhNotificationComponent, {
+        panelClass: 'pi-dialog',
+        width: '80vw',
+        maxHeight: '90vh',
+        disableClose: true,
+        autoFocus: false,
+        data: this.store.selectedParticipants(),
+      })
       .afterClosed()
-      .subscribe((r) => {
-        if (r) this.snack.open(`Notification sent to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
+      .subscribe(async (result: any) => {
+        if (!result) return;
+        const profileID = this.store.selectedParticipants().filter((p) => p.registered).map((p) => p.profileid);
+        let notificationimage = null;
+        if (result['notificationimage'] != null) {
+          try {
+            const filepath = 'Notification Images/' + new Date().toISOString() + result['notificationimage'].name;
+            const uploadResult = await uploadBytes(ref(getStorage(), filepath), result['notificationimage']);
+            notificationimage = await getDownloadURL(uploadResult.ref);
+          } catch (e) {
+            console.log('notification image upload error', e);
+          }
+        }
+        await this.authguard.saveNotificationRecord({
+          title: result['title'],
+          message: result['message'],
+          subtitle: result['subtitle'] ?? null,
+          notificationtype: 'ahupdate',
+          notificationimage,
+          sticky: result['sticky'],
+          logged: true,
+          landingpage: result['landingpage'],
+          profileid: profileID,
+        });
+        this.snack.open(`Notification sent to ${profileID.length} app users`, 'Dismiss', { duration: 3000 });
       });
   }
 
