@@ -4,13 +4,13 @@
   <div class="pl-filters">
     <mat-form-field appearance="outline" class="pl-fil pl-fil-event">
       <mat-label>Event</mat-label>
-      <mat-select [ngModel]="selectedEventIds" multiple (ngModelChange)="onEventChange($event)">
+      <mat-select panelClass="eod-ios-pane" [ngModel]="selectedEventIds" multiple (ngModelChange)="onEventChange($event)">
         <mat-option *ngFor="let e of eventList" [value]="e.id">{{ e.name || e.queuename || e.id }}</mat-option>
       </mat-select>
     </mat-form-field>
     <mat-form-field appearance="outline" class="pl-fil pl-fil-queue">
       <mat-label>Queue(s)</mat-label>
-      <mat-select [ngModel]="queueModel" multiple (ngModelChange)="onQueueChange($event)">
+      <mat-select panelClass="eod-ios-pane" [ngModel]="queueModel" multiple (ngModelChange)="onQueueChange($event)">
         <mat-option *ngFor="let q of queueList" [value]="q.docid">{{ q.queuename }}</mat-option>
       </mat-select>
     </mat-form-field>
@@ -108,6 +108,7 @@
           <button class="ios-icon danger" (click)="deletePhase(row.phase)" matTooltip="Delete"><mat-icon>delete_outline</mat-icon></button>
         </span>
       </div>
+      <div class="pmx-core">
       <table class="pmx">
         <thead>
           <tr>
@@ -127,7 +128,7 @@
               <div class="row-lbl">{{ ln.label }}</div>
               <mat-form-field appearance="outline" class="row-cfg">
                 <mat-label>{{ ln.kind === 'slot' ? 'Slot stage' : 'Queue stage' }}</mat-label>
-                <mat-select [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)">
+                <mat-select panelClass="eod-ios-pane" [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)">
                   <mat-option *ngFor="let opt of stageOptions" [value]="opt">{{ opt.stagename }} <span class="opt-queue-hint">({{ queueName(opt.queueid) }})</span></mat-option>
                 </mat-select>
               </mat-form-field>
@@ -155,6 +156,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
       <!-- Drill-down for a clicked matrix cell -->
       <div class="dd cell-dd" *ngIf="selectedCell && selectedCell.phaseDocid === row.phase.docid">
