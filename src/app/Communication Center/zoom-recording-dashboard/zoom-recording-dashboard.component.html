@@ -291,7 +291,7 @@
 
     @if (files.length > 0) {
     <div class="file-list">
-      @for (f of files; track f.fileType) {
+      @for (f of files; track $index) {
       <div class="file-item">
         <div class="file-item__top">
           <span class="file-type mono">{{ f.fileType }}</span>

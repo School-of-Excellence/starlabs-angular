@@ -73,6 +73,44 @@
 .sx-bd-row.un .sx-bd-dot { background: #7a2638; }
 .sx-bd-row:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
 
+/* Subscription split under the Potential card */
+.sx-pot-split { display: flex; align-items: center; gap: 7px; padding: 2px 12px 8px 30px; flex-wrap: wrap; }
+.sx-pot-chip { font-size: 11.5px; font-family: inherit; color: rgba(60,60,67,.7); background: rgba(60,60,67,.06);
+  border: 1px solid transparent; border-radius: 7px; padding: 2px 9px; line-height: 1.6;
+  font-variant-numeric: tabular-nums; cursor: pointer; transition: filter .12s, box-shadow .12s; }
+.sx-pot-chip b { font-weight: 700; margin-left: 3px; }
+.sx-pot-chip.act { color: #1f8a3b; background: rgba(31,138,59,.1); }
+.sx-pot-chip.non { color: #c25e00; background: rgba(194,94,0,.1); }
+.sx-pot-chip.disc { color: #d70015; background: rgba(215,0,21,.1); }
+.sx-pot-chip:hover { filter: brightness(.96); }
+.sx-pot-chip.act.on { border-color: #1f8a3b; box-shadow: inset 0 0 0 1px #1f8a3b; }
+.sx-pot-chip.non.on { border-color: #c25e00; box-shadow: inset 0 0 0 1px #c25e00; }
+.sx-pot-chip.disc.on { border-color: #d70015; box-shadow: inset 0 0 0 1px #d70015; }
+.sx-pot-chip:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
+.sx-pot-load { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: rgba(60,60,67,.5); }
+.sx-pot-load mat-icon { font-size: 14px; height: 14px; width: 14px; }
+.sx-pot-more { border: .5px solid rgba(0,122,255,.4); background: rgba(0,122,255,.06); color: #0060df;
+  font-size: 11.5px; font-weight: 600; border-radius: 7px; padding: 3px 10px; cursor: pointer; }
+.sx-pot-more:hover { background: rgba(0,122,255,.12); }
+
+/* Overall-requested as its own card, stacked directly below the Approved card */
+.sx-bd-stack { display: flex; flex-direction: column; gap: 14px; width: 360px; max-width: 100%; }
+.sx-bd-stack .sx-bd-panel { width: 100%; }
+.sx-overall-card { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  font: inherit; background: #fff; border: .5px solid rgba(60,60,67,.1); border-radius: 14px;
+  padding: 13px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); cursor: pointer;
+  transition: box-shadow .12s, border-color .12s; }
+.sx-overall-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+.sx-overall-card.on { border-color: rgba(0,96,223,.5);
+  box-shadow: 0 0 0 1px rgba(0,96,223,.4) inset, 0 8px 20px -12px rgba(47,102,214,.5); }
+.sx-overall-card:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
+.sx-overall-card .sx-oc-dot { width: 5px; height: 34px; border-radius: 3px; background: #0060df; flex: 0 0 auto; }
+.sx-oc-text { flex: 1 1 auto; }
+.sx-oc-lab { font-size: 15px; font-weight: 700; color: #1c1c1e; }
+.sx-oc-hint { font-size: 11px; color: rgba(60,60,67,.5); margin-top: 1px; }
+.sx-oc-num { font-size: 22px; font-weight: 700; color: #0060df;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
 /* KPI cards */
 .sx-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .sx-card { position: relative; background: #fff; border-radius: 14px; padding: 13px 15px 13px 18px;
@@ -185,6 +223,14 @@ table.sx-t { width: 100%; border-collapse: collapse; }
 .sx-nm { font-weight: 600; letter-spacing: -.01em; }
 .sx-em { font-size: 12px; color: rgba(60,60,67,.5); }
 .sx-mut { color: rgba(60,60,67,.6); }
+.sx-paid { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; letter-spacing: -.01em; }
+.sx-paid .tot { color: rgba(60,60,67,.5); font-weight: 400; }
+.sx-clr { color: #1f8a3b; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.sx-clr.no { color: #d70015; }
+.sx-fin { display: inline-flex; align-items: center; gap: 7px; }
+.sx-fin-hint { font-size: 11px; font-weight: 600; color: #1f8a3b; }
+.sx-fin-hint.no { color: #c25e00; }
+.sx-stage { font-size: 13px; color: #1c1c1e; }
 
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .d-ok { background: #1f8a3b; } .d-bad { background: #d70015; } .d-org { background: #c25e00; }
