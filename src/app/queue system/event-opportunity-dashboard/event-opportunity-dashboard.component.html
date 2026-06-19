@@ -8,7 +8,7 @@
     </span>
 
     <div *ngIf="showQueueSelect" class="d-flex flex-row justify-content-center">
-      <mat-form-field appearance="outline" class="w-50">
+      <mat-form-field appearance="outline">
         <mat-label>Select queue</mat-label>
         <mat-select [value]="selectedQueueList" multiple panelClass="eod-ios-pane">
           <mat-option *ngFor="let item of queueList" [value]="item['docid']"

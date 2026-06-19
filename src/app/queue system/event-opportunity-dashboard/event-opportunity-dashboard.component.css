@@ -72,8 +72,8 @@
   flex-wrap: wrap;
   margin-bottom: 6px;
 }
-.main-container .content-area > .d-flex.flex-row.justify-content-center .w-50 {
-  width: min(460px, 100%) !important;
+.main-container .content-area > .d-flex.flex-row.justify-content-center > .mat-mdc-form-field {
+  width: min(460px, 100%);
   flex: 0 1 460px;
 }
 .main-container .content-area > .d-flex.flex-row.justify-content-center > div[style*="margin-left"] {
@@ -81,27 +81,32 @@
   align-self: center;
 }
 
-/* iOS outline treatment for in-screen mat-form-fields */
+/* ============================================================
+   Canonical compact form-field recipe (single source of truth)
+   Scoped to .main-container ::ng-deep so it also reaches the
+   planning-tab fields (planning-tab renders inside .main-container).
+   ============================================================ */
+.main-container ::ng-deep .mat-mdc-form-field{ --mat-form-field-container-height:44px; --mat-form-field-container-vertical-padding:8px; font-size:14px; }
+.main-container ::ng-deep .mat-mdc-form-field-infix{ min-height:44px; padding-top:10px; padding-bottom:10px; }
+.main-container ::ng-deep .mat-mdc-text-field-wrapper{ background:var(--surface); border-radius:var(--r-control); overflow:hidden; }
+.main-container ::ng-deep .mdc-notched-outline__leading{ border-radius:var(--r-control) 0 0 var(--r-control); min-width:var(--r-control); }
+.main-container ::ng-deep .mdc-notched-outline__trailing{ border-radius:0 var(--r-control) var(--r-control) 0; }
 .main-container ::ng-deep .mat-mdc-form-field .mdc-notched-outline__leading,
 .main-container ::ng-deep .mat-mdc-form-field .mdc-notched-outline__notch,
-.main-container ::ng-deep .mat-mdc-form-field .mdc-notched-outline__trailing {
-  border-color: var(--hairline);
-}
-.main-container ::ng-deep .mat-mdc-form-field .mdc-notched-outline__leading {
-  border-radius: var(--r-control) 0 0 var(--r-control);
-}
-.main-container ::ng-deep .mat-mdc-form-field .mdc-notched-outline__trailing {
-  border-radius: 0 var(--r-control) var(--r-control) 0;
-}
+.main-container ::ng-deep .mat-mdc-form-field .mdc-notched-outline__trailing{ border-color:rgba(60,60,67,.20); border-width:1px; }
 .main-container ::ng-deep .mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
 .main-container ::ng-deep .mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
-.main-container ::ng-deep .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
-  border-color: var(--tint) !important;
-}
+.main-container ::ng-deep .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing{ border-color:var(--tint); border-width:1.5px; }
 .main-container ::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-floating-label,
-.main-container ::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-select-arrow {
-  color: var(--tint) !important;
-}
+.main-container ::ng-deep .mat-mdc-form-field.mat-focused .mat-mdc-select-arrow{ color:var(--tint); }
+.main-container ::ng-deep .mat-mdc-form-field .mat-mdc-floating-label{ font-size:14px; }
+.main-container ::ng-deep .mat-mdc-form-field .mdc-floating-label--float-above{ font-size:12px; }
+.main-container ::ng-deep .mat-mdc-select-value{ font-size:14px; }
+.main-container ::ng-deep .mat-mdc-select-trigger{ min-height:24px; }
+.main-container ::ng-deep .mdc-line-ripple{ display:none; }   /* removes the stray indigo bar */
+.main-container ::ng-deep .mat-mdc-form-field-subscript-wrapper{ display:none; }  /* one decision: no reserved error gutter */
+/* re-enable the gutter only where mat-error is actually used (phase name input): */
+.main-container ::ng-deep .phase-form .full-width .mat-mdc-form-field-subscript-wrapper{ display:block; }
 
 /* Event filter chip (mat-chip) */
 .active-filter-indicator { margin-left: 0 !important; display: flex; justify-content: center; }

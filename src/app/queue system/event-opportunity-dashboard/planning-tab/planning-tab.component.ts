@@ -117,6 +117,25 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   selectedCell: CellRef | null = null;
   cellDrillRows: CellDrillRow[] = [];
 
+  // Client-side pagination for both drill tables
+  readonly pageSize = 15;
+  drillPage = 0;
+  cellPage = 0;
+  get drillPageCount(): number { return Math.max(1, Math.ceil(this.drillList.length / this.pageSize)); }
+  get cellPageCount(): number { return Math.max(1, Math.ceil(this.cellDrillRows.length / this.pageSize)); }
+  get pagedDrill(): DrillRow[] { const s = this.drillPage * this.pageSize; return this.drillList.slice(s, s + this.pageSize); }
+  get pagedCellDrill(): CellDrillRow[] { const s = this.cellPage * this.pageSize; return this.cellDrillRows.slice(s, s + this.pageSize); }
+  get drillRangeStart(): number { return this.drillList.length ? this.drillPage * this.pageSize + 1 : 0; }
+  get drillRangeEnd(): number { return Math.min(this.drillList.length, (this.drillPage + 1) * this.pageSize); }
+  get cellRangeStart(): number { return this.cellDrillRows.length ? this.cellPage * this.pageSize + 1 : 0; }
+  get cellRangeEnd(): number { return Math.min(this.cellDrillRows.length, (this.cellPage + 1) * this.pageSize); }
+  prevDrillPage(): void { this.drillPage = Math.max(0, this.drillPage - 1); }
+  nextDrillPage(): void { this.drillPage = Math.min(this.drillPageCount - 1, this.drillPage + 1); }
+  prevCellPage(): void { this.cellPage = Math.max(0, this.cellPage - 1); }
+  nextCellPage(): void { this.cellPage = Math.min(this.cellPageCount - 1, this.cellPage + 1); }
+  private clampDrillPage(): void { this.drillPage = Math.min(this.drillPage, this.drillPageCount - 1); }
+  private clampCellPage(): void { this.cellPage = Math.min(this.cellPage, this.cellPageCount - 1); }
+
   readonly ringCircumference = 163;
   private phasesSub?: Subscription;
 
@@ -170,6 +189,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   onEventChange(ids: string[]): void {
     this.selectedEventIds = ids || [];
     this.selectedCardKey = null;
+    this.drillPage = 0;
     this.dataLoading = true;
     this.loadEventSets().then(() => this.recompute()).finally(() => this.dataLoading = false);
   }
@@ -178,6 +198,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     this.queueModel = ids || [];
     this.selectedCell = null;
     this.cellDrillRows = [];
+    this.cellPage = 0;
     this.queueChange.emit(this.queueModel);
   }
 
@@ -324,6 +345,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   selectCard(key: string): void {
     this.selectedCardKey = this.selectedCardKey === key ? null : key;
+    this.drillPage = 0;
     this.refreshDrill();
   }
 
@@ -356,6 +378,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
       confirmed: ap.has(id),
       inQueue: holders.has(id)
     })).sort((a, b) => a.name.localeCompare(b.name));
+    this.clampDrillPage();
   }
 
   // ---------- Matrix cell drill-down ----------
@@ -370,6 +393,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   selectCell(phase: any, line: MatrixLine, col: Col | 'total'): void {
     const count = line.cells[col];
     if (this.isCellSel(phase, line, col) || !count) { this.closeCell(); return; }
+    this.cellPage = 0;
     this.selectedCell = {
       phaseDocid: phase['docid'],
       lineKey: line.key,
@@ -439,6 +463,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
         slot: isSlot ? this.participantSlot(id, stagesInScope) : ''
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
+    this.clampCellPage();
   }
 
   /** The slot a participant picked for this row's configured slot stage(s): first stage with a dated slot. */

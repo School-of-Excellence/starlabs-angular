@@ -8,12 +8,7 @@
         <mat-option *ngFor="let e of eventList" [value]="e.id">{{ e.name || e.queuename || e.id }}</mat-option>
       </mat-select>
     </mat-form-field>
-    <mat-form-field appearance="outline" class="pl-fil pl-fil-queue">
-      <mat-label>Queue(s)</mat-label>
-      <mat-select panelClass="eod-ios-pane" [ngModel]="queueModel" multiple (ngModelChange)="onQueueChange($event)">
-        <mat-option *ngFor="let q of queueList" [value]="q.docid">{{ q.queuename }}</mat-option>
-      </mat-select>
-    </mat-form-field>
+    <!-- Queue selection is driven by the single global "Select queue" picker above the tabs. -->
   </div>
 
   <div *ngIf="selectedEventIds.length === 0 && selectedQueueList.length === 0" class="planning-empty">
@@ -43,8 +38,8 @@
       <table class="t">
         <thead><tr><th class="col-idx">#</th><th>Participant</th><th>Status</th><th>uP!</th><th>In queue</th></tr></thead>
         <tbody>
-          <tr *ngFor="let r of drillList.slice(0, drillCap); let i = index">
-            <td class="meta col-idx">{{ i + 1 }}</td>
+          <tr *ngFor="let r of pagedDrill; let i = index">
+            <td class="meta col-idx">{{ drillPage * pageSize + i + 1 }}</td>
             <td><div class="nm">{{ r.name }}</div><div class="meta">{{ r.phone }}</div></td>
             <td>{{ r.status }}</td>
             <td><span class="pill" [class.ok]="r.confirmed" [class.mut]="!r.confirmed"><span class="dot"></span>{{ r.confirmed ? 'Confirmed' : 'Not' }}</span></td>
@@ -53,7 +48,11 @@
           <tr *ngIf="drillList.length === 0"><td colspan="5" class="empty-cell">No participants.</td></tr>
         </tbody>
       </table>
-      <div class="dd-more" *ngIf="drillList.length > drillCap">Showing {{ drillCap }} of {{ drillList.length }}.</div>
+      <div class="dd-pager" *ngIf="drillPageCount > 1">
+        <button type="button" class="pg-btn" [disabled]="drillPage === 0" (click)="prevDrillPage()" matTooltip="Previous" aria-label="Previous page"><mat-icon>chevron_left</mat-icon></button>
+        <span class="pg-range">{{ drillRangeStart }}–{{ drillRangeEnd }} of {{ drillList.length }}</span>
+        <button type="button" class="pg-btn" [disabled]="drillPage >= drillPageCount - 1" (click)="nextDrillPage()" matTooltip="Next" aria-label="Next page"><mat-icon>chevron_right</mat-icon></button>
+      </div>
     </div>
   </div>
 
@@ -127,8 +126,12 @@
             <td class="lbl">
               <div class="row-lbl">{{ ln.label }}</div>
               <mat-form-field appearance="outline" class="row-cfg">
-                <mat-label>{{ ln.kind === 'slot' ? 'Slot stage' : 'Queue stage' }}</mat-label>
-                <mat-select panelClass="eod-ios-pane" [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)">
+                <mat-select panelClass="eod-ios-pane" [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)"
+                  [placeholder]="ln.kind === 'slot' ? 'Add slot stage' : 'Add queue stage'"
+                  [attr.aria-label]="ln.kind === 'slot' ? 'Slot stage' : 'Queue stage'">
+                  <mat-select-trigger>
+                    {{ ln.stages?.[0]?.stagename }}<span class="cfg-more" *ngIf="(ln.stages?.length || 0) > 1">+{{ ln.stages.length - 1 }}</span>
+                  </mat-select-trigger>
                   <mat-option *ngFor="let opt of stageOptions" [value]="opt">{{ opt.stagename }} <span class="opt-queue-hint">({{ queueName(opt.queueid) }})</span></mat-option>
                 </mat-select>
               </mat-form-field>
@@ -166,10 +169,10 @@
         </div>
         <div class="tbl-wrap">
           <table class="t" [class.t--slot]="cellIsSlot">
-            <thead><tr><th class="col-idx">#</th><th>Participant</th><th>Current queue</th><th>Stage</th><th *ngIf="cellIsSlot" class="col-slot">Selected slot</th><th>Status</th><th class="col-up">uP!</th></tr></thead>
+            <thead><tr><th class="col-idx">#</th><th>Participant</th><th>Current queue</th><th>Current stage</th><th *ngIf="cellIsSlot" class="col-slot">Selected slot</th><th>Status</th><th class="col-up">uP!</th></tr></thead>
             <tbody>
-              <tr *ngFor="let r of cellDrillRows.slice(0, drillCap); let i = index">
-                <td class="meta col-idx">{{ i + 1 }}</td>
+              <tr *ngFor="let r of pagedCellDrill; let i = index">
+                <td class="meta col-idx">{{ cellPage * pageSize + i + 1 }}</td>
                 <td><div class="nm">{{ r.name }}</div><div class="meta">{{ r.phone }}</div></td>
                 <td>{{ r.queueName }}</td>
                 <td>{{ r.stage }}</td>
@@ -180,7 +183,11 @@
               <tr *ngIf="cellDrillRows.length === 0"><td [attr.colspan]="cellIsSlot ? 7 : 6" class="empty-cell">No participants.</td></tr>
             </tbody>
           </table>
-          <div class="dd-more" *ngIf="cellDrillRows.length > drillCap">Showing {{ drillCap }} of {{ cellDrillRows.length }}.</div>
+          <div class="dd-pager" *ngIf="cellPageCount > 1">
+            <button type="button" class="pg-btn" [disabled]="cellPage === 0" (click)="prevCellPage()" matTooltip="Previous" aria-label="Previous page"><mat-icon>chevron_left</mat-icon></button>
+            <span class="pg-range">{{ cellRangeStart }}–{{ cellRangeEnd }} of {{ cellDrillRows.length }}</span>
+            <button type="button" class="pg-btn" [disabled]="cellPage >= cellPageCount - 1" (click)="nextCellPage()" matTooltip="Next" aria-label="Next page"><mat-icon>chevron_right</mat-icon></button>
+          </div>
         </div>
       </div>
     </div>
