@@ -19,7 +19,7 @@
 #   green on a real PR, then make it a required check.
 #
 # ── ONE SECRET REQUIRED ─────────────────────────────────────────────────────────────────────────────
-#   CICD_PAT — a fine-grained PAT with READ access to BOTH private repos:
+#   REPO_PAT — a fine-grained PAT with READ access to BOTH private repos:
 #              School-of-Excellence/starlabs-e2e-tests  AND  School-of-Excellence/starlabs-cloud-function
 name: journey-e2e (emulator gate)
 
@@ -59,15 +59,15 @@ jobs:
           repository: School-of-Excellence/starlabs-e2e-tests
           ref: journey-gate   # TEMPORARY: validate against the unmerged hub branch. Flip back to `main` after the hub PR merges.
           path: e2e
-          token: ${{ secrets.CICD_PAT }}
+          token: ${{ secrets.REPO_PAT }}
 
       - name: Clone the Cloud Functions repo (real triggers) → ./e2e/starlabs-cloud-function
         run: |
-          if [ -z "${{ secrets.CICD_PAT }}" ]; then
-            echo "::error::CICD_PAT secret is not set — needed to clone the private CF repo."; exit 1
+          if [ -z "${{ secrets.REPO_PAT }}" ]; then
+            echo "::error::REPO_PAT secret is not set — needed to clone the private CF repo."; exit 1
           fi
           git clone --depth 1 --branch "$CF_BRANCH" \
-            "https://x-access-token:${{ secrets.CICD_PAT }}@github.com/School-of-Excellence/starlabs-cloud-function.git" \
+            "https://x-access-token:${{ secrets.REPO_PAT }}@github.com/School-of-Excellence/starlabs-cloud-function.git" \
             e2e/starlabs-cloud-function
 
       - uses: actions/setup-node@v4
