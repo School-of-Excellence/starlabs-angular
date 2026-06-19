@@ -1,16 +1,16 @@
 name: Deploy to Firebase
 
 # AUTO-DEPLOY ON MERGE (the only model — no "merged-but-not-deployed" gap).
-#   The ONLY way code reaches development/production is an APPROVED Pull Request. Direct pushes are forbidden
-#   by team policy now, and will be HARD-blocked later by the release-console approval gate + GitHub branch
-#   protection. A merge is a push to the base branch, which triggers this deploy:
-#     • merge into development → deploy to TEST  (starlabs-test)
-#     • merge into production  → deploy to LIVE  (fir-sample-aae4a)
+#   • merge into development / cicd-dev  → deploy to TEST  (starlabs-test)
+#   • merge into production  / cicd-prod → deploy to LIVE  (fir-sample-aae4a)
+#   cicd-dev / cicd-prod are validation stand-ins; remove after cutover.
 on:
   push:
     branches:
-      - cicd-dev      # TEST stand-in for development → deploys to starlabs-test. Remove after validation.
-      - cicd-prod     # TEST stand-in for production → also deploys to starlabs-test (NOT live). Remove after validation.
+      - development
+      - cicd-dev
+      - production
+      - cicd-prod
 
 jobs:
   deploy:
@@ -24,6 +24,14 @@ jobs:
         with:
           node-version: '22.16.0'
 
+      - name: Set deploy environment
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/development" || "${{ github.ref }}" == "refs/heads/cicd-dev" ]]; then
+            echo "DEPLOY_ENV=test" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_ENV=prod" >> $GITHUB_ENV
+          fi
+
       - name: Generate Environment Files
         env:
           FIREBASE_TEST_CONFIG: ${{ secrets.FIREBASE_TEST_CONFIG }}
@@ -36,71 +44,51 @@ jobs:
         run: |
           mkdir -p src/environments
 
-          if [ "${{ github.ref }}" == "refs/heads/development" ] || [ "${{ github.ref }}" == "refs/heads/cicd-dev" ] || [ "${{ github.ref }}" == "refs/heads/cicd-prod" ]; then
-            # Test branch - use TEST config for both files
-            cat > src/environments/environment.development.ts << EOF
-          export const environment = {
-            production: true,
-            firebase: $FIREBASE_TEST_CONFIG,
-            watson: $WATSON_TEST_CONFIG,
-            salescrm: $SALESCRM_TEST_CONFIG,
-            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3',
-            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
-          };
-          EOF
-
-            cat > src/environments/environment.ts << EOF
-          export const environment = {
-            production: true,
-            firebase: $FIREBASE_TEST_CONFIG,
-            watson: $WATSON_TEST_CONFIG,
-            salescrm: $SALESCRM_TEST_CONFIG,
-            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3',
-            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
-          };
-          EOF
-            cat > src/firebase-messaging-sw.js << EOF
-          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-app.js');
-          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-messaging.js');
-
-          firebase.initializeApp($FIREBASE_TEST_CONFIG);
-          firebase.messaging();
-          EOF
+          if [ "$DEPLOY_ENV" == "test" ]; then
+            FIREBASE_CONFIG=$FIREBASE_TEST_CONFIG
+            WATSON_CONFIG=$WATSON_TEST_CONFIG
+            SALESCRM_CONFIG=$SALESCRM_TEST_CONFIG
+            CDN_URL='https://breakthroughs-test.web.app/assets/df3'
           else
-            # Production branch - use PROD config for both files
-            cat > src/environments/environment.development.ts << EOF
+            FIREBASE_CONFIG=$FIREBASE_PROD_CONFIG
+            WATSON_CONFIG=$WATSON_PROD_CONFIG
+            SALESCRM_CONFIG=$SALESCRM_PROD_CONFIG
+            CDN_URL='https://breakthroughs.app/assets/df3'
+          fi
+
+          cat > src/environments/environment.development.ts << EOF
           export const environment = {
             production: true,
-            firebase: $FIREBASE_PROD_CONFIG,
-            watson: $WATSON_PROD_CONFIG,
-            salescrm: $SALESCRM_PROD_CONFIG,
-            df3CdnUrl: 'https://breakthroughs.app/assets/df3',
+            firebase: $FIREBASE_CONFIG,
+            watson: $WATSON_CONFIG,
+            salescrm: $SALESCRM_CONFIG,
+            df3CdnUrl: '$CDN_URL',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
 
-            cat > src/environments/environment.ts << EOF
+          cat > src/environments/environment.ts << EOF
           export const environment = {
             production: true,
-            firebase: $FIREBASE_PROD_CONFIG,
-            watson: $WATSON_PROD_CONFIG,
-            salescrm: $SALESCRM_PROD_CONFIG,
-            df3CdnUrl: 'https://breakthroughs.app/assets/df3',
+            firebase: $FIREBASE_CONFIG,
+            watson: $WATSON_CONFIG,
+            salescrm: $SALESCRM_CONFIG,
+            df3CdnUrl: '$CDN_URL',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
-            cat > src/firebase-messaging-sw.js << EOF
+
+          cat > src/firebase-messaging-sw.js << EOF
           importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-app.js');
           importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-messaging.js');
 
-          firebase.initializeApp($FIREBASE_PROD_CONFIG);
+          firebase.initializeApp($FIREBASE_CONFIG);
           firebase.messaging();
           EOF
-          fi
 
       - name: Update Firebase Site
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/development" ] || [ "${{ github.ref }}" == "refs/heads/cicd-dev" ] || [ "${{ github.ref }}" == "refs/heads/cicd-prod" ]; then
+          if [ "$DEPLOY_ENV" == "test" ]; then
             jq '.hosting.site = "breakthroughs-test"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
           else
             jq '.hosting.site = "star-labs"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
@@ -118,16 +106,15 @@ jobs:
       - name: Build Angular App
         run: ng build --configuration production
 
-      - name: Authenticate with Firebase & Set Project
+      - name: Authenticate with Firebase & Deploy
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/development" ] || [ "${{ github.ref }}" == "refs/heads/cicd-dev" ] || [ "${{ github.ref }}" == "refs/heads/cicd-prod" ]; then
+          if [ "$DEPLOY_ENV" == "test" ]; then
             echo '${{ secrets.GOOGLE_SERVICE_TEST }}' > $HOME/firebase-key.json
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json
             firebase use --add starlabs-test
-            firebase deploy --only hosting
-          elif [ "${{ github.ref }}" == "refs/heads/production" ]; then
+          else
             echo '${{ secrets.GOOGLE_SERVICE_PROD }}' > $HOME/firebase-key.json
             export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-key.json
             firebase use --add fir-sample-aae4a
-            firebase deploy --only hosting
           fi
+          firebase deploy --only hosting
