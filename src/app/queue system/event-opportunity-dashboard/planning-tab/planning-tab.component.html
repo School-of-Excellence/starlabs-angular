@@ -11,6 +11,14 @@
     <!-- Queue selection is driven by the single global "Select queue" picker above the tabs. -->
   </div>
 
+  <div class="pl-countdown" *ngIf="eventDate">
+    <mat-icon>event</mat-icon>
+    <span class="cd-name">{{ eventName }}</span>
+    <span class="cd-dot">·</span>
+    <span class="cd-date">{{ eventDate | date:'EEE, MMM d, y' }}</span>
+    <span class="cd-badge" [class.soon]="daysToEvent!=null && daysToEvent>=0 && daysToEvent<=7" [class.today]="daysToEvent===0" [class.past]="daysToEvent!=null && daysToEvent<0">{{ countdownLabel }}</span>
+  </div>
+
   <div *ngIf="selectedEventIds.length === 0 && selectedQueueList.length === 0" class="planning-empty">
     <mat-icon>event_available</mat-icon>
     <p>Select an event and a queue to begin.</p>
@@ -92,6 +100,10 @@
           <input matInput type="text" formControlName="phasename" placeholder="e.g. Phase 1 · Orientation">
           <mat-error *ngIf="phaseForm.get('phasename')?.touched && phaseForm.get('phasename')?.invalid">Name is required</mat-error>
         </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Target readiness % (optional)</mat-label>
+          <input matInput type="number" min="0" max="100" formControlName="targetPct" placeholder="e.g. 80">
+        </mat-form-field>
         <div class="phase-form-hint">Name the phase. Configure the queue stage(s) and slot(s) per row in the table below.</div>
         <div class="phase-form-actions">
           <button mat-button type="button" (click)="closePhaseForm()">Cancel</button>
@@ -116,7 +128,8 @@
         </span>
         <span class="grp-name">
           <span class="grp-title">{{ row.phase.phasename }}</span>
-          <span class="grp-stages">configure each row below</span>
+          <span class="grp-stages" *ngIf="row.target == null">configure each row below</span>
+          <span class="grp-target" *ngIf="row.target != null" [class.ontrack]="row.status==='ontrack'" [class.risk]="row.status==='risk'" [class.behind]="row.status==='behind'">Target {{ row.target }}% · {{ phaseStatusLabel(row.status) }}</span>
         </span>
         <span class="grp-actions">
           <button class="ios-icon" (click)="editPhase(row.phase)" matTooltip="Rename phase"><mat-icon>edit</mat-icon></button>

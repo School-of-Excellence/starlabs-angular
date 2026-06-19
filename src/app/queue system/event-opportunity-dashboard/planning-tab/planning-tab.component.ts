@@ -20,7 +20,7 @@ interface PhaseStageRow { queueid: string; stagename: string; }
 type Col = 'c_a' | 'c_na' | 'c_d' | 'n_a' | 'n_na' | 'n_d';
 interface Cells { c_a: number; c_na: number; c_d: number; n_a: number; n_na: number; n_d: number; total: number; }
 interface MatrixLine { key: string; label: string; kind: 'stage' | 'slot'; cells: Cells; stages: PhaseStageRow[]; }
-interface MatrixRow { phase: any; pct: number; pop: number; lines: MatrixLine[]; }
+interface MatrixRow { phase: any; pct: number; target: number | null; status: 'ontrack' | 'risk' | 'behind' | 'none'; pop: number; lines: MatrixLine[]; }
 interface CardDef { key: string; label: string; value: number; }
 interface DrillRow { name: string; phone: string; status: string; confirmed: boolean; inQueue: boolean; }
 interface CellDrillRow { name: string; phone: string; queueName: string; stage: string; status: string; confirmed: boolean; slot: string; }
@@ -182,7 +182,8 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     private planningData: PlanningDataService
   ) {
     this.phaseForm = this.fb.group({
-      phasename: [null, Validators.required]
+      phasename: [null, Validators.required],
+      targetPct: [null]
     });
   }
 
@@ -357,7 +358,10 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
       });
       const completeLine = lines.find(l => l.key === 'complete');
       const pct = holders.length > 0 && completeLine ? Math.round((completeLine.cells.total / holders.length) * 100) : 0;
-      return { phase, pct, pop: holders.length, lines } as MatrixRow;
+      const rawTarget = phase['targetPct'];
+      const target = (rawTarget === null || rawTarget === undefined || rawTarget === '') ? null : Number(rawTarget);
+      const status: MatrixRow['status'] = target == null ? 'none' : pct >= target ? 'ontrack' : pct >= target - 10 ? 'risk' : 'behind';
+      return { phase, pct, target, status, pop: holders.length, lines } as MatrixRow;
     });
   }
 
@@ -377,6 +381,40 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   ringDash(pct: number): string {
     return `${Math.round(this.ringCircumference * pct / 100)} ${this.ringCircumference}`;
   }
+
+  get eventDate(): Date | null {
+    const dates = (this.eventList || [])
+      .filter(e => this.selectedEventIds.includes(e['id']))
+      .map(e => this.toDate(e['start_date']))
+      .filter((d): d is Date => !!d)
+      .sort((a, b) => a.getTime() - b.getTime());
+    if (!dates.length) return null;
+    const now = Date.now();
+    return dates.find(d => d.getTime() >= now) || dates[dates.length - 1];
+  }
+  get eventName(): string {
+    const sel = (this.eventList || []).filter(e => this.selectedEventIds.includes(e['id']));
+    if (!sel.length) return '';
+    if (sel.length === 1) return sel[0]['name'] || '';
+    const d = this.eventDate;
+    const match = d ? sel.find(e => { const ed = this.toDate(e['start_date']); return !!ed && ed.getTime() === d.getTime(); }) : null;
+    return (match || sel[0])['name'] || (sel.length + ' events');
+  }
+  get daysToEvent(): number | null {
+    const d = this.eventDate; if (!d) return null;
+    const a = new Date(d); a.setHours(0, 0, 0, 0);
+    const b = new Date(); b.setHours(0, 0, 0, 0);
+    return Math.round((a.getTime() - b.getTime()) / 86400000);
+  }
+  get countdownLabel(): string {
+    const n = this.daysToEvent; if (n == null) return '';
+    if (n > 1) return 'in ' + n + ' days';
+    if (n === 1) return 'tomorrow';
+    if (n === 0) return 'today';
+    if (n === -1) return 'yesterday';
+    return Math.abs(n) + ' days ago';
+  }
+  phaseStatusLabel(s: string): string { return s === 'ontrack' ? 'On track' : s === 'risk' ? 'At risk' : s === 'behind' ? 'Behind' : ''; }
 
   // ---------- Card drill-down ----------
 
@@ -589,29 +627,32 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   openAddPhase(): void {
     this.isEditMode = false;
     this.editingPhase = null;
-    this.phaseForm.reset({ phasename: null });
+    this.phaseForm.reset({ phasename: null, targetPct: null });
     this.showPhaseForm = true;
   }
 
   editPhase(phase: any): void {
     this.isEditMode = true;
     this.editingPhase = phase;
-    this.phaseForm.patchValue({ phasename: phase['phasename'] });
+    this.phaseForm.patchValue({ phasename: phase['phasename'], targetPct: phase['targetPct'] ?? null });
     this.showPhaseForm = true;
   }
 
   submitPhase(): void {
     if (!this.phaseForm.valid) return;
     const name = this.phaseForm.value.phasename;
+    const t = this.phaseForm.value.targetPct;
+    const targetPct = (t === null || t === undefined || t === '') ? null : Math.max(0, Math.min(100, Number(t)));
     if (this.isEditMode && this.editingPhase) {
       updateDoc(doc(this.firestore, 'stage opportunity count', this.editingPhase['docid']),
-        { phasename: name, queuelist: this.selectedQueueList, kind: 'phase', updated: new Date() })
+        { phasename: name, targetPct, queuelist: this.selectedQueueList, kind: 'phase', updated: new Date() })
         .then(() => this.closePhaseForm())
         .catch(err => { console.error('Save phase failed', err); alert('Could not save phase: ' + (err?.code || err?.message || err)); });
     } else {
       const docid = doc(collection(this.firestore, 'stage opportunity count')).id;
       const docData = {
         phasename: name,
+        targetPct,
         rows: { complete: [], notComplete: [], slotConfirmed: [], slotNotConfirmed: [] },
         queuelist: this.selectedQueueList, kind: 'phase', docid, sequence: this.planningPhases.length, created: new Date()
       };
@@ -644,6 +685,6 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     this.showPhaseForm = false;
     this.isEditMode = false;
     this.editingPhase = null;
-    this.phaseForm.reset({ phasename: null });
+    this.phaseForm.reset({ phasename: null, targetPct: null });
   }
 }
