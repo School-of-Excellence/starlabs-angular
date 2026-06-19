@@ -154,6 +154,29 @@
   color: var(--ink-soft);
 }
 
+/* ===== "in Zoom?" badge ===== */
+.zoom-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.zoom-badge .badge-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.zoom-yes { background: var(--ok-bg, rgba(34,160,90,.12)); color: var(--ok, #1f9d57); }
+.zoom-no { background: var(--ink-soft-bg, rgba(120,120,120,.14)); color: var(--ink-soft, #777); }
+.zoom-unknown { color: var(--ink-soft, #999); font-weight: 500; }
+
+/* ===== dropbox links ===== */
+.dropbox-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #0061ff; font-weight: 600; font-size: 13px; text-decoration: none;
+}
+.dropbox-link:hover { text-decoration: underline; }
+.dropbox-link-sm {
+  display: inline-block; margin-top: 6px;
+  color: #0061ff; font-weight: 600; font-size: 12px; text-decoration: none; white-space: nowrap;
+}
+.dropbox-link-sm:hover { text-decoration: underline; }
+
 /* ===== filters ===== */
 .filters {
   display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
