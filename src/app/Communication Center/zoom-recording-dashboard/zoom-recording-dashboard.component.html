@@ -64,6 +64,109 @@
     </mat-form-field>
   </form>
 
+  <!-- ===== migrate-from-Zoom panel ===== -->
+  <section class="zoom-panel">
+    <div class="zoom-panel__bar">
+      <button class="zoom-toggle" (click)="toggleZoomPanel()">
+        {{ showZoomPanel ? '▾' : '▸' }} Migrate from Zoom
+        <span class="zoom-toggle__hint">— fetch the selected date's Zoom recordings and migrate on demand</span>
+      </button>
+      @if (showZoomPanel) {
+      <button class="reload-btn" (click)="loadZoomRecordings()" [disabled]="zoomLoading">
+        {{ zoomLoading ? 'Loading…' : '↻ Reload' }}
+      </button>
+      }
+    </div>
+
+    @if (showZoomPanel) {
+    <div class="zoom-panel__body">
+      @if (zoomError) {
+      <div class="zoom-error">⚠ {{ zoomError }}</div>
+      }
+
+      @if (migratedCount > 0) {
+      <div class="zoom-note">✓ {{ migratedCount }} recording{{ migratedCount === 1 ? '' : 's' }} from this range already migrated — hidden here, shown in the table below.</div>
+      }
+
+      @if (zoomLoading) {
+      <div class="zoom-loading"><mat-spinner diameter="22"></mat-spinner> Fetching recordings from Zoom…</div>
+      } @else if (zoomRecordings.length === 0 && !zoomError) {
+      <div class="empty-state small"><p>No Zoom recordings found for this date range.</p></div>
+      } @else if (visibleZoomRecordings.length === 0) {
+      <div class="empty-state small">
+        @if (migratedCount === zoomRecordings.length) {
+        <p>All {{ zoomRecordings.length }} recording(s) in this range are already migrated. ✓</p>
+        } @else {
+        <p>Nothing ready to migrate here — today's still-processing or empty recordings are hidden until Zoom finishes them.</p>
+        }
+      </div>
+      } @else {
+      <table mat-table [dataSource]="visibleZoomRecordings" class="zoom-table">
+        <ng-container matColumnDef="topic">
+          <th mat-header-cell *matHeaderCellDef>Meeting</th>
+          <td mat-cell *matCellDef="let r">
+            <div class="cell-topic">{{ r.topic }}</div>
+            <div class="cell-sub mono">#{{ r.meetingId }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="hostEmail">
+          <th mat-header-cell *matHeaderCellDef>Host</th>
+          <td mat-cell *matCellDef="let r"><span class="cell-host">{{ r.hostEmail }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="startTime">
+          <th mat-header-cell *matHeaderCellDef>Start</th>
+          <td mat-cell *matCellDef="let r">
+            <div>{{ r.startTime | date : "MMM d, y" }}</div>
+            <div class="cell-sub">{{ r.startTime | date : "h:mm a" }}</div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="files">
+          <th mat-header-cell *matHeaderCellDef>Files</th>
+          <td mat-cell *matCellDef="let r"><span class="mono">{{ r.totalFiles }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="totalSize">
+          <th mat-header-cell *matHeaderCellDef>Size</th>
+          <td mat-cell *matCellDef="let r"><span class="mono">{{ formatBytes(r.totalSize) }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="migration">
+          <th mat-header-cell *matHeaderCellDef>Migration</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="status-badge status-{{ migrationBadgeClass(r) }}">
+              <span class="badge-dot"></span>{{ migrationLabel(r) }}
+            </span>
+            @if (migrationFor(r.uuid) || isQueued(r.uuid)) {
+            <div class="row-progress mini">
+              <div class="progress-bar">
+                <div class="progress-fill progress-{{ migrationFor(r.uuid)?.status || 'processing' }}"
+                     [style.width.%]="migrationPercent(r)"></div>
+              </div>
+              <span class="mono progress-text">{{ migrationPercent(r) }}%</span>
+            </div>
+            }
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r">
+            @if (isInFlight(r)) {
+            <button class="migrate-btn" disabled>Migrating…</button>
+            } @else if (canMigrate(r)) {
+            <button class="migrate-btn" (click)="migrate(r)">
+              {{ migrationFor(r.uuid) ? 'Retry →' : 'Migrate →' }}
+            </button>
+            } @else if (r.totalSize <= 0) {
+            <span class="action-muted" title="Zoom has no downloadable media for this meeting yet">No media</span>
+            }
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="zoomTableHeaders"></tr>
+        <tr mat-row *matRowDef="let row; columns: zoomTableHeaders"></tr>
+      </table>
+      }
+    </div>
+    }
+  </section>
+
   <!-- ===== table ===== -->
   <div class="table-card">
     <table mat-table [dataSource]="recordsBackup">
