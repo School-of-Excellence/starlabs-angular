@@ -1,0 +1,88 @@
+name: preview (Stage 1 fast + channel)
+
+# CI/CD plan — Case 2 (Starlabs/angular), Stage 1:
+#   On every feature branch push, run FAST checks (lint / tsc / build) and publish a short-lived Firebase
+#   Hosting PREVIEW CHANNEL (named after the branch) on the TEST project for manual QA. The full hermetic
+#   Playwright gate (queue-e2e) runs separately when a PR to `development` is opened, and posts its report there.
+on:
+  push:
+    branches-ignore:
+      - development
+      - production
+      - main
+      - cicd-dev      # TEST stand-in branches are not feature branches — no preview channel for them
+      - cicd-prod
+
+permissions:
+  contents: read
+
+jobs:
+  fast-and-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # Env files first — the typecheck and the build both import src/environments/*.
+      - name: Generate TEST environment files
+        env:
+          FIREBASE_TEST_CONFIG: ${{ secrets.FIREBASE_TEST_CONFIG }}
+          WATSON_TEST_CONFIG: ${{ secrets.WATSON_TEST_CONFIG }}
+          SALESCRM_TEST_CONFIG: ${{ secrets.SALESCRM_TEST_CONFIG }}
+          PICOVOICE_ACCESS_KEY: ${{ secrets.PICOVOICE_ACCESS_KEY }}
+        run: |
+          mkdir -p src/environments
+          cat > src/environments/environment.development.ts << EOF
+          export const environment = {
+            production: true,
+            firebase: $FIREBASE_TEST_CONFIG,
+            watson: $WATSON_TEST_CONFIG,
+            salescrm: $SALESCRM_TEST_CONFIG,
+            df3CdnUrl: 'https://breakthroughs-test.web.app/assets/df3',
+            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
+          };
+          EOF
+          cp src/environments/environment.development.ts src/environments/environment.ts
+
+      # Fast checks. Advisory for now (continue-on-error) so day-one rollout doesn't block existing branches;
+      # flip these to hard gates once the tree is lint/type clean.
+      - name: Lint
+        continue-on-error: true
+        run: npm run -s lint || echo "no lint script — skipping"
+
+      - name: Typecheck (tsc --noEmit)
+        continue-on-error: true
+        run: npx tsc --noEmit || echo "type errors present (advisory)"
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@14.4.0
+
+      - name: Build Angular app (hard gate — must pass to publish a preview)
+        run: npx ng build --configuration production
+
+      - name: Compute channel id from branch name
+        id: ch
+        run: |
+          ID=$(echo "${{ github.ref_name }}" | tr '/' '-' | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | cut -c1-40)
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "Preview channel id: $ID"
+
+      - name: Publish preview channel (TEST project, 7-day expiry)
+        env:
+          GOOGLE_SERVICE_TEST: ${{ secrets.GOOGLE_SERVICE_TEST }}
+        run: |
+          echo "$GOOGLE_SERVICE_TEST" > "$HOME/firebase-key.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/firebase-key.json"
+          jq '.hosting.site = "breakthroughs-test"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
+          # Site comes from firebase.json (set above); hosting:channel:deploy has no --site flag in fb-tools 14.
+          firebase hosting:channel:deploy "${{ steps.ch.outputs.id }}" \
+            --expires 7d --project starlabs-test
