@@ -79,6 +79,7 @@ export class AhNotificationComponent implements AfterViewInit {
   sticky: boolean = false;
   logged:boolean = true;
   notificationimage = null;
+  receivingApp: string = 'breakthroughsapp';
 
   // Array declarations
   templateArray = [];
@@ -178,6 +179,7 @@ export class AhNotificationComponent implements AfterViewInit {
     this.landingPage = row.landingpage || '';
     this.sticky = row.sticky || false;
     this.logged = row.logged || true;
+    this.receivingApp = row.receivingapp || 'breakthroughsapp';
     this.notificationimage = null;
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -223,6 +225,7 @@ export class AhNotificationComponent implements AfterViewInit {
       landingpage: row.landingpage || '',
       sticky: row.sticky || false,
       logged: row.logged || true,
+      receivingapp: row.receivingapp || 'breakthroughsapp',
       notificationimage: row.notificationimage || null,
       scheduled: false,
       scheduletime: null
@@ -261,6 +264,7 @@ export class AhNotificationComponent implements AfterViewInit {
         landingpage: [null, undefined, ""].includes(this.landingPage) ? "" : this.landingPage,
         sticky: this.sticky,
         logged: this.logged,
+        receivingapp: this.receivingApp,
         updated: serverTimestamp()
       };
 
@@ -471,6 +475,7 @@ export class AhNotificationComponent implements AfterViewInit {
           landingpage: [null, undefined, ""].includes(this.landingPage) ? "" : this.landingPage,
           sticky: this.sticky,
           logged: this.logged,
+          receivingapp: this.receivingApp,
           notificationimage: [null, undefined, ""].includes(this.notificationimage) ? null : this.notificationimage,
           scheduled: false,  // Add this
           scheduletime: null  // Add this
@@ -561,6 +566,7 @@ export class AhNotificationComponent implements AfterViewInit {
     this.landingPage = '';
     this.sticky = false;
     this.logged = true;
+    this.receivingApp = 'breakthroughsapp';
     this.notificationimage = null;
     this.isEditMode = false;
     this.editingDocId = null;
@@ -601,6 +607,7 @@ export class AhNotificationComponent implements AfterViewInit {
             landingpage: [null, undefined, ""].includes(this.landingPage) ? "" : this.landingPage,
             sticky: this.sticky,
             logged: this.logged,
+            receivingapp: this.receivingApp,
             notificationimage: notificationimage,
             created: serverTimestamp()
           };
@@ -703,6 +710,7 @@ export class AhNotificationComponent implements AfterViewInit {
           landingpage: [null, undefined, ""].includes(this.landingPage) ? "" : this.landingPage,
           sticky: this.sticky,
           logged: this.logged,
+          receivingapp: this.receivingApp,
           notificationimage: notificationimage,
           scheduled: this.scheduled,
           scheduletime: this.scheduletime
@@ -849,6 +857,7 @@ export class AhNotificationComponent implements AfterViewInit {
     this.landingPage = row.landingpage || '';
     this.sticky = row.sticky || false;
     this.logged = row.logged || true;
+    this.receivingApp = row.receivingapp || 'breakthroughsapp';
     this.broadcastname = row.broadcastname || '';
     this.scheduleRowDate = null;
     this.scheduleRowTime = '';
@@ -887,6 +896,7 @@ export class AhNotificationComponent implements AfterViewInit {
         schedule: true,
         sent: false,
         profiles: this.profiles,
+        receivingapp: this.receivingApp,
       });
       this.openSnackBar("Notification scheduled for " + mergedDateTime.toLocaleString(), "OK");
       this.cancelEdit();

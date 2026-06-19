@@ -1035,7 +1035,8 @@ export class ProductFunnelComponent implements OnInit {
           await this.guard.saveNotificationRecord({
             title: result['title'], message: result['message'], subtitle: result['subtitle'] ?? null,
             notificationtype: 'ahupdate', notificationimage: image, sticky: result['sticky'],
-            logged: true, landingpage: result['landingpage'], profileid: profileids
+            logged: true, landingpage: result['landingpage'], profileid: profileids,
+            receivingapp: result['receivingapp'] ?? "breakthroughsapp"
           });
           this.snackbar.open(`Notification sent to ${profileids.length}`, 'OK', { duration: 4000 });
         } catch (e) {

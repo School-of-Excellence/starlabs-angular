@@ -1236,6 +1236,7 @@ export class AuthguardService {
     logged = true, // Boolean (Notification will be displayed in user Log)
     metadata = {}, // Map (Related Metadata)
     profileid,
+    receivingapp = "breakthroughsapp", // String ('all' | 'breakthroughsapp' | 'eiflixapp')
   }) {
     var docid = this.generateId(this.firestore, "notificationrecord")
     console.log(docid)
@@ -1251,6 +1252,7 @@ export class AuthguardService {
       logged: logged,
       metadata: metadata,
       profileid: profileid,
+      receivingapp: receivingapp,
       success: false,
     }
     console.log("Record ID", docid)
