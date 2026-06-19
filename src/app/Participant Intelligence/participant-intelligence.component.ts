@@ -25,7 +25,7 @@ import { RemarksDialogComponent } from './dialogs/remarks-dialog.component';
 import { TagManagerDialogComponent } from './dialogs/tag-manager-dialog.component';
 import { SubscriptionDialogComponent, SubscriptionResult } from './dialogs/subscription-dialog.component';
 import { EmailComposerDialogComponent, ComposerResult } from './dialogs/email-composer-dialog.component';
-import { WhatsappComposerDialogComponent } from './dialogs/whatsapp-composer-dialog.component';
+import { WatiInputComponent } from '../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { ManageAudiencesDialogComponent } from './dialogs/manage-audiences-dialog.component';
 import { QuickComposeDialogComponent, QuickComposeData } from './dialogs/quick-compose-dialog.component';
 import { EvolutionDialogComponent } from './dialogs/evolution-dialog.component';
@@ -240,18 +240,28 @@ export class ParticipantIntelligenceComponent implements OnInit {
       });
   }
 
+  // Reuses the production WhatsApp composer (wati-input) from the analytics screen.
+  // It writes the `wati archive` doc and triggers the send itself; we just react to the close result.
   private composeWhatsapp(): void {
     this.dialog
-      .open(WhatsappComposerDialogComponent, { panelClass: 'pi-dialog', width: '640px', data: { count: this.store.selectedCount() } })
+      .open(WatiInputComponent, {
+        panelClass: 'pi-dialog',
+        width: '70vw',
+        height: '80vh',
+        disableClose: true,
+        data: this.store.selectedParticipants(),
+      })
       .afterClosed()
-      .subscribe((r?: ComposerResult) => {
+      .subscribe((r: any) => {
         if (!r) return;
         const n = this.store.selectedCount();
-        if (r.action === 'queue') {
+        if (r === 'queued') {
           this.store.bumpQueued('whatsapp');
-          this.snack.open(`WhatsApp draft queued for ${n} participants`, 'Dismiss', { duration: 3000 });
-        } else {
-          this.snack.open(`WhatsApp draft composed for ${n} — sending isn't wired up yet`, 'Dismiss', { duration: 4000 });
+          this.snack.open(`WhatsApp queued for ${n} participants`, 'Dismiss', { duration: 3000 });
+        } else if (r === 'failed' || r?.status === 'failed') {
+          this.snack.open('Sending WhatsApp failed', 'Dismiss', { duration: 4000 });
+        } else if (r?.status) {
+          this.snack.open(`WhatsApp ${r.status} for ${n} participants`, 'Dismiss', { duration: 3000 });
         }
       });
   }
