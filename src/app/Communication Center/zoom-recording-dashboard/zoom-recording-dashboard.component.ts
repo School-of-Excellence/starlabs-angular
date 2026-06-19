@@ -10,12 +10,15 @@ import { provideNativeDateAdapter } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ZoomMigrationService, ZoomRecording } from './zoom-migration.service';
 
 @Component({
   selector: 'app-zoom-recording-dashboard',
   imports: [MatTableModule, CommonModule, MatFormFieldModule,
     MatInput, FormsModule, MatDatepickerModule,
-    MatSelectModule, MatPaginatorModule, MatButtonModule, ReactiveFormsModule],
+    MatSelectModule, MatPaginatorModule, MatButtonModule, ReactiveFormsModule,
+    MatProgressSpinnerModule],
   templateUrl: './zoom-recording-dashboard.component.html',
   styleUrl: './zoom-recording-dashboard.component.css',
   providers: [provideNativeDateAdapter()],
@@ -23,11 +26,29 @@ import { MatButtonModule } from '@angular/material/button';
 export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(MatPaginator) paginator: MatPaginator;
   private firestore: Firestore = inject(Firestore)
+  private migrationApi = inject(ZoomMigrationService)
 
   private collRef = collection(this.firestore, 'zoom recordings backup')
   public recordsBackup: MatTableDataSource<any> = new MatTableDataSource([])
   private unsubscribe: Unsubscribe | null = null
   public loading = true
+
+  // ── Zoom "fetch a date + migrate on demand" panel state ──────────────────
+  public showZoomPanel = false
+  public zoomLoading = false
+  public zoomError: string | null = null
+  public zoomRecordings: ZoomRecording[] = []
+  // Rows actually shown in the migrate panel: fetched recordings MINUS the ones
+  // already fully migrated (status 'completed'). Recomputed on every snapshot.
+  public visibleZoomRecordings: ZoomRecording[] = []
+  // How many fetched recordings are hidden because they're already completed.
+  public migratedCount = 0
+  public readonly zoomTableHeaders = ['topic', 'hostEmail', 'startTime', 'files', 'totalSize', 'migration', 'action']
+  // Live Firestore docs matched to fetched recordings by meetinguid.
+  private migrationByUuid = new Map<string, any>()
+  // uuids the user just clicked Migrate on, before a Firestore doc appears.
+  private queuedUuids = new Set<string>()
+  private zoomUnsubs: Unsubscribe[] = []
 
   readonly tableHeaders = ['meetingTopic', 'hostEmail', 'status', 'progress',
     'totalSize', 'totalFiles', 'startTime', 'processingTime', 'file']
@@ -56,6 +77,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
 
   ngOnDestroy(): void {
     this.stopSubscription()
+    this.stopZoomMatching()
   }
 
   private stopSubscription() {
@@ -103,6 +125,175 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     this.recordsBackup.filter = JSON.stringify({
       search: this.form.value.search, status: this.form.value.status
     })
+  }
+
+  // ── Zoom panel: fetch a date's recordings + migrate on demand ────────────
+
+  toggleZoomPanel() {
+    this.showZoomPanel = !this.showZoomPanel
+    if (this.showZoomPanel && this.zoomRecordings.length === 0) this.loadZoomRecordings()
+  }
+
+  private ymd(d: Date): string {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
+  // Pull the selected date range's recordings straight from Zoom (via the
+  // migration server), then start matching them to Firestore by meetinguid.
+  async loadZoomRecordings() {
+    const start = this.form.value.startDate ? new Date(this.form.value.startDate) : new Date()
+    const end = this.form.value.endDate ? new Date(this.form.value.endDate) : start
+    this.zoomLoading = true
+    this.zoomError = null
+    try {
+      this.zoomRecordings = await this.migrationApi.listRecordings(this.ymd(start), this.ymd(end))
+      this.startZoomMatching(this.zoomRecordings.map(r => r.uuid))
+      this.recomputeVisible()
+    } catch (e: any) {
+      this.zoomError = e?.error?.error || e?.message || 'Failed to load Zoom recordings'
+      this.zoomRecordings = []
+      this.recomputeVisible()
+    } finally {
+      this.zoomLoading = false
+    }
+  }
+
+  private isToday(rec: ZoomRecording): boolean {
+    const d = this.toDate(rec.startTime)
+    if (!d) return false
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  }
+
+  // Which recordings the migrate panel lists. Always hidden: already-completed
+  // ones (they live in the backup table below). For TODAY's recordings we also
+  // hide the ones that aren't actionable yet — size 0 (Zoom is still generating
+  // the media) and ones actively migrating — since those are just noise while a
+  // meeting is fresh. For PREVIOUS dates we show everything that isn't complete,
+  // so a stuck/stalled or "no media" recording stays visible to act on.
+  // Recomputed on every live meetinguid match so rows appear/vanish in step
+  // with Firestore. Kept as a field (not a getter) to avoid churning mat-table.
+  private recomputeVisible() {
+    let completed = 0
+    this.visibleZoomRecordings = this.zoomRecordings.filter(r => {
+      const doc = this.migrationByUuid.get(r.uuid)
+      if (doc && doc.status === 'completed') { completed++; return false }
+      if (this.isToday(r)) {
+        if (r.totalSize <= 0) return false                                   // Zoom not ready yet
+        if (doc?.status === 'processing' || this.isQueued(r.uuid)) return false // actively migrating
+      }
+      return true
+    })
+    this.migratedCount = completed
+  }
+
+  // Click "Migrate" → POST the same payload Zoom sends. Live status then flows
+  // back through the meetinguid match below.
+  async migrate(rec: ZoomRecording) {
+    this.queuedUuids.add(rec.uuid)
+    this.zoomError = null
+    try {
+      await this.migrationApi.migrate(rec)
+    } catch (e: any) {
+      this.queuedUuids.delete(rec.uuid)
+      this.zoomError = e?.error?.error || e?.message || `Failed to start migration for ${rec.topic}`
+    }
+  }
+
+  // Live-subscribe to the backup docs whose meetinguid matches a fetched
+  // recording. Firestore `in` filters cap at 10 values, so chunk the uuids.
+  private startZoomMatching(uuids: string[]) {
+    this.stopZoomMatching()
+    this.migrationByUuid.clear()
+    const chunks: string[][] = []
+    for (let i = 0; i < uuids.length; i += 10) chunks.push(uuids.slice(i, i + 10))
+    for (const chunk of chunks) {
+      if (!chunk.length) continue
+      const q = query(this.collRef, where('meetinguid', 'in', chunk))
+      const unsub = onSnapshot(q, (snap) => {
+        const present = new Set<string>()
+        snap.docs.forEach((d) => {
+          const data = d.data() as any
+          if (!data?.meetinguid) return
+          present.add(data.meetinguid)
+          this.migrationByUuid.set(data.meetinguid, { id: d.id, ...data })
+          this.queuedUuids.delete(data.meetinguid) // a real doc now exists
+        })
+        // Reconcile deletions: if a doc for one of this chunk's uuids no longer
+        // exists (e.g. a retry deleted the stale doc), drop the stale entry so
+        // the row reverts to its real state instead of showing the old status.
+        for (const u of chunk) {
+          if (!present.has(u)) this.migrationByUuid.delete(u)
+        }
+        this.recomputeVisible() // a row may have just completed → drop it
+      })
+      this.zoomUnsubs.push(unsub)
+    }
+  }
+
+  private stopZoomMatching() {
+    this.zoomUnsubs.forEach((u) => u())
+    this.zoomUnsubs = []
+  }
+
+  // ---- per-recording migration view (matched by meetinguid) ----
+  migrationFor(uuid: string): any | null { return this.migrationByUuid.get(uuid) || null }
+
+  migrationLabel(rec: ZoomRecording): string {
+    const doc = this.migrationByUuid.get(rec.uuid)
+    if (doc) return this.isStaleProcessing(rec) ? 'stalled' : doc.status
+    if (this.queuedUuids.has(rec.uuid)) return 'queued'
+    return 'not migrated'
+  }
+
+  isQueued(uuid: string): boolean { return this.queuedUuids.has(uuid) && !this.migrationByUuid.has(uuid) }
+
+  // CSS status-* suffix for the migration badge (stale 'processing' → warn).
+  migrationBadgeClass(rec: ZoomRecording): string {
+    if (this.isStaleProcessing(rec)) return 'partial_success'
+    const doc = this.migrationByUuid.get(rec.uuid)
+    if (doc) return doc.status
+    return this.isQueued(rec.uuid) ? 'processing' : 'none'
+  }
+
+  // A doc stuck at 'processing' for longer than the server's max run window
+  // (6h) is abandoned — the migration died and left the doc frozen. We treat it
+  // as retryable rather than "in flight".
+  private readonly STALE_PROCESSING_MS = 6 * 60 * 60 * 1000
+  isStaleProcessing(rec: ZoomRecording): boolean {
+    const doc = this.migrationByUuid.get(rec.uuid)
+    if (!doc || doc.status !== 'processing') return false
+    const started = this.toDate(doc.processingStartedAt) || this.toDate(doc.timestamp)
+    if (!started) return true
+    return Date.now() - started.getTime() > this.STALE_PROCESSING_MS
+  }
+
+  // True while a matched doc is genuinely being processed right now (so we show
+  // "Migrating…" and hide the button). A stale/stuck 'processing' doc is NOT in
+  // flight — it should offer Retry instead.
+  isInFlight(rec: ZoomRecording): boolean {
+    const doc = this.migrationByUuid.get(rec.uuid)
+    return this.isQueued(rec.uuid) || (doc?.status === 'processing' && !this.isStaleProcessing(rec))
+  }
+
+  migrationPercent(rec: ZoomRecording): number {
+    const doc = this.migrationByUuid.get(rec.uuid)
+    return doc ? this.recordPercent(doc) : 0
+  }
+
+  // Show the Migrate button only when the recording actually CAN be migrated:
+  // it has media (size > 0), it isn't already completed, and it isn't currently
+  // in flight. Size 0 means Zoom has no downloadable media yet (still
+  // processing on Zoom's side / nothing recorded).
+  canMigrate(rec: ZoomRecording): boolean {
+    if (rec.totalSize <= 0) return false
+    if (this.isInFlight(rec)) return false
+    const doc = this.migrationByUuid.get(rec.uuid)
+    return doc?.status !== 'completed'
   }
 
   // ---- summary stats (computed from the currently filtered rows) ----
