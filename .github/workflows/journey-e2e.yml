@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: School-of-Excellence/starlabs-e2e-tests
-          ref: main
+          ref: journey-gate   # TEMPORARY: validate against the unmerged hub branch. Flip back to `main` after the hub PR merges.
           path: e2e
           token: ${{ secrets.CICD_PAT }}
 
