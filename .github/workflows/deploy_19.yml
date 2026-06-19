@@ -49,11 +49,15 @@ jobs:
             WATSON_CONFIG=$WATSON_TEST_CONFIG
             SALESCRM_CONFIG=$SALESCRM_TEST_CONFIG
             CDN_URL='https://breakthroughs-test.web.app/assets/df3'
+            ZOOM_API_URL='https://zoom-to-dropbox-server-rhdwzw46ya-uc.a.run.app'
           else
             FIREBASE_CONFIG=$FIREBASE_PROD_CONFIG
             WATSON_CONFIG=$WATSON_PROD_CONFIG
             SALESCRM_CONFIG=$SALESCRM_PROD_CONFIG
             CDN_URL='https://breakthroughs.app/assets/df3'
+            # TODO: set to the production zoom-to-dropbox server URL when one exists.
+            # Left empty so prod never silently hits the starlabs-test Cloud Run service.
+            ZOOM_API_URL=''
           fi
 
           cat > src/environments/environment.development.ts << EOF
@@ -63,6 +67,7 @@ jobs:
             watson: $WATSON_CONFIG,
             salescrm: $SALESCRM_CONFIG,
             df3CdnUrl: '$CDN_URL',
+            zoomMigrationApiUrl: '$ZOOM_API_URL',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
@@ -74,6 +79,7 @@ jobs:
             watson: $WATSON_CONFIG,
             salescrm: $SALESCRM_CONFIG,
             df3CdnUrl: '$CDN_URL',
+            zoomMigrationApiUrl: '$ZOOM_API_URL',
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF

@@ -8,9 +8,9 @@
     </span>
 
     <div *ngIf="showQueueSelect" class="d-flex flex-row justify-content-center">
-      <mat-form-field appearance="outline" class="w-50">
+      <mat-form-field appearance="outline">
         <mat-label>Select queue</mat-label>
-        <mat-select [value]="selectedQueueList" multiple>
+        <mat-select [value]="selectedQueueList" multiple panelClass="eod-ios-pane">
           <mat-option *ngFor="let item of queueList" [value]="item['docid']"
             (onSelectionChange)="updateSelectedQueues(item['docid'], $event)">
             {{item.queuename}}
@@ -60,7 +60,7 @@
       </app-event-opportunity>
     </ng-container>
 
-    <div *ngIf="selectedQueueList.length != 0" class="planning-tabs">
+    <div class="planning-tabs">
       <button class="planning-tab-btn" [class.active]="activeTab === 'board'" (click)="setActiveTab('board')">Board</button>
       <button class="planning-tab-btn" [class.active]="activeTab === 'planning'" (click)="setActiveTab('planning')">Planning</button>
     </div>
@@ -210,14 +210,14 @@
                   </div>
                   <div class="shadow-row">
                     <div class="status-indicator">
-                      <span class="status-dot" style="background:#8e44ad"></span>
+                      <span class="status-dot" style="background:var(--tint)"></span>
                       <strong>Shadowing</strong>
                     </div>
                     <span class="count-value">{{ getShadowingParticipants(queueid, stage).length }}</span>
                   </div>
                   <div class="not-shadow-row">
                     <div class="status-indicator">
-                      <span class="status-dot" style="background:#f39c12"></span>
+                      <span class="status-dot" style="background:var(--orange)"></span>
                       <strong>Not Shadowing</strong>
                     </div>
                     <span class="count-value">{{ getNotShadowingParticipants(queueid, stage).length }}</span>
@@ -310,6 +310,9 @@
       [allCompletedStageCount]="allCompletedStageCount"
       [mapProfile]="mapProfile"
       [mapNumber]="mapNumber"
+      [eventList]="eventList"
+      [queueList]="queueList"
+      (queueChange)="onPlanningQueueChange($event)"
       [refreshKey]="planningRefreshKey">
     </app-planning-tab>
   </div>
@@ -868,7 +871,7 @@
     
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Select stages from selected queues</mat-label>
-            <mat-select [compareWith]="compareFnc" formControlName="stage" multiple>
+            <mat-select [compareWith]="compareFnc" formControlName="stage" multiple panelClass="eod-ios-pane">
               <mat-option *ngFor="let item of updatestages" [value]="item">
                 {{item.stagename}} - {{item.status === 'instudio' ? 'activity' : (item.status ?? 'all')}}
                 <span class="queue-name-hint">({{mapQueue[item.queueid]?.queuename || mapQueue[item.queueid]}})</span>
