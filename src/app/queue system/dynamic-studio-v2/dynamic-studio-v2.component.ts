@@ -80,6 +80,10 @@ export class DynamicStudioV2Component {
   liveStudio = []
   // Outside Studio
   outsideLiveAssignmentSubscription: Subscription = null
+  // One live-assignment listener per ongoing-queue chunk (Firestore `in` caps
+  // at 30 ids). Tracked so they can be torn down on queue switch / destroy —
+  // the old single-field listener was never stored and leaked on every switch.
+  outsideLiveAssignmentSubscriptions: Subscription[] = []
   outsideLiveAssignment = []
   // Studio Assignment
   liveassignmentSubscription:Subscription = null
@@ -1048,6 +1052,7 @@ export class DynamicStudioV2Component {
     this.studioGroupingInvitationSubscription?.unsubscribe()
     this.tripleATCSubscription?.unsubscribe()
     this.outsideLiveAssignmentSubscription?.unsubscribe()
+    this.outsideLiveAssignmentSubscriptions.forEach(s => s?.unsubscribe())
     this.studioconversationSubscription?.unsubscribe()
     this.otherStudioInvitationSubscription?.unsubscribe()
 
@@ -1058,6 +1063,7 @@ export class DynamicStudioV2Component {
     this.studioGroupingInvitationSubscription = null
     this.tripleATCSubscription = null
     this.outsideLiveAssignmentSubscription = null
+    this.outsideLiveAssignmentSubscriptions = []
     this.studioconversationSubscription = null
     this.otherStudioInvitationSubscription = null
     this.tokenInvitedByOther = {}
@@ -1273,8 +1279,28 @@ export class DynamicStudioV2Component {
   }
 
   getOutsideStudio(){
-    collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "==", this.ongoingQueue["docid"]),where("status", "==", "live"),where("bonusactivityparticipant", "array-contains", this.profileid)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(assignment=>{
-      this.outsideLiveAssignment = assignment
+    // An "outside studio" invite (added via Invite More → bonusactivityparticipant)
+    // can live in ANY of the specialist's ongoing queues, not just the one
+    // currently selected. Watch every ongoing queue so the invite surfaces no
+    // matter which queue the specialist is looking at. Firestore `in` allows at
+    // most 30 values, so chunk the queue ids and merge the per-chunk results.
+    this.outsideLiveAssignmentSubscriptions.forEach(s => s?.unsubscribe())
+    this.outsideLiveAssignmentSubscriptions = []
+    this.outsideLiveAssignment = []
+
+    const queueIds = (this.ongoingQueueList ?? []).map(q => q['docid']).filter(Boolean)
+    if (queueIds.length === 0) return
+
+    const chunks: string[][] = []
+    for (let i = 0; i < queueIds.length; i += 30) chunks.push(queueIds.slice(i, i + 30))
+
+    const chunkResults: any[][] = chunks.map(() => [])
+    chunks.forEach((chunk, idx) => {
+      const sub = collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "in", chunk),where("status", "==", "live"),where("bonusactivityparticipant", "array-contains", this.profileid)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(assignment=>{
+        chunkResults[idx] = assignment
+        this.outsideLiveAssignment = chunkResults.flat()
+      })
+      this.outsideLiveAssignmentSubscriptions.push(sub)
     })
   }
 
