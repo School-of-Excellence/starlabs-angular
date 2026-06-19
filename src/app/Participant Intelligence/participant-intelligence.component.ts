@@ -29,6 +29,8 @@ import { TagManagerDialogComponent } from './dialogs/tag-manager-dialog.componen
 import { SubscriptionDialogComponent, SubscriptionResult } from './dialogs/subscription-dialog.component';
 import { EmailInputComponent } from '../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { WatiInputComponent } from '../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
+import { SendInterimReportComponent } from '../Participants Profile Management/participants-analytics/send-interim-report/send-interim-report.component';
+import { EvolutionWishlistLogComponent } from '../Participants Profile Management/participants-analytics/evolution-wishlist-log/evolution-wishlist-log.component';
 import { ManageAudiencesDialogComponent } from './dialogs/manage-audiences-dialog.component';
 import { QuickComposeDialogComponent, QuickComposeData } from './dialogs/quick-compose-dialog.component';
 import { EvolutionDialogComponent } from './dialogs/evolution-dialog.component';
@@ -199,34 +201,27 @@ export class ParticipantIntelligenceComponent implements OnInit {
     );
   }
 
+  // Reuses the production interim-report dialog (writes `interimreport log` itself). Takes profile IDs.
   private interimReport(): void {
-    this.composeStub(
-      {
-        icon: 'description',
-        title: 'Manage interim report',
-        subtitle: `Generate an interim report for ${this.store.selectedCount()} participants.`,
-        fields: [{ key: 'period', label: 'Reporting period', type: 'text', placeholder: 'e.g. Q3 2026' }],
-        confirmText: 'Generate',
-        confirmIcon: 'check',
-        note: 'UI prototype — report generation isn’t wired up yet.',
-      },
-      'Interim report drafted for {n} participants (prototype)'
-    );
+    this.dialog.open(SendInterimReportComponent, {
+      panelClass: 'pi-dialog',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      disableClose: true,
+      data: this.store.selectedParticipants().map((p) => p.profileid),
+    });
   }
 
+  // Reuses the production evolution-wishlist dialog (writes `evolutionwishlistlog` itself). Takes profile IDs.
   private evolutionWishlist(): void {
-    this.composeStub(
-      {
-        icon: 'favorite',
-        title: 'Evolution wishlist',
-        subtitle: `Log an evolution wishlist note for ${this.store.selectedCount()} participants.`,
-        fields: [{ key: 'note', label: 'Wishlist note', type: 'textarea', placeholder: 'What evolution outcome are we aiming for?' }],
-        confirmText: 'Add to wishlist',
-        confirmIcon: 'check',
-        note: 'UI prototype — wishlist persistence isn’t wired up yet.',
-      },
-      'Wishlist note drafted for {n} participants (prototype)'
-    );
+    this.dialog.open(EvolutionWishlistLogComponent, {
+      panelClass: 'pi-dialog',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      data: this.store.selectedParticipants().map((p) => p.profileid),
+    });
   }
 
   // Reuses the production email composer (email-input) from the analytics screen.
