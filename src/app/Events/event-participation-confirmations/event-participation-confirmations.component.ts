@@ -73,7 +73,7 @@ export class EventParticipationConfirmationsComponent {
   mode: 'upcoming' | 'past' = 'upcoming';
 
   pageIndex = 0;
-  pageSize = 10;
+  pageSize = 5;
   private tabsRestored = false;
 
   constructor(public firestore: Firestore, public guard: AuthguardService) {

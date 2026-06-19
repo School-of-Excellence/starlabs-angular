@@ -17,16 +17,16 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-      <div *ngIf="selectedQueueList.length != 0" style="margin-left: 20px;">
+      <div *ngIf="selectedQueueList.length != 0 && activeTab === 'board'" style="margin-left: 20px;">
         <button (click)="openAddStageCount()" class="report-button">Add Stagescount</button>
       </div>
 
-      <div *ngIf="selectedQueueList.length != 0" style="margin-left: 20px;">
+      <div *ngIf="selectedQueueList.length != 0 && activeTab === 'board'" style="margin-left: 20px;">
         <button (click)="toggleContainer()" class="report-button">
           {{ isContainerOpen ? 'Hide Stagescount' : 'Show Stagescount' }}
         </button>
       </div>
-      <div *ngIf="selectedQueueList.length !== 0 && developerRole" style="margin-left: 20px;">
+      <div *ngIf="selectedQueueList.length !== 0 && developerRole && activeTab === 'board'" style="margin-left: 20px;">
         <button
           mat-raised-button
           class="report-button"
@@ -60,6 +60,12 @@
       </app-event-opportunity>
     </ng-container>
 
+    <div *ngIf="selectedQueueList.length != 0" class="planning-tabs">
+      <button class="planning-tab-btn" [class.active]="activeTab === 'board'" (click)="setActiveTab('board')">Board</button>
+      <button class="planning-tab-btn" [class.active]="activeTab === 'planning'" (click)="setActiveTab('planning')">Planning</button>
+    </div>
+
+    <ng-container *ngIf="activeTab === 'board'">
     <div *ngIf="isContainerOpen" class="diagnostic-dashboard">
       <div class="drag-drop-container" 
            cdkDropList 
@@ -293,6 +299,19 @@
         </ng-container>
       </div>
     </div>
+    </ng-container>
+
+    <app-planning-tab
+      *ngIf="activeTab === 'planning'"
+      [selectedQueueList]="selectedQueueList"
+      [mapQueue]="mapQueue"
+      [mapData]="mapData"
+      [queueTokens]="queueTokens"
+      [allCompletedStageCount]="allCompletedStageCount"
+      [mapProfile]="mapProfile"
+      [mapNumber]="mapNumber"
+      [refreshKey]="planningRefreshKey">
+    </app-planning-tab>
   </div>
 
   <!-- Side Panel for Stage Details -->
