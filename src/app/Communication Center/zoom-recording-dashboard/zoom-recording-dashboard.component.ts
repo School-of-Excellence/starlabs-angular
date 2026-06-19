@@ -85,7 +85,10 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   // LIVE subscription scoped to the selected date range (server-side) so we
-  // never download the whole 12k-doc collection just to show one day.
+  // never download the whole 12k-doc collection just to show one day. The range
+  // is matched against the MEETING start time (`startTime`), not the processing
+  // date (`timestamp`) — so a meeting shows up under the day it was held, even
+  // if it was migrated/processed later.
   subscribe() {
     this.stopSubscription()
     this.loading = true
@@ -97,9 +100,9 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
 
     const q = query(
       this.collRef,
-      where('timestamp', '>=', Timestamp.fromDate(start)),
-      where('timestamp', '<=', Timestamp.fromDate(end)),
-      orderBy('timestamp', 'desc'),
+      where('startTime', '>=', Timestamp.fromDate(start)),
+      where('startTime', '<=', Timestamp.fromDate(end)),
+      orderBy('startTime', 'desc'),
       limit(500)
     )
 
