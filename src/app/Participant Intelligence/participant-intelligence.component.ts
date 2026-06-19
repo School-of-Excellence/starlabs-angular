@@ -5,21 +5,14 @@ import { MatDialog, MatDialogConfig } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Firestore, collection, doc, setDoc } from '@angular/fire/firestore';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 import { ParticipantStore } from './core/participant.store';
 import { ParticipantDataService } from './data/participant-data.service';
 import { FirestoreParticipantDataService } from './data/firestore-participant-data.service';
-import { MockParticipantDataService } from './data/mock-participant-data.service';
 import { COLUMN_DEF_MAP } from './data/column-catalog';
-import { environment } from '../../environments/environment';
-
-// Only talk to live Firestore on the starlabs-test project; anywhere else fall back to mock data
-// so a production build (environment.ts → fir-sample-aae4a) can never read/write the wrong project.
-export function participantDataServiceFactory(): ParticipantDataService {
-  return environment.firebase?.projectId === 'starlabs-test'
-    ? inject(FirestoreParticipantDataService)
-    : inject(MockParticipantDataService);
-}
 
 import { FilterRailComponent } from './components/filter-rail/filter-rail.component';
 import { ActiveFilterChipsComponent } from './components/active-filter-chips/active-filter-chips.component';
@@ -34,8 +27,13 @@ import { PromptDialogComponent } from './dialogs/prompt-dialog.component';
 import { RemarksDialogComponent } from './dialogs/remarks-dialog.component';
 import { TagManagerDialogComponent } from './dialogs/tag-manager-dialog.component';
 import { SubscriptionDialogComponent, SubscriptionResult } from './dialogs/subscription-dialog.component';
-import { EmailComposerDialogComponent, ComposerResult } from './dialogs/email-composer-dialog.component';
-import { WhatsappComposerDialogComponent } from './dialogs/whatsapp-composer-dialog.component';
+import { EmailInputComponent } from '../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { WatiInputComponent } from '../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
+import { SendInterimReportComponent } from '../Participants Profile Management/participants-analytics/send-interim-report/send-interim-report.component';
+import { EvolutionWishlistLogComponent } from '../Participants Profile Management/participants-analytics/evolution-wishlist-log/evolution-wishlist-log.component';
+import { AhNotificationComponent } from '../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { AuthguardService } from '../authguard.service';
+import { getStorage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { ManageAudiencesDialogComponent } from './dialogs/manage-audiences-dialog.component';
 import { QuickComposeDialogComponent, QuickComposeData } from './dialogs/quick-compose-dialog.component';
 import { EvolutionDialogComponent } from './dialogs/evolution-dialog.component';
@@ -64,9 +62,8 @@ import { CHECKLISTS, ChecklistDef } from './core/checklists';
   styleUrl: './participant-intelligence.component.css',
   providers: [
     ParticipantStore,
-    MockParticipantDataService,
-    FirestoreParticipantDataService,
-    { provide: ParticipantDataService, useFactory: participantDataServiceFactory },
+    // Always read from the configured Firebase project's Firestore — no mock fallback.
+    { provide: ParticipantDataService, useClass: FirestoreParticipantDataService },
   ],
 })
 export class ParticipantIntelligenceComponent implements OnInit {
@@ -74,6 +71,9 @@ export class ParticipantIntelligenceComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
   private readonly injector = inject(Injector);
+  private readonly firestore = inject(Firestore);
+  private readonly http = inject(HttpClient);
+  private readonly authguard = inject(AuthguardService);
 
   // dialogs that inject ParticipantStore must resolve THIS screen's store instance
   private dlg(width: string): MatDialogConfig {
@@ -205,86 +205,125 @@ export class ParticipantIntelligenceComponent implements OnInit {
     );
   }
 
+  // Reuses the production interim-report dialog (writes `interimreport log` itself). Takes profile IDs.
   private interimReport(): void {
-    this.composeStub(
-      {
-        icon: 'description',
-        title: 'Manage interim report',
-        subtitle: `Generate an interim report for ${this.store.selectedCount()} participants.`,
-        fields: [{ key: 'period', label: 'Reporting period', type: 'text', placeholder: 'e.g. Q3 2026' }],
-        confirmText: 'Generate',
-        confirmIcon: 'check',
-        note: 'UI prototype — report generation isn’t wired up yet.',
-      },
-      'Interim report drafted for {n} participants (prototype)'
-    );
+    this.dialog.open(SendInterimReportComponent, {
+      panelClass: 'pi-dialog',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      disableClose: true,
+      data: this.store.selectedParticipants().map((p) => p.profileid),
+    });
   }
 
+  // Reuses the production evolution-wishlist dialog (writes `evolutionwishlistlog` itself). Takes profile IDs.
   private evolutionWishlist(): void {
-    this.composeStub(
-      {
-        icon: 'favorite',
-        title: 'Evolution wishlist',
-        subtitle: `Log an evolution wishlist note for ${this.store.selectedCount()} participants.`,
-        fields: [{ key: 'note', label: 'Wishlist note', type: 'textarea', placeholder: 'What evolution outcome are we aiming for?' }],
-        confirmText: 'Add to wishlist',
-        confirmIcon: 'check',
-        note: 'UI prototype — wishlist persistence isn’t wired up yet.',
-      },
-      'Wishlist note drafted for {n} participants (prototype)'
-    );
+    this.dialog.open(EvolutionWishlistLogComponent, {
+      panelClass: 'pi-dialog',
+      maxWidth: '90vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      data: this.store.selectedParticipants().map((p) => p.profileid),
+    });
   }
 
+  // Reuses the production email composer (email-input) from the analytics screen.
+  // It returns a result with {docid, status}; the parent persists to `email archive`
+  // and/or triggers the sendBatchEmail cloud function (mirrors the old screen's afterClosed).
   private composeEmail(): void {
     this.dialog
-      .open(EmailComposerDialogComponent, { panelClass: 'pi-dialog', width: '640px', data: { count: this.store.selectedCount() } })
+      .open(EmailInputComponent, { panelClass: 'pi-dialog', minWidth: '600px', disableClose: true, data: this.store.selectedParticipants() })
       .afterClosed()
-      .subscribe((r?: ComposerResult) => {
-        if (!r) return;
+      .subscribe(async (result: any) => {
+        if (!result) return;
         const n = this.store.selectedCount();
-        if (r.action === 'queue') {
-          this.store.bumpQueued('email');
-          this.snack.open(`Email draft queued for ${n} participants`, 'Dismiss', { duration: 3000 });
-        } else {
-          this.snack.open(`Email draft composed for ${n} — sending isn't wired up yet`, 'Dismiss', { duration: 4000 });
+        try {
+          if (result.status === 'queued' || result.status === 'send') {
+            await setDoc(doc(collection(this.firestore, 'email archive'), result.docid), result, { merge: true });
+            this.store.bumpQueued('email');
+            this.snack.open(result.status === 'queued' ? `Email queued for ${n} participants` : `Email sent to ${n} participants`, 'Dismiss', { duration: 3000 });
+          } else if (result.status === 'validated') {
+            const url = `https://us-central1-${environment.firebase?.projectId}.cloudfunctions.net/sendBatchEmail`;
+            const data = { ...result, archiveid: result.docid };
+            this.http
+              .post(url, JSON.stringify(data), { responseType: 'text', headers: new HttpHeaders().set('Content-Type', 'application/json') })
+              .subscribe({
+                next: () => this.snack.open(`Email sent to ${n} participants`, 'Dismiss', { duration: 3000 }),
+                error: () => this.snack.open('Error sending email', 'Dismiss', { duration: 4000 }),
+              });
+          }
+        } catch {
+          this.snack.open('Error sending email', 'Dismiss', { duration: 4000 });
         }
       });
   }
 
+  // Reuses the production WhatsApp composer (wati-input) from the analytics screen.
+  // It writes the `wati archive` doc and triggers the send itself; we just react to the close result.
   private composeWhatsapp(): void {
     this.dialog
-      .open(WhatsappComposerDialogComponent, { panelClass: 'pi-dialog', width: '640px', data: { count: this.store.selectedCount() } })
+      .open(WatiInputComponent, {
+        panelClass: 'pi-dialog',
+        width: '70vw',
+        height: '80vh',
+        disableClose: true,
+        data: this.store.selectedParticipants(),
+      })
       .afterClosed()
-      .subscribe((r?: ComposerResult) => {
+      .subscribe((r: any) => {
         if (!r) return;
         const n = this.store.selectedCount();
-        if (r.action === 'queue') {
+        if (r === 'queued') {
           this.store.bumpQueued('whatsapp');
-          this.snack.open(`WhatsApp draft queued for ${n} participants`, 'Dismiss', { duration: 3000 });
-        } else {
-          this.snack.open(`WhatsApp draft composed for ${n} — sending isn't wired up yet`, 'Dismiss', { duration: 4000 });
+          this.snack.open(`WhatsApp queued for ${n} participants`, 'Dismiss', { duration: 3000 });
+        } else if (r === 'failed' || r?.status === 'failed') {
+          this.snack.open('Sending WhatsApp failed', 'Dismiss', { duration: 4000 });
+        } else if (r?.status) {
+          this.snack.open(`WhatsApp ${r.status} for ${n} participants`, 'Dismiss', { duration: 3000 });
         }
       });
   }
 
+  // Reuses the production in-app notification composer (ah-notification). It saves the template;
+  // the parent (here) uploads any image and pushes via authguard.saveNotificationRecord to the
+  // registered (firebaseuserref) profiles — mirrors the old analytics screen's afterClosed.
   private notify(): void {
-    const data: QuickComposeData = {
-      icon: 'notifications',
-      title: 'In-app notification',
-      subtitle: `${this.store.selectedCount()} registered participants will receive this.`,
-      fields: [
-        { key: 'title', label: 'Title', type: 'text', placeholder: 'Notification title' },
-        { key: 'body', label: 'Message', type: 'textarea', placeholder: 'What do you want them to know?' },
-      ],
-      confirmText: 'Send notification',
-      confirmIcon: 'send',
-      note: 'UI prototype on mock data — nothing is actually delivered.',
-    };
     this.dialog
-      .open(QuickComposeDialogComponent, { panelClass: 'pi-dialog', width: '480px', data })
+      .open(AhNotificationComponent, {
+        panelClass: 'pi-dialog',
+        width: '80vw',
+        maxHeight: '90vh',
+        disableClose: true,
+        autoFocus: false,
+        data: this.store.selectedParticipants(),
+      })
       .afterClosed()
-      .subscribe((r) => {
-        if (r) this.snack.open(`Notification sent to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
+      .subscribe(async (result: any) => {
+        if (!result) return;
+        const profileID = this.store.selectedParticipants().filter((p) => p.registered).map((p) => p.profileid);
+        let notificationimage = null;
+        if (result['notificationimage'] != null) {
+          try {
+            const filepath = 'Notification Images/' + new Date().toISOString() + result['notificationimage'].name;
+            const uploadResult = await uploadBytes(ref(getStorage(), filepath), result['notificationimage']);
+            notificationimage = await getDownloadURL(uploadResult.ref);
+          } catch (e) {
+            console.log('notification image upload error', e);
+          }
+        }
+        await this.authguard.saveNotificationRecord({
+          title: result['title'],
+          message: result['message'],
+          subtitle: result['subtitle'] ?? null,
+          notificationtype: 'ahupdate',
+          notificationimage,
+          sticky: result['sticky'],
+          logged: true,
+          landingpage: result['landingpage'],
+          profileid: profileID,
+        });
+        this.snack.open(`Notification sent to ${profileID.length} app users`, 'Dismiss', { duration: 3000 });
       });
   }
 

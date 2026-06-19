@@ -1356,9 +1356,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     this.stageCountSubscription = collectionData(query(collection(this.firestore, 'stage opportunity count'),where('queuelist', 'array-contains', this.selectedQueue.docid))).pipe(takeUntil(this.subscriptionHandle),takeUntil(this.liveQueueSubscription)).subscribe(data => 
     {
-      this.stageCountCards = (data as any[]).sort((a: any, b: any) =>
-        (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
-      );
+      this.stageCountCards = (data as any[])
+        .filter((e: any) => e['kind'] !== 'phase')
+        .sort((a: any, b: any) =>
+          (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
+        );
     });
   }
 

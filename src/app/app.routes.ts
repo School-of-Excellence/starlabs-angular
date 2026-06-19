@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { loggedInGuard } from './Participant Intelligence/auth-only.guard';
 import { roleGuard } from './role.guard';
+import { loggedInGuard } from './Participant Intelligence/auth-only.guard';
 
 export const routes: Routes = [
   {path: 'journeyonboardingdetail', loadComponent: () => import('./journey-onboarding-detail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent), canActivate:[authGuard]},

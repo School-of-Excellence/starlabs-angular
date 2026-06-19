@@ -85,7 +85,10 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   // LIVE subscription scoped to the selected date range (server-side) so we
-  // never download the whole 12k-doc collection just to show one day.
+  // never download the whole 12k-doc collection just to show one day. The range
+  // is matched against the MEETING start time (`startTime`), not the processing
+  // date (`timestamp`) — so a meeting shows up under the day it was held, even
+  // if it was migrated/processed later.
   subscribe() {
     this.stopSubscription()
     this.loading = true
@@ -97,9 +100,9 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
 
     const q = query(
       this.collRef,
-      where('timestamp', '>=', Timestamp.fromDate(start)),
-      where('timestamp', '<=', Timestamp.fromDate(end)),
-      orderBy('timestamp', 'desc'),
+      where('startTime', '>=', Timestamp.fromDate(start)),
+      where('startTime', '<=', Timestamp.fromDate(end)),
+      orderBy('startTime', 'desc'),
       limit(500)
     )
 
@@ -296,17 +299,42 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     return doc?.status !== 'completed'
   }
 
+  // ---- migration cost estimate ----
+  // Internet egress (Cloud Run → Dropbox) is the dominant per-GB migration cost.
+  // GCP us-central1 internet egress is $0.12/GB (first 1 TB/mo); compute is
+  // negligible once the service scales to zero, so we estimate from GB egressed.
+  readonly costPerGbUsd = 0.12
+  // USD → INR. Adjust as the rate moves (≈ ₹94.5 / $1 as of Jun 2026).
+  readonly usdToInr = 94.5
+
   // ---- summary stats (computed from the currently filtered rows) ----
   get stats() {
     const rows = this.recordsBackup.filteredData || []
     const count = (s: string) => rows.filter(r => r.status === s).length
+    const uploadedBytes = rows.reduce((sum, r) => sum + this.uploadedBytesFor(r), 0)
+    const uploadedGb = uploadedBytes / (1024 ** 3)
+    const costUsd = uploadedGb * this.costPerGbUsd
     return {
       total: rows.length,
       completed: count('completed'),
       processing: count('processing'),
       partial: count('partial_success'),
       failed: count('failed'),
+      uploadedGb,
+      costUsd,
+      costInr: costUsd * this.usdToInr,
     }
+  }
+
+  // Bytes actually pushed to Dropbox for one record: a file counts its full size
+  // once 'success', otherwise its live uploaded byte count (so in-flight and
+  // partial_success records contribute what they've already sent). Legacy docs
+  // with no per-file map fall back to totalSize when completed.
+  private uploadedBytesFor(record: any): number {
+    const files = this.normalizeFiles(record?.files)
+    if (!files.length) return record?.status === 'completed' ? (Number(record?.totalSize) || 0) : 0
+    return files.reduce((sum, f) =>
+      sum + (f.status === 'success' ? (Number(f.fileSize) || 0) : (Number(f.uploadedBytes) || 0)), 0)
   }
 
   // ---- file modal ----
