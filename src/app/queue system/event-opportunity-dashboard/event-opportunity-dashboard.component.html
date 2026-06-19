@@ -60,7 +60,7 @@
       </app-event-opportunity>
     </ng-container>
 
-    <div *ngIf="selectedQueueList.length != 0" class="planning-tabs">
+    <div class="planning-tabs">
       <button class="planning-tab-btn" [class.active]="activeTab === 'board'" (click)="setActiveTab('board')">Board</button>
       <button class="planning-tab-btn" [class.active]="activeTab === 'planning'" (click)="setActiveTab('planning')">Planning</button>
     </div>
@@ -310,6 +310,9 @@
       [allCompletedStageCount]="allCompletedStageCount"
       [mapProfile]="mapProfile"
       [mapNumber]="mapNumber"
+      [eventList]="eventList"
+      [queueList]="queueList"
+      (queueChange)="onPlanningQueueChange($event)"
       [refreshKey]="planningRefreshKey">
     </app-planning-tab>
   </div>
