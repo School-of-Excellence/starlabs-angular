@@ -5,6 +5,9 @@ import { MatDialog, MatDialogConfig } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Firestore, collection, doc, setDoc } from '@angular/fire/firestore';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 import { ParticipantStore } from './core/participant.store';
 import { ParticipantDataService } from './data/participant-data.service';
@@ -24,7 +27,7 @@ import { PromptDialogComponent } from './dialogs/prompt-dialog.component';
 import { RemarksDialogComponent } from './dialogs/remarks-dialog.component';
 import { TagManagerDialogComponent } from './dialogs/tag-manager-dialog.component';
 import { SubscriptionDialogComponent, SubscriptionResult } from './dialogs/subscription-dialog.component';
-import { EmailComposerDialogComponent, ComposerResult } from './dialogs/email-composer-dialog.component';
+import { EmailInputComponent } from '../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { WatiInputComponent } from '../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { ManageAudiencesDialogComponent } from './dialogs/manage-audiences-dialog.component';
 import { QuickComposeDialogComponent, QuickComposeData } from './dialogs/quick-compose-dialog.component';
@@ -63,6 +66,8 @@ export class ParticipantIntelligenceComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
   private readonly injector = inject(Injector);
+  private readonly firestore = inject(Firestore);
+  private readonly http = inject(HttpClient);
 
   // dialogs that inject ParticipantStore must resolve THIS screen's store instance
   private dlg(width: string): MatDialogConfig {
@@ -224,18 +229,33 @@ export class ParticipantIntelligenceComponent implements OnInit {
     );
   }
 
+  // Reuses the production email composer (email-input) from the analytics screen.
+  // It returns a result with {docid, status}; the parent persists to `email archive`
+  // and/or triggers the sendBatchEmail cloud function (mirrors the old screen's afterClosed).
   private composeEmail(): void {
     this.dialog
-      .open(EmailComposerDialogComponent, { panelClass: 'pi-dialog', width: '640px', data: { count: this.store.selectedCount() } })
+      .open(EmailInputComponent, { panelClass: 'pi-dialog', minWidth: '600px', disableClose: true, data: this.store.selectedParticipants() })
       .afterClosed()
-      .subscribe((r?: ComposerResult) => {
-        if (!r) return;
+      .subscribe(async (result: any) => {
+        if (!result) return;
         const n = this.store.selectedCount();
-        if (r.action === 'queue') {
-          this.store.bumpQueued('email');
-          this.snack.open(`Email draft queued for ${n} participants`, 'Dismiss', { duration: 3000 });
-        } else {
-          this.snack.open(`Email draft composed for ${n} — sending isn't wired up yet`, 'Dismiss', { duration: 4000 });
+        try {
+          if (result.status === 'queued' || result.status === 'send') {
+            await setDoc(doc(collection(this.firestore, 'email archive'), result.docid), result, { merge: true });
+            this.store.bumpQueued('email');
+            this.snack.open(result.status === 'queued' ? `Email queued for ${n} participants` : `Email sent to ${n} participants`, 'Dismiss', { duration: 3000 });
+          } else if (result.status === 'validated') {
+            const url = `https://us-central1-${environment.firebase?.projectId}.cloudfunctions.net/sendBatchEmail`;
+            const data = { ...result, archiveid: result.docid };
+            this.http
+              .post(url, JSON.stringify(data), { responseType: 'text', headers: new HttpHeaders().set('Content-Type', 'application/json') })
+              .subscribe({
+                next: () => this.snack.open(`Email sent to ${n} participants`, 'Dismiss', { duration: 3000 }),
+                error: () => this.snack.open('Error sending email', 'Dismiss', { duration: 4000 }),
+              });
+          }
+        } catch {
+          this.snack.open('Error sending email', 'Dismiss', { duration: 4000 });
         }
       });
   }
