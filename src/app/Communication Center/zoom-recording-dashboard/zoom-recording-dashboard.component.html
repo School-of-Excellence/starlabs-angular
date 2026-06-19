@@ -33,6 +33,10 @@
       <span class="stat-label">Failed</span>
       <span class="stat-num">{{ stats.failed }}</span>
     </div>
+    <div class="stat-card stat-card--data">
+      <span class="stat-label">Uploaded (GB)</span>
+      <span class="stat-num">{{ stats.uploadedGb | number : "1.2-2" }}</span>
+    </div>
   </section>
 
   <!-- ===== filters ===== -->

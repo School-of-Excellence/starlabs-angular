@@ -202,6 +202,14 @@ export class EventOpportunityDashboardComponent {
     this.activeTab = tab;
     if (tab === 'planning') this.planningRefreshKey++;
   }
+
+  /** Queue selection coming from the Planning tab's own queue filter. */
+  onPlanningQueueChange(ids: string[]): void {
+    this.selectedQueueList = [...(ids || [])];
+    this.getselectedStages();
+    this.fetchQueueTokens();
+    this.planningRefreshKey++;
+  }
   print() {
     if (!this.selectedCustomStage) {
       this.snackBar.open('No stage selected to print', 'Close', { duration: 3000 });

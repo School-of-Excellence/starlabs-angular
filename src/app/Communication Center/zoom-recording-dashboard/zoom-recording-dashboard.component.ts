@@ -303,13 +303,26 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   get stats() {
     const rows = this.recordsBackup.filteredData || []
     const count = (s: string) => rows.filter(r => r.status === s).length
+    const uploadedBytes = rows.reduce((sum, r) => sum + this.uploadedBytesFor(r), 0)
     return {
       total: rows.length,
       completed: count('completed'),
       processing: count('processing'),
       partial: count('partial_success'),
       failed: count('failed'),
+      uploadedGb: uploadedBytes / (1024 ** 3),
     }
+  }
+
+  // Bytes actually pushed to Dropbox for one record: a file counts its full size
+  // once 'success', otherwise its live uploaded byte count (so in-flight and
+  // partial_success records contribute what they've already sent). Legacy docs
+  // with no per-file map fall back to totalSize when completed.
+  private uploadedBytesFor(record: any): number {
+    const files = this.normalizeFiles(record?.files)
+    if (!files.length) return record?.status === 'completed' ? (Number(record?.totalSize) || 0) : 0
+    return files.reduce((sum, f) =>
+      sum + (f.status === 'success' ? (Number(f.fileSize) || 0) : (Number(f.uploadedBytes) || 0)), 0)
   }
 
   // ---- file modal ----
