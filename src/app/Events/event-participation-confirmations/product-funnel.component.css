@@ -1,0 +1,241 @@
+.sx {
+  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", sans-serif;
+  color: #1c1c1e; background: #f2f2f7; padding: 16px 22px 30px; min-height: 100%;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+.sx-head { padding: 6px 2px 14px; }
+.sx-eyebrow { font-size: 14px; font-weight: 600; color: rgba(60,60,67,.6); letter-spacing: .2px; }
+.sx-title { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin: 3px 0 4px; line-height: 1.05; }
+.sx-subt { font-size: 15px; color: rgba(60,60,67,.6); }
+.sx-frozen-card { display: inline-block; margin-top: 10px; background: #fff; border: .5px solid rgba(60,60,67,.1);
+  border-radius: 12px; padding: 9px 14px 10px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.sx-frozen-head { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700;
+  color: #6c6c70; margin-bottom: 7px; letter-spacing: .2px; }
+.sx-frozen-head mat-icon { font-size: 15px; height: 15px; width: 15px; }
+.sx-frozen-tbl { border-collapse: collapse; font-size: 13px; }
+.sx-frozen-tbl th { font-size: 10px; font-weight: 600; color: rgba(60,60,67,.5); text-transform: uppercase;
+  letter-spacing: .3px; padding: 0 14px 5px 0; text-align: left; border-bottom: .5px solid rgba(60,60,67,.08); }
+.sx-frozen-tbl td { padding: 4px 14px 2px 0; color: #1c1c1e; }
+.sx-frozen-tbl td:first-child { color: rgba(60,60,67,.7); }
+.sx-frozen-tbl .r { text-align: right; }
+.sx-frozen-tbl .sx-fp-ok { color: #1f8a3b; font-weight: 700; }
+
+.sx-error { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #fff; border: .5px solid rgba(215,0,21,.25); border-radius: 14px; padding: 14px 18px;
+  margin-bottom: 14px; color: #d70015; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.sx-error span { display: inline-flex; align-items: center; gap: 8px; }
+.sx-error mat-icon { font-size: 20px; height: 20px; width: 20px; }
+
+.sx-loading { display: flex; align-items: center; gap: 8px; color: rgba(60,60,67,.6); font-size: 14px; padding: 30px 0; }
+.sx-loading .spin { animation: sx-spin 1s linear infinite; }
+@keyframes sx-spin { to { transform: rotate(360deg); } }
+
+/* Grouped breakdown — a header total + indented subset rows with share bars + %.
+   Vertical, grouped, fixed compact width, never full-screen. */
+.sx-bd { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+.sx-bd-panel { width: 360px; max-width: 100%; background: #fff; border: .5px solid rgba(60,60,67,.1);
+  border-radius: 16px; padding: 8px 8px 6px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -18px rgba(0,0,0,.18); }
+.sx-bd-about { font-size: 11.5px; color: rgba(60,60,67,.5); padding: 2px 8px 8px; line-height: 1.3; }
+
+/* Rows — two lines: metric on top, customer-status split below. d0 = total (Potential / Approved) */
+.sx-bd-row { display: flex; flex-direction: column; gap: 3px; width: 100%; border: none; background: none;
+  cursor: pointer; text-align: left; padding: 7px 12px; border-radius: 9px; font: inherit; }
+.sx-bd-row:hover { background: #f6f6f9; }
+.sx-bd-row.on { background: linear-gradient(180deg, rgba(0,122,255,.08), rgba(0,122,255,.04)); }
+.sx-bd-row.d0 { padding: 9px 12px; margin-bottom: 4px; border-bottom: .5px solid rgba(60,60,67,.1);
+  border-radius: 10px 10px 0 0; }
+.sx-bd-row.d1 { padding-left: 18px; }
+.sx-bd-row.d2 { padding-left: 34px; }
+.sx-bd-top { display: flex; align-items: center; gap: 9px; }
+.sx-bd-dot { width: 8px; height: 8px; border-radius: 3px; flex: 0 0 auto; background: rgba(60,60,67,.3); }
+.sx-bd-row.d0 .sx-bd-dot { width: 5px; height: 18px; border-radius: 3px; background: #8e8e93; }
+.sx-bd-row.d0.app .sx-bd-dot { background: #0060df; }
+.sx-bd-lab { flex: 1 1 auto; font-size: 13.5px; color: #1c1c1e; white-space: nowrap; }
+.sx-bd-row.d0 .sx-bd-lab { font-size: 15px; font-weight: 700; }
+.sx-bd-pct { font-size: 11.5px; color: rgba(60,60,67,.5); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+.sx-bd-row.d0 .sx-bd-pct { visibility: hidden; }
+.sx-bd-num { font-size: 15px; font-weight: 600; color: #1c1c1e; font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; margin-left: 10px; }
+.sx-bd-row.d0 .sx-bd-num { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+/* customer-status split line (under the metric) */
+.sx-bd-cs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; padding-left: 17px; }
+.sx-bd-row.d0 .sx-bd-cs { padding-left: 14px; }
+.sx-bd-cs-i { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cs-dot { width: 6px; height: 6px; border-radius: 2px; flex: 0 0 auto; }
+.sx-bd-cs-load { font-size: 11px; color: rgba(60,60,67,.35); padding-left: 17px; }
+/* per-segment accent on the dot */
+.sx-bd-row.elig .sx-bd-dot { background: #1f8a3b; }
+.sx-bd-row.ne .sx-bd-dot { background: #c25e00; }
+.sx-bd-row.inq .sx-bd-dot { background: #8e8e93; }
+.sx-bd-row.att .sx-bd-dot { background: #1f8a3b; }
+.sx-bd-row.ns .sx-bd-dot { background: #d70015; }
+.sx-bd-row.un .sx-bd-dot { background: #7a2638; }
+.sx-bd-row:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
+
+/* KPI cards */
+.sx-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.sx-card { position: relative; background: #fff; border-radius: 14px; padding: 13px 15px 13px 18px;
+  border: .5px solid rgba(60,60,67,.08); box-shadow: 0 1px 2px rgba(0,0,0,.04); cursor: pointer;
+  text-align: left; font-family: inherit; display: flex; flex-direction: column; gap: 2px;
+  transition: transform .12s cubic-bezier(.32,.72,0,1), box-shadow .12s; }
+.sx-card::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
+  border-radius: 3px; background: rgba(60,60,67,.18); transition: opacity .12s; }
+.sx-card:hover { transform: translateY(-2px); box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 10px 26px -14px rgba(0,0,0,.16); }
+.sx-card:active { transform: scale(.98); }
+.sx-lab { font-size: 12.5px; font-weight: 600; color: rgba(60,60,67,.6); }
+.sx-num { font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; color: #1c1c1e; }
+.sx-desc { font-size: 11.5px; color: rgba(60,60,67,.6); }
+.sx-card.elig::before { background: #1f8a3b; } .sx-card.elig .sx-lab { color: #1f8a3b; }
+.sx-card.ne::before { background: #c25e00; } .sx-card.ne .sx-lab { color: #c25e00; }
+.sx-card.inq::before { background: #8e8e93; } .sx-card.inq .sx-lab { color: #6c6c70; }
+.sx-card.app::before { background: #0060df; } .sx-card.app .sx-lab { color: #0060df; }
+.sx-card.att::before { background: #1f8a3b; } .sx-card.att .sx-lab { color: #1f8a3b; }
+.sx-card.ns::before { background: #d70015; } .sx-card.ns .sx-lab { color: #d70015; }
+.sx-card.un::before { background: #7a2638; } .sx-card.un .sx-lab { color: #7a2638; }
+.sx-card.on { background: linear-gradient(180deg, rgba(0,122,255,.08) 0%, #f5f9ff 100%);
+  border-color: rgba(0,122,255,.22); box-shadow: 0 0 0 1px rgba(0,122,255,.22) inset, 0 10px 24px -14px rgba(47,102,214,.42); }
+.sx-card.on::before { background: #007aff; }
+.sx-card.on .sx-lab { color: #0060df; }
+.sx-card:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(0,122,255,.35); }
+
+/* Action bar */
+.sx-bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 14px;
+  padding: 9px 11px; background: #f7f7f9; border: .5px solid rgba(60,60,67,.08); border-radius: 14px; }
+.sx-seq { width: 210px; }
+.sx-finance { width: 150px; margin-left: auto; }
+.sx-search { width: 200px; }
+.sx-approve { border-radius: 10px; height: 40px; font-weight: 600; font-size: 14px; padding: 0 16px;
+  --mdc-filled-button-container-color: #007aff; --mdc-filled-button-label-text-color: #fff;
+  --mdc-filled-button-container-shape: 10px; }
+.sx-approve:hover:not([disabled]) { --mdc-filled-button-container-color: #0060df; }
+.sx-approve:not([disabled]) mat-icon { color: #fff; }
+.sx-approve[disabled] { --mdc-filled-button-disabled-container-color: rgba(118,118,128,.12);
+  --mdc-filled-button-disabled-label-text-color: rgba(60,60,67,.32); }
+.sx-approve[disabled] mat-icon { color: rgba(60,60,67,.32); }
+.sx-approve mat-icon { vertical-align: middle; }
+.sx-ghost { height: 40px; border-radius: 10px; font-weight: 500; font-size: 14px;
+  --mdc-outlined-button-container-shape: 10px; --mdc-outlined-button-outline-color: rgba(60,60,67,.2);
+  --mdc-outlined-button-label-text-color: #1c1c1e; }
+.sx-ghost:hover { background: #f6f6f9; }
+.sx-ghost mat-icon { vertical-align: middle; margin-right: 4px; }
+.sx-approve:focus-visible, .sx-ghost:focus-visible, .sx-mark:focus-visible,
+.sx-assign:focus-visible { outline: 2px solid #007aff; outline-offset: 2px; }
+
+/* Material controls -> iOS look */
+:host ::ng-deep .mdc-button { font-family: inherit; letter-spacing: 0; }
+:host ::ng-deep .mat-mdc-text-field-wrapper { background: #fff; }
+:host ::ng-deep .mat-mdc-form-field-flex { align-items: center; }
+:host ::ng-deep .mat-mdc-form-field-infix { min-height: 40px; padding-top: 9px; padding-bottom: 8px; }
+:host ::ng-deep .mdc-notched-outline__leading { border-radius: 10px 0 0 10px; border-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mdc-notched-outline__trailing { border-radius: 0 10px 10px 0; border-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mdc-notched-outline__notch { border-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mat-mdc-outlined-button { border-radius: 10px; height: 40px;
+  --mdc-outlined-button-container-shape: 10px; --mdc-outlined-button-outline-color: rgba(60,60,67,.2); }
+:host ::ng-deep .mat-mdc-select-value-text { font-family: inherit; color: #1c1c1e; }
+:host ::ng-deep .mat-mdc-select-placeholder { color: rgba(60,60,67,.5); }
+:host ::ng-deep .mat-mdc-select-arrow { color: rgba(60,60,67,.5); }
+:host ::ng-deep .mat-mdc-form-field-icon-suffix .mat-icon { font-size: 18px; width: 18px; height: 18px; color: rgba(60,60,67,.45); }
+
+/* Checkboxes -> iOS blue (was Material pink) */
+:host ::ng-deep .mat-mdc-checkbox {
+  /* selected-icon-color is the BOX FILL when checked; checkmark-color is the tick. */
+  --mdc-checkbox-selected-icon-color: #007aff;
+  --mdc-checkbox-selected-hover-icon-color: #0060df;
+  --mdc-checkbox-selected-focus-icon-color: #007aff;
+  --mdc-checkbox-selected-pressed-icon-color: #007aff;
+  --mdc-checkbox-selected-checkmark-color: #fff;
+  --mdc-checkbox-selected-hover-state-layer-color: #007aff;
+  --mdc-checkbox-selected-focus-state-layer-color: #007aff;
+  --mdc-checkbox-selected-pressed-state-layer-color: #007aff;
+  --mat-checkbox-ripple-color: #007aff;
+}
+/* Hard fallback in case the host theme overrides the MDC tokens. */
+:host ::ng-deep .mat-mdc-checkbox-checked .mdc-checkbox__background {
+  background-color: #007aff !important;
+  border-color: #007aff !important;
+}
+:host ::ng-deep .mat-mdc-checkbox-checked .mdc-checkbox__checkmark { color: #fff !important; }
+
+/* Paginator -> SF Pro */
+:host ::ng-deep .mat-mdc-paginator { font-family: inherit; background: transparent; }
+.sx-hint { font-size: 12.5px; color: rgba(60,60,67,.55); }
+/* Toolbar polish — white inputs on the grey bar, ghost buttons get a surface */
+:host ::ng-deep .sx-bar .mat-mdc-text-field-wrapper { background: #fff; border-radius: 10px; }
+.sx-bar .sx-ghost { background: #fff; border: .5px solid rgba(60,60,67,.14); }
+.sx-bar .sx-ghost:hover { background: #f1f1f4; }
+.sx-showing { font-size: 12.5px; color: rgba(60,60,67,.55); margin: 2px 0 10px; }
+
+/* Table card */
+.sx-wrap { background: #fff; border-radius: 16px; overflow: hidden; border: .5px solid rgba(60,60,67,.08);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+table.sx-t { width: 100%; border-collapse: collapse; }
+.sx-t thead th { font-size: 11.5px; font-weight: 600; color: rgba(60,60,67,.5); text-align: left;
+  padding: 12px 15px; border-bottom: .5px solid rgba(60,60,67,.12); }
+.sx-t td { padding: 12px 15px; font-size: 14px; vertical-align: middle; border-bottom: .5px solid rgba(60,60,67,.07); }
+.sx-t tbody tr:last-child td { border-bottom: none; }
+.sx-t tbody tr:hover { background: #fafafd; }
+.sx-c-check { width: 46px; }
+
+.sx-nmcell { display: flex; align-items: center; gap: 11px; }
+.sx-ph { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; background: #e5e5ea;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.sx-ph img { width: 100%; height: 100%; object-fit: cover; }
+.sx-init { font-size: 11px; font-weight: 600; color: #8e8e93; }
+.sx-nm { font-weight: 600; letter-spacing: -.01em; }
+.sx-em { font-size: 12px; color: rgba(60,60,67,.5); }
+.sx-mut { color: rgba(60,60,67,.6); }
+
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.d-ok { background: #1f8a3b; } .d-bad { background: #d70015; } .d-org { background: #c25e00; }
+
+.sx-warn-i mat-icon { font-size: 16px; height: 16px; width: 16px; color: #c25e00; vertical-align: -3px; }
+.sx-reason { color: #c25e00; font-size: 13.5px; }
+.sx-reason.sx-reason-mut { color: rgba(60,60,67,.6); }
+.sx-assign { font-size: 13.5px; min-width: 0; margin-left: 8px; color: #007aff; }
+.sx-att { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; color: #1f8a3b; font-weight: 600; }
+.sx-att mat-icon { font-size: 16px; height: 16px; width: 16px; }
+.sx-noshow { font-size: 13.5px; color: #d70015; font-weight: 600; margin-right: 8px; }
+.sx-mark { font-size: 13.5px; min-width: 0; color: #007aff; }
+.sx-mark-danger { font-size: 13.5px; min-width: 0; color: #a32d2d; margin-left: 4px; }
+.sx-unatt { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; color: #7a2638; font-weight: 600; }
+.sx-unatt mat-icon { font-size: 16px; height: 16px; width: 16px; }
+:host ::ng-deep .sx-assign.mdc-button, :host ::ng-deep .sx-mark.mdc-button {
+  --mdc-text-button-label-text-color: #007aff;
+  --mat-text-button-state-layer-color: #007aff;
+  --mat-text-button-ripple-color: #007aff;
+}
+:host ::ng-deep .sx-mark-danger.mdc-button {
+  --mdc-text-button-label-text-color: #a32d2d;
+  --mat-text-button-state-layer-color: #a32d2d;
+}
+/* Danger action button (Mark not attended) */
+.sx-danger { height: 40px; border-radius: 10px; font-weight: 500; font-size: 14px;
+  border: 1px solid rgba(163,45,45,.4); color: #a32d2d; }
+.sx-danger:hover:not([disabled]) { background: rgba(163,45,45,.06); }
+.sx-danger[disabled] { color: rgba(60,60,67,.32); border-color: rgba(60,60,67,.12); }
+.sx-danger mat-icon { vertical-align: middle; margin-right: 4px; }
+
+/* Import preview dialog */
+.sx-imp-total { font-size: 13px; color: rgba(60,60,67,.7); margin: 0 0 10px; }
+.sx-imp-sec { border: .5px solid rgba(60,60,67,.12); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.sx-imp-head { display: flex; align-items: center; gap: 6px; width: 100%; background: #fafafb;
+  border: none; padding: 10px 12px; cursor: pointer; font-size: 13.5px; font-weight: 600; color: #1c1c1e; text-align: left; }
+.sx-imp-head mat-icon { font-size: 18px; height: 18px; width: 18px; color: rgba(60,60,67,.5); }
+.sx-imp-head .sx-imp-n { margin-left: auto; font-weight: 700; background: rgba(60,60,67,.08); border-radius: 20px; padding: 1px 9px; font-size: 12px; }
+.sx-imp-add .sx-imp-head { color: #1f8a3b; } .sx-imp-add .sx-imp-n { background: rgba(31,138,59,.12); color: #1f8a3b; }
+.sx-imp-queue .sx-imp-head { color: #6c6c70; }
+.sx-imp-no .sx-imp-head { color: #c25e00; } .sx-imp-no .sx-imp-n { background: rgba(194,94,0,.12); color: #c25e00; }
+.sx-imp-list { list-style: none; margin: 0; padding: 6px 12px 10px; max-height: 180px; overflow: auto; font-size: 13px; }
+.sx-imp-list li { padding: 3px 0; }
+.sx-imp-no-act { display: flex; gap: 8px; align-items: center; padding: 0 12px 10px; }
+.sx-empty { text-align: center; color: rgba(60,60,67,.6); font-style: italic; padding: 26px; }
+:host ::ng-deep .sx-empty .mdc-button { --mdc-text-button-label-text-color: #007aff; }
+
+/* Dialogs */
+.sx-warnline { display: flex; align-items: center; gap: 6px; color: #c25e00; font-size: 14px; }
+.sx-warnline mat-icon { font-size: 18px; height: 18px; width: 18px; }
+.sx-prog { padding: 8px 4px; }
+.sx-prog-msg { font-size: 14px; margin-bottom: 12px; }
+.sx-prog-sub { font-size: 12.5px; color: rgba(60,60,67,.55); margin-top: 8px; }
+.sx-fail { max-height: 200px; overflow: auto; margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }

@@ -313,7 +313,7 @@
       <br>
       <!-- {{deliveryForm.value | json}} -->
       <div *ngIf="!formpatch" class="Acontainer mt10" style="display: flex;justify-content: center;">
-          <button class="button-css" style="width: 150px;font-size: 1rem;letter-spacing:2px ;" mat-raised-button color="primary" type="submit" [disabled]="deliveryForm.invalid || !submissionAccess" (click)="onSubmit(this.deliveryForm.value)">Submit</button>
+          <button class="button-css" style="width: 150px;font-size: 1rem;letter-spacing:2px ;" mat-raised-button color="primary" type="submit" [disabled]="deliveryForm.invalid || !submissionAccess" (click)="onSubmit(this.deliveryForm.value)" data-testid="form-submit">Submit</button>
       </div>
   
       <div *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'" class="Acontainer mt10" style="display: flex;justify-content: center;">
@@ -348,8 +348,8 @@
       </div>
     
       <div class="button-container">
-        <button mat-raised-button color="primary" type="button" (click)="reworkNotes()" [disabled]="!reviewAccess" class="button-css">Re-Work</button>
-        <button mat-raised-button color="accent" type="submit" (click)="completeNotes()" [disabled]="!reviewAccess" class="button-css">Complete</button>
+        <button mat-raised-button color="primary" type="button" (click)="reworkNotes()" data-testid="form-rework" [disabled]="!reviewAccess" class="button-css">Re-Work</button>
+        <button mat-raised-button color="accent" type="submit" (click)="completeNotes()" data-testid="form-complete" [disabled]="!reviewAccess" class="button-css">Complete</button>
       </div>
       <br>
       <p *ngIf="!reviewAccess" style="color: rgb(229, 66, 66);">*you do not have access to review</p>    

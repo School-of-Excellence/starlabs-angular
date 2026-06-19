@@ -3,7 +3,7 @@
     <form [formGroup]="activityForm" (ngSubmit)="submit()">
       <mat-form-field *ngIf="activityForm.controls['selectedstudio'].enabled" class="w-100 mt-3" appearance="outline">
         <mat-label>Studio Specialist</mat-label>
-        <mat-select formControlName="selectedstudio">
+        <mat-select formControlName="selectedstudio" data-testid="aqs-studio-select">
           <mat-option *ngFor="let option of studioList" [value]="option.value">{{option.name}}</mat-option>
         </mat-select>
         <mat-error *ngIf="activityForm.get('selectedstudio').hasError('required')">Required</mat-error>
@@ -43,7 +43,7 @@
       </button>
       <div class="w-100 text-center mt-4">
         <button mat-stroked-button class="cancelbtn me-3" type="button" (click)="dialogRef.close(null)">Close</button>
-        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="activityForm.invalid">Assign Specialist</button>
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="activityForm.invalid" data-testid="aqs-submit">Confirm Specialist</button>
       </div>
     </form>
 </div>

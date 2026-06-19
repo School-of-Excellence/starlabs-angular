@@ -168,7 +168,7 @@
         <section class="ios-card is-tappable" role="button" tabindex="0"
                  (click)="goToParticipantsWithLever('flagged')" (keydown.enter)="goToParticipantsWithLever('flagged')">
           <div class="ios-card-head"><span class="ios-card-title tint-pink">Flagged</span></div>
-          <div class="ios-bignum sm">{{ flaggedIds.size }}<span class="unit">pinned</span></div>
+          <div class="ios-bignum sm">{{ flaggedCount() }}<span class="unit">pinned</span></div>
           <div class="ios-cluster" *ngIf="flaggedRows().length; else flagEmpty">
             <span class="ios-row" *ngFor="let r of flaggedRows() | slice:0:3">
               <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
@@ -176,9 +176,31 @@
             </span>
           </div>
           <ng-template #flagEmpty>
-            <p class="ios-empty" *ngIf="flaggedIds.size === 0">Nothing flagged.</p>
-            <p class="ios-empty" *ngIf="flaggedIds.size > 0">Open to see all.</p>
+            <p class="ios-empty" *ngIf="flaggedCount() === 0">Nothing flagged.</p>
+            <p class="ios-empty" *ngIf="flaggedCount() > 0">Open to see all.</p>
           </ng-template>
+        </section>
+
+        <!-- Coach-set health distribution (across the current scope's loaded rows) -->
+        <section class="ios-card span-2 health-card" *ngIf="healthDistribution() as hd">
+          <div class="ios-card-head"><span class="ios-card-title tint-indigo">Coach-set health</span></div>
+          <div class="health-bar" *ngIf="hd.total > 0" aria-hidden="true">
+            <span class="hb-segment state-happy" [style.width.%]="healthPct(hd.happy, hd.total)" matTooltip="Happy: {{ hd.happy }}"></span>
+            <span class="hb-segment state-neutral" [style.width.%]="healthPct(hd.neutral, hd.total)" matTooltip="Neutral: {{ hd.neutral }}"></span>
+            <span class="hb-segment state-unhappy" [style.width.%]="healthPct(hd.unhappy, hd.total)" matTooltip="Unhappy: {{ hd.unhappy }}"></span>
+            <span class="hb-segment state-at-risk" [style.width.%]="healthPct(hd.atRisk, hd.total)" matTooltip="At-risk: {{ hd.atRisk }}"></span>
+            <span class="hb-segment state-critical" [style.width.%]="healthPct(hd.critical, hd.total)" matTooltip="Critical: {{ hd.critical }}"></span>
+            <span class="hb-segment state-not-assessed" [style.width.%]="healthPct(hd.notAssessed, hd.total)" matTooltip="Not assessed: {{ hd.notAssessed }}"></span>
+          </div>
+          <div class="health-legend">
+            <span class="hl-item"><i class="hl-dot state-happy"></i>Happy <b>{{ hd.happy }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-neutral"></i>Neutral <b>{{ hd.neutral }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-unhappy"></i>Unhappy <b>{{ hd.unhappy }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-at-risk"></i>At-risk <b>{{ hd.atRisk }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-critical"></i>Critical <b>{{ hd.critical }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-not-assessed"></i>Not assessed <b>{{ hd.notAssessed }}</b></span>
+          </div>
+          <p class="health-caption">From logged assessments only — most participants start as Not assessed.</p>
         </section>
 
       </section>
@@ -200,21 +222,41 @@
       </button>
     </div>
 
-    <!-- Phase B: assignment bar (Unassigned view only) -->
-    <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED">
+    <!-- Persistent selection tray (Unassigned view) — survives search/filter/paging because selection
+         is now persistent. Chips read from selectedMeta so off-page picks still show; ✕ deselects. -->
+    <section class="jchd-tray" *ngIf="(selectedCoachId === UNASSIGNED || selectedCoachId === ALL) && selectedCount > 0">
+      <div class="jchd-tray-head">
+        <strong>{{ selectedCount }}</strong> selected
+        <button type="button" class="jchd-tray-clear" (click)="clearSelection()">Clear all</button>
+      </div>
+      <div class="jchd-tray-chips">
+        <span class="jchd-chip" *ngFor="let s of selectedTray">
+          <span class="jchd-chip-name">{{ s.name }}</span>
+          <button type="button" class="jchd-chip-x" aria-label="Remove from selection"
+                  (click)="deselect(s.id)">✕</button>
+        </span>
+      </div>
+    </section>
+
+    <!-- Assignment bar: Unassigned view (always), or All view once something is selected (bulk assign/reassign) -->
+    <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED || (selectedCoachId === ALL && selectedCount > 0)">
       <mat-icon>person_add</mat-icon>
-      <span class="assign-text"><strong>{{ selectedCount }}</strong> of {{ dataSource.data.length }} selected · these participants have no journey coach</span>
-      <mat-form-field appearance="outline" class="assign-coach">
-        <mat-label>Assign to coach</mat-label>
-        <mat-select [(ngModel)]="assignTargetCoachId">
-          <mat-option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <button mat-flat-button color="primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
+      <span class="assign-text" *ngIf="selectedCoachId === UNASSIGNED"><strong>{{ selectedCount }}</strong> of {{ dataSource.data.length }} selected · these participants have no journey coach</span>
+      <span class="assign-text" *ngIf="selectedCoachId === ALL"><strong>{{ selectedCount }}</strong> selected · assign or reassign to a coach</span>
+      <span class="jchd-assign-spacer"></span>
+      <label class="jchd-assign-pick">
+        <select class="jchd-assign-select" [(ngModel)]="assignTargetCoachId" aria-label="Assign to coach">
+          <option value="">Assign to coach</option>
+          <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
+        </select>
+        <svg class="jchd-assign-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </label>
+      <button type="button" class="jchd-btn-primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
         (click)="assignSelected()">
         <mat-icon>how_to_reg</mat-icon> Assign {{ selectedCount }}
       </button>
-      <mat-spinner *ngIf="assigning" diameter="22"></mat-spinner>
+      <mat-spinner *ngIf="assigning" diameter="20"></mat-spinner>
     </section>
 
     <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
@@ -227,7 +269,7 @@
       </button>
       <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
         matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
-        <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded"
+        <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded()"
           matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
         <span class="mc-num">{{ summary.goingQuiet }}</span>
       </button>
@@ -249,7 +291,7 @@
       <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
         matTooltip="Flagged participants (visible to all coaches)">
         <span class="mc-label"><span class="mc-dot dot-pink"></span>Flagged</span>
-        <span class="mc-num">{{ flaggedIds.size }}</span>
+        <span class="mc-num">{{ flaggedCount() }}</span>
       </button>
     </section>
 
@@ -434,13 +476,13 @@
     <div class="sr-only" aria-live="polite">{{ focusedRowName }}</div>
 
     <div class="jchd-table-wrap ios-table-card">
-      <table mat-table [dataSource]="dataSource" matSort matSortActive="priority" matSortDirection="desc"
+      <table mat-table [dataSource]="dataSource" [trackBy]="trackByProfileId" matSort matSortActive="priority" matSortDirection="desc"
              class="jchd-table ios-grid-t">
 
         <!-- Participant: initials avatar + bold name (+ flag glyph when flagged) + masked mono id -->
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
-          <td mat-cell *matCellDef="let r">
+          <td mat-cell *matCellDef="let r" class="col-person">
             <span class="cell-person">
               <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
               <span class="cp-id-wrap">
@@ -449,7 +491,8 @@
                     <mat-icon>flag</mat-icon>
                   </span>
                 </span>
-                <span class="cp-id">{{ maskedId(r.number) }}</span>
+                <span class="cp-email" *ngIf="r.email">{{ r.email }}</span>
+                <span class="cp-id">{{ r.number || '—' }}</span>
               </span>
             </span>
           </td>
@@ -527,7 +570,7 @@
           </th>
           <td mat-cell *matCellDef="let r">
             <mat-checkbox [checked]="isSelected(r.profileid)"
-              (click)="$event.stopPropagation()" (change)="toggleSelect(r.profileid)"></mat-checkbox>
+              (click)="$event.stopPropagation()" (change)="toggleSelect(r.profileid, r.name)"></mat-checkbox>
           </td>
         </ng-container>
 
@@ -546,6 +589,11 @@
               <button mat-menu-item *ngFor="let c of coaches" (click)="assignCoachToRow(r, c.id)">
                 <mat-icon *ngIf="r.coachname === c.name">check</mat-icon>
                 <span [class.assign-current]="r.coachname === c.name">{{ c.name }}</span>
+              </button>
+              <button mat-menu-item class="assign-unassign" *ngIf="r.coachname && r.coachname !== '—'"
+                      (click)="unassignCoach(r)">
+                <mat-icon>person_remove</mat-icon>
+                <span>Unassign (remove coach)</span>
               </button>
             </mat-menu>
           </td>
@@ -589,7 +637,7 @@
 
       <!-- Mockup #panel-coaches: one .coach-card per coach, all stats from real loaded data. -->
       <div class="coach-list">
-        <div class="coach-card" *ngFor="let card of coachCards()"
+        <div class="coach-card" *ngFor="let card of coachCards(); trackBy: trackByCoachId"
              [class.open]="expandedCoachIds.has(card.coachId)"
              (click)="toggleCoachCard(card.coachId)">
           <div class="coach-top">
@@ -655,7 +703,7 @@
       </div>
 
       <div class="wl-list" *ngIf="worklistTotal() > 0">
-        <article class="wl-card" *ngFor="let r of worklistRows(); let i = index" [ngClass]="bandClass(r.priorityBand)" [style.--i]="i">
+        <article class="wl-card" *ngFor="let r of worklistRows(); let i = index; trackBy: trackByProfileId" [ngClass]="bandClass(r.priorityBand)" [style.--i]="i">
           <div class="wl-rail"></div>
 
           <div class="wl-body">
@@ -695,7 +743,7 @@
             <button mat-icon-button class="wl-flag" [class.is-flagged]="r.flagged"
               (click)="toggleFlag(r)" [attr.aria-pressed]="r.flagged"
               [matTooltip]="r.flagged ? 'Unflag' : 'Flag'">
-              <mat-icon>{{ r.flagged ? 'star' : 'star_border' }}</mat-icon>
+              <mat-icon>{{ r.flagged ? 'flag' : 'outlined_flag' }}</mat-icon>
             </button>
             <button mat-stroked-button class="wl-act" (click)="openSlideover(r)" matTooltip="Open participant panel">Details</button>
             <button mat-stroked-button class="wl-act" (click)="logCall(r)">Log call</button>

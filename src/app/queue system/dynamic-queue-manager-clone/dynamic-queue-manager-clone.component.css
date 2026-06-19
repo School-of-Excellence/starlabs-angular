@@ -244,6 +244,14 @@
 .forestgreen{
   color:forestgreen;
 }
+.approved-check{
+  color:#2e7d32;
+  font-size:18px;
+  width:18px;
+  height:18px;
+  vertical-align:text-bottom;
+  margin-left:4px;
+}
 
 .textbtn:hover{
   color: green;

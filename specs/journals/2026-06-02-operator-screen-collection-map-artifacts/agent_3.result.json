@@ -1,0 +1,379 @@
+[
+  {
+    "route": "communitymanager",
+    "file": "src/app/AppEngagement/community-manager/community-manager.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "community category", "line": 185},
+      {"c": "community post tags", "line": 190},
+      {"c": "activesnippet", "line": 195},
+      {"c": "queue generation", "line": 202},
+      {"c": "event collection", "line": 213},
+      {"c": "community post", "line": 224},
+      {"c": "classify", "line": 234}
+    ],
+    "writes": [
+      {"c": "activesnippet", "line": 291},
+      {"c": "community category", "line": 359},
+      {"c": "community category", "line": 376},
+      {"c": "community post tags", "line": 408},
+      {"c": "community post tags", "line": 426},
+      {"c": "community post", "line": 511},
+      {"c": "community post", "line": 571},
+      {"c": "community post", "line": 660}
+    ],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Lines 298/304 (.collection(collection).doc().update) are inside a /* */ comment block (294-308) - not live. activesnippet & classify accessed via doc()+docData (single-doc reads). community category docRef at 339 is used to set a field value, not a write."
+  },
+  {
+    "route": "appactionpending",
+    "file": "src/app/AppEngagement/app-action-pending/app-action-pending.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "delivery forms", "line": 73},
+      {"c": "quiz", "line": 82},
+      {"c": "arenavideoask", "line": 92},
+      {"c": "appactionpending", "line": 103}
+    ],
+    "writes": [],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only screen. appactionpending via onSnapshot (live)."
+  },
+  {
+    "route": "interimreportlog",
+    "file": "src/app/AppEngagement/interim-report-log/interim-report-log.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 194},
+      {"c": "participant metadata", "line": 206},
+      {"c": "interimreport log", "line": 229},
+      {"c": "ask AH", "line": 322},
+      {"c": "love letter", "line": 322}
+    ],
+    "writes": [
+      {"c": "ask AH", "line": 596},
+      {"c": "love letter", "line": 596},
+      {"c": "ask AH", "line": 623},
+      {"c": "love letter", "line": 623},
+      {"c": "email archive", "line": 848},
+      {"c": "wati archive", "line": 909}
+    ],
+    "services": ["AuthguardService"],
+    "dynamic": ["collectionMap[activeTab] resolves to 'ask AH' or 'love letter' (defined line 115); used by buildQuery read (322->343) and ALL toggle updateDoc writes at lines 591/596, 618/623, 644/649, 669/675, 696/702, 747/749"],
+    "atc": [],
+    "notes": "interimreport log read via collectionData (live). buildQuery (322) and toggle updateDocs target dynamic collectionMap=['ask AH','love letter'] selected by active tab - both names listed in reads/writes (representative lines 322/596/623). email archive setDoc (848), wati archive updateDoc (909)."
+  },
+  {
+    "route": "evolutionwishlistlog",
+    "file": "src/app/AppEngagement/evolution-wishlist-log-screen/evolution-wishlist-log-screen.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 75},
+      {"c": "evolutionwishlistlog", "line": 81},
+      {"c": "evolutionwishlistquestions", "line": 160}
+    ],
+    "writes": [
+      {"c": "evolutionwishlistlog", "line": 191},
+      {"c": "evolutionwishlistlog", "line": 219},
+      {"c": "evolutionwishlistlog", "line": 298}
+    ],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "evolutionwishlistlog read via collectionData (live, ordered by created). Lines 245-291 contain commented-out .collection().doc().update() blocks - ignored."
+  },
+  {
+    "route": "evolutionwishlist",
+    "file": "src/app/AppEngagement/evolution-wishlist-form/evolution-wishlist-form.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "evolutionwishlistlog", "line": 66},
+      {"c": "evolutionwishlistquestions", "line": 110}
+    ],
+    "writes": [
+      {"c": "evolutionwishlistlog", "line": 268}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Public-facing form. evolutionwishlistlog read via getDoc(doc) (single doc), written via updateDoc (268). No AuthguardService injected."
+  },
+  {
+    "route": "modedashboard",
+    "file": "src/app/AppEngagement/mode-dashboard/mode-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "modes", "line": 128},
+      {"c": "adsplaylist", "line": 140},
+      {"c": "solar voice playlist", "line": 151},
+      {"c": "series", "line": 162},
+      {"c": "conetent_urls", "line": 173},
+      {"c": "delivery forms", "line": 184},
+      {"c": "product mode config", "line": 196},
+      {"c": "participantdashboard", "line": 229},
+      {"c": "participantsproduct", "line": 251},
+      {"c": "participantsproduct", "line": 259},
+      {"c": "participantsproduct", "line": 304}
+    ],
+    "writes": [
+      {"c": "participantsproduct", "line": 410}
+    ],
+    "writes_note": "line 410 batch.update committed at 421",
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "'conetent_urls' (line 173) is the literal spelling in code (likely a typo for content_urls). product mode config & participantdashboard read via onSnapshot (live). Write is a writeBatch (396) of participantsproduct docs, batch.update@410, commit@421."
+  },
+  {
+    "route": "mode-dashboard-new",
+    "file": "src/app/AppEngagement/mode-dashboard-new/mode-dashboard-new.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 188},
+      {"c": "queue generation", "line": 205},
+      {"c": "modes", "line": 222},
+      {"c": "adsplaylist", "line": 252},
+      {"c": "solar voice playlist", "line": 253},
+      {"c": "series", "line": 254},
+      {"c": "content_urls", "line": 255},
+      {"c": "delivery forms", "line": 256},
+      {"c": "participant metadata", "line": 306},
+      {"c": "participantsproduct", "line": 331},
+      {"c": "product mode config", "line": 349},
+      {"c": "modes", "line": 350},
+      {"c": "products", "line": 353},
+      {"c": "participantsproduct", "line": 446},
+      {"c": "participantsproduct", "line": 554},
+      {"c": "participantsproduct", "line": 581},
+      {"c": "participantsproduct", "line": 705}
+    ],
+    "writes": [],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "No direct writes in this component. Line 718 builds a products docRef only to pass into ProductModeConfigupdateComponent dialog (actual write happens in that child dialog, not this screen). Heavy live reads via collectionData/collectionSnapshots."
+  },
+  {
+    "route": "participantAEL/:id",
+    "file": "src/app/AppEngagement/participant-ael/participant-ael.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "atc_alpha", "line": 116},
+      {"c": "accelerated evolution level", "line": 152},
+      {"c": "event collection", "line": 171},
+      {"c": "queue generation", "line": 172},
+      {"c": "participant AEL", "line": 223},
+      {"c": "event participation request", "line": 369},
+      {"c": "queue_token", "line": 383},
+      {"c": "interim crossover", "line": 430}
+    ],
+    "writes": [
+      {"c": "participant AEL", "line": 424},
+      {"c": "interim crossover", "line": 437},
+      {"c": "participant AEL", "line": 455}
+    ],
+    "writes_note": "lines 424/437 are batch.update (writeBatch@422, commit@441)",
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [
+      {"c": "atc_alpha", "line": 116}
+    ],
+    "notes": "READS atc_alpha (line 116-122, getDocs query type==online, isdelete==false, date range, author array-contains) - this is a SENSITIVE ATC collection per CLAUDE.md denylist. No ATC writes. participant AEL written via batch.update(424) and updateDoc(455); interim crossover via batch.update(437)."
+  },
+  {
+    "route": "participantAEL",
+    "file": "src/app/AppEngagement/participant-ael/participant-ael.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "atc_alpha", "line": 116},
+      {"c": "accelerated evolution level", "line": 152},
+      {"c": "event collection", "line": 171},
+      {"c": "queue generation", "line": 172},
+      {"c": "participant AEL", "line": 223},
+      {"c": "event participation request", "line": 369},
+      {"c": "queue_token", "line": 383},
+      {"c": "interim crossover", "line": 430}
+    ],
+    "writes": [
+      {"c": "participant AEL", "line": 424},
+      {"c": "interim crossover", "line": 437},
+      {"c": "participant AEL", "line": 455}
+    ],
+    "writes_note": "Same component as participantAEL/:id (duplicate route). lines 424/437 batch.update.",
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [
+      {"c": "atc_alpha", "line": 116}
+    ],
+    "notes": "Duplicate of route participantAEL/:id - same component file. READS sensitive ATC collection atc_alpha (line 116). See participantAEL/:id notes."
+  },
+  {
+    "route": "productmodeconfig",
+    "file": "src/app/AppEngagement/product-mode-config/product-mode-config.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "product mode config", "line": 47},
+      {"c": "products", "line": 56},
+      {"c": "adsplaylist", "line": 77},
+      {"c": "solar voice playlist", "line": 91},
+      {"c": "series", "line": 103},
+      {"c": "content_urls", "line": 113},
+      {"c": "delivery forms", "line": 123}
+    ],
+    "writes": [],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "No direct writes. product mode config & products via collectionData (live). Line 154 builds products docRef only to pass into ProductModeConfigupdateComponent dialog (write occurs in that child dialog, not here)."
+  },
+  {
+    "route": "communitymanager",
+    "file": "src/app/AppEngagement/community-manager/community-manager.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "community category", "line": 185},
+      {"c": "community post tags", "line": 190},
+      {"c": "activesnippet", "line": 195},
+      {"c": "queue generation", "line": 202},
+      {"c": "event collection", "line": 213},
+      {"c": "community post", "line": 224},
+      {"c": "classify", "line": 234}
+    ],
+    "writes": [
+      {"c": "activesnippet", "line": 291},
+      {"c": "community category", "line": 359},
+      {"c": "community category", "line": 376},
+      {"c": "community post tags", "line": 408},
+      {"c": "community post tags", "line": 426},
+      {"c": "community post", "line": 511},
+      {"c": "community post", "line": 571},
+      {"c": "community post", "line": 660}
+    ],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Duplicate route of row 1 - same community-manager component. Lines 298/304 are commented out. See row 1 notes."
+  },
+  {
+    "route": "recommendedplaylist",
+    "file": "src/app/AppEngagement/manage-recommended-playlist/manage-recommended-playlist-component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 143},
+      {"c": "buffermix archive", "line": 170},
+      {"c": "recommended mix playlist", "line": 210},
+      {"c": "recommended mix playlist", "line": 338},
+      {"c": "series", "line": 354},
+      {"c": "episodes", "line": 361},
+      {"c": "solar voice playlist", "line": 368},
+      {"c": "solar voice audios", "line": 375},
+      {"c": "content_urls", "line": 382},
+      {"c": "recommended mix playlist", "line": 445}
+    ],
+    "writes": [
+      {"c": "buffermix archive", "line": 336},
+      {"c": "recommended mix playlist", "line": 342},
+      {"c": "recommended mix playlist", "line": 429},
+      {"c": "recommended mix playlist", "line": 450},
+      {"c": "buffermix archive", "line": 934},
+      {"c": "recommended mix playlist", "line": 940}
+    ],
+    "writes_note": "lines 342/450/940 are batch.update (writeBatch); 336/429/934 updateDoc",
+    "services": ["AuthguardService", "SnackbarService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "recommended mix playlist reads at 338/445 are query(where bufferdocref==) feeding batch deletes. Lines 1194-1200 are commented-out duplicate of the toggle logic - ignored. Two near-identical toggle handlers (onTogglePersonalisedDelete @328 and another @~930) both update buffermix archive + cascade recommended mix playlist."
+  },
+  {
+    "route": "bigwall",
+    "file": "src/app/AppEngagement/bigwall-data-adding/bigwall-data-adding.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 87},
+      {"c": "post_categories", "line": 98},
+      {"c": "profile_data", "line": 107},
+      {"c": "arena highlights", "line": 137}
+    ],
+    "writes": [
+      {"c": "arena highlights", "line": 153},
+      {"c": "arena highlights", "line": 158},
+      {"c": "arena highlights", "line": 165}
+    ],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "arena highlights read via onSnapshot (live, filtered by selected eventref). Writes: pin updateDoc(153), unpin updateDoc(158), deleteDoc(165) - all target arena highlights."
+  },
+  {
+    "route": "atctaxonomy",
+    "file": "src/app/AppEngagement/taxonomy/view-tags/view-tags.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "atc taxonomy", "line": 50}
+    ],
+    "writes": [
+      {"c": "atc taxonomy", "line": 89}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads/writes 'atc taxonomy' (collectionData read @50, deleteDoc @89). Per CLAUDE.md, 'atc taxonomy' is explicitly REFERENCE-ONLY config and SAFE (not on the sensitive ATC denylist) - so not flagged in atc[]. Edit handled in AddTagsComponent dialog."
+  },
+  {
+    "route": "notificationlog",
+    "file": "src/app/AppEngagement/notifications-log/notifications-log.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "user_data", "line": 64},
+      {"c": "notifications", "line": 70},
+      {"c": "logs", "line": 159}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. 'logs' (line 159) is read via collectionGroup query (across all notifications/*/logs subcollections), filtered by date range. notifications read filtered by read==true (line 70). Lines 101-103 are a commented-out collectionGroup. firestore via inject()."
+  },
+  {
+    "route": "notificationrecord",
+    "file": "src/app/AppEngagement/notification-record/notification-record.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "notifications", "line": 124},
+      {"c": "notifications/{userRef.id}/logs", "line": 161},
+      {"c": "notifications/{userRef.id}/logs", "line": 631},
+      {"c": "notificationrecord", "line": 188}
+    ],
+    "writes": [],
+    "services": ["AuthguardService"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only. notifications/{userRef.id}/logs subcollection read via getDocs (161-171 per-profile, 631-637). notificationrecord read via collectionData (live, date range). notifications query read==true @124. Lines 427-432 and 696-703 are commented-out subcollection reads."
+  },
+  {
+    "route": "updateprofiletaxonomy",
+    "file": "src/app/AppEngagement/taxonomy/update-adjustment-taxonomy/update-adjustment-taxonomy.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 68},
+      {"c": "atc taxonomy", "line": 72},
+      {"c": "atc_alpha", "line": 109},
+      {"c": "atc_alpha/{id}/corrections", "line": 118}
+    ],
+    "writes": [
+      {"c": "atc_alpha/{id}/corrections", "line": 143}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [
+      {"c": "atc_alpha", "line": 109},
+      {"c": "atc_alpha/{id}/corrections", "line": 118},
+      {"c": "atc_alpha/{id}/corrections", "line": 143}
+    ],
+    "notes": "READS AND WRITES SENSITIVE ATC DATA. atc_alpha query @109 (getDocs, where profileid, ordered prescription_date). corrections subcollection read @118 (getDocs(collection(docSnap.ref,'corrections'))). WRITE @143: doc['ref'].update({tags}) where ref = correction.ref (line 123) -> writes atc_alpha/{id}/corrections. 'atc taxonomy' @72 is safe reference config. This screen is on the ATC denylist scope (atc_alpha)."
+  }
+]

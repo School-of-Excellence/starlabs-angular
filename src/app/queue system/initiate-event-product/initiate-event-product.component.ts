@@ -191,7 +191,7 @@ export class InitiateEventProductComponent {
 
   ngAfterViewInit() {
     console.log("After View Init")
-    this.participantProductList.sort((a, b) => a["name"].localeCompare(b["name"]))
+    this.participantProductList.sort((a, b) => (a["name"] || '').localeCompare(b["name"] || ''))
     this.participantProductList.sort((a, b) => Number(b["eventrequested"]) - Number(a["eventrequested"]))
     this.tableDatasource.data = this.participantProductList;
     setTimeout(() => {

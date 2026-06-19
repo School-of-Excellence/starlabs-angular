@@ -6,25 +6,10 @@
       <span class="arena__brand-mark"><mat-icon>bolt</mat-icon></span>
       <div>
         <h1 class="arena__brand-title">{{ queueName || 'Arena' }}</h1>
-        <span class="arena__brand-sub">Live Activity Board · Coordinator View</span>
       </div>
     </div>
 
-    <div class="arena__head-counts">
-      <span class="hc hc--ink">
-        <span class="hc__dot hc__dot--ink"></span>
-        {{ idleStudios.length + invitingStudios.length + joinedAssignments.length + activeAssignments.length }}
-      </span>
-      <span class="hc hc--amber"><span class="hc__dot hc__dot--amber"></span>{{ invitingStudios.length }}</span>
-      <span class="hc hc--blue"><span class="hc__dot hc__dot--blue"></span>{{ joinedAssignments.length }}</span>
-      <span class="hc hc--green"><span class="hc__dot hc__dot--green"></span>{{ activeAssignments.length }}</span>
-    </div>
-
     <div class="arena__head-stats">
-      <span class="stat stat--green">Active <b>{{ activeCount }}</b></span>
-      <span class="stat stat--indigo">SE Done <b>{{ seDoneCount }}</b></span>
-      <span class="stat stat--purple">ATC Done <b>{{ atcDoneCount }}</b></span>
-      <span class="stat stat--orange">Waiting <b>{{ waitingCount }}</b></span>
       <button class="arena__back" (click)="goBack()">
         <mat-icon>arrow_back</mat-icon> Back
       </button>
@@ -32,10 +17,21 @@
   </header>
 
   <!-- ============================== BODY ============================== -->
-  <main class="arena__body">
+  <main class="arena__body" [class.is-left-closed]="!leftOpen" [class.is-right-closed]="!rightOpen">
 
     <!-- ----- LEFT SIDEBAR ----- -->
-    <aside class="arena__left">
+    <aside class="arena__left" [class.is-closed]="!leftOpen">
+      <!-- Collapsed: thin rail with a reopen control (kept inside the sidenav) -->
+      <button class="panel-rail" *ngIf="!leftOpen" (click)="leftOpen = true" matTooltip="Show participants panel">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+
+      <ng-container *ngIf="leftOpen">
+      <div class="panel-bar panel-bar--end">
+        <button class="panel-collapse" (click)="leftOpen = false" matTooltip="Close this panel" aria-label="Close panel">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
       <div class="arena__left-tabs">
         <button class="ltab" [class.ltab--active]="leftTab === 'participants'" (click)="leftTab = 'participants'">
           <mat-icon>groups</mat-icon> Participants
@@ -98,8 +94,7 @@
               <span class="prow__avatar prow__avatar--ink">{{ i + 1 }}</span>
               <div class="prow__studio">
                 <span class="prow__studio-name" *ngFor="let sp of specialistList(s); let last = last">
-                  <span class="prow__activity">{{ sp.activity || sp.name }}</span>
-                  <span class="prow__person" *ngIf="sp.activity"> ({{ sp.name }})</span><span *ngIf="!last">, </span>
+                  <span class="prow__activity">{{ sp.name }}</span><span class="prow__person" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
                 </span>
               </div>
             </div>
@@ -119,8 +114,7 @@
               </span>
               <div class="prow__studio">
                 <span class="prow__studio-name" *ngFor="let sp of specialistList(s); let last = last">
-                  <span class="prow__activity">{{ sp.activity || sp.name }}</span>
-                  <span class="prow__person" *ngIf="sp.activity"> ({{ sp.name }})</span><span *ngIf="!last">, </span>
+                  <span class="prow__activity">{{ sp.name }}</span><span class="prow__person" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
                 </span>
               </div>
             </div>
@@ -128,6 +122,7 @@
           </div>
         </section>
       </div>
+      </ng-container>
     </aside>
 
     <!-- ----- KANBAN COLUMNS ----- -->
@@ -144,18 +139,15 @@
             <div class="kc__head">
               <span class="kc__avatar kc__avatar--ink">{{ initials(participantName(s.participants?.[0] || '')) }}</span>
               <div class="kc__title">
-                <span class="kc__name">{{ specialistList(s)[0]?.activity || 'Idle Studio' }}</span>
-                <span class="kc__status kc__status--ink">IDLE</span>
+                <!-- Show every specialist holding this idle studio. Long names
+                     wrap instead of being truncated with an ellipsis. -->
+                <span class="kc__name kc__name--wrap" *ngIf="!specialistList(s).length">Idle Studio</span>
+                <span class="kc__name kc__name--wrap" *ngFor="let sp of specialistList(s); let last = last">
+                  {{ sp.name }}<span class="kc__role-act" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
+                </span>
               </div>
             </div>
             <div class="kc__meta kc__meta--placeholder">No participant assigned</div>
-            <div class="kc__foot">
-              <span class="kc__timer kc__timer--idle">{{ studioTagFor(s) }}</span>
-            </div>
-            <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
-            </div>
           </article>
           <div class="kcol__empty" *ngIf="idleStudios.length === 0">— no idle studios —</div>
         </div>
@@ -173,25 +165,20 @@
               <span class="kc__avatar kc__avatar--amber">{{ initials(item.invitation.participantname || '?') }}</span>
               <div class="kc__title">
                 <span class="kc__name">{{ item.invitation.participantname || '—' }}</span>
-                <span class="kc__status kc__status--amber">INVITING</span>
               </div>
             </div>
-            <!-- Who is doing the inviting (specialist) -->
-            <div class="kc__invby" *ngIf="studioSpecialistName(item.studio)">
+            <!-- Who is doing the inviting — list every specialist in the studio -->
+            <div class="kc__invby" *ngIf="specialistList(item.studio).length">
               <mat-icon>record_voice_over</mat-icon>
               <span class="kc__invby-label">Invited by</span>
-              <span class="kc__invby-name">{{ studioSpecialistName(item.studio) }}</span>
-              <span class="kc__invby-act" *ngIf="studioSpecialistActivity(item.studio)">
-                · {{ studioSpecialistActivity(item.studio) }}
+              <span class="kc__invby-name" *ngFor="let sp of specialistList(item.studio); let last = last">
+                {{ sp.name }}<span class="kc__invby-act" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
               </span>
             </div>
             <div class="kc__foot">
               <span class="kc__timer kc__timer--amber">{{ inviteCountdown(item.invitation) }}</span>
-              <span class="kc__tag">{{ studioTagFor(item.studio) }}</span>
             </div>
             <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
               <span class="kc__pill kc__pill--amber">{{ attemptsLabel(item.invitation) }}</span>
             </div>
           </article>
@@ -210,14 +197,28 @@
             <div class="kc__head">
               <span class="kc__avatar kc__avatar--blue">{{ initials(participantName(a.participantid)) }}</span>
               <div class="kc__title">
-                <span class="kc__name">{{ participantName(a.participantid) }}</span>
-                <span class="kc__status kc__status--blue">JOINED</span>
+                <span class="kc__name kc__name--wrap">{{ participantName(a.participantid) }}</span>
               </div>
             </div>
-            <div class="kc__meta" *ngIf="a.pairing?.length">
-              <mat-icon>person</mat-icon>
-              {{ participantName(a.pairing[0]) }}
-              <mat-icon class="kc__chev">arrow_forward</mat-icon>
+
+            <!-- Participant name is already shown in the card head above; here
+                 we name every paired specialist (and any bonus-activity
+                 specialists). -->
+            <div class="kc__roles" *ngIf="pairingSpecialists(a).length || bonusSpecialists(a).length">
+              <div class="kc__role" *ngFor="let sp of pairingSpecialists(a)">
+                <span class="kc__role-label">Specialist</span>
+                <span class="kc__role-name">
+                  {{ sp.name }}
+                  <span class="kc__role-act" *ngIf="sp.activity">· {{ sp.activity }}</span>
+                </span>
+              </div>
+              <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
+                <span class="kc__role-label">Bonus</span>
+                <span class="kc__role-name">
+                  {{ bs.name }}
+                  <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
+                </span>
+              </div>
             </div>
             <div class="kc__wait" *ngIf="!participantPresent(a)">
               <mat-icon>schedule</mat-icon>
@@ -238,11 +239,6 @@
                 <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">hourglass_top</mat-icon>
                 {{ sinceStudioEntry(a) }}
               </span>
-              <span class="kc__tag">{{ studioTagFor(null, 'SE · ATC') }}</span>
-            </div>
-            <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
             </div>
           </article>
           <div class="kcol__empty" *ngIf="joinedAssignments.length === 0">— none —</div>
@@ -266,14 +262,25 @@
               </span>
               <div class="kc__title">
                 <span class="kc__name">{{ participantName(a.participantid) }}</span>
-                <span class="kc__status"
-                      [class.kc__status--green]="bothInCall(a)"
-                      [class.kc__status--amber]="onlySpecialistLeft(a) || onlyParticipantLeft(a)"
-                      [class.kc__status--ink]="callEnded(a)">
-                  {{ callEnded(a) ? 'CALL ENDED'
-                     : onlySpecialistLeft(a) ? 'SPECIALIST LEFT'
-                     : onlyParticipantLeft(a) ? 'PARTICIPANT LEFT'
-                     : 'ACTIVE' }}
+              </div>
+            </div>
+
+            <!-- Participant name is already shown in the card head above; here
+                 we name every paired specialist (and any bonus-activity
+                 specialists). -->
+            <div class="kc__roles">
+              <div class="kc__role" *ngFor="let sp of pairingSpecialists(a)">
+                <span class="kc__role-label">Specialist</span>
+                <span class="kc__role-name">
+                  {{ sp.name }}
+                  <span class="kc__role-act" *ngIf="sp.activity">· {{ sp.activity }}</span>
+                </span>
+              </div>
+              <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
+                <span class="kc__role-label">Bonus</span>
+                <span class="kc__role-name">
+                  {{ bs.name }}
+                  <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
                 </span>
               </div>
             </div>
@@ -333,9 +340,11 @@
             <!-- Live session — show the call start clock time inline -->
             <div class="kc__started" *ngIf="!callEnded(a) && a.specialistJoinedAt">
               <mat-icon>play_circle</mat-icon>
-              <span>Started at <b>{{ callStartedClock(a) }}</b></span>
+              <span>Call started at <b>{{ callStartedClock(a) }}</b></span>
             </div>
 
+            <!-- Footer timer. The label makes it obvious this is the elapsed
+                 duration (counting up live), not another clock time. -->
             <div class="kc__foot">
               <span class="kc__timer"
                     [class.kc__timer--green]="!callEnded(a)"
@@ -344,13 +353,9 @@
                 <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">
                   {{ callEnded(a) ? 'hourglass_bottom' : 'timer' }}
                 </mat-icon>
+                <span class="kc__timer-label">{{ callEnded(a) ? 'Total time' : 'Running for' }}</span>
                 {{ sessionElapsed(a) }}
               </span>
-              <span class="kc__tag">{{ studioTagFor(null, 'SE · ATC') }}</span>
-            </div>
-            <div class="kc__cta">
-              <button class="kc__btn"><mat-icon>chat_bubble_outline</mat-icon></button>
-              <button class="kc__btn"><mat-icon>description</mat-icon></button>
             </div>
           </article>
           <div class="kcol__empty" *ngIf="activeAssignments.length === 0">— none —</div>
@@ -359,7 +364,18 @@
     </section>
 
     <!-- ----- RIGHT PANEL ----- -->
-    <aside class="arena__right">
+    <aside class="arena__right" [class.is-closed]="!rightOpen">
+      <!-- Collapsed: thin rail with a reopen control (kept inside the sidenav) -->
+      <button class="panel-rail" *ngIf="!rightOpen" (click)="rightOpen = true" matTooltip="Show done panel">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+
+      <ng-container *ngIf="rightOpen">
+      <div class="panel-bar panel-bar--start">
+        <button class="panel-collapse" (click)="rightOpen = false" matTooltip="Close this panel" aria-label="Close panel">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
       <div class="arena__right-tabs">
         <button class="rtab" [class.rtab--active]="rightTab === 'done'" (click)="rightTab = 'done'">
           <mat-icon>check_circle</mat-icon> Done <span class="rtab__count">{{ seDoneCount }}</span>
@@ -374,10 +390,6 @@
         <div class="dn" *ngFor="let a of completedAssignments">
           <div class="dn__name">{{ participantName(a.participantid) }}</div>
           <div class="dn__with">with {{ participantName(a.pairing?.[0] || '') }}</div>
-          <div class="dn__pills">
-            <span class="dn__pill dn__pill--green">✓ ATC</span>
-            <span class="dn__pill dn__pill--violet">CW</span>
-          </div>
         </div>
         <div class="arena__right-empty" *ngIf="completedAssignments.length === 0">No completed sessions yet.</div>
       </div>
@@ -386,6 +398,7 @@
       <div class="arena__right-pane arena__right-pane--chat" *ngIf="rightTab === 'chat'">
         <div class="arena__right-empty">Chat feed coming soon.</div>
       </div>
+      </ng-container>
     </aside>
   </main>
 </div>

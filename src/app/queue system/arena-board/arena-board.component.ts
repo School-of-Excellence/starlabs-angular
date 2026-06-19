@@ -55,6 +55,7 @@ interface ArenaAssignment {
   participantid: string;
   pairing?: string[];
   participantsactivity?: { [profileid: string]: string };
+  bonusactivity?: { [profileid: string]: string }; // additional-activity specialists keyed by profile id
   specialistJoinedAt?: any;
   specialistLastSeenAt?: any;
   specialistLeftAt?: any;            // stamped on host pagehide / ngOnDestroy
@@ -90,6 +91,11 @@ export class ArenaBoardComponent implements OnDestroy {
   // Tabs
   leftTab: ArenaTab = 'participants';
   rightTab: ArenaRightTab = 'done';
+
+  // Side-panel open/closed state — both sidenavs are collapsible so the
+  // coordinator can give the kanban board the full width when needed.
+  leftOpen = true;
+  rightOpen = true;
 
   // Profile lookups
   mapProfile: { [id: string]: string } = {};
@@ -225,6 +231,8 @@ export class ArenaBoardComponent implements OnDestroy {
       this.liveAssignments.forEach(a => {
         if (a.participantid) this.ensureProfileLoaded(a.participantid);
         (a.pairing || []).forEach(pid => this.ensureProfileLoaded(pid));
+        // Bonus-activity (additional) specialists are keyed by profile id.
+        Object.keys(a.bonusactivity || {}).forEach(pid => this.ensureProfileLoaded(pid));
       });
     });
 
@@ -321,6 +329,20 @@ export class ArenaBoardComponent implements OnDestroy {
     return this.mapProfile[profileid] || '—';
   }
 
+  // Bonus-activity (additional) specialists for an assignment. Keyed by
+  // profile id on the live assignment; we exclude the main pairing specialist
+  // and the participant so the same person isn't listed twice.
+  bonusSpecialists(a: ArenaAssignment): { id: string, name: string, activity: string }[] {
+    const exclude = new Set<string>([a.participantid, ...(a.pairing || [])]);
+    return Object.keys(a.bonusactivity || {})
+      .filter(pid => !exclude.has(pid))
+      .map(pid => ({
+        id: pid,
+        name: this.participantName(pid),
+        activity: this.mapActivity[a.bonusactivity?.[pid] || ''] || ''
+      }));
+  }
+
   // True when we've resolved a real name for this id (i.e. the chip is worth
   // rendering — used to hide "→ —" rows in the Queued list when the
   // preassigned specialist hasn't loaded yet).
@@ -359,11 +381,15 @@ export class ArenaBoardComponent implements OnDestroy {
     }));
   }
 
-  // Returns a label like "SE 1 · ATC 0" — derived from token preassigned + invitations counters
-  studioTagFor(studio: ArenaStudio | null, fallback = ''): string {
-    if (!studio) return fallback;
-    const idx = this.studios.findIndex(s => s.docid === studio.docid) + 1;
-    return `SE ${Math.max(idx, 1)} · ATC ${idx}`;
+  // All paired specialists on an assignment (not just pairing[0]) so the
+  // JOINED / ACTIVE cards list every specialist in the session, with their
+  // activity when one is recorded.
+  pairingSpecialists(a: ArenaAssignment): { id: string, name: string, activity: string }[] {
+    return (a.pairing || []).map(pid => ({
+      id: pid,
+      name: this.participantName(pid),
+      activity: this.mapActivity[a.participantsactivity?.[pid] || ''] || '',
+    }));
   }
 
   // Returns the queue position to display, or null when the token has no
@@ -442,10 +468,15 @@ export class ArenaBoardComponent implements OnDestroy {
     return this.formatClock(new Date(Math.max(...cands)));
   }
 
+  // 12-hour clock with AM/PM (e.g. "9:42 AM", "2:05 PM") so coordinators read
+  // the start/end time the same way they see it on a phone, not 24-hour.
   private formatClock(d: Date): string {
-    const h = d.getHours().toString().padStart(2, '0');
+    let h = d.getHours();
     const m = d.getMinutes().toString().padStart(2, '0');
-    return `${h}:${m}`;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${h}:${m} ${ampm}`;
   }
 
   // True only when the participant is ACTIVELY at the studio screen right
@@ -513,21 +544,6 @@ export class ArenaBoardComponent implements OnDestroy {
     const ls = a?.specialistAtStudioLastSeenAt;
     if (!ls?.toMillis) return false;
     return (Date.now() - ls.toMillis()) < 30000;
-  }
-
-  // Returns the first specialist name attached to this studio, used in the
-  // INVITING card so the coordinator can see who is doing the inviting.
-  studioSpecialistName(studio: ArenaStudio | null): string {
-    if (!studio) return '';
-    const list = this.specialistList(studio);
-    if (!list.length) return '';
-    return list[0].name || '';
-  }
-  studioSpecialistActivity(studio: ArenaStudio | null): string {
-    if (!studio) return '';
-    const list = this.specialistList(studio);
-    if (!list.length) return '';
-    return list[0].activity || '';
   }
 
   // Time since the participant entered the studio (live assignment was created)
