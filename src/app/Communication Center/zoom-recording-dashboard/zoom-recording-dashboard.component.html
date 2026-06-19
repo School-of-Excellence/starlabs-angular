@@ -39,6 +39,21 @@
     </div>
   </section>
 
+  <!-- ===== estimated migration cost ===== -->
+  <div class="cost-banner">
+    <div class="cost-banner__label">
+      <span class="cost-icon">💸</span>
+      <div>
+        <span class="cost-title">Estimated migration cost</span>
+        <span class="cost-basis">{{ stats.uploadedGb | number : "1.2-2" }} GB egress · ${{ costPerGbUsd }}/GB · ₹{{ usdToInr }}/$</span>
+      </div>
+    </div>
+    <div class="cost-banner__values">
+      <span class="cost-usd">${{ stats.costUsd | number : "1.2-2" }}</span>
+      <span class="cost-inr">₹{{ stats.costInr | number : "1.2-2" }}</span>
+    </div>
+  </div>
+
   <!-- ===== filters ===== -->
   <form [formGroup]="form" class="filters">
     <mat-form-field appearance="outline" class="f-search">

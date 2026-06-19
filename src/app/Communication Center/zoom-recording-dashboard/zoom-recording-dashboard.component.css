@@ -126,6 +126,34 @@
 }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
+/* ===== estimated migration cost banner ===== */
+.cost-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin: -6px 0 26px;
+  animation: rise 0.5s ease backwards;
+}
+.cost-banner__label { display: flex; align-items: center; gap: 14px; }
+.cost-icon { font-size: 26px; line-height: 1; }
+.cost-title {
+  display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-soft); font-weight: 600;
+}
+.cost-basis { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-soft); }
+.cost-banner__values { display: flex; align-items: baseline; gap: 16px; }
+.cost-usd {
+  font-family: "Fraunces", serif; font-size: 34px; font-weight: 600; line-height: 1;
+}
+.cost-inr {
+  font-family: "Fraunces", serif; font-size: 26px; font-weight: 600; line-height: 1;
+  color: var(--ink-soft);
+}
+
 /* ===== filters ===== */
 .filters {
   display: flex; flex-wrap: wrap; gap: 14px; align-items: center;

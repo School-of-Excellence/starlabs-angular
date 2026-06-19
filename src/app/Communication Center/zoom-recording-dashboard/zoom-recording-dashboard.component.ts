@@ -299,18 +299,30 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     return doc?.status !== 'completed'
   }
 
+  // ---- migration cost estimate ----
+  // Internet egress (Cloud Run → Dropbox) is the dominant per-GB migration cost.
+  // GCP us-central1 internet egress is $0.12/GB (first 1 TB/mo); compute is
+  // negligible once the service scales to zero, so we estimate from GB egressed.
+  readonly costPerGbUsd = 0.12
+  // USD → INR. Adjust as the rate moves (≈ ₹94.5 / $1 as of Jun 2026).
+  readonly usdToInr = 94.5
+
   // ---- summary stats (computed from the currently filtered rows) ----
   get stats() {
     const rows = this.recordsBackup.filteredData || []
     const count = (s: string) => rows.filter(r => r.status === s).length
     const uploadedBytes = rows.reduce((sum, r) => sum + this.uploadedBytesFor(r), 0)
+    const uploadedGb = uploadedBytes / (1024 ** 3)
+    const costUsd = uploadedGb * this.costPerGbUsd
     return {
       total: rows.length,
       completed: count('completed'),
       processing: count('processing'),
       partial: count('partial_success'),
       failed: count('failed'),
-      uploadedGb: uploadedBytes / (1024 ** 3),
+      uploadedGb,
+      costUsd,
+      costInr: costUsd * this.usdToInr,
     }
   }
 
