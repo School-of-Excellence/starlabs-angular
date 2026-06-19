@@ -34,7 +34,8 @@
     <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index" class="mr-3" (click)="visitOtherStudio(studio)">
       <span>Studio {{i+1}}:</span>&nbsp;
       <span *ngFor="let participant of studio['pairing']; let j = index">
-        <span>{{mapProfile[participant]}}</span>
+        <span *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{activity}}&nbsp;</span>
+        <span>({{mapProfile[participant]}})</span>
         <span *ngIf="j+1 != studio['pairing'].length">,&nbsp;</span>
       </span>
     </button>
