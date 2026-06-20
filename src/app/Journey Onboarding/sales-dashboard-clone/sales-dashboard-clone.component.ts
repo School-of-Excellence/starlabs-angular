@@ -5,6 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { AuthguardService } from '../../authguard.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTableModule } from '@angular/material/table';
@@ -150,7 +151,8 @@ export interface MonthlyMap {
     MatTooltipModule,
     MatToolbarModule,
     MatInputModule,
-    MatHint
+    MatHint,
+    ProfilePictureComponent
   ],
   templateUrl: './sales-dashboard-clone.component.html',
   styleUrl: './sales-dashboard-clone.component.css',

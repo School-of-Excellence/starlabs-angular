@@ -20,7 +20,7 @@
     <div *ngIf="data.type === 'unassigned'" class="participants-list">
       <div class="participant-item" *ngFor="let participant of data.participants; let i = index">
         <span class="participant-number">{{ i + 1 }}.</span>
-        <span class="participant-name">{{ participant.participantName }}</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="participant.participantId" [name]="participant.participantName || ''" [size]="32"></app-profile-picture><span class="participant-name">{{ participant.participantName }}</span></span>
       </div>
     </div>
 
@@ -29,7 +29,7 @@
       <div class="conflict-item" *ngFor="let participant of data.participants; let i = index">
         <div class="conflict-header">
           <span class="participant-number">{{ i + 1 }}.</span>
-          <span class="participant-name">{{ participant.participantName }}</span>
+          <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="participant.participantId" [name]="participant.participantName || ''" [size]="32"></app-profile-picture><span class="participant-name">{{ participant.participantName }}</span></span>
         </div>
         <div class="zone-selection">
           <label class="zone-label">Select Zone:</label>
