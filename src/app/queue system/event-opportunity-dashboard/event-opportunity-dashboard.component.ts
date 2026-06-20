@@ -473,6 +473,114 @@ export class EventOpportunityDashboardComponent {
     return this.mapData[queueid]['stageTokenMap'][stage][type] || 0;
   }
 
+  // ===== Names modal: click any metric count to see who is behind the number =====
+  showNamesModal: boolean = false;
+  namesModalTitle: string = '';
+  namesModalSubtitle: string = '';
+  namesModalSearch: string = '';
+  namesModalItems: Array<{ name: string, sub: string }> = [];
+
+  openNamesModal(queueid: string, stage: string, type: string, label: string): void {
+    this.namesModalItems = this.getMetricNames(queueid, stage, type);
+    this.namesModalTitle = label;
+    const queuename = this.mapQueue[queueid]?.['queuename'] || '';
+    this.namesModalSubtitle = `${queuename} · ${stage} · ${this.namesModalItems.length} ${this.namesModalItems.length === 1 ? 'name' : 'names'}`;
+    this.namesModalSearch = '';
+    this.showNamesModal = true;
+  }
+
+  closeNamesModal(): void {
+    this.showNamesModal = false;
+    this.namesModalItems = [];
+    this.namesModalSearch = '';
+  }
+
+  getFilteredNamesModalItems(): Array<{ name: string, sub: string }> {
+    const q = this.namesModalSearch.trim().toLowerCase();
+    if (!q) return this.namesModalItems;
+    return this.namesModalItems.filter(item =>
+      (item.name || '').toLowerCase().includes(q) || (item.sub || '').toLowerCase().includes(q));
+  }
+
+  private getMetricNames(queueid: string, stage: string, type: string): Array<{ name: string, sub: string }> {
+    const out: Array<{ name: string, sub: string }> = [];
+    const nameOf = (pid: string) => this.mapProfile[pid] || pid;
+
+    switch (type) {
+      case 'opportunities':
+      case 'waiting':
+      case 'queued': {
+        const tokenlist = this.mapData[queueid]?.['stageTokenMap']?.[stage]?.['tokenlist'] || [];
+        for (const t of tokenlist) {
+          const name = this.mapProfile[t['profile_id']] || t['profile_name'] || '—';
+          const isWaiting = t['status'] === 'ready';
+          const isQueued = t['status'] == null || t['status'] === 'queued' || t['status'] === 'invited';
+          if (type === 'waiting' && !isWaiting) continue;
+          if (type === 'queued' && !isQueued) continue;
+          if (!isWaiting && !isQueued) continue;
+          out.push({ name, sub: isWaiting ? 'Waiting' : 'Queued' });
+        }
+        break;
+      }
+      case 'studio': {
+        for (const studio of this.getStageStudioLive(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            const act = this.getMapBigActivity(queueid, studio, p);
+            out.push({ name: nameOf(p), sub: act ? `Live · ${act}` : 'Live' });
+          }
+        }
+        for (const studio of this.getStageStudioIdle(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            const act = this.getMapBigActivity(queueid, studio, p);
+            out.push({ name: nameOf(p), sub: act ? `Idle · ${act}` : 'Idle' });
+          }
+        }
+        break;
+      }
+      case 'live': {
+        for (const studio of this.getStageStudioLive(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            out.push({ name: nameOf(p), sub: this.getMapBigActivity(queueid, studio, p) || '' });
+          }
+        }
+        break;
+      }
+      case 'idle': {
+        for (const studio of this.getStageStudioIdle(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            out.push({ name: nameOf(p), sub: this.getMapBigActivity(queueid, studio, p) || '' });
+          }
+        }
+        break;
+      }
+      case 'shadowing': {
+        for (const p of this.getShadowingParticipants(queueid, stage)) {
+          out.push({ name: nameOf(p.profileid), sub: p.activity || '' });
+        }
+        break;
+      }
+      case 'notshadowing': {
+        for (const p of this.getNotShadowingParticipants(queueid, stage)) {
+          out.push({ name: nameOf(p.profileid), sub: p.activity || '' });
+        }
+        break;
+      }
+      case 'completed-today': {
+        for (const n of this.getCompletedParticipantNames(queueid, stage, 'today')) {
+          out.push({ name: n, sub: '' });
+        }
+        break;
+      }
+      case 'completed-all': {
+        for (const n of this.getCompletedParticipantNames(queueid, stage, 'all')) {
+          out.push({ name: n, sub: '' });
+        }
+        break;
+      }
+    }
+    return out;
+  }
+
   getPotentialTooltip(queueid: string, stage: string): string {
     if (!this.mapData[queueid] ||
         !this.mapData[queueid]['stageTokenMap'] ||
