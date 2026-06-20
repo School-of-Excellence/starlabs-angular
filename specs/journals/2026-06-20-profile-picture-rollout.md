@@ -55,6 +55,46 @@ only the safe `profile_data` collection, so it was in scope.
   so it never ships in a production bundle.
 
 ## Pending / next
+- Re-open `…-artifacts/index.html` (all 30 screens) via the `pp-evidence` launch config (port 4320) or
+  `cd specs/journals/2026-06-20-profile-picture-rollout-artifacts && python3 -m http.server 4320`.
+
+---
+
+## Session 2 (same day) — operator pushed: "what about other screens?"
+
+The first pass (7 screens) was **not comprehensive**. Re-ran an exhaustive 4-way parallel Explore sweep
+over every feature folder, cross-checking each candidate against `app.routes.ts` for LIVE routing and
+excluding ATC + dead clones. Found **23 more LIVE name-display sites** and integrated the avatar in each
+(same pattern: add `ProfilePictureComponent` to the standalone `imports:` array + inline-flex wrapper with
+the in-scope profileid). Committed as `ba69f7e`.
+
+### The 23 added this session
+live-event-dashboard, journeycoach-opportunities, journey-coach-health-dashboard (replaced its placeholder
+initials avatar), eco-system-new, onboarding-pipeline (replaced placeholder avatar button),
+product-initiation-dashboard (dynamic-column table — gated avatar to the Name column only via
+`column.key==='profileid' && column.mapValue==='name'` so Mobile/Email/Finance columns that reuse the
+`profileid` key don't get stamped), approve-offtime, arena-design-insights, big-planner,
+view-notification-participants (removed its old initials circle so there's one avatar, not two),
+arenastudioactivity, queue-planning-review, event-zone-management (comma lists), participant-form-tracker,
+view-participants-form, participant-touchpoint, participant-product, profile-summary (first table's client +
+reportedBy cells), participant-ael, monitor-activity-log, questionandanswer (6 live question/reply spans;
+left the large commented-out block untouched), mode-dashboard, participant-reports.
+
+### Verification
+- `ng build --configuration production` → **green** (no errors; `app-profile-picture` resolves in all 23
+  new components; only pre-existing canvg/CommonJS warnings).
+- Evidence: extended the harness to **all 30 screens** (7 done + 23 new) at `…-artifacts/index.html`,
+  served on :4320 and screenshotted in the browser. **30/30 panels, 92/92 portraits loaded, 0 failed**;
+  click-to-enlarge preview confirmed (full-size image + name caption). Real `i.pravatar.cc` portraits stand
+  in for the auth-gated production `profile_data` images.
+
+### Still pending
+- Real authenticated live-screen captures need operator `starlabs-test` creds.
+- Two cosmetic follow-ups a designer may want: (a) journey-coach-health-dashboard's 5 summary-card preview
+  rows still use the old initials badge (only the main table got the real avatar); (b) decide a consistent
+  avatar size for the comma-list screens (currently 22px).
+
+## Pending / next (session 1, superseded above)
 - **Live-screen screenshots** still need `starlabs-test` login creds (or a seeded profile_data with images)
   to capture the real auth-gated pages — operator to provide if they want those in addition to the harness.
 - Re-open `…-artifacts/pp-evidence.html` any time via
