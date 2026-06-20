@@ -396,15 +396,17 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   // Web link to the Dropbox folder this recording's files live in. The folder is
-  // derived from any uploaded file's `dropboxPath` (drop the filename). Returns
-  // null until at least one file has landed in Dropbox (nothing to open yet).
+  // derived from any uploaded file's `dropboxPath` (drop the filename), then
+  // resolved to a real shared link by the server (files live in the team space,
+  // so a client-built /home/<path> URL 404s). Null until a file has landed in
+  // Dropbox, or when the API base isn't configured.
   dropboxFolderUrl(record: any): string | null {
     const withPath = this.normalizeFiles(record?.files).find(f => f?.dropboxPath)
     const path: string | undefined = withPath?.dropboxPath
     if (!path) return null
     const folder = path.substring(0, path.lastIndexOf('/'))
     if (!folder) return null
-    return 'https://www.dropbox.com/home' + encodeURI(folder)
+    return this.migrationApi.folderOpenUrl(folder) || null
   }
 
   // ---- formatting helpers ----

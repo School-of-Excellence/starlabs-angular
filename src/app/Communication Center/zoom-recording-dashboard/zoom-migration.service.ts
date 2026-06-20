@@ -49,4 +49,13 @@ export class ZoomMigrationService {
       this.http.post<MigrateResponse>(`${this.base}/api/zoom/migrate`, { meeting: rec })
     );
   }
+
+  // A link that opens a backup folder in Dropbox. The server resolves the real
+  // team-space shared link and 302-redirects — a /home/<path> URL built on the
+  // client 404s because the files live in the team space. Empty when the API
+  // base isn't configured (so callers can hide the link).
+  folderOpenUrl(folderPath: string): string {
+    if (!this.base) return '';
+    return `${this.base}/api/dropbox/open?path=${encodeURIComponent(folderPath)}`;
+  }
 }
