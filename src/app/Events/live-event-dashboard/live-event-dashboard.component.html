@@ -606,9 +606,12 @@
           <div class="participant-info">
             <div class="participant-header">
               <div class="participant-name">
-                <a [routerLink]="'/userprofile/' + participant.profileid" target="_blank" rel="noopener">
-                  {{participant.name || 'Unknown'}}
-                </a>
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="participant.profileid" [name]="participant.name" [size]="32"></app-profile-picture>
+                  <a [routerLink]="'/userprofile/' + participant.profileid" target="_blank" rel="noopener">
+                    {{participant.name || 'Unknown'}}
+                  </a>
+                </span>
               </div>
               <div class="atc-id" *ngIf="participant.atcid">
                 ATC ID: {{participant.atcid}}

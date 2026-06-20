@@ -77,7 +77,10 @@
                       <!-- <mat-icon class="status-icon" [ngClass]="invitation.status === 'away' ? 'status-away' : 'status-active'">
                         fiber_manual_record
                       </mat-icon> -->
-                      <span class="participant-name" [title]="mapProfile[invitation]">{{mapProfile[invitation]}}</span>
+                      <span style="display:inline-flex;align-items:center;gap:6px;">
+                        <app-profile-picture [profileId]="invitation" [name]="mapProfile[invitation]" [size]="28"></app-profile-picture>
+                        <span class="participant-name" [title]="mapProfile[invitation]">{{mapProfile[invitation]}}</span>
+                      </span>
                     </div>
                     <div class="participant-stats">
                       <div class="stat-chip chip-shadow" (mouseenter)="onEnter($event, invitation , 'shadow')"
