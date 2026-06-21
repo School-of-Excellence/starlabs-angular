@@ -142,11 +142,11 @@
   <!-- Stage Waiting list -->
   <div *ngIf="liveAssignment == null && selectedStudio['checkin']">
     <div class="row">
-      <div *ngFor="let stage of stageTokenList; let stageindex = index" class="col-sm" data-testid="studio-stage-col" [attr.data-stage]="stage.stagename">
+      <div *ngFor="let stage of stageTokenList; let stageindex = index; trackBy: trackByStageName" class="col-sm" data-testid="studio-stage-col" [attr.data-stage]="stage.stagename">
         <div class="mat-elevation-z2">
           <div class="stagename">{{stage.stagename}}</div>
           <div class="stagequeue">
-            <div *ngFor="let token of stage.tokenlist">
+            <div *ngFor="let token of stage.tokenlist; trackBy: trackByTokenDocId">
               <div class="wait-token" data-testid="studio-token-card" [attr.data-token]="token.docid">
                 <!-- Avatar + name (left) -->
                 <div class="wait-token__id">

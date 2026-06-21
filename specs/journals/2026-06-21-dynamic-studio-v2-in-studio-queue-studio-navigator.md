@@ -69,6 +69,38 @@ feature:
    `.ds-app .ds-main {…}` rule, marked "IN-STUDIO QUEUE/STUDIO NAV").
 Nothing else references these; legacy `dynamic-studio` is untouched.
 
+## Follow-up fix (same session) — blank arena when not in a studio
+
+**Symptom:** On `/dynamicstudio`, the arena header showed a queue name
+("uP!/Legacy Diagnostics & Consultation") but the body was completely blank.
+Console: `this.studioList []`, `Live Studio []`, `liveAssignment == null`.
+
+**Root cause:** v2's queue auto-select ([dynamic-studio-v2.component.ts:1007]) was
+`ongoingQueue = queueWithLive || firstWithStudios || ongoingQueueList[0]`.
+`findQueueWithLiveAssignment()` matches on a `live assignment` doc's `pairing`
+array (which includes invited/bonus specialists), but the arena renders studios
+from `queue studio pairing` (`studioin==true`, `participants` includes YOU). If
+you're only an invited/bonus specialist in someone else's live studio,
+`queueWithLive` hijacked selection to a queue where you have NO studio →
+`getStudio()` returns `studioList=[]`, and since `liveAssignment` is only wired up
+inside the `studioList.length != 0` branch, it stays null → blank screen.
+
+Legacy `dynamic-studio` never had this override (`ongoingQueue = firstWithStudios
+|| ongoingQueueList[0]`, line 205), so it always lands you on the queue where you
+have studios. This was a v2-only regression introduced with the auto-enter-live
+optimization.
+
+**Fix:** Only honor `queueWithLive` when that queue actually has a studio for you
+(`queueStudioCounts[queueWithLive.docid] > 0`); otherwise fall back to
+`firstWithStudios` (legacy behavior). Invited studios remain reachable via the
+"Other Studio you're invited to Join" path (`outsideLiveAssignment` /
+`visitOtherStudio`). One-line logic change at the selection site; no other path
+touched.
+
+**Revert:** restore the single line
+`this.ongoingQueue = queueWithLive || firstWithStudios || this.ongoingQueueList[0]`
+and delete the `queueWithLiveHasStudio` guard above it.
+
 ## Pending / follow-ups
 - Live visual + interaction QA on a real account with multiple queues (confirm dialog,
   chip highlighting, switch-while-live behavior).
