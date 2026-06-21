@@ -1,5 +1,33 @@
 # 2026-06-20 — Profile-picture rollout to participant-name sites
 
+---
+
+## 🔄 CHANGE LOG & REVERT GUIDE  (update on EVERY screen change — operator directive 2026-06-20)
+> Append a row here whenever a screen is touched, so any change can be reverted in isolation.
+> Keep newest at the bottom of each section.
+
+### A. COMMITTED (revert with `git revert <hash>`, or `git checkout <hash>^ -- <path>` for one file)
+| Commit | Scope | Files |
+|---|---|---|
+| `3a40282` | (prior, not this session) avatar integrated in 11 screens incl. profilelist | ProfilePicture/* + 9 callers |
+| `c33ff4d` | avatar on **7** live screens | delivery-dashboard-clone, sales-dashboard-clone, event-attendance-log, event-participation-approve, resolve-participant-zone, live-event-health, big-dashboard (.html+.ts each) |
+| `ba69f7e` | avatar on **23** more live screens | live-event-dashboard, journeycoach-opportunities, journey-coach-health-dashboard, eco-system-new, onboarding-pipeline, product-initiation-dashboard, approve-offtime, arena-design-insights, big-planner, view-notification-participants, arenastudioactivity, queue-planning-review, event-zone-management, participant-form-tracker, view-participants-form, participant-touchpoint, participant-product, profile-summary, participant-ael, monitor-activity-log, questionandanswer, mode-dashboard, participant-reports |
+| `101d776` | evidence harness + journal (no screen code) | specs/journals/2026-06-20-…-artifacts/index.html, launch.json, journal |
+
+### B. UNCOMMITTED — working tree (discard a file with `git checkout -- "<path>"`; discard all with `git stash`)
+1. **COEP/crossorigin image fix (load-bearing, shared)** — `ProfilePicture/profile-picture/profile-picture.component.html`: added `crossorigin="anonymous"` to BOTH `<img>` tags. *Without this every avatar is a broken image under the coi-serviceworker's COEP. Do NOT revert in isolation unless reverting the whole rollout.*
+2. **Dropdown avatars (`<mat-option>` person pickers, size 24)** — hpc, big-aggregate, big-aggregate-event-level, big-activity-log, monitor-activity-log, view-arena-space, participant-ael, update-adjustment-taxonomy, videoasktranscribe, capacity-dashboard, workshop-configuration, participant-delivery-sequence, evolution-mapping, map-client-eis-dialog, team-delivery-hours-update, arena-e-ticket-approve, event-attendance-log, live-event-dashboard, assign-queue-studio, big-planner, queue-creation-v3, big-event-invitation, add-issue (.html ± .ts each).
+3. **Customer Support avatars** — customer-support-dashboard, customer-ticket-new, customer-chat-screen (+ **import-array fix**: `ProfilePictureComponent` was missing from `imports[]` — required, else the dashboard crashes), chat-config, flag-review-screen, insert-message-dialog, releaselogdialog (.html ± .ts).
+4. **Route Configuration avatars** — route-configuration-duplicate/createroutedialog (.html+.ts) — replaced initials placeholder in Profiles + Child-Profiles dropdowns. (Parent route-configuration table untouched = route labels, no people.)
+
+### C. OPERATIONAL (not code; no revert needed)
+- Cleared `.angular/cache` + restarted the operator's `ng serve` on **:4200** to fix a stale Vite dep cache that caused `NullInjectorError: No provider for _MatSelect` (dashboard rendered blank). Source was always correct.
+
+### D. KNOWN DATA ISSUE (not a code change)
+- Profile **Vignesh S** has a blank/near-black stored image (`profile_data` `Vignesh S/profile/image_cropper_17…`, brightness 24, sd 4) → shows a dark avatar everywhere. Pixel-scan of 5 screens (dashboard, profilelist, view-participants-form, evolution-mapping, participant-product) found this is the ONLY bad image; 0 broken. Fix = re-upload his photo (production data, not touched).
+
+---
+
 ## What & why
 Operator goal: wherever a person's **name** is rendered from `profile_data` / `participant metadata`,
 show the shared **`<app-profile-picture>`** avatar next to it, and produce browser evidence that the
@@ -93,6 +121,35 @@ left the large commented-out block untouched), mode-dashboard, participant-repor
 - Two cosmetic follow-ups a designer may want: (a) journey-coach-health-dashboard's 5 summary-card preview
   rows still use the old initials badge (only the main table got the real avatar); (b) decide a consistent
   avatar size for the comma-list screens (currently 22px).
+
+## Session 3 (same day) — live Chrome verification, the COEP fix, dropdowns, Customer Support + Route Config
+
+Drove the REAL auth-gated app in the operator's connected Chrome (app already logged in; `ng serve` :4310,
+which uses `environment.ts` → prod `fir-sample-aae4a` for reads).
+
+- **CRITICAL BUG FOUND + FIXED — broken avatars everywhere.** The app ships `coi-serviceworker.js` which
+  forces `COEP: require-corp`; that blocks cross-origin `<img>` (Firebase Storage photos) unless loaded in
+  CORS mode → every avatar rendered as a broken-image icon. Fix = `crossorigin="anonymous"` on the shared
+  component's two `<img>` tags (Storage returns CORS headers, so the CORS load satisfies COEP). One line in
+  `profile-picture.component.html` repairs ALL screens. Tell-tale: `fetch(url)` 200 but `<img>` `onerror`.
+  Verified live: profilelist 25/25 photos load, 0 broken.
+- **profilelist "roles expanded by default"** — NOT a bug: detail rows are collapsed (`display:none,h:0`);
+  the tall 126px rows are pre-existing CSS + stacked action buttons. profilelist was NOT changed this session.
+- **Dropdowns** — added the avatar inside ~30 `<mat-option>` person-pickers across ~20 live components
+  (full list in [[project_profile-picture-rollout]] memory). Verified live on `hpc`.
+- **Customer Support** (operator ask) — added avatars to customer-support-dashboard (Reported By + Client
+  Name table cells, Assigned/Reviewed-By filters, notes-author + category popups), customer-ticket-new
+  (review/notes/assigned-to/calendar-participant), customer-chat-screen (Assigned To / Issue Reported By /
+  Reported By / chat sender / notes / log user — 6 sites), insert-message-dialog + releaselogdialog dropdowns.
+  SKIPPED (no person-name-with-id): customertickets (analytics), add-notes, customer-ticket-review.
+  customer-chat-screen had a HALF-APPLIED import from a 529-crashed agent (import line present, not in
+  imports array) → fixed manually. Verified live: dashboard 20/20 loaded, chat screen 6/6 loaded.
+- **Route Configuration** (operator ask) — LIVE route `/routeconfiguration` loads the `-duplicate` clone
+  (the plain `route-configuration/` is dead). Parent table = route/screen labels (no people → no avatars).
+  Added avatars to the `createroutedialog` Profiles + Child-Profiles dropdowns (replaced the initials
+  placeholder). Verified live: Profiles dropdown shows photo+name+email per option.
+- All audited clean by 5 parallel agents; **production build green**. **NOT committed** (operator gate):
+  the `crossorigin` fix + all dropdown + Customer Support + route-config edits are uncommitted.
 
 ## Pending / next (session 1, superseded above)
 - **Live-screen screenshots** still need `starlabs-test` login creds (or a seeded profile_data with images)
