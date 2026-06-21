@@ -28,16 +28,24 @@ Decisions taken from operator: **placement = top strip**; **switch while live = 
 
 - `dynamic-studio-v2.component.html` — new `.ds-qnav` block as the first child of
   `<main class="ds-main">` (renders only inside `liveAssignment`, since the whole `.ds-app`
-  is). Shows queue chips (`queuesWithStudios`, count from `queueStudioCounts`) when >1 queue,
-  and studio chips (`studioList`, `live_tv` from `mapStudioLiveAssignment`) when >1 studio.
-  Clicks call the new confirm wrappers. `data-testid="studio-qnav-queue"` /
-  `studio-qnav-studio`.
-- `dynamic-studio-v2.component.ts` — added `confirmSwitchQueue(queue)` and
-  `confirmSwitchStudio(studio)`. Each no-ops on the already-active item, and when
-  `liveAssignment != null` shows `window.confirm(...)` before delegating to the existing
-  `selectQueueCard()` / `onStudioSelect()` (no change to switch logic itself).
-- `dynamic-studio-v2.component.css` — `.ds-qnav` + `.ds-qchip` styles (non-shrinking strip
-  under the status pill; scroll area below flexes as before), using existing design tokens.
+  is). Three chip groups:
+  - **Queues** — `queuesWithStudios` (count from `queueStudioCounts`), shown when >1 queue.
+  - **Studios** — `studioList`, shown when >1 studio. Label is the participant **activity
+    name(s)** (`mapActivity[studio.participantsactivity[participant]]`) + `(You)` / `(name)`,
+    mirroring the non-live "Your Studios" buttons — NOT a generic "Studio N". `live_tv` marker
+    from `mapStudioLiveAssignment`.
+  - **Invited** — `outsideLiveAssignment` (studios in OTHER queues you've been invited to
+    join), shown when non-empty. Activity + `(name)` from `studio.pairing`; `login` icon;
+    dashed outline (`.ds-qchip--invited`).
+  - `data-testid`: `studio-qnav-queue` / `studio-qnav-studio` / `studio-qnav-invited`.
+- `dynamic-studio-v2.component.ts` — added `confirmSwitchQueue(queue)`,
+  `confirmSwitchStudio(studio)`, and `confirmVisitOtherStudio(studio)`. Each no-ops on the
+  already-active item, and when `liveAssignment != null` shows `window.confirm(...)` before
+  delegating to the existing `selectQueueCard()` / `onStudioSelect()` / `visitOtherStudio()`
+  (no change to those methods).
+- `dynamic-studio-v2.component.css` — `.ds-qnav` + `.ds-qchip` (+ `.ds-qchip--invited`)
+  styles (non-shrinking strip under the status pill; scroll area below flexes as before),
+  using existing design tokens.
 
 No data-model / Firestore changes. `selectQueueCard()` still calls `checkoutQueue()`
 (`checkin:false` on the previous queue's pairings), same as before.
@@ -54,8 +62,9 @@ feature:
 1. `dynamic-studio-v2.component.html` — delete the `<div class="ds-qnav" …>…</div>` block
    (first child of `<main class="ds-main">`, marked by the "In-studio navigator (legacy
    parity)" comment).
-2. `dynamic-studio-v2.component.ts` — delete the `confirmSwitchQueue` and
-   `confirmSwitchStudio` methods (between `selectQueueCard` and `onQueueSelect`).
+2. `dynamic-studio-v2.component.ts` — delete the `confirmSwitchQueue`,
+   `confirmSwitchStudio`, and `confirmVisitOtherStudio` methods (between `selectQueueCard`
+   and `onQueueSelect`).
 3. `dynamic-studio-v2.component.css` — delete the `.ds-qnav` / `.ds-qchip` block (after the
    `.ds-app .ds-main {…}` rule, marked "IN-STUDIO QUEUE/STUDIO NAV").
 Nothing else references these; legacy `dynamic-studio` is untouched.

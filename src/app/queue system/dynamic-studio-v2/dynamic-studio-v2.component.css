@@ -712,6 +712,11 @@
 .ds-app .ds-qchip.is-active .ds-qchip__count { background: rgba(255, 255, 255, .22); }
 .ds-app .ds-qchip__live { font-size: 16px; width: 16px; height: 16px; line-height: 16px; color: var(--green-bright); }
 .ds-app .ds-qchip.is-active .ds-qchip__live { color: #fff; }
+/* Invited studios (from other queues) — dashed outline + primary "login" icon
+   so they read as "jump in" rather than one of your own studios. */
+.ds-app .ds-qchip--invited { border-style: dashed; border-color: var(--primary-line); }
+.ds-app .ds-qchip--invited:hover { border-style: solid; }
+.ds-app .ds-qchip--invited .ds-qchip__live { color: var(--primary); }
 .ds-app .ds-main-scroll {
   flex: 1;
   min-height: 0;

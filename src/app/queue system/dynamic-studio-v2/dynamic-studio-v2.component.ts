@@ -1312,6 +1312,18 @@ export class DynamicStudioV2Component {
     this.onStudioSelect(studio)
   }
 
+  /**
+   * Confirm-guarded jump to a studio in another queue that you've been invited
+   * to join (`outsideLiveAssignment`). Joining leaves your current live session,
+   * so ask first while in a live assignment. Delegates to the existing
+   * visitOtherStudio() which handles the actual join.
+   */
+  confirmVisitOtherStudio(studio: any){
+    if (!studio) return
+    if (this.liveAssignment != null && !window.confirm('Leave this studio and join the invited studio?')) return
+    this.visitOtherStudio(studio)
+  }
+
   async onQueueSelect(){
     this.resetSubscription()
     var loading = this.dialog.open(LoadingProgressComponent, {
