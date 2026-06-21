@@ -27,6 +27,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthguardService } from '../../authguard.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-queue-creation-v3',
@@ -49,7 +50,8 @@ import { AuthguardService } from '../../authguard.service';
     MatButtonModule,
     DragDropModule,
     NgxMatSelectSearchModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    ProfilePictureComponent
   ],
   templateUrl: './queue-creation-v3.component.html',
   styleUrl: './queue-creation-v3.component.css'

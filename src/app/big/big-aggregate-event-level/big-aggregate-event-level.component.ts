@@ -14,6 +14,7 @@ import { CommonModule } from '@angular/common';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-big-aggregate-event-level',
@@ -28,7 +29,8 @@ import { MatButtonModule } from '@angular/material/button';
     MatPaginatorModule,
     ReactiveFormsModule,
     MatIconModule,
-    MatButtonModule
+    MatButtonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './big-aggregate-event-level.component.html',
   styleUrl: './big-aggregate-event-level.component.css'

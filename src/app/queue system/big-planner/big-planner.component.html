@@ -147,7 +147,10 @@
                           <ngx-mat-select-search [(ngModel)]="filterText" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
                         </mat-option>
                         <mat-option *ngFor="let profile of filterInvitedParticipant(i)" [value]="profile.profileid">
-                          {{profile.name}}
+                          <span style="display:inline-flex;align-items:center;gap:8px;">
+                            <app-profile-picture [profileId]="profile.profileid" [name]="profile.name" [size]="24"></app-profile-picture>
+                            <span>{{profile.name}}</span>
+                          </span>
                         </mat-option>
                       </mat-select>
                     </mat-form-field>

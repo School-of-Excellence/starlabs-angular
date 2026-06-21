@@ -7,7 +7,12 @@
       <mat-option>
         <ngx-mat-select-search [(ngModel)]="filteredSpecialist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
       </mat-option>
-      <mat-option *ngFor="let user of returnSpecialist()" [value]="user.profileid">{{user.name}}</mat-option>
+      <mat-option *ngFor="let user of returnSpecialist()" [value]="user.profileid">
+        <span style="display:inline-flex;align-items:center;gap:8px;">
+          <app-profile-picture [profileId]="user.profileid" [name]="user.name" [size]="24"></app-profile-picture>
+          <span>{{user.name}}</span>
+        </span>
+      </mat-option>
     </mat-select>
   </mat-form-field>
 

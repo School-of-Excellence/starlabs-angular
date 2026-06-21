@@ -50,7 +50,10 @@
               <ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onFilterProfiles()" [placeholderLabel]="'Search prescriber...'" [noEntriesFoundLabel]="'No matching records found'"></ngx-mat-select-search>
             </mat-option>
             <mat-option *ngFor="let profileid of filteredProfiles" [value]="profileid">
-              {{mapProfile[profileid]}}
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profileid" [name]="mapProfile[profileid]" [size]="24"></app-profile-picture>
+                <span>{{mapProfile[profileid]}}</span>
+              </span>
             </mat-option>
           </mat-select>
         </mat-form-field>
