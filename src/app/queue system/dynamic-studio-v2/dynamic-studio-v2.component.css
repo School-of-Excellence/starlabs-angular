@@ -2293,6 +2293,29 @@
   font-weight: 600;
   opacity: .85;
 }
+/* This studio's own pending invite — blue "awaiting response" with a Cancel. */
+.wait-token__chip--self {
+  background: #E8F1F4;
+  color: #176B7E;
+  border-color: #BBD9E1;
+}
+.wait-token__chip-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: .7;
+}
+.wait-token__chip-cancel:hover { opacity: 1; background: rgba(23,107,126,.14); }
+.wait-token__chip-cancel .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
 
 @media (max-width: 720px) {
   .wait-token { flex-wrap: wrap; gap: 10px; }

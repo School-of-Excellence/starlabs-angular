@@ -103,6 +103,12 @@ export class DynamicStudioV2Component {
   // Used by the waiting-list "Bring To Studio" row to hide the CTA and show
   // an amber "Already being invited" chip instead.
   tokenInvitedByOther: { [tokenDocId: string]: { studioName?: string; specialistNames?: string[] } } = {}
+  // Tokens this SAME studio has a still-pending invitation for (awaiting the
+  // participant's response). Keyed by token doc id. Used by the waiting-list row
+  // to replace the "Bring To Studio" CTA with an "awaiting response" chip + a
+  // Cancel action, so the specialist can't re-invite (and hit the reservation
+  // guard) and can recover a stuck participant without waiting for expiry.
+  tokenInvitedBySelf: { [tokenDocId: string]: { invitationDocId?: string } } = {}
   private otherStudioInvitationSubscription: Subscription = null
   private otherStudioInvitationHandle = new Subject<void>()
   // Zoom Control
@@ -1128,6 +1134,7 @@ export class DynamicStudioV2Component {
     this.studioconversationSubscription = null
     this.otherStudioInvitationSubscription = null
     this.tokenInvitedByOther = {}
+    this.tokenInvitedBySelf = {}
   }
 
   /**
@@ -1146,29 +1153,40 @@ export class DynamicStudioV2Component {
     this.otherStudioInvitationHandle.next()
     this.otherStudioInvitationSubscription?.unsubscribe()
     this.tokenInvitedByOther = {}
+    this.tokenInvitedBySelf = {}
 
     const queueRef = doc(this.firestore, 'queue generation', this.ongoingQueue['docid'])
+    // Pull every non-expired invite for the queue and classify in code by
+    // `clientresponse` + `studioid`. Participant invites (written by
+    // inviteParticipant) carry no `status` field — they reserve the token purely
+    // via expiry + clientresponse — so we must NOT filter on status here, or a
+    // token with a live invite would stay a clickable-but-blocked CTA (the bug).
     this.otherStudioInvitationSubscription = collectionData(
       query(
         collection(this.firestore, 'studioinvitation'),
         where('queueref', '==', queueRef),
-        where('status', '==', 'pending'),
         where('expirydate', '>=', new Date()),
       ),
       { idField: 'id' }
     ).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.otherStudioInvitationHandle)).subscribe(invitations => {
       const next: { [tokenDocId: string]: { studioName?: string; specialistNames?: string[] } } = {}
+      const nextSelf: { [tokenDocId: string]: { invitationDocId?: string } } = {}
       const selfStudio = this.selectedStudio?.['docid']
       for (const inv of (invitations || [])) {
         const invStudio = inv['studioid']
-        if (!invStudio || invStudio === selfStudio) continue
+        if (!invStudio) continue
         const tokenRef: any = inv['tokenref']
         const tokenDocId = tokenRef?.id
           ?? (typeof tokenRef?.path === 'string' ? tokenRef.path.split('/').pop() : null)
+        // Skip non-participant invites (e.g. stage-grouping) and terminal states.
         if (!tokenDocId) continue
-        // Skip terminal client responses
         const clientResp = inv['clientresponse']
         if (clientResp === 'denied') continue
+        // This studio's own pending invite → "awaiting response" + Cancel.
+        if (invStudio === selfStudio) {
+          nextSelf[tokenDocId] = { invitationDocId: inv['docid'] ?? inv['id'] }
+          continue
+        }
         const studio = this.mapStudio?.[invStudio] || {}
         const studioName = studio?.['studioname'] || studio?.['name'] || 'another studio'
         const specialistIds: string[] = Array.isArray(inv['specialistpairing'])
@@ -1180,6 +1198,7 @@ export class DynamicStudioV2Component {
         next[tokenDocId] = { studioName, specialistNames }
       }
       this.tokenInvitedByOther = next
+      this.tokenInvitedBySelf = nextSelf
     })
   }
 
@@ -2196,9 +2215,28 @@ export class DynamicStudioV2Component {
         setDoc(doc(this.firestore,"studioinvitation",invitationData['docid']),invitationData,{merge:true}).catch((err)=>{
           alert(err)
         })
-       
+
       }
     })
+  }
+
+  /**
+   * Cancel THIS studio's still-pending invitation(s) for a token so a stuck
+   * "awaiting response" participant can be recovered (and re-invited) without
+   * waiting for the invite to expire. Only deletes un-answered invites created
+   * by the current studio — an already-approved invite is being moved in and is
+   * left alone.
+   */
+  async cancelOwnInvitation(token){
+    const snap = await getDocs(query(
+      collection(this.firestore,"studioinvitation"),
+      where("tokenref", "==", doc(this.firestore,"queue_token",token["docid"])),
+      where("studioid", "==", this.selectedStudio["docid"]),
+    ))
+    const stale = snap.docs.filter(e => e.data()["clientresponse"] == null)
+    await Promise.all(stale.map(e =>
+      deleteDoc(doc(this.firestore,"studioinvitation", e.id)).catch(err => console.log(err))
+    ))
   }
 
   // async inviteParticipant(token: any) {
@@ -2336,7 +2374,7 @@ export class DynamicStudioV2Component {
         }
         liveassignmentData["zoomlinkrequired"] = this.ongoingQueue["zoomlinkrequired"] ?? true
         await setDoc(doc(this.firestore,('live assignment/' + liveassignmentid)),liveassignmentData, {merge: true})
-        
+
         loading.close()
       }
     })

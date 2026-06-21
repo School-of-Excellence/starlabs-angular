@@ -194,7 +194,20 @@
                       </small>
                     </span>
                   </span>
-                  <button *ngIf="!tokenInvitedByOther[token.docid]"
+                  <span *ngIf="tokenInvitedBySelf[token.docid]"
+                        class="wait-token__chip wait-token__chip--self"
+                        title="You invited this participant — waiting for their response">
+                    <mat-icon class="ic">hourglass_top</mat-icon>
+                    <span class="wait-token__chip-text">Invitation sent · awaiting response</span>
+                    <button type="button"
+                            class="wait-token__chip-cancel"
+                            (click)="cancelOwnInvitation(token)"
+                            title="Cancel invitation"
+                            data-testid="studio-cancel-invite-btn">
+                      <mat-icon class="ic">close</mat-icon>
+                    </button>
+                  </span>
+                  <button *ngIf="!tokenInvitedByOther[token.docid] && !tokenInvitedBySelf[token.docid]"
                           type="button"
                           class="wait-token__btn"
                           (click)="sendStudioInvitation(token)" data-testid="studio-bring-btn">
