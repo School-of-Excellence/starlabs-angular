@@ -1289,6 +1289,41 @@ export class DynamicStudioV2Component {
     this.onQueueSelect()
   }
 
+  /**
+   * Confirm-guarded queue switch used by the in-studio top navigator
+   * (`.ds-qnav`). The navigator stays visible WHILE in a live assignment
+   * (legacy parity), so switching could drop an active session — ask first.
+   * No-op when picking the already-active queue.
+   */
+  confirmSwitchQueue(queue: any){
+    if (!queue || queue['docid'] === this.ongoingQueue['docid']) return
+    if (this.liveAssignment != null && !window.confirm('Leave this studio and switch to another queue?')) return
+    this.selectQueueCard(queue)
+  }
+
+  /**
+   * Confirm-guarded studio switch used by the in-studio top navigator.
+   * Same rationale as confirmSwitchQueue. No-op when picking the already-
+   * selected studio.
+   */
+  confirmSwitchStudio(studio: any){
+    if (!studio || studio['docid'] === this.selectedStudio['docid']) return
+    if (this.liveAssignment != null && !window.confirm('Leave this studio and switch to another studio?')) return
+    this.onStudioSelect(studio)
+  }
+
+  /**
+   * Confirm-guarded jump to a studio in another queue that you've been invited
+   * to join (`outsideLiveAssignment`). Joining leaves your current live session,
+   * so ask first while in a live assignment. Delegates to the existing
+   * visitOtherStudio() which handles the actual join.
+   */
+  confirmVisitOtherStudio(studio: any){
+    if (!studio) return
+    if (this.liveAssignment != null && !window.confirm('Leave this studio and join the invited studio?')) return
+    this.visitOtherStudio(studio)
+  }
+
   async onQueueSelect(){
     this.resetSubscription()
     var loading = this.dialog.open(LoadingProgressComponent, {

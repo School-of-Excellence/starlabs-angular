@@ -632,6 +632,91 @@
   flex-direction: column;
   background: var(--canvas);
 }
+
+/* -------------------------------------------- IN-STUDIO QUEUE/STUDIO NAV
+   Top strip inside the live-studio view (legacy parity). Non-shrinking row
+   directly under the status pill; the scroll area below flexes as before. */
+.ds-app .ds-qnav {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  padding: 10px clamp(20px, 2.2vw + 8px, 40px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.ds-app .ds-qnav__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ds-app .ds-qnav__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.ds-app .ds-qnav__label .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+.ds-app .ds-qnav__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.ds-app .ds-qchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
+}
+.ds-app .ds-qchip:hover {
+  border-color: var(--primary-line);
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+}
+.ds-app .ds-qchip.is-active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.ds-app .ds-qchip__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-app .ds-qchip__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(26, 35, 50, .10);
+  font-size: 11px;
+  font-weight: 800;
+}
+.ds-app .ds-qchip.is-active .ds-qchip__count { background: rgba(255, 255, 255, .22); }
+.ds-app .ds-qchip__live { font-size: 16px; width: 16px; height: 16px; line-height: 16px; color: var(--green-bright); }
+.ds-app .ds-qchip.is-active .ds-qchip__live { color: #fff; }
+/* Invited studios (from other queues) — dashed outline + primary "login" icon
+   so they read as "jump in" rather than one of your own studios. */
+.ds-app .ds-qchip--invited { border-style: dashed; border-color: var(--primary-line); }
+.ds-app .ds-qchip--invited:hover { border-style: solid; }
+.ds-app .ds-qchip--invited .ds-qchip__live { color: var(--primary); }
 .ds-app .ds-main-scroll {
   flex: 1;
   min-height: 0;
