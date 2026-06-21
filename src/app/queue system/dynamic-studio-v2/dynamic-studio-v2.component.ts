@@ -1669,6 +1669,19 @@ export class DynamicStudioV2Component {
     })
   }
 
+  // trackBy fns for the stage/token *ngFor lists. Each queue_token snapshot
+  // rebuilds stageTokenList as a fresh array of fresh objects, so without a
+  // stable identity Angular tears down and re-creates every row (and its
+  // avatar/name) on each emission — the visible flicker. Key on the stage name
+  // and the token docid so updates patch in place instead.
+  trackByStageName(_index: number, stage: any){
+    return stage?.stagename
+  }
+
+  trackByTokenDocId(_index: number, token: any){
+    return token?.docid
+  }
+
   async onStudioSelect(studio){
     console.log("****** studio select ******");
     
@@ -1713,7 +1726,12 @@ export class DynamicStudioV2Component {
       }
     }
      // get studioconversation
-    collectionData(query(collection(this.firestore,"studio conversation"), where('studioid', 'array-contains', this.selectedStudio['docid'])), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async snap => {
+    // onStudioSelect re-fires on every studio switch / check-in-out (and from
+    // the auto-enter + "Bring to Studio" paths), so tear down the previous
+    // listener before opening a new one — otherwise a fresh anonymous listener
+    // leaked on every call and kept firing in parallel.
+    this.studioconversationSubscription?.unsubscribe()
+    this.studioconversationSubscription = collectionData(query(collection(this.firestore,"studio conversation"), where('studioid', 'array-contains', this.selectedStudio['docid'])), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async snap => {
       this.studiochatList = snap;
       console.log(this.studiochatList);
 
@@ -1735,7 +1753,13 @@ export class DynamicStudioV2Component {
     });
     
     if(studioStage.length != 0){
-      collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
+      // Same leak as the studio-conversation listener above: a new queue_token
+      // listener was opened on every onStudioSelect call and never stored, so
+      // duplicates accumulated and each one reassigned this.stageTokenList on
+      // every token change — spamming the console and flickering the on-screen
+      // names. Tear down the previous listener before subscribing again.
+      this.tokenSubscription?.unsubscribe()
+      this.tokenSubscription = collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
         console.log(token)
         if(this.liveAssignment != null && token.length != 0){
           this.liveAssignment["token"] = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
