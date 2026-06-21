@@ -1004,7 +1004,17 @@ export class DynamicStudioV2Component {
             // queue so they go straight inside the studio (no queue picker).
             const queueWithLive = await this.findQueueWithLiveAssignment()
 
-            this.ongoingQueue = queueWithLive || firstWithStudios || this.ongoingQueueList[0]
+            // BUT only honor it when they actually have a studio in that queue.
+            // `findQueueWithLiveAssignment` matches on the live-assignment's
+            // `pairing` (which includes invited/bonus specialists), whereas the
+            // arena renders from `queue studio pairing` (studioin==true) for YOU.
+            // If you're only an invited/bonus specialist in someone else's live
+            // studio, honoring queueWithLive would select a queue with no studio
+            // for you → blank screen. Fall back to the queue where you DO have a
+            // studio (legacy behavior). Invited studios remain reachable via the
+            // "Other Studio you're invited to Join" path.
+            const queueWithLiveHasStudio = queueWithLive && (this.queueStudioCounts[queueWithLive['docid']] || 0) > 0
+            this.ongoingQueue = (queueWithLiveHasStudio ? queueWithLive : firstWithStudios) || this.ongoingQueueList[0]
             this.selectedQueue = this.ongoingQueue
             await this.onQueueSelect()
             const profileMap = await guard.getProfileMap()
