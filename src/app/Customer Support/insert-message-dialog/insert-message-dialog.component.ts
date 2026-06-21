@@ -13,6 +13,7 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-insert-message-dialog',
@@ -27,6 +28,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatIconModule,
     FormsModule,
     NgxMatSelectSearchModule,
+    ProfilePictureComponent,
   ],
   templateUrl: './insert-message-dialog.component.html',
   styleUrl: './insert-message-dialog.component.css'

@@ -377,7 +377,10 @@
         </div>
         <div class="user-info">
           <div class="user-name-container">
-            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <app-profile-picture [profileId]="question.profileid" [name]="getDisplayName(question.profileid, question.isadmin)" [size]="28"></app-profile-picture>
+              <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            </span>
             <span style="font-weight: bold;color: red;size: 18;">{{question['onetoone']? 'Private': ''}}</span>
             <span *ngIf="question.isadmin" class="admin-badge">
               <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
@@ -452,7 +455,10 @@
             <div class="reply-info">
               <div class="reply-meta-row">
                 <span class="reply-user-name-container">
-                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span style="display:inline-flex;align-items:center;gap:8px;">
+                    <app-profile-picture [profileId]="reply.profileid" [name]="getDisplayName(reply.profileid, reply.isadmin)" [size]="28"></app-profile-picture>
+                    <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  </span>
                   <span style="font-weight: bold;color: red;size: 18;">{{reply['onetoone']? 'Private': ''}}</span>
                   <span *ngIf="reply.isadmin" class="admin-badge small">
                     <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
@@ -521,7 +527,10 @@
         </div>
         <div class="user-info">
           <div class="user-name-container">
-            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <app-profile-picture [profileId]="question.profileid" [name]="getDisplayName(question.profileid, question.isadmin)" [size]="28"></app-profile-picture>
+              <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            </span>
             <span style="font-weight: bold;color: red;size: 18;">{{question['onetoone']? 'Private': ''}}</span>
             <span *ngIf="question.isadmin" class="admin-badge">
               <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
@@ -590,7 +599,10 @@
             <div class="reply-info">
               <div class="reply-meta-row">
                 <span class="reply-user-name-container">
-                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span style="display:inline-flex;align-items:center;gap:8px;">
+                    <app-profile-picture [profileId]="reply.profileid" [name]="getDisplayName(reply.profileid, reply.isadmin)" [size]="28"></app-profile-picture>
+                    <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  </span>
                   <span style="font-weight: bold;color: red;size: 18;">{{reply['onetoone']? 'Private': ''}}</span>
                   <span *ngIf="reply.isadmin" class="admin-badge small">
                     <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 
@@ -658,7 +670,10 @@
         </div>
         <div class="user-info">
           <div class="user-name-container">
-            <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <app-profile-picture [profileId]="question.profileid" [name]="getDisplayName(question.profileid, question.isadmin)" [size]="28"></app-profile-picture>
+              <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
+            </span>
             <span style="font-weight: bold;color: red;size: 18;">{{question['onetoone']? 'Private': ''}}</span>
             <button *ngIf="question['onetoone'] !== true"
               class="move-button"
@@ -736,7 +751,10 @@
             <div class="reply-info">
               <div class="reply-meta-row">
                 <span class="reply-user-name-container">
-                  <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  <span style="display:inline-flex;align-items:center;gap:8px;">
+                    <app-profile-picture [profileId]="reply.profileid" [name]="getDisplayName(reply.profileid, reply.isadmin)" [size]="28"></app-profile-picture>
+                    <span class="reply-user-name">{{ getDisplayName(reply.profileid, reply.isadmin) }}</span>
+                  </span>
                   <span style="font-weight: bold;color: red;size: 18;">{{reply['onetoone']? 'Private': ''}}</span>
                   <span *ngIf="reply.isadmin" class="admin-badge small">
                     <img src="https://firebasestorage.googleapis.com/v0/b/starlabs-test.firebasestorage.app/o/eiflix_images%2F1756643286018sizew1h1sizeGroup%20(3).png?alt=media&token=cb1903b6-b66f-4816-89b6-41ab7dee802e" 

@@ -22,6 +22,7 @@ import { MatChipGrid } from '@angular/material/chips';
 import { MatSnackBar, MatSnackBarHorizontalPosition,MatSnackBarVerticalPosition} from '@angular/material/snack-bar';
 import { MatFormField } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 
 
 @Component({
@@ -39,6 +40,7 @@ import { MatSelectModule } from '@angular/material/select';
     ReactiveFormsModule,
     FormsModule,
     MatIconModule,
+    ProfilePictureComponent,
     ],
   templateUrl: './update-adjustment-taxonomy.component.html',
   styleUrls: ['./update-adjustment-taxonomy.component.css']

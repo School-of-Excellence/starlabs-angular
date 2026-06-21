@@ -13,6 +13,7 @@ import { CommonModule } from '@angular/common';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-big-aggregate',
@@ -27,7 +28,8 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     FormsModule,
     MatInputModule,
     MatSelectModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    ProfilePictureComponent
   ],
   templateUrl: './big-aggregate.component.html',
   styleUrl: './big-aggregate.component.css'

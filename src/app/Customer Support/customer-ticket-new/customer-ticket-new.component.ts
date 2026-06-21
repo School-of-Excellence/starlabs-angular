@@ -22,6 +22,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { AddIssueComponent } from '../add-issue/add-issue.component';
 import { MatDialog } from '@angular/material/dialog';
 import { CustomerticketsComponent } from '../customertickets/customertickets.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 
 
@@ -31,7 +32,8 @@ import { CustomerticketsComponent } from '../customertickets/customertickets.com
     MatDatepickerModule, MatCardModule, MatIconModule, MatAutocompleteModule,
     ReactiveFormsModule, CommonModule, MatCheckboxModule, NgxMatSelectSearchModule,
     FormsModule, MatButtonModule, MatPaginatorModule, MatTabsModule,
-    CustomerChatScreenComponent, FlagReviewScreenComponent, AddIssueComponent, CustomerticketsComponent
+    CustomerChatScreenComponent, FlagReviewScreenComponent, AddIssueComponent, CustomerticketsComponent,
+    ProfilePictureComponent
   ],
   templateUrl: './customer-ticket-new.component.html',
   styleUrl: './customer-ticket-new.component.css'

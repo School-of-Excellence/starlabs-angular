@@ -50,7 +50,10 @@
               <ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onFilterProfiles()" [placeholderLabel]="'Search prescriber...'" [noEntriesFoundLabel]="'No matching records found'"></ngx-mat-select-search>
             </mat-option>
             <mat-option *ngFor="let profileid of filteredProfiles" [value]="profileid">
-              {{mapProfile[profileid]}}
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profileid" [name]="mapProfile[profileid]" [size]="24"></app-profile-picture>
+                <span>{{mapProfile[profileid]}}</span>
+              </span>
             </mat-option>
           </mat-select>
         </mat-form-field>
@@ -107,7 +110,12 @@
         </ng-container>
         <ng-container matColumnDef="participant">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>PARTICIPANT</th>
-          <td mat-cell *matCellDef="let element">{{element["participant"]}}</td>
+          <td mat-cell *matCellDef="let element">
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <app-profile-picture [profileId]="element['profileid']" [name]="element['participant']" [size]="32"></app-profile-picture>
+              {{element["participant"]}}
+            </span>
+          </td>
         </ng-container>
 
         <ng-container *ngFor="let header of tableHeader.slice(2)" [matColumnDef]="header">

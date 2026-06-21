@@ -132,7 +132,12 @@
               <mat-label><i class="fa-solid fa-user"></i>&nbsp;&nbsp;Participants</mat-label>
               <mat-select [(ngModel)]="filter['participant']" (selectionChange)="onFilter()" multiple>
                 <mat-option><ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onSearchText('participant')" placeholderLabel="Search participants..." noEntriesFoundLabel="No matching participants" ngDefaultControl></ngx-mat-select-search></mat-option>
-                <mat-option *ngFor="let o of filteredProfilelist" [value]="o['profileid']">{{o['name']}}</mat-option>
+                <mat-option *ngFor="let o of filteredProfilelist" [value]="o['profileid']">
+                  <span style="display:inline-flex;align-items:center;gap:8px;">
+                    <app-profile-picture [profileId]="o['profileid']" [name]="o['name']" [size]="24"></app-profile-picture>
+                    <span>{{o['name']}}</span>
+                  </span>
+                </mat-option>
               </mat-select>
             </mat-form-field>
           </div>

@@ -95,6 +95,11 @@ export class ZoomClientviewComponent {
   private recordingPromptTimer: any = null;
   private recordingPromptDismissedAt: number = 0;
   private recordingListenersWiredAt: number = 0;
+  // Stable bound reference so addEventListener/removeEventListener match.
+  // Using `this.handleKeyDown.bind(this)` inline at both sites produced two
+  // DIFFERENT function objects, so the window 'keydown' listener was never
+  // removed — leaking this component (and its Zoom SDK instance) on every visit.
+  private readonly boundKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
   private readonly RECORDING_PROMPT_COOLDOWN_MS = 30000; // re-prompt 30s after dismiss
   // After this long with status still 'unknown' AND a remote participant
   // present, assume recording is OFF and prompt. The Zoom SDK doesn't fire
@@ -576,7 +581,7 @@ export class ZoomClientviewComponent {
   // -------------------- end attention grabbers --------------------
 
   ngOnDestroy() {
-    window.removeEventListener('keydown', this.handleKeyDown.bind(this));
+    window.removeEventListener('keydown', this.boundKeyDown);
     this.clearScreenshots();
     this.waitingSub?.unsubscribe();
     this.waitingSub = null;
@@ -862,7 +867,7 @@ export class ZoomClientviewComponent {
         });
       });
     }
-    window.addEventListener('keydown', this.handleKeyDown.bind(this));
+    window.addEventListener('keydown', this.boundKeyDown);
   }
 
   async onClick() {

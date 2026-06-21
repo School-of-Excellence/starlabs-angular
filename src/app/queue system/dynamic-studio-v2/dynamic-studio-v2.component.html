@@ -610,8 +610,10 @@
 
                 <!-- Raw Zoom start URL shown below the button so the host can
                      open/copy the link directly (parity with legacy studio).
-                     Sourced from liveAssignment.zoomdata.start_url. -->
-                <!-- <div class="zoom-link-row" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
+                     Sourced from liveAssignment.zoomdata.start_url. Shown to
+                     EVERY paired specialist viewing the studio (the link is on
+                     the shared live-assignment doc), matching legacy v1. -->
+                <div class="zoom-link-row" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
                   <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
                   <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
                      [title]="liveAssignment['zoomdata']?.start_url">
@@ -621,7 +623,7 @@
                           matTooltip="Copy link">
                     <mat-icon class="ic">content_copy</mat-icon>
                   </button>
-                </div> -->
+                </div>
               </div>
 
               <!-- Generate New Link (placed at the BOTTOM as a separate row).

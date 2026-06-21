@@ -18,6 +18,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-add-issue',
@@ -34,6 +35,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     MatSelectModule,
     NgxMatSelectSearchModule,
     MatMenuModule,
+    ProfilePictureComponent
   ],
   templateUrl: './add-issue.component.html',
   styleUrl: './add-issue.component.css'
