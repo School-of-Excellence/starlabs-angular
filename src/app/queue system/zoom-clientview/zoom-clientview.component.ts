@@ -50,6 +50,9 @@ export class ZoomClientviewComponent {
   profileid: any;
   profileHost: boolean;
   screenshots: any = [];
+  // Pending auto-remove timers for capture chips (cleared on teardown).
+  private clipChipTimers: any[] = [];
+  private readonly CLIP_CHIP_TTL_MS = 10000; // auto-remove each capture chip after 10s
   collectiontype: any;
   documentId: any;
   private subscription: Subscription;
@@ -94,17 +97,12 @@ export class ZoomClientviewComponent {
   private recordingStatus: 'started' | 'paused' | 'stopped' | 'unknown' = 'unknown';
   private recordingPromptTimer: any = null;
   private recordingPromptDismissedAt: number = 0;
-  private recordingListenersWiredAt: number = 0;
   // Stable bound reference so addEventListener/removeEventListener match.
   // Using `this.handleKeyDown.bind(this)` inline at both sites produced two
   // DIFFERENT function objects, so the window 'keydown' listener was never
   // removed — leaking this component (and its Zoom SDK instance) on every visit.
   private readonly boundKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
   private readonly RECORDING_PROMPT_COOLDOWN_MS = 30000; // re-prompt 30s after dismiss
-  // After this long with status still 'unknown' AND a remote participant
-  // present, assume recording is OFF and prompt. The Zoom SDK doesn't fire
-  // initial-state events on every build, so we'd otherwise be silent forever.
-  private readonly RECORDING_GRACE_MS = 8000;
 
   // Big-center recording overlay (host only). Replaces the older snackbar.
   recordingPromptVisible: boolean = false;
@@ -463,8 +461,6 @@ export class ZoomClientviewComponent {
       console.warn('Could not wire Zoom recording listeners', e);
     }
 
-    this.recordingListenersWiredAt = Date.now();
-
     // After a short delay, query the current attendees list so we catch
     // any participants who were already in the call when the host (re)joined.
     // The user-join listener only fires for NEW joins, so on page refresh
@@ -522,21 +518,22 @@ export class ZoomClientviewComponent {
     // `remoteParticipantCount` is already self-excluded (snapshot subtracts 1).
     // Only prompt when at least one OTHER person is in the room.
     const otherPresent = this.remoteParticipantCount >= 1;
-    // Explicit off states always prompt. 'unknown' also prompts, but only
-    // after a grace period — that gives the Zoom SDK a few seconds to fire
-    // its initial 'Recording' event if recording was already running. If
-    // nothing arrives within the grace window, assume the host needs to
-    // start the recording manually.
-    const sinceWired = this.recordingListenersWiredAt > 0
-      ? Date.now() - this.recordingListenersWiredAt
-      : 0;
+    // Only prompt on a POSITIVE off-signal — an explicit 'paused' or 'stopped'
+    // recording event from Zoom. We deliberately do NOT treat 'unknown' as off.
+    //
+    // Previously 'unknown' (no recording event seen yet) was treated as off
+    // after an 8s grace. But several Zoom SDK builds never emit the initial
+    // 'Recording'/'started' event when recording is already running, so the
+    // status stayed 'unknown' forever and the host got nagged with
+    // "recording is not running" *while recording was actually on*. That false
+    // alarm is the exact bug we're fixing. By requiring an explicit pause/stop
+    // event, the prompt fires only when Zoom tells us recording really stopped
+    // or paused — never as a guess.
     const recordingOff = this.recordingStatus === 'paused'
-                      || this.recordingStatus === 'stopped'
-                      || (this.recordingStatus === 'unknown' && sinceWired > this.RECORDING_GRACE_MS);
+                      || this.recordingStatus === 'stopped';
     console.debug('[recording-prompt] evaluate', {
       status: this.recordingStatus,
       remote: this.remoteParticipantCount,
-      sinceWired,
       recordingOff,
     });
     if (!otherPresent || !recordingOff) return;
@@ -755,7 +752,10 @@ export class ZoomClientviewComponent {
       }
       // ← END ADDED
 
-      ZoomMtg.setZoomJSLib('https://source.zoom.us/3.13.2/lib', '/av');
+      // Self-hosted SDK assets (served from /zoom via angular.json). Zoom's CDN
+      // (source.zoom.us) stopped publishing the Client View /ui bundle for 4.x+,
+      // so the only way to run 6.x is to host dist/{lib,ui} ourselves.
+      ZoomMtg.setZoomJSLib(`${window.location.origin}/zoom/lib`, '/av');
 
       ZoomMtg.preLoadWasm();
       ZoomMtg.prepareWebSDK();
@@ -932,9 +932,29 @@ export class ZoomClientviewComponent {
 
   updateSlider(dataURL: string) {
     this.screenshots.push(dataURL);
+    // The chip is only a still screenshot marker (not playable) and the clip
+    // TIMING is already saved to Firestore, so it doesn't need to linger. Auto-
+    // remove this chip from the on-screen slider after a short window.
+    const timer = setTimeout(() => {
+      this.ngZone.run(() => {
+        const i = this.screenshots.indexOf(dataURL);
+        if (i > -1) this.screenshots.splice(i, 1);
+      });
+      // keep the localStorage backup in sync
+      try {
+        const arr = JSON.parse(localStorage.getItem('screenshots') || '[]');
+        const j = arr.indexOf(dataURL);
+        if (j > -1) { arr.splice(j, 1); localStorage.setItem('screenshots', JSON.stringify(arr)); }
+      } catch {}
+      const t = this.clipChipTimers.indexOf(timer);
+      if (t > -1) this.clipChipTimers.splice(t, 1);
+    }, this.CLIP_CHIP_TTL_MS);
+    this.clipChipTimers.push(timer);
   }
 
   clearScreenshots() {
+    this.clipChipTimers.forEach(t => clearTimeout(t));
+    this.clipChipTimers = [];
     localStorage.removeItem('screenshots');
     this.screenshots = [];
   }
