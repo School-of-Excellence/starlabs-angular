@@ -342,7 +342,7 @@
               <div class="talk-bubble1 round">
                 <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
                   <span class="d-flex justify-content-between">
-                    <p>{{mapProfileData[list['senderprofileid']]['name']}}</p>
+                    <p>{{mapProfileData[list['senderprofileid']]?.['name']}}</p>
                     <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
                         [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
                   </span>
@@ -1405,6 +1405,11 @@
 
                     <!-- Name with TEXT highlighting only -->
                     <span class="label">Name:</span>
+                    <app-profile-picture
+                      [profileId]="token.profile_id"
+                      [name]="mapProfileData[token.profile_id]?.['name'] || ''"
+                      [size]="24"
+                      style="display:inline-block;vertical-align:middle;margin:0 4px;"></app-profile-picture>
                     <span [innerHTML]="highlightText(mapProfileData[token.profile_id]?.['name'] || '')"></span>
                     <mat-icon *ngIf="isApproved(token)" class="approved-check"
                       [matTooltip]="'Approved for ' + approvedEventName(token)">check_circle</mat-icon>

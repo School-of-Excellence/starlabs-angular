@@ -13,6 +13,7 @@
 | `c33ff4d` | avatar on **7** live screens | delivery-dashboard-clone, sales-dashboard-clone, event-attendance-log, event-participation-approve, resolve-participant-zone, live-event-health, big-dashboard (.html+.ts each) |
 | `ba69f7e` | avatar on **23** more live screens | live-event-dashboard, journeycoach-opportunities, journey-coach-health-dashboard, eco-system-new, onboarding-pipeline, product-initiation-dashboard, approve-offtime, arena-design-insights, big-planner, view-notification-participants, arenastudioactivity, queue-planning-review, event-zone-management, participant-form-tracker, view-participants-form, participant-touchpoint, participant-product, profile-summary, participant-ael, monitor-activity-log, questionandanswer, mode-dashboard, participant-reports |
 | `101d776` | evidence harness + journal (no screen code) | specs/journals/2026-06-20-…-artifacts/index.html, launch.json, journal |
+| `7c876f5` | (2026-06-22) avatar on **dynamic-queue-manager-clone** kanban card name (the LIVE `/dynamicqueuemanager`); also Fix-1-guarded its chat-sender binding (L345) | dynamic-queue-manager-clone (.html + .ts) |
 
 ### B. UNCOMMITTED — working tree (discard a file with `git checkout -- "<path>"`; discard all with `git stash`)
 1. **COEP/crossorigin image fix (load-bearing, shared)** — `ProfilePicture/profile-picture/profile-picture.component.html`: added `crossorigin="anonymous"` to BOTH `<img>` tags. *Without this every avatar is a broken image under the coi-serviceworker's COEP. Do NOT revert in isolation unless reverting the whole rollout.*
@@ -150,6 +151,36 @@ which uses `environment.ts` → prod `fir-sample-aae4a` for reads).
   placeholder). Verified live: Profiles dropdown shows photo+name+email per option.
 - All audited clean by 5 parallel agents; **production build green**. **NOT committed** (operator gate):
   the `crossorigin` fix + all dropdown + Customer Support + route-config edits are uncommitted.
+
+## Session 4 (2026-06-22) — dynamic queue manager card avatar (+ clone-routing catch)
+
+Operator asked to show the profile image next to the name on the **dynamic queue
+manager**. The clone-routing gotcha bit again: the LIVE route `/dynamicqueuemanager`
+loads **`dynamic-queue-manager-clone`** (`app.routes.ts:182`); the same-named
+non-clone `dynamic-queue-manager` is **dead** (commented route at `:181` + spec
+file only). So all work went to the **clone**.
+
+- Added `<app-profile-picture [profileId]="token.profile_id" [size]="24">` to the
+  left of the kanban card participant name (`…-clone.component.html` ~L1408, the
+  `highlightText`-rendered name span). Registered `ProfilePictureComponent` in the
+  standalone `imports[]`. Commit `7c876f5`.
+- The clone already had `?.` guards on nearly all its `mapProfileData[...]` bindings
+  (Fix-1-style); the only remaining unguarded one was the chat-sender bubble
+  (`~L345`) — guarded it in the same commit.
+- **Revert:** `git revert 7c876f5`, or in `…-clone.component.html` delete the
+  `<app-profile-picture>` block at the card name and restore `]['name']` at L345;
+  in `…-clone.component.ts` remove the `ProfilePictureComponent` import + its
+  `imports[]` entry.
+- Other name spots on this screen NOT yet stamped (left for a follow-up if wanted):
+  the side chat-panel participant list (~L204, uses an `#index` placeholder avatar),
+  the notes-group initial badge (~L1726/1729), and the bulk-move results list
+  (~L1936).
+
+> ⚠️ Cross-ref to the **2026-06-22 name-binding crash-guard** journal: the earlier
+> "Fix 1" for the *name-disappears* bug was committed (`29097e0`) on the **dead
+> non-clone** `dynamic-queue-manager`. The live screen is the clone, which already
+> carried the guards — so the live screen was effectively already protected. The
+> dead-file commit is harmless (would help only if the route is ever switched back).
 
 ## Pending / next (session 1, superseded above)
 - **Live-screen screenshots** still need `starlabs-test` login creds (or a seeded profile_data with images)
