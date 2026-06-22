@@ -7,6 +7,7 @@ import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { PeopleInvolvedComponent } from '../people-involved/people-involved.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { environment } from '../../../environments/environment';
 import { AssignQueueStudioComponent } from '../assign-queue-studio/assign-queue-studio.component';
 import { AvTestComponent } from '../av-test/av-test.component';
@@ -101,7 +102,7 @@ interface ProfileNotificationSummary {
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressSpinnerModule,
-    
+    ProfilePictureComponent,
   ],
   templateUrl: './dynamic-queue-manager-clone.component.html',
   styleUrl: './dynamic-queue-manager-clone.component.css'
