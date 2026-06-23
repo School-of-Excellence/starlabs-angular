@@ -5,13 +5,19 @@ name: preview (Stage 1 fast + channel)
 #   Hosting PREVIEW CHANNEL (named after the branch) on the TEST project for manual QA. The full hermetic
 #   Playwright gate (queue-e2e) runs separately when a PR to `development` is opened, and posts its report there.
 on:
-  push:
-    branches-ignore:
-      - development
-      - production
-      - main
-      - cicd-dev      # TEST stand-in branches are not feature branches — no preview channel for them
-      - cicd-prod
+  # DISABLED 2026-06-23 (console v2, plan C1/D5): preview is now manual via workflow_dispatch.
+  # push:
+  #   branches-ignore:
+  #     - development
+  #     - production
+  #     - main
+  #     - cicd-dev      # TEST stand-in branches are not feature branches — no preview channel for them
+  #     - cicd-prod
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Feature branch to build a preview for'
+        required: true
 
 permissions:
   contents: read
@@ -72,7 +78,7 @@ jobs:
       - name: Compute channel id from branch name
         id: ch
         run: |
-          ID=$(echo "${{ github.ref_name }}" | tr '/' '-' | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | cut -c1-40)
+          ID=$(echo "${{ github.event.inputs.ref || github.ref_name }}" | tr '/' '-' | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | cut -c1-40)
           echo "id=$ID" >> "$GITHUB_OUTPUT"
           echo "Preview channel id: $ID"
 
