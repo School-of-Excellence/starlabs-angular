@@ -10,7 +10,7 @@ name: queue-e2e (emulator gate)
 
 on:
   pull_request:
-    branches: [cicd-dev, cicd-prod]   # sudo branches — gate runs on PR to either. Switch to [development] at cutover.
+    branches: []   # sudo branches — gate runs on PR to either. Switch to [development] at cutover.
     types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - 'src/app/queue system/**'
