@@ -11,6 +11,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
 import { NetworkStatusService } from '../../network-status.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
+import { FirestoreRecoveryService } from '../../shared/firestore-recovery.service';
 import { PreviewAtcBeforeSubmissionComponent } from '../preview-atc-before-submission/preview-atc-before-submission.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -210,7 +211,8 @@ export class EditAtcComponent {
     public datepipe: DatePipe,
     private networkStatusService: NetworkStatusService,
     private mediaCache: MediaCacheService,
-    public snackbar: MatSnackBar
+    public snackbar: MatSnackBar,
+    private recovery: FirestoreRecoveryService
   ) {
     this.reportATC = {
       atcData: null,
@@ -387,6 +389,8 @@ export class EditAtcComponent {
   async getATC() {
     var date = new Date()
     var totalProcedureRead = 0
+    // push any edit-draft that never reached the server (e.g. saved during a bricked session) before loading
+    await this.recovery.flushPending(this.firestoreATC)
     await getDoc(doc(this.firestoreATC, this.collectionName, this.atcID)).then(async atcData => {
       var atcDocData = atcData.data()
       getDoc(doc(this.firestoreDefault, "profile_data", atcDocData["profileid"])).then(participant => {
@@ -616,29 +620,21 @@ export class EditAtcComponent {
           notes: this.editNotes.notes ?? null,
           notesedited: this.editNotes.notesedited ?? false,
           delete: false,
-          lastupdated: serverTimestamp()
+          lastupdated: new Date()        // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
         }
 
-        // save the draft first; with offline persistence the write is durable in IndexedDB the moment it's called
-        const writePromise = setDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"]), data);
-        if (navigator.onLine) {
-          await writePromise;            // online: confirm the server write
-        } else {
-          writePromise.catch(() => {});  // offline: already durable locally; don't block the next save so EVERY offline edit persists
-        }
-
-        this.draftStatus = {
-          message: navigator.onLine ? "Draft saved." : "Saved on this device — will sync when online.",
-          code: 1
-        }
+        // durable local outbox first (never lost), then Firestore — falling back to a direct REST write if the
+        // SDK client has been bricked by its internal assertion (b815). Never hangs, never loses the draft.
+        const outcome = await this.recovery.writeDraft(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"], data);
+        this.draftStatus = this.recovery.draftStatusFor(outcome);
         this.lastDraftSavedOn = new Date()
       }
     } catch (error) {
       console.log(error)
-      this.draftStatus = {
-        message: "Couldn't save draft. Waiting for network...",
-        code: -1
-      }
+      // honest message: a genuine offline state vs. anything else (incl. the SDK assertion) — never the false "network" claim
+      this.draftStatus = navigator.onLine
+        ? { message: "Could not save the draft just now — your changes are kept on this device and will retry.", code: -1 }
+        : { message: "Saved on this device — will sync when online.", code: 1 }
     }
   }
 
