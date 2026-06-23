@@ -11,6 +11,7 @@ import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
 import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
+import { FirestoreRecoveryService } from '../../shared/firestore-recovery.service';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
@@ -272,7 +273,8 @@ export class PrescribeATCComponent {
     public snackbar: MatSnackBar,
     private networkStatusService : NetworkStatusService,
     private connectivity: ConnectivityGuardService,
-    private mediaCache: MediaCacheService
+    private mediaCache: MediaCacheService,
+    private recovery: FirestoreRecoveryService
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -987,6 +989,8 @@ export class PrescribeATCComponent {
     }
     this.lastDraftSavedOn = null
     var draftATC = []
+    // push any drafts that never reached the server (e.g. saved during a bricked session) before reading the list
+    await this.recovery.flushPending(this.firestoreATC)
     if (this.developer || this.admin) {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
@@ -1470,27 +1474,19 @@ export class PrescribeATCComponent {
           atcImageURLs: this.existingATCImageURLs ?? [],
           delete: false,
           authorprofileid: authorprofileid,
-          lastupdated: serverTimestamp(),
+          lastupdated: new Date(),       // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
         };
 
-        // save the TEXT first; with offline persistence the write is durable in IndexedDB the moment it's called
-        const writePromise = setDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID), data);
-        if (navigator.onLine) {
-          await writePromise;            // online: confirm the server write (for status + ordering)
-        } else {
-          writePromise.catch(() => {});  // offline: already durable locally; don't block the next save so EVERY offline edit persists
-        }
-
-        this.draftStatus = {
-          message: navigator.onLine ? "Draft saved." : "Saved on this device — will sync when online.",
-          code: 1
-        };
+        // durable local outbox first (never lost), then Firestore — falling back to a direct REST write if the
+        // SDK client has been bricked by its internal assertion (b815). Never hangs, never loses the draft.
+        const outcome = await this.recovery.writeDraft(this.firestoreATC, 'temporary_ATC', this.autoSaveID, data);
+        this.draftStatus = this.recovery.draftStatusFor(outcome);
         this.lastDraftSavedOn = new Date();
 
-        // upload media only when online; failures are non-fatal and retried on the next save / reconnect
-        if (navigator.onLine) {
+        // upload media only when online AND the Firestore client is healthy; otherwise it stays cached and retries
+        if (navigator.onLine && !this.recovery.isDegraded()) {
           try {
             const [audioURLs, noteImageURLs, atcImageURLs] = await Promise.all([
               this.uploadAudioToStorage(),
@@ -1524,10 +1520,10 @@ export class PrescribeATCComponent {
       }
     } catch (error) {
       console.error("Error in autoSave:", error);
-      this.draftStatus = {
-        message: "Couldn't save draft. Waiting for network...",
-        code: -1
-      };
+      // honest message: a genuine offline state vs. anything else (incl. the SDK assertion) — never the false "network" claim
+      this.draftStatus = navigator.onLine
+        ? { message: "Could not save the draft just now — your changes are kept on this device and will retry.", code: -1 }
+        : { message: "Saved on this device — will sync when online.", code: 1 };
       this.uploadProgress.isUploading = false;
     }
   }
