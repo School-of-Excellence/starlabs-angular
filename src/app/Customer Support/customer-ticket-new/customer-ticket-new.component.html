@@ -225,11 +225,14 @@
                         padding-inline: 10px;
                         font-size: 12px;
                       " *ngIf="isIdPresent(ticket)">
-                        {{
-                        mapProfileData[
-                        getMostRecentTimestampKey(ticket["review"])
-                        ]?.name
-                        }}
+                        <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                            [profileId]="getMostRecentTimestampKey(ticket['review'])"
+                            [name]="mapProfileData[getMostRecentTimestampKey(ticket['review'])]?.name"
+                            [size]="24"></app-profile-picture><span>{{
+                            mapProfileData[
+                            getMostRecentTimestampKey(ticket["review"])
+                            ]?.name
+                            }}</span></span>
                       </button>
                     </div>
                   </div>
@@ -303,14 +306,16 @@
               <div style="line-height: 1">
                 <div *ngFor="let notes of popupData['notes']; let idx = index">
                   <p>
-                    <b>{{ idx + 1 }}</b> &nbsp;&nbsp;
-                    {{
-                    [null, undefined, ""].includes(
-                    mapProfileData[notes["writtenBy"]]
-                    )
-                    ? "..."
-                    : mapProfileData[notes["writtenBy"]]["name"]
-                    }}
+                    <span style="display:inline-flex;align-items:center;gap:8px;"><b>{{ idx + 1 }}</b> &nbsp;&nbsp;
+                      <app-profile-picture [profileId]="notes['writtenBy']"
+                        [name]="[null, undefined, ''].includes(mapProfileData[notes['writtenBy']]) ? '' : mapProfileData[notes['writtenBy']]['name']"
+                        [size]="24"></app-profile-picture><span>{{
+                        [null, undefined, ""].includes(
+                        mapProfileData[notes["writtenBy"]]
+                        )
+                        ? "..."
+                        : mapProfileData[notes["writtenBy"]]["name"]
+                        }}</span></span>
                     : {{ notes["date"].toDate() | date : "short" }}
                   </p>
                   <p>&nbsp;{{ notes.remarks }}</p>
@@ -369,8 +374,11 @@
                         [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
                         ngDefaultControl></ngx-mat-select-search>
                     </mat-option>
-                    <mat-option *ngFor="let assign of returnFilterMember()" [value]="assign">{{
-                      mapProfileData[assign]["name"] }}</mat-option>
+                    <mat-option *ngFor="let assign of returnFilterMember()" [value]="assign"><span
+                        style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                          [profileId]="assign" [name]="mapProfileData[assign]['name']"
+                          [size]="24"></app-profile-picture><span>{{
+                          mapProfileData[assign]["name"] }}</span></span></mat-option>
                   </mat-select>
                 </mat-form-field>
               </div>
@@ -475,8 +483,10 @@
                 </div>
                 <div class="info-separator">|</div>
                 <div class="info-item participant-name-flex">
-                  <strong>Participant:</strong> 
-                  <span class="participant-text">{{ ticket?.name }}</span>
+                  <strong>Participant:</strong>
+                  <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                      [profileId]="ticket?.clientid" [name]="ticket?.name"
+                      [size]="28"></app-profile-picture><span class="participant-text">{{ ticket?.name }}</span></span>
                 </div>
               </div>
               

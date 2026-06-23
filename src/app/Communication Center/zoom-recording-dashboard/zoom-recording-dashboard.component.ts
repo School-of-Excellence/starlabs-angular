@@ -50,8 +50,16 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   private queuedUuids = new Set<string>()
   private zoomUnsubs: Unsubscribe[] = []
 
-  readonly tableHeaders = ['meetingTopic', 'hostEmail', 'status', 'progress',
+  readonly tableHeaders = ['meetingTopic', 'hostEmail', 'status', 'zoom', 'progress',
     'totalSize', 'totalFiles', 'startTime', 'processingTime', 'file']
+
+  // ── "still in Zoom?" tracking ────────────────────────────────────────────
+  // uuids + meetingIds currently present in Zoom for the loaded date range, so
+  // we can flag whether each migrated recording still exists in Zoom (it may
+  // have been deleted from Zoom after backup). Refreshed with the table query.
+  private zoomPresentUuids = new Set<string>()
+  private zoomPresentMeetingIds = new Set<string>()
+  public zoomPresenceLoaded = false
 
   public files: Array<any> | null = null
   public activeRecord: any = null
@@ -85,10 +93,14 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   }
 
   // LIVE subscription scoped to the selected date range (server-side) so we
-  // never download the whole 12k-doc collection just to show one day.
+  // never download the whole 12k-doc collection just to show one day. The range
+  // is matched against the MEETING start time (`startTime`), not the processing
+  // date (`timestamp`) — so a meeting shows up under the day it was held, even
+  // if it was migrated/processed later.
   subscribe() {
     this.stopSubscription()
     this.loading = true
+    this.loadZoomPresence()
 
     const start = this.form.value.startDate ? new Date(this.form.value.startDate) : new Date()
     const end = this.form.value.endDate ? new Date(this.form.value.endDate) : new Date()
@@ -97,9 +109,9 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
 
     const q = query(
       this.collRef,
-      where('timestamp', '>=', Timestamp.fromDate(start)),
-      where('timestamp', '<=', Timestamp.fromDate(end)),
-      orderBy('timestamp', 'desc'),
+      where('startTime', '>=', Timestamp.fromDate(start)),
+      where('startTime', '<=', Timestamp.fromDate(end)),
+      orderBy('startTime', 'desc'),
       limit(500)
     )
 
@@ -118,6 +130,32 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   // date range changed -> re-query server-side
   onDateChange() {
     if (this.form.value.startDate && this.form.value.endDate) this.subscribe()
+  }
+
+  // Fetch the recordings currently in Zoom for the selected range and index them
+  // by uuid + meetingId, so each migrated row can show whether it still exists in
+  // Zoom. Best-effort: on failure we leave presence "unknown" rather than wrong.
+  private async loadZoomPresence() {
+    const start = this.form.value.startDate ? new Date(this.form.value.startDate) : new Date()
+    const end = this.form.value.endDate ? new Date(this.form.value.endDate) : start
+    this.zoomPresenceLoaded = false
+    try {
+      const recs = await this.migrationApi.listRecordings(this.ymd(start), this.ymd(end))
+      this.zoomPresentUuids = new Set(recs.map(r => r.uuid).filter(Boolean))
+      this.zoomPresentMeetingIds = new Set(recs.map(r => String(r.meetingId)).filter(Boolean))
+      this.zoomPresenceLoaded = true
+    } catch {
+      this.zoomPresenceLoaded = false
+    }
+  }
+
+  // 'yes' | 'no' | 'unknown' — whether this migrated recording still exists in
+  // Zoom. Matches on uuid first (unique per recording), then meetingId.
+  existsInZoom(record: any): 'yes' | 'no' | 'unknown' {
+    if (!this.zoomPresenceLoaded) return 'unknown'
+    if (record?.meetinguid && this.zoomPresentUuids.has(record.meetinguid)) return 'yes'
+    if (record?.meetingId != null && this.zoomPresentMeetingIds.has(String(record.meetingId))) return 'yes'
+    return 'no'
   }
 
   // search / status changed -> client-side refine on the already-scoped data
@@ -296,17 +334,42 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     return doc?.status !== 'completed'
   }
 
+  // ---- migration cost estimate ----
+  // Internet egress (Cloud Run → Dropbox) is the dominant per-GB migration cost.
+  // GCP us-central1 internet egress is $0.12/GB (first 1 TB/mo); compute is
+  // negligible once the service scales to zero, so we estimate from GB egressed.
+  readonly costPerGbUsd = 0.12
+  // USD → INR. Adjust as the rate moves (≈ ₹94.5 / $1 as of Jun 2026).
+  readonly usdToInr = 94.5
+
   // ---- summary stats (computed from the currently filtered rows) ----
   get stats() {
     const rows = this.recordsBackup.filteredData || []
     const count = (s: string) => rows.filter(r => r.status === s).length
+    const uploadedBytes = rows.reduce((sum, r) => sum + this.uploadedBytesFor(r), 0)
+    const uploadedGb = uploadedBytes / (1024 ** 3)
+    const costUsd = uploadedGb * this.costPerGbUsd
     return {
       total: rows.length,
       completed: count('completed'),
       processing: count('processing'),
       partial: count('partial_success'),
       failed: count('failed'),
+      uploadedGb,
+      costUsd,
+      costInr: costUsd * this.usdToInr,
     }
+  }
+
+  // Bytes actually pushed to Dropbox for one record: a file counts its full size
+  // once 'success', otherwise its live uploaded byte count (so in-flight and
+  // partial_success records contribute what they've already sent). Legacy docs
+  // with no per-file map fall back to totalSize when completed.
+  private uploadedBytesFor(record: any): number {
+    const files = this.normalizeFiles(record?.files)
+    if (!files.length) return record?.status === 'completed' ? (Number(record?.totalSize) || 0) : 0
+    return files.reduce((sum, f) =>
+      sum + (f.status === 'success' ? (Number(f.fileSize) || 0) : (Number(f.uploadedBytes) || 0)), 0)
   }
 
   // ---- file modal ----
@@ -330,6 +393,20 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     if (Array.isArray(files)) return files
     if (typeof files === 'object') return Object.values(files)
     return []
+  }
+
+  // Web link to the Dropbox folder this recording's files live in. The folder is
+  // derived from any uploaded file's `dropboxPath` (drop the filename), then
+  // resolved to a real shared link by the server (files live in the team space,
+  // so a client-built /home/<path> URL 404s). Null until a file has landed in
+  // Dropbox, or when the API base isn't configured.
+  dropboxFolderUrl(record: any): string | null {
+    const withPath = this.normalizeFiles(record?.files).find(f => f?.dropboxPath)
+    const path: string | undefined = withPath?.dropboxPath
+    if (!path) return null
+    const folder = path.substring(0, path.lastIndexOf('/'))
+    if (!folder) return null
+    return this.migrationApi.folderOpenUrl(folder) || null
   }
 
   // ---- formatting helpers ----

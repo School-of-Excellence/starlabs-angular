@@ -30,6 +30,7 @@ import {
 } from '@angular/fire/firestore';
 import { AuthguardService } from '../../../authguard.service';
 import { Subscription } from 'rxjs';
+import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface QAItem {
   docid: string;
@@ -61,7 +62,8 @@ interface ProfileData {
     MatFormFieldModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    ProfilePictureComponent
   ],
   templateUrl: './questionandanswer.component.html',
   styleUrl: './questionandanswer.component.css'

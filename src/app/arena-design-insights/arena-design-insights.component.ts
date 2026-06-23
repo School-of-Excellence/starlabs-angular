@@ -16,6 +16,7 @@ import { AuthguardService } from '../authguard.service';
 import { where } from 'firebase/firestore';
 import { TopCompletedDoersPipe } from "../custompipe.pipe";
 import { trigger, transition, style, animate, query as animQuery, stagger, group, state, AnimationEvent } from '@angular/animations';
+import { ProfilePictureComponent } from '../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-arena-design-insights',
@@ -30,7 +31,8 @@ import { trigger, transition, style, animate, query as animQuery, stagger, group
     MatPaginatorModule,
     MatButtonModule,
     MarkdownModule,
-    TopCompletedDoersPipe
+    TopCompletedDoersPipe,
+    ProfilePictureComponent
   ],
   templateUrl: './arena-design-insights.component.html',
   styleUrl: './arena-design-insights.component.css',

@@ -11,6 +11,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-team-delivery-hours-update',
@@ -24,7 +25,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     NgxMatSelectSearchModule,
     MatButtonModule,
     MatInputModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    ProfilePictureComponent
   ],
   templateUrl: './team-delivery-hours-update.component.html',
   styleUrl: './team-delivery-hours-update.component.css'

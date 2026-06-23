@@ -7,7 +7,12 @@
         <mat-option>
           <ngx-mat-select-search [(ngModel)]="filteredProfile" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
         </mat-option>
-        <mat-option class="matOption" *ngFor="let profile of returnProfile()" [value]="profile.id">{{profile["name"]}}</mat-option>
+        <mat-option class="matOption" *ngFor="let profile of returnProfile()" [value]="profile.id">
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <app-profile-picture [profileId]="profile.id" [name]="profile['name']" [size]="24"></app-profile-picture>
+            <span>{{profile["name"]}}</span>
+          </span>
+        </mat-option>
       </mat-select>
       <mat-error *ngIf="this.assignEISForm.get('profile').hasError('required')">
         Profile Name <strong>Required</strong>

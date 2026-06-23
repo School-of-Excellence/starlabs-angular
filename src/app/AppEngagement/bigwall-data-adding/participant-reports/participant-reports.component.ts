@@ -22,6 +22,7 @@ import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-participant-reports',
@@ -37,7 +38,8 @@ import { MatInputModule } from '@angular/material/input';
   MatTableModule,
   MatSelectModule,
   MatDialogModule,
-  ReactiveFormsModule,],
+  ReactiveFormsModule,
+  ProfilePictureComponent,],
   templateUrl: './participant-reports.component.html',
   styleUrls: ['./participant-reports.component.css']
 })

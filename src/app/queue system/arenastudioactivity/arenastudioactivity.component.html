@@ -63,7 +63,10 @@
           <div class="value eis-list" 
                [ngClass]="{'duplicate-eis': duplicateSpecialistPairing.includes(item['pairing'].join(','))}">
             <span *ngFor="let eis of item['pairing']; let last = last" class="eis-chip">
-              {{ mapProfile[eis] }}{{ !last ? ',' : '' }}
+              <span style="display:inline-flex;align-items:center;gap:6px;">
+                <app-profile-picture [profileId]="eis" [name]="mapProfile[eis]" [size]="22"></app-profile-picture>
+                <span>{{ mapProfile[eis] }}</span>
+              </span>{{ !last ? ',' : '' }}
             </span>
           </div>
         </div>
@@ -71,7 +74,12 @@
         <!-- Client Section -->
         <div class="info-block">
           <span class="label">Client</span>
-          <span class="value">{{ mapProfile[item['participantid']] }}</span>
+          <span class="value">
+            <span style="display:inline-flex;align-items:center;gap:6px;">
+              <app-profile-picture [profileId]="item['participantid']" [name]="mapProfile[item['participantid']]" [size]="28"></app-profile-picture>
+              <span>{{ mapProfile[item['participantid']] }}</span>
+            </span>
+          </span>
         </div>
         
         <!-- Stage Section with Warning -->

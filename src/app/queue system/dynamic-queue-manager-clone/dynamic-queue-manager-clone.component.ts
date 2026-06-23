@@ -7,6 +7,7 @@ import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { PeopleInvolvedComponent } from '../people-involved/people-involved.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { environment } from '../../../environments/environment';
 import { AssignQueueStudioComponent } from '../assign-queue-studio/assign-queue-studio.component';
 import { AvTestComponent } from '../av-test/av-test.component';
@@ -101,7 +102,7 @@ interface ProfileNotificationSummary {
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressSpinnerModule,
-    
+    ProfilePictureComponent,
   ],
   templateUrl: './dynamic-queue-manager-clone.component.html',
   styleUrl: './dynamic-queue-manager-clone.component.css'
@@ -1356,9 +1357,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     this.stageCountSubscription = collectionData(query(collection(this.firestore, 'stage opportunity count'),where('queuelist', 'array-contains', this.selectedQueue.docid))).pipe(takeUntil(this.subscriptionHandle),takeUntil(this.liveQueueSubscription)).subscribe(data => 
     {
-      this.stageCountCards = (data as any[]).sort((a: any, b: any) =>
-        (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
-      );
+      this.stageCountCards = (data as any[])
+        .filter((e: any) => e['kind'] !== 'phase')
+        .sort((a: any, b: any) =>
+          (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
+        );
     });
   }
 

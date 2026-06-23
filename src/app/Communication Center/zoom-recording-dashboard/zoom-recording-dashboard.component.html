@@ -33,7 +33,26 @@
       <span class="stat-label">Failed</span>
       <span class="stat-num">{{ stats.failed }}</span>
     </div>
+    <div class="stat-card stat-card--data">
+      <span class="stat-label">Uploaded (GB)</span>
+      <span class="stat-num">{{ stats.uploadedGb | number : "1.2-2" }}</span>
+    </div>
   </section>
+
+  <!-- ===== estimated migration cost ===== -->
+  <div class="cost-banner">
+    <div class="cost-banner__label">
+      <span class="cost-icon">💸</span>
+      <div>
+        <span class="cost-title">Estimated migration cost</span>
+        <span class="cost-basis">{{ stats.uploadedGb | number : "1.2-2" }} GB egress · ${{ costPerGbUsd }}/GB · ₹{{ usdToInr }}/$</span>
+      </div>
+    </div>
+    <div class="cost-banner__values">
+      <span class="cost-usd">${{ stats.costUsd | number : "1.2-2" }}</span>
+      <span class="cost-inr">₹{{ stats.costInr | number : "1.2-2" }}</span>
+    </div>
+  </div>
 
   <!-- ===== filters ===== -->
   <form [formGroup]="form" class="filters">
@@ -195,6 +214,25 @@
         </td>
       </ng-container>
 
+      <ng-container matColumnDef="zoom">
+        <th mat-header-cell *matHeaderCellDef>In Zoom</th>
+        <td mat-cell *matCellDef="let el">
+          @switch (existsInZoom(el)) {
+            @case ('yes') {
+              <span class="zoom-badge zoom-yes" title="This recording still exists in Zoom">
+                <span class="badge-dot"></span>In Zoom</span>
+            }
+            @case ('no') {
+              <span class="zoom-badge zoom-no" title="Not found in Zoom — deleted or aged out of Zoom cloud">
+                <span class="badge-dot"></span>Not in Zoom</span>
+            }
+            @default {
+              <span class="zoom-badge zoom-unknown" title="Checking Zoom…">—</span>
+            }
+          }
+        </td>
+      </ng-container>
+
       <ng-container matColumnDef="progress">
         <th mat-header-cell *matHeaderCellDef>Progress</th>
         <td mat-cell *matCellDef="let el">
@@ -244,6 +282,10 @@
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let el">
           <button class="view-btn" (click)="openFileModel(el.id)">View files →</button>
+          @if (dropboxFolderUrl(el); as dbUrl) {
+          <a class="dropbox-link-sm" [href]="dbUrl" target="_blank" rel="noopener"
+             title="Open this recording's folder in Dropbox">📁 Dropbox ↗</a>
+          }
         </td>
       </ng-container>
 
@@ -285,13 +327,20 @@
             {{ processingStart(activeRecord) | date : "MMM d, y, h:mm:ss a" }}
             &ndash; {{ processingEnd(activeRecord) | date : "h:mm:ss a" }}</span>
         </p>
+        @if (dropboxFolderUrl(activeRecord); as dbUrl) {
+        <p class="modal-meta">
+          <a class="dropbox-link" [href]="dbUrl" target="_blank" rel="noopener">
+            📁 Open folder in Dropbox ↗
+          </a>
+        </p>
+        }
       </div>
       <button class="close-x" (click)="closeFileModel()">✕</button>
     </div>
 
     @if (files.length > 0) {
     <div class="file-list">
-      @for (f of files; track f.fileType) {
+      @for (f of files; track $index) {
       <div class="file-item">
         <div class="file-item__top">
           <span class="file-type mono">{{ f.fileType }}</span>

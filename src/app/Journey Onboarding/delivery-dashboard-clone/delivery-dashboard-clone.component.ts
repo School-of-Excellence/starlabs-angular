@@ -8,6 +8,7 @@ import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remar
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -142,7 +143,8 @@ interface UtilizationRow {
         MatDatepickerModule,
         MatNativeDateModule,
         MatInputModule,
-        MatSlideToggleModule
+        MatSlideToggleModule,
+        ProfilePictureComponent
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',

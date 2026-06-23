@@ -7,7 +7,12 @@
                     <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                     </mat-option>
-                    <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">{{client.name}}</mat-option>
+                    <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">
+                      <span style="display:inline-flex;align-items:center;gap:8px;">
+                        <app-profile-picture [profileId]="client.profileid" [name]="client.name" [size]="24"></app-profile-picture>
+                        <span>{{client.name}}</span>
+                      </span>
+                    </mat-option>
                   <!-- <mat-option *ngFor="let participant of participantList" [value]="participant.profileid">{{participant.name}}</mat-option> -->
                 </mat-select>
                 <mat-error *ngIf="aggregateForm.get('participant').hasError('required')">
@@ -59,7 +64,12 @@
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterText" (keyup)="onSearchText('participant')" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let option of filteredProfilelist" [value]="option['profileid']">{{option['name']}}</mat-option>
+              <mat-option *ngFor="let option of filteredProfilelist" [value]="option['profileid']">
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="option['profileid']" [name]="option['name']" [size]="24"></app-profile-picture>
+                  <span>{{option['name']}}</span>
+                </span>
+              </mat-option>
             </mat-select>
         </mat-form-field>&nbsp;&nbsp;
         <mat-form-field class="mr-4" appearance="outline" class="w-25">

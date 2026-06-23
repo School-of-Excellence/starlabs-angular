@@ -26,7 +26,12 @@
           <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
         </mat-option>
         <mat-option [value]="null">None</mat-option>
-        <mat-option *ngFor="let option of filterProfile()" [value]="option.profileid">{{option['name']}}</mat-option>
+        <mat-option *ngFor="let option of filterProfile()" [value]="option.profileid">
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <app-profile-picture [profileId]="option.profileid" [name]="option['name']" [size]="24"></app-profile-picture>
+            <span>{{option['name']}}</span>
+          </span>
+        </mat-option>
       </mat-select>
     </mat-form-field>&nbsp;&nbsp;
     <mat-form-field class="w-25" appearance="outline">
