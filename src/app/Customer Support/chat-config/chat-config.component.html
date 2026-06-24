@@ -58,7 +58,12 @@
                                         placeholderLabel="Search" [noEntriesFoundLabel]="'No matching records found'"
                                         ngDefaultControl></ngx-mat-select-search>
                                 </mat-option>
-                                <mat-option *ngFor="let item of returnvalidators()" [value]="item.id">{{item.name}}</mat-option>
+                                <mat-option *ngFor="let item of returnvalidators()" [value]="item.id">
+                                    <span style="display:inline-flex;align-items:center;gap:8px;">
+                                        <app-profile-picture [profileId]="item.id" [name]="item.name" [size]="24"></app-profile-picture>
+                                        <span>{{item.name}}</span>
+                                    </span>
+                                </mat-option>
                             </mat-select>
                         </mat-form-field>
 

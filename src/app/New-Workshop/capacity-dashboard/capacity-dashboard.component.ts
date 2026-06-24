@@ -19,6 +19,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatDividerModule } from '@angular/material/divider';
 import { Router } from '@angular/router';
 import { MatMenuModule } from '@angular/material/menu';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface LevelCount { fasttrack: number; regular: number; total: number; }
 interface ParticipantInfo { profileId: string; name: string; count: number; atcModels?: string[]; }
@@ -27,7 +28,7 @@ interface ParticipantInfo { profileId: string; name: string; count: number; atcM
   selector: 'app-capacity-dashboard',
   imports: [MatTableModule, MatPaginatorModule, MatSortModule, MatButtonModule, MatIconModule, CommonModule,
     ReactiveFormsModule, FormsModule, MatInputModule, MatSelectModule, NgxMatSelectSearchModule,
-    MatSidenavModule, MatCardModule, MatListModule, MatDividerModule, MatMenuModule],
+    MatSidenavModule, MatCardModule, MatListModule, MatDividerModule, MatMenuModule, ProfilePictureComponent],
   templateUrl: './capacity-dashboard.component.html',
   styleUrl: './capacity-dashboard.component.css'
 })

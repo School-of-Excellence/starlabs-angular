@@ -19,10 +19,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatMenuModule } from '@angular/material/menu';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-live-event-dashboard',
   imports: [
+    ProfilePictureComponent,
     MatProgressSpinnerModule,
     CommonModule,
     ReactiveFormsModule,

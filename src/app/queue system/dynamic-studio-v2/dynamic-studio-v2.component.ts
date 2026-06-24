@@ -80,6 +80,10 @@ export class DynamicStudioV2Component {
   liveStudio = []
   // Outside Studio
   outsideLiveAssignmentSubscription: Subscription = null
+  // One live-assignment listener per ongoing-queue chunk (Firestore `in` caps
+  // at 30 ids). Tracked so they can be torn down on queue switch / destroy —
+  // the old single-field listener was never stored and leaked on every switch.
+  outsideLiveAssignmentSubscriptions: Subscription[] = []
   outsideLiveAssignment = []
   // Studio Assignment
   liveassignmentSubscription:Subscription = null
@@ -99,6 +103,12 @@ export class DynamicStudioV2Component {
   // Used by the waiting-list "Bring To Studio" row to hide the CTA and show
   // an amber "Already being invited" chip instead.
   tokenInvitedByOther: { [tokenDocId: string]: { studioName?: string; specialistNames?: string[] } } = {}
+  // Tokens this SAME studio has a still-pending invitation for (awaiting the
+  // participant's response). Keyed by token doc id. Used by the waiting-list row
+  // to replace the "Bring To Studio" CTA with an "awaiting response" chip + a
+  // Cancel action, so the specialist can't re-invite (and hit the reservation
+  // guard) and can recover a stuck participant without waiting for expiry.
+  tokenInvitedBySelf: { [tokenDocId: string]: { invitationDocId?: string } } = {}
   private otherStudioInvitationSubscription: Subscription = null
   private otherStudioInvitationHandle = new Subject<void>()
   // Zoom Control
@@ -357,10 +367,51 @@ export class DynamicStudioV2Component {
       return
     }
     try {
+      // Resolve the queue_token for THIS live assignment freshly, so form
+      // loading doesn't depend on token-hydration timing (ensureTokenForAssignment
+      // runs un-awaited on the auto-enter path) or on a stale token carried
+      // over from a previous participant. Without this, a specialist who
+      // auto-enters a studio before the token settles — or whose participant
+      // was transferred from another queue — sees no forms while another
+      // specialist (direct-queue participant) sees them fine.
+      let token: any = la?.['token']
+      if (!token?.['queueref'] || token?.['liveassignmentid'] !== la['docid']) {
+        const tokSnap = await getDocs(query(
+          collection(this.firestore, 'queue_token'),
+          where('liveassignmentid', '==', la['docid']),
+          limit(1),
+        ))
+        token = tokSnap.empty ? null : tokSnap.docs[0].data()
+      }
+
       const firestoreForms = getFirestore('firestore-forms')
-      const queueRef = la?.['token']?.['queueref']
-        || doc(this.firestore, 'queue generation', this.ongoingQueue['docid'])
-      const involvedQueueRef = [doc(firestoreForms, queueRef.path)]
+      // Build the full set of queues whose forms count for this participant:
+      // the current queue plus the entire transfer chain it came through.
+      // Mirrors onStudioSelect's manual "Bring to Studio" path so both behave
+      // identically for transferred participants.
+      let involvedQueueRef: any[] = []
+      if (token?.['queueref']) {
+        involvedQueueRef.push(token['queueref'])
+        if (![null, undefined].includes(token['transferredfrom'])) {
+          involvedQueueRef.push(token['transferredfrom'])
+          let currentRef: DocumentReference | null = token['tokentransferredfrom'] ?? null
+          while (currentRef != null) {
+            const transferData = await this.getQueueRefFromTransferredFrom(currentRef)
+            if (![null, undefined].includes(transferData['transferredfrom'])) {
+              involvedQueueRef.push(transferData['transferredfrom'])
+              currentRef = transferData['tokentransferredfrom']
+            } else {
+              currentRef = null
+              break
+            }
+          }
+        }
+      } else {
+        // No token at all — fall back to the ongoing queue's own ref.
+        involvedQueueRef.push(doc(this.firestore, 'queue generation', this.ongoingQueue['docid']))
+      }
+      involvedQueueRef = involvedQueueRef.map(e => doc(firestoreForms, e.path))
+
       const snap = await getDocs(query(
         collection(firestoreForms, 'formsByClient'),
         where('queueref', 'in', involvedQueueRef),
@@ -959,7 +1010,17 @@ export class DynamicStudioV2Component {
             // queue so they go straight inside the studio (no queue picker).
             const queueWithLive = await this.findQueueWithLiveAssignment()
 
-            this.ongoingQueue = queueWithLive || firstWithStudios || this.ongoingQueueList[0]
+            // BUT only honor it when they actually have a studio in that queue.
+            // `findQueueWithLiveAssignment` matches on the live-assignment's
+            // `pairing` (which includes invited/bonus specialists), whereas the
+            // arena renders from `queue studio pairing` (studioin==true) for YOU.
+            // If you're only an invited/bonus specialist in someone else's live
+            // studio, honoring queueWithLive would select a queue with no studio
+            // for you → blank screen. Fall back to the queue where you DO have a
+            // studio (legacy behavior). Invited studios remain reachable via the
+            // "Other Studio you're invited to Join" path.
+            const queueWithLiveHasStudio = queueWithLive && (this.queueStudioCounts[queueWithLive['docid']] || 0) > 0
+            this.ongoingQueue = (queueWithLiveHasStudio ? queueWithLive : firstWithStudios) || this.ongoingQueueList[0]
             this.selectedQueue = this.ongoingQueue
             await this.onQueueSelect()
             const profileMap = await guard.getProfileMap()
@@ -1011,8 +1072,18 @@ export class DynamicStudioV2Component {
   }
 
   ngOnDestroy(){
-   this.subscriptionHandle.complete();
+   // takeUntil tears down only on a notifier `next` — emitting it BEFORE
+   // `complete()` is what actually unsubscribes every takeUntil(subscriptionHandle)
+   // stream. The previous order (complete() then next()) left ~18 realtime
+   // Firestore collectionData listeners alive after destroy → unbounded
+   // listener/memory growth across studio navigations.
    this.subscriptionHandle.next();
+   this.subscriptionHandle.complete();
+   this.otherStudioInvitationHandle.next();
+   this.otherStudioInvitationHandle.complete();
+   // resetSubscription tears down the subscriptions that are NOT wired through
+   // takeUntil (notably tripleATCSubscription at :3593).
+   this.resetSubscription();
    if (this.presenceTimer) { clearInterval(this.presenceTimer); this.presenceTimer = null }
    this.stopStudioPresence()
   }
@@ -1048,6 +1119,7 @@ export class DynamicStudioV2Component {
     this.studioGroupingInvitationSubscription?.unsubscribe()
     this.tripleATCSubscription?.unsubscribe()
     this.outsideLiveAssignmentSubscription?.unsubscribe()
+    this.outsideLiveAssignmentSubscriptions.forEach(s => s?.unsubscribe())
     this.studioconversationSubscription?.unsubscribe()
     this.otherStudioInvitationSubscription?.unsubscribe()
 
@@ -1058,9 +1130,11 @@ export class DynamicStudioV2Component {
     this.studioGroupingInvitationSubscription = null
     this.tripleATCSubscription = null
     this.outsideLiveAssignmentSubscription = null
+    this.outsideLiveAssignmentSubscriptions = []
     this.studioconversationSubscription = null
     this.otherStudioInvitationSubscription = null
     this.tokenInvitedByOther = {}
+    this.tokenInvitedBySelf = {}
   }
 
   /**
@@ -1079,29 +1153,40 @@ export class DynamicStudioV2Component {
     this.otherStudioInvitationHandle.next()
     this.otherStudioInvitationSubscription?.unsubscribe()
     this.tokenInvitedByOther = {}
+    this.tokenInvitedBySelf = {}
 
     const queueRef = doc(this.firestore, 'queue generation', this.ongoingQueue['docid'])
+    // Pull every non-expired invite for the queue and classify in code by
+    // `clientresponse` + `studioid`. Participant invites (written by
+    // inviteParticipant) carry no `status` field — they reserve the token purely
+    // via expiry + clientresponse — so we must NOT filter on status here, or a
+    // token with a live invite would stay a clickable-but-blocked CTA (the bug).
     this.otherStudioInvitationSubscription = collectionData(
       query(
         collection(this.firestore, 'studioinvitation'),
         where('queueref', '==', queueRef),
-        where('status', '==', 'pending'),
         where('expirydate', '>=', new Date()),
       ),
       { idField: 'id' }
     ).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.otherStudioInvitationHandle)).subscribe(invitations => {
       const next: { [tokenDocId: string]: { studioName?: string; specialistNames?: string[] } } = {}
+      const nextSelf: { [tokenDocId: string]: { invitationDocId?: string } } = {}
       const selfStudio = this.selectedStudio?.['docid']
       for (const inv of (invitations || [])) {
         const invStudio = inv['studioid']
-        if (!invStudio || invStudio === selfStudio) continue
+        if (!invStudio) continue
         const tokenRef: any = inv['tokenref']
         const tokenDocId = tokenRef?.id
           ?? (typeof tokenRef?.path === 'string' ? tokenRef.path.split('/').pop() : null)
+        // Skip non-participant invites (e.g. stage-grouping) and terminal states.
         if (!tokenDocId) continue
-        // Skip terminal client responses
         const clientResp = inv['clientresponse']
         if (clientResp === 'denied') continue
+        // This studio's own pending invite → "awaiting response" + Cancel.
+        if (invStudio === selfStudio) {
+          nextSelf[tokenDocId] = { invitationDocId: inv['docid'] ?? inv['id'] }
+          continue
+        }
         const studio = this.mapStudio?.[invStudio] || {}
         const studioName = studio?.['studioname'] || studio?.['name'] || 'another studio'
         const specialistIds: string[] = Array.isArray(inv['specialistpairing'])
@@ -1113,6 +1198,7 @@ export class DynamicStudioV2Component {
         next[tokenDocId] = { studioName, specialistNames }
       }
       this.tokenInvitedByOther = next
+      this.tokenInvitedBySelf = nextSelf
     })
   }
 
@@ -1232,6 +1318,41 @@ export class DynamicStudioV2Component {
     this.onQueueSelect()
   }
 
+  /**
+   * Confirm-guarded queue switch used by the in-studio top navigator
+   * (`.ds-qnav`). The navigator stays visible WHILE in a live assignment
+   * (legacy parity), so switching could drop an active session — ask first.
+   * No-op when picking the already-active queue.
+   */
+  confirmSwitchQueue(queue: any){
+    if (!queue || queue['docid'] === this.ongoingQueue['docid']) return
+    if (this.liveAssignment != null && !window.confirm('Leave this studio and switch to another queue?')) return
+    this.selectQueueCard(queue)
+  }
+
+  /**
+   * Confirm-guarded studio switch used by the in-studio top navigator.
+   * Same rationale as confirmSwitchQueue. No-op when picking the already-
+   * selected studio.
+   */
+  confirmSwitchStudio(studio: any){
+    if (!studio || studio['docid'] === this.selectedStudio['docid']) return
+    if (this.liveAssignment != null && !window.confirm('Leave this studio and switch to another studio?')) return
+    this.onStudioSelect(studio)
+  }
+
+  /**
+   * Confirm-guarded jump to a studio in another queue that you've been invited
+   * to join (`outsideLiveAssignment`). Joining leaves your current live session,
+   * so ask first while in a live assignment. Delegates to the existing
+   * visitOtherStudio() which handles the actual join.
+   */
+  confirmVisitOtherStudio(studio: any){
+    if (!studio) return
+    if (this.liveAssignment != null && !window.confirm('Leave this studio and join the invited studio?')) return
+    this.visitOtherStudio(studio)
+  }
+
   async onQueueSelect(){
     this.resetSubscription()
     var loading = this.dialog.open(LoadingProgressComponent, {
@@ -1273,8 +1394,28 @@ export class DynamicStudioV2Component {
   }
 
   getOutsideStudio(){
-    collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "==", this.ongoingQueue["docid"]),where("status", "==", "live"),where("bonusactivityparticipant", "array-contains", this.profileid)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(assignment=>{
-      this.outsideLiveAssignment = assignment
+    // An "outside studio" invite (added via Invite More → bonusactivityparticipant)
+    // can live in ANY of the specialist's ongoing queues, not just the one
+    // currently selected. Watch every ongoing queue so the invite surfaces no
+    // matter which queue the specialist is looking at. Firestore `in` allows at
+    // most 30 values, so chunk the queue ids and merge the per-chunk results.
+    this.outsideLiveAssignmentSubscriptions.forEach(s => s?.unsubscribe())
+    this.outsideLiveAssignmentSubscriptions = []
+    this.outsideLiveAssignment = []
+
+    const queueIds = (this.ongoingQueueList ?? []).map(q => q['docid']).filter(Boolean)
+    if (queueIds.length === 0) return
+
+    const chunks: string[][] = []
+    for (let i = 0; i < queueIds.length; i += 30) chunks.push(queueIds.slice(i, i + 30))
+
+    const chunkResults: any[][] = chunks.map(() => [])
+    chunks.forEach((chunk, idx) => {
+      const sub = collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "in", chunk),where("status", "==", "live"),where("bonusactivityparticipant", "array-contains", this.profileid)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(assignment=>{
+        chunkResults[idx] = assignment
+        this.outsideLiveAssignment = chunkResults.flat()
+      })
+      this.outsideLiveAssignmentSubscriptions.push(sub)
     })
   }
 
@@ -1347,8 +1488,13 @@ export class DynamicStudioV2Component {
         }
         // Check if Studio Grouping Invitation is Sent
         var involvedStudio = this.studioList.map(e => e["docid"])
-        // if(this.studioGroupingInvitationSubscription == null){
-          collectionData(query(collection(this.firestore,"studioinvitation"), where("type", "==", "stagegrouping"),where("status", "==", "pending"),where("invitedstudio", "array-contains-any", involvedStudio)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(studioInvitation=>{
+        // The outer "queue studio pairing" subscription re-fires on every
+        // check-in/out, so unsubscribe the previous listener before creating a
+        // new one — otherwise a fresh listener leaked on every emission (the
+        // handle was never stored, so the old `== null` guard never tripped and
+        // duplicate listeners kept re-opening the invitation dialog).
+        this.studioGroupingInvitationSubscription?.unsubscribe()
+        this.studioGroupingInvitationSubscription = collectionData(query(collection(this.firestore,"studioinvitation"), where("type", "==", "stagegrouping"),where("status", "==", "pending"),where("invitedstudio", "array-contains-any", involvedStudio)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(studioInvitation=>{
             for (let i = 0; i < studioInvitation.length; i++) {
               const invitation = studioInvitation[i];
               var matchedstudio = invitation["invitedstudio"].find(studio => involvedStudio.includes(studio))
@@ -1380,7 +1526,12 @@ export class DynamicStudioV2Component {
         // Check if Live Assignment is On
         var studioID = this.studioList.map(e => e["docid"])
         if(this.liveassignmentSubscription == null){
-          collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "==", this.ongoingQueue["docid"]),where("status", "==", "live"),where("studioid", "in", studioID)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(assignment=>{
+          // Store the handle so the `== null` guard above actually works.
+          // Before, the result was discarded, so a brand-new live-assignment
+          // listener was created on EVERY pairing emission — each one
+          // independently re-ran the auto-enter logic below, multiplying the
+          // "studio opens blank then loads" race and leaking listeners.
+          this.liveassignmentSubscription = collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "==", this.ongoingQueue["docid"]),where("status", "==", "live"),where("studioid", "in", studioID)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async assignment=>{
             var activeStudio = []
             assignment.forEach(e =>{
               activeStudio.push(e["studioid"])
@@ -1430,7 +1581,10 @@ export class DynamicStudioV2Component {
               // When we auto-entered the studio (no manual Bring-To-Studio
               // flow), the queue_token isn't attached. Pull it so the
               // sidebar shows product / variation / queue position.
-              this.ensureTokenForAssignment()
+              // Await it BEFORE loading widgets so the first render already has
+              // product / variation / forms data, instead of flashing a blank
+              // studio that fills in a moment later.
+              await this.ensureTokenForAssignment()
               // Trigger all widget-driven fetches (Validated ATC,
               // Unvalidated ATC, Assigned ATC, Triple ATC, AEL, UP visit,
               // Forms) directly from the live-assignment subscription so
@@ -1450,11 +1604,15 @@ export class DynamicStudioV2Component {
         if(!!this.studioInvitationSubscription && !this.studioInvitationSubscription.closed){
           console.log("studioInvitationSubscription","subscribed");
           this.studioInvitationSubscription.unsubscribe()
+          // Null it so the `if(!this.studioInvitationSubscription)` below
+          // rebuilds the listener — previously the handle was never stored, so
+          // it stayed falsy and a fresh listener leaked on every emission.
+          this.studioInvitationSubscription = null
         }
         if(!this.studioInvitationSubscription){
           console.log(this.studioInvitationSubscription, 'studioInvitationSubscription');
           
-          collectionData(query(collection(this.firestore,"studioinvitation"), where("specialistpairing", 'array-contains', this.profileid),where("queueref", '==', doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("studioid", "in", studioID),where("expirydate", ">=", new Date())), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async invitationSnap => {
+          this.studioInvitationSubscription = collectionData(query(collection(this.firestore,"studioinvitation"), where("specialistpairing", 'array-contains', this.profileid),where("queueref", '==', doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("studioid", "in", studioID),where("expirydate", ">=", new Date())), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async invitationSnap => {
           // this.studioInvitationSubscription = this.firestore.collection("studioinvitation", ref => ref.where("specialistpairing", 'array-contains', this.profileid).where("queueref", '==', this.firestore.collection("queue generation").doc(this.ongoingQueue["docid"]).ref).where("studioid", "in", studioID).where("expirydate", ">=", new Date())).valueChanges().subscribe(async invitationSnap => {
             console.log(invitationSnap)
             // Scenario: Invitation Approved by Participant (Invitation is saved from previous snapshot)
@@ -1540,6 +1698,19 @@ export class DynamicStudioV2Component {
     })
   }
 
+  // trackBy fns for the stage/token *ngFor lists. Each queue_token snapshot
+  // rebuilds stageTokenList as a fresh array of fresh objects, so without a
+  // stable identity Angular tears down and re-creates every row (and its
+  // avatar/name) on each emission — the visible flicker. Key on the stage name
+  // and the token docid so updates patch in place instead.
+  trackByStageName(_index: number, stage: any){
+    return stage?.stagename
+  }
+
+  trackByTokenDocId(_index: number, token: any){
+    return token?.docid
+  }
+
   async onStudioSelect(studio){
     console.log("****** studio select ******");
     
@@ -1584,7 +1755,12 @@ export class DynamicStudioV2Component {
       }
     }
      // get studioconversation
-    collectionData(query(collection(this.firestore,"studio conversation"), where('studioid', 'array-contains', this.selectedStudio['docid'])), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async snap => {
+    // onStudioSelect re-fires on every studio switch / check-in-out (and from
+    // the auto-enter + "Bring to Studio" paths), so tear down the previous
+    // listener before opening a new one — otherwise a fresh anonymous listener
+    // leaked on every call and kept firing in parallel.
+    this.studioconversationSubscription?.unsubscribe()
+    this.studioconversationSubscription = collectionData(query(collection(this.firestore,"studio conversation"), where('studioid', 'array-contains', this.selectedStudio['docid'])), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async snap => {
       this.studiochatList = snap;
       console.log(this.studiochatList);
 
@@ -1606,7 +1782,13 @@ export class DynamicStudioV2Component {
     });
     
     if(studioStage.length != 0){
-      collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
+      // Same leak as the studio-conversation listener above: a new queue_token
+      // listener was opened on every onStudioSelect call and never stored, so
+      // duplicates accumulated and each one reassigned this.stageTokenList on
+      // every token change — spamming the console and flickering the on-screen
+      // names. Tear down the previous listener before subscribing again.
+      this.tokenSubscription?.unsubscribe()
+      this.tokenSubscription = collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
         console.log(token)
         if(this.liveAssignment != null && token.length != 0){
           this.liveAssignment["token"] = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
@@ -2033,9 +2215,28 @@ export class DynamicStudioV2Component {
         setDoc(doc(this.firestore,"studioinvitation",invitationData['docid']),invitationData,{merge:true}).catch((err)=>{
           alert(err)
         })
-       
+
       }
     })
+  }
+
+  /**
+   * Cancel THIS studio's still-pending invitation(s) for a token so a stuck
+   * "awaiting response" participant can be recovered (and re-invited) without
+   * waiting for the invite to expire. Only deletes un-answered invites created
+   * by the current studio — an already-approved invite is being moved in and is
+   * left alone.
+   */
+  async cancelOwnInvitation(token){
+    const snap = await getDocs(query(
+      collection(this.firestore,"studioinvitation"),
+      where("tokenref", "==", doc(this.firestore,"queue_token",token["docid"])),
+      where("studioid", "==", this.selectedStudio["docid"]),
+    ))
+    const stale = snap.docs.filter(e => e.data()["clientresponse"] == null)
+    await Promise.all(stale.map(e =>
+      deleteDoc(doc(this.firestore,"studioinvitation", e.id)).catch(err => console.log(err))
+    ))
   }
 
   // async inviteParticipant(token: any) {
@@ -2173,7 +2374,7 @@ export class DynamicStudioV2Component {
         }
         liveassignmentData["zoomlinkrequired"] = this.ongoingQueue["zoomlinkrequired"] ?? true
         await setDoc(doc(this.firestore,('live assignment/' + liveassignmentid)),liveassignmentData, {merge: true})
-        
+
         loading.close()
       }
     })
@@ -2775,72 +2976,21 @@ export class DynamicStudioV2Component {
       }
     })
 
-    // Snapshot the current (broken) URL so we can detect when the
-    // subscription delivers a fresh one. If after a few seconds the URL is
-    // still the same broken value, surface the failure to the user instead
-    // of silently leaving them stuck.
-    const prevUrl: string = this.liveAssignment?.['zoomdata']?.['start_url'] || ''
-    let cloudErr: any = null
-
+    // Legacy (v1) behaviour: fire the regenerate request and let the Firestore
+    // subscription push the fresh zoomdata back into `liveAssignment`. The
+    // cloud function returns a plain-text "success" body, so we read it as text
+    // to avoid a spurious JSON parse error — but, like v1, we do NOT surface any
+    // success/error toast. The earlier rewrite raised a false error toast when
+    // the (server-side-successful) call came back CORS/network-blocked.
     try {
-      // The cloud function returns a plain "success" string, not JSON, so
-      // tell HttpClient not to try to parse it. Without responseType:'text'
-      // Angular throws a parse error even though the call returned 200.
       const res = await this.http.get(url, { responseType: 'text' }).toPromise();
       console.log('[regenerateZoomLink] response', res)
-    } catch (err: any) {
-      cloudErr = err
-      console.warn('[regenerateZoomLink] cloud function error', err)
-      // status 0 + "Unknown Error" = the browser blocked the response,
-      // almost always because the cloud function is missing CORS headers
-      // (or is unreachable / behind a network block). Flag it for the UI.
-      if (err?.status === 0) {
-        cloudErr = Object.assign(new Error('CORS / network blocked'), { isCors: true })
-      }
-      // Parse errors with a 2xx status mean the request itself succeeded,
-      // we just couldn't deserialize the response body. Treat as success.
-      if (err?.status >= 200 && err?.status < 300) {
-        console.log('[regenerateZoomLink] succeeded (non-JSON body)', err?.error?.text)
-        cloudErr = null
-      }
-    }
-
-    // Wait up to 8 seconds for the Firestore subscription to push the new
-    // zoomdata back into `liveAssignment`. Poll once per second.
-    const isBroken = (u: any) => !u || u === 'Link Broken'
-    const startedWait = Date.now()
-    while (Date.now() - startedWait < 8000) {
-      const cur = this.liveAssignment?.['zoomdata']?.['start_url']
-      if (!isBroken(cur) && cur !== prevUrl) break
-      await new Promise(r => setTimeout(r, 1000))
+    } catch (err) {
+      console.log('[regenerateZoomLink] error (ignored, link regenerates server-side)', err)
     }
 
     generateLoading.close()
     this.enableZoomLinkGenerator()
-
-    const final = this.liveAssignment?.['zoomdata']?.['start_url']
-    if (cloudErr) {
-      const msg = (cloudErr as any)?.isCors
-        ? 'Cannot reach the link-regeneration service (CORS / network blocked). Backend needs to be fixed by the dev team.'
-        : 'Could not regenerate the Zoom link — please try again or contact support.'
-      this.snackBar.open(msg, 'Dismiss',
-        { duration: 8000, horizontalPosition: 'center', verticalPosition: 'top' }
-      )
-      return
-    }
-    if (isBroken(final)) {
-      this.snackBar.open(
-        'Zoom link could not be regenerated. The previous link is still broken — try again in a moment.',
-        'Dismiss',
-        { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
-      )
-      return
-    }
-    this.snackBar.open(
-      'New Zoom link generated. You can start the meeting now.',
-      'Dismiss',
-      { duration: 4000, horizontalPosition: 'center', verticalPosition: 'top' }
-    )
   }
   
   // ==========================================

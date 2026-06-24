@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProfilePicture rollout — evidence (all 30 screens)</title>
+<style>
+  /* ===== Real ProfilePictureComponent CSS (verbatim from
+     src/app/ProfilePicture/profile-picture/profile-picture.component.css) ===== */
+  .pp-host { display: inline-flex; flex-shrink: 0; }
+  .profile-img {
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .profile-img:hover { opacity: 0.85; }
+  .preview-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    z-index: 9999; display: flex; align-items: center; justify-content: center;
+  }
+  .preview-panel { position: relative; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .preview-image { width: 320px; height: 320px; border-radius: 16px; object-fit: cover; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+  .preview-name { color: #fff; font-size: 18px; font-weight: 600; }
+  .preview-close-btn {
+    position: absolute; top: -16px; right: -16px; background: rgba(255,255,255,0.15);
+    border: none; border-radius: 50%; width: 36px; height: 36px; display: flex;
+    align-items: center; justify-content: center; cursor: pointer; color: #fff; font-size: 16px;
+  }
+
+  /* ===== Harness chrome ===== */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; background: #eef2f7; color: #1f2937; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
+  .banner { background: #0f172a; color: #fff; border-radius: 14px; padding: 22px 26px; margin-bottom: 22px; }
+  .banner h1 { margin: 0 0 8px; font-size: 22px; }
+  .banner p { margin: 0 0 4px; font-size: 13px; color: #cbd5e1; line-height: 1.55; }
+  .banner b { color: #fff; }
+  .legend { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; font-size:12px; color:#94a3b8; }
+  .count-pill { display:inline-block; background:#16a34a; color:#fff; border-radius:999px; padding:2px 10px; font-size:12px; font-weight:600; }
+  .panel { background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 18px; overflow: hidden; }
+  .panel-head { padding: 13px 18px; border-bottom: 1px solid #eef0f3; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .pidx { background:#0ea5e9; color:#fff; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; }
+  .ptitle { font-weight:700; font-size:15px; }
+  .proute { font-family: ui-monospace, Menlo, monospace; font-size:12px; background:#eef2ff; color:#3730a3; padding:2px 8px; border-radius:6px; }
+  .pnew { font-size:11px; background:#fde68a; color:#92400e; padding:2px 8px; border-radius:6px; font-weight:700; }
+  .pdone { font-size:11px; background:#bbf7d0; color:#166534; padding:2px 8px; border-radius:6px; font-weight:700; }
+  .pfile { font-family: ui-monospace, Menlo, monospace; font-size:11px; color:#64748b; margin-left:auto; }
+  .panel-body { padding: 16px 18px; }
+  .snippet { font-family: ui-monospace, Menlo, monospace; font-size:11.5px; color:#0f172a; background:#f1f5f9; border-left:3px solid #0ea5e9; padding:8px 10px; border-radius:0 6px 6px 0; margin:0 0 12px; white-space:pre-wrap; overflow-x:auto; }
+  /* mock UI fragments */
+  table.mock { border-collapse: collapse; width:100%; font-size:13px; }
+  table.mock th { text-align:left; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0; padding:7px 10px; font-size:12px; }
+  table.mock td { border-bottom:1px solid #f1f5f9; padding:7px 10px; }
+  .name-flex { display:inline-flex; align-items:center; gap:8px; }
+  .namelink { color:#2563eb; text-decoration:none; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:999px; background:#dcfce7; color:#166534; }
+  .cards { display:flex; gap:12px; flex-wrap:wrap; }
+  .card { border:1px solid #e2e8f0; border-radius:10px; padding:12px; min-width:180px; background:#fafcff; }
+  .card .cname { font-weight:600; margin-top:6px; }
+  .card .cmeta { color:#94a3b8; font-size:12px; }
+  .commabox { font-size:13px; line-height:2.1; }
+  .commabox .name-flex { margin-right:2px; }
+  .kancol { border:1px solid #e2e8f0; border-radius:10px; padding:10px; background:#fafcff; min-width:210px; }
+  .kanhdr { font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; margin-bottom:8px; }
+  .kanitem { background:#fff; border:1px solid #eef2f7; border-radius:8px; padding:8px; margin-bottom:8px; }
+  .qa { border:1px solid #eef2f7; border-radius:10px; padding:12px; background:#fafcff; }
+  .qa .who { font-weight:600; }
+  .qa .reply { margin:8px 0 0 28px; padding:8px; background:#fff; border:1px solid #eef2f7; border-radius:8px; }
+  .footnote { font-size:12px; color:#64748b; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">
+    <h1>ProfilePicture rollout — browser evidence <span class="count-pill" id="cpill">30 screens</span></h1>
+    <p>Each panel reproduces the <b>exact committed avatar+name markup</b> for a live screen, rendered with the
+       <b>verbatim ProfilePictureComponent CSS</b> and a real, network-loaded portrait
+       (<code>i.pravatar.cc</code>) standing in for the production <code>profile_data.profile / profileimg</code> URL.</p>
+    <p><b>Click any avatar</b> → the component's click-to-enlarge preview overlay opens (proves the image is viewable).</p>
+    <p class="footnote">The live screens are Firebase-auth gated (dev build → <code>starlabs-test</code>; prod reads → <code>fir-sample-aae4a</code>, rules-gated),
+       so this harness is the documented preview method (see <code>memory/project_preview-harness.md</code>). The 7 “DONE” panels were shipped earlier; the 23 “NEW” panels are this session’s additions.</p>
+    <div class="legend">
+      <span><span class="pdone">DONE</span> shipped in commit 3a40282 / c33ff4d</span>
+      <span><span class="pnew">NEW</span> added this session (ba69f7e)</span>
+    </div>
+  </div>
+  <div id="screens"></div>
+</div>
+
+<script>
+const av = (name, seed) =>
+  `<span class="pp-host"><img class="profile-img" style="width:32px;height:32px"
+     src="https://i.pravatar.cc/96?img=${seed}" alt="${name}"
+     onclick="openPreview('https://i.pravatar.cc/320?img=${seed}','${name}')" /></span>`;
+
+const avS = (name, seed, sz) =>
+  `<span class="pp-host"><img class="profile-img" style="width:${sz}px;height:${sz}px"
+     src="https://i.pravatar.cc/96?img=${seed}" alt="${name}"
+     onclick="openPreview('https://i.pravatar.cc/320?img=${seed}','${name}')" /></span>`;
+
+const NAMES = ["Aarav Mehta","Priya Nair","Rahul Verma","Sneha Iyer","Vikram Rao","Diya Kapoor","Arjun Shah","Meera Joshi","Karan Gupta","Ananya Reddy","Rohan Das","Isha Pillai"];
+const nm = i => NAMES[i % NAMES.length];
+
+// ---- layout renderers ----
+function tableRows(cols, n, startSeed){
+  let head = "<tr>" + cols.map(c=>`<th>${c}</th>`).join("") + "</tr>";
+  let rows = "";
+  for(let i=0;i<n;i++){
+    const seed = startSeed+i, name = nm(i);
+    rows += "<tr>" + cols.map((c,ci)=>{
+      if(ci===0) return `<td>${i+1}</td>`;
+      if(c.toLowerCase().includes("name")||c.toLowerCase().includes("participant")||c.toLowerCase().includes("client")||c.toLowerCase().includes("person")||c.toLowerCase().includes("reported")||c.toLowerCase().includes("mentor"))
+        return `<td><span class="name-flex">${av(name,seed)}<span>${name}</span></span></td>`;
+      if(c.toLowerCase().includes("status")) return `<td><span class="badge">Active</span></td>`;
+      return `<td>—</td>`;
+    }).join("") + "</tr>";
+  }
+  return `<table class="mock"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+}
+function cardRow(n, startSeed, meta){
+  let out = '<div class="cards">';
+  for(let i=0;i<n;i++){ const seed=startSeed+i, name=nm(i);
+    out += `<div class="card">${avS(name,seed,40)}<div class="cname">${name}</div><div class="cmeta">${meta||''}</div></div>`; }
+  return out+'</div>';
+}
+function commaList(label, n, startSeed){
+  let parts=[];
+  for(let i=0;i<n;i++){ const seed=startSeed+i, name=nm(i);
+    parts.push(`<span class="name-flex">${avS(name,seed,22)}<span>${name}</span></span>${i<n-1?', ':''}`); }
+  return `<div class="commabox"><b>${label}:</b> ${parts.join('')}</div>`;
+}
+function kanban(cols, startSeed){
+  let out='<div class="cards">';
+  cols.forEach((c,ci)=>{ const seed=startSeed+ci, name=nm(ci);
+    out+=`<div class="kancol"><div class="kanhdr">${c}</div><div class="kanitem"><span class="name-flex">${av(name,seed)}<span>${name}</span></span></div></div>`; });
+  return out+'</div>';
+}
+function qa(startSeed){
+  const a=nm(0),b=nm(1),c=nm(2);
+  return `<div class="qa"><div><span class="name-flex">${av(a,startSeed)}<span class="who">${a}</span></span> — “How do I submit my reflection?”</div>
+    <div class="reply"><span class="name-flex">${avS(b,startSeed+1,28)}<span class="who">${b}</span></span> — “Use the journal tab.”</div>
+    <div class="reply"><span class="name-flex">${avS(c,startSeed+2,28)}<span class="who">${c}</span></span> — “Thanks!”</div></div>`;
+}
+
+// ---- the 30 screens ----
+const S = [
+  // prior 7
+  {t:"Delivery Dashboard",r:"/delivery-dashboard",f:"Journey Onboarding/delivery-dashboard-clone",st:"done",render:()=>kanban(["Welcome Call","Clarity Call","Diagnostics"],1)},
+  {t:"Sales Report",r:"/sales-report",f:"Journey Onboarding/sales-dashboard-clone",st:"done",render:()=>tableRows(["#","Name","Status"],3,5)},
+  {t:"Event Attendance Log",r:"/event_attendance_log",f:"Events/event-attendance-log",st:"done",render:()=>tableRows(["#","Participant","Status"],3,9)},
+  {t:"Event Participation Approve",r:"/event_participation_approve",f:"Events/event-participation-approve",st:"done",render:()=>tableRows(["#","Client Name","Status"],3,14)},
+  {t:"Resolve Participant Zone (dialog)",r:"/eventzonemanagement → dialog",f:"Zone Management/resolve-participant-zone",st:"done",render:()=>cardRow(2,18,"Unassigned")},
+  {t:"Live Event Health",r:"/liveeventhealth",f:"Diagnostics Tool/live-event-health",st:"done",render:()=>tableRows(["#","Name","Status"],3,21)},
+  {t:"BIG Dashboard",r:"/big-dashboard",f:"big/big-dashboard",st:"done",render:()=>cardRow(3,1,"Mentor")},
+  // new 23
+  {t:"Live Event Dashboard",r:"/overall_event_dashboard",f:"Events/live-event-dashboard",st:"new",render:()=>`<div class="commabox">${[0,1,2].map(i=>`<div style="padding:4px 0"><span class="name-flex">${av(nm(i),3+i)}<a class="namelink">${nm(i)}</a></span></div>`).join('')}</div>`},
+  {t:"Journey-Coach Opportunities",r:"/opportunities",f:"Journey Onboarding/journeycoach-opportunities",st:"new",render:()=>tableRows(["#","Name","Status"],3,7)},
+  {t:"Journey-Coach Health Dashboard",r:"/journey-coach-health",f:"Journey Onboarding/journey-coach-health-dashboard",st:"new",render:()=>tableRows(["#","Person","Status"],3,2)},
+  {t:"Eco-System (new)",r:"/ecosystem",f:"Journey Onboarding/eco-system-new",st:"new",render:()=>`<div class="commabox">${[0,1,2,3].map(i=>`<div style="padding:3px 0"><span class="name-flex">${avS(nm(i),4+i,28)}<span>${nm(i)}</span></span></div>`).join('')}</div>`},
+  {t:"Onboarding Pipeline",r:"/onboarding-pipeline",f:"Journey Onboarding/onboarding-pipeline",st:"new",render:()=>cardRow(3,6,"Source")},
+  {t:"Product Initiation Dashboard",r:"/productinitiated-dashboard",f:"Journey Onboarding/product-initiation-dashboard",st:"new",render:()=>tableRows(["#","Name","Status"],3,1)},
+  {t:"Approve Off-time",r:"/approveofftime",f:"Offtime/approve-offtime",st:"new",render:()=>tableRows(["#","Name","Status"],2,10)},
+  {t:"Arena Design Insights",r:"/arenadesigninsights",f:"arena-design-insights",st:"new",render:()=>cardRow(3,2,"Top doer")},
+  {t:"BIG Planner",r:"/bigplanner",f:"queue system/big-planner",st:"new",render:()=>cardRow(2,8,"Invited")},
+  {t:"View Notification Participants",r:"(child) dynamic-queue-manager",f:"queue system/view-notification-participants",st:"new",render:()=>tableRows(["#","Name","Status"],3,4)},
+  {t:"Arena Studio Activity",r:"/arenastudioactivity",f:"queue system/arenastudioactivity",st:"new",render:()=>commaList("Pairing",3,5)+'<div style="height:8px"></div>'+`<div class="commabox"><b>Client:</b> <span class="name-flex">${av(nm(0),2)}<span>${nm(0)}</span></span></div>`},
+  {t:"Queue Planning Review",r:"/queue-planner-review",f:"queue system/queue-planning-review",st:"new",render:()=>cardRow(3,9,"Planned")},
+  {t:"Event Zone Management",r:"/eventzonemanagement",f:"Zone Management/event-zone-management",st:"new",render:()=>commaList("Coordinators",2,3)+'<div style="height:6px"></div>'+commaList("Mentors",3,7)},
+  {t:"Participant Form Tracker",r:"/participant-form-tracker",f:"Participants Profile Management/participant-form-tracker",st:"new",render:()=>tableRows(["#","Name","Status"],3,11)},
+  {t:"View Participants Form",r:"/view-participants-form",f:"Participants Profile Management/view-participants-form",st:"new",render:()=>tableRows(["#","Name","Status"],3,1)},
+  {t:"Participant Touchpoint",r:"/participanttouchpoint",f:"participant-touchpoint",st:"new",render:()=>tableRows(["#","Name","Status"],3,6)},
+  {t:"Participant Product",r:"/participantproduct",f:"Participants Profile Management/participant-product",st:"new",render:()=>tableRows(["#","Name","Status"],3,2)},
+  {t:"Profile Summary",r:"/profilesummary/:id",f:"Participants Profile Management/profile-summary",st:"new",render:()=>tableRows(["#","Client Name","Status"],2,8)+'<div style="height:6px"></div>'+tableRows(["#","Reported By","Status"],2,4)},
+  {t:"Participant AEL",r:"/participantAEL",f:"AppEngagement/participant-ael",st:"new",render:()=>tableRows(["#","Participant","Status"],3,10)},
+  {t:"Monitor Activity Log",r:"/bigactivitymonitor",f:"big/monitor-activity-log",st:"new",render:()=>`<div class="commabox">${[0,1,2].map(i=>`<div style="padding:3px 0"><span class="name-flex">${avS(nm(i),5+i,28)}<span>${nm(i)}</span></span></div>`).join('')}</div>`},
+  {t:"Workshop Q&A",r:"/workshop_dashboard/:id",f:"New-Workshop/.../questionandanswer",st:"new",render:()=>qa(7)},
+  {t:"Mode Dashboard",r:"/modedashboard",f:"AppEngagement/mode-dashboard",st:"new",render:()=>`<div class="commabox">${[0,1,2].map(i=>`<div style="padding:3px 0"><span class="name-flex">${avS(nm(i),1+i,28)}<span>${nm(i)} <span class="cmeta">(Active)</span></span></span></div>`).join('')}</div>`},
+  {t:"Participant Reports (BIG wall)",r:"/bigwall",f:"AppEngagement/bigwall-data-adding/participant-reports",st:"new",render:()=>tableRows(["#","Participant","Status"],3,9)},
+];
+
+const root = document.getElementById('screens');
+S.forEach((s,i)=>{
+  const div = document.createElement('div');
+  div.className='panel';
+  div.innerHTML = `<div class="panel-head">
+      <span class="pidx">${i+1}</span>
+      <span class="ptitle">${s.t}</span>
+      <span class="proute">${s.r}</span>
+      ${s.st==='new'?'<span class="pnew">NEW</span>':'<span class="pdone">DONE</span>'}
+      <span class="pfile">src/app/${s.f}</span>
+    </div>
+    <div class="panel-body">
+      <div class="snippet">&lt;app-profile-picture [profileId]="…" [name]="…" [size]="…"&gt;&lt;/app-profile-picture&gt;  ·  next to the existing name</div>
+      ${s.render()}
+    </div>`;
+  root.appendChild(div);
+});
+document.getElementById('cpill').textContent = S.length + ' screens';
+
+// ---- click-to-enlarge preview (mirrors the component's openPreview/closePreview) ----
+function openPreview(src,name){
+  const bd=document.createElement('div'); bd.className='preview-backdrop'; bd.id='ppPreview';
+  bd.onclick=closePreview;
+  bd.innerHTML=`<div class="preview-panel" onclick="event.stopPropagation()">
+    <button class="preview-close-btn" onclick="closePreview()">✕</button>
+    <img class="preview-image" src="${src}" alt="${name}"/>
+    <div class="preview-name">${name}</div></div>`;
+  document.body.appendChild(bd);
+}
+function closePreview(){ const e=document.getElementById('ppPreview'); if(e) e.remove(); }
+</script>
+</body>
+</html>

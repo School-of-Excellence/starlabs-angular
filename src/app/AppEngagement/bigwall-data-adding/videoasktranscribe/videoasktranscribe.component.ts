@@ -16,6 +16,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { deleteDoc } from '@angular/fire/firestore';
+import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 
 
 @Component({
@@ -35,7 +36,8 @@ import { deleteDoc } from '@angular/fire/firestore';
     NgxMatSelectSearchModule,
     MatIconModule,
     MatDatepickerModule,
-    MatNativeDateModule
+    MatNativeDateModule,
+    ProfilePictureComponent
   ],
   templateUrl: './videoasktranscribe.component.html',
   styleUrl: './videoasktranscribe.component.css'

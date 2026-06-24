@@ -768,7 +768,10 @@
                     <mat-icon *ngIf="participant.isDuplicate" class="duplicate-icon">content_copy</mat-icon>
                     <mat-icon *ngIf="participant.isNonSegmentParticipant" class="non-segment-icon">person_off</mat-icon>
                   </div>
-                  <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                  <span style="display:inline-flex;align-items:center;gap:6px;">
+                    <app-profile-picture [profileId]="participant.profile_id || participant.profileid" [name]="getProfileName(participant.profile_id || participant.profileid)" [size]="28"></app-profile-picture>
+                    <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                  </span>
                   <span class="participant-phone"
                     *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid)">
                     📞 {{ getParticipantPhoneNumber(participant.profile_id || participant.profileid) }}

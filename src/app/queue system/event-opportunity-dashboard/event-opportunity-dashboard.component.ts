@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CdkDragDrop, moveItemInArray, DragDropModule } from '@angular/cdk/drag-drop';
 import { collection, collectionData, Firestore, getDoc, getDocs, orderBy, query, where, doc, deleteDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { MatSelectModule } from '@angular/material/select';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { takeUntil } from 'rxjs/operators';
@@ -11,6 +11,7 @@ import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { EventOpportunityComponent } from './event-opportunity/event-opportunity.component';
+import { PlanningTabComponent } from './planning-tab/planning-tab.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -40,7 +41,8 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatMenuModule,
     MatChipsModule,
     NgxMatSelectSearchModule,
-
+,
+    PlanningTabComponent
   ],
   templateUrl: './event-opportunity-dashboard.component.html',
   styleUrl: './event-opportunity-dashboard.component.css'
@@ -52,6 +54,10 @@ export class EventOpportunityDashboardComponent {
   selectedPanelStage: string = '';
   selectedPanelQueue: any = null;
   panelFilter: 'all' | 'live' | 'idle' | 'completed-today' | 'completed-all' = 'all';
+
+  // Top-level tab: the live board vs the planning view
+  activeTab: 'board' | 'planning' = 'board';
+  planningRefreshKey = 0;
 
   // Search
   completedSearchText: string = '';
@@ -164,8 +170,12 @@ export class EventOpportunityDashboardComponent {
     private router: Router,
     public dialog: MatDialog,
     private fb: FormBuilder,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private route: ActivatedRoute
   ) {
+    if (this.route.snapshot.data['defaultTab'] === 'planning') {
+      this.activeTab = 'planning';
+    }
 
     this.notesForm = this.fb.group({
       stagename: [null, Validators.required],
@@ -205,6 +215,19 @@ export class EventOpportunityDashboardComponent {
   ngOnDestroy() {
     this.subscription.complete();
     this.subscription.next();
+  }
+
+  setActiveTab(tab: 'board' | 'planning'): void {
+    this.activeTab = tab;
+    if (tab === 'planning') this.planningRefreshKey++;
+  }
+
+  /** Queue selection coming from the Planning tab's own queue filter. */
+  onPlanningQueueChange(ids: string[]): void {
+    this.selectedQueueList = [...(ids || [])];
+    this.getselectedStages();
+    this.fetchQueueTokens();
+    this.planningRefreshKey++;
   }
   print() {
     if (!this.selectedCustomStage) {
@@ -388,7 +411,7 @@ export class EventOpportunityDashboardComponent {
     if (this.selectedQueueList.length !== 0) {
 
       collectionData(query(collection(this.firestore, "stage opportunity count"), where("queuelist", "array-contains-any", this.selectedQueueList))).pipe(takeUntil(this.subscription)).subscribe((queueData) => {
-        this.customValuesFromSelectedQueues = queueData.filter(e => e['queuelist'].every((item: string) => this.selectedQueueList.includes(item))).sort((a, b) => (a['sequence'] ?? 999) - (b['sequence'] ?? 999));
+        this.customValuesFromSelectedQueues = queueData.filter(e => e['kind'] !== 'phase' && e['queuelist'].every((item: string) => this.selectedQueueList.includes(item))).sort((a, b) => (a['sequence'] ?? 999) - (b['sequence'] ?? 999));
       })
 
 
@@ -409,6 +432,7 @@ export class EventOpportunityDashboardComponent {
       }
       this.getselectedStages();
       this.fetchQueueTokens();
+      this.planningRefreshKey++;
     }
   }
 
@@ -483,6 +507,114 @@ export class EventOpportunityDashboardComponent {
       return 0;
     }
     return this.mapData[queueid]['stageTokenMap'][stage][type] || 0;
+  }
+
+  // ===== Names modal: click any metric count to see who is behind the number =====
+  showNamesModal: boolean = false;
+  namesModalTitle: string = '';
+  namesModalSubtitle: string = '';
+  namesModalSearch: string = '';
+  namesModalItems: Array<{ name: string, sub: string }> = [];
+
+  openNamesModal(queueid: string, stage: string, type: string, label: string): void {
+    this.namesModalItems = this.getMetricNames(queueid, stage, type);
+    this.namesModalTitle = label;
+    const queuename = this.mapQueue[queueid]?.['queuename'] || '';
+    this.namesModalSubtitle = `${queuename} · ${stage} · ${this.namesModalItems.length} ${this.namesModalItems.length === 1 ? 'name' : 'names'}`;
+    this.namesModalSearch = '';
+    this.showNamesModal = true;
+  }
+
+  closeNamesModal(): void {
+    this.showNamesModal = false;
+    this.namesModalItems = [];
+    this.namesModalSearch = '';
+  }
+
+  getFilteredNamesModalItems(): Array<{ name: string, sub: string }> {
+    const q = this.namesModalSearch.trim().toLowerCase();
+    if (!q) return this.namesModalItems;
+    return this.namesModalItems.filter(item =>
+      (item.name || '').toLowerCase().includes(q) || (item.sub || '').toLowerCase().includes(q));
+  }
+
+  private getMetricNames(queueid: string, stage: string, type: string): Array<{ name: string, sub: string }> {
+    const out: Array<{ name: string, sub: string }> = [];
+    const nameOf = (pid: string) => this.mapProfile[pid] || pid;
+
+    switch (type) {
+      case 'opportunities':
+      case 'waiting':
+      case 'queued': {
+        const tokenlist = this.mapData[queueid]?.['stageTokenMap']?.[stage]?.['tokenlist'] || [];
+        for (const t of tokenlist) {
+          const name = this.mapProfile[t['profile_id']] || t['profile_name'] || '—';
+          const isWaiting = t['status'] === 'ready';
+          const isQueued = t['status'] == null || t['status'] === 'queued' || t['status'] === 'invited';
+          if (type === 'waiting' && !isWaiting) continue;
+          if (type === 'queued' && !isQueued) continue;
+          if (!isWaiting && !isQueued) continue;
+          out.push({ name, sub: isWaiting ? 'Waiting' : 'Queued' });
+        }
+        break;
+      }
+      case 'studio': {
+        for (const studio of this.getStageStudioLive(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            const act = this.getMapBigActivity(queueid, studio, p);
+            out.push({ name: nameOf(p), sub: act ? `Live · ${act}` : 'Live' });
+          }
+        }
+        for (const studio of this.getStageStudioIdle(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            const act = this.getMapBigActivity(queueid, studio, p);
+            out.push({ name: nameOf(p), sub: act ? `Idle · ${act}` : 'Idle' });
+          }
+        }
+        break;
+      }
+      case 'live': {
+        for (const studio of this.getStageStudioLive(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            out.push({ name: nameOf(p), sub: this.getMapBigActivity(queueid, studio, p) || '' });
+          }
+        }
+        break;
+      }
+      case 'idle': {
+        for (const studio of this.getStageStudioIdle(queueid, stage)) {
+          for (const p of studio['participants'] || []) {
+            out.push({ name: nameOf(p), sub: this.getMapBigActivity(queueid, studio, p) || '' });
+          }
+        }
+        break;
+      }
+      case 'shadowing': {
+        for (const p of this.getShadowingParticipants(queueid, stage)) {
+          out.push({ name: nameOf(p.profileid), sub: p.activity || '' });
+        }
+        break;
+      }
+      case 'notshadowing': {
+        for (const p of this.getNotShadowingParticipants(queueid, stage)) {
+          out.push({ name: nameOf(p.profileid), sub: p.activity || '' });
+        }
+        break;
+      }
+      case 'completed-today': {
+        for (const n of this.getCompletedParticipantNames(queueid, stage, 'today')) {
+          out.push({ name: n, sub: '' });
+        }
+        break;
+      }
+      case 'completed-all': {
+        for (const n of this.getCompletedParticipantNames(queueid, stage, 'all')) {
+          out.push({ name: n, sub: '' });
+        }
+        break;
+      }
+    }
+    return out;
   }
 
   getPotentialTooltip(queueid: string, stage: string): string {

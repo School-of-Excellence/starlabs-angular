@@ -28,6 +28,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface CardData {
   participants: string[];
@@ -57,7 +58,8 @@ interface CardData {
     MatButtonModule,
     MatCheckboxModule,
     MatTooltipModule,
-    MatDialogModule
+    MatDialogModule,
+    ProfilePictureComponent
   ],
   templateUrl: './big-planner.component.html',
   styleUrl: './big-planner.component.css',

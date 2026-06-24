@@ -28,6 +28,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthguardService } from '../../authguard.service';
 import { ManageCohertsComponent } from '../../big/manage-coherts/manage-coherts.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-queue-creation-v3',
@@ -50,7 +51,8 @@ import { ManageCohertsComponent } from '../../big/manage-coherts/manage-coherts.
     MatButtonModule,
     DragDropModule,
     NgxMatSelectSearchModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    ProfilePictureComponent
   ],
   templateUrl: './queue-creation-v3.component.html',
   styleUrl: './queue-creation-v3.component.css'

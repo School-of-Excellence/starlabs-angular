@@ -21,7 +21,10 @@
           (ngModelChange)="filterProfiles()">
         </ngx-mat-select-search>
         <mat-option *ngFor="let p of filteredProfiles" [value]="p.profileid">
-          {{ p.name }}
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <app-profile-picture [profileId]="p.profileid" [name]="p.name" [size]="24"></app-profile-picture>
+            <span>{{ p.name }}</span>
+          </span>
         </mat-option>
       </mat-select>
     </mat-form-field>
