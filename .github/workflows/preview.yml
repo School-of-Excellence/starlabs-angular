@@ -5,13 +5,19 @@ name: preview (Stage 1 fast + channel)
 #   Hosting PREVIEW CHANNEL (named after the branch) on the TEST project for manual QA. The full hermetic
 #   Playwright gate (queue-e2e) runs separately when a PR to `development` is opened, and posts its report there.
 on:
-  push:
-    branches-ignore:
-      - development
-      - production
-      - main
-      - cicd-dev      # TEST stand-in branches are not feature branches — no preview channel for them
-      - cicd-prod
+  # DISABLED 2026-06-23 (console v2, plan C1/D5): preview is now manual via workflow_dispatch.
+  # push:
+  #   branches-ignore:
+  #     - development
+  #     - production
+  #     - main
+  #     - cicd-dev      # TEST stand-in branches are not feature branches — no preview channel for them
+  #     - cicd-prod
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Feature branch to build a preview for'
+        required: true
 
 permissions:
   contents: read
@@ -72,11 +78,12 @@ jobs:
       - name: Compute channel id from branch name
         id: ch
         run: |
-          ID=$(echo "${{ github.ref_name }}" | tr '/' '-' | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | cut -c1-40)
+          ID=$(echo "${{ github.event.inputs.ref || github.ref_name }}" | tr '/' '-' | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | cut -c1-40)
           echo "id=$ID" >> "$GITHUB_OUTPUT"
           echo "Preview channel id: $ID"
 
       - name: Publish preview channel (TEST project, 7-day expiry)
+        id: deploy
         env:
           GOOGLE_SERVICE_TEST: ${{ secrets.GOOGLE_SERVICE_TEST }}
         run: |
@@ -84,5 +91,39 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$HOME/firebase-key.json"
           jq '.hosting.site = "breakthroughs-test"' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
           # Site comes from firebase.json (set above); hosting:channel:deploy has no --site flag in fb-tools 14.
-          firebase hosting:channel:deploy "${{ steps.ch.outputs.id }}" \
-            --expires 7d --project starlabs-test
+          # Capture the REAL channel URL (it has a random hash — not predictable).
+          OUT=$(firebase hosting:channel:deploy "${{ steps.ch.outputs.id }}" --expires 7d --project starlabs-test --json)
+          echo "$OUT"
+          URL=$(echo "$OUT" | jq -r '[.. | objects | .url? // empty] | map(select(type=="string" and test("web[.]app"))) | first // empty')
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Preview URL: $URL"
+
+      # Write the REAL preview URL into the release console (release-candidates doc on
+      # starlabs-cicd). The console can't compute it (hashed), so the workflow — the only
+      # place that knows it — records it. Reuses the same SA as the history recorder.
+      - name: Record preview URL in the release console
+        if: success() && steps.deploy.outputs.url != ''
+        env:
+          STARLABS_CICD_SA_JSON: ${{ secrets.STARLABS_CICD_SA }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          PREVIEW_SHA: ${{ github.sha }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ github.event.inputs.ref || github.ref_name }}
+        run: |
+          if [ -z "$STARLABS_CICD_SA_JSON" ]; then echo "STARLABS_CICD_SA not set — skipping console update."; exit 0; fi
+          echo "$STARLABS_CICD_SA_JSON" > "$RUNNER_TEMP/cicd-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/cicd-sa.json"
+          npm i firebase-admin@12 --no-save --no-audit --no-fund --silent
+          node -e '
+            const admin = require("firebase-admin");
+            admin.initializeApp({ credential: admin.credential.cert(require(process.env.RUNNER_TEMP + "/cicd-sa.json")), projectId: "starlabs-cicd" });
+            const id = process.env.REPO_NAME + "__" + process.env.BRANCH.replace(/\//g, "-");
+            admin.firestore().collection("release-candidates").doc(id).set({
+              repo: process.env.REPO_NAME,
+              branch: process.env.BRANCH,
+              preview: { url: process.env.PREVIEW_URL, buildState: "LIVE", sha: process.env.PREVIEW_SHA },
+              updatedAt: Date.now(),
+            }, { merge: true })
+            .then(() => { console.log("Recorded preview URL on", id, "→", process.env.PREVIEW_URL); process.exit(0); })
+            .catch((e) => { console.error("console update failed (non-fatal):", e.message); process.exit(0); });
+          '
