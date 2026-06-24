@@ -108,7 +108,12 @@ export class DynamicStudioV2Component {
   // to replace the "Bring To Studio" CTA with an "awaiting response" chip + a
   // Cancel action, so the specialist can't re-invite (and hit the reservation
   // guard) and can recover a stuck participant without waiting for expiry.
-  tokenInvitedBySelf: { [tokenDocId: string]: { invitationDocId?: string } } = {}
+  // `approved` distinguishes a still-pending invite (awaiting response) from one
+  // the participant already approved — the latter shows an "Assign studio" CTA
+  // that reopens the assign dialog (otherwise an accidentally-dismissed dialog
+  // is unrecoverable). `invitation` is the full doc so the CTA can re-invoke
+  // assignStudio().
+  tokenInvitedBySelf: { [tokenDocId: string]: { invitationDocId?: string; approved?: boolean; invitation?: any } } = {}
   private otherStudioInvitationSubscription: Subscription = null
   private otherStudioInvitationHandle = new Subject<void>()
   // Zoom Control
@@ -468,14 +473,8 @@ export class DynamicStudioV2Component {
     const ready = la['participantReadyAt']
     const inCall = la['participantInCallAt']
     const left = la['participantLeftAt']
-    if (!ready || inCall || left) return false
-    const ls = la['participantLastSeenAt']
-    if (!ls) return true // legacy fallback
-    const ms = typeof ls?.toMillis === 'function'
-      ? ls.toMillis()
-      : (ls instanceof Date ? ls.getTime() : 0)
-    if (!ms) return false
-    return (Date.now() - ms) < this.PARTICIPANT_PRESENCE_FRESHNESS_MS
+    // Heartbeat removed — derive purely from the one-shots (see plan).
+    return !!ready && !inCall && !left
   }
 
   // True when the participant is actually live in the Zoom call.
@@ -484,13 +483,7 @@ export class DynamicStudioV2Component {
     const la: any = this.liveAssignment || {}
     if (!la['participantInCallAt']) return false
     if (la['participantLeftAt']) return false
-    const ls = la['participantLastSeenAt']
-    if (!ls) return true
-    const ms = typeof ls?.toMillis === 'function'
-      ? ls.toMillis()
-      : (ls instanceof Date ? ls.getTime() : 0)
-    if (!ms) return false
-    return (Date.now() - ms) < this.PARTICIPANT_PRESENCE_FRESHNESS_MS
+    return true
   }
 
   // True when the current specialist has the mentor role. Used to gate the
@@ -633,35 +626,20 @@ export class DynamicStudioV2Component {
     return !!this.expandedATC[atcid]
   }
 
-  // True when the participant has opened the openmeeting screen and is
-  // actively present. Driven by `participantReadyAt` + a 10s heartbeat on
-  // `participantLastSeenAt`. If the participant closes the tab the heartbeat
-  // stops and after ~25s this flips back to false (best-effort presence).
-  // Falls back to `participantReadyAt` alone if heartbeat data is missing
-  // (e.g., participant is on an older build).
-  readonly PARTICIPANT_PRESENCE_FRESHNESS_MS = 25000
+  // True when the participant has opened the openmeeting screen (on the wait
+  // screen). Heartbeat removed — derived purely from `participantReadyAt`
+  // (which is nulled on leave/in-call, so its mere presence means "waiting").
+  // See specs/plans/2026-06-24-presence-heartbeat-removal.md.
   // Tick property only exists so change detection re-evaluates this getter
-  // periodically — see participantPresenceTicker below.
+  // periodically — see startPresenceTicker below.
   private presenceTick: number = 0
   get participantReady(): boolean {
     void this.presenceTick // ensure getter re-runs when tick increments
-    const readyAt = this.liveAssignment?.['participantReadyAt']
-    if (!readyAt) return false
-    const lastSeen = this.liveAssignment?.['participantLastSeenAt']
-    if (lastSeen) {
-      const ms = typeof lastSeen?.toMillis === 'function'
-        ? lastSeen.toMillis()
-        : (lastSeen instanceof Date ? lastSeen.getTime() : 0)
-      if (!ms) return false
-      return (Date.now() - ms) < this.PARTICIPANT_PRESENCE_FRESHNESS_MS
-    }
-    // Legacy client (no heartbeat field) — fall back to presence-only check
-    return true
+    return !!this.liveAssignment?.['participantReadyAt']
   }
   private presenceTimer: any = null
 
-  // Top-bar live status pill — pure derivation from liveAssignment + the
-  // presence ticker. Returns a tone/icon/title/sub that the template binds to.
+  // Top-bar live status pill — pure derivation from liveAssignment one-shots.
   // tones: primary | green | amber | slate. icons are Material icon names.
   get topBarStatus(): { tone: string; icon: string; title: string; sub: string } {
     void this.presenceTick // re-run on tick
@@ -670,26 +648,16 @@ export class DynamicStudioV2Component {
     const inCallAt = la['participantInCallAt']
     const leftAt = la['participantLeftAt']
     const specialistJoinedAt = la['specialistJoinedAt']
-    const lastSeen = la['participantLastSeenAt']
-    const fresh = (ts: any): boolean => {
-      if (!ts) return false
-      const ms = typeof ts?.toMillis === 'function'
-        ? ts.toMillis()
-        : (ts instanceof Date ? ts.getTime() : 0)
-      if (!ms) return false
-      return (Date.now() - ms) < this.PARTICIPANT_PRESENCE_FRESHNESS_MS
-    }
+    const specialistLeftAt = la['specialistLeftAt']
 
-    // session ended — both participant left and call had started
-    if (leftAt && specialistJoinedAt && !fresh(lastSeen)) {
-      return { tone: 'slate', icon: 'check', title: 'Session ended', sub: '' }
+    // call ended — BOTH parties left after the call had started (e.g. "End
+    // meeting for all"). Must be checked before the participant-left branch,
+    // otherwise an ended call reads as "participant left · waiting for rejoin".
+    if (leftAt && specialistLeftAt && specialistJoinedAt) {
+      return { tone: 'slate', icon: 'check_circle', title: 'Call ended', sub: 'Complete the activity to finish this session.' }
     }
-    // participant left mid-call
-    if (leftAt && specialistJoinedAt) {
-      return { tone: 'amber', icon: 'logout', title: 'Participant left the meeting', sub: 'Connection dropped — waiting for them to rejoin' }
-    }
-    // participant in call (joined live)
-    if (inCallAt && fresh(lastSeen)) {
+    // participant in call (joined live) — readyAt/leftAt are nulled on join
+    if (inCallAt && !leftAt) {
       return {
         tone: 'primary',
         icon: 'login',
@@ -698,59 +666,26 @@ export class DynamicStudioV2Component {
       }
     }
     // participant ready (on meeting screen) — show review hint
-    if (readyAt && fresh(lastSeen)) {
+    if (readyAt && !leftAt) {
       return { tone: 'green', icon: 'videocam', title: 'Participant is waiting', sub: 'Take a moment to review the forms and ATC before starting the call.' }
     }
-    if (readyAt && !lastSeen) {
-      return { tone: 'green', icon: 'videocam', title: 'Participant is waiting', sub: 'Take a moment to review the forms and ATC before starting the call.' }
+    // participant left mid-call while the specialist is still in the meeting
+    if (leftAt && specialistJoinedAt) {
+      return { tone: 'amber', icon: 'logout', title: 'Participant left the meeting', sub: 'Connection dropped — waiting for them to rejoin' }
     }
     // default — silent (no scary "no signal" copy)
     return { tone: 'slate', icon: 'schedule', title: 'Awaiting participant', sub: 'Use this time to review the forms and ATC.' }
   }
 
-  // ----- Studio-screen presence (writes to live assignment) -----------------
-  // Heartbeat `specialistAtStudioLastSeenAt` every 10s on the currently
-  // selected studio's live assignment so the arena board can tell that the
-  // specialist is actually looking at the studio screen (vs. just having the
-  // record around). One-shot `returnedToStudioAt` is also written the first
-  // time we hit a beat with `specialistJoinedAt` already set on the
-  // assignment (i.e. the specialist came back after a call had started).
-  private studioPresenceTimer: any = null
-  private readonly STUDIO_PRESENCE_HEARTBEAT_MS = 10000
-  private studioReturnStampedFor = new Set<string>()
+  // ----- Studio-screen presence -----------------
+  // The `specialistAtStudioLastSeenAt` 10s heartbeat and the `returnedToStudioAt`
+  // one-shot were REMOVED (see plan). The arena no longer distinguishes
+  // "Returned to studio" from "Awaiting" — "Call ended" alone is enough.
+  // startStudioPresence/stopStudioPresence kept as no-ops to avoid churning
+  // the call sites; the actual writes are gone.
+  private startStudioPresence() {}
 
-  private startStudioPresence() {
-    if (this.studioPresenceTimer) return
-    this.beatStudioPresence()
-    this.studioPresenceTimer = setInterval(
-      () => this.beatStudioPresence(),
-      this.STUDIO_PRESENCE_HEARTBEAT_MS
-    )
-  }
-
-  private beatStudioPresence() {
-    const docid: string = this.liveAssignment?.['docid']
-    if (!docid) return
-    const update: any = { specialistAtStudioLastSeenAt: serverTimestamp() }
-    // One-shot: stamp `returnedToStudioAt` the first time we beat against this
-    // assignment AFTER its call has started (specialistJoinedAt set) and we
-    // haven't stamped it already this session.
-    const callStarted = !!this.liveAssignment?.['specialistJoinedAt']
-    const alreadyOnDoc = !!this.liveAssignment?.['returnedToStudioAt']
-    if (callStarted && !alreadyOnDoc && !this.studioReturnStampedFor.has(docid)) {
-      update.returnedToStudioAt = serverTimestamp()
-      this.studioReturnStampedFor.add(docid)
-    }
-    updateDoc(doc(this.firestore, 'live assignment', docid), update)
-      .catch(err => console.warn('Studio presence beat failed', err))
-  }
-
-  private stopStudioPresence() {
-    if (this.studioPresenceTimer) {
-      clearInterval(this.studioPresenceTimer)
-      this.studioPresenceTimer = null
-    }
-  }
+  private stopStudioPresence() {}
 
   // Helper: count specialists across all activities in an ATC
   countSpecialists(atc: any): number {
@@ -1170,7 +1105,7 @@ export class DynamicStudioV2Component {
       { idField: 'id' }
     ).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.otherStudioInvitationHandle)).subscribe(invitations => {
       const next: { [tokenDocId: string]: { studioName?: string; specialistNames?: string[] } } = {}
-      const nextSelf: { [tokenDocId: string]: { invitationDocId?: string } } = {}
+      const nextSelf: { [tokenDocId: string]: { invitationDocId?: string; approved?: boolean; invitation?: any } } = {}
       const selfStudio = this.selectedStudio?.['docid']
       for (const inv of (invitations || [])) {
         const invStudio = inv['studioid']
@@ -1182,9 +1117,14 @@ export class DynamicStudioV2Component {
         if (!tokenDocId) continue
         const clientResp = inv['clientresponse']
         if (clientResp === 'denied') continue
-        // This studio's own pending invite → "awaiting response" + Cancel.
+        // This studio's own invite → pending shows "awaiting response" + Cancel;
+        // approved shows an "Assign studio" CTA that reopens the assign dialog.
         if (invStudio === selfStudio) {
-          nextSelf[tokenDocId] = { invitationDocId: inv['docid'] ?? inv['id'] }
+          nextSelf[tokenDocId] = {
+            invitationDocId: inv['docid'] ?? inv['id'],
+            approved: clientResp === 'approved',
+            invitation: inv
+          }
           continue
         }
         const studio = this.mapStudio?.[invStudio] || {}
@@ -2300,6 +2240,11 @@ export class DynamicStudioV2Component {
         additionalactivities: this.additionalActivities
       },
       autoFocus: false,
+      // Don't let a stray backdrop tap dismiss the assign step — an
+      // accidentally-closed dialog used to be unrecoverable. The dialog has its
+      // own "Close" button for an intentional cancel, and the waiting-list
+      // "Approved · Assign studio" CTA can reopen it.
+      disableClose: true,
       maxWidth: "90vw",
       maxHeight: "90vh"
     })

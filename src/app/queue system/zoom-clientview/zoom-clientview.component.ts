@@ -66,21 +66,16 @@ export class ZoomClientviewComponent {
   meetingEnded: boolean = false;
   endedReason: 'completed' | 'cancelled' | 'expired' | 'notfound' | '' = '';
 
-  // Participant heartbeat — keeps `participantLastSeenAt` fresh so the
-  // specialist UI can detect when the participant has closed the tab.
-  private heartbeatTimer: any = null;
+  // Participant presence — pagehide cleanup clears the presence one-shots on
+  // tab close. The 10s `participantLastSeenAt` heartbeat was REMOVED
+  // (see specs/plans/2026-06-24-presence-heartbeat-removal.md). Presence is now
+  // derived from participantReadyAt / participantInCallAt / participantLeftAt.
   private unloadHandler: ((ev?: any) => void) | null = null;
-  private readonly HEARTBEAT_INTERVAL_MS = 10000; // 10 seconds
 
-  // Specialist heartbeat — refreshes `specialistLastSeenAt` so participants
-  // can tell the specialist is still actually in the meeting. Without this,
-  // a stale `specialistJoinedAt` would persist after the specialist leaves /
-  // generates a new link, and the next participant would skip the wait
-  // screen and try to join an empty room.
-  private specialistHeartbeatTimer: any = null;
+  // Specialist presence — pagehide cleanup stamps `specialistLeftAt` on tab
+  // close. The 10s `specialistLastSeenAt` heartbeat was REMOVED. Presence is
+  // now derived from `specialistJoinedAt && !specialistLeftAt`.
   private specialistUnloadHandler: ((ev?: any) => void) | null = null;
-  private readonly SPECIALIST_PRESENCE_FRESHNESS_MS = 30000; // 30s window
-  private readonly SPECIALIST_HEARTBEAT_INTERVAL_MS = 10000; // 10s beat
 
   // Background-tab attention grabbers (used when the gate releases)
   private originalTitle: string = '';
@@ -161,28 +156,18 @@ export class ZoomClientviewComponent {
 
   ngOnInit(): void {}
 
-  // Start a 10s heartbeat that refreshes `participantLastSeenAt` so the
-  // specialist UI can tell whether the participant is still on the page.
-  // Also wires a `pagehide` cleanup that tries to clear `participantReadyAt`
-  // when the tab is closed (best effort — may not always complete).
+  // Wire a `pagehide` cleanup so that on tab close the participant's presence
+  // one-shots are cleared immediately: `participantReadyAt`/`participantInCallAt`
+  // nulled and `participantLeftAt` stamped, so the specialist's "Ready to join"
+  // pill disappears and the arena shows "Participant left". Best-effort — does
+  // NOT fire on crash/sleep/network-drop (accepted; see plan). The 10s heartbeat
+  // was removed — presence is derived purely from these one-shots.
   private startParticipantHeartbeat() {
-    if (this.heartbeatTimer || this.collectiontype !== 'queue' || this.profileHost) return;
+    if (this.unloadHandler || this.collectiontype !== 'queue' || this.profileHost) return;
     if (!this.documentId) return;
 
     const liveAssignmentRef = doc(this.firestore, 'live assignment', this.documentId);
 
-    const beat = () => {
-      updateDoc(liveAssignmentRef, { participantLastSeenAt: serverTimestamp() })
-        .catch(err => console.warn('Heartbeat failed', err));
-    };
-    beat();
-    this.heartbeatTimer = setInterval(beat, this.HEARTBEAT_INTERVAL_MS);
-
-    // On tab close, try one final cleanup so the specialist's "Ready to join"
-    // pill disappears immediately rather than waiting for the heartbeat to age
-    // out. Also clear `participantInCallAt` and stamp `participantLeftAt` so
-    // the arena can show "Participant left the call" while the specialist is
-    // still in the meeting.
     this.unloadHandler = () => {
       try {
         updateDoc(liveAssignmentRef, {
@@ -196,43 +181,26 @@ export class ZoomClientviewComponent {
   }
 
   private stopParticipantHeartbeat() {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
     if (this.unloadHandler) {
       window.removeEventListener('pagehide', this.unloadHandler);
       this.unloadHandler = null;
     }
   }
 
-  // Specialist heartbeat — same idea as the participant heartbeat.
-  // Updates `specialistLastSeenAt` every 10s; on tab close clears both
-  // `specialistJoinedAt` and `specialistLastSeenAt` so the next participant
-  // arrival enters the wait screen immediately rather than skipping it
-  // because of a stale flag.
+  // Wire a `pagehide` cleanup so that on tab close the SPECIALIST's leave is
+  // stamped (`specialistLeftAt`). Keep `specialistJoinedAt` as the historical
+  // call-start time. We deliberately do NOT touch participant fields — they may
+  // still be in the call. The 10s heartbeat was removed — presence is derived
+  // from `specialistJoinedAt && !specialistLeftAt`.
   private startSpecialistHeartbeat() {
-    if (this.specialistHeartbeatTimer) return;
+    if (this.specialistUnloadHandler) return;
     if (!this.profileHost || this.collectiontype !== 'queue' || !this.documentId) return;
 
     const ref = doc(this.firestore, 'live assignment', this.documentId);
-    const beat = () => {
-      updateDoc(ref, { specialistLastSeenAt: serverTimestamp() })
-        .catch(err => console.warn('Specialist heartbeat failed', err));
-    };
-    beat();
-    this.specialistHeartbeatTimer = setInterval(beat, this.SPECIALIST_HEARTBEAT_INTERVAL_MS);
 
     this.specialistUnloadHandler = () => {
       try {
-        // Tab close = SPECIALIST left. Keep `specialistJoinedAt` as the
-        // historical call start time, stamp `specialistLeftAt` so the arena
-        // can show "Specialist left the call · participant still in meet",
-        // and null the heartbeat. We deliberately do NOT touch participant
-        // fields — the participant might still be in the call, and overwriting
-        // their fields from here would be a false signal.
         updateDoc(ref, {
-          specialistLastSeenAt: null,
           specialistLeftAt: serverTimestamp()
         }).catch(() => {});
       } catch {}
@@ -241,30 +209,20 @@ export class ZoomClientviewComponent {
   }
 
   private stopSpecialistHeartbeat() {
-    if (this.specialistHeartbeatTimer) {
-      clearInterval(this.specialistHeartbeatTimer);
-      this.specialistHeartbeatTimer = null;
-    }
     if (this.specialistUnloadHandler) {
       window.removeEventListener('pagehide', this.specialistUnloadHandler);
       this.specialistUnloadHandler = null;
     }
   }
 
-  // Returns true when the specialist is actually present (joined AND heartbeat fresh).
-  // Falls back to legacy `specialistJoinedAt`-only check if the heartbeat field
-  // isn't present (older deployments).
+  // Specialist is present when they joined the Zoom call and have not left.
+  // (Heartbeat removed — see plan. No freshness/legacy-fallback path: the
+  // legacy branch ignored `specialistLeftAt` and would read "present" after a
+  // clean leave.)
   private isSpecialistPresent(data: any): boolean {
     if (!data?.['specialistJoinedAt']) return false;
-    const hasLastSeenField = data && 'specialistLastSeenAt' in data;
-    const lastSeen = data?.['specialistLastSeenAt'];
-    if (!hasLastSeenField) return true; // legacy fallback — no heartbeat yet
-    if (lastSeen == null) return false; // explicitly cleared on leave
-    const ms = typeof lastSeen?.toMillis === 'function'
-      ? lastSeen.toMillis()
-      : (lastSeen instanceof Date ? lastSeen.getTime() : 0);
-    if (!ms) return false;
-    return (Date.now() - ms) < this.SPECIALIST_PRESENCE_FRESHNESS_MS;
+    if (data?.['specialistLeftAt']) return false;
+    return true;
   }
 
   // -------------------- Attention grabbers --------------------
@@ -396,6 +354,41 @@ export class ZoomClientviewComponent {
     if (this.titleVisibilityHandler) {
       document.removeEventListener('visibilitychange', this.titleVisibilityHandler);
       this.titleVisibilityHandler = null;
+    }
+  }
+
+  // -------------------- Meeting-end leave stamp (both roles) --------------------
+  // Stamp the leave the instant the Zoom meeting ends/disconnects — BEFORE the
+  // SDK's `leaveUrl` redirect fires. This write enters the Firestore
+  // offline-cache queue and syncs reliably across the hard redirect, whereas a
+  // bare pagehide write races the navigation and often never lands (and there
+  // is no heartbeat staleness fallback anymore). meetingStatus 3 = disconnected.
+  private meetingEndStamped = false;
+  private wireMeetingEndListener() {
+    if (this.collectiontype !== 'queue' || !this.documentId) return;
+    try {
+      const ZM: any = ZoomMtg as any;
+      ZM.inMeetingServiceListener('onMeetingStatus', (data: any) => {
+        const status = data?.meetingStatus;
+        if (status !== 3 || this.meetingEndStamped) return; // 3 = disconnected/ended
+        this.meetingEndStamped = true;
+        const ref = doc(this.firestore, 'live assignment', this.documentId);
+        if (this.profileHost) {
+          // Host ending the call = "End meeting for all" → everyone is gone.
+          // Stamp BOTH leaves so the arena flips to "Call ended" even if the
+          // participant's own client can't write before its redirect.
+          updateDoc(ref, {
+            specialistLeftAt: serverTimestamp(),
+            participantLeftAt: serverTimestamp()
+          }).catch(err => console.warn('Could not stamp leave on meeting end (host)', err));
+        } else {
+          updateDoc(ref, {
+            participantLeftAt: serverTimestamp()
+          }).catch(err => console.warn('Could not stamp leave on meeting end (participant)', err));
+        }
+      });
+    } catch (e) {
+      console.warn('Could not wire Zoom meeting-end listener', e);
     }
   }
 
@@ -590,19 +583,30 @@ export class ZoomClientviewComponent {
     this.stopChimeLoop();
     this.stopRecordingListeners();
 
-    // Stop the specialist heartbeat. Stamp `specialistLeftAt` so we record
-    // when the specialist left this call (the arena uses this together with
-    // `participantLeftAt` to decide whether the call is fully over or just
-    // missing one party). Keep `specialistJoinedAt` as the historical call
-    // start time. Do NOT touch participant fields — they may still be in the
-    // call, and forcibly clearing their state would be a false signal.
+    // On in-app route change (ngOnDestroy fires; pagehide does NOT), stamp the
+    // leave so presence clears. pagehide handles clean tab close; this handles
+    // navigation away. The unload listeners were just removed by the stop*
+    // calls above, so there is no double-fire.
     this.stopSpecialistHeartbeat();
-    if (this.profileHost && this.collectiontype === 'queue' && this.documentId &&
+    if (this.collectiontype === 'queue' && this.documentId &&
         this.zoomdata?.['status'] === 'live') {
-      updateDoc(doc(this.firestore, 'live assignment', this.documentId), {
-        specialistLastSeenAt: null,
-        specialistLeftAt: serverTimestamp()
-      }).catch(err => console.warn('Could not stamp specialistLeftAt on leave', err));
+      if (this.profileHost) {
+        // Specialist left. Keep `specialistJoinedAt` as the historical call
+        // start time; stamp the leave. Do NOT touch participant fields — they
+        // may still be in the call.
+        updateDoc(doc(this.firestore, 'live assignment', this.documentId), {
+          specialistLeftAt: serverTimestamp()
+        }).catch(err => console.warn('Could not stamp specialistLeftAt on leave', err));
+      } else {
+        // Participant left (route change). Clear presence one-shots and stamp
+        // the leave — mirrors the pagehide cleanup so a navigation-away doesn't
+        // leave a stale "waiting"/"in call" until aged out.
+        updateDoc(doc(this.firestore, 'live assignment', this.documentId), {
+          participantReadyAt: null,
+          participantInCallAt: null,
+          participantLeftAt: serverTimestamp()
+        }).catch(err => console.warn('Could not stamp participantLeftAt on leave', err));
+      }
     }
   }
 
@@ -653,9 +657,11 @@ export class ZoomClientviewComponent {
       // and is ready to join. This fires regardless of whether the specialist is in
       // yet — the specialist UI watches this flag to show a "ready" indicator.
       try {
+        // Clear `participantLeftAt` too so a refresh (which stamps a leave via
+        // pagehide) self-heals back to "waiting" on re-init.
         await updateDoc(liveAssignmentRef, {
           participantReadyAt: serverTimestamp(),
-          participantLastSeenAt: serverTimestamp()
+          participantLeftAt: null
         });
       } catch (err) {
         console.warn('Could not mark participantReadyAt', err);
@@ -799,16 +805,13 @@ export class ZoomClientviewComponent {
                 //   specialistJoinedAt = call START (preserved across leave/
                 //                        rejoin so it represents the original
                 //                        time the call began)
-                //   callEndedAt        = cleared because we're live again
                 if (this.profileHost && this.collectiontype === 'queue') {
-                  // Host (re)entered Zoom. Refresh heartbeat, clear
-                  // `specialistLeftAt` (in case they had bounced), and stamp
-                  // `specialistJoinedAt` ONLY if it isn't already set so
+                  // Host (re)entered Zoom. Clear `specialistLeftAt` (in case
+                  // they had bounced) so presence reads "in call" again, and
+                  // stamp `specialistJoinedAt` ONLY if it isn't already set so
                   // the call-start time is preserved across leave/rejoin.
                   const update: any = {
-                    specialistLastSeenAt: serverTimestamp(),
-                    specialistLeftAt: null,
-                    callEndedAt: null
+                    specialistLeftAt: null
                   };
                   if (!this.zoomdata?.['specialistJoinedAt']) {
                     update.specialistJoinedAt = serverTimestamp();
@@ -829,7 +832,6 @@ export class ZoomClientviewComponent {
                 if (!this.profileHost && this.collectiontype === 'queue') {
                   updateDoc(doc(this.firestore, 'live assignment', this.documentId), {
                     participantInCallAt: serverTimestamp(),
-                    participantLastSeenAt: serverTimestamp(),
                     participantReadyAt: null,
                     participantLeftAt: null
                   }).catch(err => console.warn('Could not mark participantInCallAt', err));
@@ -839,6 +841,12 @@ export class ZoomClientviewComponent {
                 if (this.profileHost) {
                   this.wireRecordingListeners();
                 }
+
+                // Both roles: stamp the leave reliably the instant the meeting
+                // ends ("End meeting for all" / leave), BEFORE the leaveUrl
+                // redirect — pagehide alone races the navigation and there is no
+                // heartbeat fallback anymore. See wireMeetingEndListener.
+                this.wireMeetingEndListener();
 
                 this.snackBar.open(
                   'Reminder: You can click the Capture button or press the Tab key to take a video clip',
