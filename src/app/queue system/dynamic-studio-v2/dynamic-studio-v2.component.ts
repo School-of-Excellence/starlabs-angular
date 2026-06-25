@@ -2,20 +2,13 @@ import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildr
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
-import { QueueInvitationApprovalComponent } from '../queue-invitation-approval/queue-invitation-approval.component';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { AssignQueueStudioComponent } from '../assign-queue-studio/assign-queue-studio.component';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AssignProcedureStudioComponent } from '../assign-procedure-studio/assign-procedure-studio.component';
-import { InviteOtherStudioComponent } from '../invite-other-studio/invite-other-studio.component';
-import { AcceptOtherStudioComponent } from '../accept-other-studio/accept-other-studio.component';
-import { PreassignStudioComponent } from '../preassign-studio/preassign-studio.component';
-import { HoldAlertDialogComponent } from '../hold-alert-dialog/hold-alert-dialog.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { collection, collectionData, doc, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,7 +18,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { StageIncompleteConfirmationComponent } from '../stage-incomplete-confirmation/stage-incomplete-confirmation.component';
 import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view-participant-atc.component';
 
 
@@ -166,6 +158,13 @@ export class DynamicStudioV2Component {
   mapProfileuid: any = {};
   selectedParticipant = false
   participantinvitationSubscription : Subscription
+  // Realtime listeners for the "previous ATC" lists, keyed by collectiontype
+  // ('alpha' | 'validation'). previewATC() replaces the entry for its key on
+  // every call, so at most TWO listeners ever exist (no unbounded growth). Torn
+  // down on destroy via subscriptionHandle and explicitly in ngOnDestroy. The
+  // nested corrections/procedures stay one-time getDocs per emit to avoid a
+  // nested-listener fan-out.
+  private previousAtcSubs: { [key: string]: Subscription } = {}
   private subscriptionHandle = new Subject<void>()
   messageform:FormGroup 
   chatId: any;
@@ -174,11 +173,33 @@ export class DynamicStudioV2Component {
   // deleteOption : boolean = false
   // Participant AEL
   aelLevelList = []
+  private aelLevelListLoaded = false
   participantAEL = {}
   isLoadingStudios: boolean;
 
   // Stepper state (v2)
   activeStepId: string = ''
+  // Precomputed index of activeStepId within visibleSteps. Kept in sync at the
+  // three points activeStepId / the step list can change (the visibleSteps
+  // getter's re-sync block, setActiveStep, goToStep) so the template can read a
+  // field instead of calling getStepIndex(activeStepId) — which re-runs the
+  // side-effecting visibleSteps getter on every change-detection tick.
+  activeStepIndex: number = -1
+  // True once the "Previous ATC & Love Letters" step has been opened at least
+  // once. The step's content is then kept mounted (toggled with [hidden] instead
+  // of *ngIf) so the heavy <app-view-participant-atc> child loads ONCE and
+  // persists, instead of being destroyed/recreated — and re-fetching all its ATC
+  // getDocs — on every step change.
+  prevHistoryMounted: boolean = false
+  // Master switch for the AI-ATC pre-check. While false the whole studio-side feature is held:
+  // no queue_atc_generation query, and the "Use AI-Generated ATC" buttons never render. Flip to
+  // true to release the feature.
+  aiAtcFeatureEnabled: boolean = false
+  // Inline "Use AI ATC" button state for the Prescribe ATC step (populated by
+  // checkAiAtcAvailability() when a completed queue_atc_generation doc exists for the participant).
+  aiAtcAvailable: boolean = false
+  aiAtcDocId: string | null = null
+  aiAtcCheckedKey: string | null = null
   private lastStepSignature: string = ''
   private userNavigated: boolean = false
   private lastAssignmentId: string = ''
@@ -226,7 +247,10 @@ export class DynamicStudioV2Component {
   async loadAssignmentWidgetData() {
     const la: any = this.liveAssignment
     if (!la?.['docid'] || !la?.['stagename']) return
-    const sig = la['docid'] + '|' + la['stagename']
+    // Include the token identity so a freshly-hydrated token (auto-enter path
+    // runs before the token settles) triggers exactly ONE refresh of the
+    // token-dependent widgets (AEL, Forms), then same-token ticks are skipped.
+    const sig = la['docid'] + '|' + la['stagename'] + '|' + (la['token']?.['docid'] ?? 'pending')
     if (sig === this.widgetFetchSignature) return  // already loaded this combination
     this.widgetFetchSignature = sig
 
@@ -825,6 +849,9 @@ export class DynamicStudioV2Component {
     if (assignmentId !== this.lastAssignmentId) {
       this.lastAssignmentId = assignmentId
       this.userNavigated = false
+      // New assignment → unmount the previous-ATC step again so it stays lazy
+      // (re-mounts + loads only when the user opens it for this participant).
+      this.prevHistoryMounted = false
     }
 
     // Re-sync active step whenever the step list changes
@@ -836,6 +863,11 @@ export class DynamicStudioV2Component {
       if (!this.userNavigated || !steps.find(s => s.id === this.activeStepId)) {
         this.activeStepId = steps[0]?.id || ''
       }
+      // Auto-select may land on the prescribe step without going through setActiveStep().
+      if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
+      // Step list changed (or active step was reset) — refresh the cached index.
+      this.activeStepIndex = steps.findIndex(s => s.id === this.activeStepId)
+      if (this.activeStepId === 'prev-history') this.prevHistoryMounted = true
     }
 
     return steps
@@ -844,6 +876,10 @@ export class DynamicStudioV2Component {
   setActiveStep(id: string) {
     this.activeStepId = id
     this.userNavigated = true
+    this.activeStepIndex = this.visibleSteps.findIndex(s => s.id === id)
+    if (id === 'prev-history') this.prevHistoryMounted = true
+    // Lazily check for an AI-generated ATC only when the specialist opens the prescribe step.
+    if (id === 'prescribe-atc') this.checkAiAtcAvailability()
   }
 
   goToStep(offset: number) {
@@ -851,7 +887,11 @@ export class DynamicStudioV2Component {
     const idx = steps.findIndex(s => s.id === this.activeStepId)
     const next = Math.max(0, Math.min(steps.length - 1, idx + offset))
     this.activeStepId = steps[next]?.id || this.activeStepId
+    this.activeStepIndex = steps.findIndex(s => s.id === this.activeStepId)
+    if (this.activeStepId === 'prev-history') this.prevHistoryMounted = true
     this.userNavigated = true
+    // next/prev arrows bypass setActiveStep — trigger the AI-ATC check when landing here too.
+    if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
   }
 
   getStepIndex(id: string): number {
@@ -977,20 +1017,23 @@ export class DynamicStudioV2Component {
       // }else if(environment.firebase.projectId == "starlabs-test" && this.profileid == 'g2mQ7GiD6PSV8oaZnZLb'){
       //   this.deleteOption = true
       // }else{this.deleteOption = false}
-      // fetch user data
-      await getDoc(roles['profile_ref']).then((profileDoc) => {
-        if (profileDoc.exists()) {
-          this.currentuserData = profileDoc.data();
-          this.currentuseruid = profileDoc.data()['user_ref'].id;        
-        }
-      });
-      // get atcmodel
-      await getDocs(collection(this.firestore, 'products')).then(snap => {
-        for (let i = 0; i < snap.docs.length; i++) {
-          const element = snap.docs[i].data();
-          this.mapProducts[element['id']] = element['atcmodel']
-        }
-      })
+      // fetch user data + atcmodel in PARALLEL — two independent reads that were
+      // previously awaited one-after-the-other on the load critical path. Both must
+      // resolve before the queue-generation block below (which uses mapProducts).
+      await Promise.all([
+        getDoc(roles['profile_ref']).then((profileDoc) => {
+          if (profileDoc.exists()) {
+            this.currentuserData = profileDoc.data();
+            this.currentuseruid = profileDoc.data()['user_ref'].id;
+          }
+        }),
+        getDocs(collection(this.firestore, 'products')).then(snap => {
+          for (let i = 0; i < snap.docs.length; i++) {
+            const element = snap.docs[i].data();
+            this.mapProducts[element['id']] = element['atcmodel']
+          }
+        }),
+      ]);
       // if(roles["eis"] || roles["changeagent"] || roles["ah"] || roles["admin"] || roles["developer"]){
         await getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()))).then(async queue=>{
           var activeQueueList = queue.docs.filter(e => e.data()["queuestartdate"].toDate() <= new Date()) // Find Ongoing Queue
@@ -1036,7 +1079,11 @@ export class DynamicStudioV2Component {
         //
       // })
     })
-      //fetch profilelist and user list
+      //fetch profilelist and user list — deferred off the synchronous construction
+      // frame so the heavy full profile_data read (ordered by name) doesn't compete
+      // with the initial queue load. Only feeds notification / profile-uid maps,
+      // which were always populated asynchronously, so behaviour is unchanged.
+      setTimeout(() => {
       collectionData(query(collection(this.firestore, 'profile_data'), orderBy('name','asc')), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe((profileDoc)=>{
         // this.profileList = [];
         // this.userListId=[];
@@ -1055,6 +1102,7 @@ export class DynamicStudioV2Component {
           }
         }
       });
+      }, 0)
   }
 
   ngOnInit(): void {
@@ -1081,6 +1129,10 @@ export class DynamicStudioV2Component {
    this.subscriptionHandle.complete();
    this.otherStudioInvitationHandle.next();
    this.otherStudioInvitationHandle.complete();
+   // Explicitly drop the previous-ATC realtime listeners (belt-and-suspenders on
+   // top of takeUntil above).
+   Object.values(this.previousAtcSubs).forEach(s => s?.unsubscribe());
+   this.previousAtcSubs = {};
    // resetSubscription tears down the subscriptions that are NOT wired through
    // takeUntil (notably tripleATCSubscription at :3593).
    this.resetSubscription();
@@ -1494,19 +1546,19 @@ export class DynamicStudioV2Component {
         // handle was never stored, so the old `== null` guard never tripped and
         // duplicate listeners kept re-opening the invitation dialog).
         this.studioGroupingInvitationSubscription?.unsubscribe()
-        this.studioGroupingInvitationSubscription = collectionData(query(collection(this.firestore,"studioinvitation"), where("type", "==", "stagegrouping"),where("status", "==", "pending"),where("invitedstudio", "array-contains-any", involvedStudio)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(studioInvitation=>{
+        this.studioGroupingInvitationSubscription = collectionData(query(collection(this.firestore,"studioinvitation"), where("type", "==", "stagegrouping"),where("status", "==", "pending"),where("invitedstudio", "array-contains-any", involvedStudio)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async studioInvitation=>{
             for (let i = 0; i < studioInvitation.length; i++) {
               const invitation = studioInvitation[i];
               var matchedstudio = invitation["invitedstudio"].find(studio => involvedStudio.includes(studio))
               if(matchedstudio != null && matchedstudio != undefined && !invitation["acceptedstudio"].includes(matchedstudio)){
                 // TODO Open Invitation Dialog
-                console.log(matchedstudio, invitation["docid"])
-                this.dialog.open(AcceptOtherStudioComponent, {
+                console.log(matchedstudio, invitation["docid"]);
+                (await this.openAcceptOtherStudio({
                   data: {
                     mapprofile: this.mapProfile,
                     invitation: invitation
                   }
-                }).afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result => {
+                })).afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result => {
                   if (result == "success") {
                     updateDoc(doc(this.firestore, "studioinvitation", invitation["docid"]), {
                       acceptedstudio: arrayUnion(matchedstudio)
@@ -1666,7 +1718,7 @@ export class DynamicStudioV2Component {
                   
                   // Open Invitation Countdown
                   if(this.invitationCountdown == null){
-                    this.invitationCountdown = this.dialog.open(QueueInvitationApprovalComponent,{
+                    this.invitationCountdown = await this.openQueueInvitationApproval({
                       disableClose:true,
                       data: this.studioInvitation,
                       maxHeight: "90vh",
@@ -1762,20 +1814,24 @@ export class DynamicStudioV2Component {
     this.studioconversationSubscription?.unsubscribe()
     this.studioconversationSubscription = collectionData(query(collection(this.firestore,"studio conversation"), where('studioid', 'array-contains', this.selectedStudio['docid'])), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async snap => {
       this.studiochatList = snap;
-      console.log(this.studiochatList);
 
+      // Unread badge counts. Previously this re-downloaded EVERY message of
+      // EVERY conversation on every emission just to count the ones still
+      // pending for this user. Use a server-side aggregation count with the
+      // same `pending array-contains uid` filter (mirrors :selectedchat) so we
+      // transfer a single integer per conversation instead of the full history.
       const messagePromises = this.studiochatList.map(async doc => {
-        console.log(doc['docid'], doc);
-        
-        // Fetch messages for the current document
-        const count = await getDocs(collection(this.firestore,"studio conversation", doc['docid'], 'messages'));
-        const messages = count.docs.map(e => e.data());
-        console.log(messages);
-
-        // Calculate unread messages
-        const unreadMessages = messages.filter(msg => msg['pending'].includes(this.currentuseruid)).length;
-        this.pendingMessagesCount[doc['docid']] = unreadMessages;
-        console.log(unreadMessages);
+        try {
+          const unreadQuery = query(
+            collection(this.firestore, "studio conversation", doc['docid'], 'messages'),
+            where('pending', 'array-contains', this.currentuseruid),
+          );
+          const agg = await getCountFromServer(unreadQuery);
+          this.pendingMessagesCount[doc['docid']] = agg.data().count;
+        } catch (err) {
+          console.warn('unread count failed for', doc['docid'], err);
+          this.pendingMessagesCount[doc['docid']] = this.pendingMessagesCount[doc['docid']] ?? 0;
+        }
       });
 
       await Promise.all(messagePromises);
@@ -1794,6 +1850,10 @@ export class DynamicStudioV2Component {
           this.liveAssignment["token"] = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
           console.log(this.liveAssignment['docid']);
           console.log(this.liveAssignment['token']);
+          // If the specialist is already on the prescribe step, refresh the AI-ATC button for the
+          // (possibly switched) participant. Keyed inside the method, so same-participant token
+          // refreshes don't re-query.
+          if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability();
           
           
           // Transferred Queue Detail
@@ -1813,87 +1873,13 @@ export class DynamicStudioV2Component {
             this.transferredQueue = null
           }
 
-          // Get Studio Widgets
-          var studioWidget = this.ongoingQueue["stageproperty"][this.liveAssignment["stagename"]]?.studiowidgets ?? []
-          // List Validated ATC
-          if(studioWidget.includes("prescribedvalidatedatc")){
-            this.previewATC("alpha")
-          }
-          else{
-            this.alphaATCList = []
-          }
-
-          // List Unvalidated ATC
-          if(studioWidget.includes("prescribedunvalidatedatc")){
-            this.previewATC("validation")
-          }
-          else{
-            this.unvalidatedATCList = []
-          }
-
-          // List Procedure to Mark
-          if(studioWidget.includes("assignedatc")){
-            this.getAssignedATC()
-          }
-          else{
-            this.cwATClist = []
-          }
-
-          // List Triple ATC
-          if(studioWidget.includes("viewtripleatc")){
-            this.getTripleATC()
-          }
-          else{
-            this.tripleATCList = []
-          }
-
-          // UP Attendance Count
-          this.getParticipantUPVisit()
-
-          // List Form
-          const firestoreForms = getFirestore("firestore-forms")
-          var mappedForm = this.ongoingQueue['stageproperty'][this.liveAssignment['stagename']]?.participantform ?? []
-          console.log(this.liveAssignment["participantid"], mappedForm)
-          if(mappedForm.length != 0 && this.liveAssignment["token"]){
-            // var involvedQueueRef = [this.firestore.collection("queue generation").doc(this.ongoingQueue["docid"]).ref]
-            var involvedQueueRef = []
-            involvedQueueRef.push(this.liveAssignment["token"]['queueref'])
-            if(![null,undefined].includes(this.liveAssignment["token"]["transferredfrom"])){
-              involvedQueueRef.push(this.liveAssignment["token"]["transferredfrom"])
-              let currentRef:DocumentReference | null = this.liveAssignment["token"]['tokentransferredfrom'] ?? null
-              while (currentRef != null) {
-                const transferData = await this.getQueueRefFromTransferredFrom(currentRef);
-                if(![null,undefined].includes(transferData['transferredfrom'])){
-                  involvedQueueRef.push(transferData["transferredfrom"])
-                  currentRef = transferData['tokentransferredfrom']
-                }else{
-                  currentRef = null;
-                  break;
-                }
-              }
-            }
-            involvedQueueRef = involvedQueueRef.map(e => doc(firestoreForms, e.path))
-            console.log("Involved Queue", involvedQueueRef.map(e => e.path))
-            await getDocs(query(collection(firestoreForms,"formsByClient"), where("queueref", "in", involvedQueueRef),where("profileid", "==", this.liveAssignment["participantid"]))).then(queueform =>{
-              console.log("Related Form", queueform.docs.map(e =>e.data()["formid"]))
-              this.participantForm = queueform.docs.map(e =>e.data()).filter(e => mappedForm.includes(e["formid"]))
-              console.log(this.participantForm)
-            }).catch(e =>{
-              console.log("Unable to fetch Form", e)
-            })
-          }
-          else{
-            this.participantForm = []
-          }
-
-          // current AEL
-          // List Triple ATC
-          if(studioWidget.includes("validateael")){
-            this.getCurrentAEL()
-          }
-          else{
-            this.participantAEL = {}
-          }
+          // Run the per-participant widget fan-out through the shared, guarded
+          // helper. It dedups via widgetFetchSignature (docid|stagename|token),
+          // so this only re-queries ATC / Triple ATC / Forms / AEL / Evolution
+          // Wishlist when the assignment, stage, or token actually changes —
+          // NOT on every token tick. transferredQueue + token are already set
+          // above, so the token-dependent widgets read the right values.
+          await this.loadAssignmentWidgetData()
 
         }
         // var stageToken = token.filter(e => e["liveassignmentid"] == null && (e["preassigned"] == null || e["preassigned"] == undefined || e["preassigned"] == this.selectedStudio["docid"])).sort((a, b) => a["logdate"].toDate() - b["logdate"].toDate())
@@ -2084,7 +2070,7 @@ export class DynamicStudioV2Component {
       }
       setDoc(doc(this.firestore,"studio checkin log", id), data)
       }else{
-        this.dialog.open(HoldAlertDialogComponent)
+        await this.openHoldAlertDialog()
         this.onhold = true
         this.selectedStudio["checkin"] = false
         console.log("scheduled time have passed. Check-in restricted.");
@@ -2141,8 +2127,8 @@ export class DynamicStudioV2Component {
         participantname: this.mapProfile[token['profile_id']],
         status: "pending",
         createdby:this.profileid
-      })
-      this.dialog.open(InviteOtherStudioComponent, {
+      });
+      (await this.openInviteOtherStudio({
         data: {
           mapprofile: this.mapProfile,
           mapactivity: this.mapActivity,
@@ -2152,7 +2138,7 @@ export class DynamicStudioV2Component {
         disableClose: true,
         maxHeight: "90vh",
         maxWidth: "90vw"
-      }).afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
+      })).afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
         if(result != "denied"){
           updateDoc(doc(this.firestore, 'studioinvitation', invitationID), {
             status: "success"
@@ -2287,11 +2273,11 @@ export class DynamicStudioV2Component {
   //   }
   // } 
 
-  assignStudio(invitation){
+  async assignStudio(invitation){
     console.log(invitation)
     var token = this.stageTokenList.filter(e => e["stagename"] == invitation["stage"])[0]["tokenlist"].find(e => e["profile_id"] == invitation["profileid"])
     console.log(token)
-    var assignStudio = this.dialog.open(AssignQueueStudioComponent, {
+    var assignStudio = await this.openAssignQueueStudio({
       data: {
         title: "Update Specialist and Activity in the Studio",
         studiolist: [this.selectedStudio],
@@ -2403,7 +2389,7 @@ export class DynamicStudioV2Component {
   // not progressing the token.
   async moveBackToQueue(){
     if(this.liveAssignment == null) return
-    var inCompleteDialog = this.dialog.open(StageIncompleteConfirmationComponent, {
+    var inCompleteDialog = await this.openStageIncompleteConfirmation({
       data: {
         currentstage: this.liveAssignment["stagename"],
         participantname: this.mapProfile[this.liveAssignment["token"]?.profile_id]
@@ -2562,7 +2548,7 @@ export class DynamicStudioV2Component {
       })
     }
     else if(eligiblePreStudio.length != 0){
-      var studio = this.dialog.open(PreassignStudioComponent, {
+      var studio = await this.openPreassignStudio({
         data: {
           stagename: nextstage,
           studiolist: eligiblePreStudio,
@@ -2592,7 +2578,7 @@ export class DynamicStudioV2Component {
 
     if(movable){
       if(this.liveAssignment["stagename"] == nextstage || (this.liveAssignment["stagename"] != nextstage && markascompleted != true)){
-        var inCompleteDialog = this.dialog.open(StageIncompleteConfirmationComponent, {
+        var inCompleteDialog = await this.openStageIncompleteConfirmation({
           data: {
             currentstage: this.liveAssignment["stagename"],
             participantname: this.mapProfile[this.liveAssignment["token"]?.profile_id]
@@ -2673,7 +2659,7 @@ export class DynamicStudioV2Component {
       }else{
         var reviewSpecialist = (await this.inviteMore(true))
         if(!reviewSpecialist) return
-        var confirm = this.dialog.open(HoldAlertDialogComponent, {
+        var confirm = await this.openHoldAlertDialog({
           data : {}
         })
   
@@ -2894,7 +2880,7 @@ export class DynamicStudioV2Component {
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]].push(profileid)
     })
     console.log(additionalActivities)
-    var inviteParticipant = this.dialog.open(AssignQueueStudioComponent, {
+    var inviteParticipant = await this.openAssignQueueStudio({
       data: {
         title: reviewSpecialist ? "Confirm Specialist(s) who attended this Studio" : "Update Additional Specialist and Activity in the Studio",
         studiolist: reviewSpecialist ? [this.selectedStudio] : null,
@@ -3192,19 +3178,112 @@ export class DynamicStudioV2Component {
     }
   }
   
+  // Manual prescribe: blank prescribe-ATC form for this participant (opens in a new tab).
   addATC(validated, profileid) {
     console.log(profileid, 'profileid');
-  
+
     const url = this.router.createUrlTree(['/prescribeATC'], { queryParams: { validation: validated, profileid: profileid } }).toString();
     window.open(url, '_blank');
   }
-  
+
+  // Open prescribe-ATC pre-filled from the completed AI-generated ATC (queue_atc_generation).
+  // Only callable when checkAiAtcAvailability() found a doc and surfaced the "Use AI ATC" button.
+  useAiAtc(validated) {
+    if (!this.aiAtcDocId) return;
+    const url = this.router.createUrlTree(['/prescribeATC'], {
+      queryParams: { aigenerated: true, docid: this.aiAtcDocId, source: 'queueatc', validation: validated }
+    }).toString();
+    window.open(url, '_blank');
+  }
+
+  // Pre-check whether a completed AI-generated ATC exists for the live participant, driving the
+  // inline "Use AI ATC" button. Keyed on profileid+token so it queries once per participant; any
+  // failure leaves the button hidden (manual prescribe always remains available). Reads only
+  // (firestore-atc, queue_atc_generation), never writes.
+  async checkAiAtcAvailability() {
+    if (!this.aiAtcFeatureEnabled) { this.aiAtcAvailable = false; return; }  // feature held — no query, no buttons
+    const token = this.liveAssignment?.['token'];
+    const profileid = this.participantProfileId;
+    const queueTokenId = token?.['docid'];
+    const tokenQueueRef = token?.['queueref'];
+
+    if (!profileid || !queueTokenId || !tokenQueueRef?.id) {
+      // token not hydrated yet — reset so a later token update re-checks.
+      this.aiAtcAvailable = false;
+      this.aiAtcDocId = null;
+      this.aiAtcCheckedKey = null;
+      return;
+    }
+
+    const key = profileid + '|' + queueTokenId;
+    if (key === this.aiAtcCheckedKey) return;  // already checked this participant
+
+    // New participant → clear stale state immediately and claim the key (prevents concurrent
+    // duplicate queries while this one is in flight).
+    this.aiAtcCheckedKey = key;
+    this.aiAtcAvailable = false;
+    this.aiAtcDocId = null;
+
+    try {
+      const firestoreATC = getFirestore("firestore-atc");
+      // queue_atc_generation stores queueref as a firestore-atc reference
+      // (cloud fn: adminATC.doc(queueRef.path)); the studio token's queueref points at the default
+      // DB, so rebuild it against firestore-atc for the equality query to match.
+      const atcQueueRef = doc(firestoreATC, 'queue generation', tokenQueueRef.id);
+      const aiSnap = await getDocs(query(
+        collection(firestoreATC, 'queue_atc_generation'),
+        where('profileid', '==', profileid),
+        where('queue_token_id', '==', queueTokenId),
+        where('queueref', '==', atcQueueRef),
+        where('stage', '==', 'Scope Enhancement'),
+        where('status', '==', 'completed')
+      ));
+
+      // Guard against a participant switch that happened while this query was awaiting.
+      if (this.aiAtcCheckedKey !== key) return;
+
+      if (!aiSnap.empty) {
+        this.aiAtcDocId = aiSnap.docs[0].id;
+        this.aiAtcAvailable = true;
+      }
+    } catch (err) {
+      console.error('AI ATC availability check failed; hiding AI button', err);
+      this.aiAtcCheckedKey = null;  // allow a retry on the next entry
+    }
+  }
+
   updateATC(atcid, collection, option){
     var url = '/editATC/'+atcid+"/" + collection + option
     window.open(url.toString(), '_blank')
   }
   
-  async previewATC(collectiontype){
+  // Realtime entry point. Instead of a one-time fetch on every screen load, watch
+  // the participant's ATC collection and re-hydrate the list whenever it changes.
+  // Replaces any existing listener for this collectiontype so they never stack.
+  previewATC(collectiontype){
+    const firestoreATC = getFirestore("firestore-atc")
+    const startDate = this.transferredQueue != null ? this.transferredQueue["queuestartdate"].toDate() : this.ongoingQueue["queuestartdate"].toDate()
+    // Mirrors the effective query in hydratePreviewATC (the role branch there is
+    // dead — `|| true` always selects the allow-all form).
+    const watchQuery = collectiontype == "alpha"
+      ? query(
+          collection(firestoreATC, "atc_alpha"),
+          where("profileid", "==", this.liveAssignment["participantid"]),
+          where("prescription_date", ">=", startDate)
+        )
+      : query(
+          collection(firestoreATC, "atc_to_validate"),
+          where("status", "==", "atc given"),
+          where("profileid", "==", this.liveAssignment["participantid"]),
+          where("prescription_date", ">=", startDate)
+        )
+    this.previousAtcSubs[collectiontype]?.unsubscribe()
+    this.previousAtcSubs[collectiontype] = collectionData(watchQuery, {idField: 'id'})
+      .pipe(takeUntil(this.subscriptionHandle))
+      .subscribe(() => this.hydratePreviewATC(collectiontype))
+  }
+
+  async hydratePreviewATC(collectiontype){
 
     const firestoreATC = getFirestore("firestore-atc")
 
@@ -3631,7 +3710,7 @@ export class DynamicStudioV2Component {
     
     
 
-    this.dialog.open(AssignProcedureStudioComponent, {
+    (await this.openAssignProcedureStudio({
       data: {
         studiolist: eligibleStudio,
         collectiontype: validated || this.profileRoles["mentor"] ? "alpha" : "validation",
@@ -3644,7 +3723,7 @@ export class DynamicStudioV2Component {
       maxHeight: "90vh",
       maxWidth: "90vw",
       disableClose: true
-    }).afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
+    })).afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
       if(result != null){
         var token = this.liveAssignment["token"]
         var preassigned = token["preassigned"] ?? {}
@@ -3673,7 +3752,11 @@ export class DynamicStudioV2Component {
       where("status", "==", "atc given")
     );
     
-    this.tripleATCSubscription = collectionData(tripleATCQuery).subscribe(atc => {
+    // Tear down the previous listener before opening a new one and pipe through
+    // takeUntil — getTripleATC can be called repeatedly per participant, and
+    // without this each call orphaned a live "triple atc" listener.
+    this.tripleATCSubscription?.unsubscribe()
+    this.tripleATCSubscription = collectionData(tripleATCQuery).pipe(takeUntil(this.subscriptionHandle)).subscribe(atc => {
       this.tripleATCList = atc.sort((a, b) => a["prescription_date"].toDate() - b["prescription_date"].toDate())
     });
   }
@@ -3696,8 +3779,12 @@ export class DynamicStudioV2Component {
     if(!this.liveAssignment["token"]) return;
 
     try {
-      const level = await getDocs(collection(this.firestore, "accelerated evolution level"));
-      this.aelLevelList = level.docs.map(e => e.data())
+      // Static reference collection — fetch once per session, not per call.
+      if (!this.aelLevelListLoaded) {
+        const level = await getDocs(collection(this.firestore, "accelerated evolution level"));
+        this.aelLevelList = level.docs.map(e => e.data())
+        this.aelLevelListLoaded = true
+      }
 
       var involvedQueueID = []
       involvedQueueID.push(this.liveAssignment["token"]['queueref'].id)
@@ -4138,8 +4225,54 @@ export class DynamicStudioV2Component {
     });
   }
 
+  // ── Lazily-loaded dialogs ───────────────────────────────────────────────
+  // Each dialog component is code-split into its own chunk via dynamic import()
+  // and fetched only when the dialog actually opens, keeping it out of the
+  // /dynamicstudio route chunk. Helpers return the MatDialogRef so callers keep
+  // using .afterClosed() exactly as before.
+  private async openAcceptOtherStudio(cfg?: any){
+    const { AcceptOtherStudioComponent } = await import('../accept-other-studio/accept-other-studio.component')
+    return this.dialog.open(AcceptOtherStudioComponent, cfg)
+  }
+  private async openQueueInvitationApproval(cfg?: any){
+    const { QueueInvitationApprovalComponent } = await import('../queue-invitation-approval/queue-invitation-approval.component')
+    return this.dialog.open(QueueInvitationApprovalComponent, cfg)
+  }
+  private async openHoldAlertDialog(cfg?: any){
+    const { HoldAlertDialogComponent } = await import('../hold-alert-dialog/hold-alert-dialog.component')
+    return this.dialog.open(HoldAlertDialogComponent, cfg)
+  }
+  private async openInviteOtherStudio(cfg?: any){
+    const { InviteOtherStudioComponent } = await import('../invite-other-studio/invite-other-studio.component')
+    return this.dialog.open(InviteOtherStudioComponent, cfg)
+  }
+  private async openAssignQueueStudio(cfg?: any){
+    const { AssignQueueStudioComponent } = await import('../assign-queue-studio/assign-queue-studio.component')
+    return this.dialog.open(AssignQueueStudioComponent, cfg)
+  }
+  private async openStageIncompleteConfirmation(cfg?: any){
+    const { StageIncompleteConfirmationComponent } = await import('../stage-incomplete-confirmation/stage-incomplete-confirmation.component')
+    return this.dialog.open(StageIncompleteConfirmationComponent, cfg)
+  }
+  private async openPreassignStudio(cfg?: any){
+    const { PreassignStudioComponent } = await import('../preassign-studio/preassign-studio.component')
+    return this.dialog.open(PreassignStudioComponent, cfg)
+  }
+  private async openAssignProcedureStudio(cfg?: any){
+    const { AssignProcedureStudioComponent } = await import('../assign-procedure-studio/assign-procedure-studio.component')
+    return this.dialog.open(AssignProcedureStudioComponent, cfg)
+  }
+
   trackById(index: number, item: any): string {
     return item.key;
+  }
+
+  // Generic *ngFor identity: track realtime-stream rows by their stable Firestore
+  // id so an emit diffs in place instead of tearing down + rebuilding the DOM.
+  // Falls back to index for primitive / id-less rows (safe for these small,
+  // non-reordering inner lists).
+  trackByDocId(index: number, item: any): any {
+    return item?.docid ?? item?.id ?? index;
   }
 
   async joinOpenViduRoom(){
