@@ -49,3 +49,13 @@ The recovery path only engages on error/offline, so a bug in it cannot break a n
 3. Reload / reopen / different device → `getDocs` returns the draft.
 4. Offline save → "Saved on this device…"; reconnect or reload → it syncs.
 5. Confirm `atc_draft_outbox` IndexedDB empties after a successful sync.
+
+## Addendum — 2026-06-25: `DataCloneError` on Edit ATC outbox
+
+**Symptom:** `Draft outbox: could not store draft locally DataCloneError: ... e=>new re(e) could not be cloned` on the Edit ATC screen (a warning, caught — the draft still saved). Also a benign `Failed to obtain primary lease for action 'Backfill Indexes'` (normal `persistentMultipleTabManager` message when another tab holds the lease; not from our code).
+
+**Cause:** the Edit draft payload contains Firestore **`DocumentReference`** objects (`e=>new re(e)` is a ref's internal converter). `setDoc` accepts refs, so the server write worked — but IndexedDB's structured clone rejects them, so the outbox copy failed and the durability net was missing for Edit drafts.
+
+**Fix (service-only):** added `sanitize()` — produces a clone-/REST-safe copy (Timestamp→Date, `DocumentReference`→`{__ref: path}` marker, functions dropped) used for the **outbox + REST**, while the live `setDoc` still receives the **original** data (full ref/Timestamp fidelity, happy path unchanged). `flushPending` and the REST encoder `revive`/encode the `{__ref}` markers back into real references (`doc(firestore, path)` / `referenceValue`).
+
+**Known caveat:** revived refs and REST `referenceValue` assume the ref lives in the `firestore-atc` database. A draft field holding a ref to the **default** DB would be revived against the wrong DB — but only on the recovery path (flush/REST after a primary-write failure), never on the normal `setDoc`. Capture the ref's database in `sanitize` if this proves to matter.
