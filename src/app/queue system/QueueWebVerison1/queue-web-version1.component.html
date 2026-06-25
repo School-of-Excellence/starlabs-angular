@@ -70,6 +70,51 @@
     <!-- Main -->
     <main class="qwv-main">
 
+      <!-- Open to book -->
+      <div *ngIf="hasOpenSlot && !showInlineForm" class="qwv-slot-banner qwv-slot-banner--open">
+        <div class="qwv-slot-banner-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </div>
+        <div class="qwv-slot-banner-content">
+          <span class="qwv-slot-banner-title">Slots are now open — book your {{ openSlotStageName }}</span>
+          <span class="qwv-slot-banner-desc">
+            Pick the dates that work best for you in your A&amp;H Breakthroughs app. Your spot is reserved the moment you confirm. We recommend getting an early start, as it will be beneficial for you in several ways.
+          </span>
+        </div>
+      </div>
+
+      <!-- Already booked -->
+      <div *ngIf="hasBookedSlot && !showInlineForm" class="qwv-slot-banner qwv-slot-banner--booked">
+        <div class="qwv-slot-banner-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <div class="qwv-slot-banner-content">
+          <span class="qwv-slot-banner-title">
+            You've booked your slot for the {{ bookedSlotStageName }} successfully.
+          </span>
+          <span class="qwv-slot-banner-desc">
+            <ng-container *ngIf="bookedSlotTitle && bookedSlotDescription; else existingFormat">
+              Your Selected Slot: {{ bookedSlotTitle }}-{{ bookedSlotDescription }}
+            </ng-container>
+            <ng-template #existingFormat>
+              Your Selected Slot:
+              {{ getBookedSlotSummary() }}
+              <ng-container *ngIf="getBookedSlotStartTime()">
+                at {{ getBookedSlotStartTime() }}.
+              </ng-container>
+            </ng-template>
+          </span>
+        </div>
+      </div>
+
       <!-- Activity card — Normal stage -->
         <!-- Inline Form -->
         <ng-container *ngIf="showInlineForm">
