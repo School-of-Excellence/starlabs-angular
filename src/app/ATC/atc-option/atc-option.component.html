@@ -16,6 +16,11 @@
       <ul>
         <li *ngFor="let atc of draftOption; let i = index">
           <span>Prescription Date - {{atc.data()["lastupdated"] ? (atc.data()["lastupdated"].toDate() | date: "medium") : atc.data()["date"]}}</span>
+          <!-- Flag drafts started from an AI generation so the specialist opens THIS draft
+               (same queue_atc_generation doc id) instead of creating a fresh one. -->
+          <span *ngIf="atc.data()['aiedited']" class="aiatc-badge">
+            <mat-icon class="icon">auto_awesome</mat-icon> AI ATC draft
+          </span>
           <button mat-icon-button class="selectbtn" (click)="selecteATC('draft', atc)">
             <mat-icon class="icon">check</mat-icon>
           </button>

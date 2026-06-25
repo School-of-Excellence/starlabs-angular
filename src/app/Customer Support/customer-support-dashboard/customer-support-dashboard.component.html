@@ -409,7 +409,7 @@
                   </tr>
                 </tbody>
                 <tbody class="table-body">
-                  <tr *ngFor="let element of paginatedData; let idx = index" [ngClass]="{
+                  <tr *ngFor="let element of paginatedData; let idx = index; trackBy: trackByTicket" [ngClass]="{
                         'flagrow': element['flag'], 
                         'websiteticket': !element['flag'] && ['website'].includes(element['ticketfrom']),
                         'status-open': element.status?.status.toLowerCase() == 'open',
