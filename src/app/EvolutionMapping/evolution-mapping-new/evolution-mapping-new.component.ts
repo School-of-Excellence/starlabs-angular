@@ -1691,9 +1691,14 @@ openAddVideo(prefillParticipantId?: string) {
         };
 
         this.logEvents = [...updated];
+        this.filteredLogEvents = this.selectedLogEventFilter.length? this.logEvents.filter((e) => 
+        {
+          const eventId = (e as any).eventId || null;
+          return eventId && this.selectedLogEventFilter.includes(eventId);
+        })
+        : [...this.logEvents];
       }
       this.closeEditVideo();
-      this.fetchRecords();
 
     } catch (err) {
       console.error('Error saving video:', err);
