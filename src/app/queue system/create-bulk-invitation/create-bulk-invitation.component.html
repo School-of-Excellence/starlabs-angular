@@ -5,7 +5,7 @@
     <form [formGroup]="invitationForm" (ngSubmit)="sendInvitation()">
       <mat-form-field appearance="outline">
         <mat-label>Invite To</mat-label>
-        <mat-select formControlName="stage" required>
+        <mat-select formControlName="stage" data-testid="bulkinv-stage-select" required>
           <mat-option *ngFor="let option of activityStage" [value]="option">{{option}}</mat-option>
         </mat-select>
         <mat-error *ngIf="invitationForm.controls['stage'].hasError('required')">Required</mat-error>
@@ -30,7 +30,7 @@
       </mat-form-field>
       <div>
         <button mat-stroked-button class="cancelbtn" type="button" (click)="dialogRef.close(null)" [disabled]="loading">Cancel</button>
-        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="invitationForm.invalid || loading">{{loading ? 'Sending Invitation...' : 'Send Invitation'}}</button>
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="invitationForm.invalid || loading" data-testid="bulkinv-submit-btn">{{loading ? 'Sending Invitation...' : 'Send Invitation'}}</button>
       </div>
     </form>
 </main>

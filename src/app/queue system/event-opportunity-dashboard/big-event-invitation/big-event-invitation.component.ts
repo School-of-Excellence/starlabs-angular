@@ -10,6 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatButtonModule } from '@angular/material/button';
+import { ProfilePictureComponent } from '../../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-big-event-invitation',
@@ -22,7 +23,8 @@ import { MatButtonModule } from '@angular/material/button';
     MatDatepickerModule,
     NgxMatSelectSearchModule,
     MatDialogModule,
-    MatButtonModule
+    MatButtonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './big-event-invitation.component.html',
   styleUrl: './big-event-invitation.component.css'

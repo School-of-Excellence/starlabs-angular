@@ -13,6 +13,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Firestore } from '@angular/fire/firestore';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-live-event-health',
@@ -24,7 +25,8 @@ import { Firestore } from '@angular/fire/firestore';
     MatAutocompleteModule,  
     MatSelectModule,
     MatTableModule,
-    MatPaginatorModule
+    MatPaginatorModule,
+    ProfilePictureComponent
   ],
   templateUrl: './live-event-health.component.html',
   styleUrl: './live-event-health.component.css'
@@ -471,6 +473,7 @@ private upsertProduct(product: any) {
 
     return {
       participationRequestId: req.id,
+      profileid: profileId,
       name: participantMeta?.name ?? profileId ?? '-',
       event: this.selectedEvent?.name ?? '-',
       product: productMaster?.product ?? productId ?? '-',

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Queue: Journeys → Variations → State Machine (655)</title>
+<style>
+  body{margin:0;background:#0f1216;color:#e8edf3;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;padding:24px 28px 60px}
+  h1{font-size:20px;margin:0 0 2px}.sub{color:#9aa7b6;margin:0 0 14px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;color:#9aa7b6;font-size:12.5px;margin:10px 0 14px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .tags{color:#9aa7b6;font-size:12.5px;margin:4px 0 16px;max-width:1040px}
+  .tags code{background:#1d232b;border:1px solid #2a323d;border-radius:4px;padding:1px 6px;color:#e8edf3}
+  .wrap{background:#11151a;border:1px solid #2a323d;border-radius:12px;padding:10px;overflow:auto}
+  .mermaid{min-width:1300px}
+</style>
+</head>
+<body>
+  <h1>Diagnostics &amp; Consultation — journeys → variations → studio machine</h1>
+  <p class="sub">Queue <code>L3rqCrqDBsshd7HM5YRn</code> · 655 participants · 9 variations. Left→right: the participant's <b>journey</b> → the <b>variation</b> they're put on (edge number = participants) → how that variation <b>flows</b> through the studio stages (edge scope from the <code>nextstage</code> config).</p>
+  <div class="legend">
+    <span><i class="sw" style="background:#94a3b8"></i> journey</span>
+    <span><i class="sw" style="background:#22c55e"></i> variation → B!G·LYL family (routes via Consultation)</span>
+    <span><i class="sw" style="background:#f97316"></i> variation → uP!·Prodigies family (routes via uP! Readiness CW)</span>
+    <span><i class="sw" style="background:#a78bfa"></i> studio stage</span>
+    <span>↺ = Send-Back loop</span>
+  </div>
+  <p class="tags">Edge scope tags inside the machine: <code>all</code> · cycle fork <code>first-cycle</code>/<code>next-cycle</code>/<code>Prodigies-first</code> · family fork <code>B!G·LYL</code> vs <code>uP!·Prodigies</code> · <code>B!G only</code> = Triple-ATC. Journey→variation edge numbers are the dominant-journey participant counts (off-family remainders not drawn).</p>
+  <div class="wrap"><pre class="mermaid">
+flowchart LR
+  classDef jour fill:#1d232b,stroke:#94a3b8,color:#e2e8f0;
+  classDef famA fill:#14331f,stroke:#22c55e,color:#bbf7d0,stroke-width:1.5px;
+  classDef famB fill:#3a2412,stroke:#f97316,color:#fde7d3,stroke-width:1.5px;
+  classDef spec fill:#241a2e,stroke:#a78bfa,color:#e9d5ff,stroke-width:1.5px;
+  classDef self fill:#16243b,stroke:#3b82f6,color:#dbeafe;
+  classDef gate fill:#1d232b,stroke:#64748b,color:#cbd5e1;
+  classDef done fill:#0f2a1a,stroke:#22c55e,color:#bbf7d0,stroke-width:1.5px;
+
+  subgraph JN["JOURNEYS"]
+    direction TB
+    JU["uP!"]:::jour
+    JB["B!G / B!G Continuity"]:::jour
+    JP["uP! For Prodigies"]:::jour
+    JF["FTM"]:::jour
+    JC["CPM"]:::jour
+  end
+
+  subgraph VR["VARIATIONS · participants"]
+    direction TB
+    VUF["uP! First Cycle · 187"]:::famB
+    VUN["uP! Next Cycle · 120"]:::famB
+    VU3["uP! 3rd Cycle · 41"]:::famB
+    VPF["Prodigies First · 14"]:::famB
+    VPN["Prodigies Next · 25"]:::famB
+    VBN["B!G Next Cycle · 190"]:::famA
+    VLF["LYL First Cycle · 48"]:::famA
+    VLN["LYL Next Cycle · 26"]:::famA
+    VH["uP! Prep Hold · 3"]:::famB
+  end
+
+  JU -->|111| VUF
+  JU -->|70| VUN
+  JU -->|14| VU3
+  JU -->|8| VPN
+  JC -->|21| VUF
+  JC -->|15| VUN
+  JB -->|132| VBN
+  JB -->|35| VLF
+  JB -->|9| VLN
+  JF -->|8| VLN
+  JP -->|12| VPF
+  JP -->|7| VPN
+
+  VUF & VUN & VU3 & VPF & VPN & VBN & VLF & VLN & VH --> SE
+
+  subgraph MC["STUDIO STATE MACHINE"]
+    SE["Scope Enhancement"]:::spec
+    SE -->|"↺ send back · all"| SE
+    SE -->|"first-cycle"| GSA["Guided Self ATC"]:::self
+    SE -->|"next-cycle"| EMA["Evolution Mapping"]:::self
+    SE -->|"Prodigies-first"| RFD["Ready for Diagnostics"]:::gate
+    GSA --> RFD
+    EMA --> RFD
+    RFD --> DIAG["Diagnostics"]:::spec
+    DIAG -->|"↺ send back"| DIAG
+    DIAG -->|"implementation · all"| DRCW["Diag Readiness CW"]:::spec
+    DRCW -->|"send again"| DIAG
+    DIAG -->|"validation pending · all"| ATCP["ATC Preparation"]:::spec
+    ATCP -->|"↺"| ATCP
+    DIAG -->|"all"| ATCB["ATC Briefing"]:::spec
+    ATCP -->|"all"| ATCB
+    DIAG -->|"B!G·LYL"| CONS["Consultation"]:::spec
+    ATCP -->|"B!G·LYL"| CONS
+    ATCB -->|"B!G·LYL"| CONS
+    DIAG -->|"uP!·Prodigies"| URCW["uP! Readiness CW"]:::spec
+    DIAG -->|"uP!·Prodigies"| SER["Self Evolution Report ✓"]:::done
+    ATCB -->|"uP!·Prodigies"| SER
+    ATCB -->|"uP!·Prodigies"| URCW
+    CONS -->|"↺ send back"| CONS
+    CONS -->|"uP! changework · all"| URCW
+    CONS -->|"all"| SER
+    CONS -->|"back to Diag-CW · all"| DRCW
+    URCW -->|"send again · all"| CONS
+    URCW -->|"review · all"| REV["Review"]:::spec
+    REV -->|"completed · all"| SER
+    REV -->|"implementation · all"| URCW
+    TATC["Triple ATC"]:::spec -->|"B!G only"| TATCV["Triple ATC Validation"]:::spec
+    TATCV -->|"B!G only"| CONS
+    TATCV -->|"B!G only"| SER
+    DIP["Diagnostics In-person"]:::spec -->|"↺"| DIP
+    DIP -->|"B!G·LYL"| CIP["Consultation In-person"]:::spec
+    CIP -->|"all"| IPC["In-person Completed ✓"]:::done
+  end
+  </pre></div>
+  <p class="sub" style="margin-top:14px">If it doesn't render you're offline (Mermaid loads from CDN). Family color of each variation = which way it routes at Diagnostics (green→Consultation, orange→uP! Readiness CW). Note <b>LYL variations are green/B!G-family but fed by B!G &amp; FTM journeys</b> — the "LYL" label is an operational batch, not a journey.</p>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({startOnLoad:true,theme:'dark',flowchart:{curve:'basis',nodeSpacing:48,rankSpacing:75}});
+</script>
+</body>
+</html>

@@ -42,7 +42,7 @@
             <div *ngFor="let log of logArray; let i=index" style="border: 1px solid grey; padding: 10px; margin-bottom: 10px;">
                 <div class="header-info">
                     <p><strong>Version:</strong> {{ log.versionno }}</p>
-                    <p><strong>Developer:</strong> {{ log.developer_name }}</p>
+                    <p><strong>Developer:</strong> <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="log.developer_pid" [name]="log.developer_name" [size]="28"></app-profile-picture>{{ log.developer_name }}</span></p>
                     <p><strong>Screen Name:</strong> {{ log.screen_name }}</p>
                     <p><strong>Date:</strong> {{ log.date.toDate() | date:'short'}}</p>
                 </div>

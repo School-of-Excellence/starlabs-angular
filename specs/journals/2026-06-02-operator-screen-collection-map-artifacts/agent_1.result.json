@@ -1,0 +1,291 @@
+[
+  {
+    "route": "audiodashboard",
+    "file": "src/app/content/audio-dashboard/audio-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 92},
+      {"c": "atc taxonomy", "line": 101},
+      {"c": "solar voice playlist", "line": 113}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 101}],
+    "notes": "Read-only dashboard. atc taxonomy is reference-only (safe per project rules)."
+  },
+  {
+    "route": "videodashboard",
+    "file": "src/app/content/episodes-dashboard/episodes-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "episodes", "line": 136},
+      {"c": "atc taxonomy", "line": 145}
+    ],
+    "writes": [
+      {"c": "episodes", "line": 595}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 145}],
+    "notes": "Reads episodes (ordered query line 137) + atc taxonomy. Writes episodes via setDoc(merge) at 595; new doc id minted at 346. Imports AuthguardService but no data-fetch call seen."
+  },
+  {
+    "route": "ads",
+    "file": "src/app/content/click-ads/click-ads.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "ads", "line": 139}
+    ],
+    "writes": [],
+    "services": ["getRoles"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads ads (collectionSnapshots). guard.getRoles() at 137 for role gating only. Large commented-out legacy block above; active code starts ~line 94."
+  },
+  {
+    "route": "healthstories",
+    "file": "src/app/content/health-stories/health-stories.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "health stories", "line": 43}
+    ],
+    "writes": [],
+    "services": ["getRoles"],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only of 'health stories'. guard.getRoles() at 41 for role gating only."
+  },
+  {
+    "route": "contentupload",
+    "file": "src/app/content/content-upload/content-upload.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "user_data", "line": 70},
+      {"c": "profile_data", "line": 71},
+      {"c": "content_urls", "line": 79},
+      {"c": "atc taxonomy", "line": 92}
+    ],
+    "writes": [
+      {"c": "content_urls", "line": 168}
+    ],
+    "services": ["getuid"],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 92}],
+    "notes": "guardservice.getuid() at 68 gates load. user_data doc ref (70) used in profile_data query (where user_ref==, getDocs 73). content_urls read via collectionSnapshots (79) and deleteDoc (168). atc taxonomy reference-only."
+  },
+  {
+    "route": "learningmaterial",
+    "file": "src/app/content/learning-material/learning-material.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "learning-materials", "line": 41}
+    ],
+    "writes": [
+      {"c": "learning-materials", "line": 95}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads learning-materials (collectionSnapshots 42), deleteDoc at 95."
+  },
+  {
+    "route": "category-dashboard",
+    "file": "src/app/content/category-dashboard/category-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "category", "line": 39},
+      {"c": "series", "line": 95}
+    ],
+    "writes": [
+      {"c": "series", "line": 106}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads category (collectionData 39) and series (ordered by 'order', 95). updateDoc on series docs to persist 'order' (102 ref, 106 updateDoc)."
+  },
+  {
+    "route": "assigncategory",
+    "file": "src/app/content/series-dashboard/categoryassign/categoryassign.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "category", "line": 61},
+      {"c": "series", "line": 62}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads category (61) + series (62) via combineLatest of collectionSnapshots (65-66). getDoc imported but used for resolving refs; no write ops found."
+  },
+  {
+    "route": "seriesdashboard",
+    "file": "src/app/content/series-dashboard/series-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "series", "line": 53}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only of 'series' (collectionSnapshots 54)."
+  },
+  {
+    "route": "viewparticipantstieraccess",
+    "file": "src/app/content/eiflix_tier/viewparticipant-tier-access/viewparticipant-tier-access.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "tier", "line": 53},
+      {"c": "participant metadata", "line": 69},
+      {"c": "series", "line": 94},
+      {"c": "tier access config", "line": 144},
+      {"c": "journey", "line": 151},
+      {"c": "products", "line": 159},
+      {"c": "biglevel", "line": 167}
+    ],
+    "writes": [
+      {"c": "tier access config", "line": 277}
+    ],
+    "writes_note": "deleteDoc on 'tier access config'",
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads tier(53), participant metadata(69 ordered by name), series(94), tier access config(144), journey(151), products(159), biglevel(167). getDoc at 109 resolves tier refs from series docs. deleteDoc on 'tier access config' at 277 (ref 276). profile_data read commented out (61)."
+  },
+  {
+    "route": "playlistdashboard",
+    "file": "src/app/content/playlist-dashboard/playlist-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice playlist", "line": 65},
+      {"c": "atc taxonomy", "line": 70}
+    ],
+    "writes": [
+      {"c": "solar voice playlist", "line": 161}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 70}],
+    "notes": "Reads solar voice playlist (collectionSnapshots 66) + atc taxonomy (71). deleteDoc on solar voice playlist at 161 (ref 160). atc taxonomy reference-only."
+  },
+  {
+    "route": "edit-playlist",
+    "file": "src/app/content/playlist-dashboard/playlist-configuration/playlist-configuration.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 95},
+      {"c": "solar voice playlist", "line": 96},
+      {"c": "atc taxonomy", "line": 157}
+    ],
+    "writes": [
+      {"c": "solar voice playlist", "line": 265},
+      {"c": "solar voice playlist", "line": 284}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 157}],
+    "notes": "Newer config screen used for both edit-playlist and add-playlist routes. Reads solar voice audios (collectionSnapshots 97), solar voice playlist (getDocs 135), atc taxonomy (158). Writes solar voice playlist via setDoc: edit path 265, create path 284. 'solar voice audios' doc refs (236) only build the 'sequence' DocumentReference array stored in the playlist doc - NOT written."
+  },
+  {
+    "route": "add-playlist",
+    "file": "src/app/content/playlist-dashboard/playlist-configuration/playlist-configuration.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 95},
+      {"c": "solar voice playlist", "line": 96},
+      {"c": "atc taxonomy", "line": 157}
+    ],
+    "writes": [
+      {"c": "solar voice playlist", "line": 265},
+      {"c": "solar voice playlist", "line": 284}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 157}],
+    "notes": "Same component as edit-playlist (playlist-configuration). Create path setDoc at 284, edit path at 265. 'solar voice audios' refs only populate sequence array; not written."
+  },
+  {
+    "route": "edit-playlist",
+    "file": "src/app/content/playlist-dashboard/edit/edit.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 86},
+      {"c": "solar voice playlist", "line": 87},
+      {"c": "atc taxonomy", "line": 118}
+    ],
+    "writes": [
+      {"c": "solar voice playlist", "line": 199}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 118}],
+    "notes": "Legacy edit screen. Reads solar voice audios (getDocs 89), solar voice playlist (getDocs 95), atc taxonomy (collectionSnapshots 119). setDoc on solar voice playlist at 199. 'solar voice audios' doc refs (195) only build the 'sequence' DocumentReference array - NOT written."
+  },
+  {
+    "route": "audiodashboard",
+    "file": "src/app/content/audio-dashboard/audio-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 92},
+      {"c": "atc taxonomy", "line": 101},
+      {"c": "solar voice playlist", "line": 113}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 101}],
+    "notes": "Duplicate of route 1. Read-only dashboard. atc taxonomy reference-only."
+  },
+  {
+    "route": "playlistdashboard",
+    "file": "src/app/content/playlist-dashboard/playlist-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice playlist", "line": 65},
+      {"c": "atc taxonomy", "line": 70}
+    ],
+    "writes": [
+      {"c": "solar voice playlist", "line": 161}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 70}],
+    "notes": "Duplicate of earlier playlistdashboard. Reads solar voice playlist + atc taxonomy; deleteDoc solar voice playlist at 161."
+  },
+  {
+    "route": "edit-playlist",
+    "file": "src/app/content/playlist-dashboard/edit/edit.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 86},
+      {"c": "solar voice playlist", "line": 87},
+      {"c": "atc taxonomy", "line": 118}
+    ],
+    "writes": [
+      {"c": "solar voice playlist", "line": 199}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 118}],
+    "notes": "Duplicate (edit/edit.component). setDoc solar voice playlist at 199. solar voice audios refs only build sequence array."
+  },
+  {
+    "route": "add-playlist",
+    "file": "src/app/content/playlist-dashboard/solar-playlist/solar-playlist.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 76},
+      {"c": "solar voice playlist", "line": 81},
+      {"c": "atc taxonomy", "line": 88}
+    ],
+    "writes": [
+      {"c": "solar voice playlist", "line": 146}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [{"c": "atc taxonomy", "line": 88}],
+    "notes": "Legacy add-playlist screen. Reads solar voice audios (collectionSnapshots 77), solar voice playlist (getDocs 82), atc taxonomy (collectionSnapshots 89). setDoc new solar voice playlist at 146. 'solar voice audios' doc refs (140) only build the 'sequence' DocumentReference array - NOT written."
+  }
+]

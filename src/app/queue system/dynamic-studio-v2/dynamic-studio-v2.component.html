@@ -1,11 +1,11 @@
 <div class="mainscreen mb-2">
   <div class="row">
     <div class="col-sm">
-      <h5 class="title mb-3" style="font-size: 20px;" *ngIf="liveAssignment == null">My Arena ({{ongoingQueue["queuename"]}})</h5>
+      <h5 class="title mb-3" style="font-size: 20px;" *ngIf="liveAssignment == null" data-testid="studio-arena-title">My Arena ({{ongoingQueue["queuename"]}})</h5>
     </div>
   </div>
 
-  <div *ngIf="noStudioInAnyQueue" class="no-studio-alert mb-3">
+  <div *ngIf="noStudioInAnyQueue" class="no-studio-alert mb-3" data-testid="studio-no-studio-alert">
     <mat-icon>info</mat-icon>
     <span>No studios available in any of your ongoing queues.</span>
   </div>
@@ -13,13 +13,13 @@
   <div *ngIf="queuesWithStudios.length > 1" class="queue-card-list mb-3">
     <div class="queue-card-list__label">Your Queues</div>
     <div class="queue-card-row">
-      <div *ngFor="let queue of queuesWithStudios"
+      <div *ngFor="let queue of queuesWithStudios" data-testid="studio-queue-card" [attr.data-queueid]="queue['docid']"
         class="queue-card"
         [class.queue-card--active]="queue['docid'] === ongoingQueue['docid']"
         (click)="selectQueueCard(queue)">
         <div class="queue-card__body">
           <span class="queue-card__name">{{ queue['queuename'] }}</span>
-          <span class="queue-card__meta">
+          <span class="queue-card__meta" data-testid="studio-queue-card-count">
             <mat-icon class="queue-card__icon">groups</mat-icon>
             {{ queueStudioCounts[queue['docid']] || 0 }} studio{{ (queueStudioCounts[queue['docid']] || 0) === 1 ? '' : 's' }}
           </span>
@@ -34,7 +34,8 @@
     <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index" class="mr-3" (click)="visitOtherStudio(studio)">
       <span>Studio {{i+1}}:</span>&nbsp;
       <span *ngFor="let participant of studio['pairing']; let j = index">
-        <span>{{mapProfile[participant]}}</span>
+        <span *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{activity}}&nbsp;</span>
+        <span>({{mapProfile[participant]}})</span>
         <span *ngIf="j+1 != studio['pairing'].length">,&nbsp;</span>
       </span>
     </button>
@@ -51,7 +52,7 @@
       <span class="sec__head-count">{{ studioList.length }}</span>
     </div>
     <div class="sec__body">
-      <button mat-stroked-button *ngFor="let studio of studioList; let i = index" class="me-3 mt-2" [ngClass]="selectedStudio['docid'] == studio['docid'] ? 'primarystudio' : studio['checkin'] ? 'secondarystudio' : ''" [value]="studio" (click)="onStudioSelect(studio)">
+      <button mat-stroked-button *ngFor="let studio of studioList; let i = index" class="me-3 mt-2" [ngClass]="selectedStudio['docid'] == studio['docid'] ? 'primarystudio' : studio['checkin'] ? 'secondarystudio' : ''" [value]="studio" (click)="onStudioSelect(studio)" data-testid="studio-select-btn" [attr.data-studioid]="studio['docid']">
         <span>My Studio {{i+1}}:</span>&nbsp;
         <span *ngFor="let participant of studio['participants']; let j = index">
           <span>{{mapActivity[studio["participantsactivity"][participant]]}}</span>
@@ -59,11 +60,11 @@
           <span *ngIf="participant != profileid">&nbsp;({{mapProfile[participant]}})</span>
           <span *ngIf="j+1 != studio['participants'].length">,&nbsp;</span>
         </span>
-        <mat-icon *ngIf="mapStudioLiveAssignment[studio['docid']]" class="ml-2">live_tv</mat-icon>
+        <mat-icon *ngIf="mapStudioLiveAssignment[studio['docid']]" class="ml-2" data-testid="studio-live-tv-icon">live_tv</mat-icon>
       </button>
 
       <div class="mt-3 mb-3" *ngIf="selectedStudio['docid'] && liveAssignment == null">
-        <mat-slide-toggle labelPosition="before" [checked]="selectedStudio['checkin']" [disabled]="onhold == true" (change)="onhold ? $event.source.checked = selectedStudio['checkin'] : checkinStudio($event.checked)">Studio Checkin</mat-slide-toggle>
+        <mat-slide-toggle labelPosition="before" data-testid="studio-checkin-toggle" [checked]="selectedStudio['checkin']" [disabled]="onhold == true" (change)="onhold ? $event.source.checked = selectedStudio['checkin'] : checkinStudio($event.checked)">Studio Checkin</mat-slide-toggle>
       </div>
     </div>
   </div>
@@ -141,12 +142,12 @@
   <!-- Stage Waiting list -->
   <div *ngIf="liveAssignment == null && selectedStudio['checkin']">
     <div class="row">
-      <div *ngFor="let stage of stageTokenList; let stageindex = index" class="col-sm">
+      <div *ngFor="let stage of stageTokenList; let stageindex = index; trackBy: trackByStageName" class="col-sm" data-testid="studio-stage-col" [attr.data-stage]="stage.stagename">
         <div class="mat-elevation-z2">
           <div class="stagename">{{stage.stagename}}</div>
           <div class="stagequeue">
-            <div *ngFor="let token of stage.tokenlist">
-              <div class="wait-token">
+            <div *ngFor="let token of stage.tokenlist; trackBy: trackByTokenDocId">
+              <div class="wait-token" data-testid="studio-token-card" [attr.data-token]="token.docid">
                 <!-- Avatar + name (left) -->
                 <div class="wait-token__id">
                   <div class="wait-token__avatar"
@@ -193,10 +194,36 @@
                       </small>
                     </span>
                   </span>
-                  <button *ngIf="!tokenInvitedByOther[token.docid]"
+                  <ng-container *ngIf="tokenInvitedBySelf[token.docid] as self">
+                    <!-- Pending: awaiting the participant's response -->
+                    <span *ngIf="!self.approved"
+                          class="wait-token__chip wait-token__chip--self"
+                          title="You invited this participant — waiting for their response">
+                      <mat-icon class="ic">hourglass_top</mat-icon>
+                      <span class="wait-token__chip-text">Invitation sent · awaiting response</span>
+                      <button type="button"
+                              class="wait-token__chip-cancel"
+                              (click)="cancelOwnInvitation(token)"
+                              title="Cancel invitation"
+                              data-testid="studio-cancel-invite-btn">
+                        <mat-icon class="ic">close</mat-icon>
+                      </button>
+                    </span>
+                    <!-- Approved: reopen the assign-studio dialog (recoverable if dismissed) -->
+                    <button *ngIf="self.approved"
+                            type="button"
+                            class="wait-token__btn wait-token__btn--approved"
+                            (click)="assignStudio(self.invitation)"
+                            title="Participant approved — assign them to the studio"
+                            data-testid="studio-assign-approved-btn">
+                      Approved · Assign studio
+                      <mat-icon class="ic">arrow_forward</mat-icon>
+                    </button>
+                  </ng-container>
+                  <button *ngIf="!tokenInvitedByOther[token.docid] && !tokenInvitedBySelf[token.docid]"
                           type="button"
                           class="wait-token__btn"
-                          (click)="sendStudioInvitation(token)">
+                          (click)="sendStudioInvitation(token)" data-testid="studio-bring-btn">
                     Bring To Studio
                     <mat-icon class="ic">arrow_forward</mat-icon>
                   </button>
@@ -238,7 +265,7 @@
             <span class="ds-online" *ngIf="participantReady"></span>
           </div>
           <div style="min-width:0; flex:1;">
-            <div class="ds-side-name">{{ mapProfile[participantProfileId] || '—' }}</div>
+            <div class="ds-side-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
           </div>
           <button type="button" class="ds-collapse" [class.open]="sidebarProfileOpen"
             (click)="toggleSidebarProfile()"
@@ -300,7 +327,7 @@
 
       <!-- Sidebar actions -->
       <div class="ds-side-actions">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn">
           <mat-icon class="ic">person_add</mat-icon>
           Invite More Specialist(s)
         </button>
@@ -381,6 +408,59 @@
 
     <!-- ============================ MAIN ============================ -->
     <main class="ds-main">
+
+      <!-- In-studio navigator (legacy parity): keep every queue you belong to
+           and the studios in the active queue reachable WITHOUT leaving the
+           live session. Switching while live is confirm-guarded. Only shown
+           when there is something to switch between. -->
+      <div class="ds-qnav"
+           *ngIf="queuesWithStudios.length > 1 || studioList.length > 1 || outsideLiveAssignment.length">
+        <div class="ds-qnav__group" *ngIf="queuesWithStudios.length > 1">
+          <span class="ds-qnav__label"><mat-icon class="ic">layers</mat-icon>Queues</span>
+          <div class="ds-qnav__chips">
+            <button type="button" class="ds-qchip"
+              *ngFor="let queue of queuesWithStudios"
+              [class.is-active]="queue['docid'] === ongoingQueue['docid']"
+              (click)="confirmSwitchQueue(queue)"
+              [attr.data-queueid]="queue['docid']" data-testid="studio-qnav-queue">
+              <span class="ds-qchip__name">{{ queue['queuename'] }}</span>
+              <span class="ds-qchip__count">{{ queueStudioCounts[queue['docid']] || 0 }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="ds-qnav__group" *ngIf="studioList.length > 1">
+          <span class="ds-qnav__label"><mat-icon class="ic">meeting_room</mat-icon>Studios</span>
+          <div class="ds-qnav__chips">
+            <button type="button" class="ds-qchip"
+              *ngFor="let studio of studioList; let i = index"
+              [class.is-active]="selectedStudio['docid'] === studio['docid']"
+              (click)="confirmSwitchStudio(studio)"
+              [attr.data-studioid]="studio['docid']" data-testid="studio-qnav-studio">
+              <span class="ds-qchip__name">
+                <ng-container *ngFor="let participant of studio['participants']; let j = index">{{ mapActivity[studio['participantsactivity']?.[participant]] }}<ng-container *ngIf="participant == profileid && studio['participants'].length != 1"> (You)</ng-container><ng-container *ngIf="participant != profileid"> ({{ mapProfile[participant] }})</ng-container>{{ j + 1 != studio['participants'].length ? ', ' : '' }}</ng-container>
+              </span>
+              <mat-icon class="ic ds-qchip__live" *ngIf="mapStudioLiveAssignment[studio['docid']]">live_tv</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <!-- Studios in OTHER queues you've been invited to join (outsideLiveAssignment).
+             Joining one leaves your current session, so it's confirm-guarded too. -->
+        <div class="ds-qnav__group" *ngIf="outsideLiveAssignment.length">
+          <span class="ds-qnav__label"><mat-icon class="ic">group_add</mat-icon>Invited</span>
+          <div class="ds-qnav__chips">
+            <button type="button" class="ds-qchip ds-qchip--invited"
+              *ngFor="let studio of outsideLiveAssignment; let i = index"
+              (click)="confirmVisitOtherStudio(studio)"
+              data-testid="studio-qnav-invited">
+              <span class="ds-qchip__name">
+                <ng-container *ngFor="let participant of studio['pairing']; let j = index"><ng-container *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{ activity }} </ng-container>({{ mapProfile[participant] }}){{ j + 1 != studio['pairing'].length ? ', ' : '' }}</ng-container>
+              </span>
+              <mat-icon class="ic ds-qchip__live">login</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Stage notes — full-width banner directly below the topbar (so the
            complete text is visible and never overlaps). Each note targets a
@@ -573,7 +653,7 @@
                   Start a secure video call right here in the app. No external link to share, no app switching — fastest way to begin the session.
                 </div>
                 <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
-                        (click)="joinOpenViduRoom()">
+                        (click)="joinOpenViduRoom()" data-testid="studio-openvidu-start-btn">
                   <mat-icon class="ic">play_arrow</mat-icon>
                   <span class="start-meeting-btn__label">Start Meeting</span>
                 </button>
@@ -601,26 +681,33 @@
                   This Zoom link is broken — please generate a new one below.
                 </div>
                 <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
-                        (click)="navigateMeeting(liveAssignment)"
+                        (click)="navigateMeeting(liveAssignment)" data-testid="studio-zoom-start-btn"
                         [disabled]="liveAssignment['zoomdata'] === undefined || isZoomLinkBroken">
                   <mat-icon class="ic">play_arrow</mat-icon>
                   <span class="start-meeting-btn__label">Start Meeting</span>
                 </button>
 
-                <!-- Raw Zoom start URL shown below the button so the host can
-                     open/copy the link directly (parity with legacy studio).
-                     Sourced from liveAssignment.zoomdata.start_url. -->
-                <!-- <div class="zoom-link-row" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
-                  <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
-                  <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
-                     [title]="liveAssignment['zoomdata']?.start_url">
-                    {{ liveAssignment['zoomdata']?.start_url }}
-                  </a>
-                  <button type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
-                          matTooltip="Copy link">
-                    <mat-icon class="ic">content_copy</mat-icon>
-                  </button>
-                </div> -->
+                <!-- Backup-link UX: the in-app Start Meeting button is the
+                     primary path; the raw start_url is the fallback if it
+                     doesn't launch. Hint + link are grouped so it reads as one
+                     "if that didn't work, use this" block. -->
+                <div class="zoom-fallback" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
+                  <div class="zoom-link-hint">
+                    <mat-icon class="ic">info</mat-icon>
+                    <span>Use <strong>Start Meeting</strong> above. If it doesn’t open, join with this backup link:</span>
+                  </div>
+                  <div class="zoom-link-row">
+                    <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
+                    <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
+                       [title]="liveAssignment['zoomdata']?.start_url">
+                      {{ liveAssignment['zoomdata']?.start_url }}
+                    </a>
+                    <button type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
+                            matTooltip="Copy link">
+                      <mat-icon class="ic">content_copy</mat-icon>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <!-- Generate New Link (placed at the BOTTOM as a separate row).
@@ -630,20 +717,15 @@
                    *ngIf="(isZoomLinkBroken || (liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator)) && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
                 <div class="choice-secondary__head">
                   <div class="choice-secondary__text">
-                    <div class="choice-title">Generate a new link</div>
+                    <div class="choice-title">Link broken or expired?</div>
                     <div class="choice-desc">
-                      <ng-container *ngIf="isZoomLinkBroken">
-                        The current link is broken. Create a fresh one — the new link is sent to the participant automatically.
-                      </ng-container>
-                      <ng-container *ngIf="!isZoomLinkBroken">
-                        If the existing link is broken, expired, or unreachable, create a fresh one. The new link is sent to the participant automatically.
-                      </ng-container>
+                      Generate a fresh link — it's sent to the participant automatically.
                     </div>
                   </div>
                   <button type="button" class="btn btn-lg"
                           [class.btn-ghost]="!isZoomLinkBroken"
                           [class.btn-primary]="isZoomLinkBroken"
-                          (click)="regenerateZoomLink()">
+                          (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">
                     <mat-icon class="ic">refresh</mat-icon>
                     Generate New Link
                   </button>
@@ -763,7 +845,7 @@
                 </div>
 
                 <div class="ael-actions" *ngIf="participantAEL['crossovermetric'] != null">
-                  <button type="button" class="btn btn-green btn-lg" (click)="updateCurrentAEL()" [disabled]="participantAEL['aelStatus'] === 'validated'">
+                  <button type="button" class="btn btn-green btn-lg" (click)="updateCurrentAEL()" data-testid="studio-ael-validate-btn" [disabled]="participantAEL['aelStatus'] === 'validated'">
                     <mat-icon class="ic">check</mat-icon>
                     {{ participantAEL['aelStatus'] == "edited" ? "Update Changes & Mark as Validated" : participantAEL['aelStatus'] == "validated" ? "AEL Validated" : "Mark as Validated" }}
                   </button>
@@ -820,7 +902,7 @@
                       *ngIf="(liveAssignment['token']?.variationid == null || liveAssignment['token']?.variationid == undefined) && (!config.variations || config.variations.length === 0)"
                       type="button"
                       class="btn btn-green btn-lg"
-                      (click)="moveStage(config.stage, config.markascompleted)">
+                      (click)="moveStage(config.stage, config.markascompleted)" data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
                       <mat-icon class="ic">check</mat-icon>
                       {{ config.calltoaction }}
                     </button>
@@ -828,7 +910,7 @@
                       *ngIf="liveAssignment['token']?.variationid != null && liveAssignment['token']?.variationid != undefined && queueVariation[liveAssignment['token']?.variationid] && queueVariation[liveAssignment['token']?.variationid].includes(liveAssignment['stagename']) && config.variations && config.variations.includes(liveAssignment['token']?.variationid)"
                       type="button"
                       class="btn btn-green btn-lg"
-                      (click)="moveStage(config.stage, config.markascompleted)">
+                      (click)="moveStage(config.stage, config.markascompleted)" data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
                       <mat-icon class="ic">check</mat-icon>
                       {{ config.calltoaction }}
                     </button>
@@ -1194,7 +1276,7 @@
                               type="button"
                               class="proc-actionable__btn"
                               [class.proc-actionable__btn--done]="procedure.status == 'completed'"
-                              (click)="markProcedure(a, i, j); $event.stopPropagation()">
+                              (click)="markProcedure(a, i, j); $event.stopPropagation()" data-testid="studio-mark-procedure-btn">
                               <mat-icon class="ic">{{ procedure.status == 'completed' ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
                               {{ procedure.status == 'completed' ? 'Completed' : 'Mark as Completed' }}
                             </button>

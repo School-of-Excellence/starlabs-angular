@@ -56,16 +56,11 @@ interface ArenaAssignment {
   pairing?: string[];
   participantsactivity?: { [profileid: string]: string };
   bonusactivity?: { [profileid: string]: string }; // additional-activity specialists keyed by profile id
-  specialistJoinedAt?: any;
-  specialistLastSeenAt?: any;
+  specialistJoinedAt?: any;          // call START (preserved across rejoin)
   specialistLeftAt?: any;            // stamped on host pagehide / ngOnDestroy
   participantReadyAt?: any;
-  participantLastSeenAt?: any;
   participantInCallAt?: any;
-  participantLeftAt?: any;           // stamped on participant pagehide
-  specialistAtStudioLastSeenAt?: any; // heartbeat from dynamic-studio-v2
-  returnedToStudioAt?: any;          // one-shot stamp when specialist views the studio after a call
-  callEndedAt?: any;                 // legacy — older code path may still write this
+  participantLeftAt?: any;           // stamped on participant pagehide / ngOnDestroy
   token?: any;
   zoomdata?: any;
   created?: any;
@@ -91,6 +86,11 @@ export class ArenaBoardComponent implements OnDestroy {
   // Tabs
   leftTab: ArenaTab = 'participants';
   rightTab: ArenaRightTab = 'done';
+
+  // Side-panel open/closed state — both sidenavs are collapsible so the
+  // coordinator can give the kanban board the full width when needed.
+  leftOpen = true;
+  rightOpen = true;
 
   // Profile lookups
   mapProfile: { [id: string]: string } = {};
@@ -291,12 +291,12 @@ export class ArenaBoardComponent implements OnDestroy {
   }
   // Joined = participant pulled into studio but Zoom not yet started
   get joinedAssignments(): ArenaAssignment[] {
-    return this.liveAssignments.filter(a => !a.specialistJoinedAt && !a.callEndedAt);
+    return this.liveAssignments.filter(a => !a.specialistJoinedAt);
   }
   // Active = the Zoom call has started OR is ending. We keep ended-but-not-
   // yet-completed sessions in this column so the coordinator can see that the
   // call has wrapped up (vs the card just disappearing). The timer freezes at
-  // `callEndedAt` via sessionElapsed().
+  // the last leave timestamp via sessionElapsed().
   get activeAssignments(): ArenaAssignment[] {
     return this.liveAssignments.filter(a => !!a.specialistJoinedAt);
   }
@@ -376,6 +376,17 @@ export class ArenaBoardComponent implements OnDestroy {
     }));
   }
 
+  // All paired specialists on an assignment (not just pairing[0]) so the
+  // JOINED / ACTIVE cards list every specialist in the session, with their
+  // activity when one is recorded.
+  pairingSpecialists(a: ArenaAssignment): { id: string, name: string, activity: string }[] {
+    return (a.pairing || []).map(pid => ({
+      id: pid,
+      name: this.participantName(pid),
+      activity: this.mapActivity[a.participantsactivity?.[pid] || ''] || '',
+    }));
+  }
+
   // Returns the queue position to display, or null when the token has no
   // `queueposition` field. The chip is hidden via *ngIf when this is null —
   // we deliberately do NOT fall back to `tokennumber` or array index because
@@ -419,12 +430,10 @@ export class ArenaBoardComponent implements OnDestroy {
     if (!ts) return '—';
     let endMs = Date.now();
     if (this.callEnded(assignment)) {
-      // End time = whichever party left LAST (or the legacy callEndedAt if
-      // newer code paths haven't migrated yet).
+      // End time = whichever party left LAST.
       const sLeft = assignment?.specialistLeftAt?.toMillis?.();
       const pLeft = assignment?.participantLeftAt?.toMillis?.();
-      const legacy = assignment?.callEndedAt?.toMillis?.();
-      const candidates = [sLeft, pLeft, legacy].filter((n: any) => typeof n === 'number');
+      const candidates = [sLeft, pLeft].filter((n: any) => typeof n === 'number');
       if (candidates.length) endMs = Math.max(...candidates);
     }
     const diffMs = endMs - ts.getTime();
@@ -446,45 +455,42 @@ export class ArenaBoardComponent implements OnDestroy {
   callEndedClock(a: ArenaAssignment): string {
     const sLeft = a?.specialistLeftAt?.toMillis?.();
     const pLeft = a?.participantLeftAt?.toMillis?.();
-    const legacy = a?.callEndedAt?.toMillis?.();
-    const cands = [sLeft, pLeft, legacy].filter((n: any) => typeof n === 'number');
+    const cands = [sLeft, pLeft].filter((n: any) => typeof n === 'number');
     if (!cands.length) return '—';
     return this.formatClock(new Date(Math.max(...cands)));
   }
 
+  // 12-hour clock with AM/PM (e.g. "9:42 AM", "2:05 PM") so coordinators read
+  // the start/end time the same way they see it on a phone, not 24-hour.
   private formatClock(d: Date): string {
-    const h = d.getHours().toString().padStart(2, '0');
+    let h = d.getHours();
     const m = d.getMinutes().toString().padStart(2, '0');
-    return `${h}:${m}`;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${h}:${m} ${ampm}`;
   }
 
-  // True only when the participant is ACTIVELY at the studio screen right
-  // now — i.e. there is a fresh heartbeat (≤ 30s) on `participantLastSeenAt`.
-  // We deliberately do NOT fall back to "participantReadyAt is set" alone,
-  // because that flag can be left over from a previous session or written by
-  // a different code path. The heartbeat is the only signal that proves the
-  // participant has the studio tab open right now.
+  // True when the participant is at the studio/wait screen. Heartbeat removed
+  // (see plan) — derived from the one-shot `participantReadyAt` (nulled on
+  // leave/in-call, so its presence means "on the wait screen now").
   participantPresent(assignment: ArenaAssignment): boolean {
     void this.nowTick;
-    const ls = assignment?.participantLastSeenAt;
-    if (!ls?.toMillis) return false;
-    return (Date.now() - ls.toMillis()) < 30000;
+    return !!assignment?.participantReadyAt && !assignment?.participantLeftAt;
   }
 
   // ---- ACTIVE-card presence helpers ----------------------------------------
-  // Each person's "in call" state is determined SOLELY by their own join +
-  // heartbeat. We deliberately do not gate either party on `callEndedAt` /
-  // the other party's leave — that would hide the case where one person
-  // dropped while the other is still in the meeting.
+  // Each person's "in call" state is determined SOLELY by their own
+  // join/left one-shots (heartbeat removed — see plan). We deliberately do not
+  // gate either party on the other party's leave — that would hide the case
+  // where one person dropped while the other is still in the meeting.
 
   // Specialist is currently inside the Zoom call.
   specialistInCall(a: ArenaAssignment): boolean {
     void this.nowTick;
     if (!a?.specialistJoinedAt) return false;
     if (a?.specialistLeftAt) return false; // explicitly left
-    const ls = a?.specialistLastSeenAt;
-    if (!ls?.toMillis) return false;
-    return (Date.now() - ls.toMillis()) < 60000;
+    return true;
   }
 
   // Participant is currently inside the Zoom call.
@@ -492,9 +498,7 @@ export class ArenaBoardComponent implements OnDestroy {
     void this.nowTick;
     if (!a?.participantInCallAt) return false;
     if (a?.participantLeftAt) return false; // explicitly left
-    const ls = a?.participantLastSeenAt;
-    if (!ls?.toMillis) return false;
-    return (Date.now() - ls.toMillis()) < 60000;
+    return true;
   }
 
   // Derived call-state predicates (the only state ACTIVE cards branch on)
@@ -512,32 +516,6 @@ export class ArenaBoardComponent implements OnDestroy {
   callEnded(a: ArenaAssignment): boolean {
     if (this.specialistInCall(a) || this.participantInCall(a)) return false;
     return !!(a?.specialistJoinedAt || a?.participantInCallAt);
-  }
-
-  // Specialist is currently looking at the studio screen (dynamic-studio-v2
-  // writes `specialistAtStudioLastSeenAt` every 10s while it is mounted).
-  // Used to tell "Returned to studio · awaiting completion" from "Call ended
-  // · specialist offline".
-  specialistAtStudio(a: ArenaAssignment): boolean {
-    void this.nowTick;
-    const ls = a?.specialistAtStudioLastSeenAt;
-    if (!ls?.toMillis) return false;
-    return (Date.now() - ls.toMillis()) < 30000;
-  }
-
-  // Returns the first specialist name attached to this studio, used in the
-  // INVITING card so the coordinator can see who is doing the inviting.
-  studioSpecialistName(studio: ArenaStudio | null): string {
-    if (!studio) return '';
-    const list = this.specialistList(studio);
-    if (!list.length) return '';
-    return list[0].name || '';
-  }
-  studioSpecialistActivity(studio: ArenaStudio | null): string {
-    if (!studio) return '';
-    const list = this.specialistList(studio);
-    if (!list.length) return '';
-    return list[0].activity || '';
   }
 
   // Time since the participant entered the studio (live assignment was created)

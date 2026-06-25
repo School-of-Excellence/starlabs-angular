@@ -905,7 +905,7 @@
                                                 </thead>
                                                 <tbody>
                                                     <tr *ngFor="let detail of getSalesData(element.expandedData)">
-                                                        <td>{{ detail.name }}</td>
+                                                        <td><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="detail.profileid" [name]="detail.name || ''" [size]="28"></app-profile-picture><span>{{ detail.name }}</span></span></td>
                                                         <td>{{ mapjourneyname[detail.journey] }}</td>
                                                         <td>{{ detail.journeytype }}</td>
                                                         <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
@@ -1080,7 +1080,7 @@
                                                 </thead>
                                                 <tbody>
                                                     <tr *ngFor="let detail of getSalesData(element.expandedData)">
-                                                        <td>{{ detail.name }}</td>
+                                                        <td><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="detail.profileid" [name]="detail.name || ''" [size]="28"></app-profile-picture><span>{{ detail.name }}</span></span></td>
                                                         <td>{{ mapjourneyname[detail.journey] }}</td>
                                                         <td>{{ detail.journeytype }}</td>
                                                         <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
@@ -1231,7 +1231,7 @@
                                             </thead>
                                             <tbody>
                                                 <tr *ngFor="let detail of getSalesData(element.expandedData)">
-                                                    <td>{{ detail.name }}</td>
+                                                    <td><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="detail.profileid" [name]="detail.name || ''" [size]="28"></app-profile-picture><span>{{ detail.name }}</span></span></td>
                                                     <td>{{ mapjourneyname[detail.journey] }}</td>
                                                     <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
                                                     <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
@@ -1362,7 +1362,7 @@
                                             </thead>
                                             <tbody>
                                                 <tr *ngFor="let detail of getSalesData(element.expandedData)">
-                                                    <td>{{ detail.name }}</td>
+                                                    <td><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="detail.profileid" [name]="detail.name || ''" [size]="28"></app-profile-picture><span>{{ detail.name }}</span></span></td>
                                                     <td>{{ mapjourneyname[detail.journey] }}</td>
                                                     <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
                                                     <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
@@ -1500,7 +1500,7 @@
                                             </thead>
                                             <tbody>
                                                 <tr *ngFor="let detail of getSalesData(element.expandedData)">
-                                                    <td>{{ detail.name }}</td>
+                                                    <td><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="detail.profileid" [name]="detail.name || ''" [size]="28"></app-profile-picture><span>{{ detail.name }}</span></span></td>
                                                     <td>{{ mapjourneyname[detail.journey] }}</td>
                                                     <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
                                                     <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>
@@ -1628,7 +1628,7 @@
                                             </thead>
                                             <tbody>
                                                 <tr *ngFor="let detail of getSalesData(element.expandedData)">
-                                                    <td>{{ detail.name }}</td>
+                                                    <td><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="detail.profileid" [name]="detail.name || ''" [size]="28"></app-profile-picture><span>{{ detail.name }}</span></span></td>
                                                     <td>{{ mapjourneyname[detail.journey] }}</td>
                                                     <td>₹{{ detail.totalpurchasevalue | number:'1.0-0' }}</td>
                                                     <td>{{ detail.purchasedate?.toDate() | date:'dd-MMM-yyyy' }}</td>

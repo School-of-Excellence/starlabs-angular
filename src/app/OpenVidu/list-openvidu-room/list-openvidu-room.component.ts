@@ -284,6 +284,13 @@ export class ListOpenviduRoomComponent {
   }
 
   ngOnDestroy() {
+    // The 1s countdown interval (this.timerSub, set at loadAppointments) is NOT
+    // piped through takeUntil(this.subscription), so completing the subject does
+    // not stop it. Without this, leaving the page mid-countdown leaves a 1s
+    // interval calling checkLiveAppointment() (and re-running loadAppointments)
+    // on a destroyed component forever.
+    this.timerSub?.unsubscribe()
+    this.timerSub = null
     this.subscription?.next()
     this.subscription?.complete()
   }

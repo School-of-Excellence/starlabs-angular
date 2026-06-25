@@ -4,7 +4,7 @@
       <form [formGroup]="specialist" (ngSubmit)="submit(specialist.value)">
         <mat-form-field appearance="outline">
           <mat-label>Specialist</mat-label>
-          <mat-select formControlName="person" [multiple]="option.multiperson">
+          <mat-select formControlName="person" data-testid="pi-person-select" [multiple]="option.multiperson">
             <mat-option *ngFor="let specialist of option.personoption" [value]="specialist.value">{{specialist.name}}</mat-option>
           </mat-select>
         </mat-form-field>
@@ -24,7 +24,7 @@
         </mat-form-field> -->
         <div class="actionbox">
           <button type="button" class="btn btn-outline-primary me-3" (click)="submit(null)">Close</button>
-          <button type="submit" class="btn btn-outline-success">submit</button>
+          <button type="submit" class="btn btn-outline-success" data-testid="pi-submit">submit</button>
         </div>
       </form>
     </div>

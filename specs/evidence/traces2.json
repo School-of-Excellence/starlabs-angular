@@ -1,0 +1,78 @@
+{
+  "roleRefTargetTally": {
+    "users_roles": 60
+  },
+  "usersRolesDoc": {
+    "path": "users_roles/OY9ngjcvUXtgkPUl5cRl",
+    "fieldCount": 13,
+    "trueFlags": [
+      "participant"
+    ],
+    "allKeysSample": [
+      "profile_ref",
+      "transcriber",
+      "supportdesk",
+      "admin",
+      "chatxadmin",
+      "changeagent",
+      "eitfellowship",
+      "participant",
+      "eitcoordinator",
+      "verifier",
+      "name",
+      "eventcoordinator",
+      "eitapprentice"
+    ]
+  },
+  "eisrolesDocs": [
+    {
+      "id": "0VDWDUDz6A6d9wyqn88g",
+      "role": "Breakthrough Mid Review Collaborator",
+      "experiencestage": "Diagnostics",
+      "experiencelevel": "Apprenticing"
+    },
+    {
+      "id": "0X0xTZHfFY9WH9hU0Jcr",
+      "role": "Critical Support Orientation Facilitator"
+    },
+    {
+      "id": "1KunlbALzQ6inQilT4Ie",
+      "role": "Breakthrough Review Collaborator",
+      "experiencestage": "Diagnostics",
+      "experiencelevel": "Apprenticing"
+    }
+  ],
+  "usersRolesCount": 3252,
+  "schedulingTrace": {
+    "appointmentId": "YJkhYjIPNyT7KJ6d9IBP",
+    "start": "2026-06-07 01:30:00",
+    "end": "2026-06-07 03:30:00",
+    "attended": false,
+    "cancelled": false,
+    "totalminutes": null,
+    "appointmentRef": "appointmenttype/BGL9XTv48QoRg06LGu6K",
+    "participantproductid": null,
+    "productid": "tdN8iRRoB74PvWapeLNV",
+    "hostCount": 1,
+    "hasZoom": false,
+    "appointmentType": "Critical Support Implementation",
+    "appointmentTypeId": "BGL9XTv48QoRg06LGu6K"
+  },
+  "tokenQueueRef": {
+    "tokenId": "00dyh4CxBHvM0NjWivlu",
+    "queueref": "queue generation/TmUKHbQaFVhYrpGHH1Z8",
+    "resolvesToQueueGeneration": true,
+    "queuename": "CTD D&I Dec 2022",
+    "hasStages": true
+  },
+  "productToDeliverySequenceSample": {
+    "id": "0mQIrpSvydzfe9OPcgoh",
+    "product": "products/Rq9cu2Z3FSuILXdwYtca",
+    "deliveryoptionCount": 1,
+    "firstOptionKeys": [
+      "deliverysequence",
+      "deliverytype"
+    ],
+    "firstOptionDeliverySeqLen": 1
+  }
+}

@@ -19,7 +19,7 @@
           (click)="selectCommType('whatsapp')"
           [disabled]="getSelectedTokens().length === 0">
           <i class="bi bi-whatsapp"></i>
-          Whatsapp({{getSelectedTokens().length}})
+          Whatsapp ({{getSelectedTokens().length}})
         </button>
         <button 
           class="comm-btn email-btn"
@@ -27,7 +27,7 @@
           (click)="selectCommType('email')"
           [disabled]="getSelectedTokens().length === 0">
           <i class="bi bi-envelope"></i>
-          Email({{getSelectedTokens().length}})
+          Email ({{getSelectedTokens().length}})
         </button>
         <button 
           class="comm-btn notification-btn"
@@ -35,7 +35,7 @@
           (click)="selectCommType('notification')"
           [disabled]="getSelectedTokens().length === 0">
           <i class="bi bi-bell-fill"></i>
-          Notification({{getSelectedTokens().length}})
+          Notification ({{getSelectedTokens().length}})
         </button>
       </section>
 
@@ -86,11 +86,11 @@
             <div class="participant-info">
               <div class="participant-name">
                 <i class="bi bi-person-fill"></i>
-                {{mapProfileData[token.profile_id]['name']}}
+                {{mapProfileData[token.profile_id]?.['name']}}
               </div>
               <div class="participant-email">
                 <i class="bi bi-envelope"></i>
-                {{mapProfileData[token.profile_id]['email']}}
+                {{mapProfileData[token.profile_id]?.['email']}}
               </div>
             </div>
           </div>
@@ -112,9 +112,9 @@
       </section>
       <section>
         <div *ngFor="let token of getStageParticipants(selectedChatStage)['tokenlist']">
-          <div>{{mapProfileData[token.profile_id]['name']}}</div>
-          <div>{{mapProfileData[token.profile_id]['email']}}</div>
-          <div>{{mapProfileData[token.profile_id]['number']}}</div>
+          <div>{{mapProfileData[token.profile_id]?.['name']}}</div>
+          <div>{{mapProfileData[token.profile_id]?.['email']}}</div>
+          <div>{{mapProfileData[token.profile_id]?.['number']}}</div>
         </div>
       </section>
       <section>
@@ -191,7 +191,7 @@
             <div class="talk-bubble1 round">
               <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
                 <span class="d-flex justify-content-between">
-                  <p>{{mapProfileData[list['senderprofileid']]['name']}}</p>
+                  <p>{{mapProfileData[list['senderprofileid']]?.['name']}}</p>
                   <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
                       [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
                 </span>
@@ -446,13 +446,13 @@
                   <span *ngIf="i==0 && deleteOption" style="margin-left: 10px;"
                     (click)="deleteParticipant(token)"><mat-icon>delete</mat-icon></span>
                   <br>
-                  <span class="label">Name:</span> {{mapProfileData[token.profile_id]['name']}}
+                  <span class="label">Name:</span> {{mapProfileData[token.profile_id]?.['name']}}
                   <span *ngIf="column.type != null && column.type != 'Activity'">&nbsp;({{token['status'] == null ?
                     'Queued' : token['status']}})</span>
                   <div
                     *ngIf="token['people_involved'] != null && token['people_involved'] != undefined && token['people_involved'].length != 0">
                     <span class="label">People Involved:&nbsp;</span>
-                    <span *ngFor="let specialist of token['people_involved']">{{mapProfileData[specialist]['name']}},&nbsp;</span>
+                    <span *ngFor="let specialist of token['people_involved']">{{mapProfileData[specialist]?.['name']}},&nbsp;</span>
                   </div>
                   <div *ngIf="token['variationid'] != null">
                     <span class="label">Queue Variation:&nbsp;</span>
@@ -469,7 +469,7 @@
                         <b>{{ stage.key }}:</b>
                         <span *ngFor="let studioId of stage.value; let isLastStudio = last">
                           <span *ngFor="let participant of mapStudio[studioId]['participants']; let isLastParticipant = last">
-                            {{ mapProfileData[participant]['name'] }}<span *ngIf="!isLastParticipant">, </span>
+                            {{ mapProfileData[participant]?.['name'] }}<span *ngIf="!isLastParticipant">, </span>
                           </span>
                           <span *ngIf="!isLastStudio"> | </span>
                         </span>
@@ -582,7 +582,7 @@
                               <span *ngIf="list['status'] == 'ready'" class="badge waiting">W</span>
                               <span *ngIf="list['liveassignmentid']" class="badge activity">A</span>
                               <span *ngIf="list['movedby']" class="log-meta">
-                                <mat-icon>person</mat-icon>{{mapProfileData[list['movedby']]['name']}}
+                                <mat-icon>person</mat-icon>{{mapProfileData[list['movedby']]?.['name']}}
                               </span>
                               <span *ngIf="list['movedthrough']" class="log-via" [ngClass]="list['movedthrough']?.toLowerCase()">
                                 {{list['movedthrough']}}
