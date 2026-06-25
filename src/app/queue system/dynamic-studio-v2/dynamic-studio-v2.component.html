@@ -194,19 +194,32 @@
                       </small>
                     </span>
                   </span>
-                  <span *ngIf="tokenInvitedBySelf[token.docid]"
-                        class="wait-token__chip wait-token__chip--self"
-                        title="You invited this participant — waiting for their response">
-                    <mat-icon class="ic">hourglass_top</mat-icon>
-                    <span class="wait-token__chip-text">Invitation sent · awaiting response</span>
-                    <button type="button"
-                            class="wait-token__chip-cancel"
-                            (click)="cancelOwnInvitation(token)"
-                            title="Cancel invitation"
-                            data-testid="studio-cancel-invite-btn">
-                      <mat-icon class="ic">close</mat-icon>
+                  <ng-container *ngIf="tokenInvitedBySelf[token.docid] as self">
+                    <!-- Pending: awaiting the participant's response -->
+                    <span *ngIf="!self.approved"
+                          class="wait-token__chip wait-token__chip--self"
+                          title="You invited this participant — waiting for their response">
+                      <mat-icon class="ic">hourglass_top</mat-icon>
+                      <span class="wait-token__chip-text">Invitation sent · awaiting response</span>
+                      <button type="button"
+                              class="wait-token__chip-cancel"
+                              (click)="cancelOwnInvitation(token)"
+                              title="Cancel invitation"
+                              data-testid="studio-cancel-invite-btn">
+                        <mat-icon class="ic">close</mat-icon>
+                      </button>
+                    </span>
+                    <!-- Approved: reopen the assign-studio dialog (recoverable if dismissed) -->
+                    <button *ngIf="self.approved"
+                            type="button"
+                            class="wait-token__btn wait-token__btn--approved"
+                            (click)="assignStudio(self.invitation)"
+                            title="Participant approved — assign them to the studio"
+                            data-testid="studio-assign-approved-btn">
+                      Approved · Assign studio
+                      <mat-icon class="ic">arrow_forward</mat-icon>
                     </button>
-                  </span>
+                  </ng-container>
                   <button *ngIf="!tokenInvitedByOther[token.docid] && !tokenInvitedBySelf[token.docid]"
                           type="button"
                           class="wait-token__btn"
@@ -683,21 +696,26 @@
                   <span class="start-meeting-btn__label">Start Meeting</span>
                 </button>
 
-                <!-- Raw Zoom start URL shown below the button so the host can
-                     open/copy the link directly (parity with legacy studio).
-                     Sourced from liveAssignment.zoomdata.start_url. Shown to
-                     EVERY paired specialist viewing the studio (the link is on
-                     the shared live-assignment doc), matching legacy v1. -->
-                <div class="zoom-link-row" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
-                  <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
-                  <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
-                     [title]="liveAssignment['zoomdata']?.start_url">
-                    {{ liveAssignment['zoomdata']?.start_url }}
-                  </a>
-                  <button type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
-                          matTooltip="Copy link">
-                    <mat-icon class="ic">content_copy</mat-icon>
-                  </button>
+                <!-- Backup-link UX: the in-app Start Meeting button is the
+                     primary path; the raw start_url is the fallback if it
+                     doesn't launch. Hint + link are grouped so it reads as one
+                     "if that didn't work, use this" block. -->
+                <div class="zoom-fallback" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
+                  <div class="zoom-link-hint">
+                    <mat-icon class="ic">info</mat-icon>
+                    <span>Use <strong>Start Meeting</strong> above. If it doesn’t open, join with this backup link:</span>
+                  </div>
+                  <div class="zoom-link-row">
+                    <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
+                    <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
+                       [title]="liveAssignment['zoomdata']?.start_url">
+                      {{ liveAssignment['zoomdata']?.start_url }}
+                    </a>
+                    <button type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
+                            matTooltip="Copy link">
+                      <mat-icon class="ic">content_copy</mat-icon>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -708,14 +726,9 @@
                    *ngIf="(isZoomLinkBroken || (liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator)) && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
                 <div class="choice-secondary__head">
                   <div class="choice-secondary__text">
-                    <div class="choice-title">Generate a new link</div>
+                    <div class="choice-title">Link broken or expired?</div>
                     <div class="choice-desc">
-                      <ng-container *ngIf="isZoomLinkBroken">
-                        The current link is broken. Create a fresh one — the new link is sent to the participant automatically.
-                      </ng-container>
-                      <ng-container *ngIf="!isZoomLinkBroken">
-                        If the existing link is broken, expired, or unreachable, create a fresh one. The new link is sent to the participant automatically.
-                      </ng-container>
+                      Generate a fresh link — it's sent to the participant automatically.
                     </div>
                   </div>
                   <button type="button" class="btn btn-lg"
