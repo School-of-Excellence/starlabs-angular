@@ -219,6 +219,11 @@ export class PrescribeATCComponent {
   isonline:boolean
   pageloadedatfirsttime:boolean = false
   aigeneratedEntry:boolean = false  // true when opened from an AI-generated draft link (hides "open another draft")
+  // "Edited from AI generation" provenance — set when a draft is started from / loaded from an AI source,
+  // carried through to the final atc_alpha / atc_to_validate document on submit.
+  aiedited:boolean = false
+  aigeneratedsource:string | null = null
+  aigeneratedid:string | null = null
   submitAttempted = false  // true once Submit was pressed — drives the inline "required" hints
   // shows the inline "Required" message on every required field once Submit was attempted
   requiredMatcher: ErrorStateMatcher = {
@@ -460,16 +465,25 @@ export class PrescribeATCComponent {
         this.summarystring = value['aiatcsummary'] ?? null;
         this.areasstring = value['areastoexplore'] ?? [];
 
+        this.aiedited = value['aiedited'] ?? true;  // reached via an aigenerated link → AI-edited
+        this.aigeneratedsource = value['aigeneratedsource'] ?? null;
+        this.aigeneratedid = value['aigeneratedid'] ?? docid;
+
         console.log('Draft loaded, AI re-parse skipped');
         return;
       }
       console.log('No draft found → parsing AI output');
 
-      const aiRef = doc(this.firestoreATC, 'ai_generated_atc_summary', docid);
+      // AI source collection: the queue-studio flow stores its AI ATC in
+      // queue_atc_generation (its `output` field); the legacy view-ai-generated-atc flow
+      // uses ai_generated_atc_summary. Both expose `output` + `profileid`, so the parse
+      // below is identical for either source.
+      const aiSourceCollection = params['source'] === 'queueatc' ? 'queue_atc_generation' : 'ai_generated_atc_summary';
+      const aiRef = doc(this.firestoreATC, aiSourceCollection, docid);
       const aiSnap = await getDoc(aiRef);
 
       if (!aiSnap.exists()) {
-        console.warn('AI summary document not found');
+        console.warn('AI source document not found in ' + aiSourceCollection);
         return;
       }
 
@@ -523,6 +537,9 @@ export class PrescribeATCComponent {
 
       this.autoSaveID = docid;
       this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
+      this.aiedited = true;
+      this.aigeneratedsource = aiSourceCollection;
+      this.aigeneratedid = docid;
 
       await setDoc(draftRef, {
         profileid: this.participantProfileid,
@@ -530,6 +547,10 @@ export class PrescribeATCComponent {
         aiatcsummary: this.summarystring,
         areastoexplore: this.areasstring,
         delete: false,
+        // Mark that this ATC was started from an AI generation (edited-from-AI provenance).
+        aiedited: true,
+        aigeneratedsource: aiSourceCollection,
+        aigeneratedid: docid,
         created: serverTimestamp(),
         lastupdated: serverTimestamp()
       });
@@ -1048,6 +1069,10 @@ export class PrescribeATCComponent {
             this.consultationpoint = value['consultationpoint'] ?? null
             this.casenotes = value['notes'] ?? null
             this.mentornotes = value['mentornotes'] ?? null
+            // Carry the "edited from AI generation" provenance through to submit.
+            this.aiedited = value['aiedited'] ?? false
+            this.aigeneratedsource = value['aigeneratedsource'] ?? null
+            this.aigeneratedid = value['aigeneratedid'] ?? null
             console.log(atc)
             for (let i = 0; i < this.transcript.length; i++) {
               this.transcript[i]['awareness'] = this.transcript[i]['awareness'] ?? null
@@ -1477,6 +1502,10 @@ export class PrescribeATCComponent {
           lastupdated: new Date(),       // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
+          // preserve "edited from AI generation" provenance across autosaves (writeDraft overwrites the doc)
+          aiedited: this.aiedited ?? false,
+          aigeneratedsource: this.aigeneratedsource ?? null,
+          aigeneratedid: this.aigeneratedid ?? null,
         };
 
         // durable local outbox first (never lost), then Firestore — falling back to a direct REST write if the
@@ -2163,7 +2192,13 @@ async removeATCImage(index: number) {
           bigactivity: atclevelBigActivity,
           evolutionprogressdate: new Date(),
           aiatcsummary:this.summarystring ?? '',
-          areastoexplore:this.areasstring ?? ''
+          areastoexplore:this.areasstring ?? '',
+          aiedited: this.aiedited ?? false
+        }
+
+        if(this.aiedited){
+          alphaData['aigeneratedsource'] = this.aigeneratedsource ?? null
+          alphaData['aigeneratedid'] = this.aigeneratedid ?? null
         }
 
         if(this.assignmentInitiated){
@@ -2203,7 +2238,11 @@ async removeATCImage(index: number) {
 
         // Write Alpha Level
         firebaseATCBatch.set(doc(this.firestoreATC, collectionName, this.alphaid), alphaData);
-        if (this.queryparam?.['aigenerated'] && this.queryparam?.['docid']) {
+        // Back-reference only the legacy ai_generated_atc_summary flow. For source=queueatc the
+        // docid points at queue_atc_generation (not a summary doc); writing there would either fail
+        // the batch (missing doc) or trigger the queue_atc_generation onUpdate cloud function. The
+        // aiedited / aigeneratedid fields on the alpha doc already record the AI origin.
+        if (this.queryparam?.['aigenerated'] && this.queryparam?.['docid'] && this.queryparam?.['source'] !== 'queueatc') {
           const aiSummaryRef = doc(this.firestoreATC, 'ai_generated_atc_summary', this.queryparam['docid']);
           firebaseATCBatch.update(aiSummaryRef, {
             atcalpharef: doc(this.firestoreATC, collectionName, this.alphaid),
