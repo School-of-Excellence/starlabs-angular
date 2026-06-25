@@ -26,6 +26,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import { FormOverlayViewComponent } from '../form-overlay-view/form-overlay-view.component';
 
 @Component({
   selector: 'app-view-participants-form',
@@ -48,6 +49,7 @@ import * as XLSX from 'xlsx';
     MatDividerModule,
     MatProgressSpinnerModule,
     NgxMatSelectSearchModule,
+    FormOverlayViewComponent
   ],
   providers: [
     provideNativeDateAdapter()
@@ -66,6 +68,7 @@ export class ViewParticipantsFormComponent {
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
+  @ViewChild('formOverlay') formOverlay: FormOverlayViewComponent;
 
   mapProfile: any = {};
   mapProfileNew: any = {};
@@ -89,7 +92,6 @@ export class ViewParticipantsFormComponent {
   workshopFilterCtrl = new FormControl<string>('');
   formFilterCtrl = new FormControl<string>('');
   participantFilterCtrl = new FormControl<string>('');
-
 
   // Filtered lists
   filteredQueueList: any[] = [];
@@ -139,6 +141,15 @@ export class ViewParticipantsFormComponent {
   //Like and Flag Filter
   filterLiked = false;
   filterFlagged = false;
+
+  openFormOverlay(row: any) {
+    this.formOverlay.mapProfile = this.mapProfile;
+    this.formOverlay.mapProfileNew = this.mapProfileNew;
+    this.formOverlay.mapQueue = this.mapQueue;
+    this.formOverlay.mapWorkshop = this.mapWorkshop;
+    this.formOverlay.mapWorkshopNew = this.mapWorkshopNew;
+    this.formOverlay.viewFormOverlay(row);
+  }
 
   get loadingScreen() {
     return this.dialog.open(LoadingProgressComponent, {
@@ -251,7 +262,7 @@ export class ViewParticipantsFormComponent {
 
   ngOnInit(): void {
     this.filterForm = this.fb.group({
-      name: [[], ],
+      name: [[],],
       queue: [[],],
       formname: [[],],
       workshop: [[],]
@@ -541,16 +552,16 @@ export class ViewParticipantsFormComponent {
             const name = this.mapProfile[id] || this.mapProfileNew[id] || email;
             if (!matchedNames.includes(name)) matchedNames.push(name);
           });
-          } else {
-            unmatchedEmailsCount++;
-            const name = this.mapProfile[profileIds[0]] || this.mapProfileNew[profileIds[0]] || email;
-            notFoundEmails.push(`${name}`);
-          }
-          profileIds.forEach(id => matchedProfileIds.push(id));
-          } else {
-            unmatchedEmailsCount++;
-            notFoundEmails.push(`${email} (not registered)`);
-          }
+        } else {
+          unmatchedEmailsCount++;
+          const name = this.mapProfile[profileIds[0]] || this.mapProfileNew[profileIds[0]] || email;
+          notFoundEmails.push(`${name}`);
+        }
+        profileIds.forEach(id => matchedProfileIds.push(id));
+      } else {
+        unmatchedEmailsCount++;
+        notFoundEmails.push(`${email} (not registered)`);
+      }
     });
 
     this.matchedEmailsCount = matchedEmailsCount;
@@ -601,36 +612,6 @@ export class ViewParticipantsFormComponent {
     let path = doc(this.firestoreForms, "formsByClient", form['docid']).path;
     const url = this.router.createUrlTree(['/formtemplate'], { queryParams: { id: form.formid, type: 'form', patchdata: path, viewFilledForm: 'true' } });
     window.open(url.toString(), '_blank');
-  }
-
-  // ==========================================
-  // VIEW HERE — OVERLAY (NEW)
-  // ==========================================
-  async viewFormOverlay(row: any) {
-    this.currentOverlayRow = row;
-    this.overlayMode = 'individual';
-    this.overlayTitle = row.formname || 'Form View';
-    this.overlayLoading = true;
-    this.overlayFormData = null;
-    this.showOverlay = true;
-
-    try {
-      const [formTemplateDoc, submittedFormDoc] = await Promise.all([
-        getDoc(doc(this.firestoreDefault, 'delivery forms', row.formid)),
-        getDoc(doc(this.firestoreForms, 'formsByClient', row.docid))
-      ]);
-
-      if (!formTemplateDoc.exists() || !submittedFormDoc.exists()) {
-        this.overlayLoading = false;
-        return;
-      }
-
-      this.overlayFormData = this.buildFormDisplayData(row, formTemplateDoc.data(), submittedFormDoc.data());
-    } catch (err) {
-      console.error('Error loading form overlay:', err);
-    }
-
-    this.overlayLoading = false;
   }
 
   // ==========================================
@@ -1345,25 +1326,25 @@ export class ViewParticipantsFormComponent {
   }
 
   isSelectedParticipantOutOfRange(): boolean {
-  const selectedIds: string[] = this.filterForm.get('name')?.value || [];
-  if (selectedIds.length === 0) return false;
+    const selectedIds: string[] = this.filterForm.get('name')?.value || [];
+    if (selectedIds.length === 0) return false;
 
-  // Check if all selected participants have no forms in current fetched data
-  const hasAnyForms = selectedIds.some(id =>
-    this.participantForm.some(form => form.profileid === id)
-  );
+    // Check if all selected participants have no forms in current fetched data
+    const hasAnyForms = selectedIds.some(id =>
+      this.participantForm.some(form => form.profileid === id)
+    );
 
-  return !hasAnyForms;
-}
+    return !hasAnyForms;
+  }
 
- toggleLikeFilter() {
-  this.filterLiked = !this.filterLiked;
-  this.onFilter(this.filterForm.value);
-}
+  toggleLikeFilter() {
+    this.filterLiked = !this.filterLiked;
+    this.onFilter(this.filterForm.value);
+  }
 
-toggleFlagFilter() {
-  this.filterFlagged = !this.filterFlagged;
-  this.onFilter(this.filterForm.value);
-}
+  toggleFlagFilter() {
+    this.filterFlagged = !this.filterFlagged;
+    this.onFilter(this.filterForm.value);
+  }
 
 }

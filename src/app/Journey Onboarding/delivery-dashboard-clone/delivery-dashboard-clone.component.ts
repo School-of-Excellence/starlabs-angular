@@ -20,6 +20,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { FormOverlayViewComponent } from '../../Participants Profile Management/form-overlay-view/form-overlay-view.component';
 
 interface TableHeader {
     key: string;
@@ -152,6 +153,8 @@ interface UtilizationRow {
 
 export class DeliveryDashboardCloneComponent {
     @ViewChild('tabGroup') tabGroup: any;
+    @ViewChild('formOverlay') formOverlay: FormOverlayViewComponent;
+
     filterForm: FormGroup;
     firestoreForms = getFirestore('firestore-forms');
 
@@ -567,6 +570,15 @@ export class DeliveryDashboardCloneComponent {
     dfuProductIds: string[] = [];
     dfuProducts: any[] = [];
 
+    // View form overlay
+    mapProfileNew: any = {};
+    mapQueue: any = {};
+    workshopList: any[] = [];
+    mapWorkshop: any = {};
+    mapWorkshopNew: any = {};
+    events: any[] = [];
+    selectedEvent: any = null;
+
     productData: any = {
         eiStarterPack: {
             totalEligible: [],
@@ -901,7 +913,7 @@ export class DeliveryDashboardCloneComponent {
                     return acc;
                 }, {} as Record<string, string>);
 
-            await this.getApprovedDFUParticipants();
+            await this.getAllEvents();
 
             // Process users (depends on mapprofile from metadata)
             this.coachesList = usersSnap.docs
@@ -991,7 +1003,6 @@ export class DeliveryDashboardCloneComponent {
     ]);
 
     async applyDateFilter() {
-        // Invalidate memoized getters — fresh data is about to land.
         this.invalidateMemos();
         try {
             const groupedAll = {};
@@ -1007,13 +1018,57 @@ export class DeliveryDashboardCloneComponent {
             const avgInitToStart = {};
             const avgStartToComplete = {};
 
+            const cycleCountMap = new Map<string, number>();
             for (const item of this.allMatchedProductsRaw) {
+                const productId = item?.productref?.id;
+                const profileId = item?.profileid;
+                if (!productId || !profileId) continue;
+                const key = `${profileId}__${productId}`;
+                cycleCountMap.set(key, (cycleCountMap.get(key) || 0) + 1);
+            }
+
+            const latestItemMap = new Map<string, any>();
+            for (const item of this.allMatchedProductsRaw) {
+                const productId = item?.productref?.id;
+                const profileId = item?.profileid;
+                if (!productId || !profileId) continue;
+
+                const key = `${profileId}__${productId}`;
+                const existing = latestItemMap.get(key);
+
+                if (!existing) {
+                    latestItemMap.set(key, item);
+                    continue;
+                }
+
+                const getLatestProduct = (item: any): number => {
+                    if (!item) return 0;
+                    const status = ['initiated', 'ongoing', 'completed'];
+                    let latest = 0;
+                    for (const s of status) {
+                        const date = this.getDateFromFieldPublic(item[s]);
+                        if (date && date.getTime() > latest) {
+                            latest = date.getTime();
+                        }
+                    }
+                    return latest;
+                };
+
+                if (getLatestProduct(item?.statusdate) > getLatestProduct(existing?.statusdate)) {
+                    latestItemMap.set(key, item);
+                }
+            }
+            const latestItems = Array.from(latestItemMap.values());
+
+            for (const item of latestItems) {
                 const productId = item?.productref?.id;
                 if (!productId) continue;
                 if (!this.itemPassesProductFilter(item)) continue;
 
                 const status = item?.status?.toLowerCase?.() || null;
                 const profileId = item?.profileid;
+                const key = `${profileId}__${productId}`;
+                const cycle = cycleCountMap.get(key) || 1;
                 const mode = this.mapMetaData?.[profileId]?.['participantmode']?.toLowerCase().trim();
                 const totalPaid = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpaid'] ?? '0') || 0;
                 const totalPurchaseValue = parseInt(this.mapMetaData?.[profileId]?.['pp_totalpurchasevalue'] ?? '0') || 0;
@@ -1025,11 +1080,6 @@ export class DeliveryDashboardCloneComponent {
                 const packageId = item?.packageref?.id;
 
                 if (!['completed', 'ongoing'].includes(status)) {
-                    // ── Pre-completion pool (Total, Eligible, Not Elig., Purchased, Bonus) ──
-                    // All four participant-count columns use the same base filter:
-                    // exclude completed and ongoing so the sums are consistent:
-                    //   Total = Eligible + Not Elig.
-                    //   Eligible = Purchased + Bonus
                     (groupedAll[productId] ||= []).push(item);
 
                     if (isEligible) {
@@ -1053,12 +1103,9 @@ export class DeliveryDashboardCloneComponent {
                             }
                         }
 
-                        // Purchased / Bonus split — inside same status guard so they match Eligible.
-                        // Addons are treated as Purchased (both are paid/entitled, non-bonus).
                         if (packageId && this.bonusPackageLookup[packageId]) {
                             (groupedBonus[productId] ||= []).push(item);
                         } else {
-                            // Standard purchase OR addons package — both go into Purchased
                             (groupedPurchased[productId] ||= []).push(item);
                         }
                     } else {
@@ -1071,24 +1118,29 @@ export class DeliveryDashboardCloneComponent {
                 }
 
                 if (status === 'ongoing') {
-                    funnelData[productId].ongoing.push(item);
+                    funnelData[productId].ongoing.push({ ...item, cycle });
                 }
 
                 if (status === 'completed') {
                     const completedDate = this.getDateFromFieldPublic(statusdate['completed']);
-                    if (this.isDateInRange(completedDate)) funnelData[productId].completed.push(item);
+                    if (this.isDateInRange(completedDate)) {
+                        funnelData[productId].completed.push({ ...item, cycle });
+                    }
                 }
 
                 if (isEligible) {
-                    // Funnel Data (includes ongoing/completed — separate from the participant-count columns)
                     if (!status) {
-                        funnelData[productId].awaiting.push(item);
+                        funnelData[productId].awaiting.push({ ...item, cycle });
                     } else if (status === 'initiated') {
                         const d = this.getDateFromFieldPublic(statusdate['initiated']);
-                        if (this.isDateInRange(d)) funnelData[productId].initiated.push(item);
+                        if (this.isDateInRange(d)) {
+                            funnelData[productId].initiated.push({ ...item, cycle });
+                        }
                     } else if (status === 'ongoing') {
                         const d = this.getDateFromFieldPublic(statusdate['ongoing']);
-                        if (this.isDateInRange(d)) funnelData[productId].started.push(item);
+                        if (this.isDateInRange(d)) {
+                            funnelData[productId].started.push({ ...item, cycle });
+                        }
                     }
                 }
             }
@@ -1111,14 +1163,10 @@ export class DeliveryDashboardCloneComponent {
             console.log("error apply date filter", err);
         }
 
-        // Universal filter: rehydrate Stages section against freshly gated data
         if (this.selectedProductLabel) {
             await this.selectProduct(this.selectedProductLabel);
         }
 
-        // Repopulate the actionable cohorts (Participants tab) from the
-        // freshly gated participantsproduct data. Stage-based, not appointment-
-        // based — so it works even when the appointments read is denied.
         this.populateActionableCohorts(this.productFilterControl.value as string[]);
     }
 
@@ -1314,7 +1362,7 @@ export class DeliveryDashboardCloneComponent {
             const totalEligibleAll = this.getCardGroupedFiltered(productId);
 
             const totalEligible = totalEligibleAll.filter(
-                data => data.status === 'initiated'
+                data => data.status === "initiated"
             );
             if (this.selectedProductType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
@@ -1609,6 +1657,7 @@ export class DeliveryDashboardCloneComponent {
                         appointments = [...appointments, data];
                         return {
                             ...data,
+                            formDocId: data.docid,
                             status: data?.date ? 'submitted' : 'pending',
                             appointmentstart: data?.date || null,
                             productid: productId,
@@ -1822,12 +1871,46 @@ export class DeliveryDashboardCloneComponent {
         });
     }
 
+    async getAllEvents() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    async getApprovedDFUParticipants() {
+        const allEventsSnap = await getDocs(
+            query(
+                collection(this.firestore, 'event collection'),
+                where(
+                    'start_date',
+                    '>=',
+                    Timestamp.fromDate(today)
+                )
+            )
+        );
+
+        this.events = allEventsSnap.docs
+            .map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }))
+            .sort((a: any, b: any) => a.start_date.seconds - b.start_date.seconds);
+
+        if (this.events.length) {
+            this.selectedEvent = this.events[0];
+            await this.getApprovedDFUParticipants(this.selectedEvent.id);
+        }
+    }
+
+    onEventChange(selectedEvent: any) {
+        if (selectedEvent?.id) {
+            this.selectedEvent = selectedEvent;
+            this.getApprovedDFUParticipants(selectedEvent.id);
+        }
+    }
+
+    async getApprovedDFUParticipants(eventId: string) {
         try {
             const eventRef = doc(
                 this.firestore,
-                'event collection/E3UNqXFyW477MdmLBkhg'
+                `event collection/${eventId}`
             );
 
             const dfuProductSet = new Set(this.dfuProductIds);
@@ -2089,17 +2172,18 @@ export class DeliveryDashboardCloneComponent {
                     const deliveryOptions = deliveryDoc.data()['deliveryoptions'];
                     if (!Array.isArray(deliveryOptions) || deliveryOptions.length === 0) continue;
 
-                    const lastOption = deliveryOptions.at(0);
-                    const deliverySequence = lastOption?.deliverysequence;
-                    if (!Array.isArray(deliverySequence)) continue;
+                    for (const option of deliveryOptions) {
+                        const deliverySequence = option?.deliverysequence;
+                        if (!Array.isArray(deliverySequence)) continue;
 
-                    for (const sequenceItem of deliverySequence) {
-                        if (sequenceItem.activity) {
-                            activityFetchList.push({
-                                productDoc,
-                                productName,
-                                activityRef: sequenceItem.activity,
-                            });
+                        for (const sequenceItem of deliverySequence) {
+                            if (sequenceItem.activity) {
+                                activityFetchList.push({
+                                    productDoc,
+                                    productName,
+                                    activityRef: sequenceItem.activity,
+                                });
+                            }
                         }
                     }
                 }
@@ -2120,7 +2204,7 @@ export class DeliveryDashboardCloneComponent {
                 activityResults.push(...batchResults);
             }
 
-            const seenTypeIds = new Set<string>();
+            const seenTypeIds = new Map<string, any>();
             this.specialistSequences = [];
 
             for (const { productDoc, productName, snap: activitySnap } of activityResults) {
@@ -2131,26 +2215,59 @@ export class DeliveryDashboardCloneComponent {
                 const appointmentTypeName = activityData['appointmenttype'];
 
                 if (!appointmentTypeId || !appointmentTypeName) continue;
-                if (seenTypeIds.has(appointmentTypeId)) continue;
-                seenTypeIds.add(appointmentTypeId);
 
-                this.specialistSequences.push({
-                    productId: productDoc.id,
-                    productName,
-                    appointmentType: appointmentTypeName,
-                    appointmentTypeId,
-                });
+                if (seenTypeIds.has(appointmentTypeId)) {
+                    seenTypeIds.get(appointmentTypeId).productIds.add(productDoc.id);
+                } else {
+                    const entry = {
+                        productId: productDoc.id,
+                        productIds: new Set<string>([productDoc.id]),
+                        productName,
+                        appointmentType: appointmentTypeName,
+                        appointmentTypeId,
+                    };
+                    seenTypeIds.set(appointmentTypeId, entry);
+                    this.specialistSequences.push(entry);
+                }
             }
-            // Show delivery activities alphabetically (ascending).
+
             this.specialistSequences.sort((a: any, b: any) =>
                 (a.appointmentType || '').localeCompare(b.appointmentType || '')
             );
+
             this.specialistLoading = false;
         } catch (error) {
             console.error('Error loading specialist base data:', error);
             this.specialistLoading = false;
             this.cdr.detectChanges();
         }
+    }
+
+    get filteredSpecialistSequences(): any[] {
+        const selected = (this.productFilterControl?.value as string[]) || [];
+        if (!selected.length || this.allProductsSelected) return this.specialistSequences;
+
+        const selectedProductIds = new Set<string>();
+
+        for (const label of selected) {
+            const cardId = [...this.visibleCardIds, ...this.hiddenCardIds]
+                .find(id => this.getCardName(id) === label);
+
+            if (cardId) {
+                for (const pid of this.getCardProductIds(cardId)) {
+                    selectedProductIds.add(pid);
+                }
+            }
+        }
+
+        if (selectedProductIds.size === 0) return this.specialistSequences;
+
+        return this.specialistSequences.filter(seq => {
+            for (const pid of seq.productIds) {
+                if (selectedProductIds.has(pid)) return true;
+            }
+            return false;
+        });
     }
 
     async fetchSpecialistSlotsAndCompute(appointmentTypeId: string) {
@@ -4099,19 +4216,22 @@ export class DeliveryDashboardCloneComponent {
 
                         const onboardedDate = participant['onboardedtime']?.toDate();
                         participant['waitingperiod'] = this.calculateWaitingPeriod(onboardedDate);
-                        const totalpaid = this.mapMetaData[profileId]?.['pp_totalpaid'] || 0;
+                        const totalpaid = this.mapMetaData[profileId]?.['pp_totalpaid'] || '0' || 0;
                         const paymentdate = this.mapMetaData[profileId]?.['lastpaymentdate'];
                         participant['lastpaymentdate'] = paymentdate;
                         let hasAtLeastOneCleared = false;
 
                         for (let j = 0; j < productQuery.docs.length; j++) {
                             const productData = productQuery.docs[j].data();
-                            let minimumpayment = productData['minimumpayment'];
-                            if ([null, undefined].includes(minimumpayment)) {
-                                minimumpayment = this.mapProduct[productData['productref']?.id]?.minimumrequiredamount || 0;
+                            let minimumpayment = productData['minimumpayment'] || 0;
+
+                            if (!minimumpayment) {
+                                const productId = productData['productref']?.id;
+                                const productSnap = this.rawProductData.find((p: any) => p.id === productId);
+                                minimumpayment = productSnap?.['minimumrequiredamount'] || 0;
                             }
 
-                            if (minimumpayment <= totalpaid) {
+                             if (minimumpayment <= totalpaid) {
                                 hasAtLeastOneCleared = true;
                                 break;
                             }
@@ -4140,7 +4260,6 @@ export class DeliveryDashboardCloneComponent {
                         participant['journey'] = journeyname;
                         tempArray3.push(participant);
                     }
-
                     this.originalData['clearedMoreThan30Days'].data = tempArray1;
                     this.originalData['clearedMoreThan30Days'].count = tempArray1.length;
                     this.originalData['clearedMoreThan7Days'].data = tempArray2;
@@ -5395,7 +5514,8 @@ export class DeliveryDashboardCloneComponent {
                     'Product': this.mapProductName[item['productref']?.id] || 'Unknown',
                     'Initiated': item['statusdate']?.['initiated'] ? this.getDateFromFieldPublic(item['statusdate']['initiated']) : '',
                     'Ongoing': item['statusdate']?.['ongoing'] ? this.getDateFromFieldPublic(item['statusdate']['ongoing']) : '',
-                    'Completed': item['statusdate']?.['completed'] ? this.getDateFromFieldPublic(item['statusdate']['completed']) : ''
+                    'Completed': item['statusdate']?.['completed'] ? this.getDateFromFieldPublic(item['statusdate']['completed']) : '',
+                    'Product Cycle': item['cycle'] || 'N/A'
                 });
             }
             index++;
@@ -6441,6 +6561,7 @@ export class DeliveryDashboardCloneComponent {
         const awaiting: any[] = [];
         const idle: any[] = [];
         const stuck: any[] = [];
+        const clearedPayment: any[] = [];
 
         const rejected = new Set(['rejected', 'cancelled', 'inactive']);
 
@@ -6465,9 +6586,9 @@ export class DeliveryDashboardCloneComponent {
             const totalPurchaseValue = parseInt(meta['pp_totalpurchasevalue'] ?? '0') || 0;
             const totalBalance = totalPurchaseValue - totalPaid;
             const minPayment = parseInt(item?.['minimumpayment']) || 0;
-            const isEligible = !this.excludedModes.has(mode)
-                && (totalBalance <= 0 || totalPaid >= minPayment);
-            const financialdata = isEligible ? 'Cleared' : 'Not Scheduled';
+            const isEligible = !this.excludedModes.has(mode);
+            const isClearedPayment = (!this.excludedModes.has(mode)) && (totalBalance <= 0 || totalPaid >= minPayment);
+            const financialdata = isClearedPayment ? 'Cleared' : 'Not Scheduled';
 
             const productId = item?.productref?.id;
             const productName = this.shortenProductName(this.mapProductName?.[productId] || '');
@@ -6484,6 +6605,21 @@ export class DeliveryDashboardCloneComponent {
             const daysSinceInitiated = this.daysSinceTs(initiated);
             const daysSinceActivity = this.daysSinceTs(lastActivity);
 
+            // payment confirmed — not yet initiated
+            if (!status && isClearedPayment) {
+                clearedPayment.push({
+                    profileid: profileId,
+                    journey: journeyName,
+                    onboardedtime: onboarded,
+                    waitingperiod: daysSinceOnboarded,
+                    financialdata,
+                    lastpaymentdate: lastPayment,
+                    bottleneck: 'Ready for Initiation',
+                });
+                continue;
+            }
+
+            // payment not confirmed — not yet initiated
             if (!status && isEligible) {
                 awaiting.push({
                     profileid: profileId,
@@ -6492,7 +6628,7 @@ export class DeliveryDashboardCloneComponent {
                     waitingperiod: daysSinceOnboarded,
                     financialdata,
                     lastpaymentdate: lastPayment,
-                    bottleneck: 'Ready for Initiation',
+                    bottleneck: 'Awaiting for Initiation',
                 });
                 continue;
             }
@@ -6529,6 +6665,8 @@ export class DeliveryDashboardCloneComponent {
 
         this.originalData['awaitingInitiation'].data = awaiting;
         this.originalData['awaitingInitiation'].count = awaiting.length;
+        this.originalData['readyForInitiation'].data = clearedPayment;
+        this.originalData['readyForInitiation'].count = clearedPayment.length;
         this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
         this.originalData['stuckCases'].data = stuck;
@@ -6540,5 +6678,14 @@ export class DeliveryDashboardCloneComponent {
 
     openParticipant(profileId: string) {
         this.router.navigate(['/profilesummary', profileId]);
+    }
+
+    openFormOverlay(row: any) {
+        this.formOverlay.mapProfile = this.mapProfile;
+        this.formOverlay.mapProfileNew = this.mapProfileNew;
+        this.formOverlay.mapQueue = this.mapQueue;
+        this.formOverlay.mapWorkshop = this.mapWorkshop;
+        this.formOverlay.mapWorkshopNew = this.mapWorkshopNew;
+        this.formOverlay.viewFormOverlay(row);
     }
 }
