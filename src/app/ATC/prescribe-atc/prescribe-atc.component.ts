@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getDocsFromCache, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, Location } from '@angular/common';
@@ -11,7 +11,8 @@ import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
 import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
-import { FirestoreRecoveryService } from '../../shared/firestore-recovery.service';
+import { ATCDraftService } from '../../shared/atc-draft.service';
+import { DraftConflictDialogComponent } from '../shared/draft-conflict-dialog.component';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
@@ -65,7 +66,6 @@ const generateId = (firestore: Firestore, collectionName: string) => doc(collect
 })
 export class PrescribeATCComponent {
   autoSaveID = null;
-  draftUrls = []
   // Progess
   settingup:boolean = true
   loading = false;
@@ -279,7 +279,7 @@ export class PrescribeATCComponent {
     private networkStatusService : NetworkStatusService,
     private connectivity: ConnectivityGuardService,
     private mediaCache: MediaCacheService,
-    private recovery: FirestoreRecoveryService
+    private draftService: ATCDraftService
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -1010,16 +1010,18 @@ export class PrescribeATCComponent {
     }
     this.lastDraftSavedOn = null
     var draftATC = []
-    // push any drafts that never reached the server (e.g. saved during a bricked session) before reading the list
-    await this.recovery.flushPending(this.firestoreATC)
+    // push any drafts that never reached the server (e.g. saved offline) before reading the list
+    await this.draftService.flushDirty(this.firestoreATC)
     if (this.developer || this.admin) {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
         where('profileid', '==', this.participantProfileid),
         where('delete', '==', false)
       );
-      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
-      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
+      // online: read from server; offline: read from our local draft cache (Firestore persistence cache is gone)
+      draftATC = navigator.onLine
+        ? (await getDocs(q)).docs
+        : await this.draftService.listLocalDocs('temporary_ATC', d => d['profileid'] === this.participantProfileid && d['delete'] !== true);
     } else {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
@@ -1027,8 +1029,10 @@ export class PrescribeATCComponent {
         where('delete', '==', false),
         where('authorprofileid', 'array-contains', this.loggedinProfileid)
       );
-      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
-      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
+      // online: read from server; offline: read from our local draft cache (Firestore persistence cache is gone)
+      draftATC = navigator.onLine
+        ? (await getDocs(q)).docs
+        : await this.draftService.listLocalDocs('temporary_ATC', d => d['profileid'] === this.participantProfileid && d['delete'] !== true && (d['authorprofileid'] || []).includes(this.loggedinProfileid));
     }
     console.log(draftATC.map(e => e.ref.path))
     this.existingDraftIds = draftATC.map(e => e.id)  // remember this participant's existing draft ids
@@ -1050,9 +1054,17 @@ export class PrescribeATCComponent {
           var atc = selectedATC
           if(atc["type"] == "draft"){
             this.autoSaveID = atc["doc"].id
-            // re-read the doc so the latest offline edits (pending writes) are loaded, not the stale query snapshot
-            const freshSnap = await getDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID))
-            var value = freshSnap.exists() ? freshSnap.data() : atc["doc"].data()
+            // reconcile the server doc with this device's local cache: a clean side adopts the other; a true
+            // two-device divergence asks the user to choose (the rejected version is archived, never lost)
+            var value: any;
+            if (navigator.onLine) {
+              const freshSnap = await getDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID))
+              const remote = freshSnap.exists() ? freshSnap.data() : atc["doc"].data()
+              value = await this.draftService.reconcileOnOpen(this.firestoreATC, 'temporary_ATC', this.autoSaveID, remote, (mine, theirs) => this.openConflictDialog(mine, theirs))
+            } else {
+              // offline: the picked draft came from our local cache; use its working copy
+              value = (await this.draftService.loadLocal('temporary_ATC', this.autoSaveID)) ?? atc["doc"].data()
+            }
             console.log(value);
             this.date = value['date']
             this.product = value['product']
@@ -1104,7 +1116,8 @@ export class PrescribeATCComponent {
               code: 1
             }
             if(value["lastupdated"]){
-              this.lastDraftSavedOn = value["lastupdated"].toDate()
+              // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
+              this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
             }
           }
         }
@@ -1502,20 +1515,21 @@ export class PrescribeATCComponent {
           lastupdated: new Date(),       // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
-          // preserve "edited from AI generation" provenance across autosaves (writeDraft overwrites the doc)
+          // preserve "edited from AI generation" provenance across autosaves (each sync overwrites the doc)
           aiedited: this.aiedited ?? false,
           aigeneratedsource: this.aigeneratedsource ?? null,
           aigeneratedid: this.aigeneratedid ?? null,
         };
 
-        // durable local outbox first (never lost), then Firestore — falling back to a direct REST write if the
-        // SDK client has been bricked by its internal assertion (b815). Never hangs, never loses the draft.
-        const outcome = await this.recovery.writeDraft(this.firestoreATC, 'temporary_ATC', this.autoSaveID, data);
-        this.draftStatus = this.recovery.draftStatusFor(outcome);
+        // local-first: durable local write (never lost), then push to Firestore inside a rev-checked transaction.
+        // A second device's edit is detected as a 'conflict' and surfaced on reopen — never silently overwritten.
+        await this.draftService.saveLocal('temporary_ATC', this.autoSaveID, data);
+        const res = await this.draftService.sync(this.firestoreATC, 'temporary_ATC', this.autoSaveID);
+        this.draftStatus = this.draftService.statusFor(res.outcome);
         this.lastDraftSavedOn = new Date();
 
-        // upload media only when online AND the Firestore client is healthy; otherwise it stays cached and retries
-        if (navigator.onLine && !this.recovery.isDegraded()) {
+        // upload media only when online and the draft synced cleanly; on conflict/error it stays cached and retries
+        if (navigator.onLine && res.outcome !== 'conflict' && res.outcome !== 'error') {
           try {
             const [audioURLs, noteImageURLs, atcImageURLs] = await Promise.all([
               this.uploadAudioToStorage(),
@@ -1523,7 +1537,6 @@ export class PrescribeATCComponent {
               this.uploadATCImageToStorage()
             ]);
 
-            this.draftUrls = audioURLs;
             this.audiolist = audioURLs;
             this.imagelist = noteImageURLs;
             this.atcImageURL = atcImageURLs;
@@ -1574,6 +1587,25 @@ export class PrescribeATCComponent {
   // true when the participant has at least one draft other than the one currently open
   get hasOtherDrafts(): boolean {
     return this.existingDraftIds.some(id => id !== this.autoSaveID);
+  }
+
+  // ask the user which version to keep when the same draft diverged across two devices (default to this device's
+  // copy if dismissed — the rejected side is archived by ATCDraftService either way, so nothing is ever lost)
+  private openConflictDialog(mine: any, theirs: any): Promise<'mine' | 'theirs'> {
+    const ref = this.matDialog.open(DraftConflictDialogComponent, {
+      data: { mine, theirs }, autoFocus: false, disableClose: true, maxWidth: '680px'
+    });
+    return ref.afterClosed().toPromise().then(choice => (choice === 'theirs' ? 'theirs' : 'mine'));
+  }
+
+  // lastupdated may arrive as a Firestore Timestamp (server read) or a JS Date (local cache) — normalise to a Date
+  private toJsDate(v: any): Date | null {
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000);
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
   }
 
   // collect media blobs that haven't been uploaded yet (for durable offline storage)
@@ -2434,9 +2466,8 @@ async removeATCImage(index: number) {
     this.loading = false
     // await this.cleanTemporaryaudio()
     // wait for the soft-delete to complete so the submitted draft does not reappear
-    await updateDoc(doc(this.firestoreATC, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
-      console.log(err)
-    })
+    // soft-delete the server draft AND purge the local cache copy (idempotent; self-heals if it can't complete now)
+    await this.draftService.finalizeSubmit(this.firestoreATC, "temporary_ATC", this.autoSaveID)
     // clear locally-cached media for the submitted draft
     await this.mediaCache.deleteByDraft(this.autoSaveID)
 

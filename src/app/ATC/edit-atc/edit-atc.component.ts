@@ -11,7 +11,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
 import { NetworkStatusService } from '../../network-status.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
-import { FirestoreRecoveryService } from '../../shared/firestore-recovery.service';
+import { ATCDraftService } from '../../shared/atc-draft.service';
+import { DraftConflictDialogComponent } from '../shared/draft-conflict-dialog.component';
 import { PreviewAtcBeforeSubmissionComponent } from '../preview-atc-before-submission/preview-atc-before-submission.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -212,7 +213,7 @@ export class EditAtcComponent {
     private networkStatusService: NetworkStatusService,
     private mediaCache: MediaCacheService,
     public snackbar: MatSnackBar,
-    private recovery: FirestoreRecoveryService
+    private draftService: ATCDraftService
   ) {
     this.reportATC = {
       atcData: null,
@@ -389,8 +390,8 @@ export class EditAtcComponent {
   async getATC() {
     var date = new Date()
     var totalProcedureRead = 0
-    // push any edit-draft that never reached the server (e.g. saved during a bricked session) before loading
-    await this.recovery.flushPending(this.firestoreATC)
+    // push any edit-draft that never reached the server (e.g. saved offline) before loading
+    await this.draftService.flushDirty(this.firestoreATC)
     await getDoc(doc(this.firestoreATC, this.collectionName, this.atcID)).then(async atcData => {
       var atcDocData = atcData.data()
       getDoc(doc(this.firestoreDefault, "profile_data", atcDocData["profileid"])).then(participant => {
@@ -534,13 +535,20 @@ export class EditAtcComponent {
     }
     this.loading = false
     var draftATC = []
-    await getDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"])).then(draft => {
-      if (draft.exists()) {
-        if (draft.data()["delete"] != true) {
-          draftATC = [draft]
+    const atcid = this.reportATC.atcData["atcid"];
+    if (navigator.onLine) {
+      await getDoc(doc(this.firestoreATC, "temporary_edit_ATC", atcid)).then(snap => {
+        if (snap.exists() && snap.data()["delete"] != true) {
+          draftATC = [snap]
         }
+      })
+    } else {
+      // offline: read the edit-draft from our local cache (Firestore persistence cache is gone)
+      const local = await this.draftService.loadLocal('temporary_edit_ATC', atcid);
+      if (local && local["delete"] != true) {
+        draftATC = [{ id: atcid, data: () => local, ref: { path: `temporary_edit_ATC/${atcid}` } }];
       }
-    })
+    }
     if (draftATC.length != 0) {
       var dialogRef = this.dialog.open(AtcOptionComponent, {
         data: {
@@ -557,7 +565,13 @@ export class EditAtcComponent {
         if (selectedATC != null) {
           var atc = selectedATC
           if (atc["type"] == "draft") {
-            var value = atc["doc"].data()
+            // reconcile the server draft with this device's local cache (true divergence → user picks; loser archived)
+            var value: any;
+            if (navigator.onLine) {
+              value = await this.draftService.reconcileOnOpen(this.firestoreATC, 'temporary_edit_ATC', atcid, atc["doc"].data(), (mine, theirs) => this.openConflictDialog(mine, theirs))
+            } else {
+              value = (await this.draftService.loadLocal('temporary_edit_ATC', atcid)) ?? atc["doc"].data()
+            }
             this.reportATC.bigactivity = value["bigactivity"] ?? {}
             this.selectedAdditionalActivity = value["otheractivity"] ?? []
             this.reportATC.directive = value["directive"] ?? null
@@ -577,7 +591,8 @@ export class EditAtcComponent {
               code: 1
             }
             if (value["lastupdated"]) {
-              this.lastDraftSavedOn = value["lastupdated"].toDate()
+              // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
+              this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
             }
           }
         }
@@ -623,10 +638,11 @@ export class EditAtcComponent {
           lastupdated: new Date()        // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
         }
 
-        // durable local outbox first (never lost), then Firestore — falling back to a direct REST write if the
-        // SDK client has been bricked by its internal assertion (b815). Never hangs, never loses the draft.
-        const outcome = await this.recovery.writeDraft(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"], data);
-        this.draftStatus = this.recovery.draftStatusFor(outcome);
+        // local-first: durable local write (never lost), then push to Firestore inside a rev-checked transaction.
+        // A second device's edit is detected as a 'conflict' and surfaced on reopen — never silently overwritten.
+        await this.draftService.saveLocal('temporary_edit_ATC', this.reportATC.atcData["atcid"], data);
+        const res = await this.draftService.sync(this.firestoreATC, 'temporary_edit_ATC', this.reportATC.atcData["atcid"]);
+        this.draftStatus = this.draftService.statusFor(res.outcome);
         this.lastDraftSavedOn = new Date()
       }
     } catch (error) {
@@ -636,6 +652,25 @@ export class EditAtcComponent {
         ? { message: "Could not save the draft just now — your changes are kept on this device and will retry.", code: -1 }
         : { message: "Saved on this device — will sync when online.", code: 1 }
     }
+  }
+
+  // ask the user which version to keep when the same edit-draft diverged across two devices (default to this
+  // device's copy if dismissed — the rejected side is archived by ATCDraftService either way, nothing is lost)
+  private openConflictDialog(mine: any, theirs: any): Promise<'mine' | 'theirs'> {
+    const ref = this.dialog.open(DraftConflictDialogComponent, {
+      data: { mine, theirs }, autoFocus: false, disableClose: true, maxWidth: '680px'
+    });
+    return ref.afterClosed().toPromise().then(choice => (choice === 'theirs' ? 'theirs' : 'mine'));
+  }
+
+  // lastupdated may arrive as a Firestore Timestamp (server read) or a JS Date (local cache) — normalise to a Date
+  private toJsDate(v: any): Date | null {
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000);
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
   }
 
   // collect media blobs added during editing (for durable offline storage)
@@ -1556,8 +1591,9 @@ export class EditAtcComponent {
       await this.firebaseATCBatch.commit();
       await this.firebaseDefaultBatch.commit();
 
-      // clear locally-cached media for the submitted ATC
+      // clear locally-cached media AND the local draft copy for the submitted ATC (server soft-delete is in the batch above)
       await this.mediaCache.deleteByDraft(this.reportATC.atcData["atcid"]);
+      await this.draftService.purgeLocal('temporary_edit_ATC', this.reportATC.atcData["atcid"]);
 
       if (this.roles["mentor"] && !this.bigActivity()) {
         const existingValidator = Array.from(new Set([...(this.reportATC.validator ?? []), this.loggedProfileID]));
