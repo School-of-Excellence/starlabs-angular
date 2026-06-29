@@ -129,6 +129,9 @@ export class CohortDetailComponent implements OnDestroy {
   studioExpanded: Set<string> = new Set<string>();
   dragPayload = null;
 
+  unassignedParticipants = [];
+  filterUnassignedParticipants = [];
+
   toggleStudioExpanded(studio: any, event?: Event) {
     if (event) event.stopPropagation();
     const sid = studio?.docid || studio?.id;
@@ -217,7 +220,7 @@ export class CohortDetailComponent implements OnDestroy {
         this.dialogData.eventParticipationList || [];
       this.searchableQueueList = this.dialogData.searchableQueueList ?? [];
       this.mapQueueName = this.dialogData.mapQueueName ?? {};
-      this.selectedQueue = this.dialogData.cohort['queueref']?.id ?? null;
+      this.selectedQueue = this.isStudioCohort() ? this.dialogData.cohort['queueref']?.id ?? null : null;
       this.contentTab = this.dialogData.viewType ?? 'participants'
       console.log('queueid', this.dialogData.cohort['queueref']?.id);
       this.peopleCount = this.cohort?.['participantidlist']?.length || 0;
@@ -226,6 +229,7 @@ export class CohortDetailComponent implements OnDestroy {
       this.computeActivitiesFromInjectedMaps();
       this.computeOwners();
       this.rebuildParticipantRows();
+      console.log('selected queue',this.selectedQueue)
       if(this.selectedQueue)  this.loadLiveAssignments();
       this.loadMentors();
       return;
@@ -486,6 +490,7 @@ export class CohortDetailComponent implements OnDestroy {
 
   /** Participants in cohort but NOT in any studio (for Unassigned-to-Studio panel). */
   getUnassignedToStudio(): string[] {
+    console.log('message from uassign studio')
     const cohortParticipants: string[] =
       this.cohort?.['participantidlist'] || [];
     const inAnyStudio = new Set<string>();
@@ -502,6 +507,37 @@ export class CohortDetailComponent implements OnDestroy {
       (this.mapProfile?.[pid] || pid).toLowerCase().includes(q),
     );
   }
+
+  calculateUnassignedParticipants(){
+    const cohortParticipants: string[] =
+      this.cohort?.['participantidlist'] || [];
+    const inAnyStudio = new Set<string>();
+    (this.getCohortStudios() || []).forEach((s: any) => {
+      if (s?.studioin) {
+        this.getStudioParticipantIds(s).forEach((pid) => inAnyStudio.add(pid));
+      }
+    });
+    const newStudioPairingPID = this.newStudioPairing.map((studio)=>studio['participants'] ?? []).flatMap((studio)=>studio)
+    const result = cohortParticipants.filter((pid) => !inAnyStudio.has(pid) && !newStudioPairingPID.includes(pid));
+
+    console.log('result' , this.getCohortStudios())
+    this.unassignedParticipants = [...result];
+    this.filterUnassignedParticipants = [...result];
+    this.applyUnassignedFilter();
+  }
+
+  applyUnassignedFilter(){
+    let participants = [...this.unassignedParticipants];
+    const q = (this.studioUnassignedSearch || '').toLowerCase().trim();
+    if (q){
+      participants = participants.filter((pid) =>
+        (this.mapProfile?.[pid] || pid).toLowerCase().includes(q),
+      );
+    }
+
+    this.filterUnassignedParticipants = [...participants];
+  }
+
 
   /** Toggle a group-code filter pill (uP!/LYL/B!G). */
   toggleStudioGroupFilter(code: string) {
@@ -999,7 +1035,9 @@ export class CohortDetailComponent implements OnDestroy {
     const queue = this.searchableQueueList.find(
       (q) => q?.docid === this.selectedQueue,
     );
-    if (!this.selectedQueue || queue == -1) {
+
+    console.log('selected queue',queue ,this.searchableQueueList)
+    if (!this.selectedQueue || !queue) {
       this.liveAssignmentList = [];
       this.studioPairingList = [];
       this.mapLiveParticipants = {};
@@ -1103,9 +1141,10 @@ export class CohortDetailComponent implements OnDestroy {
         this.stageStudioMap = localMap;
 
         this.updateParticipantStudioMappings();
+        this.calculateUnassignedParticipants();
       });
 
-    if (queue !== -1) {
+    if (!queue) {
       const arenaEventsSnap = await getDocs(
         query(
           collection(this.firestore, 'arena events'),
@@ -1373,6 +1412,8 @@ export class CohortDetailComponent implements OnDestroy {
     this.newStudioPairing = [];
     if(this.studioCreateMode){
       this.createStudioCombination()
+    } else {
+      this.calculateUnassignedParticipants();
     }
   }
 
@@ -1409,7 +1450,7 @@ export class CohortDetailComponent implements OnDestroy {
     }
   }
 
-  createStudioCombination() {
+createStudioCombination() {
     this.newStudioPairing.push({
       participants: [],
       atcmodel: null,
@@ -1565,18 +1606,18 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   showQueueSelection() {
+    return (
+      this.isStudioCohort() && !this.cohort['queueref']?.id && this.searchableQueueList.length > 0
+    );
+  }
+
+  isStudioCohort(){
     const isStudioCohort = this.cohort['cohortCategory'] === 'studio';
     const isShadowCohort =
       this.bigActivityMap[this.cohort['bigactivity'] ?? '']?.shadow;
-    // console.log(
-    //   'msg from showQueueSelection',
-    //   isStudioCohort,
-    //   this.bigActivityMap[this.cohort['bigactivity'] ?? '']?.shadow,
-    //   this.searchableQueueList
-    // );
     return (
-      isStudioCohort && isShadowCohort === false && !this.cohort['queueref']?.id && this.searchableQueueList.length > 0
-    );
+      isStudioCohort && isShadowCohort === false
+    )
   }
 
   toggleSelectMode(){
@@ -1852,6 +1893,7 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   onStudioDragOver(event: DragEvent) {
+    console.log('message from onstudiodragover');
     if (!this.dragPayload) return
     event.preventDefault()
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
@@ -1884,6 +1926,8 @@ export class CohortDetailComponent implements OnDestroy {
       });
 
       console.log(this.newStudioPairing)
+
+      this.calculateUnassignedParticipants();
     } else if(payload.kind === 'studio' && payload.participantId && ![null , undefined , ''].includes(payload.studioIndex)){
       this.newStudioPairing = this.newStudioPairing.map((studio , index)=>{
       if (
@@ -1906,5 +1950,9 @@ export class CohortDetailComponent implements OnDestroy {
       return {...studio}
       });
     }
+  }
+
+  selectionChange(value){
+    console.log(value)
   }
 }

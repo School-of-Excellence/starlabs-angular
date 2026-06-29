@@ -112,7 +112,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
       where('startTime', '>=', Timestamp.fromDate(start)),
       where('startTime', '<=', Timestamp.fromDate(end)),
       orderBy('startTime', 'desc'),
-      limit(500)
+      // limit(500)
     )
 
     this.unsubscribe = onSnapshot(q, (snap) => {

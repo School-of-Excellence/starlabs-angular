@@ -41,7 +41,6 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatMenuModule,
     MatChipsModule,
     NgxMatSelectSearchModule,
-,
     PlanningTabComponent
   ],
   templateUrl: './event-opportunity-dashboard.component.html',

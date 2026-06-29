@@ -2515,7 +2515,7 @@
 }
 
 /* Add studio button */
-.cd-studios-canvas .studio-create-section > div > button {
+.add-studio-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
