@@ -4,10 +4,9 @@
 # this file just wires the app's PR triggers + path filters and selects the JOURNEY suite via `config` + `suite`.
 # Requires repo secret REPO_PAT (read on the private e2e + cloud-function repos), passed via `secrets: inherit`.
 #
-# ⚠️ VALIDATION PINNING (pre-cutover): `uses:` and `e2e_ref` point at the hub branch `journey-reusable`
-#    (which carries the config/suite engine change + the journey engine). Flip BOTH to `@main` once the hub
-#    PR (journey-reusable -> main) merges. Triggers on the sudo branches [cicd-dev, cicd-prod] like queue;
-#    switch to [development] at the joint cutover.
+# ✅ POST-MERGE: `uses:` and `e2e_ref` point at the hub `@main` (engine merged via b27a874, 2026-06-29 —
+#    config/suite + journey engine + report-to-Storage now live on main). Triggers on the sudo branches
+#    [cicd-dev, cicd-prod] like queue; switch to [development] at the joint cutover.
 name: journey-e2e (emulator gate)
 
 on:
@@ -39,10 +38,10 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.draft == false ||
       contains(github.event.pull_request.labels.*.name, 'run-e2e')
-    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@journey-reusable
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
     with:
       cf_branch: development
-      e2e_ref: journey-reusable                      # VALIDATION: hub branch w/ engine + config/suite change. Flip to `main` post-merge.
+      e2e_ref: main                                  # engine landed on main (hub merge b27a874); was journey-reusable during validation
       firebase_project: starlabs-cicd                # MUST match the app's projectId or auth silently fails (SETUP §3)
       config: playwright.journey.emulator.evidence.config.ts  # EVIDENCE variant: screenshot+trace per test → browsable report for Firestore/Storage capture
       suite: journey                                 # default spec root (find journey/) + history audit tag
