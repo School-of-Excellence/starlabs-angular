@@ -45,5 +45,5 @@ jobs:
       # PR runs a FAST GREEN SMOKE (self-tests) so the flow proves end-to-end now; the full UI suite is the
       # parallel "green-in-CI" track. A manual workflow_dispatch can override `only`/`evidence` to debug a spec.
       only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || 'queue/invariants-selftest.spec.ts queue/oracle-selftest.spec.ts' }}
-      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '0' }}
+      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}  # default 1: run-isolated auto-selects the queue evidence config (screenshot+trace per test) → record-run.cjs ships the report to Storage + Firestore cicd-audit
     secrets: inherit
