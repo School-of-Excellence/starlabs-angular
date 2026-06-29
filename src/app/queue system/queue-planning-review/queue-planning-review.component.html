@@ -36,14 +36,53 @@
       <div class="row w-100">
         <div class="col-sm">
           <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1">
-            <div class="fw-bold mb-2 h5">Live Queue</div>
-            <span *ngFor="let live of liveQueueList">
-              <button mat-stroked-button class="me-2 mb-2"
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="fw-bold h5 mb-0">Live Queue</div>
+              <button mat-stroked-button
+                [color]="liveQueueExportModeOn ? 'primary' : ''"
+                (click)="toggleLiveQueueExportMode()">
+                <mat-icon>{{ liveQueueExportModeOn ? 'checklist' : 'checklist_rtl' }}</mat-icon>
+                {{ liveQueueExportModeOn ? 'Exit Export Mode' : 'Select for Export' }}
+              </button>
+            </div>
+
+            <span *ngFor="let live of liveQueueList" class="d-inline-flex align-items-center me-2 mb-2">
+              <span *ngIf="liveQueueExportModeOn" class="me-1">
+                <mat-icon>
+                  {{ liveQueueExportSelection.has(live['docid']) ? 'check_box' : 'check_box_outline_blank' }}
+                </mat-icon>
+              </span>
+              <button mat-stroked-button
                 [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
-                (click)="selectedQueue = live; onQueueSelect()">
+                (click)="onLiveQueueClick(live)">
                 {{live["queuename"]}}
               </button>
             </span>
+
+            <div class="d-flex align-items-center gap-2 mt-2" *ngIf="liveQueueExportModeOn && liveQueueExportSelection.size > 0">
+              <span class="text-muted small">{{ liveQueueExportSelection.size }} selected</span>
+
+              <mat-form-field appearance="outline" style="width:260px">
+                <mat-label>Date range</mat-label>
+                <mat-date-range-input [rangePicker]="exportRangePicker">
+                  <input matStartDate placeholder="Start" [(ngModel)]="liveQueueExportRange.startDate">
+                  <input matEndDate placeholder="End" [(ngModel)]="liveQueueExportRange.endDate">
+                </mat-date-range-input>
+                <mat-datepicker-toggle matIconSuffix [for]="exportRangePicker"></mat-datepicker-toggle>
+                <mat-date-range-picker #exportRangePicker></mat-date-range-picker>
+              </mat-form-field>
+
+              <button mat-raised-button color="primary"
+                [disabled]="!liveQueueExportRange.startDate || !liveQueueExportRange.endDate || liveQueueExportBusy"
+                (click)="exportLiveQueuesByDateRange()">
+                <mat-spinner *ngIf="liveQueueExportBusy" diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+                Export
+              </button>
+
+              <button mat-icon-button matTooltip="Clear" (click)="toggleLiveQueueExportMode()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -691,6 +730,10 @@
               [disabled]="getSelectedParticipantsCount(activePanelSection || 'all') === 0"
               (click)="exportParticipantsToExcel()">
               <mat-icon>file_download</mat-icon>
+            </button>
+            <button mat-icon-button matTooltip="Overall Slot Revert History"
+              (click)="openOverallSlotRevertHistory()">
+              <mat-icon>manage_history</mat-icon>
             </button>
             <mat-checkbox [checked]="areAllParticipantsSelected(activePanelSection || 'all')"
               [indeterminate]="areSomeParticipantsSelected(activePanelSection || 'all')"
@@ -1508,5 +1551,61 @@
         </div>
       </ng-container>
     </div>
+  </div>
+</div>
+<!-- Overall Slot Revert History Dialog -->
+<div class="revert-history-overlay" *ngIf="showOverallSlotRevertHistory"
+  (click)="showOverallSlotRevertHistory = false">
+  <div class="revert-history-dialog" (click)="$event.stopPropagation()">
+
+    <div class="revert-history-dialog-header">
+      <div class="revert-history-title">
+        <mat-icon>manage_history</mat-icon>
+        <span>Overall Slot Revert History ({{ overallSlotRevertHistory.length }})</span>
+      </div>
+      <button mat-icon-button (click)="showOverallSlotRevertHistory = false">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="revert-history-dialog-body">
+      <div *ngIf="overallSlotRevertHistory.length === 0" style="padding: 16px; color: #888;">
+        No revert history found for this slot.
+      </div>
+
+      <div class="revert-history-entry"
+        *ngFor="let entry of overallSlotRevertHistory; let i = index">
+        <div class="revert-history-entry-number">#{{ i + 1 }}</div>
+        <div class="revert-history-entry-details">
+          <div class="revert-history-entry-row">
+            <mat-icon>person</mat-icon>
+            <span><b>Participant:</b> {{ getProfileName(entry.profileId) }}</span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>flag</mat-icon>
+            <span><b>Stage:</b> {{ entry.stageName }}</span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>schedule</mat-icon>
+            <span><b>Slot:</b>
+              {{ (entry.log.startdate?.toDate ? entry.log.startdate.toDate() : entry.log.startdate) | date:'dd MMM yyyy, HH:mm' }}
+              —
+              {{ (entry.log.enddate?.toDate ? entry.log.enddate.toDate() : entry.log.enddate) | date:'HH:mm' }}
+            </span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>event</mat-icon>
+            <span><b>Reverted On:</b>
+              {{ (entry.log.createdon?.toDate ? entry.log.createdon.toDate() : entry.log.createdon) | date:'dd MMM yyyy, HH:mm' }}
+            </span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <span><b>Reverted By:</b> {{ getProfileName(entry.log.revertedby) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>

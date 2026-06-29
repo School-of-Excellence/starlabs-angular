@@ -690,7 +690,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: clamp(10px, 1vw + 4px, 16px) clamp(16px, 2vw + 6px, 40px);
+  padding: clamp(10px, 1vw + 4px, 16px) 20px clamp(10px, 1vw + 4px, 16px) clamp(16px, 2vw + 6px, 40px);
   gap: 12px;
 }
 .ds-app .ds-footer-center {
@@ -1942,40 +1942,341 @@
 /* ============================================================== LIGHTBOX
    Unscoped — the lightbox lives at the component's top level so it works
    pre-live (waiting list) and inside the studio. */
-.image-lightbox {
+.preview-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.78);
-  z-index: 9000;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
 }
-.image-lightbox__img {
-  max-width: min(56vw, 520px);
-  max-height: min(70vh, 600px);
-  width: auto;
-  height: auto;
-  border-radius: 12px;
-  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+.preview-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
-.image-lightbox__close {
+.preview-image {
+  max-width: 60vw;
+  max-height: 70vh;
+  border-radius: 16px;
+  object-fit: contain;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.preview-close-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 36px;
-  height: 36px;
+  top: -20px;
+  right: -20px;
+  background: rgba(255, 255, 255, 0.4);
+  border: none;
   border-radius: 50%;
-  background: rgba(255,255,255,.18);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.preview-close-btn:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+.wait-token__avatar--clickable { cursor: pointer; }
+
+.std-chat-fab {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #1E5663;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid #5DCAA5;
+  cursor: pointer;
+  z-index: 9050;
+  box-shadow: 0 4px 14px rgba(30,86,99,.35);
+  transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+.std-chat-fab:hover { background: #143F49; transform: scale(1.06); }
+.std-chat-fab .mat-icon { font-size: 23px; width: 23px; height: 23px; line-height: 23px; color: #fff; }
+
+.std-chat-fab__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Draws attention only when there's something unread — calm otherwise */
+.std-chat-fab--unread {
+  animation: stdChatPulse 2.2s ease-in-out infinite;
+}
+@keyframes stdChatPulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(30,86,99,.35), 0 0 0 0 rgba(93,202,165,.45); }
+  50%      { box-shadow: 0 4px 14px rgba(30,86,99,.35), 0 0 0 8px rgba(93,202,165,0); }
+}
+
+.std-chat-popup {
+  position: fixed;
+  bottom: 160px;
+  right: 20px;
+  width: 300px;
+  max-height: 420px;
+  background: #FFFFFF;
+  border: 1px solid #E2E7EF;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  z-index: 9050;
+  overflow: hidden;
+  box-shadow: 0 18px 48px rgba(26,35,50,.18), 0 6px 14px rgba(26,35,50,.10);
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+.std-chat-popup__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #1E5663;
+  color: #fff;
+  flex-shrink: 0;
+}
+.std-chat-popup__head-info { display: flex; align-items: center; gap: 8px; }
+.std-chat-popup__head-info .mat-icon { color: #fff; font-size: 18px; width: 18px; height: 18px; line-height: 18px; }
+.std-chat-popup__head button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+.std-chat-popup__title { font-size: 14px; font-weight: 700; color: #fff; }
+
+.std-chat-popup__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.std-chat-showmore { display: flex; justify-content: center; margin-bottom: 4px; }
+.std-chat-showmore button {
+  background: #F8FAFC;
+  border: 1px solid #E2E7EF;
+  border-radius: 14px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #566072;
+  cursor: pointer;
+  font-family: inherit;
+}
+.std-chat-showmore button:hover { background: #E2E7EF; }
+
+.std-chat-divider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.std-chat-divider::before,
+.std-chat-divider::after {
+  content: '';
+  flex: 1;
+  height: 0.5px;
+  background: #E2E7EF;
+}
+.std-chat-divider span {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #8A93A3;
+  white-space: nowrap;
+}
+
+.std-chat-msg { display: flex; flex-direction: column; }
+.std-chat-msg--mine { align-items: flex-end; }
+.std-chat-msg:not(.std-chat-msg--mine) { align-items: flex-start; }
+.std-chat-msg__bubble {
+  max-width: 85%;
+  padding: 7px 10px;
+  border-radius: 10px 10px 10px 2px;
+  background: #F8FAFC;
+  border: 1px solid #E2E7EF;
+  font-size: 12.5px;
+  color: #1A2332;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.std-chat-msg__bubble a {
+  color: inherit;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.std-chat-msg__bubble p { margin: 0; }
+.std-chat-msg--mine .std-chat-msg__bubble {
+  background: #1E5663;
+  border-color: #1E5663;
+  color: #fff;
+  border-radius: 10px 10px 2px 10px;
+}
+.std-chat-msg__time {
+  font-size: 10px;
+  color: #8A93A3;
+  margin-top: 2px;
+  padding: 0 2px;
+}
+.std-chat-img {
+  max-width: 160px;
+  max-height: 120px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: block;
+  margin-top: 4px;
+  object-fit: cover;
+}
+.std-chat-file__card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 5px 8px;
+  background: rgba(0,0,0,.06);
+  border-radius: 6px;
+  font-size: 11.5px;
+}
+.std-chat-msg--mine .std-chat-file__card { background: rgba(255,255,255,.18); color: #fff; }
+.std-chat-file__card a { color: inherit; display: flex; }
+.std-chat-empty {
+  text-align: center;
+  font-size: 12.5px;
+  color: #8A93A3;
+  padding: 20px 0;
+}
+
+.std-chat-previews {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid #E2E7EF;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.std-chat-preview {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: #F8FAFC;
+  border: 1px solid #E2E7EF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.std-chat-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
+.std-chat-preview button {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #DC2626;
   color: #fff;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
 }
-.wait-token__avatar--clickable { cursor: pointer; }
+.std-chat-preview button .mat-icon { font-size: 11px; width: 11px; height: 11px; line-height: 11px; }
+
+.std-chat-popup__input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid #E2E7EF;
+  background: #F8FAFC;
+  flex-shrink: 0;
+}
+
+.std-chat-popup__input button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #1E5663;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+.std-chat-popup__input button:disabled { opacity: .45; cursor: not-allowed; }
+.std-chat-popup__input button:first-of-type {
+  background: #fff;
+  color: #566072;
+  border: 1px solid #E2E7EF;
+}
+.std-chat-popup__input button:first-of-type:hover { background: #F8FAFC; }
+.std-chat-msg__sender {
+  font-size: 10px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 3px;
+  padding: 0 4px;
+}
+
+.std-chat-msg--mine .std-chat-msg__sender {
+  text-align: right;
+  color: #334155;
+}
+.std-chat-input-textarea {
+  flex: 1;
+  resize: none;
+  overflow-y: auto;
+  max-height: 120px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.4;
+  background: transparent;
+  font-family: inherit;
+}
 
 /* ============================================================== LEGACY PRE-LIVE STYLES */
 /* These keep the surrounding "select studio / queue card / waiting list" UI

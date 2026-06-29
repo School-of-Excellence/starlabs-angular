@@ -2191,12 +2191,22 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         );
       });
     }
+    if (this.selectedEventParticipation) {
     if (this.selectedArenaEventId) {
       const profileIds = this.arenaEventProfileMap[this.selectedArenaEventId];
       filteredTokens = filteredTokens.filter(token =>
         profileIds?.has(token.profile_id)
       );
+    } else {
+      const allProfileIds = new Set<string>();
+      Object.values(this.arenaEventProfileMap).forEach(profileSet => {
+        profileSet.forEach(id => allProfileIds.add(id));
+      });
+      filteredTokens = filteredTokens.filter(token =>
+        allProfileIds.has(token.profile_id)
+      );
     }
+  }
 
     if (this.atcFilterActive) {
       if (this.atcFilter === 'validated') {

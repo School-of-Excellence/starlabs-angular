@@ -1,12 +1,12 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import {
-  collection, collectionData, doc, docData, Firestore,
-  query, where, orderBy, getDoc
-} from '@angular/fire/firestore';
+import {collection, collectionData, doc, docData, Firestore,query, where, orderBy, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, writeBatch, limit, startAfter, collectionGroup} from '@angular/fire/firestore';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 
@@ -74,7 +74,7 @@ interface ArenaAssignment {
 @Component({
   selector: 'app-arena-board',
   standalone: true,
-  imports: [CommonModule, MatIconModule, MatTooltipModule],
+  imports: [CommonModule, MatIconModule, MatTooltipModule, FormsModule],
   templateUrl: './arena-board.component.html',
   styleUrl: './arena-board.component.css'
 })
@@ -102,17 +102,46 @@ export class ArenaBoardComponent implements OnDestroy {
   invitations: ArenaInvitation[] = [];
   liveAssignments: ArenaAssignment[] = [];
   completedAssignments: ArenaAssignment[] = [];
+  //chat
+  profileid = '';
+  chatThreads: { [studioid: string]: any } = {};
+  private chatNameCache: { [studioid: string]: string } = {};
+  unreadStudioIds: Set<string> = new Set();
+  studioUnreadCounts: { [studioid: string]: number } = {};
+  selectedChatStudioId = '';
+  chatMessages: any[] = [];
+  chatText = '';
+  chatAttachedFiles: any[] = [];
+  chatUploading = false;
+  chatHasMore = false;
+  chatLoadingMore = false;
+  private chatFirstDoc: any = null;
+  private chatPageSize = 10;
+  private chatThreadSub: Subscription = null;
+  private chatUnreadSub: Subscription = null;
+  private chatLiveSub: Subscription = null;
+  @ViewChild('chatMessagesScroll') chatMessagesScroll: ElementRef;
+  expandedImage: string | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    public router: Router,
-    private firestore: Firestore,
-    private guard: AuthguardService
-  ) {
+      private route: ActivatedRoute,
+      public router: Router,
+      private firestore: Firestore,
+      private guard: AuthguardService,
+      private storage: Storage,
+      private sanitizer: DomSanitizer
+    ) {
     this.route.paramMap.subscribe(params => {
       this.queueid = params.get('queueid') || '';
       this.stage = params.get('stage') || '';
       if (this.queueid && this.stage) this.bootstrap();
+    });
+
+    this.guard.getRoles().then(roles => {
+      this.profileid = roles?.['profile_ref']?.id || '';
+      this.subscribeChatThreads();
+      this.requestNotificationPermission();
+
     });
 
     // Tick every second so live timers refresh in the view
@@ -134,6 +163,7 @@ export class ArenaBoardComponent implements OnDestroy {
       const profileMap = await this.guard.getProfileMap();
       this.mapProfile = profileMap?.map || {};
     } catch {}
+    this.rebuildChatNameCache();
     try {
       collectionData(collection(this.firestore, 'bigactivity'), { idField: 'id' })
         .pipe(takeUntil(this.destroy$))
@@ -190,6 +220,8 @@ export class ArenaBoardComponent implements OnDestroy {
       this.studios = (rows as ArenaStudio[]).filter((s: any) =>
         s['studioin'] === true && s['checkin'] === true
       );
+      this.rebuildChatNameCache();
+      this.sortStudiosAndAssignments();
     });
 
     // Pending invitations for this stage
@@ -221,6 +253,7 @@ export class ArenaBoardComponent implements OnDestroy {
       { idField: 'docid' }
     ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
       this.liveAssignments = rows as ArenaAssignment[];
+      this.sortStudiosAndAssignments();
       // Lazy-load profiles for participants and pairing specialists so cards
       // show real names instead of "—" immediately after a participant lands.
       this.liveAssignments.forEach(a => {
@@ -561,9 +594,318 @@ export class ArenaBoardComponent implements OnDestroy {
     }
   }
 
+  subscribeChatThreads() {
+    this.chatThreadSub?.unsubscribe();
+    this.chatUnreadSub?.unsubscribe();
+    if (!this.queueid) return;
+    this.chatThreadSub = collectionData(
+      query(collection(this.firestore, 'studio_chat'), where('queueid', '==', this.queueid))).pipe(takeUntil(this.destroy$)).subscribe(threads => {
+      const map: any = {};
+      threads.forEach((t: any) => map[t.studioid] = t);
+      this.chatThreads = map;
+      this.sortStudiosAndAssignments();
+    });
+
+    if (this.profileid) {
+    const seenMsgIds = new Set<string>()
+    let initialLoadDone = false
+    this.chatUnreadSub = collectionData(query(collectionGroup(this.firestore, 'messages'), where('pending', 'array-contains', this.profileid),where('queueid', '==', this.queueid))).pipe(takeUntil(this.destroy$)).subscribe(msgs =>
+    {
+      this.unreadStudioIds = new Set(msgs.map((m: any) => m['studioid']));
+      const counts: { [studioid: string]: number } = {};
+      msgs.forEach((m: any) => {
+        const sid = m['studioid'];
+        counts[sid] = (counts[sid] ?? 0) + 1;
+      });
+      this.studioUnreadCounts = counts;
+      this.sortStudiosAndAssignments();
+      msgs.forEach((m: any) => {
+        const msgid = m['messageid']
+        if (!msgid) return
+        if (!seenMsgIds.has(msgid)) {
+          if (initialLoadDone) {
+            const studioName = this.getStudioChatName(m['studioid'])
+            this.showChatNotification(m['message'] || 'Sent an attachment', studioName, m['studioid'])
+          }
+          seenMsgIds.add(msgid)
+        }
+      })
+      initialLoadDone = true
+    });
+    }
+  }
+
+  private rebuildChatNameCache(): void {
+    const cache: { [studioid: string]: string } = {};
+    this.studios.forEach(s => {
+      const list = this.specialistList(s);
+      cache[s.docid] = list.length? list.map(p => `${p.name}${p.activity ? ' - ' + p.activity : ''}`).join(', '): 'Studio';
+    });
+    this.chatNameCache = cache;
+  }
+
+  backToChatList() {
+    this.chatLiveSub?.unsubscribe();
+    this.selectedChatStudioId = '';
+    this.chatMessages = [];
+  }
+
+  async openStudioChat(studioid: string) {
+    const alreadyLoaded = this.selectedChatStudioId === studioid && this.chatMessages.length > 0;
+    
+    const threadRef = doc(this.firestore, 'studio_chat', studioid);
+    const snap = await getDoc(threadRef);
+    const studio = this.studios.find(s => s.docid === studioid);
+    const participants = studio?.participants ?? [];
+    if (!snap.exists()) {
+      await setDoc(threadRef, {
+        studioid,
+        queueid: this.queueid,
+        liveassignmentid: [],
+        currentliveassignmentid: null,
+        lastmessage: null,
+        lastmessageat: null,
+        createdat: serverTimestamp(),
+        profileid: [...participants, this.profileid]
+      });
+    } else if (!(snap.data()?.['profileid'] ?? []).includes(this.profileid)) {
+      await updateDoc(threadRef, { profileid: arrayUnion(this.profileid) });
+    }
+
+    this.selectedChatStudioId = studioid;
+    if (!alreadyLoaded) {
+      this.chatMessages = [];
+      this.chatFirstDoc = null;
+      this.chatHasMore = false;
+      const q = query(collection(this.firestore, 'studio_chat', studioid, 'messages'),orderBy('sentat', 'desc'),limit(this.chatPageSize));
+      const snap = await getDocs(q);
+      const reversed = [...snap.docs].reverse();
+      this.chatFirstDoc = reversed[0] ?? null;
+      this.chatHasMore = snap.docs.length === this.chatPageSize;
+      this.chatMessages = reversed.map(d => d.data());
+    }
+    this.markChatRead(studioid);
+    setTimeout(() => {
+      if (this.chatMessagesScroll) this.chatMessagesScroll.nativeElement.scrollTop = this.chatMessagesScroll.nativeElement.scrollHeight;
+    }, 50);
+    // Live-watch for new messages sent after this page loaded.
+    this.chatLiveSub?.unsubscribe();
+    const sinceTime = this.chatMessages.length? this.chatMessages[this.chatMessages.length - 1]['sentat']: null;
+    let liveQuery = query(collection(this.firestore, 'studio_chat', studioid, 'messages'),orderBy('sentat', 'asc'));
+    if (sinceTime) {
+      liveQuery = query(collection(this.firestore, 'studio_chat', studioid, 'messages'),orderBy('sentat', 'asc'),where('sentat', '>', sinceTime));
+    }
+    this.chatLiveSub = collectionData(liveQuery).pipe(takeUntil(this.destroy$)).subscribe(newMsgs => {
+      newMsgs.forEach((m: any) => {
+        if (!this.chatMessages.some(existing => existing['messageid'] === m['messageid'])) {
+          this.chatMessages = [...this.chatMessages, m];
+          this.markChatRead(studioid);
+          if (m['sent_by'] !== this.profileid && this.selectedChatStudioId === studioid) {
+            const studioName = this.getStudioChatName(studioid);
+            this.showChatNotification(m['message'] || 'Sent an attachment', studioName, studioid);
+          }
+          setTimeout(() => {
+            if (this.chatMessagesScroll) this.chatMessagesScroll.nativeElement.scrollTop = this.chatMessagesScroll.nativeElement.scrollHeight;
+          }, 50);
+        }
+      });
+    });
+  }
+
+  async loadMoreChatMessages() {
+    if (!this.chatHasMore || this.chatLoadingMore || !this.chatFirstDoc || !this.selectedChatStudioId) return;
+    this.chatLoadingMore = true;
+    const q = query(
+      collection(this.firestore, 'studio_chat', this.selectedChatStudioId, 'messages'),
+      orderBy('sentat', 'desc'),
+      startAfter(this.chatFirstDoc),
+      limit(this.chatPageSize)
+    );
+    const snap = await getDocs(q);
+    const reversed = [...snap.docs].reverse();
+    this.chatFirstDoc = reversed[0] ?? this.chatFirstDoc;
+    this.chatHasMore = snap.docs.length === this.chatPageSize;
+    this.chatMessages = [...reversed.map(d => d.data()), ...this.chatMessages];
+    this.chatLoadingMore = false;
+  }
+
+  private markChatRead(studioid: string) {
+    const unread = this.chatMessages.filter(m =>
+      m['sent_by'] !== this.profileid && (m['pending'] ?? []).includes(this.profileid)
+    );
+    if (!unread.length) return;
+    const batch = writeBatch(this.firestore);
+    unread.forEach(m => {
+      batch.update(
+        doc(this.firestore, 'studio_chat', studioid, 'messages', m['messageid']),
+        { pending: arrayRemove(this.profileid), read_by: arrayUnion(this.profileid) }
+      );
+    });
+    batch.commit().catch(() => {});
+  }
+
+  onChatFileSelected(event: any) {
+    Array.from(event.target.files as FileList).forEach((file: File) => {
+      if (file.size > 10 * 1024 * 1024) return;
+      const entry: any = { file, filename: file.name, fileurl: '' };
+      if (this.isImageFile(file.name)) {
+        const reader = new FileReader();
+        reader.onload = e => { entry.fileurl = e.target?.result as string; };
+        reader.readAsDataURL(file);
+      }
+      this.chatAttachedFiles.push(entry);
+    });
+  }
+
+  removeChatFile(index: number) {
+    this.chatAttachedFiles.splice(index, 1);
+  }
+
+  isImageFile(filename: string): boolean {
+    return /\.(jpg|jpeg|png|gif|webp)$/i.test(filename || '');
+  }
+
+  async sendChatMessage() {
+      if (this.chatUploading) return
+    if (!this.chatText.trim() && !this.chatAttachedFiles.length) return;
+    if (!this.selectedChatStudioId) return;
+    this.chatUploading = true;
+    const studioid = this.selectedChatStudioId;
+    const thread = this.chatThreads[studioid];
+    const queueid = this.queueid;
+    const text = this.chatText.trim();
+    this.chatText = '';
+    const profileids: string[] = thread?.profileid ?? [];
+    const pending = profileids.filter(id => id !== this.profileid);
+
+    let files: any[] = [];
+    try {
+      files = await Promise.all(
+        this.chatAttachedFiles.map(async f => {
+          const fileName = `${Date.now()}_${f.filename}`;
+          const storageRef = ref(this.storage, `studio-chat/${queueid}/${studioid}/${fileName}`);
+          const snap = await uploadBytes(storageRef, f.file);
+          const url = await getDownloadURL(snap.ref);
+          return { filename: f.filename, fileurl: url };
+        })
+      );
+    } catch {
+      this.chatUploading = false;
+      return;
+    }
+    this.chatAttachedFiles = [];
+    const msgid = doc(collection(this.firestore, 'studio_chat', studioid, 'messages')).id;
+    const newMsg = {
+      messageid: msgid,
+      message: text || null,
+      sent_by: this.profileid,
+      sentat: serverTimestamp(),
+      files,
+      read_by: [this.profileid],
+      pending,
+      liveassignmentid: thread?.currentliveassignmentid ?? null,
+      studioid,
+      queueid
+    };
+    await Promise.all([
+      setDoc(doc(this.firestore, 'studio_chat', studioid, 'messages', msgid), newMsg),
+      updateDoc(doc(this.firestore, 'studio_chat', studioid), {
+        lastmessage: text || 'media',
+        lastmessageat: serverTimestamp(),
+        profileid: arrayUnion(this.profileid)
+      })
+    ]);
+    if (!this.chatMessages.some(m => m['messageid'] === msgid)) {
+      this.chatMessages = [...this.chatMessages, { ...newMsg, sentat: new Date() }]
+    }
+    setTimeout(() => {
+      if (this.chatMessagesScroll) this.chatMessagesScroll.nativeElement.scrollTop = this.chatMessagesScroll.nativeElement.scrollHeight;
+    }, 50);
+    this.chatUploading = false;
+  }
+
+  private sortStudiosAndAssignments(): void {
+    const score = (id: string) => {
+      const unread = this.unreadStudioIds.has(id) ? 1 : 0;
+      const time = this.chatThreads[id]?.lastmessageat?.toMillis?.() ?? 0;
+      return { unread, time };
+    };
+    this.studios = [...this.studios].sort((a, b) => {
+      const as = score(a.docid), bs = score(b.docid);
+      if (bs.unread !== as.unread) return bs.unread - as.unread;
+      return bs.time - as.time;
+    });
+    this.liveAssignments = [...this.liveAssignments].sort((a, b) => {
+      const as = score(a.studioid), bs = score(b.studioid);
+      if (bs.unread !== as.unread) return bs.unread - as.unread;
+      return bs.time - as.time;
+    });
+  }
+
+  processMessage(message: string, linkColor: string = '#1a56db'): SafeHtml {
+    if (!message) return '';
+    let processed = message.replace(/\n/g, '<br>');
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    processed = processed.replace(urlRegex, `<a href="$1" target="_blank" rel="noopener" style="color:${linkColor};word-break:break-word;overflow-wrap:anywhere;">$1</a>`);
+    return this.sanitizer.bypassSecurityTrustHtml(processed);
+  }
+
+  getStudioUnread(studioid: string): boolean {
+    return this.unreadStudioIds.has(studioid);
+  }
+
+  getStudioUnreadCount(studioid: string): number {
+    return this.studioUnreadCounts?.[studioid] ?? 0;
+  }
+
+  get unreadChatCount(): number {
+    return this.unreadStudioIds.size;
+  }
+
+  getStudioChatName(studioid: string): string {
+    return this.chatNameCache[studioid] || 'Studio';
+  }
+
+  onChatKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      this.sendChatMessage()
+    }
+  }
+
   ngOnDestroy() {
     if (this.nowTimer) clearInterval(this.nowTimer);
+    this.chatThreadSub?.unsubscribe();
+    this.chatUnreadSub?.unsubscribe();
+    this.chatLiveSub?.unsubscribe();
     this.destroy$.next();
     this.destroy$.complete();
   }
+  private requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  private showChatNotification(message: string, studioName: string, studioid?: string) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    const notification = new Notification(`New message from ${studioName}`, {
+      body: message || 'Sent an attachment',
+      icon: '/assets/icons/icon-72x72.png'
+    });
+
+    notification.onclick = () => {
+      window.focus();
+      this.rightTab = 'chat';
+      if (studioid) {
+        this.openStudioChat(studioid);
+      }
+      notification.close();
+    };
+
+    setTimeout(() => notification.close(), 5000);
+  }
 }
+

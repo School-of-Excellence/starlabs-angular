@@ -211,11 +211,11 @@
 
   <!-- Expanded profile image overlay — rendered at top level so it works
        both pre-live (waiting list) and inside the live studio. -->
-  <div *ngIf="expandedImage" class="image-lightbox" (click)="expandedImage = null">
-    <button type="button" class="image-lightbox__close" (click)="expandedImage = null; $event.stopPropagation()">
-      <mat-icon>close</mat-icon>
-    </button>
-    <img class="image-lightbox__img" [src]="expandedImage" (click)="$event.stopPropagation()" alt="Profile image">
+  <div class="preview-backdrop" *ngIf="expandedImage" (click)="expandedImage = null">
+    <div class="preview-panel" (click)="$event.stopPropagation()">
+      <button class="preview-close-btn" (click)="expandedImage = null">✕</button>
+      <img class="preview-image" [src]="expandedImage" alt="Preview">
+    </div>
   </div>
 
   <!-- =================== LIVE ASSIGNMENT (STEPPER V2 — NEW DESIGN) =================== -->
@@ -859,7 +859,7 @@
           Complete Session
         </button>
       </footer>
-    </main>
+  </main>
 
     <!-- Form-in-dialog template (used by viewform()).
          Renders the submitted form INLINE — markup mirrors the overlay in
@@ -1303,4 +1303,88 @@
     </div>
   </ng-template>
 
+  <button *ngIf="selectedStudio['docid']" type="button" class="std-chat-fab"
+      matTooltip="Chat" matTooltipPosition="above"
+      (click)="isChatOpen ? closeChat() : openChat()">
+    <mat-icon>chat</mat-icon>
+    <span *ngIf="unreadChatCount > 0" class="std-chat-fab__badge">
+      {{ unreadChatCount > 99 ? '99+' : unreadChatCount }}
+    </span>
+  </button>
+
+  <div *ngIf="isChatOpen" class="std-chat-popup">
+    <div class="std-chat-popup__head">
+      <div class="std-chat-popup__head-info">
+        <mat-icon>support_agent</mat-icon>
+        <div>
+          <div class="std-chat-popup__title">CHAT</div>
+        </div>
+      </div>
+      <button type="button" (click)="closeChat()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="std-chat-popup__messages" #chatScroll>
+      <div *ngIf="chatHasMore" class="std-chat-showmore">
+        <button type="button" (click)="loadMoreChatMessages()">
+          Show more
+        </button>
+      </div>
+
+      <ng-container *ngFor="let msg of chatMessages; let i = index">
+        <div *ngIf="i === 0 || msg['liveassignmentid'] !== chatMessages[i-1]['liveassignmentid']"
+            class="std-chat-divider">
+          <span>{{ msg['liveassignmentid'] === liveAssignment?.['docid'] ? 'Current session' : 'Previous session' }}</span>
+        </div>
+        <div class="std-chat-msg" [class.std-chat-msg--mine]="msg['sent_by'] === profileid">
+          <div class="std-chat-msg__sender">
+            {{ msg['sent_by'] === profileid ? 'You' : 'A&H Team' }}
+          </div>
+          <div class="std-chat-msg__bubble">
+            <p *ngIf="msg['message']" [innerHTML]="processMessage(msg['message'], msg['sent_by'] === profileid ? '#ffffff' : '#1a56db')"></p>
+            <div *ngFor="let f of msg['files']">
+              <img *ngIf="isImageFile(f.filename)" [src]="f.fileurl"
+                  class="std-chat-img" (click)="expandedImage = f.fileurl">
+              <div *ngIf="!isImageFile(f.filename)" class="std-chat-file__card">
+                <mat-icon>attach_file</mat-icon>
+                <span>{{ f.filename }}</span>
+                <a [href]="f.fileurl" target="_blank" (click)="$event.stopPropagation()">
+                  <mat-icon>download</mat-icon>
+                </a>
+              </div>
+            </div>
+          </div>
+          <div class="std-chat-msg__time">
+            {{ msg['sentat']?.toDate ? (msg['sentat'].toDate() | date:'shortTime') : (msg['sentat'] | date:'shortTime') }}
+          </div>
+        </div>
+      </ng-container>
+      <div *ngIf="!chatMessages.length" class="std-chat-empty">No messages yet</div>
+    </div>
+
+    <div *ngIf="chatAttachedFiles.length" class="std-chat-previews">
+      <div *ngFor="let f of chatAttachedFiles; let i = index" class="std-chat-preview">
+        <img *ngIf="f.fileurl" [src]="f.fileurl">
+        <mat-icon *ngIf="!f.fileurl">attach_file</mat-icon>
+        <button type="button" (click)="removeChatFile(i)">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="std-chat-popup__input">
+      <input #chatFileInput type="file" multiple style="display:none"
+        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+        (change)="onChatFileSelected($event)">
+      <textarea [(ngModel)]="chatText" placeholder="Type a message..." rows="1"(keydown)="onChatKeydown($event)"class="std-chat-input-textarea"></textarea>
+      <button type="button" (click)="chatFileInput.click()">
+        <mat-icon>attach_file</mat-icon>
+      </button>
+      <button type="button" (click)="sendChatMessage()"
+        [disabled]="chatUploading || (!chatText.trim() && !chatAttachedFiles.length)">
+        <mat-icon>{{ chatUploading ? 'hourglass_top' : 'send' }}</mat-icon>
+      </button>
+    </div>
+  </div>
 </div>
