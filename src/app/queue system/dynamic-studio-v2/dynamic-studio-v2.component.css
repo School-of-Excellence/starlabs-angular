@@ -632,6 +632,91 @@
   flex-direction: column;
   background: var(--canvas);
 }
+
+/* -------------------------------------------- IN-STUDIO QUEUE/STUDIO NAV
+   Top strip inside the live-studio view (legacy parity). Non-shrinking row
+   directly under the status pill; the scroll area below flexes as before. */
+.ds-app .ds-qnav {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  padding: 10px clamp(20px, 2.2vw + 8px, 40px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.ds-app .ds-qnav__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ds-app .ds-qnav__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.ds-app .ds-qnav__label .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+.ds-app .ds-qnav__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.ds-app .ds-qchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
+}
+.ds-app .ds-qchip:hover {
+  border-color: var(--primary-line);
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+}
+.ds-app .ds-qchip.is-active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.ds-app .ds-qchip__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-app .ds-qchip__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(26, 35, 50, .10);
+  font-size: 11px;
+  font-weight: 800;
+}
+.ds-app .ds-qchip.is-active .ds-qchip__count { background: rgba(255, 255, 255, .22); }
+.ds-app .ds-qchip__live { font-size: 16px; width: 16px; height: 16px; line-height: 16px; color: var(--green-bright); }
+.ds-app .ds-qchip.is-active .ds-qchip__live { color: #fff; }
+/* Invited studios (from other queues) — dashed outline + primary "login" icon
+   so they read as "jump in" rather than one of your own studios. */
+.ds-app .ds-qchip--invited { border-style: dashed; border-color: var(--primary-line); }
+.ds-app .ds-qchip--invited:hover { border-style: solid; }
+.ds-app .ds-qchip--invited .ds-qchip__live { color: var(--primary); }
 .ds-app .ds-main-scroll {
   flex: 1;
   min-height: 0;
@@ -1237,11 +1322,32 @@
 .ds-app .zoom-link--pending { color: var(--amber); }
 
 /* Raw Zoom start URL row shown under the Start Meeting button (getstarted step) */
+/* Backup-link block: the "if Start Meeting didn't work, use this" group.
+   Hint caption + link row are visually tied together below the button. */
+.ds-app .zoom-fallback {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.ds-app .zoom-link-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.ds-app .zoom-link-hint strong { color: var(--ink); font-weight: 800; }
+.ds-app .zoom-link-hint .ic {
+  font-size: 16px; width: 16px; height: 16px; line-height: 16px;
+  color: var(--primary); flex: 0 0 auto;
+}
 .ds-app .zoom-link-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
   padding: 9px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -2484,6 +2590,9 @@
 }
 .wait-token__btn:hover { background: #143F49; }
 .wait-token__btn .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+/* Approved invite — green so it reads as "ready to assign", not a fresh invite. */
+.wait-token__btn--approved { background: #15803D; }
+.wait-token__btn--approved:hover { background: #166534; }
 .wait-token__chip {
   display: inline-flex;
   align-items: center;
@@ -2509,6 +2618,29 @@
   font-weight: 600;
   opacity: .85;
 }
+/* This studio's own pending invite — blue "awaiting response" with a Cancel. */
+.wait-token__chip--self {
+  background: #E8F1F4;
+  color: #176B7E;
+  border-color: #BBD9E1;
+}
+.wait-token__chip-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: .7;
+}
+.wait-token__chip-cancel:hover { opacity: 1; background: rgba(23,107,126,.14); }
+.wait-token__chip-cancel .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
 
 @media (max-width: 720px) {
   .wait-token { flex-wrap: wrap; gap: 10px; }
@@ -2652,18 +2784,24 @@
 }
 .ds-app .zoom-status--broken .ic { color: var(--red); }
 
-/* Generate New Link card (secondary, sits at the bottom of the step) */
+/* Generate New Link — compact helper strip sitting just under the Zoom card.
+   Slimmer padding + muted surface so it reads as a secondary "fix it" action,
+   not a co-equal card. Negative margin pulls it tight against the Zoom card. */
 .ds-app .choice--secondary {
   border: 1px solid var(--border);
-  background: var(--surface);
-  padding: clamp(16px, 1.2vw + 8px, 22px);
+  background: var(--surface-2);
+  padding: 12px 16px;
   display: block;
   height: auto;
+  border-radius: var(--r-sm);
+  margin-top: -8px;
 }
+.ds-app .choice--secondary .choice-title { font-size: 14px; }
+.ds-app .choice--secondary .choice-desc { font-size: 12.5px; }
 .ds-app .choice-secondary__head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .ds-app .choice-secondary__head .choice-ic {

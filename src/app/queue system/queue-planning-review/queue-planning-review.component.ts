@@ -33,6 +33,7 @@ import { AhNotificationComponent } from '../../Participants Profile Management/p
 import { ChannelCommunicationComponent } from '../../Channel Communication/channel-communication/channel-communication.component';
 import * as XLSX from 'xlsx';
 import { T } from '@angular/cdk/keycodes';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface StageConfig {
   stageName: string;
@@ -88,6 +89,7 @@ interface MergedSlot {
     MatChipsModule,
     MatCheckboxModule,
     MatBadgeModule,
+    ProfilePictureComponent,
   ],
   templateUrl: './queue-planning-review.component.html',
   styleUrl: './queue-planning-review.component.css'

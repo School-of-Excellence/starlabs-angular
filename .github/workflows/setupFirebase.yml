@@ -46,6 +46,15 @@ jobs:
             picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
           };
           EOF
+
+          # Create Firebase Messaging
+          cat > src/firebase-messaging-sw.js << EOF
+          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-app.js');
+          importScripts('https://www.gstatic.com/firebasejs/7.6.0/firebase-messaging.js');
+
+          firebase.initializeApp($FIREBASE_TEST_CONFIG);
+          firebase.messaging();
+          EOF
       
       - name: Upload environment files
         uses: actions/upload-artifact@v4

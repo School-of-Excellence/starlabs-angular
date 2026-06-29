@@ -37,3 +37,22 @@
     color: rgb(3, 48, 63);
     border: 1px solid rgb(3, 48, 63);
   }
+.aiatc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #efe9fc;
+  color: #6c4ad6;
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.aiatc-badge .icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}

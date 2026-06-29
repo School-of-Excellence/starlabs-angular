@@ -7,6 +7,7 @@ import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { PeopleInvolvedComponent } from '../people-involved/people-involved.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { environment } from '../../../environments/environment';
 import { AssignQueueStudioComponent } from '../assign-queue-studio/assign-queue-studio.component';
 import { AvTestComponent } from '../av-test/av-test.component';
@@ -101,7 +102,7 @@ interface ProfileNotificationSummary {
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressSpinnerModule,
-    
+    ProfilePictureComponent,
   ],
   templateUrl: './dynamic-queue-manager-clone.component.html',
   styleUrl: './dynamic-queue-manager-clone.component.css'
@@ -163,6 +164,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   participantSubscription: Subscription;
   participantMetaDataMap = {};
+
+  // Set of profile ids approved for the selected queue's event (event participation
+  // request with arenaeventid == arena docid and status == 'approved'). Used to mark
+  // approved participants with a green check in the queue board.
+  approvedProfileIds: Set<string> = new Set();
+  // profileid -> event name they were approved for (arena event's `eventname`).
+  approvedEventNameMap: { [profileid: string]: string } = {};
 
   selectedStages: string[] = [];
   availableStagesForComm: any[] = [];
@@ -236,6 +244,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   mapTagsName = {};
   mapTagsMetaData = {};
   preassignedFilter: 'all' | 'preassigned' | 'not-preassigned' = 'all';
+  approvedFilter: 'all' | 'approved' | 'not-approved' = 'all';
+  approvedDropdownOpen: boolean = false;
   slotTitleMap: { [key: string]: string } = {};
 
   roundRobbinformData = {
@@ -908,6 +918,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.selectedSegments = [];
     this.selectedTags = [];
     this.preassignedFilter = 'all';
+    this.approvedFilter = 'all';
+    this.approvedDropdownOpen = false;
     this.dfuFilterActive = false;
     this.reminderTodayFilterActive = false;
     this.selectedStageSlot = null;
@@ -1170,6 +1182,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.processTokensIntoStages(this.allTokensData);
   }
 
+  onApprovedFilterChange() {
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
   //dharshan
   onStageSlotChange() {  
     if (!this.selectedStageSlot) {
@@ -1351,9 +1367,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     this.stageCountSubscription = collectionData(query(collection(this.firestore, 'stage opportunity count'),where('queuelist', 'array-contains', this.selectedQueue.docid))).pipe(takeUntil(this.subscriptionHandle),takeUntil(this.liveQueueSubscription)).subscribe(data => 
     {
-      this.stageCountCards = (data as any[]).sort((a: any, b: any) =>
-        (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
-      );
+      this.stageCountCards = (data as any[])
+        .filter((e: any) => e['kind'] !== 'phase')
+        .sort((a: any, b: any) =>
+          (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
+        );
     });
   }
 
@@ -1768,6 +1786,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     let count = 0
     this.currentQueueParticipants = [];
+    this.approvedProfileIds = new Set();
+
+    // Who got approved for this queue's event. Mirrors the chain used by Event
+    // Participation Confirmations: queue -> arena events (eventref == queue) ->
+    // event participation request (arenaeventid == arena docid, status approved).
+    this.loadApprovedProfileIds(this.selectedQueue.docid);
+
     var loading = this.dialog.open(LoadingProgressComponent, {
       data: {
         msg: "Staging Queue..."
@@ -2106,6 +2131,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         return !token['preassigned'] || Object.keys(token['preassigned']).length === 0 ||
           !Object.values(token['preassigned']).some((val: any) => val && val.length > 0);
       });
+    }
+
+    // Approved filter (approved for this queue's event)
+    if (this.approvedFilter === 'approved') {
+      filteredTokens = filteredTokens.filter(token => this.approvedProfileIds.has(token['profile_id']));
+    } else if (this.approvedFilter === 'not-approved') {
+      filteredTokens = filteredTokens.filter(token => !this.approvedProfileIds.has(token['profile_id']));
     }
     //dharshan
     if (this.selectedStageSlot) {
@@ -2604,6 +2636,68 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         selectedQueue: this.selectedQueue
       }
     })
+  }
+
+  // Build the set of approved profile ids for a queue, following the same chain
+  // as Event Participation Confirmations (which keys requests by arenaeventid,
+  // NOT by eventref). queue generation doc -> arena events whose eventref points
+  // at it -> their docids -> event participation request with status 'approved'.
+  async loadApprovedProfileIds(queueDocId: string) {
+    try {
+      const queueRef = doc(this.firestore, "queue generation", queueDocId);
+      const arenaSnap = await getDocs(query(
+        collection(this.firestore, 'arena events'), where('eventref', '==', queueRef)));
+      // arenaeventid -> event name (from the arena event's own `eventname` field).
+      const arenaEventName: { [arenaId: string]: string } = {};
+      const arenaIds: string[] = [];
+      arenaSnap.docs.forEach(d => {
+        const a = d.data();
+        if (a['delete'] == true || !a['docid']) return;
+        arenaIds.push(a['docid']);
+        arenaEventName[a['docid']] = a['eventname'] || '';
+      });
+
+      if (!arenaIds.length) {
+        this.approvedProfileIds = new Set();
+        this.approvedEventNameMap = {};
+        return;
+      }
+
+      const ids = new Set<string>();
+      const nameMap: { [profileid: string]: string } = {};
+      for (let i = 0; i < arenaIds.length; i += 10) {
+        const chunk = arenaIds.slice(i, i + 10);
+        const reqSnap = await getDocs(query(collection(this.firestore, 'event participation request'),
+          where('arenaeventid', 'in', chunk), where('status', '==', 'approved')));
+        reqSnap.docs.forEach(d => {
+          const x = d.data();
+          if (!x['profileid']) return;
+          ids.add(x['profileid']);
+          nameMap[x['profileid']] = arenaEventName[x['arenaeventid']] || '';
+        });
+      }
+      // Guard against a stale response after the user switched queues.
+      if (this.selectedQueue?.docid === queueDocId) {
+        this.approvedProfileIds = ids;
+        this.approvedEventNameMap = nameMap;
+      }
+      console.log('approved profiles for queue', queueDocId, ids.size, 'from', arenaIds.length, 'arena(s)');
+    } catch (e) {
+      console.log('loadApprovedProfileIds failed', e);
+    }
+  }
+
+  // True when this token's participant was approved for the event (event
+  // participation request status == 'approved'). Drives the green check icon.
+  isApproved(token: any): boolean {
+    return !!token && this.approvedProfileIds.has(token['profile_id']);
+  }
+
+  // Event name this participant was approved for (from the arena event's
+  // `eventname`); falls back to the queue name then a generic label.
+  approvedEventName(token: any): string {
+    return (token && this.approvedEventNameMap[token['profile_id']])
+      || this.selectedQueue?.queuename || 'this event';
   }
 
   getPreassignedEntries(token: any): Array<{ key: string, value: string[] }> {
@@ -4907,6 +5001,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
     this.stageSlotDropdownOpen = false;
+    this.approvedDropdownOpen = false;
+  }
+
+  toggleApprovedDropdown() {
+    if (this.dfuFilterActive || !!this.selectedStageSlot) return;
+    this.approvedDropdownOpen = !this.approvedDropdownOpen;
+    this.segmentDropdownOpen = false;
+    this.tagDropdownOpen = false;
+    this.stageSlotDropdownOpen = false;
+    this.preassignedDropdownOpen = false;
   }
 
   toggleStageSlotDropdown() {
@@ -5121,6 +5225,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     count += this.selectedSegments.length;
     count += this.selectedTags.length;
     if (this.preassignedFilter !== 'all') count++;
+    if (this.approvedFilter !== 'all') count++;
     if (this.selectedStageSlot) count++;
     if (this.dateRangeStart && this.dateRangeEnd) count++;
     if (this.selectedTimeSlots?.length > 0) count++;

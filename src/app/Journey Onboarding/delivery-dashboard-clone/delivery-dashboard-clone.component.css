@@ -16120,6 +16120,11 @@ table.specialist-table tr:hover td {
   transition: background 0.12s !important;
 }
 
+:host .dd-app .dd-statbadge--ended {
+  cursor: pointer !important;
+  transition: background 0.12s !important;
+}
+
 :host .dd-app .dd-statbadge--active:hover {
   background: #dbeafe !important;
 }
@@ -17493,4 +17498,307 @@ i.seat-chip {
   .spec-grid { grid-template-columns: 1fr; }
   .spec-card-counts .scc-lbl { display: none; }
   .scc-item { min-width: 42px; }
+}
+
+
+/* ============================================================
+   PRODUCTS ROW — 7-column grid fix (UP Confirmed added)
+   Placed at the END of the file to win all cascade conflicts
+   ============================================================ */
+
+:host .dd-app .dd-prow-colhead,
+:host .dd-app .dd-prow {
+  display: grid !important;
+  grid-template-columns:
+    minmax(160px, 1.8fr)
+    minmax(56px, 0.55fr)
+    minmax(64px, 0.6fr)
+    minmax(0, 2.2fr)
+    minmax(0, 2.6fr)
+    minmax(0, 1.3fr)
+    minmax(0, 1.1fr) !important;
+  gap: 0 !important;
+  align-items: center !important;
+}
+
+/* Colhead cells */
+:host .dd-app .dd-prow-colhead {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px 10px 0 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+:host .dd-app .dd-prow-colhead__cell {
+  padding: 7px 14px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+:host .dd-app .dd-prow-colhead__cell:last-child {
+  border-right: none;
+}
+
+:host .dd-app .dd-prow-colhead__cell--group {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 0 4px;
+}
+
+:host .dd-app .dd-colhead__grp-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #334155;
+  padding-left: 14px;
+}
+
+:host .dd-app .dd-colhead__grp-tags {
+  display: flex;
+  width: 100%;
+  gap: 0;
+}
+
+:host .dd-app .dd-colhead__grp-tags span {
+  flex: 1;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 2px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Data row cells */
+:host .dd-app .dd-prow {
+  border-bottom: 1px solid #f1f5f9;
+  min-height: 68px;
+  transition: background 0.14s;
+  cursor: pointer;
+}
+
+:host .dd-app .dd-prow:last-child {
+  border-bottom: none;
+}
+
+:host .dd-app .dd-prow:hover {
+  background: #f8faff;
+}
+
+:host .dd-app .dd-prow > * {
+  padding: 12px 14px;
+  border-right: 1px solid #f1f5f9;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+:host .dd-app .dd-prow > *:last-child {
+  border-right: none;
+}
+
+/* UP Confirmed cell */
+:host .dd-app .dd-prow__upconfirmed {
+  justify-content: center !important;
+  padding: 0 8px !important;
+}
+
+:host .dd-app .dd-upconfirmed-count {
+  cursor: pointer;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: underline;
+  text-decoration-color: #bfdbfe;
+  text-underline-offset: 2px;
+}
+
+:host .dd-app .dd-upconfirmed-count:hover {
+  color: #1d4ed8;
+}
+
+/* Chips sub-grid */
+:host .dd-app .dd-prow > .dd-prow__chips {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  align-items: stretch !important;
+  height: 100% !important;
+  padding: 0 !important;
+}
+
+/* Funnel sub-grid */
+:host .dd-app .dd-prow > .dd-prow__funnel {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  align-items: stretch !important;
+  height: 100% !important;
+  padding: 0 !important;
+  position: relative !important;
+}
+
+/* Time cell */
+:host .dd-app .dd-prow > .dd-prow__time {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+}
+
+/* Status cell */
+:host .dd-app .dd-prow > .dd-prow__status {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+}
+
+.profile-products {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.product-tag {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 0.5px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+/* Product name */
+.product-tag > span:first-child {
+  font-weight: 500;
+  min-width: 130px;
+}
+
+/* Status pill */
+.status-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 99px;
+}
+
+.status-tag.active {
+  background: #EAF3DE;
+  color: #3B6D11;
+}
+
+.status-tag.pending {
+  background: #FAEEDA;
+  color: #854F0B;
+}
+
+.status-tag.na {
+  background: #F1EFE8;
+  color: #444441;
+}
+
+.status-tag.inactive {
+  background: #FCEBEB;
+  color: #A32D2D;
+}
+
+/* Reason wrapper */
+.product-tag > span:nth-child(3) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+/* "Reason:" label */
+.product-tag > span:nth-child(3) > .fw-bold:first-child {
+  font-size: 11px;
+  font-weight: 500;
+  color: #000;
+}
+
+/* Mode chip */
+.product-tag > span:nth-child(3) > span:nth-child(2) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: #f5f5ff;
+  border: 0.5px solid #c5c2f0;
+  color: #444441;
+}
+
+.product-tag > span:nth-child(3) > span:nth-child(2) .fw-bold {
+  color: #534AB7;
+  font-weight: 500;
+}
+
+/* Remaining Payable chip */
+.product-tag > span:nth-child(3) > span:nth-child(3) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: #FAEEDA;
+  border: 0.5px solid #FAC775;
+  color: #854F0B;
+}
+
+.product-tag > span:nth-child(3) > span:nth-child(3) .fw-bold {
+  color: #854F0B;
+  font-weight: 500;
+}
+
+/* Initiate button */
+.dd-initiate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #534AB7;
+  color: #EEEDFE;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  margin-left: auto;
+}
+
+.dd-initiate-btn:hover {
+  background: #3C3489;
+}
+
+.dd-initiate-btn:active {
+  transform: scale(0.97);
 }

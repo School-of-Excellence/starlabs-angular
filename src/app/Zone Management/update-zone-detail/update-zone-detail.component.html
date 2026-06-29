@@ -27,7 +27,10 @@
       <mat-label>Coordinator</mat-label>
       <mat-select [(ngModel)]="selectedCoordinators" multiple>
         <mat-option *ngFor="let coordinator of data.teammemberlist" [value]="coordinator['profileid']">
-          {{ coordinator['name'] }}
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <app-profile-picture [profileId]="coordinator['profileid']" [name]="coordinator['name']" [size]="24"></app-profile-picture>
+            <span>{{ coordinator['name'] }}</span>
+          </span>
         </mat-option>
       </mat-select>
     </mat-form-field>
@@ -37,7 +40,10 @@
       <mat-label>Mentor</mat-label>
       <mat-select [(ngModel)]="selectedMentors" multiple>
         <mat-option *ngFor="let mentor of data.teammemberlist" [value]="mentor['profileid']">
-          {{ mentor['name'] }}
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <app-profile-picture [profileId]="mentor['profileid']" [name]="mentor['name']" [size]="24"></app-profile-picture>
+            <span>{{ mentor['name'] }}</span>
+          </span>
         </mat-option>
       </mat-select>
     </mat-form-field>

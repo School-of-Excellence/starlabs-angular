@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 export interface ZoneDialogData {
   zonedata?: any; // Existing zone data for edit mode
@@ -30,7 +31,8 @@ export interface ZoneDialogResult {
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    ProfilePictureComponent
   ],
   templateUrl: './update-zone-detail.component.html',
   styleUrl: './update-zone-detail.component.css'

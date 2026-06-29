@@ -20,11 +20,13 @@ import { Timestamp } from '@angular/fire/firestore';
 import { MatDatepickerModule, MatDatepickerInputEvent } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatIconModule } from '@angular/material/icon';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 
 @Component({
   selector: 'app-participant-product',
   imports: [
+    ProfilePictureComponent,
     CommonModule,
     FormsModule,
     MatFormFieldModule,

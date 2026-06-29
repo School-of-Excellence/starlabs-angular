@@ -27,7 +27,7 @@
           </circle>
         </svg>
         <div class="timer-text">
-          <span class="time" [class.warning]="expiryInSeconds <= 30">{{ expiryInSeconds }}</span>
+          <span class="time" [class.warning]="expiryInSeconds <= 30" data-testid="qia-countdown">{{ expiryInSeconds }}</span>
           <span class="label">SECONDS</span>
         </div>
       </div>
@@ -37,7 +37,7 @@
         <p *ngIf="expiryInSeconds <= 0">⏱️ Time expired</p>
       </div>
 
-      <button mat-stroked-button color="warn" class="cancel-btn" (click)="cancel()">
+      <button mat-stroked-button color="warn" class="cancel-btn" (click)="cancel()" data-testid="qia-cancel-btn">
         Cancel Invitation
       </button>
     </div>

@@ -11,7 +11,7 @@
             <mat-radio-button style="margin-right: 25px;" value="atc">ATC Log</mat-radio-button>
             <mat-radio-button value="queue activity log">Queue Activity</mat-radio-button>
           </mat-radio-group>
-          &nbsp;<button mat-raised-button type="button" (click)="exportCSV()">Export CSV</button>
+          &nbsp;<button mat-raised-button type="button" (click)="exportCSV()" data-testid="activitylog-export">Export CSV</button>
         </div>
       </div>
     </div>
@@ -76,17 +76,27 @@
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let profile of filterProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
+              <mat-option *ngFor="let profile of filterProfileList()" [value]="profile.profileid">
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="profile.profileid" [name]="profile.name" [size]="24"></app-profile-picture>
+                  <span>{{profile.name}}</span>
+                </span>
+              </mat-option>
             </mat-select>
           </mat-form-field>
-  
+
           <mat-form-field class="ml-3" appearance="outline">
             <mat-label>Filter Participant</mat-label>
             <mat-select [(ngModel)]="filter.selectedProfile" (selectionChange)="onFilter()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let profile of filterProfileList()" [value]="profile.profileid">{{profile.name}}</mat-option>
+              <mat-option *ngFor="let profile of filterProfileList()" [value]="profile.profileid">
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="profile.profileid" [name]="profile.name" [size]="24"></app-profile-picture>
+                  <span>{{profile.name}}</span>
+                </span>
+              </mat-option>
             </mat-select>
           </mat-form-field>
   

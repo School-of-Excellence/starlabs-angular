@@ -21,6 +21,7 @@
       <div class="select-wrapper">
         <select 
           class="select-input"
+          data-testid="validate-marathon-select"
           [ngModel]="selectedMarathonId"
           (ngModelChange)="onMarathonChange($event)">
           <option [ngValue]="null" disabled>Select Marathon</option>
@@ -89,7 +90,7 @@
     <div class="assignments-list" *ngIf="selectedMarathonId && !loadingAssignments">
       <div 
         *ngFor="let assignment of filteredAssignments"
-        class="assignment-item"
+        class="assignment-item" data-testid="validate-assignment-item" [attr.data-assignment-id]="assignment.id"
         [class.active]="selectedAssignmentId === assignment.id"
         (click)="onAssignmentChange(assignment.id)">
         <div class="assignment-indicator" [style.background]="themeColor"></div>
@@ -205,7 +206,7 @@
     <!-- Kanban Board -->
     <div class="kanban-wrapper" *ngIf="selectedAssignment && !loadingParticipants">
       <div class="kanban-board">
-        <div *ngFor="let status of statusList" class="kanban-column">
+        <div *ngFor="let status of statusList" data-testid="validate-col" [attr.data-status]="status" class="kanban-column">
           
           <!-- Column Header -->
           <div class="column-header" [style.borderColor]="themeColor">
@@ -213,7 +214,7 @@
               <mat-icon class="column-icon">{{ statusIcons[status] }}</mat-icon>
               <span class="column-title">{{ status }}</span>
             </div>
-            <span class="column-count" [style.background]="themeColor">{{ getStatusCount(status) }}</span>
+            <span class="column-count" [style.background]="themeColor" data-testid="validate-col-count">{{ getStatusCount(status) }}</span>
           </div>
 
           <!-- Search -->
@@ -235,7 +236,7 @@
               <span>Select All</span>
             </button>
             <button 
-              class="move-all-btn"
+              class="move-all-btn" data-testid="validate-bulk-move"
               [matMenuTriggerFor]="bulkMoveMenu"
               [disabled]="getSelectedCount(status) === 0"
               matTooltip="Move selected">
@@ -244,7 +245,7 @@
             </button>
             <mat-menu #bulkMoveMenu="matMenu" class="move-menu">
               <div class="menu-header">Move to</div>
-              <button mat-menu-item *ngFor="let s of filteredStatus(status)" (click)="moveParticipant(status, s)">
+              <button mat-menu-item *ngFor="let s of filteredStatus(status)" data-testid="validate-move-to" [attr.data-status]="s" (click)="moveParticipant(status, s)" data-testid="validate-move-to">
                 <mat-icon>{{ statusIcons[s] }}</mat-icon>
                 <span>{{ s }}</span>
               </button>
@@ -279,7 +280,7 @@
                 <!-- Review Button -->
                 <button 
                   *ngIf="status === 'review'"
-                  class="action-btn-sm review"
+                  class="action-btn-sm review" data-testid="validate-review"
                   (click)="review(p)"
                   matTooltip="Review">
                   <mat-icon>visibility</mat-icon>
@@ -287,14 +288,14 @@
                 
                 <!-- Move Button -->
                 <button 
-                  class="action-btn-sm move"
+                  class="action-btn-sm move" data-testid="validate-single-move"
                   [matMenuTriggerFor]="singleMoveMenu"
                   matTooltip="Move">
                   <mat-icon>arrow_forward</mat-icon>
                 </button>
                 <mat-menu #singleMoveMenu="matMenu" class="move-menu">
                   <div class="menu-header">Move to</div>
-                  <button mat-menu-item *ngFor="let s of filteredStatus(status)" (click)="moveSingleParticipant(p.docid, status, s)">
+                  <button mat-menu-item *ngFor="let s of filteredStatus(status)" data-testid="validate-move-to" [attr.data-status]="s" (click)="moveSingleParticipant(p.docid, status, s)">
                     <mat-icon>{{ statusIcons[s] }}</mat-icon>
                     <span>{{ s }}</span>
                   </button>

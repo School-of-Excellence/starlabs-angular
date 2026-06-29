@@ -3,11 +3,12 @@ import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule }
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, serverTimestamp, arrayUnion, writeBatch, getFirestore, documentId } from '@angular/fire/firestore';
-import { Observable, Subscription, combineLatest } from 'rxjs';
+import { Observable, Subscription, combineLatest, firstValueFrom } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -66,7 +67,7 @@ interface CompletionProduct {
     bonusCompletions: number;
     purchasedCompletions: number;
     activeSubUsers: number;
-    noSubUsers: number;
+    // noSubUsers: number;
     avgInitToStart: number;
     avgStartToDone: number;
     eligiblePct: number;
@@ -142,7 +143,8 @@ interface UtilizationRow {
         MatDatepickerModule,
         MatNativeDateModule,
         MatInputModule,
-        MatSlideToggleModule
+        MatSlideToggleModule,
+        ProfilePictureComponent
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',
@@ -204,7 +206,7 @@ export class DeliveryDashboardCloneComponent {
     groupedFiltered: { [key: string]: any[] } = {};
     groupedThisMonth: { [key: string]: any[] } = {};
     groupedNextMonth: { [key: string]: any[] } = {};
-    modalType: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible' = 'all';
+    modalType: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible' | 'nonactive' = 'all';
     stageModalType: string = '';
     groupedScheduled: any = {};
     groupedAwaiting: { [key: string]: any[] } = {};
@@ -216,7 +218,8 @@ export class DeliveryDashboardCloneComponent {
     groupedBonus: { [key: string]: any[] } = {};
     groupedAddons: { [key: string]: any[] } = {};
     groupedPurchased: { [key: string]: any[] } = {};
-    groupedNotEligible: { [key: string]: any[] } = {}
+    groupedNotEligible: { [key: string]: any[] } = {};
+    groupedNonActive: { [key: string]: any[] } = {};
     avgInitToStart: { [key: string]: number } = {};
     avgStartToComplete: { [key: string]: number } = {};
     avgModalOpen = false;
@@ -266,7 +269,7 @@ export class DeliveryDashboardCloneComponent {
             'CTD Platinum',
             'CTD Diagnostics And Implementation'
         ],
-        'EI Solution': [
+        'EI Custom Solutions': [
             'EI Solution',
             'EI Solution for Wife',
             'EI Solution for Husband',
@@ -417,7 +420,7 @@ export class DeliveryDashboardCloneComponent {
     products = [
         { label: 'WiSH', value: 'WiSH' },
         { label: 'A&H Light', value: 'A&H Light' },
-        { label: 'EI Solution', value: 'EI Solution' },
+        { label: 'EI Solution', value: 'EI Custom Solutions' },
         { label: 'EI Starter Pack', value: 'EI Starter Pack' },
         {
             label: 'Critical Support',
@@ -557,6 +560,14 @@ export class DeliveryDashboardCloneComponent {
     tentativeStartDate: Date | null = null;
     selectedDeliveryType: string = '';
     mergedSeatSlots: any[] = [];
+
+    upConfirmedMap: any = {};
+    upConfirmedModalOpen = false;
+    selectedUPConfirmedParticipants: any[] = [];
+    selectedUPConfirmedProduct = '';
+    approvedDFUParticipants: any[] = [];
+    dfuProductIds: string[] = [];
+    dfuProducts: any[] = [];
 
     productData: any = {
         eiStarterPack: {
@@ -892,6 +903,8 @@ export class DeliveryDashboardCloneComponent {
                     return acc;
                 }, {} as Record<string, string>);
 
+            await this.getApprovedDFUParticipants();
+
             // Process users (depends on mapprofile from metadata)
             this.coachesList = usersSnap.docs
                 .map((e) => e.data())
@@ -991,6 +1004,7 @@ export class DeliveryDashboardCloneComponent {
             const groupedAddons = {}
             const groupedPurchased = {};
             const groupedNotEligible = {};
+            const groupedNonActive = {};
             const funnelData = {};
             const avgInitToStart = {};
             const avgStartToComplete = {};
@@ -1022,6 +1036,15 @@ export class DeliveryDashboardCloneComponent {
 
                     if (isEligible) {
                         (groupedFiltered[productId] ||= []).push(item);
+
+                        const today = new Date();
+                        const endDate =
+                            item['subscriptionend']?.toDate?.() ||
+                            new Date(item['subscriptionend']);
+
+                        if (endDate < today) {
+                            (groupedNonActive[productId] ||= []).push(item);
+                        }
 
                         if (tentativestart?.toDate) {
                             const d = tentativestart.toDate();
@@ -1081,6 +1104,7 @@ export class DeliveryDashboardCloneComponent {
             this.groupedAddons = groupedAddons;
             this.groupedPurchased = groupedPurchased;
             this.groupedNotEligible = groupedNotEligible;
+            this.groupedNonActive = groupedNonActive;
             this.funnelData = funnelData;
 
             this.currentSelectedLabels = this.productFilterControl.value as string[] || [];
@@ -1112,7 +1136,7 @@ export class DeliveryDashboardCloneComponent {
         // Clear previous product's data immediately so stale cards don't show while loading
         this.productData = {
             eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
-            eiCustomSolutions: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            eiCustomSolutions: { totalEligible: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
             criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
         };
         const productId = this.mapProductGroupId[product];
@@ -1268,9 +1292,6 @@ export class DeliveryDashboardCloneComponent {
 
             eiCustomSolutions: {
                 totalEligible: [],
-                pastMonth: [],
-                thisMonth: [],
-                nextMonth: [],
                 diagnostics: [],
                 implementation: [],
                 review: [],
@@ -1292,7 +1313,11 @@ export class DeliveryDashboardCloneComponent {
         this.selectedProductType = productType;
         const allAppointments = this.allAppointments;
         try {
-            const totalEligible = this.getCardGroupedFiltered(productId);
+            const totalEligibleAll = this.getCardGroupedFiltered(productId);
+
+            const totalEligible = totalEligibleAll.filter(
+                data => data.status === 'initiated'
+            );
             if (this.selectedProductType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
             }
@@ -1300,7 +1325,7 @@ export class DeliveryDashboardCloneComponent {
                 for (let data of totalEligible) {
                     const { status, tentativestart } = data;
 
-                    if (status === null || status === "initiated") {
+                    if (status === "initiated") {
                         if (!tentativestart) productData.eiStarterPack.totalEligible.push(data);
                         else if (tentativestart) {
                             const date = tentativestart.toDate();
@@ -1310,6 +1335,9 @@ export class DeliveryDashboardCloneComponent {
                         }
                     }
                 };
+            }
+            else if (this.selectedProductType === 'eiCustomSolutions') {
+                productData.eiCustomSolutions.totalEligible = [...totalEligible];
             }
 
             // Total Eligible
@@ -1348,11 +1376,6 @@ export class DeliveryDashboardCloneComponent {
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
                         if (!data.tentativestart) {
                             productData.eiCustomSolutions.totalEligible.push(mergedData);
-                        } else {
-                            const date = data.tentativestart.toDate();
-                            const itemMonth = date.getMonth();
-                            const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, this.selectedProductType);
                         }
                     }
                 }
@@ -1485,10 +1508,10 @@ export class DeliveryDashboardCloneComponent {
 
                 if (productType === 'eiStarterPack') {
                     productData.eiStarterPack.celebrationCall.push(data);
-                }
-
-                if (productType === 'criticalSupport') {
+                } else if (productType === 'criticalSupport') {
                     productData.criticalSupport.completion.push(data);
+                } else if (productType === 'eiCustomSolutions') {
+                    productData.eiCustomSolutions.celebrationCall.push(data);
                 }
             }
             Object.assign(this.productData, productData);
@@ -1616,7 +1639,7 @@ export class DeliveryDashboardCloneComponent {
             } else if (app?.formname === 'Critical Support Pre Form') {
                 typeName = 'Pre-Process';
             } else if (app?.formname === 'Critical Support Post Form') {
-                typeName = 'Post-Process Form'
+                typeName = 'Post-Process Form';
             } else if (app?.formname === 'EI Starter Pack Post Session Check-in') {
                 typeName = 'Post Session Check-in';
             }
@@ -1801,9 +1824,109 @@ export class DeliveryDashboardCloneComponent {
         });
     }
 
+
+    async getApprovedDFUParticipants() {
+        try {
+            const eventRef = doc(
+                this.firestore,
+                'event collection/E3UNqXFyW477MdmLBkhg'
+            );
+
+            const dfuProductSet = new Set(this.dfuProductIds);
+
+            const approvedRequestsSnap = await getDocs(
+                query(
+                    collection(this.firestore, 'event participation request'),
+                    where('eventref', '==', eventRef),
+                    where('status', '==', 'approved')
+                )
+            );
+
+            const filteredParticipants: any[] = [];
+            approvedRequestsSnap.forEach((requestDoc) => {
+                const requestData: any = requestDoc.data();
+                const participantMeta =
+                    this.mapMetaData?.[requestData.profileid];
+
+                if (!participantMeta) {
+                    return;
+                }
+
+                const activeProducts =
+                    participantMeta.activeproduct || [];
+                const matchedDFUProducts = activeProducts.filter(
+                    (productId: string) =>
+                        dfuProductSet.has(productId)
+                );
+                if (matchedDFUProducts.length > 0) {
+                    filteredParticipants.push({
+                        requestId: requestDoc.id,
+                        ...requestData,
+                        participantMeta,
+                        matchedDFUProducts
+                    });
+                }
+            });
+            this.approvedDFUParticipants = filteredParticipants;
+
+            // Product-wise grouping
+            this.upConfirmedMap = {};
+            this.approvedDFUParticipants.forEach(
+                (participant: any) => {
+                    participant.matchedDFUProducts.forEach(
+                        (productId: string) => {
+                            if (!this.upConfirmedMap[productId]) {
+                                this.upConfirmedMap[productId] = [];
+                            }
+                            this.upConfirmedMap[productId].push(
+                                participant
+                            );
+                        }
+                    );
+                }
+            );
+
+        } catch (error) {
+            console.error(
+                'Error fetching approved DFU participants:',
+                error
+            );
+
+            this.approvedDFUParticipants = [];
+            this.upConfirmedMap = {};
+        }
+    }
+
+    getUPConfirmedCount(productId: string): number {
+        return this.upConfirmedMap?.[productId]?.length || 0;
+    }
+
+    openUPConfirmedModal(productId: string) {
+
+        this.selectedUPConfirmedProduct =
+            this.mapProductName?.[productId] ||
+            this.mapProduct?.[productId] ||
+            productId;
+
+        this.selectedUPConfirmedParticipants =
+            this.upConfirmedMap?.[productId] || [];
+
+        this.upConfirmedModalOpen = true;
+    }
+
+    closeUPConfirmedModal() {
+        this.upConfirmedModalOpen = false;
+        this.selectedUPConfirmedParticipants = [];
+    }
+
     async fetchDFUProductData() {
         const dfuProducts = this.rawProductData.filter((e) => e['type']?.toLowerCase() == 'dfu');
+        this.dfuProducts = dfuProducts;
+        this.rawProductData.forEach((product: any) => {
+            this.mapProduct[product.id] = product.product;
+        });
         const dfuProductIds = Array.from(new Set(dfuProducts.map((p) => p['id'])));
+        this.dfuProductIds = dfuProductIds;
         const rejectedStatuses = new Set(['cancelled', 'shifted']);
         const activeProfileIds = new Set(
             Object.keys(this.mapMetaData).filter((pid) => {
@@ -2426,9 +2549,9 @@ export class DeliveryDashboardCloneComponent {
     get selectedDayBookedCount(): number {
         return (this.selectedSpecialistSlots || []).filter((s: any) => s.booked).length;
     }
-    // get selectedDayUnavailableCount(): number {
-    //     return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
-    // }
+    get selectedDayUnavailableCount(): number {
+        return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
+    }
 
     // Find the appointment occupying a slot's time for this specialist — works for
     // both "booked" slots (this appointment type) and "unavailable" slots (the
@@ -2563,7 +2686,7 @@ export class DeliveryDashboardCloneComponent {
         }
         return result;
     }
-    
+
     // Resolve the participant a booking belongs to. Real appointment docs store
     // the client in `bookedby` (a profile_data ref → has `.id`/`.path`); our
     // optimistic local appointments use `profileid`. Handle both + a name map.
@@ -2950,6 +3073,10 @@ export class DeliveryDashboardCloneComponent {
         return this.getCardProductIds(cardId).flatMap((pid) => this.groupedNotEligible[pid] || []);
     };
 
+    getCardGroupedNonActive(cardId: string): any[] {
+        return this.getCardProductIds(cardId).flatMap((pid) => this.groupedNonActive[pid] || []);
+    };
+
     getCardFunnel(cardId: string): any {
         const pids = this.getCardProductIds(cardId);
         return {
@@ -3001,7 +3128,7 @@ export class DeliveryDashboardCloneComponent {
         return this.getCardProductIds(cardId).reduce((sum, pid) => sum + this.getNonActiveSub(pid), 0);
     }
 
-    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible') {
+    openCardModal(cardId: string, type: 'all' | 'filtered' | 'thismonth' | 'nextmonth' | 'bonus' | 'purchased' | 'noteligible' | 'nonactive') {
         this.selectedProductId = cardId;
         this.modalType = type;
         this.selectedStatus = 'all';
@@ -3015,6 +3142,7 @@ export class DeliveryDashboardCloneComponent {
             case 'bonus': source = this.getCardGroupedBonus(cardId); break;
             case 'purchased': source = this.getCardGroupedPurchased(cardId); break;
             case 'noteligible': source = this.getCardGroupedNotEligible(cardId); break;
+            case 'nonactive': source = this.getCardGroupedNonActive(cardId); break;
         }
 
         const grouped = {};
@@ -4994,16 +5122,6 @@ export class DeliveryDashboardCloneComponent {
         return this.activeFilter !== 'none';
     }
 
-    openParticipantPurchase(participant: any): void {
-        const participantId = participant['profileid'];
-        if (participantId) {
-            const url = this.router.createUrlTree(['/participantpurchase', participantId]).toString();
-            window.open(url, '_blank');
-        } else {
-            console.error('Participant ID not found', participant);
-        }
-    }
-
     onKanbanColumnClick(filterType: string) {
         this.isFilterButtonClick = true;
 
@@ -5170,7 +5288,7 @@ export class DeliveryDashboardCloneComponent {
                 bonusCompletions,
                 purchasedCompletions,
                 activeSubUsers: this.getCardActiveSub(cardId),
-                noSubUsers: this.getCardNonActiveSub(cardId),
+                // noSubUsers: this.groupedNonActive[cardId].length,
                 avgInitToStart: initToStartCnt > 0 ? Math.round(initToStartSum / initToStartCnt) : 0,
                 avgStartToDone: startToDoneCnt > 0 ? Math.round(startToDoneSum / startToDoneCnt) : 0,
                 eligiblePct: eligible > 0 ? Math.round((completedCount / eligible) * 100) : 0,
@@ -5205,6 +5323,18 @@ export class DeliveryDashboardCloneComponent {
         return !this.excludedModes.has(mode?.toLowerCase().trim()) && (totalBalance <= 0 || totalPaid >= minPayment);
     }
 
+    isSubscriptionEnded(item: any): boolean {
+        if (!item?.['subscriptionend']) {
+            return false;
+        }
+
+        const endDate =
+            item['subscriptionend']?.toDate?.() ||
+            new Date(item['subscriptionend']);
+
+        return endDate < new Date();
+    }
+
     exportProfileModal(): void {
         const rows: any[] = [];
         let index = 1;
@@ -5231,6 +5361,17 @@ export class DeliveryDashboardCloneComponent {
                         row['Total Payable'] = this.formatPrice(this.mapMetaData[pid]?.['pp_totalpaid'] || '');
                         row['Remaining Payment'] = this.formatPrice(((item?.['minimumpayment'] || 0) - (this.mapMetaData[pid]?.['pp_totalpaid'] || 0)));
                     }
+                }
+
+                const today = new Date();
+                const endDate =
+                    item['subscriptionend']?.toDate?.() ||
+                    (item['subscriptionend']
+                        ? new Date(item['subscriptionend'])
+                        : null);
+
+                if (endDate && endDate < today) {
+                    row['Subscription End Date'] = endDate;
                 }
 
                 rows.push(row);
@@ -5263,6 +5404,30 @@ export class DeliveryDashboardCloneComponent {
         }
 
         this.downloadExcel(rows, `${this.getCardName(this.funnelModalProductId!)}_${this.funnelModalType}`);
+    }
+
+    exportUPConfirmedParticipants(): void {
+
+        const rows: any[] = [];
+
+        this.selectedUPConfirmedParticipants.forEach((p: any, index: number) => {
+
+            rows.push({
+                '#': index + 1,
+                'Profile ID': p.profileid,
+                'Participant': this.mapMetaData[p.profileid]?.['name'] || '',
+                'Product(s)': p.matchedDFUProducts
+                    ?.map((productId: string) => this.mapProductName[productId] || productId)
+                    .join(', '),
+                'uP! Event': 'Approved'
+            });
+
+        });
+
+        this.downloadExcel(
+            rows,
+            `${this.selectedUPConfirmedProduct}_UP_Confirmed`
+        );
     }
 
     getCompletionProductsVisible(): CompletionProduct[] {
@@ -5344,7 +5509,7 @@ export class DeliveryDashboardCloneComponent {
             bonusCompletions,
             purchasedCompletions,
             activeSubUsers: this.getCardActiveSub(cardId),
-            noSubUsers: this.getCardNonActiveSub(cardId),
+            // noSubUsers: this.groupedNonActive[cardId].length,
             avgInitToStart: initToStartCnt > 0 ? Math.round(initToStartSum / initToStartCnt) : 0,
             avgStartToDone: startToDoneCnt > 0 ? Math.round(startToDoneSum / startToDoneCnt) : 0,
             eligiblePct: eligible > 0 ? Math.round((completedCount / eligible) * 100) : 0,
@@ -6373,5 +6538,9 @@ export class DeliveryDashboardCloneComponent {
 
         this.currentPage = 1;
         this.calculatePagination();
+    }
+
+    openParticipant(profileId: string) {
+        this.router.navigate(['/profilesummary', profileId]);
     }
 }

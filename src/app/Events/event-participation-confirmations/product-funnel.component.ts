@@ -1,11 +1,11 @@
 import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp, updateDoc, setDoc
+  doc, getDoc, writeBatch, serverTimestamp, updateDoc, setDoc
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -30,9 +30,10 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
-type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended';
+type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'overallRequested';
 
 interface ImportPreviewRow { name: string; email: string; }
+interface Split { key: string; label: string; count: number; }
 
 interface PRow {
   profileid: string;
@@ -55,6 +56,7 @@ interface PRow {
   scanned: boolean;
   attendanceState: string;
   reason: string;
+  requestedDate: number;
   journey: string;
   subEnd: number;
   subActive: boolean;
@@ -64,6 +66,7 @@ interface PRow {
   paid: number | null;
   customerStatus: string;
   metaLoaded: boolean;
+  subLoaded: boolean;
   metaError: boolean;
 }
 
@@ -147,6 +150,53 @@ export class ProductFunnelComponent implements OnInit {
     return t ? Math.min(100, Math.round((this.counts[key] / t) * 100)) : 0;
   }
 
+  // Per-segment breakdown by the actual customerstatus values found (only non-zero buckets).
+  statusSplits: Record<SegmentKey, Split[]> = {} as Record<SegmentKey, Split[]>;
+  customerStatusList: { key: string; label: string }[] = [];   // distinct statuses, for the filter
+  splitsReady = false;
+  // Loads customerstatus for every row in the background, then computes the breakdown.
+  private async loadSplits() {
+    try {
+      await this.loadMeta(this.rows);
+      this.computeSplits(this.rows);
+      this.splitsReady = true;
+    } catch (e) { console.log('split load failed', e); }
+  }
+  // Group key (merges case/spacing) and display label for a raw customerstatus value.
+  statusKey(s: string): string { return (s || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'notset'; }
+  private statusLabel(s: string): string { return (s || '').trim() || 'Not set'; }
+  // Per-segment customerstatus counts (only non-zero buckets), shown inline in the summary.
+  statusSplit(key: SegmentKey): Split[] { return this.statusSplits[key] ?? []; }
+  private readonly statusColors: Record<string, string> = {
+    active: '#1f8a3b', nonactive: '#c25e00', discontinued: '#d70015', notset: '#8e8e93'
+  };
+  private readonly statusPalette = ['#534ab7', '#1d9e75', '#d4537e', '#854f0b', '#185fa5', '#993556'];
+  statusColor(key: string): string {
+    if (this.statusColors[key]) return this.statusColors[key];
+    const idx = this.customerStatusList.findIndex(s => s.key === key);
+    return this.statusPalette[(idx >= 0 ? idx : 0) % this.statusPalette.length];
+  }
+  private computeSplits(rows: PRow[]): void {
+    const keys: SegmentKey[] = ['potential', 'requested', 'notRequested', 'eligible', 'noProduct', 'inQueue', 'approved', 'attended', 'noShow', 'unattended'];
+    const out = {} as Record<SegmentKey, Split[]>;
+    const allStatuses = new Map<string, string>();
+    for (const k of keys) {
+      const inSeg = rows.filter(r => this.matchesSegment(r, k));
+      const m = new Map<string, Split>();
+      for (const r of inSeg) {
+        const gk = this.statusKey(r.customerStatus);
+        const label = this.statusLabel(r.customerStatus);
+        allStatuses.set(gk, label);
+        const e = m.get(gk) ?? { key: gk, label, count: 0 };
+        e.count++; m.set(gk, e);
+      }
+      out[k] = [...m.values()].filter(e => e.count > 0).sort((a, b) => b.count - a.count);
+    }
+    this.statusSplits = out;
+    this.customerStatusList = [...allStatuses.entries()].map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
   mapProfile: Record<string, any> = {};
   mapEmailData: Record<string, any> = {};
   mapProduct: Record<string, string> = {};
@@ -162,11 +212,45 @@ export class ProductFunnelComponent implements OnInit {
   segment: SegmentKey = 'eligible';
   searchText = '';
   financeFilter = 'all';
+  // Customer-status filter (clicking the Active / Non-Active / Discontinued chips below Potential, or the dropdown).
+  customerFilter = 'all';   // 'all' or a key from customerFilterOptions
+  readonly customerFilterOptions = [
+    { key: 'active', label: 'Active' },
+    { key: 'nonactive', label: 'Non active' },
+    { key: 'discontinued', label: 'Discontinued' }
+  ];
   selection = new SelectionModel<PRow>(true, []);
 
   counts: Record<SegmentKey, number> = {
-    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0
+    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, overallRequested: 0
   };
+
+  // Everyone who ever raised their hand for this event. `requested` excludes the approved
+  // cohort (see loadData), so this is a clean total, not a double-count.
+  get overallRequested(): number { return this.counts.requested + this.counts.approved; }
+
+  // Customer-status split of the Potential pool (Active / Non-Active / Discontinued), shown as
+  // clickable chips below the Potential card. Counts come from the precomputed statusSplits.
+  potentialStatusCount(key: string): number {
+    return (this.statusSplits['potential'] ?? []).find(s => s.key === key)?.count ?? 0;
+  }
+  // Click a chip: jump to Potential and toggle that customer-status filter.
+  setCustomerChip(key: string): void {
+    this.segment = 'potential';
+    this.customerFilter = this.customerFilter === key ? 'all' : key;
+    this.pageIndex = 0;
+    this.defaultSelection();
+    this.refreshMeta();
+  }
+
+  // Post-approval checks (Clearance / Venue / Contract / Queue stage) — shown only on the approved cohort.
+  productMinimum: number | null = null;                 // product.minimumrequiredamount, for the auto finance hint
+  financeClearedByPid = new Map<string, boolean>();     // manual finance sign-off, from the finance_clearance collection
+  venuePaidByPid = new Map<string, boolean>();          // manual venue-fee sign-off, from the venue_clearance collection
+  queueStageByPid = new Map<string, string>();          // queue_token.currentstage per participant (queue events)
+  queueStagesLoaded = false;
+  private queueStagesLoading = false;
+  private currentUserId: string | null = null;          // for the venue_clearance audit field
 
   // owner email → row, and active-queue profile ids — used by bulk import categorisation
   private ownerByEmail = new Map<string, PRow>();
@@ -198,6 +282,8 @@ export class ProductFunnelComponent implements OnInit {
     this.mapEmailData = profile.mapEmailData;
     this.mapProduct = await this.guard.getProductMap();
     this.mapJourney = await this.guard.getJourneyMap();
+    const u: any = await this.guard.getUser();
+    this.currentUserId = u?.email ?? u?.uid ?? null;
     await this.loadData();
   }
 
@@ -210,17 +296,33 @@ export class ProductFunnelComponent implements OnInit {
   async loadData() {
     this.loading = true;
     this.loadError = false;
+    this.splitsReady = false;
+    this.queueStageByPid = new Map<string, string>();
+    this.queueStagesLoaded = false;
     const arena = this.arena;
     try {
-      const [ownSnap, eprSnap, scanSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap, financeSnap, venueSnap, productSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
           where('arenaeventid', '==', arena['docid']),
           where('status', 'in', ['requested', 'approved', 'attended', 'unattended']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
-          where('eventref', '==', arena['eventref'])))
+          where('eventref', '==', arena['eventref']))),
+        // Finance + venue clearance are isolated collections — tolerate them being absent / not yet ruled.
+        getDocs(query(collection(this.firestore, 'finance_clearance'),
+          where('arenaeventid', '==', arena['docid']))).catch(() => null),
+        getDocs(query(collection(this.firestore, 'venue_clearance'),
+          where('arenaeventid', '==', arena['docid']))).catch(() => null),
+        getDoc(arena['productref']).catch(() => null)
       ]);
+
+      // Product minimum (for the auto finance hint) + the two manual sign-off maps.
+      this.productMinimum = (productSnap && productSnap.exists()) ? Number(productSnap.data()?.['minimumrequiredamount'] ?? 0) : 0;
+      this.financeClearedByPid = new Map<string, boolean>();
+      financeSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.financeClearedByPid.set(x['profileid'], x['financeCleared'] === true); });
+      this.venuePaidByPid = new Map<string, boolean>();
+      venueSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.venuePaidByPid.set(x['profileid'], x['venuePaid'] === true); });
 
       const owners = new Map<string, string>();
       ownSnap.docs.forEach(d => {
@@ -234,10 +336,13 @@ export class ProductFunnelComponent implements OnInit {
       const unattendedIds = new Set<string>();
       const attendanceStateByPid = new Map<string, string>();
       const bucketByPid = new Map<string, string>();
+      const reqDateByPid = new Map<string, number>();
       eprSnap.docs.forEach(d => {
         const x = d.data();
         const pid = x['profileid'];
         if (!pid) return;
+        const created = this.toMillis(x['doccreateddate']);
+        if (created) reqDateByPid.set(pid, created);
         if (x['status'] == 'approved') { approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? ''); }
         else if (x['status'] == 'attended') { attendedIds.add(pid); approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended'); }
         else if (x['status'] == 'unattended') { unattendedIds.add(pid); attendanceStateByPid.set(pid, 'unattended'); }
@@ -302,10 +407,11 @@ export class ProductFunnelComponent implements OnInit {
           scanned: isScanned,
           attendanceState: attendanceStateByPid.get(pid) ?? '',
           reason,
+          requestedDate: reqDateByPid.get(pid) ?? 0,
           journey: '', subEnd: 0, subActive: false, finance: '',
           phone: prof['number'] ?? prof['phone'] ?? '',
           purchaseValue: null, paid: null, customerStatus: '',
-          metaLoaded: false, metaError: false
+          metaLoaded: false, subLoaded: false, metaError: false
         });
       });
       rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -326,7 +432,8 @@ export class ProductFunnelComponent implements OnInit {
         approved: cohort.size,
         attended: rows.filter(r => r.attended).length,
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
-        unattended: rows.filter(r => r.isUnattended).length
+        unattended: rows.filter(r => r.isUnattended).length,
+        overallRequested: requestedData.size + cohort.size
       };
 
       this.deliverySetList = await this.loadDeliverySets(arena);
@@ -334,6 +441,8 @@ export class ProductFunnelComponent implements OnInit {
 
       this.defaultSelection();
       this.refreshMeta();
+      // Splits need customerstatus for ALL rows — load it in the background so the screen shows immediately.
+      this.loadSplits();
     } catch (err) {
       console.log('confirmations load failed', err);
       this.loadError = true;
@@ -363,18 +472,19 @@ export class ProductFunnelComponent implements OnInit {
     });
   }
 
+  // Core metadata (name, number, finance, customerstatus…). Chunked by 30 (Firestore `in` max), concurrent.
+  // Does NOT touch PJP — subscriptionend is loaded separately + lazily so big events stay fast.
   private async loadMeta(rows: PRow[]) {
     const pending = rows.filter(r => !r.metaLoaded);
     if (pending.length === 0) return;
     const byId = new Map<string, PRow>();
     pending.forEach(r => byId.set(r.profileid, r));
     const ids = [...byId.keys()];
-    const now = Date.now();
-    for (let i = 0; i < ids.length; i += 10) {
-      const chunk = ids.slice(i, i + 10);
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    await Promise.all(chunks.map(async chunk => {
       try {
-        const snap = await getDocs(query(collection(this.firestore, 'participant metadata'),
-          where('profileid', 'in', chunk)));
+        const snap = await getDocs(query(collection(this.firestore, 'participant metadata'), where('profileid', 'in', chunk)));
         const metaById: Record<string, any> = {};
         snap.docs.forEach(d => { const x = d.data(); if (x['profileid']) metaById[x['profileid']] = x; });
         chunk.forEach(pid => {
@@ -382,24 +492,61 @@ export class ProductFunnelComponent implements OnInit {
           if (!row) return;
           const m = metaById[pid] ?? {};
           row.journey = this.mapJourney[m['activejourney']] ?? '';
-          row.subEnd = this.toMillis(m['subscriptionend']);
-          row.subActive = row.subEnd ? row.subEnd >= now : false;
           row.finance = m['financialstatus'] ?? '';
           row.purchaseValue = m['pp_totalpurchasevalue'] ?? null;
           row.paid = m['pp_totalpaid'] ?? null;
           row.customerStatus = m['customerstatus'] ?? '';
+          // Name + number come from participant metadata (profile_data value stays only as fallback).
+          if (m['name']) row.name = m['name'];
+          const metaNum = m['phonenumber'] ?? m['number'];
+          if (metaNum !== undefined && metaNum !== null && metaNum !== '') row.phone = metaNum.toString();
           row.metaLoaded = true;
         });
       } catch (e) {
         console.log('meta load failed', e);
         chunk.forEach(pid => { const row = byId.get(pid); if (row) { row.metaError = true; row.metaLoaded = true; } });
       }
-    }
+    }));
+  }
+
+  // subscriptionend from the PJP collection — loaded lazily (only for the rows on screen / being exported).
+  private async loadSubscriptions(rows: PRow[]) {
+    const pending = rows.filter(r => !r.subLoaded);
+    if (pending.length === 0) return;
+    const byId = new Map<string, PRow>();
+    pending.forEach(r => byId.set(r.profileid, r));
+    const ids = [...byId.keys()];
+    const now = Date.now();
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    await Promise.all(chunks.map(async chunk => {
+      try {
+        const snap = await getDocs(query(collection(this.firestore, 'participantjourneyproduct'), where('profileid', 'in', chunk)));
+        const subByPid: Record<string, number> = {};
+        snap.docs.forEach(d => {
+          const x = d.data(); const pid = x['profileid']; if (!pid) return;
+          const ms = this.toMillis(x['subscriptionend']);
+          if (ms && (!subByPid[pid] || ms > subByPid[pid])) subByPid[pid] = ms;
+        });
+        chunk.forEach(pid => {
+          const row = byId.get(pid);
+          if (!row) return;
+          row.subEnd = subByPid[pid] ?? 0;
+          row.subActive = row.subEnd ? row.subEnd >= now : false;
+          row.subLoaded = true;
+        });
+      } catch (e) {
+        console.log('subscription load failed', e);
+        chunk.forEach(pid => { const row = byId.get(pid); if (row) row.subLoaded = true; });
+      }
+    }));
   }
 
   private refreshMeta() {
     this.loadMeta(this.pagedRows);
-    if (this.financeFilter !== 'all') this.loadMeta(this.segmentMembers());
+    this.loadSubscriptions(this.pagedRows);   // PJP only for the visible page
+    // Finance + customer filters depend on metadata, so load it for the whole segment when either is active.
+    if (this.financeFilter !== 'all' || this.customerFilter !== 'all') this.loadMeta(this.segmentMembers());
   }
 
   // ---- Segments ----
@@ -408,10 +555,73 @@ export class ProductFunnelComponent implements OnInit {
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
+    if (this.showApprovalChecks) this.ensureQueueStages();
   }
 
-  private inSegment(r: PRow): boolean {
-    switch (this.segment) {
+  // ---- Post-approval checks (Clearance / Venue / Contract / Queue stage) ----
+  get showApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
+  }
+  get colSpan(): number {
+    return (this.showSelect ? 1 : 0) + 7 + (this.showApprovalChecks ? 4 : 0);
+  }
+  // Auto hint beside the Finance checkbox: has the participant paid at least the product minimum?
+  meetsMinPayment(r: PRow): boolean {
+    return (+(r.paid || 0)) >= (this.productMinimum ?? 0);
+  }
+  // Lazily load queue_token.currentstage for the whole event once (queue events only).
+  async ensureQueueStages() {
+    if (this.queueStagesLoaded || this.queueStagesLoading || this.arena?.['type'] !== 'queue') return;
+    this.queueStagesLoading = true;
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'queue_token'),
+        where('queueref', '==', this.arena['eventref'])));
+      snap.docs.forEach(d => { const x = d.data(); if (x['profile_id'] && x['currentstage']) this.queueStageByPid.set(x['profile_id'], x['currentstage']); });
+      this.queueStagesLoaded = true;
+    } catch (e) {
+      console.log('queue stage load failed', e);
+    } finally {
+      this.queueStagesLoading = false;
+    }
+  }
+  // Manual AR toggle — persisted to the isolated venue_clearance collection (optimistic, reverts on failure).
+  async toggleVenuePaid(r: PRow, checked: boolean) {
+    const prev = this.venuePaidByPid.get(r.profileid) === true;
+    this.venuePaidByPid.set(r.profileid, checked);
+    try {
+      const id = `${this.arena['docid']}_${r.profileid}`;
+      await setDoc(doc(this.firestore, 'venue_clearance', id), {
+        arenaeventid: this.arena['docid'], profileid: r.profileid,
+        venuePaid: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
+      }, { merge: true });
+    } catch (e) {
+      console.log('venue clearance write failed', e);
+      this.venuePaidByPid.set(r.profileid, prev);
+      this.snackbar.open('Could not save venue status', 'OK', { duration: 4000 });
+    }
+  }
+
+  // Manual finance sign-off — persisted to the isolated finance_clearance collection (optimistic, reverts on failure).
+  async toggleFinanceCleared(r: PRow, checked: boolean) {
+    const prev = this.financeClearedByPid.get(r.profileid) === true;
+    this.financeClearedByPid.set(r.profileid, checked);
+    try {
+      const id = `${this.arena['docid']}_${r.profileid}`;
+      await setDoc(doc(this.firestore, 'finance_clearance', id), {
+        arenaeventid: this.arena['docid'], profileid: r.profileid,
+        financeCleared: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
+      }, { merge: true });
+    } catch (e) {
+      console.log('finance clearance write failed', e);
+      this.financeClearedByPid.set(r.profileid, prev);
+      this.snackbar.open('Could not save finance status', 'OK', { duration: 4000 });
+    }
+  }
+
+  private inSegment(r: PRow): boolean { return this.matchesSegment(r, this.segment); }
+
+  private matchesSegment(r: PRow, key: SegmentKey): boolean {
+    switch (key) {
       case 'potential': return r.isOwner;
       case 'requested': return r.isRequested;
       case 'notRequested': return r.isNotRequested;
@@ -422,6 +632,7 @@ export class ProductFunnelComponent implements OnInit {
       case 'attended': return r.attended;
       case 'noShow': return r.attendanceState === 'no_show';
       case 'unattended': return r.isUnattended;
+      case 'overallRequested': return r.isRequested || r.isApproved;
     }
     return false;
   }
@@ -432,6 +643,11 @@ export class ProductFunnelComponent implements OnInit {
     return norm === this.financeFilter;
   }
 
+  private customerMatches(r: PRow): boolean {
+    if (this.customerFilter === 'all') return true;
+    return this.statusKey(r.customerStatus) === this.customerFilter;
+  }
+
   segmentMembers(): PRow[] {
     const s = this.searchText.trim().toLowerCase();
     return this.rows.filter(r => this.inSegment(r) &&
@@ -439,7 +655,7 @@ export class ProductFunnelComponent implements OnInit {
   }
 
   get segmentRows(): PRow[] {
-    return this.segmentMembers().filter(r => this.financeMatches(r));
+    return this.segmentMembers().filter(r => this.financeMatches(r) && this.customerMatches(r));
   }
 
   get pagedRows(): PRow[] {
@@ -447,11 +663,12 @@ export class ProductFunnelComponent implements OnInit {
     return this.segmentRows.slice(start, start + this.pageSize);
   }
 
-  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.searchText.trim().length > 0; }
+  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.searchText.trim().length > 0; }
 
   onPage(e: PageEvent) { this.pageIndex = e.pageIndex; this.pageSize = e.pageSize; this.refreshMeta(); }
   onSearch() { this.pageIndex = 0; this.refreshMeta(); }
   onFinance() { this.pageIndex = 0; this.refreshMeta(); }
+  onCustomer() { this.pageIndex = 0; this.refreshMeta(); }
 
   // ---- Selection: approve on Eligible + Not requested, attendance on Approved/Attended/No-show ----
   get selectionMode(): 'approve' | 'attend' | 'none' {
@@ -489,6 +706,17 @@ export class ProductFunnelComponent implements OnInit {
   // ---- Display helpers ----
   formatMonthYear(ms: number): string {
     return ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '';
+  }
+  // Compact money for the table (Indian scale): 5000 -> 5K, 122000 -> 1.2L, 25000000 -> 2.5Cr.
+  shortAmount(v: any): string {
+    const n = +(v || 0);
+    if (!n) return '0';
+    const abs = Math.abs(n);
+    const fmt = (x: number, unit: number) => (x / unit).toFixed(abs % unit === 0 ? 0 : 1).replace(/\.0$/, '');
+    if (abs >= 1e7) return fmt(n, 1e7) + 'Cr';
+    if (abs >= 1e5) return fmt(n, 1e5) + 'L';
+    if (abs >= 1e3) return fmt(n, 1e3) + 'K';
+    return String(n);
   }
   financeDotClass(f: string): string {
     const n = (f || '').toLowerCase().replace('fullypaid', 'fully paid').replace(/\s+/g, ' ').trim();
@@ -979,13 +1207,17 @@ export class ProductFunnelComponent implements OnInit {
     this.progress = { msg: 'Preparing export…', value: 0, total: rows.length, eta: '' };
     const pref = this.dialog.open(this.progressTpl, { width: '360px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
     try {
-      await this.loadMeta(rows);
+      await Promise.all([this.loadMeta(rows), this.loadSubscriptions(rows)]);
       const data = rows.map(r => {
         const due = (typeof r.purchaseValue === 'number' && typeof r.paid === 'number') ? r.purchaseValue - r.paid : '';
+        const rd = r.requestedDate ? new Date(r.requestedDate) : null;
         return {
           Name: r.name,
           Email: r.email || '',
           Phone: r.phone || '',
+          // Real Excel date value (date-only) so it sorts/filters as a date; time in its own column.
+          'Requested date': rd ? new Date(rd.getFullYear(), rd.getMonth(), rd.getDate()) : '',
+          'Requested time': rd ? formatDate(rd, 'h:mm:ss a', 'en-US') : '',
           'Active journey': r.journey || '',
           'Total purchase value': r.purchaseValue ?? '',
           'Total paid': r.paid ?? '',
@@ -998,7 +1230,7 @@ export class ProductFunnelComponent implements OnInit {
           Attended: r.attended ? 'Yes' : 'No'
         };
       });
-      const ws = XLSX.utils.json_to_sheet(data);
+      const ws = XLSX.utils.json_to_sheet(data, { cellDates: true, dateNF: 'yyyy-mm-dd' });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Participants');
       XLSX.writeFile(wb, `${this.productName}_${this.segment}.xlsx`);

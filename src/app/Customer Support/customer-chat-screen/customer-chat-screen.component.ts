@@ -25,6 +25,7 @@ import { CdkTextareaAutosize } from '@angular/cdk/text-field';
 import { environment } from '../../../environments/environment';
 import { Title } from '@angular/platform-browser';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-customer-chat-screen',
@@ -44,7 +45,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     MatProgressSpinnerModule,
     MatTooltipModule,
     LinebreaksPipe,
-    LinkPipe
+    LinkPipe,
+    ProfilePictureComponent
   ],
   templateUrl: './customer-chat-screen.component.html',
   styleUrl: './customer-chat-screen.component.css'

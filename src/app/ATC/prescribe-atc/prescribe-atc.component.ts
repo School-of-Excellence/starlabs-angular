@@ -11,6 +11,7 @@ import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
 import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
+import { FirestoreRecoveryService } from '../../shared/firestore-recovery.service';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
@@ -218,6 +219,11 @@ export class PrescribeATCComponent {
   isonline:boolean
   pageloadedatfirsttime:boolean = false
   aigeneratedEntry:boolean = false  // true when opened from an AI-generated draft link (hides "open another draft")
+  // "Edited from AI generation" provenance — set when a draft is started from / loaded from an AI source,
+  // carried through to the final atc_alpha / atc_to_validate document on submit.
+  aiedited:boolean = false
+  aigeneratedsource:string | null = null
+  aigeneratedid:string | null = null
   submitAttempted = false  // true once Submit was pressed — drives the inline "required" hints
   // shows the inline "Required" message on every required field once Submit was attempted
   requiredMatcher: ErrorStateMatcher = {
@@ -272,7 +278,8 @@ export class PrescribeATCComponent {
     public snackbar: MatSnackBar,
     private networkStatusService : NetworkStatusService,
     private connectivity: ConnectivityGuardService,
-    private mediaCache: MediaCacheService
+    private mediaCache: MediaCacheService,
+    private recovery: FirestoreRecoveryService
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -458,16 +465,25 @@ export class PrescribeATCComponent {
         this.summarystring = value['aiatcsummary'] ?? null;
         this.areasstring = value['areastoexplore'] ?? [];
 
+        this.aiedited = value['aiedited'] ?? true;  // reached via an aigenerated link → AI-edited
+        this.aigeneratedsource = value['aigeneratedsource'] ?? null;
+        this.aigeneratedid = value['aigeneratedid'] ?? docid;
+
         console.log('Draft loaded, AI re-parse skipped');
         return;
       }
       console.log('No draft found → parsing AI output');
 
-      const aiRef = doc(this.firestoreATC, 'ai_generated_atc_summary', docid);
+      // AI source collection: the queue-studio flow stores its AI ATC in
+      // queue_atc_generation (its `output` field); the legacy view-ai-generated-atc flow
+      // uses ai_generated_atc_summary. Both expose `output` + `profileid`, so the parse
+      // below is identical for either source.
+      const aiSourceCollection = params['source'] === 'queueatc' ? 'queue_atc_generation' : 'ai_generated_atc_summary';
+      const aiRef = doc(this.firestoreATC, aiSourceCollection, docid);
       const aiSnap = await getDoc(aiRef);
 
       if (!aiSnap.exists()) {
-        console.warn('AI summary document not found');
+        console.warn('AI source document not found in ' + aiSourceCollection);
         return;
       }
 
@@ -521,6 +537,9 @@ export class PrescribeATCComponent {
 
       this.autoSaveID = docid;
       this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
+      this.aiedited = true;
+      this.aigeneratedsource = aiSourceCollection;
+      this.aigeneratedid = docid;
 
       await setDoc(draftRef, {
         profileid: this.participantProfileid,
@@ -528,6 +547,10 @@ export class PrescribeATCComponent {
         aiatcsummary: this.summarystring,
         areastoexplore: this.areasstring,
         delete: false,
+        // Mark that this ATC was started from an AI generation (edited-from-AI provenance).
+        aiedited: true,
+        aigeneratedsource: aiSourceCollection,
+        aigeneratedid: docid,
         created: serverTimestamp(),
         lastupdated: serverTimestamp()
       });
@@ -987,6 +1010,8 @@ export class PrescribeATCComponent {
     }
     this.lastDraftSavedOn = null
     var draftATC = []
+    // push any drafts that never reached the server (e.g. saved during a bricked session) before reading the list
+    await this.recovery.flushPending(this.firestoreATC)
     if (this.developer || this.admin) {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
@@ -1044,6 +1069,10 @@ export class PrescribeATCComponent {
             this.consultationpoint = value['consultationpoint'] ?? null
             this.casenotes = value['notes'] ?? null
             this.mentornotes = value['mentornotes'] ?? null
+            // Carry the "edited from AI generation" provenance through to submit.
+            this.aiedited = value['aiedited'] ?? false
+            this.aigeneratedsource = value['aigeneratedsource'] ?? null
+            this.aigeneratedid = value['aigeneratedid'] ?? null
             console.log(atc)
             for (let i = 0; i < this.transcript.length; i++) {
               this.transcript[i]['awareness'] = this.transcript[i]['awareness'] ?? null
@@ -1470,27 +1499,23 @@ export class PrescribeATCComponent {
           atcImageURLs: this.existingATCImageURLs ?? [],
           delete: false,
           authorprofileid: authorprofileid,
-          lastupdated: serverTimestamp(),
+          lastupdated: new Date(),       // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
+          // preserve "edited from AI generation" provenance across autosaves (writeDraft overwrites the doc)
+          aiedited: this.aiedited ?? false,
+          aigeneratedsource: this.aigeneratedsource ?? null,
+          aigeneratedid: this.aigeneratedid ?? null,
         };
 
-        // save the TEXT first; with offline persistence the write is durable in IndexedDB the moment it's called
-        const writePromise = setDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID), data);
-        if (navigator.onLine) {
-          await writePromise;            // online: confirm the server write (for status + ordering)
-        } else {
-          writePromise.catch(() => {});  // offline: already durable locally; don't block the next save so EVERY offline edit persists
-        }
-
-        this.draftStatus = {
-          message: navigator.onLine ? "Draft saved." : "Saved on this device — will sync when online.",
-          code: 1
-        };
+        // durable local outbox first (never lost), then Firestore — falling back to a direct REST write if the
+        // SDK client has been bricked by its internal assertion (b815). Never hangs, never loses the draft.
+        const outcome = await this.recovery.writeDraft(this.firestoreATC, 'temporary_ATC', this.autoSaveID, data);
+        this.draftStatus = this.recovery.draftStatusFor(outcome);
         this.lastDraftSavedOn = new Date();
 
-        // upload media only when online; failures are non-fatal and retried on the next save / reconnect
-        if (navigator.onLine) {
+        // upload media only when online AND the Firestore client is healthy; otherwise it stays cached and retries
+        if (navigator.onLine && !this.recovery.isDegraded()) {
           try {
             const [audioURLs, noteImageURLs, atcImageURLs] = await Promise.all([
               this.uploadAudioToStorage(),
@@ -1524,10 +1549,10 @@ export class PrescribeATCComponent {
       }
     } catch (error) {
       console.error("Error in autoSave:", error);
-      this.draftStatus = {
-        message: "Couldn't save draft. Waiting for network...",
-        code: -1
-      };
+      // honest message: a genuine offline state vs. anything else (incl. the SDK assertion) — never the false "network" claim
+      this.draftStatus = navigator.onLine
+        ? { message: "Could not save the draft just now — your changes are kept on this device and will retry.", code: -1 }
+        : { message: "Saved on this device — will sync when online.", code: 1 };
       this.uploadProgress.isUploading = false;
     }
   }
@@ -2167,7 +2192,13 @@ async removeATCImage(index: number) {
           bigactivity: atclevelBigActivity,
           evolutionprogressdate: new Date(),
           aiatcsummary:this.summarystring ?? '',
-          areastoexplore:this.areasstring ?? ''
+          areastoexplore:this.areasstring ?? '',
+          aiedited: this.aiedited ?? false
+        }
+
+        if(this.aiedited){
+          alphaData['aigeneratedsource'] = this.aigeneratedsource ?? null
+          alphaData['aigeneratedid'] = this.aigeneratedid ?? null
         }
 
         if(this.assignmentInitiated){
@@ -2207,7 +2238,11 @@ async removeATCImage(index: number) {
 
         // Write Alpha Level
         firebaseATCBatch.set(doc(this.firestoreATC, collectionName, this.alphaid), alphaData);
-        if (this.queryparam?.['aigenerated'] && this.queryparam?.['docid']) {
+        // Back-reference only the legacy ai_generated_atc_summary flow. For source=queueatc the
+        // docid points at queue_atc_generation (not a summary doc); writing there would either fail
+        // the batch (missing doc) or trigger the queue_atc_generation onUpdate cloud function. The
+        // aiedited / aigeneratedid fields on the alpha doc already record the AI origin.
+        if (this.queryparam?.['aigenerated'] && this.queryparam?.['docid'] && this.queryparam?.['source'] !== 'queueatc') {
           const aiSummaryRef = doc(this.firestoreATC, 'ai_generated_atc_summary', this.queryparam['docid']);
           firebaseATCBatch.update(aiSummaryRef, {
             atcalpharef: doc(this.firestoreATC, collectionName, this.alphaid),

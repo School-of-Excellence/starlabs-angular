@@ -18,6 +18,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-chat-config',
@@ -36,7 +37,8 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatSlideToggleModule,
     MatDividerModule,
     MatTooltipModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    ProfilePictureComponent
   ],
   templateUrl: './chat-config.component.html',
   styleUrl: './chat-config.component.css'
