@@ -468,6 +468,13 @@ export class CustomerSupportDashboardComponent {
     return item.key;
   }
 
+  // Stable identity for the ticket rows so live collectionSnapshots emits don't
+  // recreate every row (and the embedded <app-profile-picture>). Without this the
+  // open avatar preview blinks out/in on each snapshot = flicker (+ perf churn).
+  trackByTicket(index: number, item: any): any {
+    return item?.id ?? item?.issueno ?? index;
+  }
+
   onItemsPerPageChange() {
     // Reset to first page when changing items per page
     this.currentPage = 1;
