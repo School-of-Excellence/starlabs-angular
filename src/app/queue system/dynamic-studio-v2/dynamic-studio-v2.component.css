@@ -1322,11 +1322,32 @@
 .ds-app .zoom-link--pending { color: var(--amber); }
 
 /* Raw Zoom start URL row shown under the Start Meeting button (getstarted step) */
+/* Backup-link block: the "if Start Meeting didn't work, use this" group.
+   Hint caption + link row are visually tied together below the button. */
+.ds-app .zoom-fallback {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.ds-app .zoom-link-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.ds-app .zoom-link-hint strong { color: var(--ink); font-weight: 800; }
+.ds-app .zoom-link-hint .ic {
+  font-size: 16px; width: 16px; height: 16px; line-height: 16px;
+  color: var(--primary); flex: 0 0 auto;
+}
 .ds-app .zoom-link-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
   padding: 9px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -2268,6 +2289,9 @@
 }
 .wait-token__btn:hover { background: #143F49; }
 .wait-token__btn .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+/* Approved invite — green so it reads as "ready to assign", not a fresh invite. */
+.wait-token__btn--approved { background: #15803D; }
+.wait-token__btn--approved:hover { background: #166534; }
 .wait-token__chip {
   display: inline-flex;
   align-items: center;
@@ -2459,18 +2483,24 @@
 }
 .ds-app .zoom-status--broken .ic { color: var(--red); }
 
-/* Generate New Link card (secondary, sits at the bottom of the step) */
+/* Generate New Link — compact helper strip sitting just under the Zoom card.
+   Slimmer padding + muted surface so it reads as a secondary "fix it" action,
+   not a co-equal card. Negative margin pulls it tight against the Zoom card. */
 .ds-app .choice--secondary {
   border: 1px solid var(--border);
-  background: var(--surface);
-  padding: clamp(16px, 1.2vw + 8px, 22px);
+  background: var(--surface-2);
+  padding: 12px 16px;
   display: block;
   height: auto;
+  border-radius: var(--r-sm);
+  margin-top: -8px;
 }
+.ds-app .choice--secondary .choice-title { font-size: 14px; }
+.ds-app .choice--secondary .choice-desc { font-size: 12.5px; }
 .ds-app .choice-secondary__head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .ds-app .choice-secondary__head .choice-ic {

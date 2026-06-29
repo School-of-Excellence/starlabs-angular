@@ -73,15 +73,17 @@ export class FirestoreRecoveryService {
    */
   async writeDraft(firestore: Firestore, collection: string, docId: string, data: any): Promise<DraftWriteOutcome> {
     const key = `${collection}/${docId}`;
+    // clone-safe copy for the outbox + REST (the live setDoc keeps the original, refs and all)
+    const safe = this.sanitize(data);
 
     // 1) durable local copy — survives reload, browser close, and the SDK crash (it's our own store)
     try {
-      await this.put({ key, collection, docId, data, savedAt: Date.now() });
+      await this.put({ key, collection, docId, data: safe, savedAt: Date.now() });
     } catch (e) {
       console.warn('Draft outbox: could not store draft locally', e);
     }
 
-    // 2) live client while it is healthy and online
+    // 2) live client while it is healthy and online (original data — keeps DocumentReferences/Timestamps intact)
     if (!this.isDegraded() && navigator.onLine) {
       try {
         await this.withTimeout(setDoc(doc(firestore, collection, docId), data), WRITE_TIMEOUT_MS);
@@ -95,7 +97,7 @@ export class FirestoreRecoveryService {
 
     // 3) recovery path: direct REST write with the user's token (bypasses the bricked SDK client)
     if (navigator.onLine) {
-      const ok = await this.restWrite(collection, docId, data);
+      const ok = await this.restWrite(collection, docId, safe);
       if (ok) { await this.remove(key); return 'fallback'; }
     }
 
@@ -109,7 +111,8 @@ export class FirestoreRecoveryService {
     for (const e of pending) {
       try {
         if (!this.isDegraded() && navigator.onLine) {
-          await this.withTimeout(setDoc(doc(firestore, e.collection, e.docId), e.data), WRITE_TIMEOUT_MS);
+          // revive {__ref} markers back into real DocumentReferences before writing through the SDK
+          await this.withTimeout(setDoc(doc(firestore, e.collection, e.docId), this.revive(firestore, e.data)), WRITE_TIMEOUT_MS);
           await this.remove(e.key);
           continue;
         }
@@ -165,8 +168,40 @@ export class FirestoreRecoveryService {
     if (t === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
     if (t === 'string') return { stringValue: v };
     if (Array.isArray(v)) return { arrayValue: { values: v.map(x => this.toValue(x)) } };
-    if (t === 'object') return { mapValue: { fields: this.toFields(v) } };
+    if (t === 'object') {
+      // a sanitised DocumentReference marker -> a Firestore reference value
+      if (typeof v.__ref === 'string') {
+        return { referenceValue: `projects/${environment.firebase.projectId}/databases/${FIRESTORE_DB_ID}/documents/${v.__ref}` };
+      }
+      return { mapValue: { fields: this.toFields(v) } };
+    }
     return { stringValue: String(v) };
+  }
+
+  // make a structured-clone- & REST-safe copy: Timestamp->Date, DocumentReference->{__ref:path}, drop functions
+  private sanitize(v: any): any {
+    if (v === null || v === undefined) return null;
+    if (v instanceof Date) return v;
+    const t = typeof v;
+    if (t === 'function') return undefined;
+    if (t !== 'object') return v;
+    if (typeof v.toDate === 'function' && typeof v.seconds === 'number') return v.toDate();  // Firestore Timestamp
+    if (v.type === 'document' && typeof v.path === 'string') return { __ref: v.path };        // DocumentReference
+    if (Array.isArray(v)) return v.map(x => this.sanitize(x)).filter(x => x !== undefined);
+    const out: any = {};
+    Object.keys(v).forEach(k => { const s = this.sanitize(v[k]); if (s !== undefined) out[k] = s; });
+    return out;
+  }
+
+  // turn {__ref:path} markers back into real DocumentReferences for an SDK write
+  private revive(firestore: Firestore, v: any): any {
+    if (v === null || typeof v !== 'object') return v;
+    if (v instanceof Date) return v;
+    if (typeof v.__ref === 'string') return doc(firestore, v.__ref);
+    if (Array.isArray(v)) return v.map(x => this.revive(firestore, x));
+    const out: any = {};
+    Object.keys(v).forEach(k => { out[k] = this.revive(firestore, v[k]); });
+    return out;
   }
 
   private toFields(obj: any): any {

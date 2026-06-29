@@ -1,3 +1,5 @@
+<!-- The enlarge preview is mounted on document.body in openPreview() (see the .ts),
+     NOT here, so the host's render tree (e.g. a churning table) can't move or flicker it. -->
 <img
   class="profile-img"
   crossorigin="anonymous"
@@ -8,20 +10,3 @@
   (error)="onImgError()"
   (click)="openPreview($event)"
 />
-
-<div class="preview-backdrop" *ngIf="showPreview" (click)="closePreview()">
-  <div class="preview-panel" (click)="$event.stopPropagation()">
-
-    <button class="preview-close-btn" (click)="closePreview()">✕</button>
-
-    <img
-      class="preview-image"
-      crossorigin="anonymous"
-      [src]="photoUrl"
-      [alt]="name"
-    />
-
-    <div class="preview-name" *ngIf="name">{{ name }}</div>
-
-  </div>
-</div>
