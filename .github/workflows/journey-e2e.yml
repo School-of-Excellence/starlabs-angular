@@ -44,8 +44,8 @@ jobs:
       cf_branch: development
       e2e_ref: journey-reusable                      # VALIDATION: hub branch w/ engine + config/suite change. Flip to `main` post-merge.
       firebase_project: starlabs-cicd                # MUST match the app's projectId or auth silently fails (SETUP §3)
-      config: playwright.journey.emulator.config.ts  # selects the JOURNEY suite (config drives testDir + seed)
+      config: playwright.journey.emulator.evidence.config.ts  # EVIDENCE variant: screenshot+trace per test → browsable report for Firestore/Storage capture
       suite: journey                                 # default spec root (find journey/) + history audit tag
       only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || '' }}
-      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '0' }}
+      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}  # default 1: blob+merge a screenshot-per-test report that record-run.cjs ships to Storage + Firestore cicd-audit
     secrets: inherit
