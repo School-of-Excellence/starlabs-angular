@@ -10,6 +10,7 @@
 #    branch `systems-emulator`, NOT yet on hub `main` (authroles + business + the shared lib already merged).
 #    So `uses:` + `e2e_ref:` are pinned there; flip BOTH to `@main` / `main` after the next hub merge.
 #    REPORT-ONLY (non-required) until proven green N times, then promote per-system.
+# Re-validate after the WS-02 console-guard fix (benign "No such document!" first-emission).
 name: workshops-e2e (emulator gate)
 
 on:
