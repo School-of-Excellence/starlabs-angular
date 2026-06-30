@@ -13,9 +13,11 @@
 #
 # NOTE: comms has 5 CF-gated cases that self-skip on the emulator (comms CFs not in the deploy set yet);
 #    they become real runs once those CFs are added to deploy-cf-emulator.sh (planned with modes, rank 7).
-# Validate the CN-14 fix (hub systems-emulator @ ce2f81d): warm /email-templates, then in-app router
-# nav to /onewaytemplates (no reload) so the authGuard's getDocs(dashboard) read is warm and admits,
-# instead of racing on the cold fresh-login deep link and bouncing to /EISDashboard. Green locally.
+# Validate the CN-14 fix (hub systems-emulator @ 2c20108): trace-derived root cause = the authGuard's
+# 3 sequential per-nav Firestore reads STALL on the cold first deep-link (Firestore memory cache, so a
+# page.goto reload re-cold-starts). Fix: warm the guard reads in-session on /email-templates, preload the
+# heavy onewaytemplates chunk, then reach it via a RETRIED in-app router nav (no reload = warm preserved;
+# absorbs the stray ** catch-all resolution that bounced to /EISDashboard). Green locally (CN-02 + CN-14).
 name: comms-e2e (emulator gate)
 
 on:
