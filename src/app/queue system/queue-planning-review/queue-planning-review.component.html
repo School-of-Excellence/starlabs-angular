@@ -316,11 +316,11 @@
                     <div class="slot-card" (click)="openSlotPanel(slot, stage)">
                       <div class="slot-datetime-box">
                         <div class="datetime-row slot-title-row" 
-                          *ngIf="slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title">
+                          *ngIf="getSlotTitle(slot, stage)">
                           <mat-icon>label</mat-icon>
                           <span class="datetime-label" style="color: black;">Title:</span>
                           <span class="slot-title-text">
-                            {{ slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title }}
+                            {{ getSlotTitle(slot, stage) }}
                           </span>
                         </div>
 
@@ -432,9 +432,9 @@
         <h4 *ngIf="panelViewType === 'slot'">
           <span class="info-value">
             <span class="panel-slot-title" style="color: white;" 
-              *ngIf="selectedSlot?.segmentVariations[0]?.variations[0]?.stageData[selectedStageForPanel]?.title">
+              *ngIf="getSlotTitle(selectedSlot, selectedStageForPanel)">
               <span style="color: white;">Title:</span>   
-              {{ selectedSlot?.segmentVariations[0]?.variations[0]?.stageData[selectedStageForPanel]?.title }}
+              {{ getSlotTitle(selectedSlot, selectedStageForPanel) }}
             </span>
             {{ selectedSlot?.startdate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.starttime) }}
             <span class="separator">—</span>
@@ -1126,10 +1126,10 @@
                 <span class="expand-arrow" [class.expanded]="slot.expanded" *ngIf="slot.showExpand">▶</span>
               </td>
               <td>
-                <div *ngIf="slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title"
+                <div *ngIf="getSlotTitle(slot, selectedStage)"
                   class="table-slot-title">
                   <span class="datetime-label" style="color: black;">Title:</span>  
-                  {{ slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title }}
+                  {{ getSlotTitle(slot, selectedStage) }}
                 </div>
                 <strong>{{ getDateAndMonthString(slot?.startdate) }}</strong>
               </td>
@@ -1225,10 +1225,10 @@
                     [class.expanded]="isQueueRowExpanded(slot)">▶</span>
                 </td>
                 <td (click)="toggleQueueRow(slot)">
-                  <div *ngIf="slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title"
+                  <div *ngIf="getSlotTitle(slot, selectedStage)"
                     class="table-slot-title">
                     <span class="datetime-label" style="color: black;">Title:</span>  
-                    {{ slot?.segmentVariations[0]?.variations[0]?.stageData[selectedStage]?.title }}
+                    {{ getSlotTitle(slot, selectedStage) }}
                   </div>
                   <strong>{{ getDateAndMonthString(slot.startdate) }}</strong>
                   {{ getTimeString(slot.startdate, slot.enddate) }}

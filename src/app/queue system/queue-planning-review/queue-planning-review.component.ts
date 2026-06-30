@@ -2109,7 +2109,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           if (variation.stageData && variation.stageData[stage]) {
             variation.stageData[stage].confirmedParticipants.forEach((participant) => {
               const participantId = participant.profile_id || participant.profileid;
-              const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title || '';
+              const slotTitle = this.getSlotTitle(slot, stage);
               if (participantId) {
                 allParticipants.push({
                   participantId,
@@ -2164,7 +2164,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           if (variation.stageData && variation.stageData[stage]) {
             const confirmed = variation.stageData[stage].confirmedParticipants || [];
             const nonConfirmed = variation.stageData[stage].nonConfirmedParticipants || [];
-            const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title || '';
+            const slotTitle = this.getSlotTitle(slot, stage);
 
             confirmed.forEach((p) => {
               const profileId = p.profile_id || p.profileid;
@@ -2330,7 +2330,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
   private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: any) {
     const slotTiming = `${this.getBookedSlotFormatedString(slot.startdate)} - ${this.getBookedSlotFormatedString(slot.enddate)}`;
-    const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title || '';
+    const slotTitle = this.getSlotTitle(slot, stage);
     const addRow = (profileId: string, segmentName: string, status: string) => exportData.push({
       'Queue': queueName,
       'Title': slotTitle || 'N/A',
@@ -2449,6 +2449,17 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
   private isActiveToken(t: any): boolean {
     return t.tokenstatus === 'Active' && t.stagestatus === 'Approved' && [null, undefined, false].includes(t.delete);
+  }
+
+  getSlotTitle(slot: any, stage: string): string {
+    if (!slot || !stage) return '';
+    for (const segVar of slot.segmentVariations || []) {
+      for (const variation of segVar.variations || []) {
+        const title = variation.stageData?.[stage]?.title;
+        if (title) return title;
+      }
+    }
+    return '';
   }
 
   // exportParticipantsDetailsForStage() {
