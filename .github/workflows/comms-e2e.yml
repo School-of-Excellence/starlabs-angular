@@ -13,7 +13,7 @@
 #
 # NOTE: comms has 5 CF-gated cases that self-skip on the emulator (comms CFs not in the deploy set yet);
 #    they become real runs once those CFs are added to deploy-cf-emulator.sh (planned with modes, rank 7).
-# Diagnostic run: capture CN-14 onewaytemplates runtime state to root-cause the CI-only non-mount.
+# Validate the CN-14 fix: re-navigate past the authGuard first-nav grant race (root-caused).
 name: comms-e2e (emulator gate)
 
 on:
