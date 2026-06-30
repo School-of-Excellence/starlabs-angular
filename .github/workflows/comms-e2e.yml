@@ -13,6 +13,7 @@
 #
 # NOTE: comms has 5 CF-gated cases that self-skip on the emulator (comms CFs not in the deploy set yet);
 #    they become real runs once those CFs are added to deploy-cf-emulator.sh (planned with modes, rank 7).
+# Re-validated after the CN-14 one-shot-getDocs list fix (hub systems-emulator).
 name: comms-e2e (emulator gate)
 
 on:
