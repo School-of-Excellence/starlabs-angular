@@ -13,7 +13,9 @@
 #
 # NOTE: comms has 5 CF-gated cases that self-skip on the emulator (comms CFs not in the deploy set yet);
 #    they become real runs once those CFs are added to deploy-cf-emulator.sh (planned with modes, rank 7).
-# Validate the CN-14 fix: re-navigate past the authGuard first-nav grant race (root-caused).
+# Validate the CN-14 fix (hub systems-emulator @ ce2f81d): warm /email-templates, then in-app router
+# nav to /onewaytemplates (no reload) so the authGuard's getDocs(dashboard) read is warm and admits,
+# instead of racing on the cold fresh-login deep link and bouncing to /EISDashboard. Green locally.
 name: comms-e2e (emulator gate)
 
 on:
