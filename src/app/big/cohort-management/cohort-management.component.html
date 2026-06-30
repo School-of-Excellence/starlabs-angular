@@ -429,15 +429,15 @@
                 <div class="stat-val">{{getActivitiesCount(cohorts['docid'])}}</div>
                 <div class="stat-key">ACTIVITIES</div>
               </div>
-              <ng-container *ngIf="(modeView === 'floor' || selectedQueueEvent.length > 0) && cohorts['cohortCategory'] == 'studio'">
+              <ng-container *ngIf="(selectedQueueEvent.length > 0) && cohorts['cohortCategory'] == 'studio'">
                 <div class="stat" (click)="openCohortStudio(cohorts, $event , 'studios');">
-                  <div class="stat-val" [class.warn]="(cohorts['participantidlist']?.length || 0) > getCohortTotalStudiosCount(cohorts)">
-                    {{cohorts['participantidlist']?.length || 0}}/{{getCohortTotalStudiosCount(cohorts)}}
+                  <div class="stat-val">
+                    {{getCohortTotalStudiosCount(cohorts)}}
                   </div>
                   <div class="stat-key">STUDIOS</div>
                 </div>
                 <div class="stat">
-                  <div class="stat-val">{{getParticipantCheckedInCount(cohorts)}}</div>
+                  <div class="stat-val">{{getCohortTotalCheckedStudiosCount(cohorts)}}</div>
                   <div class="stat-key">CHECKED IN</div>
                 </div>
                 <div class="stat">

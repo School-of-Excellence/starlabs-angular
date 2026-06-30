@@ -288,7 +288,7 @@
             </div>
 
             <!-- SPECIALIST -->
-            <ng-container *ngIf="getStudioRoles(studio).specialists.length">
+            <!-- <ng-container *ngIf="getStudioRoles(studio).specialists.length">
               <div class="cd-role-label">SPECIALIST</div>
               <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).specialists"
                 [class.cd-foreign]="!isPidInCohort(pid)"
@@ -302,7 +302,7 @@
                 <span class="cd-role-badge eis">EIS</span>
                 <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
               </div>
-            </ng-container>
+            </ng-container> -->
 
             <!-- WORKING WITH -->
             <ng-container *ngIf="getStudioRoles(studio).workingWith.length">
@@ -321,7 +321,7 @@
             </ng-container>
 
             <!-- MENTOR -->
-            <ng-container *ngIf="getStudioRoles(studio).mentors.length">
+            <!-- <ng-container *ngIf="getStudioRoles(studio).mentors.length">
               <div class="cd-role-label">MENTOR</div>
               <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).mentors"
                 [class.cd-foreign]="!isPidInCohort(pid)"
@@ -335,10 +335,10 @@
                 <span class="cd-role-badge mentor">MENTOR</span>
                 <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
               </div>
-            </ng-container>
+            </ng-container> -->
 
             <!-- SHADOWING -->
-            <ng-container *ngIf="getStudioRoles(studio).shadowing.length">
+            <!-- <ng-container *ngIf="getStudioRoles(studio).shadowing.length">
               <div class="cd-role-label">SHADOWING ({{getStudioRoles(studio).shadowing.length}})</div>
               <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).shadowing"
                 [class.cd-foreign]="!isPidInCohort(pid)"
@@ -351,7 +351,7 @@
                 <span class="cd-role-sub muted">observing</span>
                 <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
               </div>
-            </ng-container>
+            </ng-container> -->
 
             <!-- SESSION LOG -->
             <div class="cd-session-log">

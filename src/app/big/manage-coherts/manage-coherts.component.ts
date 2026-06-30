@@ -907,6 +907,7 @@ export class ManageCohertsComponent {
         const participationQuery = query(collection(this.firestore, "event participation request"),where("eventref", "==", eventRef),where("status", "in", ['attended','approved']));
         const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef));
         const assignedParticipantIds = new Set<string>(); 
+        const approvedParticipant = new Set();
         
         const [participationSnap , cohortsSnap] = await Promise.all([getDocs(participationQuery) , getDocs(cohortQuery)]);
         cohortsSnap.docs.forEach((cohortDoc)=>{
@@ -917,20 +918,22 @@ export class ManageCohertsComponent {
         });
           
         })
-        this.bigInvitationParticipants = participationSnap.docs.map(docSnap => {
+
+        participationSnap.docs.forEach(docSnap => {
           const data: any = docSnap.data();
-          if(data['profileid'] != null && !assignedParticipantIds.has(data['profileid'])){
-            return {
+          if(data['profileid'] != null && !assignedParticipantIds.has(data['profileid']) && !approvedParticipant.has(data['profileid'])){
+            approvedParticipant.add({
               id: docSnap.id,
               name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
               profileid: data['profileid'],
               ...data
-            };
+            });
           }
-        }).filter(p => p != null);
+        })
         
+        this.bigInvitationParticipants = Array.from(approvedParticipant.values());
         // Extract participant IDs from event participation request
-        const approvedParticipantIds = this.bigInvitationParticipants
+        const approvedParticipantIds = Array.from(approvedParticipant.values());
         
         this.bigInvitationCount = approvedParticipantIds.length;
         

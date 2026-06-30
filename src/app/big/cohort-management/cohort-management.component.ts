@@ -358,9 +358,9 @@ export class CohortManagementComponent {
         return
       }
       if (payload.sourceCohortId === targetCohort['docid']) return
-      const sourceCohort = this.cohortsList.find(c => c['docid'] === payload.sourceCohortId)
+      const sourceCohort = this.cohortsList.find(c => c['docid'] === payload.sourceCohortId);
       if (sourceCohort) {
-        if (sourceCohort['eventref']?.id === targetCohort['eventid']?.id) {
+        if (sourceCohort['eventref']?.id === targetCohort['eventref']?.id) {
           await this.moveParticipantToCohort(payload.participantId, sourceCohort, targetCohort)
         } else{
           alert(`Can not move participants between ${this.mapAcceleratorEvent[sourceCohort?.['eventref']?.id]} to ${this.mapAcceleratorEvent[targetCohort?.['eventref']?.id]}`)
@@ -749,7 +749,7 @@ export class CohortManagementComponent {
 
   // Studio mapping for participant status
   mapStudioPairing: { [studioId: string]: any } = {};
-  mapParticipantStudios: { [participantId: string]: any[] } = {};
+  mapParticipantStudios: { [key : string] : {[participantId: string]: any[]} } = {};
   mapLiveAssignmentByStudio: { [studioId: string]: any } = {};
 
   showProgressionDialog: boolean = false
@@ -1151,12 +1151,13 @@ export class CohortManagementComponent {
 
       if([null , undefined , ''].includes(queueId)) return
       this.mapLiveParticipants[queueId] = this.mapLiveParticipants[queueId] ?? {};
+      this.mapParticipantStudios[queueId] = this.mapParticipantStudios[queueId] ?? {};
       participants.forEach((participantId: string) => {
-        if (!this.mapParticipantStudios[participantId]) {
-          this.mapParticipantStudios[participantId] = [];
+        if (!this.mapParticipantStudios[queueId][participantId]) {
+          this.mapParticipantStudios[queueId][participantId] = [];
         }
 
-        this.mapParticipantStudios[participantId].push({
+        this.mapParticipantStudios[queueId][participantId].push({
           studioId: studioId,
           isLive: isLive,
           checkin: studio.checkin || false,
@@ -1196,45 +1197,45 @@ export class CohortManagementComponent {
     return this.isParticipantInStudio(queueId, participantId) ? 'Live' : 'Idle';
   }
 
-  getParticipantLiveStudioCount(participantId: string): number {
-    const studios = this.mapParticipantStudios[participantId] || [];
-    return studios.filter(s => s.isLive).length;
-  }
+  // getParticipantLiveStudioCount(participantId: string): number {
+  //   const studios = this.mapParticipantStudios[participantId] || [];
+  //   return studios.filter(s => s.isLive).length;
+  // }
 
-  getParticipantStudios(participantId: string): any[] {
-    return this.mapParticipantStudios[participantId] || [];
-  }
+  // getParticipantStudios(participantId: string): any[] {
+  //   return this.mapParticipantStudios[participantId] || [];
+  // }
 
-  getParticipantTotalStudioCount(participantId: string): number {
-    return (this.mapParticipantStudios[participantId] || []).length;
-  }
+  // getParticipantTotalStudioCount(participantId: string): number {
+  //   return (this.mapParticipantStudios[participantId] || []).length;
+  // }
 
-  hasParticipantCheckedIn(participantId: string): boolean {
-    const studios = this.mapParticipantStudios[participantId] || [];
-    return studios.some(s => s.checkin === true);
-  }
+  // hasParticipantCheckedIn(participantId: string): boolean {
+  //   const studios = this.mapParticipantStudios[participantId] || [];
+  //   return studios.some(s => s.checkin === true);
+  // }
 
-  isParticipantInStudioRoom(participantId: string): boolean {
-    const studios = this.mapParticipantStudios[participantId] || [];
-    return studios.some(s => s.studioin === true);
-  }
+  // isParticipantInStudioRoom(participantId: string): boolean {
+  //   const studios = this.mapParticipantStudios[participantId] || [];
+  //   return studios.some(s => s.studioin === true);
+  // }
 
-  getParticipantStudioSummary(participantId: string): {
-    totalStudios: number;
-    liveStudios: number;
-    checkedIn: boolean;
-    inStudioRoom: boolean;
-    studios: any[];
-  } {
-    const studios = this.mapParticipantStudios[participantId] || [];
-    return {
-      totalStudios: studios.length,
-      liveStudios: studios.filter(s => s.isLive).length,
-      checkedIn: studios.some(s => s.checkin === true),
-      inStudioRoom: studios.some(s => s.studioin === true),
-      studios: studios
-    };
-  }
+  // getParticipantStudioSummary(participantId: string): {
+  //   totalStudios: number;
+  //   liveStudios: number;
+  //   checkedIn: boolean;
+  //   inStudioRoom: boolean;
+  //   studios: any[];
+  // } {
+  //   const studios = this.mapParticipantStudios[participantId] || [];
+  //   return {
+  //     totalStudios: studios.length,
+  //     liveStudios: studios.filter(s => s.isLive).length,
+  //     checkedIn: studios.some(s => s.checkin === true),
+  //     inStudioRoom: studios.some(s => s.studioin === true),
+  //     studios: studios
+  //   };
+  // }
 
   getIdleCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
@@ -1248,28 +1249,28 @@ export class CohortManagementComponent {
     return participants.filter((pid: string) => this.isParticipantInStudio(queueId , pid)).length;
   }
 
-  getCohortStudioStats(cohort: any): {
-    totalLiveStudios: number;
-    checkedInCount: number;
-    inStudioRoomCount: number;
-  } {
-    const participants = cohort['participantidlist'] || [];
-    let totalLiveStudios = 0;
-    let checkedInCount = 0;
-    let inStudioRoomCount = 0;
+  // getCohortStudioStats(cohort: any): {
+  //   totalLiveStudios: number;
+  //   checkedInCount: number;
+  //   inStudioRoomCount: number;
+  // } {
+  //   const participants = cohort['participantidlist'] || [];
+  //   let totalLiveStudios = 0;
+  //   let checkedInCount = 0;
+  //   let inStudioRoomCount = 0;
 
-    participants.forEach((pid: string) => {
-      const summary = this.getParticipantStudioSummary(pid);
-      totalLiveStudios += summary.liveStudios;
-      if (summary.checkedIn) checkedInCount++;
-      if (summary.inStudioRoom) inStudioRoomCount++;
-    });
+  //   participants.forEach((pid: string) => {
+  //     const summary = this.getParticipantStudioSummary(pid);
+  //     totalLiveStudios += summary.liveStudios;
+  //     if (summary.checkedIn) checkedInCount++;
+  //     if (summary.inStudioRoom) inStudioRoomCount++;
+  //   });
 
-    return { totalLiveStudios, checkedInCount, inStudioRoomCount };
-  }
+  //   return { totalLiveStudios, checkedInCount, inStudioRoomCount };
+  // }
 
-  getParticipantStudioInList(participantId: string): any[] {
-    const studios = this.mapParticipantStudios[participantId] || [];
+  getParticipantStudioInList(queueId : string , participantId: string): any[] {
+    const studios = this.mapParticipantStudios[queueId]?.[participantId] || [];
     return studios.filter(s => s.studioin === true);
   }
 
@@ -1318,9 +1319,9 @@ export class CohortManagementComponent {
       'Studio';
   }
 
-  getParticipantCheckedInCount(participantId: string): number {
-    const studios = this.mapParticipantStudios[participantId] || [];
-    return studios.filter(s => s.checkin === true).length;
+  getParticipantCheckedInCount(queueId : string , participantId: string): any[] {
+    const studios = this.mapParticipantStudios[queueId]?.[participantId] || [];
+    return studios.filter(s => s.checkin === true);
   }
 
   calculateUnassignedParticipants() {
@@ -1976,13 +1977,37 @@ export class CohortManagementComponent {
 
   getCohortTotalStudiosCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
-    let totalStudios = 0;
+    const queueId = cohort['queueref']?.id ?? null;
+    const studioSet = new Set();
     
-    participants.forEach((pid: string) => {
-      totalStudios += this.getParticipantStudioInList(pid).length;
+    if(queueId){
+      participants.forEach((pid: string) => {
+        this.getParticipantStudioInList(queueId, pid).forEach(({ studioId }) => {
+          if (studioId) {
+            studioSet.add(studioId);
+          }
+        })
     });
+    }
+    return studioSet.size;
+  }
+
+  getCohortTotalCheckedStudiosCount(cohort: any): number {
+    const participants = cohort['participantidlist'] || [];
+    const queueId = cohort['queueref']?.id ?? null;
+    const studioSet = new Set();
     
-    return totalStudios;
+    if(queueId){
+      participants.forEach((pid: string) => {
+        this.getParticipantCheckedInCount(queueId, pid).forEach(({ studioId }) => {
+          if (studioId) {
+            studioSet.add(studioId);
+          }
+        })
+    });
+    }
+    
+    return studioSet.size;
   }
 
   getDaysRemaining(endDate: any): number {
@@ -2776,8 +2801,8 @@ export class CohortManagementComponent {
         });
       } else {
         participants.forEach((participantId: string, index: number) => {
-          const studioInList = this.getParticipantStudioInList(participantId);
-          const checkedInCount = this.getParticipantCheckedInCount(participantId);
+          const studioInList = this.getParticipantStudioInList(queueId,participantId);
+          const checkedInCount = this.getParticipantCheckedInCount(queueId , participantId);
           const liveAssignmentStats = this.getParticipantLiveAssignmentStats(participantId);
           
           exportData.push({
@@ -2792,7 +2817,7 @@ export class CohortManagementComponent {
             'Participant Name': this.mapProfile[participantId] || participantId,
             'Participant Status': this.isParticipantInStudio(queueId , participantId) ? 'In Studio' : 'Idle',
             'Studios In': studioInList.length,
-            'Checked In': checkedInCount,
+            'Checked In': checkedInCount.length,
             'Live Assignments': liveAssignmentStats.live,
             'Completed Assignments': liveAssignmentStats.completed,
             'Is Temporary': index === 0 ? (cohort['isTemporary'] ? 'Yes' : 'No') : '',

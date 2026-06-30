@@ -100,7 +100,7 @@ export class CohortDetailComponent implements OnDestroy {
   filterText = '';
 
   // Studio / live-assignment data (passed in from parent)
-  mapParticipantStudios: { [participantId: string]: any[] } = {};
+  mapParticipantStudios: { [key : string] : {[participantId: string]: any[]} } = {};
   mapStudioPairing: { [studioId: string]: any } = {};
   mapLiveAssignmentByStudio: { [studioId: string]: any } = {};
   studioPairingList: any[] = [];
@@ -225,7 +225,7 @@ export class CohortDetailComponent implements OnDestroy {
       console.log('queueid', this.dialogData.cohort['queueref']?.id);
       this.peopleCount = this.cohort?.['participantidlist']?.length || 0;
       this.selectedMentors = this.cohort?.['mentors'] ?? [];
-      this.computeStats();
+      // this.computeStats();
       this.computeActivitiesFromInjectedMaps();
       this.computeOwners();
       this.rebuildParticipantRows();
@@ -262,88 +262,61 @@ export class CohortDetailComponent implements OnDestroy {
   /**
    * Compute top-row stats: studios paired, Q demand, event confirmed.
    */
-  computeStats() {
-    const participants: string[] = this.cohort?.['participantidlist'] || [];
-    this.peopleCount = participants.length;
-    // const queueId = this.cohort;
+  // computeStats() {
+  //   const participants: string[] = this.cohort?.['participantidlist'] || [];
+  //   this.peopleCount = participants.length;
+  //   // const queueId = this.cohort;
 
-    let studiosTotal = 0;
-    let studiosPaired = 0;
-    let checkedIn = 0;
-    let live = 0;
-    participants.forEach((pid) => {
-      const studios = this.mapParticipantStudios?.[pid] || [];
-      studiosTotal += studios.length;
-      studiosPaired += studios.filter((s: any) => s?.studioin === true).length;
-      checkedIn += studios.filter((s: any) => s?.checkin === true).length;
-    });
-    live = participants.filter(
-      (pid) => !!this.mapLiveParticipants?.[this.selectedQueue]?.[pid],
-    ).length;
+  //   let studiosTotal = 0;
+  //   let studiosPaired = 0;
+  //   let checkedIn = 0;
+  //   let live = 0;
+  //   participants.forEach((pid) => {
+  //     const studios = this.mapParticipantStudios?.[pid] || [];
+  //     studiosTotal += studios.length;
+  //     studiosPaired += studios.filter((s: any) => s?.studioin === true).length;
+  //     checkedIn += studios.filter((s: any) => s?.checkin === true).length;
+  //   });
+  //   live = participants.filter(
+  //     (pid) => !!this.mapLiveParticipants?.[this.selectedQueue]?.[pid],
+  //   ).length;
 
-    this.studiosPaired =
-      studiosTotal > 0 ? `${studiosPaired}/${studiosTotal}` : '—';
-    this.qDemand =
-      studiosTotal > 0 ? String(Math.max(0, studiosPaired - checkedIn)) : '—';
+  //   this.studiosPaired =
+  //     studiosTotal > 0 ? `${studiosPaired}/${studiosTotal}` : '—';
+  //   this.qDemand =
+  //     studiosTotal > 0 ? String(Math.max(0, studiosPaired - checkedIn)) : '—';
 
-    const eventConfirmedCount = this.computeEventConfirmedCount(participants);
-    this.eventConfirmed =
-      this.peopleCount > 0 ? `${eventConfirmedCount}/${this.peopleCount}` : '—';
+  //   const eventConfirmedCount = this.computeEventConfirmedCount(participants);
+  //   this.eventConfirmed =
+  //     this.peopleCount > 0 ? `${eventConfirmedCount}/${this.peopleCount}` : '—';
 
-    this.checkedInCount = checkedIn;
-    this.liveCount = live;
-  }
+  //   this.checkedInCount = checkedIn;
+  //   this.liveCount = live;
+  // }
 
-  private computeEventConfirmedCount(participants: string[]): number {
-    if (!participants?.length) return 0;
-    const list = this.eventParticipationList || [];
-    if (!list.length) return participants.length;
-    const confirmedIds = new Set<string>(
-      list
-        .filter((e: any) => {
-          const status = (e?.status || e?.eventstatus || '').toLowerCase();
-          return (
-            !status ||
-            status === 'confirmed' ||
-            status === 'active' ||
-            status === 'attending'
-          );
-        })
-        .map((e: any) => e?.participantid || e?.profileid)
-        .filter(Boolean),
-    );
-    return participants.filter((pid) => confirmedIds.has(pid)).length;
-  }
+  // private computeEventConfirmedCount(participants: string[]): number {
+  //   if (!participants?.length) return 0;
+  //   const list = this.eventParticipationList || [];
+  //   if (!list.length) return participants.length;
+  //   const confirmedIds = new Set<string>(
+  //     list
+  //       .filter((e: any) => {
+  //         const status = (e?.status || e?.eventstatus || '').toLowerCase();
+  //         return (
+  //           !status ||
+  //           status === 'confirmed' ||
+  //           status === 'active' ||
+  //           status === 'attending'
+  //         );
+  //       })
+  //       .map((e: any) => e?.participantid || e?.profileid)
+  //       .filter(Boolean),
+  //   );
+  //   return participants.filter((pid) => confirmedIds.has(pid)).length;
+  // }
 
   /** Studios listing for the Studios tab */
   getCohortStudios() {
-    // const participants: string[] = this.cohort?.['participantidlist'] || [];
-    // const studioIndex: { [sid: string]: { studio: any, participants: Set<string>, checkedIn: number, isLive: boolean } } = {};
-    // participants.forEach(pid => {
-    //   const arr = this.mapParticipantStudios?.[pid] || [];
-    //   arr.forEach((s: any) => {
-    //     const sid = s?.studioId || s?.studioId?.toString();
-    //     if (!sid) return;
-    //     if (!studioIndex[sid]) {
-    //       studioIndex[sid] = {
-    //         studio: this.mapStudioPairing?.[sid] || s?.studioData || { id: sid },
-    //         participants: new Set<string>(),
-    //         checkedIn: 0,
-    //         isLive: !!this.mapLiveAssignmentByStudio?.[sid],
-    //       };
-    //     }
-    //     studioIndex[sid].participants.add(pid);
-    //     if (s?.checkin === true) studioIndex[sid].checkedIn++;
-    //   });
-    // });
-    // return Object.entries(studioIndex).map(([studioId, v]) => ({
-    //   studioId,
-    //   studio: v.studio,
-    //   participants: Array.from(v.participants),
-    //   checkedIn: v.checkedIn,
-    //   isLive: v.isLive,
-    // }));
-
     return this.studioPairingList.filter((queue) => {
       const queueId = queue['queueref']?.id;
       const bigActivity = this.cohort['bigactivity'];
@@ -368,10 +341,10 @@ export class CohortDetailComponent implements OnDestroy {
     );
   }
 
-  isParticipantInStudio(participantId: string): boolean {
-    const studios = this.mapParticipantStudios?.[participantId] || [];
-    return studios.some((s: any) => s?.studioin === true);
-  }
+  // isParticipantInStudio(participantId: string): boolean {
+  //   const studios = this.mapParticipantStudios?.[participantId] || [];
+  //   return studios.some((s: any) => s?.studioin === true);
+  // }
 
   isParticipantLive(queueId: string, participantId: string): boolean {
     return !!(
@@ -720,7 +693,7 @@ export class CohortDetailComponent implements OnDestroy {
       }
 
       // Refresh the parent map so unassigned-to-studio recomputes
-      this.refreshStudioMappings(participantId, targetStudio, sourceStudioId);
+      // this.refreshStudioMappings(participantId, targetStudio, sourceStudioId);
 
       this._snackBar?.open(
         `Assigned ${this.getNameForId(participantId)} to studio`,
@@ -736,76 +709,76 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   /** Remove participant from a studio (× button on a role row). */
-  async removeParticipantFromStudio(
-    participantId: string,
-    studio: any,
-    event?: Event,
-  ): Promise<void> {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    if (!participantId || !studio) return;
-    const sid = studio?.docid || studio?.id;
-    if (!sid) return;
+  // async removeParticipantFromStudio(
+  //   participantId: string,
+  //   studio: any,
+  //   event?: Event,
+  // ): Promise<void> {
+  //   if (event) {
+  //     event.preventDefault();
+  //     event.stopPropagation();
+  //   }
+  //   if (!participantId || !studio) return;
+  //   const sid = studio?.docid || studio?.id;
+  //   if (!sid) return;
 
-    try {
-      const sref = doc(this.firestore, 'studio pairing', sid);
-      await updateDoc(sref, { pairing: arrayRemove(participantId) }).catch(
-        async () => {
-          const altRef = doc(this.firestore, 'studiopairing', sid);
-          await updateDoc(altRef, { pairing: arrayRemove(participantId) });
-        },
-      );
-      studio['pairing'] = (studio['pairing'] || []).filter(
-        (p: string) => p !== participantId,
-      );
-      this.refreshStudioMappings(participantId, null, sid);
-      this._snackBar?.open(
-        `Removed ${this.getNameForId(participantId)}`,
-        'OK',
-        { duration: 1500 },
-      );
-    } catch (err) {
-      console.error('Failed to remove participant', err);
-      this._snackBar?.open('Failed to remove. Try again.', 'Dismiss', {
-        duration: 2500,
-      });
-    }
-  }
+  //   try {
+  //     const sref = doc(this.firestore, 'studio pairing', sid);
+  //     await updateDoc(sref, { pairing: arrayRemove(participantId) }).catch(
+  //       async () => {
+  //         const altRef = doc(this.firestore, 'studiopairing', sid);
+  //         await updateDoc(altRef, { pairing: arrayRemove(participantId) });
+  //       },
+  //     );
+  //     studio['pairing'] = (studio['pairing'] || []).filter(
+  //       (p: string) => p !== participantId,
+  //     );
+  //     this.refreshStudioMappings(participantId, null, sid);
+  //     this._snackBar?.open(
+  //       `Removed ${this.getNameForId(participantId)}`,
+  //       'OK',
+  //       { duration: 1500 },
+  //     );
+  //   } catch (err) {
+  //     console.error('Failed to remove participant', err);
+  //     this._snackBar?.open('Failed to remove. Try again.', 'Dismiss', {
+  //       duration: 2500,
+  //     });
+  //   }
+  // }
 
   /** Keep mapParticipantStudios in sync after an assign/move/remove. */
-  private refreshStudioMappings(
-    participantId: string,
-    targetStudio: any | null,
-    sourceStudioId: string | null,
-  ) {
-    if (!this.mapParticipantStudios) this.mapParticipantStudios = {};
-    const entry: any[] = this.mapParticipantStudios[participantId] || [];
+  // private refreshStudioMappings(
+  //   participantId: string,
+  //   targetStudio: any | null,
+  //   sourceStudioId: string | null,
+  // ) {
+  //   if (!this.mapParticipantStudios) this.mapParticipantStudios = {};
+  //   const entry: any[] = this.mapParticipantStudios[participantId] || [];
 
-    // Remove the source mapping
-    let next = entry;
-    if (sourceStudioId) {
-      next = entry.filter((e: any) => e?.studioId !== sourceStudioId);
-    }
-    // Add the target mapping
-    if (targetStudio) {
-      const sid = targetStudio?.docid || targetStudio?.id;
-      const already = next.some((e: any) => e?.studioId === sid);
-      if (!already) {
-        next = [
-          ...next,
-          {
-            studioId: sid,
-            studioData: targetStudio,
-            studioin: !!targetStudio['studioin'],
-            checkin: !!targetStudio['checkin'],
-          },
-        ];
-      }
-    }
-    this.mapParticipantStudios[participantId] = next;
-  }
+  //   // Remove the source mapping
+  //   let next = entry;
+  //   if (sourceStudioId) {
+  //     next = entry.filter((e: any) => e?.studioId !== sourceStudioId);
+  //   }
+  //   // Add the target mapping
+  //   if (targetStudio) {
+  //     const sid = targetStudio?.docid || targetStudio?.id;
+  //     const already = next.some((e: any) => e?.studioId === sid);
+  //     if (!already) {
+  //       next = [
+  //         ...next,
+  //         {
+  //           studioId: sid,
+  //           studioData: targetStudio,
+  //           studioin: !!targetStudio['studioin'],
+  //           checkin: !!targetStudio['checkin'],
+  //         },
+  //       ];
+  //     }
+  //   }
+  //   this.mapParticipantStudios[participantId] = next;
+  // }
 
   private computeActivitiesFromInjectedMaps() {
     if (!this.cohortId) {
@@ -1144,7 +1117,7 @@ export class CohortDetailComponent implements OnDestroy {
         this.calculateUnassignedParticipants();
       });
 
-    if (!queue) {
+    if (queue) {
       const arenaEventsSnap = await getDocs(
         query(
           collection(this.firestore, 'arena events'),
@@ -1244,12 +1217,13 @@ export class CohortDetailComponent implements OnDestroy {
 
       if([null , undefined , ''].includes(queueId)) return
       this.mapLiveParticipants[queueId] = this.mapLiveParticipants[queueId] ?? {};
+      this.mapParticipantStudios[queueId] = this.mapParticipantStudios[queueId] ?? {};
       participants.forEach((participantId: string) => {
-        if (!this.mapParticipantStudios[participantId]) {
-          this.mapParticipantStudios[participantId] = [];
+         if (!this.mapParticipantStudios[queueId][participantId]) {
+          this.mapParticipantStudios[queueId][participantId] = [];
         }
 
-        this.mapParticipantStudios[participantId].push({
+        this.mapParticipantStudios[queueId][participantId].push({
           studioId: studioId,
           isLive: isLive,
           checkin: studio.checkin || false,
