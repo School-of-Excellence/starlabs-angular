@@ -281,6 +281,31 @@
     </div>
   </div>
 
+  <!-- ═══════ MANAGE WATI CATEGORIES ═══════ -->
+  <div class="manage-overlay" *ngIf="manageCategoryDialogOpen" (click)="manageCategoryDialogOpen = false">
+    <div class="manage-dialog" (click)="$event.stopPropagation()">
+      <div class="manage-header">
+        <h3 style="margin:0;">Manage Categories</h3>
+        <button mat-icon-button (click)="manageCategoryDialogOpen = false"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <div class="manage-add-row">
+        <mat-form-field appearance="outline" class="manage-input">
+          <input matInput [(ngModel)]="newWatiCategoryName" (keydown.enter)="addWatiCategory()" placeholder="New Category">
+        </mat-form-field>
+        <button mat-stroked-button color="primary" (click)="addWatiCategory()" [disabled]="!newWatiCategoryName.trim() || isAddingCategory">
+          <mat-progress-spinner *ngIf="isAddingCategory" diameter="16" mode="indeterminate" style="display:inline-flex;margin-right:6px;"></mat-progress-spinner>
+          <mat-icon *ngIf="!isAddingCategory">add</mat-icon> Add
+        </button>
+      </div>
+
+      <div class="manage-list">
+        <span *ngFor="let c of watiCategories" class="dc-chip">{{c.name}}</span>
+        <div *ngIf="watiCategories.length === 0" class="manage-empty-state">No categories yet. Add one above.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════ SCHEDULE ═══════ -->
   <div class="step-card schedule-card" *ngIf="isTemplatePresent() && !isQueuedTemplate">
     <div class="schedule-header" [class.schedule-header-active]="isScheduled" (click)="isScheduled = !isScheduled; onScheduleToggle()">

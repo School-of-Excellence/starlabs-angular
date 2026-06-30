@@ -229,9 +229,7 @@ export class WatiInputComponent {
   async loadWatiCategories() {
     try {
       const snap = await getDoc(doc(this.firestore, 'classify', 'waticategories'));
-      console.log('waticategories snap exists:', snap.exists(), snap.data()); // ← ADD THIS
       this.watiCategories = snap.exists() ? (snap.data()?.['categories'] || []) : [];
-      console.log('watiCategories loaded:', this.watiCategories); // ← AND THIS
     } catch (e) { console.error('Error loading wati categories', e); }
   }
 
