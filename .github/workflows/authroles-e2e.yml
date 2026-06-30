@@ -1,0 +1,54 @@
+# authroles-e2e — THIN CALLER for the Stage-2 hermetic Playwright gate (AUTHROLES system).
+#
+# Mirrors journey-e2e.yml / queue-e2e.yml: the gate logic lives in the hub
+# (starlabs-e2e-tests/.github/workflows/web-e2e.yml); this file just wires the app's PR triggers + path
+# filters and selects the AUTHROLES suite via `config` + `suite`. Requires repo/org secret with read on the
+# private e2e + cloud-function repos, passed via `secrets: inherit`.
+#
+# ⚠️ VALIDATION PIN: the authroles ENGINE files (playwright.authroles.emulator(.evidence).config.ts,
+#    authroles/support/emulator-global-setup.ts + -teardown.ts, seed-authroles.js initAdminAuto) live on the
+#    hub branch `systems-emulator`, NOT yet on hub `main`. So `uses:` + `e2e_ref:` are pinned at that branch.
+#    Flip BOTH to `@main` / `main` only after the hub `systems-emulator` -> `main` merge (recipe step 7).
+#    REPORT-ONLY (non-required) until proven green N times, then promote per-system.
+name: authroles-e2e (emulator gate)
+
+on:
+  pull_request:
+    branches: [cicd-dev, cicd-prod]   # sudo branches — match queue/journey. Switch to [development] at cutover.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    paths:
+      - 'src/app/login/**'
+      - 'src/app/**.guard.ts'
+      - 'src/app/Business Dashboard/profile-based-access/**'
+      - 'src/app/app.component.ts'
+      - 'angular.json'
+      - 'package.json'
+      - '.github/workflows/authroles-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Spec subset (space-separated). Empty = all authroles specs.'
+        type: string
+        default: ''
+      evidence:
+        description: '1 = capture screenshots + traces (to debug a CI-only failure)'
+        type: string
+        default: '0'
+
+jobs:
+  gate:
+    # Cost control: skip the heavy gate on DRAFT PRs unless explicitly labeled `run-e2e`.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.draft == false ||
+      contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@systems-emulator
+    with:
+      cf_branch: development
+      e2e_ref: systems-emulator                      # VALIDATION PIN — flip to `main` after the hub merge
+      firebase_project: starlabs-cicd                # MUST match the app's projectId or auth silently fails
+      config: playwright.authroles.emulator.evidence.config.ts  # EVIDENCE variant: screenshot+trace per test → browsable report
+      suite: authroles                               # spec root (authroles/) + history audit tag
+      only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || '' }}
+      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}
+    secrets: inherit
