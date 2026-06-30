@@ -5,11 +5,9 @@
 # filters and selects the BUSINESS suite via `config` + `suite`. Requires repo/org secret with read on the
 # private e2e + cloud-function repos, passed via `secrets: inherit`.
 #
-# ⚠️ VALIDATION PIN: the business ENGINE files (playwright.business.emulator(.evidence).config.ts,
-#    business/support/emulator-global-setup|teardown.ts, seed-business.js initAdminAuto + the shared lib) live
-#    on the hub branch `systems-emulator`, NOT yet on hub `main`. So `uses:` + `e2e_ref:` are pinned there.
-#    Flip BOTH to `@main` / `main` only after the hub `systems-emulator` -> `main` merge (recipe step 7).
-#    REPORT-ONLY (non-required) until proven green N times, then promote per-system.
+# ✅ POST-MERGE: the business ENGINE + shared lib are merged to hub `main` (systems-emulator -> main),
+#    so `uses:` + `e2e_ref:` point at `@main`. REPORT-ONLY (non-required) until proven green N times, then
+#    promote per-system.
 name: business-e2e (emulator gate)
 
 on:
@@ -44,10 +42,10 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.draft == false ||
       contains(github.event.pull_request.labels.*.name, 'run-e2e')
-    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@systems-emulator
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
     with:
       cf_branch: development
-      e2e_ref: systems-emulator                      # VALIDATION PIN — flip to `main` after the hub merge
+      e2e_ref: main                                # VALIDATION PIN — flip to `main` after the hub merge
       firebase_project: starlabs-cicd                # MUST match the app's projectId or auth silently fails
       config: playwright.business.emulator.evidence.config.ts  # EVIDENCE variant: screenshot+trace per test → browsable report
       suite: business                                # spec root (business/) + history audit tag
