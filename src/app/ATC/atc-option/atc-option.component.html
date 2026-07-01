@@ -15,7 +15,10 @@
       <div class="title">Draft ATC</div>
       <ul>
         <li *ngFor="let atc of draftOption; let i = index">
-          <span>Prescription Date - {{atc.data()["lastupdated"] ? (atc.data()["lastupdated"].toDate() | date: "medium") : atc.data()["date"]}}</span>
+          <span>Last updated - {{ draftDate(atc) ? (draftDate(atc) | date: "medium") : atc.data()["date"] }}</span>
+          <span class="source-badge" [class.local]="isLocalDraft(atc)">
+            {{ isLocalDraft(atc) ? 'On this device — not synced' : 'Synced (server)' }}
+          </span>
           <!-- Flag drafts started from an AI generation so the specialist opens THIS draft
                (same queue_atc_generation doc id) instead of creating a fresh one. -->
           <span *ngIf="atc.data()['aiedited']" class="aiatc-badge">
