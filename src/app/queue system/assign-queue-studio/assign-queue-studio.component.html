@@ -3,7 +3,7 @@
     <form [formGroup]="activityForm" (ngSubmit)="submit()">
       <mat-form-field *ngIf="activityForm.controls['selectedstudio'].enabled" class="w-100 mt-3" appearance="outline">
         <mat-label>Studio Specialist</mat-label>
-        <mat-select formControlName="selectedstudio">
+        <mat-select formControlName="selectedstudio" data-testid="aqs-studio-select">
           <mat-option *ngFor="let option of studioList" [value]="option.value">{{option.name}}</mat-option>
         </mat-select>
         <mat-error *ngIf="activityForm.get('selectedstudio').hasError('required')">Required</mat-error>
@@ -21,12 +21,17 @@
             </mat-error>
           </mat-form-field>
           <mat-form-field class="inputfields me-3" appearance="outline">
-            <mat-label>Participant</mat-label>
+            <mat-label>Specialist</mat-label>
             <mat-select formControlName="participants" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let option of filterProfileList()" [value]="option.profileid">{{option.name}}</mat-option>
+              <mat-option *ngFor="let option of filterProfileList()" [value]="option.profileid">
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="option.profileid" [name]="option.name" [size]="24"></app-profile-picture>
+                  <span>{{option.name}}</span>
+                </span>
+              </mat-option>
             </mat-select>
             <mat-error *ngIf="field.get('participants').hasError('required')">
               Required
@@ -43,7 +48,7 @@
       </button>
       <div class="w-100 text-center mt-4">
         <button mat-stroked-button class="cancelbtn me-3" type="button" (click)="dialogRef.close(null)">Close</button>
-        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="activityForm.invalid">Assign Specialist</button>
+        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="activityForm.invalid" data-testid="aqs-submit">Confirm Specialist</button>
       </div>
     </form>
 </div>

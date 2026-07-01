@@ -10,6 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { Router } from '@angular/router';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-releaselogdialog',
@@ -20,6 +21,7 @@ import { Router } from '@angular/router';
     MatInputModule,
     MatIconModule,
     MatButtonModule,
+    ProfilePictureComponent,
   ],
   templateUrl: './releaselogdialog.component.html',
   styleUrl: './releaselogdialog.component.css'

@@ -9,7 +9,7 @@
         </mat-form-field>
       </div>
       <div class="actionitem">
-        <button class="addbtn" mat-stroked-button (click)="updateList(null)">Add New Level</button>
+        <button class="addbtn" mat-stroked-button (click)="updateList(null)" data-testid="biglevel-add">Add New Level</button>
       </div>
     </div>
     <table mat-table matSort #table [dataSource]="dataSource" cdkDropList (cdkDropListDropped)="onDrop($event)" [cdkDropListDisabled]="dragDisabled">

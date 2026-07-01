@@ -3,11 +3,12 @@ import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule }
 import { CommonModule, DatePipe } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Firestore, collection, collectionData, query, where, updateDoc, doc, getDocs, orderBy, Timestamp, getDoc, serverTimestamp, arrayUnion, writeBatch, getFirestore, documentId } from '@angular/fire/firestore';
-import { Observable, Subscription, combineLatest, firstValueFrom } from 'rxjs';
+import { Observable, Subject, Subscription, combineLatest, firstValueFrom, takeUntil } from 'rxjs';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -143,7 +144,9 @@ interface UtilizationRow {
         MatDatepickerModule,
         MatNativeDateModule,
         MatInputModule,
-        MatSlideToggleModule
+        MatSlideToggleModule,
+        ProfilePictureComponent,
+        FormOverlayViewComponent
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',
@@ -383,6 +386,7 @@ export class DeliveryDashboardCloneComponent {
     private participantsProductDataSubscription: Subscription;
     private formsSubscription: Subscription;
     private ticketRequestSubscription: Subscription;
+    private destroy$ = new Subject<void>();
 
     columns = {
         "eiStarterPack": [
@@ -573,7 +577,6 @@ export class DeliveryDashboardCloneComponent {
     // View form overlay
     mapProfileNew: any = {};
     mapQueue: any = {};
-    workshopList: any[] = [];
     mapWorkshop: any = {};
     mapWorkshopNew: any = {};
     events: any[] = [];
@@ -653,6 +656,7 @@ export class DeliveryDashboardCloneComponent {
         private injector: Injector,
         private datepipe: DatePipe,
         private ngZone: NgZone,
+        private authguard: AuthguardService,
     ) {
         this.filterForm = this.fb.group({
             search: [''],
@@ -664,6 +668,40 @@ export class DeliveryDashboardCloneComponent {
             this.onProductMultiFilterChange();
         });
 
+        this.authguard.getProfileMap().then(async profile => {
+            this.mapProfile = profile.map;
+        });
+
+        this.authguard.getProfileMapNewUser().then(async profilenew => {
+            this.mapProfileNew = profilenew.map;
+        });
+
+        const queueGenerationCollRef = collection(this.firestore, "queue generation");
+        const queueGenerationQuery = query(queueGenerationCollRef, orderBy("queueenddate", "desc"));
+        collectionData(queueGenerationQuery).pipe(takeUntil(this.destroy$)).subscribe(async queuesnap => { //collectionData - getDocs
+            for (let i = 0; i < queuesnap.length; i++) {
+                const element = queuesnap[i];
+                this.mapQueue[element['docid']] = element['queuename'];
+            }
+        });
+
+        const eiflixWorkshopCollRef = collection(this.firestore, "eiflix workshop");
+        getDocs(eiflixWorkshopCollRef).then(snap => {
+            const workshopList = snap.docs.map(e => e.data());
+            for (let i = 0; i < workshopList.length; i++) {
+                const element = workshopList[i];
+                this.mapWorkshop[element['docid']] = element['title'];
+            }
+        });
+
+        const eiflixWorkshopnewCollRef = collection(this.firestore, "workshopconfiguration");
+        getDocs(eiflixWorkshopnewCollRef).then(snap => {
+            const workshopListNew = snap.docs.map(e => e.data());
+            for (let i = 0; i < workshopListNew.length; i++) {
+                const element = workshopListNew[i];
+                this.mapWorkshopNew[element['docid']] = element['detailpage']?.['title'] ?? '';
+            }
+        });
     }
 
     get productFilterControl(): FormControl {
@@ -912,8 +950,6 @@ export class DeliveryDashboardCloneComponent {
 
                     return acc;
                 }, {} as Record<string, string>);
-
-            await this.getAllEvents();
 
             // Process users (depends on mapprofile from metadata)
             this.coachesList = usersSnap.docs
@@ -1543,10 +1579,10 @@ export class DeliveryDashboardCloneComponent {
 
             // ========================= COMPLETED DATA =========================
             const completedData = this.funnelData[productId]?.completed || [];
-
             for (let data of completedData) {
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
+
                 data = {
                     ...data,
                     allappointments: appointments
@@ -1872,30 +1908,26 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async getAllEvents() {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        if (this.events.length === 0) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-        const allEventsSnap = await getDocs(
-            query(
-                collection(this.firestore, 'event collection'),
-                where(
-                    'start_date',
-                    '>=',
-                    Timestamp.fromDate(today)
+            const allEventsSnap = await getDocs(
+                query(
+                    collection(this.firestore, 'event collection'),
+                    where(
+                        'end_date',
+                        '>=',
+                        Timestamp.fromDate(today)
+                    ),
+                    orderBy('start_date', 'asc')
                 )
-            )
-        );
+            );
 
-        this.events = allEventsSnap.docs
-            .map(doc => ({
+            this.events = allEventsSnap.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            }))
-            .sort((a: any, b: any) => a.start_date.seconds - b.start_date.seconds);
-
-        if (this.events.length) {
-            this.selectedEvent = this.events[0];
-            await this.getApprovedDFUParticipants(this.selectedEvent.id);
+            }));
         }
     }
 
@@ -4225,13 +4257,11 @@ export class DeliveryDashboardCloneComponent {
                             const productData = productQuery.docs[j].data();
                             let minimumpayment = productData['minimumpayment'] || 0;
 
-                            if (!minimumpayment) {
-                                const productId = productData['productref']?.id;
-                                const productSnap = this.rawProductData.find((p: any) => p.id === productId);
-                                minimumpayment = productSnap?.['minimumrequiredamount'] || 0;
+                            if ([null, undefined].includes(minimumpayment)) {
+                                minimumpayment = this.mapProduct[productData['productref']?.id]?.minimumrequiredamount || 0;
                             }
 
-                             if (minimumpayment <= totalpaid) {
+                            if (minimumpayment <= totalpaid) {
                                 hasAtLeastOneCleared = true;
                                 break;
                             }
@@ -6586,9 +6616,9 @@ export class DeliveryDashboardCloneComponent {
             const totalPurchaseValue = parseInt(meta['pp_totalpurchasevalue'] ?? '0') || 0;
             const totalBalance = totalPurchaseValue - totalPaid;
             const minPayment = parseInt(item?.['minimumpayment']) || 0;
-            const isEligible = !this.excludedModes.has(mode);
-            const isClearedPayment = (!this.excludedModes.has(mode)) && (totalBalance <= 0 || totalPaid >= minPayment);
-            const financialdata = isClearedPayment ? 'Cleared' : 'Not Scheduled';
+            const isEligible = !this.excludedModes.has(mode) && (totalBalance <= 0 || totalPaid >= minPayment);
+            const notClearedPayment = !this.excludedModes.has(mode) && !(totalBalance <= 0 || totalPaid >= minPayment);
+            const financialdata = isEligible ? 'Cleared' : 'Not Scheduled';
 
             const productId = item?.productref?.id;
             const productName = this.shortenProductName(this.mapProductName?.[productId] || '');
@@ -6606,7 +6636,7 @@ export class DeliveryDashboardCloneComponent {
             const daysSinceActivity = this.daysSinceTs(lastActivity);
 
             // payment confirmed — not yet initiated
-            if (!status && isClearedPayment) {
+            if (!status && isEligible) {
                 clearedPayment.push({
                     profileid: profileId,
                     journey: journeyName,
@@ -6620,7 +6650,7 @@ export class DeliveryDashboardCloneComponent {
             }
 
             // payment not confirmed — not yet initiated
-            if (!status && isEligible) {
+            if (!status && notClearedPayment) {
                 awaiting.push({
                     profileid: profileId,
                     journey: journeyName,

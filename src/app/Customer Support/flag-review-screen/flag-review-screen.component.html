@@ -14,19 +14,19 @@
                 <div>
                     <p style="font-weight: bold;">: {{currentIssueData['issueno']}}</p>                
                     <p>: {{currentIssueData['category']}}</p>
-                    <p>: {{mapProfileData[currentIssueData['issueReportedBy']]?.name}}</p>
-                    <p>: {{mapProfileData[currentIssueData['reportedBy']]?.name}}</p>
+                    <p style="display:inline-flex;align-items:center;gap:8px;">: <app-profile-picture [profileId]="currentIssueData['issueReportedBy']" [name]="mapProfileData[currentIssueData['issueReportedBy']]?.name" [size]="28"></app-profile-picture>{{mapProfileData[currentIssueData['issueReportedBy']]?.name}}</p>
+                    <p style="display:inline-flex;align-items:center;gap:8px;">: <app-profile-picture [profileId]="currentIssueData['reportedBy']" [name]="mapProfileData[currentIssueData['reportedBy']]?.name" [size]="28"></app-profile-picture>{{mapProfileData[currentIssueData['reportedBy']]?.name}}</p>
                     <div style="display: flex; flex-direction: row; padding: 8px; justify-content: space-between;">
                         <div style="line-height: 0.2;  font-size: 15px;">
                             <div *ngFor="let assign of currentIssueData['assign']">
-                                <p *ngIf="![null, undefined,''].includes(assign)">* {{mapProfileData[assign]?.name}}</p>
+                                <p *ngIf="![null, undefined,''].includes(assign)" style="display:inline-flex;align-items:center;gap:8px;">* <app-profile-picture [profileId]="assign" [name]="mapProfileData[assign]?.name" [size]="28"></app-profile-picture>{{mapProfileData[assign]?.name}}</p>
                             </div>
                         </div>
                     </div>
                     <div style="display: flex; flex-direction: row; padding: 8px; justify-content: space-between;">
                         <div style="line-height: 0.2;  font-size: 15px;">
                             <div *ngFor="let assign of currentIssueData['peopleinvolved']">
-                                <p *ngIf="![null, undefined,''].includes(assign)">* {{mapProfileData[assign]?.name}}</p>
+                                <p *ngIf="![null, undefined,''].includes(assign)" style="display:inline-flex;align-items:center;gap:8px;">* <app-profile-picture [profileId]="assign" [name]="mapProfileData[assign]?.name" [size]="28"></app-profile-picture>{{mapProfileData[assign]?.name}}</p>
                             </div>
                         </div>
                     </div>
@@ -101,7 +101,8 @@
                             <div style="display: flex; flex-direction: column">
                                 <div *ngIf="![null, undefined].includes(negligenceData[clientMessages[idx]['timegapid']]) && negligenceData[clientMessages[idx]['timegapid']].length != 0">
                                     <div *ngFor="let flag of negligenceData[clientMessages[idx]['timegapid']]" style="line-height: 0.2;">
-                                        <div style="display: flex; flex-direction: row; font-size: 16px; justify-content: flex-end; font-weight: bold;">
+                                        <div style="display: flex; flex-direction: row; font-size: 16px; justify-content: flex-end; font-weight: bold; align-items: center; gap: 8px;">
+                                            <app-profile-picture [profileId]="flag.markedby" [name]="mapProfileData[flag.markedby]?.name" [size]="28"></app-profile-picture>
                                             <p>{{mapProfileData[flag.markedby]['name']}} : </p>
                                             <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.category)">&nbsp;{{flag.category}} /</p>
                                             <p style="color: blue;">&nbsp;{{flag.severity}}</p>
@@ -249,7 +250,8 @@
                         <div *ngIf="isNotMatch(chat.sender_uid,idx)" style="width: 50%;">
                             <div *ngIf="![null, undefined].includes(negligenceData[clientMessages[idx]['flagid']]) && negligenceData[clientMessages[idx]['flagid']].length != 0">
                                 <div *ngFor="let flag of negligenceData[clientMessages[idx]['flagid']]" style="line-height: 0.2;">
-                                    <div style="display: flex; flex-direction: row; font-size: 16px; justify-content: flex-end; font-weight: bold;">
+                                    <div style="display: flex; flex-direction: row; font-size: 16px; justify-content: flex-end; font-weight: bold; align-items: center; gap: 8px;">
+                                        <app-profile-picture [profileId]="flag.markedby" [name]="mapProfileData[flag.markedby]?.name" [size]="28"></app-profile-picture>
                                         <p>{{mapProfileData[flag.markedby]['name']}} : </p>
                                         <p style="color: blue;" *ngIf="![null, undefined, ''].includes(flag.category)">&nbsp;{{flag.category}} /</p>
                                         <p style="color: blue;">&nbsp;{{flag.severity}} </p>

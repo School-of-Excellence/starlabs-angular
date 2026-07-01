@@ -9,7 +9,7 @@
         </mat-form-field>
       </div>
       <div class="actionitem">
-        <button class="addbtn" mat-stroked-button (click)="updateList(null)">Add New Config</button>
+        <button class="addbtn" mat-stroked-button (click)="updateList(null)" data-testid="modelconfig-add">Add New Config</button>
       </div>
     </div>
     <table mat-table [dataSource]="dataSource" matSort>

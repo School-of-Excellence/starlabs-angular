@@ -28,6 +28,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { FormControl } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ProfilePictureComponent } from '../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-hpc',
@@ -54,7 +55,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     ReducePipe,
     NgxMatSelectSearchModule,
     ReactiveFormsModule,
-    MatTooltipModule
+    MatTooltipModule,
+    ProfilePictureComponent
   ],
   templateUrl: './hpc.component.html',
   styleUrl: './hpc.component.css'

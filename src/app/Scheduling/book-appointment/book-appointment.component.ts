@@ -105,7 +105,6 @@ export class BookAppointmentComponent implements OnInit {
         this.route.queryParams.subscribe(param => {
           if (param["pid"] != null) {
             var profileid = param["pid"]
-            console.log(profileid)
             this.selectedUser = profileid
             this.onProfileSelect()
             this.goback = true
@@ -219,8 +218,6 @@ export class BookAppointmentComponent implements OnInit {
     var additionalRoles = []
     this.rolePersons = {}
 
-    console.log("id", this.selectedAppointment.id);
-
     var apptRoleCollection = collection(this.firestore, "AppointmentType-To-Roles")
     var apptRoleQuery = query(apptRoleCollection, where("assigned_appttype_ref", "==", doc(this.firestore, "appointmenttype/" + this.selectedAppointment.id)), limit(1))
     await getDocs(apptRoleQuery).then(roles => {
@@ -250,7 +247,6 @@ export class BookAppointmentComponent implements OnInit {
             this.rolePersons[rolesOfAppt] = assignedAgents
           }
           else {
-            console.log("Fetch 1")
             await this.fetchAppointmentEIS(rolesOfAppt)
           }
         }
@@ -638,12 +634,17 @@ export class BookAppointmentComponent implements OnInit {
         if (delivery.sequenceref.path == this.selectedAppointment.deliverypath) {
           productstatus = product.status ?? "ongoing"
           delivery.status = "ongoing"
-          console.log(product)
-          var participantProductDoc = doc(this.firestore, "participantsproduct/" + product["participantproductid"])
-          await updateDoc(participantProductDoc, {
-            status: productstatus,
-            [`statusdate.${productstatus}`]: serverTimestamp()
-          })
+          var participantProductDoc = doc(this.firestore, "participantsproduct/" + product["participantproductid"]);
+          const docSnap = await getDoc(participantProductDoc);
+          const participantProductData = docSnap.data();
+
+          let updateData: any = {
+            status: productstatus
+          };
+          if (participantProductData['status'] === 'initiated') {
+            updateData[`statusdate.${productstatus}`] = serverTimestamp();
+          }
+          await updateDoc(participantProductDoc, updateData);
         }
       }
       deliverySequence.push({
@@ -653,7 +654,6 @@ export class BookAppointmentComponent implements OnInit {
       })
     }
     // await this.firestore.collection("participantJourneySequence").doc(this.selectedAppointment.participantdelivery["profileid"]).update(this.selectedAppointment.journeyData)
-    console.log(this.selectedAppointment.participantdelivery, deliverySequence)
     var sequenecDoc = doc(this.firestore, "participantdeliverysequence/" + this.selectedAppointment.participantdelivery["profileid"])
     await updateDoc(sequenecDoc, {
       products: deliverySequence

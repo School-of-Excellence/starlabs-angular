@@ -13,6 +13,7 @@ import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { Subject, takeUntil } from 'rxjs';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-arena-e-ticket-approve',
@@ -28,7 +29,8 @@ import { Subject, takeUntil } from 'rxjs';
     MatPaginatorModule,
     MatSortModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    ProfilePictureComponent
   ],
   templateUrl: './arena-e-ticket-approve.component.html',
   styleUrl: './arena-e-ticket-approve.component.css'

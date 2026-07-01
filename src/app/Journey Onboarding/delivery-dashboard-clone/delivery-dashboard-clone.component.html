@@ -247,7 +247,7 @@
               <span class="up-confirmed">
                 <mat-form-field appearance="outline" class="event-select">
                   <mat-label>Select Event</mat-label>
-                  <mat-select [(value)]="selectedEvent" (selectionChange)="onEventChange($event.value)"
+                  <mat-select [(value)]="selectedEvent" (click)="getAllEvents()" (selectionChange)="onEventChange($event.value)"
                     panelClass="event-dropdown">
                     <mat-option *ngFor="let event of events" [value]="event">
                       {{ event.name }}
@@ -261,8 +261,7 @@
           <!-- Column header row -->
           <div class="dd-prow-colhead" aria-hidden="true">
             <div class="dd-prow-colhead__cell">Product</div>
-            <div class="dd-prow-colhead__cell w-fit-content">{{ selectedEvent ? selectedEvent.name : 'Event
-              Confirmation' }}</div>
+            <div class="dd-prow-colhead__cell">{{ selectedEvent ? selectedEvent?.name : 'Event Confirmation' }}</div>
             <div class="dd-prow-colhead__cell">Eligible</div>
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
               <span class="dd-colhead__grp-lbl">Participants</span>
@@ -551,6 +550,7 @@
                 <div class="profile-row" *ngFor="let pid of profileIds; let i = index">
                   <div class="profile-header">
                     <span class="participant-index">{{ i + 1 }}</span>
+                    <app-profile-picture [profileId]="pid" [name]="mapMetaData[pid]?.['name'] || ''"  [size]="28"></app-profile-picture>
                     <span class="participant-name">{{ mapMetaData[pid]?.['name'] || pid }}</span>
                     <span class="product-count">{{ currentGroupedByProfile[pid]?.length }} products</span>
                   </div>
@@ -663,18 +663,21 @@
                     <ng-container *ngFor="let pid of funnelProfileIds; let i = index">
                       <tr *ngFor="let item of funnelModalProfiles[pid]; let j = index">
                         <td>{{ j === 0 ? (i + 1) : '' }}</td>
-                        <td>{{ j === 0 ? (mapMetaData[pid]?.['name'] || pid) : '' }}</td>
+                        <td><app-profile-picture *ngIf="j === 0" [profileId]="pid"
+                            [name]="mapMetaData[pid]?.['name'] || ''" [size]="24"
+                            style="vertical-align:middle;margin-right:6px;"></app-profile-picture>{{ j === 0 ?
+                          (mapMetaData[pid]?.['name'] || pid) : '' }}</td>
                         <td>{{ mapProductName[item['productref']?.id] || 'Unknown' }}</td>
                         <td>{{ item['statusdate']?.['initiated'] ?
                           (getDateFromFieldPublic(item['statusdate']['initiated']) |
                           date:'dd MMM yyyy') : '-' }}</td>
-                        <td>{{ item['statusdate']?.['ongoing'] ? (getDateFromFieldPublic(item['statusdate']['ongoing'])
+                      <td>{{ item['statusdate']?.['ongoing'] ? (getDateFromFieldPublic(item['statusdate']['ongoing'])
                           |
                           date:'dd MMM yyyy') : '-' }}</td>
                         <td>{{ item['statusdate']?.['completed'] ?
                           (getDateFromFieldPublic(item['statusdate']['completed']) |
                           date:'dd MMM yyyy') : '-' }}</td>
-                          <td>{{ item['cycle'] }}</td>
+                        <td>{{ item['cycle'] }}</td>
                       </tr>
                     </ng-container>
                   </tbody>
@@ -740,7 +743,7 @@
             <div class="modal-content" (click)="$event.stopPropagation()">
 
               <div class="modal-header">
-              <h3>{{ selectedUPConfirmedProduct }} - {{ selectedEvent.name }}</h3>
+                <h3>{{ selectedUPConfirmedProduct }} - {{ selectedEvent.name }}</h3>
                 <span class="modal-count">
                   {{ selectedUPConfirmedParticipants.length }}
                   Participants
@@ -763,8 +766,11 @@
                   <tbody>
                     <tr *ngFor="let p of selectedUPConfirmedParticipants; let i=index">
                       <td>{{ i + 1 }}</td>
-                      <td style="cursor: pointer; text-decoration: underline;" (click)="openParticipant(p.profileid)">
-                        {{ mapMetaData[p.profileid]?.['name'] }}
+                      <td style="cursor: pointer;" (click)="openParticipant(p.profileid)">
+                        <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                            [profileId]="p.profileid" [name]="mapMetaData[p.profileid]?.['name'] || ''"
+                            [size]="24"></app-profile-picture><span style="text-decoration: underline;">{{
+                            mapMetaData[p.profileid]?.['name'] }}</span></span>
                       </td>
                       <td>
                         <span *ngFor="let productId of p.matchedDFUProducts; let last = last">
@@ -816,6 +822,8 @@
                 <div class="profile-row" *ngFor="let app of groupedByStageProfileAll; let i = index">
                   <div class="profile-header">
                     <span class="participant-index">{{ i + 1 }}</span>
+                    <app-profile-picture [profileId]="app.bookedby?.id"
+                      [name]="mapMetaData[app.bookedby?.id]?.['name'] || ''" [size]="28"></app-profile-picture>
                     <a class="participant-name" [href]="'/participantdeliverysequence/' + app.bookedby?.id">
                       {{ mapMetaData[app.bookedby?.id]?.['name'] || app.bookedby?.id }}
                     </a>
@@ -959,7 +967,10 @@
 
                         <!-- Visible Card -->
                         <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
-                          <div class="card-info">
+                          <div class="card-info" style="display:flex;align-items:center;gap:8px;">
+                            <app-profile-picture [profileId]="c?.profileid || c?.clientid"
+                              [name]="(c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name) || ''"
+                              [size]="28"></app-profile-picture>
                             <div class="card-name">
                               {{ c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name }}
                             </div>
@@ -1019,7 +1030,7 @@
                           </span>
                         </div>
                         <!-- View Form Button -->
-                        <button *ngIf="c?.status === 'submitted'" (click)="openFormOverlay(c)">View Form</button>
+                        <button class='btn-primary' *ngIf="c?.status === 'submitted'" (click)="openFormOverlay(c)">View Form</button>
                         <!-- Expandable Section -->
                         <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
                           <hr class="divider">

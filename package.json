@@ -21,7 +21,12 @@
     "e2e:T7": "npx playwright test --config=e2e/playwright.config.ts T7-screen-share",
     "e2e:T8": "npx playwright test --config=e2e/playwright.config.ts T8-blur",
     "e2e:T9": "npx playwright test --config=e2e/playwright.config.ts T9-sustained",
-    "e2e:T10": "npx playwright test --config=e2e/playwright.config.ts T10-rejoin"
+    "e2e:T10": "npx playwright test --config=e2e/playwright.config.ts T10-rejoin",
+    "start:emulator": "ng serve --configuration emulator",
+    "build:emulator": "ng build --configuration emulator",
+    "perf:auth": "npx tsx e2e/perf/capture-auth.ts",
+    "perf:trace": "npx playwright test --config=e2e/perf/playwright.perf.config.ts",
+    "perf:trace:report": "npx playwright show-report e2e/perf/report"
   },
   "private": true,
   "dependencies": {

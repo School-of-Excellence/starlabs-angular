@@ -21,13 +21,19 @@
                         <ng-container *ngIf="eventProfiles[eventName]?.newProfiles.length > 0">
                             <strong style="text-align: center;border-radius: 10px;background-color: grey;padding: 10px;color: white;">NEW</strong>
                             <li *ngFor="let profile of eventProfiles[eventName]?.newProfiles" class="list-group-item" (click)="profileNavigation(profile)">
-                                {{ mapProfile[profile] }}
+                                <span style="display:inline-flex;align-items:center;gap:8px;">
+                                    <app-profile-picture [profileId]="profile" [name]="mapProfile[profile]" [size]="28"></app-profile-picture>
+                                    <span>{{ mapProfile[profile] }}</span>
+                                </span>
                             </li>
                         </ng-container>                
                         <ng-container *ngFor="let previousDate of eventProfiles[eventName]?.previousStartDates">
                             <strong style="text-align: center;border-radius: 10px;background-color: grey;padding: 10px;color: white;">{{ previousDate }}</strong>
                             <li *ngFor="let profile of eventProfiles[eventName]?.oldProfiles[previousDate]" class="list-group-item" (click)="profileNavigation(profile)">
-                                {{ mapProfile[profile] }}
+                                <span style="display:inline-flex;align-items:center;gap:8px;">
+                                    <app-profile-picture [profileId]="profile" [name]="mapProfile[profile]" [size]="28"></app-profile-picture>
+                                    <span>{{ mapProfile[profile] }}</span>
+                                </span>
                             </li>
                         </ng-container>
                     </ul>

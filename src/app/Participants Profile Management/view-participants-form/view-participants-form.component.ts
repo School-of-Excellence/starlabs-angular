@@ -142,15 +142,6 @@ export class ViewParticipantsFormComponent {
   filterLiked = false;
   filterFlagged = false;
 
-  openFormOverlay(row: any) {
-    this.formOverlay.mapProfile = this.mapProfile;
-    this.formOverlay.mapProfileNew = this.mapProfileNew;
-    this.formOverlay.mapQueue = this.mapQueue;
-    this.formOverlay.mapWorkshop = this.mapWorkshop;
-    this.formOverlay.mapWorkshopNew = this.mapWorkshopNew;
-    this.formOverlay.viewFormOverlay(row);
-  }
-
   get loadingScreen() {
     return this.dialog.open(LoadingProgressComponent, {
       data: {
@@ -178,6 +169,7 @@ export class ViewParticipantsFormComponent {
     this.startDate = new Date(new Date(this.startDate.getFullYear(), this.startDate.getMonth(), this.startDate.getDate()).setHours(0, 0, 0, 0));
 
     this.authguard.getProfileMap().then(async profile => {
+      console.log("profile", profile);
       this.mapProfile = profile.map;
 
       if (profile.email) {
@@ -1347,4 +1339,12 @@ export class ViewParticipantsFormComponent {
     this.onFilter(this.filterForm.value);
   }
 
+  openFormOverlay(row: any) {
+    this.formOverlay.mapProfile = this.mapProfile;
+    this.formOverlay.mapProfileNew = this.mapProfileNew;
+    this.formOverlay.mapQueue = this.mapQueue;
+    this.formOverlay.mapWorkshop = this.mapWorkshop;
+    this.formOverlay.mapWorkshopNew = this.mapWorkshopNew;
+    this.formOverlay.viewFormOverlay(row);
+  }
 }

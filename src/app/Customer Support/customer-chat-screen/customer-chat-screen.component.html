@@ -22,8 +22,10 @@
                   <div class="assigned-chips">
                     <div class="assigned-chip"
                       *ngFor="let assign of assignTo?.slice(0,showAllAssignTo ? assignTo.length : 3)">
-                      <span class="dot"></span>
-                      {{mapProfileData[assign]?.name}}
+                      <span style="display:inline-flex;align-items:center;gap:8px;">
+                        <app-profile-picture [profileId]="assign" [name]="mapProfileData[assign]?.name" [size]="24"></app-profile-picture>
+                        <span>{{mapProfileData[assign]?.name}}</span>
+                      </span>
                     </div>
                     <div *ngIf="assignTo.length > 3" class="assigned-chip assign-toggle" (click)="toggleAssignShow()">
                       <!-- {{showAllAssignTo ? 'Show Less' : `+ ${assignTo.length - 3} More`}} -->
@@ -42,11 +44,23 @@
               <div class="reporter-row">
                 <div class="reporter-item">
                   <div class="r-label">Issue Reported By</div>
-                  <div class="r-value">{{mapProfileData[currentIssueData['issueReportedBy']]?.name}}</div>
+                  <div class="r-value">
+                    <span style="display:inline-flex;align-items:center;gap:8px;">
+                      <app-profile-picture [profileId]="currentIssueData['issueReportedBy']"
+                        [name]="mapProfileData[currentIssueData['issueReportedBy']]?.name" [size]="28"></app-profile-picture>
+                      <span>{{mapProfileData[currentIssueData['issueReportedBy']]?.name}}</span>
+                    </span>
+                  </div>
                 </div>
                 <div class="reporter-item">
                   <div class="r-label">Reported By</div>
-                  <div class="r-value">{{mapProfileData[currentIssueData['reportedBy']]?.name}}</div>
+                  <div class="r-value">
+                    <span style="display:inline-flex;align-items:center;gap:8px;">
+                      <app-profile-picture [profileId]="currentIssueData['reportedBy']"
+                        [name]="mapProfileData[currentIssueData['reportedBy']]?.name" [size]="28"></app-profile-picture>
+                      <span>{{mapProfileData[currentIssueData['reportedBy']]?.name}}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -129,7 +143,10 @@
                           ngDefaultControl></ngx-mat-select-search>
                       </mat-option>
                       <mat-option *ngFor="let user of returnFilterMember()" [value]="user">
-                        {{mapProfileData[user]['name']}}
+                        <span style="display:inline-flex;align-items:center;gap:8px;">
+                          <app-profile-picture [profileId]="user" [name]="mapProfileData[user]['name']" [size]="24"></app-profile-picture>
+                          <span>{{mapProfileData[user]['name']}}</span>
+                        </span>
                       </mat-option>
                     </mat-select>
                   </mat-form-field>
@@ -236,7 +253,10 @@
                   <div class="log-entry" *ngFor="let log of getCategoryLogs()">
                     <div>
                       <div class="log-user-name">
-                        <span style="display: inline-block;">{{getProfileName(log.user)}}</span>
+                        <span style="display:inline-flex;align-items:center;gap:8px;">
+                          <app-profile-picture [profileId]="log.user" [name]="getProfileName(log.user)" [size]="24"></app-profile-picture>
+                          <span style="display: inline-block;">{{getProfileName(log.user)}}</span>
+                        </span>
                         <span class="log-date">{{formatDate(log.time) | date:'short'}}</span>
                       </div>
                       <div class="log-category">
@@ -299,10 +319,15 @@
               <div style="display: flex; flex-direction: row; justify-content: space-between; width: 95%">
                 <div style="padding-top: 5px;">
                   <p *ngIf="![null,undefined,''].includes(chat.sender_uid)" style="font-size: 15px;">
-                    <b *ngIf="clientid != chat['sender_profileid']">
-                      {{[null,undefined].includes(mapUserId[chat.sender_uid]) ? '...' : chat.type == 'automated' ?
-                      'Automated' : mapUserId[chat.sender_uid]['name']}}
-                    </b>
+                    <span *ngIf="clientid != chat['sender_profileid']" style="display:inline-flex;align-items:center;gap:8px;">
+                      <app-profile-picture [profileId]="chat['sender_profileid']"
+                        [name]="[null,undefined].includes(mapUserId[chat.sender_uid]) ? '' : mapUserId[chat.sender_uid]['name']"
+                        [size]="28"></app-profile-picture>
+                      <b>
+                        {{[null,undefined].includes(mapUserId[chat.sender_uid]) ? '...' : chat.type == 'automated' ?
+                        'Automated' : mapUserId[chat.sender_uid]['name']}}
+                      </b>
+                    </span>
                   </p>
                 </div>
                 <div>
@@ -530,9 +555,12 @@
                   </div> -->
                   <div class="note-bubble">
                     <div class="note-meta">
-                      <span class="note-author">
-                        {{[null,undefined,''].includes(mapProfileData[note['writtenBy']]) ? '...' :
-                        mapProfileData[note['writtenBy']]['name']}}
+                      <span class="note-author" style="display:inline-flex;align-items:center;gap:8px;">
+                        <app-profile-picture [profileId]="note['writtenBy']"
+                          [name]="[null,undefined,''].includes(mapProfileData[note['writtenBy']]) ? '' : mapProfileData[note['writtenBy']]['name']"
+                          [size]="24"></app-profile-picture>
+                        <span>{{[null,undefined,''].includes(mapProfileData[note['writtenBy']]) ? '...' :
+                        mapProfileData[note['writtenBy']]['name']}}</span>
                       </span>
                       <span class="note-time">{{note['date'].toDate() | date:'short'}}</span>
                     </div>

@@ -1,0 +1,739 @@
+{
+  "id": "lWbXqjTbFNBeK9ENRNYe",
+  "queuename": "uP!/Legacy Diagnostics & Consultation - July 2024",
+  "stages": [
+    "Yet to Start",
+    "Wellness Scaling Form",
+    "uP! Life Aspiration Report",
+    "ATC Orientation Form",
+    "ATC Orientation Group Call",
+    "In ATC Orientation Group Call",
+    "uP! Life Report",
+    "Video Log",
+    "Evolution Mapping Activity",
+    "In Evolution Mapping Activity",
+    "Self Evaluation Form",
+    "Self ATC",
+    "Self ATC Next Cycle",
+    "Triple ATC",
+    "Triple ATC Validation",
+    "Ready for Diagnostics",
+    "Accelerated Evolution Level Form",
+    "Diagnostics",
+    "Diagnostics In-person",
+    "Consultation In-person",
+    "In-person Completed",
+    "Diagnostics Readiness Changework",
+    "Consultation",
+    "uP! Readiness Changework",
+    "Review",
+    "Expanding Horizon Consultation",
+    "Self Evolution Report",
+    "Completed"
+  ],
+  "queuevariation": [
+    {
+      "id": "9KJP1KUFQ3VUet8tGNCr",
+      "variationname": "uP! New Participants",
+      "stages": [
+        "Yet to Start",
+        "Wellness Scaling Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "ATC Orientation Group Call",
+        "In ATC Orientation Group Call",
+        "Video Log",
+        "Self ATC",
+        "Ready for Diagnostics",
+        "Accelerated Evolution Level Form",
+        "Diagnostics",
+        "Diagnostics Readiness Changework",
+        "Consultation",
+        "uP! Readiness Changework",
+        "Review",
+        "Self Evolution Report",
+        "Completed"
+      ]
+    },
+    {
+      "id": "SEEBG8V0yz6ND5bvGvJE",
+      "variationname": "uP! Old Participants",
+      "stages": [
+        "Yet to Start",
+        "Wellness Scaling Form",
+        "uP! Life Report",
+        "Video Log",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Self ATC Next Cycle",
+        "Ready for Diagnostics",
+        "Accelerated Evolution Level Form",
+        "Diagnostics",
+        "Diagnostics Readiness Changework",
+        "Consultation",
+        "uP! Readiness Changework",
+        "Review",
+        "Self Evolution Report",
+        "Completed"
+      ]
+    },
+    {
+      "id": "N8eV8FsBseC3HzIerMDO",
+      "variationname": "LYL New Participants",
+      "stages": [
+        "Yet to Start",
+        "Wellness Scaling Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "ATC Orientation Group Call",
+        "In ATC Orientation Group Call",
+        "Video Log",
+        "Self ATC",
+        "Ready for Diagnostics",
+        "Accelerated Evolution Level Form",
+        "Diagnostics",
+        "Diagnostics Readiness Changework",
+        "Consultation",
+        "uP! Readiness Changework",
+        "Review",
+        "Self Evolution Report",
+        "Completed"
+      ]
+    },
+    {
+      "id": "IbSd8Yox632fEC8tIQAp",
+      "variationname": "LYL Old Participants",
+      "stages": [
+        "Yet to Start",
+        "Wellness Scaling Form",
+        "uP! Life Report",
+        "Video Log",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Self ATC Next Cycle",
+        "Ready for Diagnostics",
+        "Accelerated Evolution Level Form",
+        "Diagnostics",
+        "Diagnostics Readiness Changework",
+        "Consultation",
+        "uP! Readiness Changework",
+        "Review",
+        "Self Evolution Report",
+        "Completed"
+      ]
+    },
+    {
+      "id": "AdMsCkyWr8rbMTihMlT5",
+      "variationname": "B!G First time Accelerator",
+      "stages": [
+        "Yet to Start",
+        "Wellness Scaling Form",
+        "uP! Life Report",
+        "Video Log",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Self ATC Next Cycle",
+        "Accelerated Evolution Level Form",
+        "Diagnostics",
+        "Diagnostics Readiness Changework",
+        "Consultation",
+        "uP! Readiness Changework",
+        "Review",
+        "Self Evolution Report",
+        "Completed"
+      ]
+    },
+    {
+      "id": "Q1yjxv24nvCgMpR3lZs3",
+      "variationname": "B!G Accelerator Old",
+      "stages": [
+        "Yet to Start",
+        "Wellness Scaling Form",
+        "uP! Life Report",
+        "Video Log",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Self ATC Next Cycle",
+        "Triple ATC",
+        "Triple ATC Validation",
+        "Accelerated Evolution Level Form",
+        "Diagnostics",
+        "Diagnostics Readiness Changework",
+        "Consultation",
+        "uP! Readiness Changework",
+        "Review",
+        "Self Evolution Report",
+        "Completed"
+      ]
+    }
+  ],
+  "stageproperty": {
+    "Yet to Start": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Wellness Scaling Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Life Aspiration Report": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "ATC Orientation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "ATC Orientation Group Call": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "In ATC Orientation Group Call": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "uP! Life Report": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Video Log": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {
+        "0": [
+          "SBDo3ww3ZxKrKjkfIzLU"
+        ],
+        "1": [
+          "SBDo3ww3ZxKrKjkfIzLU",
+          "zHZhg9GOmeuIEuqvCOPY"
+        ],
+        "2": [
+          "SBDo3ww3ZxKrKjkfIzLU",
+          "zHZhg9GOmeuIEuqvCOPY",
+          "zHZhg9GOmeuIEuqvCOPY",
+          "zHZhg9GOmeuIEuqvCOPY",
+          "zHZhg9GOmeuIEuqvCOPY",
+          "zHZhg9GOmeuIEuqvCOPY"
+        ],
+        "3": [
+          "SBDo3ww3ZxKrKjkfIzLU",
+          "zHZhg9GOmeuIEuqvCOPY",
+          "zHZhg9GOmeuIEuqvCOPY",
+          "zHZhg9GOmeuIEuqvCOPY"
+        ],
+        "4": [
+          "SBDo3ww3ZxKrKjkfIzLU",
+          "zHZhg9GOmeuIEuqvCOPY",
+          "zHZhg9GOmeuIEuqvCOPY"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "Self ATC",
+          "calltoaction": "If new participant. send them to Self ATC",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Evolution Mapping Activity",
+          "calltoaction": "If old participant, send to Evolution Mapping Activity",
+          "markascompleted": true,
+          "variations": []
+        }
+      ]
+    },
+    "Evolution Mapping Activity": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "In Evolution Mapping Activity": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Self Evaluation Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Self ATC": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Self ATC Next Cycle": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Triple ATC": {
+      "selfmovable": true,
+      "actiontype": "link",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Triple ATC Validation": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "viewtripleatc"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "iX3p8F4BVbt0sUtr8p5Z"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Ready for Diagnostics": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Accelerated Evolution Level Form": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Diagnostics": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "addunvalidatedatc",
+        "prescribedvalidatedatc",
+        "prescribedunvalidatedatc",
+        "assignprocedure"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "HFWFwv7YFPTNtcwkwAGK",
+          "rkM1XplBnoteX2GEJXX6"
+        ],
+        "1": [
+          "HFWFwv7YFPTNtcwkwAGK",
+          "I5wPPCFQToxULZvwmU6L"
+        ],
+        "2": [
+          "HFWFwv7YFPTNtcwkwAGK",
+          "I5wPPCFQToxULZvwmU6L",
+          "I5wPPCFQToxULZvwmU6L"
+        ],
+        "3": [
+          "HFWFwv7YFPTNtcwkwAGK",
+          "I5wPPCFQToxULZvwmU6L",
+          "I5wPPCFQToxULZvwmU6L",
+          "I5wPPCFQToxULZvwmU6L"
+        ],
+        "4": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI"
+        ],
+        "5": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI",
+          "I5wPPCFQToxULZvwmU6L"
+        ],
+        "6": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI",
+          "I5wPPCFQToxULZvwmU6L",
+          "I5wPPCFQToxULZvwmU6L"
+        ],
+        "7": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI",
+          "I5wPPCFQToxULZvwmU6L",
+          "I5wPPCFQToxULZvwmU6L",
+          "I5wPPCFQToxULZvwmU6L"
+        ],
+        "8": [
+          "HFWFwv7YFPTNtcwkwAGK"
+        ],
+        "9": [
+          "HFWFwv7YFPTNtcwkwAGK",
+          "rkM1XplBnoteX2GEJXX6",
+          "rkM1XplBnoteX2GEJXX6"
+        ],
+        "10": [
+          "MOt60i7xvRhOu0twmIIG",
+          "fSGa57cCU52aZgJP5kXI"
+        ],
+        "11": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI",
+          "rkM1XplBnoteX2GEJXX6",
+          "rkM1XplBnoteX2GEJXX6",
+          "rkM1XplBnoteX2GEJXX6"
+        ],
+        "12": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI"
+        ]
+      },
+      "participantform": [
+        "wfsPE4wUI8lrXpcSAAWr",
+        "mfMs9VWvYJA4TVS2QmH5"
+      ],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "Diagnostics Readiness Changework",
+          "calltoaction": "Send for Implementation",
+          "markascompleted": false,
+          "variations": []
+        },
+        {
+          "stage": "Consultation",
+          "calltoaction": "Send for Consultation",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Diagnostics",
+          "calltoaction": "Send Back",
+          "markascompleted": false,
+          "variations": []
+        }
+      ]
+    },
+    "Diagnostics In-person": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "addunvalidatedatc",
+        "prescribedvalidatedatc",
+        "prescribedunvalidatedatc",
+        "assignprocedure"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI"
+        ],
+        "1": [
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI",
+          "fSGa57cCU52aZgJP5kXI"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "Consultation In-person",
+          "calltoaction": "Completed",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Consultation In-person",
+          "calltoaction": "Send",
+          "markascompleted": true,
+          "variations": []
+        }
+      ]
+    },
+    "Consultation In-person": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "addunvalidatedatc",
+        "addvalidatedatc",
+        "prescribedvalidatedatc",
+        "prescribedunvalidatedatc",
+        "assignprocedure",
+        "validateael"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "sbZGR2wuvssy1AvL82hk"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "In-person Completed",
+          "calltoaction": "Completed",
+          "markascompleted": true,
+          "variations": []
+        }
+      ]
+    },
+    "In-person Completed": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Diagnostics Readiness Changework": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "prescribedvalidatedatc",
+        "assignedatc"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "ocH3kB9SL9Cgec9i7Uqq"
+        ],
+        "1": [
+          "DtUbBAdrLVUYcKipIXD0",
+          "54toXo6Nl3UU03ehuV7V"
+        ],
+        "2": [
+          "W0knU88qllYmVsdw87f5",
+          "W0knU88qllYmVsdw87f5"
+        ],
+        "3": [
+          "DtUbBAdrLVUYcKipIXD0",
+          "ocH3kB9SL9Cgec9i7Uqq"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "Diagnostics",
+          "calltoaction": "Send Again for Diagnostics",
+          "markascompleted": true,
+          "variations": []
+        }
+      ]
+    },
+    "Consultation": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "addunvalidatedatc",
+        "addvalidatedatc",
+        "prescribedvalidatedatc",
+        "prescribedunvalidatedatc",
+        "assignedatc",
+        "assignprocedure",
+        "viewtripleatc",
+        "validateael"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "sbZGR2wuvssy1AvL82hk"
+        ],
+        "1": [
+          "sbZGR2wuvssy1AvL82hk",
+          "SISu2bHKe4yHE2c29UZJ"
+        ],
+        "2": [
+          "SISu2bHKe4yHE2c29UZJ",
+          "sbZGR2wuvssy1AvL82hk",
+          "SISu2bHKe4yHE2c29UZJ"
+        ]
+      },
+      "participantform": [
+        "KqHfM292QPXRLpv9RQNi",
+        "wfsPE4wUI8lrXpcSAAWr",
+        "mfMs9VWvYJA4TVS2QmH5"
+      ],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "uP! Readiness Changework",
+          "calltoaction": "Send for uP! Changework",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Self Evolution Report",
+          "calltoaction": "Send to Next Stage",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Consultation",
+          "calltoaction": "Send back",
+          "markascompleted": false,
+          "variations": []
+        }
+      ]
+    },
+    "uP! Readiness Changework": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "assignedatc"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "ocH3kB9SL9Cgec9i7Uqq"
+        ],
+        "1": [
+          "DtUbBAdrLVUYcKipIXD0",
+          "54toXo6Nl3UU03ehuV7V"
+        ],
+        "2": [
+          "ocH3kB9SL9Cgec9i7Uqq",
+          "W0knU88qllYmVsdw87f5"
+        ],
+        "3": [
+          "ocH3kB9SL9Cgec9i7Uqq",
+          "W0knU88qllYmVsdw87f5",
+          "W0knU88qllYmVsdw87f5"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "Consultation",
+          "calltoaction": "Send Again for Consultation",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "Review",
+          "calltoaction": "Send for Review",
+          "markascompleted": true,
+          "variations": []
+        }
+      ]
+    },
+    "Review": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": [
+        {
+          "stage": "Self Evolution Report",
+          "calltoaction": "Completed",
+          "markascompleted": true,
+          "variations": []
+        },
+        {
+          "stage": "uP! Readiness Changework",
+          "calltoaction": "Send for Implementation",
+          "markascompleted": false,
+          "variations": []
+        }
+      ]
+    },
+    "Expanding Horizon Consultation": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [
+        "addunvalidatedatc",
+        "addvalidatedatc",
+        "prescribedvalidatedatc",
+        "prescribedunvalidatedatc"
+      ],
+      "compulsoryactivity": {
+        "0": [
+          "pz1RrfULkySqMUMGuPuj",
+          "pz1RrfULkySqMUMGuPuj"
+        ]
+      },
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Self Evolution Report": {
+      "selfmovable": true,
+      "actiontype": "form",
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    },
+    "Completed": {
+      "selfmovable": false,
+      "actiontype": null,
+      "studiowidgets": [],
+      "compulsoryactivity": {},
+      "participantform": [],
+      "enablezoom": false,
+      "nextstage": []
+    }
+  }
+}

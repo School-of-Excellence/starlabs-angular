@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-assign-queue-studio',
@@ -20,7 +21,8 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatSelectModule,
     NgxMatSelectSearchModule,
     FormsModule,
-    CommonModule
+    CommonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './assign-queue-studio.component.html',
   styleUrl: './assign-queue-studio.component.css'
@@ -33,7 +35,7 @@ export class AssignQueueStudioComponent {
   filterText = ""
   profileList = []
 
-  title = "Assign Specialist"
+  title = "Confirm Specialist"
 
   constructor(public formbuilder:FormBuilder, @Inject(MAT_DIALOG_DATA) dialogdata:any, public dialogRef: MatDialogRef<any>) {
     console.log(dialogdata, 'dialogdata');

@@ -15,6 +15,7 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { Storage,ref,uploadBytes,getDownloadURL } from '@angular/fire/storage';
 import * as XLSX from 'xlsx';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface EventData {
   docref: DocumentReference;
@@ -201,7 +202,7 @@ const STORAGE_KEY_QUEUE = 'live_dashboard_selected_queue_id';
 @Component({
   selector: 'app-live-event-dashboard-v2',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, MatDialogModule,],
+  imports: [CommonModule, FormsModule, MatIconModule, MatDialogModule,ProfilePictureComponent],
   templateUrl: './live-event-dashboard-v2.component.html',
   styleUrl: './live-event-dashboard-v2.component.css'
 })

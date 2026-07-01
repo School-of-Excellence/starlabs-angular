@@ -144,7 +144,7 @@
 
         <div class="cohorts-container">
           <div class="cohorts-grid">
-            <div *ngFor="let item of cohorts" class="cohort-card">
+            <div *ngFor="let item of cohorts" class="cohort-card" data-testid="big-dash-cohort-card" [attr.data-cohort-id]="item.docid">
               <div class="cohort-header">
                 <span class="cohort-name" (click)="onPatchDataToTable(item.participantidlist,item)">
                   {{item.name}}
@@ -153,7 +153,7 @@
                   <mat-icon (click)="onEditCohorts(item)">edit</mat-icon>
                 </button>
               </div>
-              <div class="cohort-count">
+              <div class="cohort-count" data-testid="big-dash-cohort-count">
                 {{item.participantidlist ? item.participantidlist.length : 0}}
               </div>
             </div>
@@ -232,8 +232,8 @@
       <!-- button bar -->
       <div class="row d-flex justify-content-end" *ngIf="!showCompactChipList">
         <div class="col-auto" style="margin-top: 40px;">
-          <span>Total Participants: {{ dataSource.data.length }}</span>&nbsp;&nbsp;
-          <span>Filtered Participants: {{ dataSource.filteredData.length }}</span>
+          <span>Total Participants: <span data-testid="big-dash-total-count">{{ dataSource.data.length }}</span></span>&nbsp;&nbsp;
+          <span>Filtered Participants: <span data-testid="big-dash-filtered-count">{{ dataSource.filteredData.length }}</span></span>
         </div>
 
         <div class="col-auto">
@@ -265,7 +265,7 @@
         </div>
 
         <div class="col-auto">
-          <button class="btn btn-outline-primary" mat-stroked-button [disabled]="selection.isEmpty()" (click)="onManageCoherts()">Coherts</button>
+          <button class="btn btn-outline-primary" mat-stroked-button [disabled]="selection.isEmpty()" (click)="onManageCoherts()" data-testid="big-dash-cohorts-btn">Coherts</button>
         </div>
 
         <div class="col-auto">
@@ -561,7 +561,7 @@
                               <!-- <mat-icon color="primary">supervisor_account</mat-icon> -->
                               <span class="mentor-title">Authored By:</span>
                               <span *ngFor="let profile of element.mapparticipantatc[field].author ; let i = index">
-                                <p class="mentor-name">{{ profile_data[profile]?.name }}<span *ngIf="i <  element.mapparticipantatc[field].author.length - 1">,</span></p>
+                                <div style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="profile" [name]="profile_data[profile]?.name || ''" [size]="32"></app-profile-picture><p class="mentor-name">{{ profile_data[profile]?.name }}<span *ngIf="i <  element.mapparticipantatc[field].author.length - 1">,</span></p></div>
                               </span>
                             </div> 
 
@@ -569,7 +569,7 @@
                               <!-- <mat-icon color="primary">supervisor_account</mat-icon> -->
                               <span class="mentor-title">Mentored By:</span>
                               <span *ngFor="let profile of element.mapparticipantatc[field].mentor ; let i = index">
-                                <p class="mentor-name">{{ profile_data[profile]?.name }}<span *ngIf="i <  element.mapparticipantatc[field].mentor.length - 1">,</span></p>
+                                <div style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="profile" [name]="profile_data[profile]?.name || ''" [size]="32"></app-profile-picture><p class="mentor-name">{{ profile_data[profile]?.name }}<span *ngIf="i <  element.mapparticipantatc[field].mentor.length - 1">,</span></p></div>
                               </span>
                             </div>
                     
@@ -618,7 +618,7 @@
                       <mat-card class="atc-card">
                         <mat-card-header>
                           <div mat-card-avatar class="example-header-image"></div>
-                          <mat-card-title>{{ profile_data[field.profileid]?.name }}</mat-card-title>
+                          <div style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="field.profileid" [name]="profile_data[field.profileid]?.name || ''" [size]="32"></app-profile-picture><mat-card-title>{{ profile_data[field.profileid]?.name }}</mat-card-title></div>
                           <mat-card-subtitle>ATC Model: {{ field.product }}</mat-card-subtitle>
                         </mat-card-header>
                   
@@ -627,9 +627,9 @@
                           <div class="mentor-list">
                             <span class="mentor-title">Prescribed By:</span>
                             <ng-container *ngFor="let profile of field.author; let i = index">
-                              <p class="mentor-name">
+                              <div style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="profile.id" [name]="profile_data[profile.id]?.name || ''" [size]="32"></app-profile-picture><p class="mentor-name">
                                 {{ profile_data[profile.id]?.name }}<span *ngIf="i < field.author.length - 1">,</span>
-                              </p>
+                              </p></div>
                             </ng-container>
                           </div>
                   
@@ -659,7 +659,7 @@
                         <mat-card class="atc-card">
                           <mat-card-header>
                             <div mat-card-avatar class="example-header-image"></div>
-                            <mat-card-title>Name: {{ profile_data[field.profileid]?.name }}</mat-card-title>
+                            <div style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="field.profileid" [name]="profile_data[field.profileid]?.name || ''" [size]="32"></app-profile-picture><mat-card-title>Name: {{ profile_data[field.profileid]?.name }}</mat-card-title></div>
                             <mat-card-subtitle>ATC Model: {{ field.product }}</mat-card-subtitle>
                           </mat-card-header>
                           <mat-card-content>
@@ -667,11 +667,11 @@
                               <mat-icon color="primary">supervisor_account</mat-icon>
                               <span class="mentor-title">Prescribed By:</span>
                               <span *ngFor="let profile of field.author">
-                                <p class="mentor-name">{{ profile_data[profile.id]?.name }}</p>
+                                <div style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="profile.id" [name]="profile_data[profile.id]?.name || ''" [size]="32"></app-profile-picture><p class="mentor-name">{{ profile_data[profile.id]?.name }}</p></div>
                               </span>
                               <span class="mentor-title">Validated By:</span>
                               <span *ngFor="let profile of field.validator || []">
-                                <p class="mentor-name">{{ profile_data[profile.id]?.name }}</p>
+                                <div style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="profile.id" [name]="profile_data[profile.id]?.name || ''" [size]="32"></app-profile-picture><p class="mentor-name">{{ profile_data[profile.id]?.name }}</p></div>
                               </span>
                             </div>
                     
@@ -875,7 +875,7 @@
                     <div class="note-text">
                       <span>{{data.note}}</span>
                       <div class="row mt-1 d-flex justify-content-between p-10">
-                        <span>{{ profile_data[data.notescreatedby].name }}</span>
+                        <span style="display:flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="data.notescreatedby" [name]="profile_data[data.notescreatedby]?.name || ''" [size]="32"></app-profile-picture><span>{{ profile_data[data.notescreatedby].name }}</span></span>
                         <span>{{ data.created?.toDate() | date:'yyyy-MM-dd hh:mm a' }}</span>
                       </div>
                     </div>

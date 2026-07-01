@@ -1,0 +1,403 @@
+<div class="arena">
+
+  <!-- ============================== HEADER ============================== -->
+  <header class="arena__head">
+    <div class="arena__brand">
+      <span class="arena__brand-mark"><mat-icon>bolt</mat-icon></span>
+      <div>
+        <h1 class="arena__brand-title">{{ queueName || 'Arena' }}</h1>
+      </div>
+    </div>
+
+    <div class="arena__head-stats">
+      <button class="arena__back" (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon> Back
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================== BODY ============================== -->
+  <main class="arena__body" [class.is-left-closed]="!leftOpen" [class.is-right-closed]="!rightOpen">
+
+    <!-- ----- LEFT SIDEBAR ----- -->
+    <aside class="arena__left" [class.is-closed]="!leftOpen">
+      <!-- Collapsed: thin rail with a reopen control (kept inside the sidenav) -->
+      <button class="panel-rail" *ngIf="!leftOpen" (click)="leftOpen = true" matTooltip="Show participants panel">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+
+      <ng-container *ngIf="leftOpen">
+      <div class="panel-bar panel-bar--end">
+        <button class="panel-collapse" (click)="leftOpen = false" matTooltip="Close this panel" aria-label="Close panel">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="arena__left-tabs">
+        <button class="ltab" [class.ltab--active]="leftTab === 'participants'" (click)="leftTab = 'participants'">
+          <mat-icon>groups</mat-icon> Participants
+          <span class="ltab__count">{{ waitingCount + queuedCount }}</span>
+        </button>
+        <button class="ltab" [class.ltab--active]="leftTab === 'specialists'" (click)="leftTab = 'specialists'">
+          <mat-icon>person</mat-icon> Specialists
+          <span class="ltab__count">{{ studios.length }}</span>
+        </button>
+      </div>
+
+      <!-- Participants tab -->
+      <div class="arena__left-pane" *ngIf="leftTab === 'participants'">
+        <section class="seg">
+          <header class="seg__head">
+            <span>WAITING</span>
+            <span class="seg__count seg__count--orange">{{ waitingCount }}</span>
+          </header>
+          <div class="seg__body">
+            <div class="prow prow--waiting" *ngFor="let t of waitingTokens"
+                 [matTooltip]="hasPosition(t) ? 'Queue position' : ''">
+              <span class="prow__pos prow__pos--lead" *ngIf="hasPosition(t)">{{ positionInWaiting(t) }}</span>
+              <span class="prow__name">{{ participantName(t.profile_id) }}</span>
+              <span class="prow__dot prow__dot--end"></span>
+            </div>
+            <div class="seg__empty" *ngIf="waitingTokens.length === 0">— none —</div>
+          </div>
+        </section>
+
+        <section class="seg">
+          <header class="seg__head">
+            <span>QUEUED</span>
+            <span class="seg__count">{{ queuedCount }}</span>
+          </header>
+          <div class="seg__body">
+            <div class="prow prow--queued" *ngFor="let t of queuedTokens"
+                 [matTooltip]="hasPosition(t) ? 'Queue position' : ''">
+              <span class="prow__pos prow__pos--lead prow__pos--neutral" *ngIf="hasPosition(t)">{{ positionInQueued(t) }}</span>
+              <span class="prow__name">{{ participantName(t.profile_id) }}</span>
+              <span class="prow__assigned"
+                    *ngIf="t.preassigned?.[stage]?.length && hasName(t.preassigned[stage][0])"
+                    matTooltip="Preassigned specialist">
+                → {{ participantName(t.preassigned[stage][0]) }}
+              </span>
+            </div>
+            <div class="seg__empty" *ngIf="queuedTokens.length === 0">— none —</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Specialists tab — split into Idle + Live studios -->
+      <div class="arena__left-pane" *ngIf="leftTab === 'specialists'">
+        <section class="seg">
+          <header class="seg__head">
+            <span>IDLE STUDIOS</span>
+            <span class="seg__count seg__count--ink">{{ idleStudios.length }}</span>
+          </header>
+          <div class="seg__body">
+            <div class="prow prow--studio" *ngFor="let s of idleStudios; let i = index">
+              <span class="prow__avatar prow__avatar--ink">{{ i + 1 }}</span>
+              <div class="prow__studio">
+                <span class="prow__studio-name" *ngFor="let sp of specialistList(s); let last = last">
+                  <span class="prow__activity">{{ sp.name }}</span><span class="prow__person" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
+                </span>
+              </div>
+            </div>
+            <div class="seg__empty" *ngIf="idleStudios.length === 0">— no idle studios —</div>
+          </div>
+        </section>
+
+        <section class="seg">
+          <header class="seg__head">
+            <span>LIVE STUDIOS</span>
+            <span class="seg__count seg__count--green">{{ liveStudios.length }}</span>
+          </header>
+          <div class="seg__body">
+            <div class="prow prow--studio prow--live" *ngFor="let s of liveStudios; let i = index">
+              <span class="prow__avatar prow__avatar--green">
+                <span class="prow__live-dot"></span>
+              </span>
+              <div class="prow__studio">
+                <span class="prow__studio-name" *ngFor="let sp of specialistList(s); let last = last">
+                  <span class="prow__activity">{{ sp.name }}</span><span class="prow__person" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
+                </span>
+              </div>
+            </div>
+            <div class="seg__empty" *ngIf="liveStudios.length === 0">— no live studios —</div>
+          </div>
+        </section>
+      </div>
+      </ng-container>
+    </aside>
+
+    <!-- ----- KANBAN COLUMNS ----- -->
+    <section class="arena__board">
+
+      <!-- IDLE -->
+      <div class="kcol kcol--idle">
+        <header class="kcol__head">
+          <span><span class="kdot kdot--ink"></span>IDLE</span>
+          <span class="kcol__count">{{ idleStudios.length }}</span>
+        </header>
+        <div class="kcol__body">
+          <article class="kc kc--idle" *ngFor="let s of idleStudios; let i = index">
+            <div class="kc__head">
+              <span class="kc__avatar kc__avatar--ink">{{ initials(participantName(s.participants?.[0] || '')) }}</span>
+              <div class="kc__title">
+                <!-- Show every specialist holding this idle studio. Long names
+                     wrap instead of being truncated with an ellipsis. -->
+                <span class="kc__name kc__name--wrap" *ngIf="!specialistList(s).length">Idle Studio</span>
+                <span class="kc__name kc__name--wrap" *ngFor="let sp of specialistList(s); let last = last">
+                  {{ sp.name }}<span class="kc__role-act" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
+                </span>
+              </div>
+            </div>
+            <div class="kc__meta kc__meta--placeholder">No participant assigned</div>
+          </article>
+          <div class="kcol__empty" *ngIf="idleStudios.length === 0">— no idle studios —</div>
+        </div>
+      </div>
+
+      <!-- INVITING -->
+      <div class="kcol kcol--inviting">
+        <header class="kcol__head">
+          <span><span class="kdot kdot--amber"></span>INVITING</span>
+          <span class="kcol__count">{{ invitingStudios.length }}</span>
+        </header>
+        <div class="kcol__body">
+          <article class="kc kc--inviting" *ngFor="let item of invitingStudios">
+            <div class="kc__head">
+              <span class="kc__avatar kc__avatar--amber">{{ initials(item.invitation.participantname || '?') }}</span>
+              <div class="kc__title">
+                <span class="kc__name">{{ item.invitation.participantname || '—' }}</span>
+              </div>
+            </div>
+            <!-- Who is doing the inviting — list every specialist in the studio -->
+            <div class="kc__invby" *ngIf="specialistList(item.studio).length">
+              <mat-icon>record_voice_over</mat-icon>
+              <span class="kc__invby-label">Invited by</span>
+              <span class="kc__invby-name" *ngFor="let sp of specialistList(item.studio); let last = last">
+                {{ sp.name }}<span class="kc__invby-act" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
+              </span>
+            </div>
+            <div class="kc__foot">
+              <span class="kc__timer kc__timer--amber">{{ inviteCountdown(item.invitation) }}</span>
+            </div>
+            <div class="kc__cta">
+              <span class="kc__pill kc__pill--amber">{{ attemptsLabel(item.invitation) }}</span>
+            </div>
+          </article>
+          <div class="kcol__empty" *ngIf="invitingStudios.length === 0">— none —</div>
+        </div>
+      </div>
+
+      <!-- JOINED -->
+      <div class="kcol kcol--joined">
+        <header class="kcol__head">
+          <span><span class="kdot kdot--blue"></span>JOINED</span>
+          <span class="kcol__count">{{ joinedAssignments.length }}</span>
+        </header>
+        <div class="kcol__body">
+          <article class="kc kc--joined" *ngFor="let a of joinedAssignments">
+            <div class="kc__head">
+              <span class="kc__avatar kc__avatar--blue">{{ initials(participantName(a.participantid)) }}</span>
+              <div class="kc__title">
+                <span class="kc__name kc__name--wrap">{{ participantName(a.participantid) }}</span>
+              </div>
+            </div>
+
+            <!-- Participant name is already shown in the card head above; here
+                 we name every paired specialist (and any bonus-activity
+                 specialists). -->
+            <div class="kc__roles" *ngIf="pairingSpecialists(a).length || bonusSpecialists(a).length">
+              <div class="kc__role" *ngFor="let sp of pairingSpecialists(a)">
+                <span class="kc__role-label">Specialist</span>
+                <span class="kc__role-name">
+                  {{ sp.name }}
+                  <span class="kc__role-act" *ngIf="sp.activity">· {{ sp.activity }}</span>
+                </span>
+              </div>
+              <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
+                <span class="kc__role-label">Bonus</span>
+                <span class="kc__role-name">
+                  {{ bs.name }}
+                  <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
+                </span>
+              </div>
+            </div>
+            <div class="kc__wait" *ngIf="!participantPresent(a)">
+              <mat-icon>schedule</mat-icon>
+              <div>
+                <div class="kc__wait-hdr">Awaiting participant</div>
+                <div class="kc__wait-line">Participant hasn't loaded the studio yet</div>
+              </div>
+            </div>
+            <div class="kc__wait" *ngIf="participantPresent(a)">
+              <mat-icon>check_circle</mat-icon>
+              <div>
+                <div class="kc__wait-hdr">Ready to join</div>
+                <div class="kc__wait-line">Participant is at studio screen</div>
+              </div>
+            </div>
+            <div class="kc__foot">
+              <span class="kc__timer kc__timer--ink" matTooltip="Waiting in studio">
+                <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">hourglass_top</mat-icon>
+                {{ sinceStudioEntry(a) }}
+              </span>
+            </div>
+          </article>
+          <div class="kcol__empty" *ngIf="joinedAssignments.length === 0">— none —</div>
+        </div>
+      </div>
+
+      <!-- ACTIVE -->
+      <div class="kcol kcol--active">
+        <header class="kcol__head">
+          <span><span class="kdot kdot--green"></span>ACTIVE</span>
+          <span class="kcol__count">{{ activeAssignments.length }}</span>
+        </header>
+        <div class="kcol__body">
+          <article class="kc" [class.kc--active]="!callEnded(a)" [class.kc--ended]="callEnded(a)"
+                   *ngFor="let a of activeAssignments">
+            <div class="kc__head">
+              <span class="kc__avatar"
+                    [class.kc__avatar--green]="!callEnded(a)"
+                    [class.kc__avatar--ink]="callEnded(a)">
+                {{ initials(participantName(a.participantid)) }}
+              </span>
+              <div class="kc__title">
+                <span class="kc__name">{{ participantName(a.participantid) }}</span>
+              </div>
+            </div>
+
+            <!-- Participant name is already shown in the card head above; here
+                 we name every paired specialist (and any bonus-activity
+                 specialists). -->
+            <div class="kc__roles">
+              <div class="kc__role" *ngFor="let sp of pairingSpecialists(a)">
+                <span class="kc__role-label">Specialist</span>
+                <span class="kc__role-name">
+                  {{ sp.name }}
+                  <span class="kc__role-act" *ngIf="sp.activity">· {{ sp.activity }}</span>
+                </span>
+              </div>
+              <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
+                <span class="kc__role-label">Bonus</span>
+                <span class="kc__role-name">
+                  {{ bs.name }}
+                  <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Who is in the meet right now -->
+            <div class="kc__presence">
+              <span class="kc__pres"
+                    [class.kc__pres--ok]="specialistInCall(a)"
+                    [class.kc__pres--off]="!specialistInCall(a)">
+                <mat-icon>{{ specialistInCall(a) ? 'check_circle' : 'remove_circle' }}</mat-icon>
+                Specialist
+              </span>
+              <span class="kc__pres"
+                    [class.kc__pres--ok]="participantInCall(a)"
+                    [class.kc__pres--off]="!participantInCall(a)">
+                <mat-icon>{{ participantInCall(a) ? 'check_circle' : 'remove_circle' }}</mat-icon>
+                Participant
+              </span>
+            </div>
+
+            <!-- Asymmetric leave banners -->
+            <div class="kc__ended kc__ended--amber" *ngIf="onlySpecialistLeft(a)">
+              <mat-icon>warning</mat-icon>
+              <div>
+                <div class="kc__ended-hdr">Specialist left the call</div>
+                <div class="kc__ended-line">Participant is still in the meet</div>
+              </div>
+            </div>
+            <div class="kc__ended kc__ended--amber" *ngIf="onlyParticipantLeft(a)">
+              <mat-icon>warning</mat-icon>
+              <div>
+                <div class="kc__ended-hdr">Participant left the call</div>
+                <div class="kc__ended-line">Specialist is still in the meet</div>
+              </div>
+            </div>
+
+            <!-- Call-ended summary: when BOTH have left, surface the full
+                 start / end / duration triplet so the coordinator can see
+                 exactly when the session ran. -->
+            <div class="kc__ended kc__ended--summary" *ngIf="callEnded(a)">
+              <mat-icon>call_end</mat-icon>
+              <div class="kc__ended-body">
+                <div class="kc__ended-hdr">Call ended</div>
+                <div class="kc__ended-grid">
+                  <span class="kc__ended-lbl">Started</span>
+                  <span class="kc__ended-val">{{ callStartedClock(a) }}</span>
+                  <span class="kc__ended-lbl">Ended</span>
+                  <span class="kc__ended-val">{{ callEndedClock(a) }}</span>
+                  <span class="kc__ended-lbl">Duration</span>
+                  <span class="kc__ended-val kc__ended-val--strong">{{ sessionElapsed(a) }}</span>
+                </div>
+                <div class="kc__ended-line">Awaiting completion</div>
+              </div>
+            </div>
+
+            <!-- Live session — show the call start clock time inline -->
+            <div class="kc__started" *ngIf="!callEnded(a) && a.specialistJoinedAt">
+              <mat-icon>play_circle</mat-icon>
+              <span>Call started at <b>{{ callStartedClock(a) }}</b></span>
+            </div>
+
+            <!-- Footer timer. The label makes it obvious this is the elapsed
+                 duration (counting up live), not another clock time. -->
+            <div class="kc__foot">
+              <span class="kc__timer"
+                    [class.kc__timer--green]="!callEnded(a)"
+                    [class.kc__timer--ink]="callEnded(a)"
+                    [matTooltip]="callEnded(a) ? 'Total call duration' : 'Live call duration'">
+                <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">
+                  {{ callEnded(a) ? 'hourglass_bottom' : 'timer' }}
+                </mat-icon>
+                <span class="kc__timer-label">{{ callEnded(a) ? 'Total time' : 'Running for' }}</span>
+                {{ sessionElapsed(a) }}
+              </span>
+            </div>
+          </article>
+          <div class="kcol__empty" *ngIf="activeAssignments.length === 0">— none —</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ----- RIGHT PANEL ----- -->
+    <aside class="arena__right" [class.is-closed]="!rightOpen">
+      <!-- Collapsed: thin rail with a reopen control (kept inside the sidenav) -->
+      <button class="panel-rail" *ngIf="!rightOpen" (click)="rightOpen = true" matTooltip="Show done panel">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+
+      <ng-container *ngIf="rightOpen">
+      <div class="panel-bar panel-bar--start">
+        <button class="panel-collapse" (click)="rightOpen = false" matTooltip="Close this panel" aria-label="Close panel">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="arena__right-tabs">
+        <button class="rtab" [class.rtab--active]="rightTab === 'done'" (click)="rightTab = 'done'">
+          <mat-icon>check_circle</mat-icon> Done <span class="rtab__count">{{ seDoneCount }}</span>
+        </button>
+        <button class="rtab" [class.rtab--active]="rightTab === 'chat'" (click)="rightTab = 'chat'">
+          <mat-icon>chat</mat-icon> Chat
+        </button>
+      </div>
+
+      <!-- Done feed -->
+      <div class="arena__right-pane" *ngIf="rightTab === 'done'">
+        <div class="dn" *ngFor="let a of completedAssignments">
+          <div class="dn__name">{{ participantName(a.participantid) }}</div>
+          <div class="dn__with">with {{ participantName(a.pairing?.[0] || '') }}</div>
+        </div>
+        <div class="arena__right-empty" *ngIf="completedAssignments.length === 0">No completed sessions yet.</div>
+      </div>
+
+      <!-- Chat (placeholder for now) -->
+      <div class="arena__right-pane arena__right-pane--chat" *ngIf="rightTab === 'chat'">
+        <div class="arena__right-empty">Chat feed coming soon.</div>
+      </div>
+      </ng-container>
+    </aside>
+  </main>
+</div>

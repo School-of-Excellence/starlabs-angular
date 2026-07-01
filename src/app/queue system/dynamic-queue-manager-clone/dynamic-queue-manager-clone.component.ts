@@ -7,6 +7,7 @@ import { CreateBulkInvitationComponent } from '../create-bulk-invitation/create-
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { PeopleInvolvedComponent } from '../people-involved/people-involved.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { environment } from '../../../environments/environment';
 import { AssignQueueStudioComponent } from '../assign-queue-studio/assign-queue-studio.component';
 import { AvTestComponent } from '../av-test/av-test.component';
@@ -101,7 +102,7 @@ interface ProfileNotificationSummary {
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressSpinnerModule,
-    
+    ProfilePictureComponent,
   ],
   templateUrl: './dynamic-queue-manager-clone.component.html',
   styleUrl: './dynamic-queue-manager-clone.component.css'
@@ -163,6 +164,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   participantSubscription: Subscription;
   participantMetaDataMap = {};
+
+  // Set of profile ids approved for the selected queue's event (event participation
+  // request with arenaeventid == arena docid and status == 'approved'). Used to mark
+  // approved participants with a green check in the queue board.
+  approvedProfileIds: Set<string> = new Set();
+  // profileid -> event name they were approved for (arena event's `eventname`).
+  approvedEventNameMap: { [profileid: string]: string } = {};
 
   selectedStages: string[] = [];
   availableStagesForComm: any[] = [];
@@ -227,15 +235,18 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   currentMatchIndex: number = -1;
   isSearchActive: boolean = false;
   searchHighlightMap: { [tokenId: string]: boolean } = {};
-  stageHighlightMap: { [stageKey: string]: boolean } = {}; // NEW: Track stage name matches
+  stageHighlightMap: { [stageKey: string]: boolean } = {}; 
   currentHighlightTokenId: string | null = null;
-  currentHighlightStageKey: string | null = null; // NEW: Track current stage highlight
+  currentHighlightStageKey: string | null = null; 
   caseSensitiveSearch: boolean = false;
   segmentDropdownOpen: boolean = false;
   tagDropdownOpen: boolean = false;
   mapTagsName = {};
   mapTagsMetaData = {};
   preassignedFilter: 'all' | 'preassigned' | 'not-preassigned' = 'all';
+  approvedFilter: 'all' | 'approved' | 'not-approved' = 'all';
+  approvedDropdownOpen: boolean = false;
+  slotTitleMap: { [key: string]: string } = {};
 
   roundRobbinformData = {
     howManyParticipantsNeeded:2,
@@ -245,7 +256,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   
   //dharshan
   availableStagesFromSlot: string[] = [];
-  availableTimeSlots: { timeRange: string; count: number }[] = [];
+  availableTimeSlots: { timeRange: string; count: number; title?: string }[] = [];
   quickLinks: Array<{ screenName: string; url: string; isInternal: boolean }> = [];
   activeStageCountFilter: string[] = []; 
   selectedTimeSlots: string[] = [];
@@ -358,6 +369,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   stageActivityCacheQueueId: string | null = null;
   stageActivityCacheLoading: boolean = false;
   participantSearchTerm: string = '';
+  //in evolution mapping
+  evolutionMappingLiveFilter: 'all' | 'live' | 'unlive' = 'all';
+  evolutionMappingLiveMap: { [profileId: string]: boolean } = {};
+  evolutionMappingLiveLoaded: boolean = false;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -895,6 +910,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.selectedSegments = [];
     this.selectedTags = [];
     this.preassignedFilter = 'all';
+    this.approvedFilter = 'all';
+    this.approvedDropdownOpen = false;
     this.dfuFilterActive = false;
     this.reminderTodayFilterActive = false;
     this.selectedStageSlot = null;
@@ -920,6 +937,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.noAtcFilterActive = false;
     this.noAtcProfileIds = new Set();
     this.noAtcCount = 0;
+    this.evolutionMappingLiveFilter = 'all';
+    this.evolutionMappingLiveMap = {};
+    this.evolutionMappingLiveLoaded = false;
     this.clearSearch();
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -1152,6 +1172,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.processTokensIntoStages(this.allTokensData);
   }
 
+  onApprovedFilterChange() {
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
   //dharshan
   onStageSlotChange() {  
     if (!this.selectedStageSlot) {
@@ -1193,9 +1217,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.showTimeSlotPicker = false;
       return;
     }
-
-    const timeMap = new Map<string, number>(); // key = "6:00 PM – 8:00 PM", value = count
-
+    const timeMap = new Map<string, { count: number; title?: string }>();
     this.allTokensData.forEach(token => {
       const slotData = token.selectedstageslot;
       if (!slotData) return;
@@ -1235,7 +1257,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           });
 
           const key = `${startTime} – ${endTime}`;
-          timeMap.set(key, (timeMap.get(key) || 0) + 1);
+          const existing = timeMap.get(key);
+          const titleKey = `${this.selectedStageSlot}_${startDate.getTime()}_${endDate.getTime()}`;
+          const title = this.slotTitleMap[titleKey] || '';
+          timeMap.set(key, { count: (existing?.count || 0) + 1, title });
         }
       });
     });
@@ -1247,12 +1272,12 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         const timeB = new Date(`1970/01/01 ${b[0].split(' – ')[0]}`).getTime();
         return timeA - timeB;
       })
-      .map(([timeRange, count]) => ({ timeRange, count }));
+      .map(([timeRange, data]) => ({ timeRange, count: data.count, title: data.title }));
 
     this.showTimeSlotPicker = this.availableTimeSlots.length > 0;
   }
 
-  selectTimeSlot(time: string | null) { //dharshan
+  selectTimeSlot(time: string | null) { 
     if (time === null) {
       // Clicking "All" clears all selections
       this.selectedTimeSlots = [];
@@ -1332,9 +1357,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     this.stageCountSubscription = collectionData(query(collection(this.firestore, 'stage opportunity count'),where('queuelist', 'array-contains', this.selectedQueue.docid))).pipe(takeUntil(this.subscriptionHandle),takeUntil(this.liveQueueSubscription)).subscribe(data => 
     {
-      this.stageCountCards = (data as any[]).sort((a: any, b: any) =>
-        (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
-      );
+      this.stageCountCards = (data as any[])
+        .filter((e: any) => e['kind'] !== 'phase')
+        .sort((a: any, b: any) =>
+          (a['sequence'] ?? 999) - (b['sequence'] ?? 999)
+        );
     });
   }
 
@@ -1403,16 +1430,22 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       default: return status;
     }
   }
+
   get filteredStageQueue(): any[] {
-    if (this.activeStageCountFilter.length === 0) {
-      return this.stageQueue;
+    let queue = this.stageQueue;
+    if (this.evolutionMappingLiveFilter !== 'all') {
+      return queue.filter(
+        column => column.stagename === 'In Evolution Mapping Activity'
+      );
     }
-    const filtered = this.stageQueue.filter(column => {
-      const shouldShow = this.activeStageCountFilter.includes(column.stagename);
-      return shouldShow;
-    });
-    
-    return filtered;
+
+    if (this.activeStageCountFilter.length === 0) {
+      return queue;
+    }
+
+    return queue.filter(column =>
+      this.activeStageCountFilter.includes(column.stagename)
+    );
   }
   
 
@@ -1735,15 +1768,26 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.availableCustomerSupportCategories = [];
     this.selectedCustomerSupportCategories = [];
     this.atcDateRangeOnlyProfileIds = new Set();
+    this.evolutionMappingLiveFilter = 'all';
+    this.evolutionMappingLiveMap = {};
+    this.evolutionMappingLiveLoaded = false;
 
     let count = 0
     this.currentQueueParticipants = [];
+    this.approvedProfileIds = new Set();
+
+    // Who got approved for this queue's event. Mirrors the chain used by Event
+    // Participation Confirmations: queue -> arena events (eventref == queue) ->
+    // event participation request (arenaeventid == arena docid, status approved).
+    this.loadApprovedProfileIds(this.selectedQueue.docid);
+
     var loading = this.dialog.open(LoadingProgressComponent, {
       data: {
         msg: "Staging Queue..."
       },
       disableClose: true
     })
+
 
     // Fetch segments for this queue
     await this.fetchQueueSegments();
@@ -2076,6 +2120,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           !Object.values(token['preassigned']).some((val: any) => val && val.length > 0);
       });
     }
+
+    // Approved filter (approved for this queue's event)
+    if (this.approvedFilter === 'approved') {
+      filteredTokens = filteredTokens.filter(token => this.approvedProfileIds.has(token['profile_id']));
+    } else if (this.approvedFilter === 'not-approved') {
+      filteredTokens = filteredTokens.filter(token => !this.approvedProfileIds.has(token['profile_id']));
+    }
     //dharshan
     if (this.selectedStageSlot) {
       filteredTokens = filteredTokens.filter(token => {
@@ -2194,6 +2245,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       filteredTokens = filteredTokens.filter(
         token => todayProfileIds.has(token.profile_id)
       );
+    }
+
+    if (this.evolutionMappingLiveFilter !== 'all') {
+      filteredTokens = filteredTokens.filter(token => {
+        if (token.currentstage !== 'In Evolution Mapping Activity') return true;
+        const isLive = this.evolutionMappingLiveMap[token.profile_id] === true;
+        if (this.evolutionMappingLiveFilter === 'live') return isLive;
+        if (this.evolutionMappingLiveFilter === 'unlive') return !isLive;
+        return true;
+      });
     }
 
     return filteredTokens;
@@ -2338,9 +2399,21 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       );
       const queuePlanningSnap = await getDocs(queuePlanningQuery);
 
+      this.slotTitleMap = {};
       if (!queuePlanningSnap.empty) {
         const queuePlanningDoc = queuePlanningSnap.docs[0].data();
         this.queuePlanningSegments = queuePlanningDoc['segmentlist'] || [];
+
+        const planning = queuePlanningDoc['planning'] || [];
+        planning.forEach((v: any) => {
+          (v.segments || []).forEach((s: any) => {
+            (s.slots || []).forEach((slot: any) => {
+              if (!slot.title || !slot.startdate || !slot.enddate) return;
+              const sec = (d: any) => d?.seconds ? d.seconds * 1000 : d?.toDate?.().getTime() ?? 0;
+              this.slotTitleMap[`${slot.stagename}_${sec(slot.startdate)}_${sec(slot.enddate)}`] = slot.title;
+            });
+          });
+        });
       } else {
         this.queuePlanningSegments = [];
       }
@@ -2439,6 +2512,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     return stages;
   }
 
+  getBookedSlotTitle(token: any): string {
+    const slot = this.getBookedSlot(token);
+    if (!slot) return '';
+    const key = `${this.selectedStageSlot}_${slot.start.getTime()}_${slot.end.getTime()}`;
+    return this.slotTitleMap[key] || '';
+  }
+
   getBookedSlot(token: any): { start: Date; end: Date } | null { //dharshan
     if (!this.selectedStageSlot || !token.selectedstageslot) return null;
 
@@ -2529,6 +2609,68 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         selectedQueue: this.selectedQueue
       }
     })
+  }
+
+  // Build the set of approved profile ids for a queue, following the same chain
+  // as Event Participation Confirmations (which keys requests by arenaeventid,
+  // NOT by eventref). queue generation doc -> arena events whose eventref points
+  // at it -> their docids -> event participation request with status 'approved'.
+  async loadApprovedProfileIds(queueDocId: string) {
+    try {
+      const queueRef = doc(this.firestore, "queue generation", queueDocId);
+      const arenaSnap = await getDocs(query(
+        collection(this.firestore, 'arena events'), where('eventref', '==', queueRef)));
+      // arenaeventid -> event name (from the arena event's own `eventname` field).
+      const arenaEventName: { [arenaId: string]: string } = {};
+      const arenaIds: string[] = [];
+      arenaSnap.docs.forEach(d => {
+        const a = d.data();
+        if (a['delete'] == true || !a['docid']) return;
+        arenaIds.push(a['docid']);
+        arenaEventName[a['docid']] = a['eventname'] || '';
+      });
+
+      if (!arenaIds.length) {
+        this.approvedProfileIds = new Set();
+        this.approvedEventNameMap = {};
+        return;
+      }
+
+      const ids = new Set<string>();
+      const nameMap: { [profileid: string]: string } = {};
+      for (let i = 0; i < arenaIds.length; i += 10) {
+        const chunk = arenaIds.slice(i, i + 10);
+        const reqSnap = await getDocs(query(collection(this.firestore, 'event participation request'),
+          where('arenaeventid', 'in', chunk), where('status', '==', 'approved')));
+        reqSnap.docs.forEach(d => {
+          const x = d.data();
+          if (!x['profileid']) return;
+          ids.add(x['profileid']);
+          nameMap[x['profileid']] = arenaEventName[x['arenaeventid']] || '';
+        });
+      }
+      // Guard against a stale response after the user switched queues.
+      if (this.selectedQueue?.docid === queueDocId) {
+        this.approvedProfileIds = ids;
+        this.approvedEventNameMap = nameMap;
+      }
+      console.log('approved profiles for queue', queueDocId, ids.size, 'from', arenaIds.length, 'arena(s)');
+    } catch (e) {
+      console.log('loadApprovedProfileIds failed', e);
+    }
+  }
+
+  // True when this token's participant was approved for the event (event
+  // participation request status == 'approved'). Drives the green check icon.
+  isApproved(token: any): boolean {
+    return !!token && this.approvedProfileIds.has(token['profile_id']);
+  }
+
+  // Event name this participant was approved for (from the arena event's
+  // `eventname`); falls back to the queue name then a generic label.
+  approvedEventName(token: any): string {
+    return (token && this.approvedEventNameMap[token['profile_id']])
+      || this.selectedQueue?.queuename || 'this event';
   }
 
   getPreassignedEntries(token: any): Array<{ key: string, value: string[] }> {
@@ -4832,6 +4974,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
     this.stageSlotDropdownOpen = false;
+    this.approvedDropdownOpen = false;
+  }
+
+  toggleApprovedDropdown() {
+    if (this.dfuFilterActive || !!this.selectedStageSlot) return;
+    this.approvedDropdownOpen = !this.approvedDropdownOpen;
+    this.segmentDropdownOpen = false;
+    this.tagDropdownOpen = false;
+    this.stageSlotDropdownOpen = false;
+    this.preassignedDropdownOpen = false;
   }
 
   toggleStageSlotDropdown() {
@@ -5046,6 +5198,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     count += this.selectedSegments.length;
     count += this.selectedTags.length;
     if (this.preassignedFilter !== 'all') count++;
+    if (this.approvedFilter !== 'all') count++;
     if (this.selectedStageSlot) count++;
     if (this.dateRangeStart && this.dateRangeEnd) count++;
     if (this.selectedTimeSlots?.length > 0) count++;
@@ -5055,6 +5208,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     if (this.noAtcFilterActive) count++;
     count += this.selectedCustomerSupportCategories.length;
     if (this.selectedArenaEventId) count++;
+    if (this.evolutionMappingLiveFilter !== 'all') count++;
     return count;
   }
 
@@ -6135,5 +6289,42 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       return name.includes(search) || email.includes(search);
     });
   }
+
+  async setEvolutionMappingFilter(filter: 'all' | 'live' | 'unlive') {
+    this.evolutionMappingLiveFilter = filter;
+
+    if (filter === 'all') {
+      this.processTokensIntoStages(this.allTokensData);
+      return;
+    }
+
+    // Always fetch fresh data on filter selection
+    const evolutionTokens = this.allTokensData.filter(
+      t => t.currentstage === 'In Evolution Mapping Activity'
+        && t.tokenstatus === 'Active'
+    );
+
+    await Promise.all(evolutionTokens.map(async token => {
+      try {
+        const snap = await getDoc(
+          doc(this.firestore, 'liveevolutionmapping', token.profile_id)
+        );
+        this.evolutionMappingLiveMap[token.profile_id] =
+          snap.exists() ? snap.data()['live'] === true : false;
+      } catch {
+        this.evolutionMappingLiveMap[token.profile_id] = false;
+      }
+    }));
+
+    this.evolutionMappingLiveLoaded = true;
+
+    this.processTokensIntoStages(this.allTokensData);
+  }
+  get hasEvolutionMappingParticipants(): boolean {
+  return this.stageQueue.some(
+    s => s.stagename === 'In Evolution Mapping Activity' 
+      && s.tokenlist?.length > 0
+  );
+}
 
 }

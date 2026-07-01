@@ -22,19 +22,61 @@
 .filterrow{
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   width: 100%;
   gap: 10px;
 }
 
 .filteritem {
   background-color: white !important;
-  width: 100%;
+  flex: 1 1 200px;
+  min-width: 180px;
   padding-bottom: 0 !important;
   margin: 0 !important;
 }
 
 .filteritem ::ng-deep .mat-mdc-form-field-subscript-wrapper {
   height: 0;
+}
+
+.filtered-info {
+  margin: 0 0 12px 0;
+  padding: 8px 12px;
+  background-color: rgb(244, 248, 252);
+  border-left: 3px solid rgb(3, 48, 63);
+  border-radius: 4px;
+  font-size: 14px;
+  color: rgb(3, 48, 63);
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filtered-info .filtered-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filtered-info .exportbtn {
+  flex: 0 0 auto;
+  background-color: rgb(3, 48, 63);
+  color: white;
+}
+
+.filtered-info .filtered-count {
+  font-weight: 700;
+}
+
+.filtered-info .filtered-by {
+  font-weight: 500;
+}
+
+.filtered-info .no-filter {
+  font-style: italic;
+  color: #6b7280;
 }
 
 .clearbtn {
