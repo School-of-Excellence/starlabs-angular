@@ -2,7 +2,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 import { environment } from './environments/environment';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
+import { initializeFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
 import { getAuth, connectAuthEmulator } from '@angular/fire/auth';
 import { getStorage, connectStorageEmulator } from '@angular/fire/storage';
 import { initializeApp } from '@angular/fire/app';
@@ -27,10 +27,8 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   if (e.storage) connectStorageEmulator(getStorage(app), e.storage.host, e.storage.port);
   console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);
 } else {
-  // PROD/DEV: durable, multi-tab offline persistence (default + named ATC database) before any component reads them
-  const offlineCache = { };
-  initializeFirestore(app, offlineCache);
-  initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }, 'firestore-atc');
+  initializeFirestore(app, {});
+  initializeFirestore(app, {}, 'firestore-atc');
 }
 
 (window as any).process = {
