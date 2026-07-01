@@ -1606,6 +1606,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
   }
 
+
+
   /** Title-case label for a coach-set Health State (Happy / Neutral / Unhappy / At-risk / Critical). */
   healthLabel(s: CoachHealthState | null | undefined): string {
     return coachHealthLabel(s);
