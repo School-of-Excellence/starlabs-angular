@@ -1,20 +1,24 @@
 .slider-container {
   position: absolute;
-  bottom: 50px; /* Adjust as needed */
-  left: 10px; /* Adjust as needed */
+  top: 60px;  /* top-left corner, just below Zoom's header */
+  left: 10px;
   z-index: 9999; /* Ensure it appears on top of other elements */
   background-color: transparent;
   color: white; /* Text color */
-  padding: 5px 10px;
+  padding: 5px;
   border-radius: 5px;
   border: none;
   cursor: pointer;
-  overflow-x: auto;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: start; /* Center align items */
   justify-content: start;
-  width: 900px;
+  /* Was 900px — a transparent 900px overlay intercepted clicks over the
+     Zoom UI underneath. Size to the thumbnails so only the chips are
+     interactive. */
+  width: 116px;
+  max-height: calc(100vh - 140px);
 }
 
 .slider-item {
