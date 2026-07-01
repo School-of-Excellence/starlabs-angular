@@ -2,15 +2,15 @@
 import { HttpClient } from '@angular/common/http';
 import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy, signal, ViewChild } from '@angular/core';
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
-import { ConnectionQuality, createLocalScreenTracks, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
+import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { doc, docData, Firestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import { ActivatedRoute } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
-import { OpenviduVideoElementComponent } from '../openvidu-video-element/openvidu-video-element.component';
+import { OpenviduVideoElementComponent } from '../../OpenVidu/openvidu-video-element/openvidu-video-element.component';
 import { CommonModule } from '@angular/common';
-import { OpenviduAudioElementComponent } from '../openvidu-audio-element/openvidu-audio-element.component';
+import { OpenviduAudioElementComponent } from '../../OpenVidu/openvidu-audio-element/openvidu-audio-element.component';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
@@ -20,6 +20,11 @@ import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
 import { AdaptiveQualityService } from '../../Service/AdaptiveQuality/adaptive-quality.service';
 import { VideoLayoutService, LayoutMode } from '../../Service/VideoLayout/video-layout.service';
+// Patched DFN build (adds makeupGain + post-DFN gate); vendored from the videoconference
+// repo because npm deepfilternet3-noise-filter@1.2.1 lacks these. See vendor/.../package.json.
+import { DeepFilterNoiseFilterProcessor } from '../dfn/vendor/deepfilternet3-noise-filter';
+import { DfnStateService } from '../dfn/dfn-state.service';
+import { startJitterController } from '../dfn/jitter-buffer';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -38,7 +43,7 @@ type RoomInfo = {
 
 
 @Component({
-  selector: 'app-join-openvidu-call',
+  selector: 'app-join-livekit-call',
   imports: [
     OpenviduVideoElementComponent,
     OpenviduAudioElementComponent,
@@ -48,10 +53,10 @@ type RoomInfo = {
     MatDividerModule,
     CdkDrag
   ],
-  templateUrl: './join-openvidu-call.component.html',
-  styleUrl: './join-openvidu-call.component.css'
+  templateUrl: './join-livekit-call.component.html',
+  styleUrl: './join-livekit-call.component.css'
 })
-export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
+export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   loggedinProfileid = null
   loggedinProfileRole = {}
@@ -89,6 +94,21 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
   localParticipantIdentity = '';
 
   private previewStream: MediaStream | null = null;
+
+  // ── DeepFilterNet3 (exact videoconference TrackProcessor architecture) ──────
+  private static readonly DFN_PROCESSOR_NAME = 'deepfilternet3-noise-filter';
+  private dfnProc: DeepFilterNoiseFilterProcessor | null = null;
+  private dfnBroadcastTimer: any = null;
+  private jitterStops = new Map<string, () => void>();
+  // UI state — exact defaults from DfnControls.tsx
+  dfnEnabled = (typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4) >= 4; // off on <4-core devices
+  dfnAtten = 80;        // attenuation / noiseReductionLevel (0–100)
+  dfnNorm = 1.2;        // makeup gain (1.0–2.5)
+  dfnNormOn = true;     // normalize toggle
+  dfnGateOn = true;     // gate toggle
+  dfnGateDb = -45;      // gate threshold dBFS (-70…-25)
+  dfnPanelOpen = false; // tuning popover visibility
+  get dfnEffNorm(): number { return this.dfnNormOn ? this.dfnNorm : 1.0; }
   // Cache active blur processor — avoids recreating the canvas pipeline on every camera re-enable
   private cachedBlurProcessor: any = null;
   private cachedBlurRadius: number = 0;
@@ -114,6 +134,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     private infraService: InstanceStatusService,
     private adaptiveQuality: AdaptiveQualityService,
     public videoLayout: VideoLayoutService,
+    public dfnState: DfnStateService,
     // public picoKoalaService : PicoKoalaService
   ){}
 
@@ -280,10 +301,18 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     const room = new Room(this.adaptiveQuality.getRoomConfig(initialTier));
     this.room.set(room);
 
+    // Share DFN settings across participants (tile badges) for this room.
+    this.dfnState.start(room);
+
     // Handle incoming remote tracks
     room.on(
       RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+        // Adaptive jitter buffer on each remote audio track (exact videoconference port).
+        if (track.kind === Track.Kind.Audio) {
+          this.jitterStops.set(publication.trackSid, startJitterController(track));
+        }
+
         // A4: Screen share subscription quality based on CPU/network at subscription time
         if (track.kind === Track.Kind.Video && publication.source === Track.Source.ScreenShare) {
           const cpu = this.adaptiveQuality.cpuPressure();
@@ -321,6 +350,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     room.on(
       RoomEvent.TrackUnsubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+        const stop = this.jitterStops.get(publication.trackSid);
+        if (stop) { stop(); this.jitterStops.delete(publication.trackSid); }
+
         this.remoteParticipants.update((prev) => {
           const next = new Map(prev);
           next.delete(publication.trackSid);
@@ -424,18 +456,24 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       // premature downgrades during the first 15 seconds).
       this.adaptiveQuality.startMonitoring(room);
 
-      // try {
-      //   await this.picoKoalaService.publishToRoom(room);
-      //   console.log('🎙️ Koala noise-suppressed audio published');
-      // } catch (koalaPublishError) {
-      //   // Fallback: if Koala publish fails, use standard mic
-      //   console.warn('Koala publish failed, falling back to standard mic:', koalaPublishError);
-        await room.localParticipant.setMicrophoneEnabled(true, {
-          noiseSuppression: true,
-          echoCancellation: true,
-          autoGainControl: true,
-        });
-      // }
+      // Publish the mic (LiveKit-managed), then apply the DeepFilterNet3 TrackProcessor —
+      // the exact videoconference architecture. applyDfnProcessor() also sets the input
+      // constraints (raw input / voiceIsolation off while DFN is on). LiveKit owns the
+      // track lifecycle (mute / device-switch), so no separate raw-stream handling needed.
+      await room.localParticipant.setMicrophoneEnabled(true, {
+        noiseSuppression: true,
+        echoCancellation: true,
+        autoGainControl: true,
+      });
+      await this.applyDfnProcessor();
+      this.startDfnBroadcast();
+
+      // DEV-ONLY: expose this component so the audio A/B test can be driven from the console.
+      // Run:  await __lk.audioDiag()   — once with recording OFF, once with recording ON.
+      if (typeof window !== 'undefined' && !environment.production) {
+        (window as any).__lk = this;
+        console.log('%c[diag] ready — run: await __lk.audioDiag()', 'color:#4caf50;font-weight:bold');
+      }
 
     } catch (error: any) {
       // Handle connection errors gracefully
@@ -492,6 +530,14 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     // Remove all listeners BEFORE disconnect so RoomEvent.Disconnected doesn't re-trigger leaveRoom
     currentRoom?.removeAllListeners();
     await currentRoom?.disconnect();
+
+    // Tear down DFN: broadcast timer, jitter controllers, processor, shared state.
+    if (this.dfnBroadcastTimer) { clearInterval(this.dfnBroadcastTimer); this.dfnBroadcastTimer = null; }
+    this.jitterStops.forEach(stop => stop());
+    this.jitterStops.clear();
+    try { (this.dfnProc as any)?.destroy?.(); } catch (_) {}
+    this.dfnProc = null;
+    this.dfnState.stop();
 
     // Reset all variables
     this.room.set(undefined);
@@ -560,6 +606,118 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     else{
       micPub.mute()
     }
+  }
+
+  // ── DeepFilterNet3 control methods (exact DfnControls.tsx behaviour) ─────────
+
+  /** Apply or remove the DFN TrackProcessor on the local mic + set input constraints. */
+  private async applyDfnProcessor(): Promise<void> {
+    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+    if (!micTrack) return;
+    try {
+      if (this.dfnEnabled) {
+        if (!this.dfnProc) {
+          if (!DeepFilterNoiseFilterProcessor.isSupported()) {
+            console.warn('DeepFilterNet3 not supported on this browser');
+            return;
+          }
+          // Clock-domain: force the mic track onto a 48 kHz AudioContext (no drift).
+          try {
+            const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+            const t = micTrack as any;
+            if (AC && typeof t.setAudioContext === 'function' && t.audioContext?.sampleRate !== 48000) {
+              t.setAudioContext(new AC({ sampleRate: 48000 }));
+            }
+          } catch (_) {}
+          const proc = new DeepFilterNoiseFilterProcessor({
+            sampleRate: 48000,
+            noiseReductionLevel: this.dfnAtten,
+            enabled: true,
+            makeupGain: this.dfnEffNorm,
+            gateEnabled: this.dfnGateOn,
+            gateThresholdDb: this.dfnGateDb,
+            assetConfig: { cdnUrl: '/assets/df3' },
+          });
+          this.dfnProc = proc;
+          await micTrack.setProcessor(proc as any);
+        }
+      } else if (this.dfnProc) {
+        this.dfnProc = null;
+        await micTrack.stopProcessor();
+      }
+
+      // Input constraints: when DFN is ON keep the input raw (voiceIsolation off) so we
+      // don't double-process; when OFF, enable Chrome's own NS/EC/AGC + voiceIsolation.
+      try {
+        const mst = micTrack.mediaStreamTrack;
+        if (mst) {
+          const constraints = this.dfnEnabled
+            ? { voiceIsolation: false }
+            : { echoCancellation: true, noiseSuppression: true, autoGainControl: true, voiceIsolation: true };
+          await mst.applyConstraints(constraints as unknown as MediaTrackConstraints);
+        }
+      } catch (ce) {
+        console.warn('DFN applyConstraints (voiceIsolation) not supported', ce);
+      }
+    } catch (e) {
+      console.error('DFN control error', e);
+    }
+  }
+
+  /** Broadcast this participant's DFN settings so peers can badge the tile (every 3 s). */
+  private broadcastDfn(): void {
+    const room = this.room();
+    if (!room) return;
+    const id = room.localParticipant?.identity;
+    const info = { dfn: this.dfnEnabled, atten: this.dfnAtten, norm: this.dfnEffNorm };
+    if (id) this.dfnState.update(id, info);
+    if (!id) return;
+    try {
+      room.localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ type: 'dfn', ...info })),
+        { reliable: true },
+      );
+    } catch (_) {}
+  }
+
+  private startDfnBroadcast(): void {
+    this.broadcastDfn();
+    this.dfnBroadcastTimer = setInterval(() => this.broadcastDfn(), 3000);
+  }
+
+  /** Master DFN on/off. */
+  async toggleDfn(): Promise<void> {
+    this.dfnEnabled = !this.dfnEnabled;
+    await this.applyDfnProcessor();
+    this.broadcastDfn();
+  }
+
+  onDfnAttenChange(v: number): void {
+    this.dfnAtten = v;
+    try { this.dfnProc?.setSuppressionLevel(v); } catch (_) {}
+    this.broadcastDfn();
+  }
+
+  onDfnNormOnChange(on: boolean): void {
+    this.dfnNormOn = on;
+    try { this.dfnProc?.setMakeupGain(this.dfnEffNorm); } catch (_) {}
+    this.broadcastDfn();
+  }
+
+  onDfnNormChange(v: number): void {
+    this.dfnNorm = v;
+    try { this.dfnProc?.setMakeupGain(this.dfnEffNorm); } catch (_) {}
+    this.broadcastDfn();
+  }
+
+  onDfnGateOnChange(on: boolean): void {
+    this.dfnGateOn = on;
+    try { this.dfnProc?.setGateEnabled(on); } catch (_) {}
+  }
+
+  onDfnGateDbChange(v: number): void {
+    this.dfnGateDb = v;
+    try { this.dfnProc?.setGateThreshold(v); } catch (_) {}
   }
 
   /**
@@ -938,6 +1096,118 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
 
       alert(errorMessage);
     }
+  }
+
+  /**
+   * DEV audio diagnostic. Run from the browser console: `await __lk.audioDiag()`.
+   * Samples WebRTC stats over `windowSec`, then prints:
+   *  1. DFN status — whether the DeepFilterNet3 processor is actually attached to the mic.
+   *  2. The selected ICE candidate pair — host/srflx = direct (good), relay = TURN fallback (breakup).
+   *  3. Per remote stream: packet-loss %, jitter, and CONCEALMENT ms/s — the objective
+   *     "audio breaking up" metric (decoder inventing samples for late/lost packets).
+   * Use it for the recording A/B: run with recording OFF, then ON; if conceal/loss/jitter
+   * jump when recording starts, the composite egress is starving the media node.
+   */
+  async audioDiag(windowSec = 6): Promise<any> {
+    const room = this.room();
+    if (!room) { console.warn('[diag] not connected to a call'); return; }
+
+    const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
+    const micTrack: any = micPub?.audioTrack;
+    const dfn = {
+      processorAttached: !!this.dfnProc,
+      processorName: micTrack?.getProcessor?.()?.name ?? null,   // expect 'deepfilternet3-noise-filter'
+      enabled: this.dfnEnabled,
+      attenuation: this.dfnAtten,
+      makeupGain: this.dfnEffNorm,
+      gate: this.dfnGateOn ? `${this.dfnGateDb} dBFS` : 'off',
+      micSampleRate: micTrack?.mediaStreamTrack?.getSettings?.()?.sampleRate ?? '?',
+    };
+
+    const readAudio = async (track: any) => {
+      const out: any = { inbound: null, pair: null, cands: {} };
+      const rep: RTCStatsReport | undefined = await track?.getRTCStatsReport?.();
+      rep?.forEach((s: any) => {
+        if (s.type === 'inbound-rtp' && s.kind === 'audio') out.inbound = s;
+        if (s.type === 'candidate-pair' && (s.nominated || s.state === 'succeeded')) out.pair = s;
+        if (s.type === 'local-candidate' || s.type === 'remote-candidate') out.cands[s.id] = s;
+      });
+      return out;
+    };
+
+    const remoteAudio = this.returnRemoteParticipantTrack()
+      .filter(t => t.trackPublication.kind === 'audio')
+      .map(t => ({ id: t.participantName, track: (t.trackPublication as any).audioTrack }));
+
+    const snap = async () => ({
+      t: performance.now(),
+      remotes: await Promise.all(remoteAudio.map(async r => ({ id: r.id, ...(await readAudio(r.track)) }))),
+    });
+
+    // Local uplink (publisher transport) — works even solo: candidate pair + outbound + SFU-reported uplink RTT/loss
+    const readLocal = async () => {
+      const out: any = { outbound: null, remoteInbound: null, pair: null, cands: {} };
+      const rep: RTCStatsReport | undefined = await micTrack?.getRTCStatsReport?.();
+      rep?.forEach((s: any) => {
+        if (s.type === 'outbound-rtp' && s.kind === 'audio') out.outbound = s;
+        if (s.type === 'remote-inbound-rtp' && s.kind === 'audio') out.remoteInbound = s;
+        if (s.type === 'candidate-pair' && (s.nominated || s.state === 'succeeded')) out.pair = s;
+        if (s.type === 'local-candidate' || s.type === 'remote-candidate') out.cands[s.id] = s;
+      });
+      return out;
+    };
+
+    const la = await readLocal();
+    const a = await snap();
+    await new Promise(r => setTimeout(r, windowSec * 1000));
+    const b = await snap();
+    const lb = await readLocal();
+    const dt = (b.t - a.t) / 1000;
+
+    const pairType = (s: any) => {
+      if (!s?.pair) return 'unknown (no nominated pair)';
+      const lc = s.cands[s.pair.localCandidateId];
+      const rc = s.cands[s.pair.remoteCandidateId];
+      return `${lc?.candidateType ?? '?'} ↔ ${rc?.candidateType ?? '?'}`;
+    };
+
+    const uplink = {
+      'pair (uplink)': pairType(lb),
+      'rtt ms': lb.remoteInbound?.roundTripTime != null ? (lb.remoteInbound.roundTripTime * 1000).toFixed(0) : '?',
+      'uplink loss %': lb.remoteInbound?.fractionLost != null ? (lb.remoteInbound.fractionLost * 100).toFixed(2) : '?',
+      'uplink jitter ms': lb.remoteInbound?.jitter != null ? (lb.remoteInbound.jitter * 1000).toFixed(1) : '?',
+      'nacks': (lb.outbound?.nackCount ?? 0) - (la.outbound?.nackCount ?? 0),
+      'pkts sent': (lb.outbound?.packetsSent ?? 0) - (la.outbound?.packetsSent ?? 0),
+      'dtx active': lb.outbound?.packetsSent != null && la.outbound?.packetsSent != null
+        ? (((lb.outbound.packetsSent - la.outbound.packetsSent) / dt) < 40 ? 'YES (silence-gated)' : 'no (~50pps)') : '?',
+    };
+
+    const rows: any[] = [];
+    b.remotes.forEach((rb: any, idx: number) => {
+      const i1 = rb.inbound, i0 = a.remotes[idx]?.inbound;
+      if (!i1) return;
+      const recvd = (i1.packetsReceived ?? 0) - (i0?.packetsReceived ?? 0);
+      const lost  = (i1.packetsLost ?? 0) - (i0?.packetsLost ?? 0);
+      const concealed = (i1.concealedSamples ?? 0) - (i0?.concealedSamples ?? 0);
+      const lossPct = (recvd + lost) > 0 ? (100 * lost / (recvd + lost)) : 0;
+      const concealMsPerS = (concealed / 48000) * 1000 / dt;
+      rows.push({
+        stream: `remote:${rb.id}`,
+        'loss %': lossPct.toFixed(2),
+        'jitter ms': ((i1.jitter ?? 0) * 1000).toFixed(1),
+        'conceal ms/s': concealMsPerS.toFixed(1),
+        'pair': pairType(rb),
+      });
+    });
+
+    console.log('%c[diag] DFN status', 'font-weight:bold;color:#4caf50', dfn);
+    console.log('%c[diag] UPLINK (this mic → SFU) — works solo', 'font-weight:bold;color:#2196f3');
+    console.table([uplink]);
+    console.log('%c[diag] DOWNLINK (remote talkers → you) — needs a second participant speaking', 'font-weight:bold;color:#ff9800');
+    console.table(rows.length ? rows : [{ note: 'no remote audio streams — join a 2nd participant to measure downlink breakup' }]);
+    console.log(`[diag] window ${dt.toFixed(1)}s · GOOD: conceal <15 ms/s, loss <1%, jitter <30 ms, rtt <120 ms, pair host/srflx (NOT relay)`);
+    console.log('[diag] BAD breakup: conceal >50 ms/s, loss >2%, rtt >250 ms, or pair contains "relay"');
+    return { dfn, uplink, downlink: rows };
   }
 
   /**
