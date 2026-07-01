@@ -312,6 +312,13 @@ export class WatiRecordComponent implements OnInit {
         if (!matchesText) return false;
       }
 
+      // Category filter
+      if (filterObj.categoryFilter) {
+        if (data.watiCategory !== filterObj.categoryFilter) {
+          return false;
+        }
+      }
+
       // Profile filter - check if autocomplete profile is selected
       if (filterObj.profileFilter && typeof filterObj.profileFilter === 'object') {
         const selectedProfileId = filterObj.profileFilter.id;
@@ -435,7 +442,8 @@ export class WatiRecordComponent implements OnInit {
     this.filterForm.patchValue({
       searchText: '',
       profileFilter: '',
-      searchByPerson: ''
+      searchByPerson: '',
+      categoryFilter: ''
     });
     this.applyFilters();
   }

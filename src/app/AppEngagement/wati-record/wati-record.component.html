@@ -267,7 +267,9 @@
         <div class="participants-list">
           <div *ngFor="let participant of filteredParticipants" class="participant-item">
             <div class="participant-info">
-              <a class="participant-name" (click)="openWatiInbox(selectedRecord())">{{ mapProfile[participant.name]['name'] }}</a>
+              <a class="participant-name" (click)="openWatiInbox(selectedRecord())">
+                {{ mapProfile[participant.name]?.['name'] || 'Unknown' }}
+              </a>
               <span class="participant-phone">{{ participant.phone }}</span>
             </div>
             <mat-chip [class]="getParticipantStatus(participant.phone)" class="status-chip-small">
