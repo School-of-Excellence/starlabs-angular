@@ -181,6 +181,15 @@
           </ng-template>
         </section>
 
+        <!-- Unassigned — no coach; tap to open the assign-coach view -->
+        <section class="ios-card is-tappable" role="button" tabindex="0"
+                 (click)="goToUnassigned()" (keydown.enter)="goToUnassigned()">
+          <div class="ios-card-head"><span class="ios-card-title tint-slate">Unassigned</span></div>
+          <div class="ios-bignum sm">{{ unassignedCount }}<span class="unit">no coach</span></div>
+          <p class="ios-empty" *ngIf="unassignedCount === 0">Everyone has a coach.</p>
+          <p class="ios-empty" *ngIf="unassignedCount > 0">Tap to assign a coach.</p>
+        </section>
+
         <!-- Coach-set health distribution (across the current scope's loaded rows) -->
         <section class="ios-card span-2 health-card" *ngIf="healthDistribution() as hd">
           <div class="ios-card-head"><span class="ios-card-title tint-indigo">Coach-set health</span></div>
@@ -578,6 +587,12 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
             <span class="row-actions" (click)="$event.stopPropagation()">
+              <button mat-icon-button (click)="markAddressed(r, !isAddressed(r))"
+                      *ngIf="r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0 || isAddressed(r)"
+                      [class.is-addressed]="isAddressed(r)"
+                      [matTooltip]="isAddressed(r) ? 'Addressed — click to re-open' : 'Mark addressed (clears Needs Attention until a new issue)'">
+                <mat-icon>{{ isAddressed(r) ? 'task_alt' : 'radio_button_unchecked' }}</mat-icon>
+              </button>
               <button mat-icon-button [matMenuTriggerFor]="assignMenu" matTooltip="Assign coach">
                 <mat-icon>person_add</mat-icon>
               </button>

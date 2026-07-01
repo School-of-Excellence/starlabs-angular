@@ -88,6 +88,11 @@ export interface SlideoverData {
   onToggleFlag: (note: string) => void;
   // assign / reassign (coachId) or unassign (null) the participant's coach.
   onAssignCoach: (coachIdOrNull: string | null) => void;
+  // current addressed state + whether the participant has any active Needs-Attention issue, and the
+  // mark/re-open callback (dashboard snapshots the active issues and writes the 'addressed' event).
+  addressed: boolean;
+  needsAttention: boolean;
+  onMarkAddressed: (next: boolean) => void;
 }
 
 interface TicketItem { subject: string; status: string; category: string; date: Date | null; }
@@ -136,6 +141,13 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           </div>
         </div>
         <div class="so-head-actions">
+          <button class="so-flag-btn" type="button" *ngIf="data.needsAttention || addressedLocal"
+                  [class.is-addressed]="addressedLocal" [attr.aria-pressed]="addressedLocal"
+                  aria-label="Mark addressed" (click)="toggleAddressed()"
+                  [matTooltip]="addressedLocal ? 'Addressed — click to re-open' : 'Mark addressed (clears Needs Attention until a new issue)'">
+            <mat-icon>{{ addressedLocal ? 'task_alt' : 'radio_button_unchecked' }}</mat-icon>
+            <span>{{ addressedLocal ? 'Addressed' : 'Mark addressed' }}</span>
+          </button>
           <button class="so-flag-btn" type="button" [class.is-flagged]="row.flagged"
                   [attr.aria-pressed]="row.flagged" aria-label="Flag participant" (click)="toggleFlag()">
             <mat-icon>{{ row.flagged ? 'flag' : 'outlined_flag' }}</mat-icon>
@@ -975,6 +987,15 @@ export class ParticipantSlideoverComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: SlideoverData,
   ) {
     this.row = data.row;
+    this.addressedLocal = data.addressed;
+  }
+
+  // local mirror of the addressed state so the button reflects the toggle immediately
+  addressedLocal = false;
+  /** Mark this participant addressed (or re-open). Delegates the write to the dashboard. */
+  toggleAddressed(): void {
+    this.addressedLocal = !this.addressedLocal;
+    this.data.onMarkAddressed(this.addressedLocal);
   }
 
   ngOnInit(): void {
