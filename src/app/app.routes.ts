@@ -299,6 +299,9 @@ export const routes: Routes = [
   // OpenVidu
   {path: 'monitorliveassignment', loadComponent: () => import('./OpenVidu/monitor-liveassignment/monitor-liveassignment.component').then(m => m.MonitorLiveassignmentComponent), canActivate: [authGuard]},
   {path: 'joinroom/:roomid', loadComponent: () => import('./OpenVidu/join-openvidu-call/join-openvidu-call.component').then(m => m.JoinOpenviduCallComponent), canActivate: [authGuard]},
+
+  // LiveKit (new call flow with DeepFilterNet3 client-side noise suppression)
+  {path: 'joinlivekit/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},
   {path: 'participantstudio', loadComponent: () => import('./OpenVidu/list-openvidu-room/list-openvidu-room.component').then(m => m.ListOpenviduRoomComponent), canActivate: [authGuard]},
   {path: 'openvidurecordings', loadComponent: () => import('./OpenVidu/openvidu-recording/openvidu-recording.component').then(m => m.OpenviduRecordingComponent), canActivate: [authGuard]},
 
