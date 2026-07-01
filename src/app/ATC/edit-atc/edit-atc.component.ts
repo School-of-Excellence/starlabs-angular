@@ -536,17 +536,14 @@ export class EditAtcComponent {
     this.loading = false
     var draftATC = []
     const atcid = this.reportATC.atcData["atcid"];
-    if (navigator.onLine) {
-      await getDoc(doc(this.firestoreATC, "temporary_edit_ATC", atcid)).then(snap => {
-        if (snap.exists() && snap.data()["delete"] != true) {
-          draftATC = [snap]
-        }
-      })
+    // local-first: a BOUNDED server read, then the local cache — show the picker if either holds a live draft
+    const remote = await this.draftService.fetchRemote(this.firestoreATC, "temporary_edit_ATC", atcid);
+    if (remote && remote["delete"] != true) {
+      draftATC = [{ id: atcid, data: () => remote, ref: { path: `temporary_edit_ATC/${atcid}` }, source: 'server' }];
     } else {
-      // offline: read the edit-draft from our local cache (Firestore persistence cache is gone)
       const local = await this.draftService.loadLocal('temporary_edit_ATC', atcid);
       if (local && local["delete"] != true) {
-        draftATC = [{ id: atcid, data: () => local, ref: { path: `temporary_edit_ATC/${atcid}` } }];
+        draftATC = [{ id: atcid, data: () => local, ref: { path: `temporary_edit_ATC/${atcid}` }, source: 'local' }];
       }
     }
     if (draftATC.length != 0) {
@@ -565,35 +562,14 @@ export class EditAtcComponent {
         if (selectedATC != null) {
           var atc = selectedATC
           if (atc["type"] == "draft") {
-            // reconcile the server draft with this device's local cache (true divergence → user picks; loser archived)
-            var value: any;
-            if (navigator.onLine) {
-              value = await this.draftService.reconcileOnOpen(this.firestoreATC, 'temporary_edit_ATC', atcid, atc["doc"].data(), (mine, theirs) => this.openConflictDialog(mine, theirs))
-            } else {
-              value = (await this.draftService.loadLocal('temporary_edit_ATC', atcid)) ?? atc["doc"].data()
-            }
-            this.reportATC.bigactivity = value["bigactivity"] ?? {}
-            this.selectedAdditionalActivity = value["otheractivity"] ?? []
-            this.reportATC.directive = value["directive"] ?? null
-            this.reportATC.transcription = value["transcript"] ?? []
-            this.updatedAdjustment = value["updatedadjustment"] ?? []
-            this.newTranscription = value["newtranscript"] ?? []
-            this.editNotes.consultationsummary = value["consultationsummary"] ?? null
-            this.editNotes.consultationpoint = value["consultationpoint"] ?? null
-            this.editNotes.notes = value["notes"] ?? null
-            this.editNotes.notesedited = value["notesedited"] ?? false
-            // this.editNotes.mentoringnote = value["mentornotes"] ?? null
+            // local-first open: render whatever we have without blocking; reconcile against a bounded server fetch
+            // (clean → adopt; local-ahead → keep local; divergence → user picks, loser archived). Falls back to local.
+            const value = (await this.draftService.openDraft(this.firestoreATC, 'temporary_edit_ATC', atcid, (mine, theirs) => this.openConflictDialog(mine, theirs))) ?? atc["doc"].data()
+            this.applyDraftValue(value)
             // re-attach any media captured offline during a previous edit session
             const pendingMedia = await this.mediaCache.listByDraft(this.reportATC.atcData["atcid"]);
             this.reattachPendingMedia(pendingMedia);
-            this.draftStatus = {
-              message: "ATC Draft Imported Successfully.",
-              code: 1
-            }
-            if (value["lastupdated"]) {
-              // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
-              this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
-            }
+            this.draftStatus = { message: "ATC Draft Imported Successfully.", code: 1 }
           }
         }
       })
@@ -644,6 +620,11 @@ export class EditAtcComponent {
         const res = await this.draftService.sync(this.firestoreATC, 'temporary_edit_ATC', this.reportATC.atcData["atcid"]);
         this.draftStatus = this.draftService.statusFor(res.outcome);
         this.lastDraftSavedOn = new Date()
+
+        // divergence detected (also covers reconnect, which re-runs autosave): surface it now, never clobber
+        if (res.outcome === 'conflict') {
+          await this.reconcileOpenDraft();
+        }
       }
     } catch (error) {
       console.log(error)
@@ -654,11 +635,57 @@ export class EditAtcComponent {
     }
   }
 
+  // guards re-entrancy while a conflict dialog is open (so autosave doesn't open a second dialog or loop)
+  private resolvingConflict = false;
+
+  // map an edit-draft document (server, local, or a conflict winner) onto the form. Reused on open AND after a resolve.
+  private applyDraftValue(value: any) {
+    this.reportATC.bigactivity = value["bigactivity"] ?? {}
+    this.selectedAdditionalActivity = value["otheractivity"] ?? []
+    this.reportATC.directive = value["directive"] ?? null
+    this.reportATC.transcription = value["transcript"] ?? []
+    this.updatedAdjustment = value["updatedadjustment"] ?? []
+    this.newTranscription = value["newtranscript"] ?? []
+    this.editNotes.consultationsummary = value["consultationsummary"] ?? null
+    this.editNotes.consultationpoint = value["consultationpoint"] ?? null
+    this.editNotes.notes = value["notes"] ?? null
+    this.editNotes.notesedited = value["notesedited"] ?? false
+    if (value["lastupdated"]) {
+      // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
+      this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
+    }
+  }
+
+  // reconcile the CURRENTLY-OPEN edit-draft against the server (fired when autosave/reconnect detects a 'conflict'):
+  // re-fetch (bounded), let the user pick on a true divergence, then re-hydrate the winner. Re-entrancy-guarded.
+  private async reconcileOpenDraft() {
+    const atcid = this.reportATC.atcData["atcid"];
+    if (atcid == null || this.resolvingConflict) return;
+    this.resolvingConflict = true;
+    try {
+      const value = await this.draftService.openDraft(this.firestoreATC, 'temporary_edit_ATC', atcid, (mine, theirs) => this.openConflictDialog(mine, theirs));
+      if (value) {
+        this.applyDraftValue(value);
+        const pendingMedia = await this.mediaCache.listByDraft(atcid);
+        this.reattachPendingMedia(pendingMedia);
+      }
+    } finally {
+      this.resolvingConflict = false;
+    }
+  }
+
   // ask the user which version to keep when the same edit-draft diverged across two devices (default to this
   // device's copy if dismissed — the rejected side is archived by ATCDraftService either way, nothing is lost)
   private openConflictDialog(mine: any, theirs: any): Promise<'mine' | 'theirs'> {
+    // build the name lookups the dialog needs from the lists the parent already loaded (offline-safe, no reads):
+    // recommended_to → procedure_recommend (recommendlist snapshots), assigned agents → profile paths (author/mentor)
+    const recommendMap: Record<string, string> = {};
+    (this.recommendlist ?? []).forEach((r: any) => { const p = r?.ref?.path; if (p) recommendMap[p] = r.data()?.['name']; });
+    const agentMap: Record<string, string> = {};
+    [...(this.authorList ?? []), ...(this.mentorList ?? [])].forEach((s: any) => { if (s?.authorpath) agentMap[s.authorpath] = s.authorname; });
     const ref = this.dialog.open(DraftConflictDialogComponent, {
-      data: { mine, theirs }, autoFocus: false, disableClose: true, maxWidth: '680px'
+      data: { mine, theirs, recommendMap, agentMap, procedureMap: this.procedureMap },
+      autoFocus: false, disableClose: true, width: '90vw', maxWidth: '960px'
     });
     return ref.afterClosed().toPromise().then(choice => (choice === 'theirs' ? 'theirs' : 'mine'));
   }

@@ -63,10 +63,24 @@ export class AtcOptionComponent {
     }
   }
 
+  // lastupdated can be a Firestore Timestamp (server) OR a JS Date (local cache) — normalise to a Date for display
+  draftDate(atc: any): Date | null {
+    const v = atc?.data?.()?.["lastupdated"];
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000);
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // where this draft came from, for the badge: the unsynced copy on this device vs the synced server copy
+  isLocalDraft(atc: any): boolean { return atc?.source === 'local'; }
+
   close(){
     this.ngZone.run(() => {
       this.dialogRef.close(null);
-    });  
+    });
     // this.dialogRef.close(null)
   }
 }

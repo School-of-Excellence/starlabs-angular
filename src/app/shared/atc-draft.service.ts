@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Firestore, doc, getDoc, setDoc, updateDoc, runTransaction, serverTimestamp } from '@angular/fire/firestore';
+import { Firestore, doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, serverTimestamp } from '@angular/fire/firestore';
 import {
   CachedDraft, SyncOutcome, draftKey, nextRev, computeDirty, decideSync, decideOpen, pickWinner
 } from './atc-draft.logic';
@@ -7,6 +7,7 @@ import {
 const DB_NAME = 'atc_draft_cache';   // our OWN IndexedDB — independent of (and replacing) Firestore's persistence cache
 const STORE = 'drafts';
 const DEVICE_KEY = 'atc_device_id';
+const FS_TIMEOUT_MS = 7000;          // bound every Firestore RPC so a hung / SW-corrupted call can't freeze the UI
 
 // caller picks which side of a conflict to keep; the other is archived, never destroyed
 export type ConflictPicker = (mine: any, theirs: any) => Promise<'mine' | 'theirs'>;
@@ -84,7 +85,7 @@ export class ATCDraftService {
     const r: { outcome: SyncOutcome; committedRev: number; remote?: any } = { outcome: 'unchanged', committedRev: 0 };
 
     try {
-      await runTransaction(firestore, async (tx) => {
+      await this.withTimeout(runTransaction(firestore, async (tx) => {
         const snap = await tx.get(ref);
         const remoteRev = snap.exists() ? (snap.data()['rev'] ?? 0) : null;
         r.outcome = decideSync({ baseRev: cached.baseRev, dirty: cached.dirty }, remoteRev, true);
@@ -94,11 +95,12 @@ export class ATCDraftService {
         } else if (r.outcome === 'took-remote' || r.outcome === 'conflict') {
           r.remote = snap.data();
         }
-      });
+      }));
     } catch (e) {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) return { outcome: 'pending-local' };
-      console.warn('ATCDraft: sync transaction failed', e);
-      return { outcome: 'error' };
+      // offline, unreachable, or a hung/timed-out RPC: the edit is already safe in IndexedDB → keep it and retry.
+      // (This is the timeout we lost with FirestoreRecoveryService — a bad connection must never freeze "Saving…".)
+      console.warn('ATCDraft: sync could not reach the server (kept on this device)', e);
+      return { outcome: cached.dirty ? 'pending-local' : 'unchanged' };
     }
 
     // post-commit local bookkeeping (outside the transaction). The server write already succeeded, so a local
@@ -113,6 +115,37 @@ export class ATCDraftService {
       console.warn('ATCDraft: post-sync local bookkeeping failed (will reconcile on next sync)', e);
     }
     return { outcome: r.outcome, remote: r.remote };
+  }
+
+  /**
+   * Local-first OPEN: never blocks on the network. Renders whatever we have, then refines against the server.
+   *  1. read the local copy,
+   *  2. try a BOUNDED server fetch (timeout) — if the server is unreachable (offline / SW-broken / slow),
+   *     return the local copy immediately and sync later,
+   *  3. if the server answered, reconcile by `rev` (clean → adopt; local-ahead → keep local; divergence →
+   *     pick + archive). Returns the value to hydrate the form, or null if nothing is available yet.
+   */
+  async openDraft(firestore: Firestore, collection: string, docId: string, pick: ConflictPicker): Promise<any | null> {
+    const local = await this.get(draftKey(collection, docId));
+    let remote: any = null;
+    try {
+      const snap = await this.withTimeout(getDoc(doc(firestore, collection, docId)));
+      remote = snap.exists() ? snap.data() : null;
+    } catch (e) {
+      // server unreachable → never block; show the local copy and let reconnect reconcile later
+      console.warn('ATCDraft: server unreachable on open — using local copy', e);
+      return local?.working ?? null;
+    }
+    if (remote == null) return local?.working ?? null;     // server has no doc yet; keep local
+    return await this.reconcileOnOpen(firestore, collection, docId, remote, pick);
+  }
+
+  /** Bounded single-doc server read; returns the data, or null if it doesn't exist OR the server is unreachable. */
+  async fetchRemote(firestore: Firestore, collection: string, docId: string): Promise<any | null> {
+    try {
+      const snap = await this.withTimeout(getDoc(doc(firestore, collection, docId)));
+      return snap.exists() ? snap.data() : null;
+    } catch { return null; }
   }
 
   /**
@@ -139,9 +172,9 @@ export class ATCDraftService {
     const choice = await pick(cached!.working, remote);
     const { winner, loser } = pickWinner(choice, cached!.working, remote);
     try {
-      await this.archiveLoser(firestore, collection, docId, remoteRev, loser);
+      await this.withTimeout(this.archiveLoser(firestore, collection, docId, remoteRev, loser));
       const rev = nextRev(remoteRev);
-      await setDoc(doc(firestore, collection, docId), this.toServer(winner, rev));
+      await this.withTimeout(setDoc(doc(firestore, collection, docId), this.toServer(winner, rev)));
       await this.setBaseExact(collection, docId, winner, rev);
     } catch (e) {
       // if we couldn't persist the resolution (e.g. dropped offline mid-pick), keep local intact for next time
@@ -157,6 +190,30 @@ export class ATCDraftService {
     return all
       .filter(c => c.collection === collection && !c.pendingDelete && predicate(c.working))
       .map(c => ({ id: c.docId, data: () => c.working, ref: { path: `${collection}/${c.docId}` } }));
+  }
+
+  /**
+   * Draft list for the picker: a BOUNDED server query merged with local-only / unsynced drafts, so a draft
+   * saved offline that never reached the server is still selectable. Falls back to local-only if the server
+   * is unreachable. `serverQuery` is the Firestore Query the caller already built (with its where-clauses).
+   */
+  async listDrafts(collection: string, serverQuery: any, predicate: (data: any) => boolean): Promise<any[]> {
+    let serverDocs: any[] | null = null;
+    try {
+      serverDocs = (await this.withTimeout(getDocs(serverQuery))).docs;
+    } catch (e) {
+      console.warn('ATCDraft: draft-list server query failed — using local cache', e);
+      serverDocs = null;
+    }
+    const localDocs = await this.listLocalDocs(collection, predicate);
+    if (serverDocs == null) {
+      return localDocs.map(l => ({ ...l, source: 'local' }));        // server unreachable → local only
+    }
+    const serverIds = new Set(serverDocs.map((d: any) => d.id));
+    // wrap server snapshots in the same shape as local shims + tag the origin so the picker can label each draft
+    const serverWrapped = serverDocs.map((d: any) => ({ id: d.id, data: () => d.data(), ref: d.ref, source: 'server' }));
+    const localOnly = localDocs.filter(l => !serverIds.has(l.id)).map(l => ({ ...l, source: 'local' })); // unsynced, not on server
+    return [...serverWrapped, ...localOnly];
   }
 
   /** Read the local working copy of a single draft (used for offline open). */
@@ -209,11 +266,11 @@ export class ATCDraftService {
       case 'took-remote':
         return { message: 'Loaded the latest version saved on another device.', code: 1 };
       case 'conflict':
-        return { message: 'This draft was also edited on another device — your changes are kept safe here. Reopen the draft to choose which version to keep.', code: -1 };
+        return { message: 'Also edited on another device — tap Retry to save.', code: -1 };
       case 'pending-local':
         return { message: 'Saved on this device — will sync automatically.', code: 1 };
       default:
-        return { message: 'Could not save the draft just now — your changes are kept on this device and will retry.', code: -1 };
+        return { message: 'Couldn\'t save — kept on this device. Tap Retry.', code: -1 };
     }
   }
 
@@ -274,6 +331,14 @@ export class ATCDraftService {
 
   private clone<T>(v: T): T {
     try { return structuredClone(v); } catch { return JSON.parse(JSON.stringify(v ?? null)); }
+  }
+
+  // bound a Firestore promise so a hung/SW-corrupted RPC rejects fast instead of hanging the draft path forever
+  private withTimeout<T>(p: Promise<T>, ms = FS_TIMEOUT_MS): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const id = setTimeout(() => reject(new Error('firestore-timeout')), ms);
+      p.then(v => { clearTimeout(id); resolve(v); }, e => { clearTimeout(id); reject(e); });
+    });
   }
 
   // ---- internal: IndexedDB (mirrors MediaCacheService style) -----------------------------------
