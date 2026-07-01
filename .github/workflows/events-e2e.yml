@@ -52,3 +52,5 @@ jobs:
       only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || '' }}
       evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}
     secrets: inherit
+
+# Re-trigger: hub fix 6323c45 (EVT-15/16 pickQueueOption poll) is on systems-emulator; re-run gate.
