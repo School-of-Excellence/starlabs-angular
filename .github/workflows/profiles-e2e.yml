@@ -44,7 +44,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'run-e2e')
     uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@systems-emulator
     with:
-      cf_branch: development
+      cf_branch: cicd-modes-emulator-fix              # CF feature branch with the participant-metadata CF fixes (profiledata/productsdata_to_pmd). Flip to `development` once the CF team merges cicd-modes-emulator-fix there.
       e2e_ref: systems-emulator                      # VALIDATION PIN — flip to `main` after the hub merge
       firebase_project: starlabs-cicd                # MUST match the app's projectId or auth silently fails
       config: playwright.profiles.emulator.evidence.config.ts  # EVIDENCE variant: screenshot+trace per test → browsable report
