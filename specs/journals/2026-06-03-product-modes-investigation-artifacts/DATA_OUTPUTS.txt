@@ -1,0 +1,172 @@
+==== modes_intent_probe.js — modes catalog (info/intent) + product day-knobs ====
+=== modes catalog — full INFO (intent), sorted by sequence ===
+
+[seq 0] Big Mode
+   info: If you are in this mode, it means you are developing the superior capabilities of the world leaders to create a big impact in this world starting with your own family.
+
+[seq 1] Installation Event Mode
+   info: If you are in this mode, it is a vibe, it's an arena for heightened unconscious assimilation. Enjoy have fun and let the artistry flow into multi fold.  
+
+[seq 2] Event Mode
+   info: If you are this mode, you will be shown all the event updates real time, your queue position, your stages in the queue, and action steps.
+
+[seq 3] Integration Mode
+   info: If you are in this mode, it means that you have experienced installations and now it's the time for all the changes to integrate in to all the aspects of your life. 
+
+[seq 4] Priority Mode
+   info: If you are in this mode, it means that there is a priority product that has been initiated for you. Book your slots and plan your sessions ahead.
+
+[seq 5] Preparation Mode
+   info: If you are in this mode, it means you have confirmed your participation in an upcoming event. Immerse in the resources that prepares you for the next league of your life. 
+
+[seq 6] Performance Mode
+   info: If you are in this mode, it is time for you to perform and revert your directives set to accomplish integrated life outcomes.
+
+[seq 7] Journey Priority Planning Mode
+   info: (none)
+
+[seq 8] Extended Performance Mode
+   info: (none)
+
+[seq 9] Early Preparation Mode
+   info: (none)
+
+[seq 10] Journey Planning Mode
+   info: If you are in this mode, it means that you have a product in your journey that is ready to be consumed. Please get in touch with your journey coach to get started.
+
+[seq 11] Exploration Mode
+   info: If you are in this mode,it means that you have freedom to explore allthe range of services that are available for you and choose the one that would change your life trajectory. 
+
+[seq 12] After Extended Performance Mode
+   info: (none)
+
+[seq 13] Snooze Mode
+   info: (none)
+
+[seq 14] Investment Mode
+   info: (none)
+
+
+=== product day-duration fields (the pacing knobs), by mode ===
+  duration field names found: delaydays, extendedperformancedays, performancedays, integrationdays, diagnosticswithin4days
+  Installation Event Mode (n=26) sample: delaydays=0  extendedperformancedays=30  performancedays=60  integrationdays=45  diagnosticswithin4days=undefined
+  Big Mode (n=24) sample: delaydays=null  extendedperformancedays=30  performancedays=60  integrationdays=30  diagnosticswithin4days=undefined
+  Priority Mode (n=33) sample: delaydays=45  extendedperformancedays=1  performancedays=1  integrationdays=1  diagnosticswithin4days=undefined
+  Event Mode (n=20) sample: delaydays=null  extendedperformancedays=30  performancedays=60  integrationdays=30  diagnosticswithin4days=undefined
+  Investment Mode (n=1) sample: delaydays=1  extendedperformancedays=30  performancedays=60  integrationdays=30  diagnosticswithin4days=undefined
+
+DONE
+
+==== modes_probe3.js — modeflow templates (A→B) ====
+products with modeflow: 99
+
+Q1  modeflow[0] == products.mode : 64/99
+   mismatch: mode="Priority Mode" head="Integration Mode"
+   mismatch: mode="Priority Mode" head="Integration Mode"
+   mismatch: mode="Priority Mode" head="Integration Mode"
+   mismatch: mode="Priority Mode" head="Integration Mode"
+   mismatch: mode="Priority Mode" head="Integration Mode"
+
+Q2  distinct FULL modeflow patterns: 21
+   (26x) modes={Priority Mode}  :: Integration Mode > Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > After Extended Performance Mode
+   (17x) modes={Big Mode}  :: Big Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > After Extended Performance Mode
+   (15x) modes={Installation Event Mode, Big Mode}  :: Installation Event Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > After Extended Performance Mode
+   (15x) modes={Event Mode}  :: Event Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > After Extended Performance Mode
+   (4x) modes={Priority Mode}  :: Integration Mode > Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Exploration Mode > After Extended Performance Mode
+   (4x) modes={Installation Event Mode}  :: Installation Event Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode
+   (3x) modes={Installation Event Mode}  :: Installation Event Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode > Snooze Mode > Investment Mode
+   (2x) modes={Big Mode}  :: Big Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode > Snooze Mode > Investment Mode
+   (1x) modes={Event Mode}  :: Event Mode > Integration Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode > Snooze Mode > Investment Mode
+   (1x) modes={Event Mode}  :: Event Mode > Integration Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode
+   (1x) modes={Installation Event Mode}  :: Installation Event Mode > Integration Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode
+   (1x) modes={Priority Mode}  :: Integration Mode > Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > After Extended Performance Mode
+   (1x) modes={Priority Mode}  :: Integration Mode > Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode
+   (1x) modes={Installation Event Mode}  :: Installation Event Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode > Investment Mode
+   (1x) modes={Installation Event Mode}  :: Installation Event Mode > Event Mode > Integration Mode > Preparation Mode > Performance Mode > Early Preparation Mode > Journey Planning Mode > After Extended Performance Mode
+   (1x) modes={Event Mode}  :: Event Mode > Integration Mode > Preparation Mode > Performance Mode > Early Preparation Mode > Journey Planning Mode
+   (1x) modes={Investment Mode}  :: Installation Event Mode > Event Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Snooze Mode > Investment Mode
+   (1x) modes={Installation Event Mode}  :: Installation Event Mode > Integration Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode > Snooze Mode > Investment Mode
+   (1x) modes={Priority Mode}  :: Integration Mode > Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early Preparation Mode > Exploration Mode > After Extended Performance Mode > Snooze Mode > Investment Mode
+   (1x) modes={Installation Event Mode}  :: Installation Event Mode
+   (1x) modes={Big Mode}  :: Big Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Planning Mode > Exploration Mode > After Extended Performance Mode
+
+Q3  distinct TAIL (modeflow[1:]) patterns: 15
+   (47x) heads={Installation Event Mode, Big Mode, Event Mode}  :: Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Pl
+   (26x) heads={Integration Mode}  :: Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early
+   (5x) heads={Installation Event Mode, Big Mode}  :: Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Pl
+   (5x) heads={Big Mode, Installation Event Mode}  :: Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Pl
+   (4x) heads={Integration Mode}  :: Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early
+   (2x) heads={Event Mode, Installation Event Mode}  :: Integration Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Ea
+   (2x) heads={Event Mode, Installation Event Mode}  :: Integration Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Ea
+   (1x) heads={Integration Mode}  :: Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early
+   (1x) heads={Integration Mode}  :: Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early
+   (1x) heads={Installation Event Mode}  :: Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Early Preparation Mode > Journey Pl
+   (1x) heads={Installation Event Mode}  :: Event Mode > Integration Mode > Preparation Mode > Performance Mode > Early Preparation Mode > Journey Planning Mode > A
+   (1x) heads={Event Mode}  :: Integration Mode > Preparation Mode > Performance Mode > Early Preparation Mode > Journey Planning Mode
+   (1x) heads={Installation Event Mode}  :: Event Mode > Integration Mode > Preparation Mode > Performance Mode > Extended Performance Mode > Snooze Mode > Investme
+   (1x) heads={Integration Mode}  :: Priority Mode > Preparation Mode > Performance Mode > Journey Priority Planning Mode > Extended Performance Mode > Early
+   (1x) heads={Installation Event Mode}  :: 
+
+Q4  per delivery mode (A) -> # distinct modeflow patterns:
+   Installation Event Mode: 8 distinct pattern(s) across products
+   Big Mode: 4 distinct pattern(s) across products
+   Priority Mode: 5 distinct pattern(s) across products
+   Event Mode: 4 distinct pattern(s) across products
+   Investment Mode: 1 distinct pattern(s) across products
+
+DONE
+
+==== queue_mode_probe.js — delivery mechanism by product mode ====
+queue_token total: 7224 | no productref: 0
+queue tokens by PRODUCT MODE:
+   7125  Event Mode
+     93  Big Mode
+      5  Priority Mode
+      1  Installation Event Mode
+
+appointments by product mode (sample 2000):
+   1505  Priority Mode
+    483  (no productid)
+      7  Event Mode
+      5  Installation Event Mode
+
+DONE
+
+==== checklist_probe.js — participant mode checklist shape ====
+
+## "participant mode checklist"  count=27496
+   [00AOxgiLRM2ujhTcCLwn] {mode:"Extended Performance Mode", aelid:"vS5F5ssmCOtmSBrAzoGl", createddate:ts, docid:"00AOxgiLRM2ujhTcCLwn", profileid:"KLtbEjejhBcbIYf9ncIT", participantproductid:"cHZ6MZVsVoSX4oNerTGe", productref:ref, widget:array[3]}
+   [00CQ1i6ss5lAuMNHRWOW] {mode:"Integration Mode", aelid:null, createddate:ts, docid:"00CQ1i6ss5lAuMNHRWOW", profileid:"it6SkI1goKwcgqsqDyxy", participantproductid:"1ZR6X6yFB1ilAI146R9C", productref:ref, widget:array[4]}
+   [00CVTuagkpmiNn4mZAA5] {createddate:ts, participantproductid:"2I16eVeekz8QqJcW5xmA", aelid:null, mode:"Journey Planning Mode", profileid:"zTU2PPGiDzzXXMaY8TZK", docid:"00CVTuagkpmiNn4mZAA5", productref:ref, widget:array[3]}
+
+## "participant mode"  count=0
+
+## "mode checklist"  count=0
+
+## "participantmodechecklist"  count=0
+
+==== delivery_probe.js — deliverytype/deliveryplanning ====
+=== products.deliverytype: (none):84  :18  [object Object]:2
+=== products.deliveryplanning: normal:70  priority:34
+
+=== cross-tab  mode | deliveryplanning | deliverytype  (count) ===
+   32  Priority Mode | plan=priority | type=-
+   26  Installation Event Mode | plan=normal | type=-
+   24  Big Mode | plan=normal | type=-
+   18  Event Mode | plan=normal | type=
+    2  Event Mode | plan=priority | type=[object Object]
+    1  Investment Mode | plan=normal | type=-
+    1  Priority Mode | plan=normal | type=-
+
+=== productToDeliverySequence: deliverytype values + sequence content ===
+  deliveryoptions.deliverytype: Set 1:20  Version 1:13  Offline:7  Winning Heart:2  Online:2  Review:2  Appointment Based:2  Version 2:2  Arena:2  Set 2:2  Latest:2  online:2  Version 1 (May 2023):1  Scope Enhancement Workshop:1  Scope Enhancement Workshop (Field Work):1  Version 1 (Apr 2022):1  Version 1 (Jan 2023):1  hhly:1  BiG:1  A&H Installation Concert:1  Leadership Training for A&H Team:1  Leadership Training for A&H Team 2:1  CTD Review:1  Queue Based:1  Set:1  Appointment version_2:1  Live Workshop:1  Sales Accelerator:1  B!G Accelerator:1  Version 1 (March 2023):1  Studio:1  BiG Arena:1  B!G Studio:1  Queue based:1  New Stuido:1  Filed work:1  B!G Installation Apprentice:1  Set 1 (Mumbai May 2023):1  Set 2 (Delhi May 2023):1  Set 3 (Chennai May 2023):1  Set 4 (Urgent Consultation):1  Prep:1  Conversational Programming Live Masterclass:1  Expanding Horizon Consultation:1  A&H Expanding Horizon Part 2:1  Appointment:1  Complimetary Review with A&H:1  Legacy Accelerator event:1  set 3:1  Set 4:1  Set 5:1  Set 6:1  Mum May '23 (Cat 1):1  Mum May '23 (Cat 2):1  Mum May '23 (Cat 3):1  Mum May '23 (Cat 4):1  Mum May '23 (Cat 5):1  Mum May '23 (Cat 6):1  A&H Vitality Booster:1  Evolution Prep:1  Urgent Consultation(Queue):1  Events:1  Queue:1  Mini uP!:1  Expanding Horizon Implementation:1  Accelerator:1  Version 2 (July 2023):1  Version 3 (March 2024):1  Feb 2025:1  Mega Consultation:1  B!G Readiness Masterclass - Event:1  Mini uP! - B!G Accelerator:1  Live Workshop for B!G Participants:1  (none):1
+  product=uP! Live Readiness mode=Installation Event Mode deliverytype="Version 1 (May 2023)" seq[0]={activity:ref, description:null, label:null}
+  product=Scope Enhancement Workshop mode=Big Mode deliverytype="Scope Enhancement Workshop" seq[0]={description:"", activity:ref, label:""}
+  product=Become Installation Genius (BiG) Advanced mode=Big Mode deliverytype="Version 1 (Apr 2022)" seq[0]={activity:ref, description:"", label:""}
+
+=== queue generation: does it reference products/modes? (sample keys) ===
+  [0McTJFfjLZW6Tc3X0cGc] arenaeventidlist=array[2]
+  [12sDrzNScSnpNoeXjkbZ] arenaeventidlist=array[0]
+  [1vlcaZU8rYvfLZs4hZ6u] arenaeventidlist=array[2]
+
+DONE

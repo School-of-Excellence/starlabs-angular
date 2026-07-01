@@ -95,7 +95,12 @@
             <div class="highlight-card-single" *ngIf="!isImageHighlight(highlight)">
               <div class="card-index-large">{{getInitials(mapProfile[highlight?.profileid])}}</div>
               <div class="card-content-large">
-                <div class="profile-name-large">{{ mapProfile[highlight?.profileid] || 'Anonymous' }}</div>
+                <div class="profile-name-large">
+                  <span style="display:inline-flex;align-items:center;gap:6px;">
+                    <app-profile-picture [profileId]="highlight?.profileid" [name]="mapProfile[highlight?.profileid]" [size]="28"></app-profile-picture>
+                    <span>{{ mapProfile[highlight?.profileid] || 'Anonymous' }}</span>
+                  </span>
+                </div>
                 <div class="transcribe-text-large">{{ highlight?.transcribe || 'No transcription available' }}</div>
               </div>
             </div>
@@ -173,7 +178,12 @@
                [class.top-3]="i === 2"
                [style.--item-index]="i">
             <div class="changework-rank">{{ i + 1 }}</div>
-            <div class="changework-name">{{ mapProfile[item.doerid] }}</div>
+            <div class="changework-name">
+              <span style="display:inline-flex;align-items:center;gap:6px;">
+                <app-profile-picture [profileId]="item.doerid" [name]="mapProfile[item.doerid]" [size]="28"></app-profile-picture>
+                <span>{{ mapProfile[item.doerid] }}</span>
+              </span>
+            </div>
             <div class="changework-score">{{ item.count }}</div>
           </div>
           <div class="leaderboard-empty" *ngIf="doerCompletedCount.length === 0">
@@ -202,7 +212,12 @@
                [class.top-3]="i === 2"
                [style.--item-index]="i">
             <div class="changework-rank">{{ i + 1 }}</div>
-            <div class="changework-name">{{ mapProfile[item.doerid] }}</div>
+            <div class="changework-name">
+              <span style="display:inline-flex;align-items:center;gap:6px;">
+                <app-profile-picture [profileId]="item.doerid" [name]="mapProfile[item.doerid]" [size]="28"></app-profile-picture>
+                <span>{{ mapProfile[item.doerid] }}</span>
+              </span>
+            </div>
             <div class="changework-score eiy-score">{{ item.eiy | number:'1.0-0' }} Yrs</div>
           </div>
           <div class="leaderboard-empty" *ngIf="doerEIYCount.length === 0">

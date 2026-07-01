@@ -23,7 +23,12 @@
       <!-- Name -->
       <ng-container matColumnDef="profileid">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-        <td mat-cell *matCellDef="let row">{{mapProfile[row["profileid"]]}}</td>
+        <td mat-cell *matCellDef="let row">
+          <span style="display:inline-flex;align-items:center;gap:6px;">
+            <app-profile-picture [profileId]="row['profileid']" [name]="mapProfile[row['profileid']]" [size]="32"></app-profile-picture>
+            <span>{{mapProfile[row["profileid"]]}}</span>
+          </span>
+        </td>
       </ng-container>
 
       <!-- Date -->

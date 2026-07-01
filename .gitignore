@@ -5,6 +5,8 @@
 /tmp
 /out-tsc
 /bazel-out
+/specs
+/graphify-out
 
 # Node
 /node_modules
@@ -48,4 +50,24 @@ ticket-management/
 src/environments
 src/firebase-messaging-sw.js
 
+# E2E workspace (injected at test time — the Playwright hub resolves the app; never commit these)
+/e2e
+/starlabs-cloud-function
+/firebase.emulator.json
+
 .claude
+
+# Service-account keys / secrets — NEVER commit (migrated from starlabs-cicd)
+*firebase-adminsdk*.json
+*-sa.json
+serviceAccount*.json
+*service-account*.json
+**/*.secret.local
+
+# Emulator / build artifacts
+/dist-emulator
+.angular/
+firebase-debug.log
+firestore-debug.log
+# Local Claude instructions (not shared; shared CLAUDE.md stays tracked)
+CLAUDE.local.md

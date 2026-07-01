@@ -1,0 +1,2941 @@
+{
+  "doc": "JOURNEY-LIFECYCLE",
+  "provenance": "READ-ONLY production probes (fir-sample-aae4a), 2026-06-02. Regenerate: specs/evidence/probe_*.js then split_evidence.js. ATC denylist enforced.",
+  "now": "2026-06-02",
+  "note": "10 anonymised end-to-end participant timelines (purchased≠delivered) in specs/evidence/journey_evidence_final.json.",
+  "schema": {
+    "participantjourneyproduct": {
+      "collection": "participantjourneyproduct",
+      "count": 5141,
+      "sampled": 100,
+      "sampleDocIds": [
+        "004TUonLCmBir4Aod3b5",
+        "00Aiq4OUe3IJGK7rD0qq",
+        "00jjNIZdBTvYOmLPEjou"
+      ],
+      "tsField": "updated",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "participantproducts": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "productref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "purchaseref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "subscriptionend": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "subscriptionstart": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "journeystatus": {
+          "fillPct": 94,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 94,
+            "null": 6
+          }
+        },
+        "journeyref": {
+          "fillPct": 92,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 92,
+            "null": 8
+          }
+        },
+        "orientationstatus": {
+          "fillPct": 62,
+          "presentPct": 62,
+          "type": "string",
+          "types": {
+            "string": 62
+          }
+        },
+        "generalnotes": {
+          "fillPct": 61,
+          "presentPct": 61,
+          "type": "array",
+          "types": {
+            "array": 61
+          }
+        },
+        "salesperson": {
+          "fillPct": 59,
+          "presentPct": 59,
+          "type": "string",
+          "types": {
+            "string": 59
+          }
+        },
+        "onboarded": {
+          "fillPct": 59,
+          "presentPct": 59,
+          "type": "boolean",
+          "types": {
+            "boolean": 59
+          }
+        },
+        "purchasedate": {
+          "fillPct": 58,
+          "presentPct": 59,
+          "type": "ts",
+          "types": {
+            "ts": 58,
+            "null": 1
+          }
+        },
+        "salesleadsref": {
+          "fillPct": 58,
+          "presentPct": 59,
+          "type": "ref",
+          "types": {
+            "ref": 58,
+            "null": 1
+          }
+        },
+        "onboardedby": {
+          "fillPct": 49,
+          "presentPct": 49,
+          "type": "array",
+          "types": {
+            "array": 49
+          }
+        },
+        "journeytype": {
+          "fillPct": 44,
+          "presentPct": 44,
+          "type": "string",
+          "types": {
+            "string": 44
+          }
+        },
+        "paymentplan": {
+          "fillPct": 39,
+          "presentPct": 98,
+          "type": "null",
+          "types": {
+            "null": 59,
+            "string": 39
+          }
+        },
+        "salenotes": {
+          "fillPct": 38,
+          "presentPct": 38,
+          "type": "string",
+          "types": {
+            "string": 38
+          }
+        },
+        "opportunities": {
+          "fillPct": 29,
+          "presentPct": 29,
+          "type": "array",
+          "types": {
+            "array": 29
+          }
+        },
+        "onboardingreportlog": {
+          "fillPct": 29,
+          "presentPct": 29,
+          "type": "array",
+          "types": {
+            "array": 29
+          }
+        },
+        "paymentplanassureddate": {
+          "fillPct": 27,
+          "presentPct": 35,
+          "type": "ts",
+          "types": {
+            "ts": 27,
+            "null": 8
+          }
+        },
+        "updated": {
+          "fillPct": 26,
+          "presentPct": 26,
+          "type": "ts",
+          "types": {
+            "ts": 26
+          }
+        },
+        "onboardedtime": {
+          "fillPct": 24,
+          "presentPct": 27,
+          "type": "ts",
+          "types": {
+            "ts": 24,
+            "null": 3
+          }
+        },
+        "appointmentid": {
+          "fillPct": 16,
+          "presentPct": 19,
+          "type": "string",
+          "types": {
+            "string": 16,
+            "null": 3
+          }
+        },
+        "onboardingscheduled": {
+          "fillPct": 14,
+          "presentPct": 19,
+          "type": "ts",
+          "types": {
+            "ts": 14,
+            "null": 5
+          }
+        },
+        "referral": {
+          "fillPct": 14,
+          "presentPct": 14,
+          "type": "string",
+          "types": {
+            "string": 14
+          }
+        },
+        "extendreason": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        },
+        "opportunities_consumed": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "array",
+          "types": {
+            "array": 8
+          }
+        },
+        "socialcommit": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "string",
+          "types": {
+            "string": 7
+          }
+        },
+        "paymentmadeby": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "string",
+          "types": {
+            "string": 7
+          }
+        },
+        "minimumpayment": {
+          "fillPct": 7,
+          "presentPct": 7,
+          "type": "number",
+          "types": {
+            "number": 7
+          }
+        },
+        "onreschedule": {
+          "fillPct": 5,
+          "presentPct": 5,
+          "type": "boolean",
+          "types": {
+            "boolean": 5
+          }
+        },
+        "onboardingreport": {
+          "fillPct": 4,
+          "presentPct": 29,
+          "type": "null",
+          "types": {
+            "null": 25,
+            "string": 4
+          }
+        },
+        "salesnote": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "emailsent": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "boolean",
+          "types": {
+            "boolean": 2
+          }
+        },
+        "participantsproducts": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "salesleadref": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        },
+        "presalesperson": {
+          "fillPct": 0,
+          "presentPct": 40,
+          "type": "null",
+          "types": {
+            "null": 40
+          }
+        }
+      },
+      "fieldCount": 39,
+      "lastWrite": "2025-03-20",
+      "writes90d": 0,
+      "writes365d": 0
+    },
+    "participantsproduct": {
+      "collection": "participantsproduct",
+      "count": 38503,
+      "sampled": 100,
+      "sampleDocIds": [
+        "003wu9TWgUZLCYRyXfvM",
+        "006aMmbWQCBJo2BkcJ3X",
+        "00LfaFARYagmj1ggVOhb"
+      ],
+      "tsField": "subscriptionstart",
+      "fields": {
+        "subscriptionstart": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "sequenceorder": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "minimumpayment": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "string": 45,
+            "number": 55
+          }
+        },
+        "packageref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "subscriptionend": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "productref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "deliveryplanning": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "deliverymode": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "unlimited": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "boolean",
+          "types": {
+            "boolean": 99
+          }
+        },
+        "statusdate": {
+          "fillPct": 95,
+          "presentPct": 95,
+          "type": "map",
+          "types": {
+            "map": 95
+          }
+        },
+        "status": {
+          "fillPct": 79,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 79,
+            "null": 21
+          }
+        },
+        "mode": {
+          "fillPct": 64,
+          "presentPct": 97,
+          "type": "string",
+          "types": {
+            "null": 33,
+            "string": 64
+          }
+        },
+        "instantiated": {
+          "fillPct": 60,
+          "presentPct": 60,
+          "type": "string",
+          "types": {
+            "string": 60
+          }
+        },
+        "deliverytype": {
+          "fillPct": 42,
+          "presentPct": 95,
+          "type": "null",
+          "types": {
+            "string": 42,
+            "null": 53
+          }
+        },
+        "eventref": {
+          "fillPct": 41,
+          "presentPct": 41,
+          "type": "ref",
+          "types": {
+            "ref": 41
+          }
+        },
+        "producteligible": {
+          "fillPct": 36,
+          "presentPct": 36,
+          "type": "string",
+          "types": {
+            "string": 36
+          }
+        },
+        "arenaeventid": {
+          "fillPct": 35,
+          "presentPct": 35,
+          "type": "string",
+          "types": {
+            "string": 35
+          }
+        },
+        "eventparticipationid": {
+          "fillPct": 23,
+          "presentPct": 23,
+          "type": "string",
+          "types": {
+            "string": 23
+          }
+        },
+        "previousmode": {
+          "fillPct": 22,
+          "presentPct": 22,
+          "type": "string",
+          "types": {
+            "string": 22
+          }
+        },
+        "queuevariationid": {
+          "fillPct": 18,
+          "presentPct": 24,
+          "type": "string",
+          "types": {
+            "string": 18,
+            "null": 6
+          }
+        },
+        "rsvpref": {
+          "fillPct": 12,
+          "presentPct": 13,
+          "type": "ref",
+          "types": {
+            "ref": 12,
+            "null": 1
+          }
+        },
+        "participantjourneyid": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "string",
+          "types": {
+            "string": 8
+          }
+        },
+        "packagedocref": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "ref",
+          "types": {
+            "ref": 8
+          }
+        },
+        "nextmode": {
+          "fillPct": 7,
+          "presentPct": 82,
+          "type": "null",
+          "types": {
+            "null": 75,
+            "string": 7
+          }
+        },
+        "nextmodedate": {
+          "fillPct": 6,
+          "presentPct": 82,
+          "type": "null",
+          "types": {
+            "null": 76,
+            "ts": 6
+          }
+        },
+        "aelid": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "string",
+          "types": {
+            "string": 4
+          }
+        },
+        "tentativestart": {
+          "fillPct": 2,
+          "presentPct": 98,
+          "type": "null",
+          "types": {
+            "null": 96,
+            "ts": 2
+          }
+        },
+        "journeyref": {
+          "fillPct": 1,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 99,
+            "ref": 1
+          }
+        },
+        "addon": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "requestedslot": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "map",
+          "types": {
+            "map": 1
+          }
+        },
+        "bigmarathonref": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "ref",
+          "types": {
+            "ref": 1
+          }
+        },
+        "eventparticipationrequestref": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "ref",
+          "types": {
+            "ref": 1
+          }
+        },
+        "addontyperef": {
+          "fillPct": 0,
+          "presentPct": 8,
+          "type": "null",
+          "types": {
+            "null": 8
+          }
+        }
+      },
+      "fieldCount": 35,
+      "lastWrite": "2029-07-29",
+      "writes90d": 2189,
+      "writes365d": 10578
+    },
+    "participant metadata": {
+      "collection": "participant metadata",
+      "count": 3312,
+      "sampled": 100,
+      "sampleDocIds": [
+        "023uA43FNuDnIo0NM8wX",
+        "0288ehN1xP1MmTXAoCNs",
+        "03"
+      ],
+      "tsField": "subscriptionstart",
+      "fields": {
+        "profileid": {
+          "fillPct": 88,
+          "presentPct": 88,
+          "type": "string",
+          "types": {
+            "string": 88
+          }
+        },
+        "name": {
+          "fillPct": 88,
+          "presentPct": 88,
+          "type": "string",
+          "types": {
+            "string": 88
+          }
+        },
+        "testuser": {
+          "fillPct": 88,
+          "presentPct": 88,
+          "type": "boolean",
+          "types": {
+            "boolean": 88
+          }
+        },
+        "email": {
+          "fillPct": 88,
+          "presentPct": 88,
+          "type": "string",
+          "types": {
+            "string": 88
+          }
+        },
+        "customerstatus": {
+          "fillPct": 87,
+          "presentPct": 87,
+          "type": "string",
+          "types": {
+            "string": 87
+          }
+        },
+        "phonenumber": {
+          "fillPct": 86,
+          "presentPct": 88,
+          "type": "string",
+          "types": {
+            "string": 86,
+            "null": 2
+          }
+        },
+        "addons": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "consumedproducts": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "gifts": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "financialstatus": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "string",
+          "types": {
+            "string": 85
+          }
+        },
+        "lastpaymentdate": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "ts",
+          "types": {
+            "ts": 85
+          }
+        },
+        "purchase": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "bonus": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "productmode": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "activeproduct": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "unconsumedproducts": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "productcount": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "map",
+          "types": {
+            "map": 85
+          }
+        },
+        "currentjourneyassured": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "boolean",
+          "types": {
+            "boolean": 85
+          }
+        },
+        "previousjourneyassured": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "array",
+          "types": {
+            "array": 85
+          }
+        },
+        "currentemi": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "string",
+          "types": {
+            "string": 85
+          }
+        },
+        "pp_totalpaid": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "number",
+          "types": {
+            "number": 80,
+            "string": 5
+          }
+        },
+        "pp_totalpurchasevalue": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "number",
+          "types": {
+            "number": 80,
+            "string": 5
+          }
+        },
+        "currentjourneyonboarded": {
+          "fillPct": 84,
+          "presentPct": 84,
+          "type": "boolean",
+          "types": {
+            "boolean": 84
+          }
+        },
+        "previousjourneyonboarded": {
+          "fillPct": 84,
+          "presentPct": 84,
+          "type": "array",
+          "types": {
+            "array": 84
+          }
+        },
+        "productevent": {
+          "fillPct": 82,
+          "presentPct": 82,
+          "type": "map",
+          "types": {
+            "map": 82
+          }
+        },
+        "paymentplan": {
+          "fillPct": 78,
+          "presentPct": 85,
+          "type": "string",
+          "types": {
+            "string": 78,
+            "null": 7
+          }
+        },
+        "participantmode": {
+          "fillPct": 77,
+          "presentPct": 96,
+          "type": "string",
+          "types": {
+            "string": 77,
+            "null": 19
+          }
+        },
+        "higherorderpurchase": {
+          "fillPct": 73,
+          "presentPct": 85,
+          "type": "string",
+          "types": {
+            "string": 73,
+            "null": 12
+          }
+        },
+        "customersupporttickets": {
+          "fillPct": 70,
+          "presentPct": 70,
+          "type": "number",
+          "types": {
+            "number": 70
+          }
+        },
+        "customersupport": {
+          "fillPct": 70,
+          "presentPct": 70,
+          "type": "string",
+          "types": {
+            "string": 50,
+            "map": 20
+          }
+        },
+        "tier": {
+          "fillPct": 63,
+          "presentPct": 63,
+          "type": "array",
+          "types": {
+            "array": 63
+          }
+        },
+        "firebaseuserref": {
+          "fillPct": 62,
+          "presentPct": 87,
+          "type": "ref",
+          "types": {
+            "null": 25,
+            "ref": 62
+          }
+        },
+        "profile": {
+          "fillPct": 59,
+          "presentPct": 87,
+          "type": "string",
+          "types": {
+            "null": 28,
+            "string": 59
+          }
+        },
+        "lastsubscriptionstart": {
+          "fillPct": 58,
+          "presentPct": 87,
+          "type": "ts",
+          "types": {
+            "null": 29,
+            "ts": 58
+          }
+        },
+        "lastsubscriptionend": {
+          "fillPct": 58,
+          "presentPct": 87,
+          "type": "ts",
+          "types": {
+            "null": 29,
+            "ts": 58
+          }
+        },
+        "solarvoice": {
+          "fillPct": 57,
+          "presentPct": 57,
+          "type": "map",
+          "types": {
+            "map": 57
+          }
+        },
+        "lasttouchpoint": {
+          "fillPct": 56,
+          "presentPct": 56,
+          "type": "map",
+          "types": {
+            "map": 56
+          }
+        },
+        "evolutionyearwasted": {
+          "fillPct": 53,
+          "presentPct": 66,
+          "type": "number",
+          "types": {
+            "null": 13,
+            "number": 53
+          }
+        },
+        "evolutionyearsaved": {
+          "fillPct": 53,
+          "presentPct": 66,
+          "type": "number",
+          "types": {
+            "null": 13,
+            "number": 53
+          }
+        },
+        "lastcompletedjourney": {
+          "fillPct": 50,
+          "presentPct": 87,
+          "type": "string",
+          "types": {
+            "null": 37,
+            "string": 50
+          }
+        },
+        "lastcompletedjourneyname": {
+          "fillPct": 50,
+          "presentPct": 84,
+          "type": "string",
+          "types": {
+            "null": 34,
+            "string": 50
+          }
+        },
+        "atcmodel": {
+          "fillPct": 49,
+          "presentPct": 49,
+          "type": "array",
+          "types": {
+            "array": 49
+          }
+        },
+        "participantatc": {
+          "fillPct": 49,
+          "presentPct": 49,
+          "type": "array",
+          "types": {
+            "array": 49
+          }
+        },
+        "profiletags": {
+          "fillPct": 42,
+          "presentPct": 42,
+          "type": "array",
+          "types": {
+            "array": 42
+          }
+        },
+        "profileimg": {
+          "fillPct": 42,
+          "presentPct": 87,
+          "type": "null",
+          "types": {
+            "null": 45,
+            "string": 42
+          }
+        },
+        "countrycode": {
+          "fillPct": 40,
+          "presentPct": 77,
+          "type": "string",
+          "types": {
+            "string": 40,
+            "null": 37
+          }
+        },
+        "journeycoachtouchpoint": {
+          "fillPct": 40,
+          "presentPct": 40,
+          "type": "map",
+          "types": {
+            "map": 40
+          }
+        },
+        "extendedlifeimpact": {
+          "fillPct": 40,
+          "presentPct": 40,
+          "type": "number",
+          "types": {
+            "number": 40
+          }
+        },
+        "currentael": {
+          "fillPct": 37,
+          "presentPct": 37,
+          "type": "array",
+          "types": {
+            "array": 37
+          }
+        },
+        "completedael": {
+          "fillPct": 37,
+          "presentPct": 37,
+          "type": "array",
+          "types": {
+            "array": 37
+          }
+        },
+        "atccount": {
+          "fillPct": 36,
+          "presentPct": 49,
+          "type": "number",
+          "types": {
+            "null": 13,
+            "number": 36
+          }
+        },
+        "mapparticipantatc": {
+          "fillPct": 36,
+          "presentPct": 49,
+          "type": "map",
+          "types": {
+            "null": 13,
+            "map": 36
+          }
+        },
+        "dateofbirth": {
+          "fillPct": 35,
+          "presentPct": 88,
+          "type": "null",
+          "types": {
+            "null": 53,
+            "ts": 35
+          }
+        },
+        "totaladjustmentaware": {
+          "fillPct": 33,
+          "presentPct": 66,
+          "type": "null",
+          "types": {
+            "null": 33,
+            "number": 33
+          }
+        },
+        "totaladjustmentunaware": {
+          "fillPct": 33,
+          "presentPct": 66,
+          "type": "null",
+          "types": {
+            "null": 33,
+            "number": 33
+          }
+        },
+        "evolutionprogress": {
+          "fillPct": 33,
+          "presentPct": 66,
+          "type": "null",
+          "types": {
+            "null": 33,
+            "map": 33
+          }
+        },
+        "activejourneyname": {
+          "fillPct": 28,
+          "presentPct": 84,
+          "type": "null",
+          "types": {
+            "string": 28,
+            "null": 56
+          }
+        },
+        "subscriptionend": {
+          "fillPct": 27,
+          "presentPct": 87,
+          "type": "null",
+          "types": {
+            "ts": 27,
+            "null": 60
+          }
+        },
+        "activejourney": {
+          "fillPct": 27,
+          "presentPct": 87,
+          "type": "null",
+          "types": {
+            "string": 27,
+            "null": 60
+          }
+        },
+        "subscriptionstart": {
+          "fillPct": 27,
+          "presentPct": 87,
+          "type": "null",
+          "types": {
+            "ts": 27,
+            "null": 60
+          }
+        },
+        "queueevent": {
+          "fillPct": 26,
+          "presentPct": 26,
+          "type": "map",
+          "types": {
+            "map": 26
+          }
+        },
+        "generalcontent": {
+          "fillPct": 25,
+          "presentPct": 25,
+          "type": "map",
+          "types": {
+            "map": 25
+          }
+        },
+        "purchasedate": {
+          "fillPct": 24,
+          "presentPct": 87,
+          "type": "null",
+          "types": {
+            "ts": 24,
+            "null": 63
+          }
+        },
+        "financedata": {
+          "fillPct": 22,
+          "presentPct": 85,
+          "type": "null",
+          "types": {
+            "null": 63,
+            "map": 22
+          }
+        },
+        "videoasktags": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "array",
+          "types": {
+            "array": 16
+          }
+        },
+        "notes": {
+          "fillPct": 15,
+          "presentPct": 87,
+          "type": "null",
+          "types": {
+            "null": 72,
+            "array": 12,
+            "map": 3
+          }
+        },
+        "eiflix": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "map",
+          "types": {
+            "map": 13
+          }
+        },
+        "minimumpayment": {
+          "fillPct": 10,
+          "presentPct": 10,
+          "type": "number",
+          "types": {
+            "number": 10
+          }
+        },
+        "firstname": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        },
+        "lastname": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        },
+        "lastsubscribedjourney": {
+          "fillPct": 8,
+          "presentPct": 87,
+          "type": "null",
+          "types": {
+            "null": 79,
+            "string": 8
+          }
+        },
+        "generalnotes": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "array",
+          "types": {
+            "array": 8
+          }
+        },
+        "lastsubscribedjourneyname": {
+          "fillPct": 6,
+          "presentPct": 84,
+          "type": "null",
+          "types": {
+            "null": 78,
+            "string": 6
+          }
+        },
+        "studioevents": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "array",
+          "types": {
+            "array": 4
+          }
+        },
+        "totalstudioopportunitiesused": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "number",
+          "types": {
+            "number": 4
+          }
+        },
+        "mapatcmodeltobiglevel": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "map",
+          "types": {
+            "map": 4
+          }
+        },
+        "generalcontentmylist": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "array",
+          "types": {
+            "array": 3
+          }
+        },
+        "eiflixmylist": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "solarvoicemylist": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "array",
+          "types": {
+            "array": 1
+          }
+        },
+        "touchpoints": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "number",
+          "types": {
+            "number": 1
+          }
+        }
+      },
+      "fieldCount": 80,
+      "lastWrite": "2029-07-29",
+      "writes90d": 277,
+      "writes365d": 736
+    },
+    "salesleads": {
+      "collection": "salesleads",
+      "count": 4339,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00QASnjXv6JNKOSJOuGr",
+        "015o4jvx9RRu90jrRUoI",
+        "01mAGZIm9yxU3LlUbyt0"
+      ],
+      "tsField": "date",
+      "fields": {
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "addons": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "bonus": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "journeytype": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "phonenumber": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 89,
+            "number": 11
+          }
+        },
+        "email": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "name": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "firstname": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "profileid": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "installmentamount": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "number",
+          "types": {
+            "number": 99
+          }
+        },
+        "salespersonname": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "edited": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "boolean",
+          "types": {
+            "boolean": 99
+          }
+        },
+        "initialpayment": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "number",
+          "types": {
+            "number": 99
+          }
+        },
+        "totalpurchasevalue": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "number",
+          "types": {
+            "number": 99
+          }
+        },
+        "lastname": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "purchasedate": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "ts",
+          "types": {
+            "ts": 99
+          }
+        },
+        "journeytenure": {
+          "fillPct": 96,
+          "presentPct": 96,
+          "type": "number",
+          "types": {
+            "number": 96
+          }
+        },
+        "journey": {
+          "fillPct": 93,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 93,
+            "null": 7
+          }
+        },
+        "paymentsnapshot": {
+          "fillPct": 88,
+          "presentPct": 90,
+          "type": "array",
+          "types": {
+            "array": 66,
+            "null": 2,
+            "string": 22
+          }
+        },
+        "notes": {
+          "fillPct": 77,
+          "presentPct": 77,
+          "type": "string",
+          "types": {
+            "string": 77
+          }
+        },
+        "installmentsData": {
+          "fillPct": 77,
+          "presentPct": 77,
+          "type": "array",
+          "types": {
+            "array": 77
+          }
+        },
+        "dueday": {
+          "fillPct": 77,
+          "presentPct": 77,
+          "type": "number",
+          "types": {
+            "number": 75,
+            "string": 2
+          }
+        },
+        "installmentstartdate": {
+          "fillPct": 77,
+          "presentPct": 77,
+          "type": "ts",
+          "types": {
+            "ts": 77
+          }
+        },
+        "statusupdateddate": {
+          "fillPct": 70,
+          "presentPct": 70,
+          "type": "ts",
+          "types": {
+            "ts": 70
+          }
+        },
+        "countrycode": {
+          "fillPct": 66,
+          "presentPct": 77,
+          "type": "string",
+          "types": {
+            "string": 66,
+            "null": 11
+          }
+        },
+        "purchaselabel": {
+          "fillPct": 66,
+          "presentPct": 77,
+          "type": "string",
+          "types": {
+            "string": 66,
+            "null": 11
+          }
+        },
+        "originalfee": {
+          "fillPct": 66,
+          "presentPct": 77,
+          "type": "number",
+          "types": {
+            "number": 66,
+            "null": 11
+          }
+        },
+        "initialpaymentapproved": {
+          "fillPct": 64,
+          "presentPct": 64,
+          "type": "boolean",
+          "types": {
+            "boolean": 64
+          }
+        },
+        "watsonparticipantid": {
+          "fillPct": 62,
+          "presentPct": 77,
+          "type": "string",
+          "types": {
+            "string": 62,
+            "null": 15
+          }
+        },
+        "presalespersonname": {
+          "fillPct": 55,
+          "presentPct": 55,
+          "type": "string",
+          "types": {
+            "string": 55
+          }
+        },
+        "paymentid": {
+          "fillPct": 53,
+          "presentPct": 64,
+          "type": "string",
+          "types": {
+            "string": 53,
+            "null": 11
+          }
+        },
+        "firstcalldate": {
+          "fillPct": 48,
+          "presentPct": 61,
+          "type": "ts",
+          "types": {
+            "ts": 33,
+            "string": 15,
+            "null": 13
+          }
+        },
+        "installmentatend": {
+          "fillPct": 48,
+          "presentPct": 77,
+          "type": "boolean",
+          "types": {
+            "boolean": 48,
+            "null": 29
+          }
+        },
+        "watsonpurchaseid": {
+          "fillPct": 47,
+          "presentPct": 62,
+          "type": "string",
+          "types": {
+            "string": 47,
+            "null": 15
+          }
+        },
+        "participantjourneyproductid": {
+          "fillPct": 47,
+          "presentPct": 62,
+          "type": "string",
+          "types": {
+            "string": 47,
+            "null": 15
+          }
+        },
+        "journeyproductpurchaseid": {
+          "fillPct": 47,
+          "presentPct": 62,
+          "type": "string",
+          "types": {
+            "string": 47,
+            "null": 15
+          }
+        },
+        "tds": {
+          "fillPct": 40,
+          "presentPct": 40,
+          "type": "boolean",
+          "types": {
+            "boolean": 40
+          }
+        },
+        "paymentplan": {
+          "fillPct": 40,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "string": 40,
+            "null": 60
+          }
+        },
+        "opportunities_consumed": {
+          "fillPct": 38,
+          "presentPct": 38,
+          "type": "array",
+          "types": {
+            "array": 38
+          }
+        },
+        "referral": {
+          "fillPct": 38,
+          "presentPct": 38,
+          "type": "boolean",
+          "types": {
+            "boolean": 20,
+            "string": 18
+          }
+        },
+        "billingaddress": {
+          "fillPct": 37,
+          "presentPct": 71,
+          "type": "string",
+          "types": {
+            "null": 34,
+            "string": 37
+          }
+        },
+        "gstno": {
+          "fillPct": 37,
+          "presentPct": 71,
+          "type": "string",
+          "types": {
+            "null": 34,
+            "string": 37
+          }
+        },
+        "presalesperson": {
+          "fillPct": 35,
+          "presentPct": 96,
+          "type": "null",
+          "types": {
+            "null": 61,
+            "string": 35
+          }
+        },
+        "enachLink": {
+          "fillPct": 33,
+          "presentPct": 33,
+          "type": "array",
+          "types": {
+            "array": 33
+          }
+        },
+        "paymentplanassureddate": {
+          "fillPct": 31,
+          "presentPct": 41,
+          "type": "ts",
+          "types": {
+            "ts": 31,
+            "null": 10
+          }
+        },
+        "billingemail": {
+          "fillPct": 26,
+          "presentPct": 71,
+          "type": "null",
+          "types": {
+            "null": 45,
+            "string": 26
+          }
+        },
+        "pendingbalanceamount": {
+          "fillPct": 20,
+          "presentPct": 57,
+          "type": "null",
+          "types": {
+            "null": 37,
+            "number": 20
+          }
+        },
+        "cancelled": {
+          "fillPct": 19,
+          "presentPct": 19,
+          "type": "boolean",
+          "types": {
+            "boolean": 19
+          }
+        },
+        "subscriptionfrompurchasedate": {
+          "fillPct": 16,
+          "presentPct": 77,
+          "type": "null",
+          "types": {
+            "null": 61,
+            "boolean": 16
+          }
+        },
+        "upgradetodocid": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "string",
+          "types": {
+            "string": 16
+          }
+        },
+        "carryover": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "boolean",
+          "types": {
+            "boolean": 16
+          }
+        },
+        "previousjourney": {
+          "fillPct": 16,
+          "presentPct": 31,
+          "type": "string",
+          "types": {
+            "string": 16,
+            "null": 15
+          }
+        },
+        "upgradefromdocid": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "string",
+          "types": {
+            "string": 16
+          }
+        },
+        "paymentcommitment": {
+          "fillPct": 16,
+          "presentPct": 18,
+          "type": "string",
+          "types": {
+            "string": 16,
+            "null": 2
+          }
+        },
+        "initialpaymentbalance": {
+          "fillPct": 13,
+          "presentPct": 57,
+          "type": "null",
+          "types": {
+            "null": 44,
+            "number": 13
+          }
+        },
+        "upgradetojourneyproductpurchaseid": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "upgradefromparticipantjourneyproductid": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "upgradetowatsonpurchaseid": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "upgradetoparticipantjourneyproductid": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "upgradefromwatsonpurchaseid": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "upgradefromwatsonparticipantid": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "upgradefromjourneyproductpurchaseid": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "string",
+          "types": {
+            "string": 13
+          }
+        },
+        "oweus": {
+          "fillPct": 13,
+          "presentPct": 13,
+          "type": "number",
+          "types": {
+            "number": 13
+          }
+        },
+        "rejectnotes": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "string",
+          "types": {
+            "string": 12
+          }
+        },
+        "canceldocid": {
+          "fillPct": 11,
+          "presentPct": 11,
+          "type": "string",
+          "types": {
+            "string": 11
+          }
+        },
+        "assuredsalesperson": {
+          "fillPct": 11,
+          "presentPct": 11,
+          "type": "boolean",
+          "types": {
+            "boolean": 11
+          }
+        },
+        "schedulemode": {
+          "fillPct": 11,
+          "presentPct": 11,
+          "type": "boolean",
+          "types": {
+            "boolean": 11
+          }
+        },
+        "downgradetodocid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "downgradetojourneyproductpurchaseid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "downgradefromdocid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "downgradetoparticipantjourneyproductid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "downgradefromwatsonpurchaseid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "downgradefromparticipantjourneyproductid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "downgradetonewpurchase": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "boolean",
+          "types": {
+            "boolean": 2
+          }
+        },
+        "downgradefromjourneyproductpurchaseid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "downgradetowatsonpurchaseid": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "string",
+          "types": {
+            "string": 2
+          }
+        },
+        "billingname": {
+          "fillPct": 0,
+          "presentPct": 40,
+          "type": "null",
+          "types": {
+            "null": 40
+          }
+        },
+        "billingnumber": {
+          "fillPct": 0,
+          "presentPct": 40,
+          "type": "null",
+          "types": {
+            "null": 40
+          }
+        }
+      },
+      "fieldCount": 80,
+      "lastWrite": "2026-06-02",
+      "writes90d": 418,
+      "writes365d": 2032
+    },
+    "journey": {
+      "collection": "journey",
+      "count": 48,
+      "sampled": 48,
+      "sampleDocIds": [
+        "1TgyhjEt97ZIjY1stgBb",
+        "32Azft9A5yyzmgY4f7yu",
+        "5ieaVGJGUMFWCpw0GdCG"
+      ],
+      "tsField": "updatedAt",
+      "fields": {
+        "originalfee": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 48
+          }
+        },
+        "journeyupgrades": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "extras": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 48
+          }
+        },
+        "addonproducts": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 48
+          }
+        },
+        "type": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 48
+          }
+        },
+        "journey": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 48
+          }
+        },
+        "sequence": {
+          "fillPct": 92,
+          "presentPct": 92,
+          "type": "number",
+          "types": {
+            "number": 44
+          }
+        },
+        "updatedAt": {
+          "fillPct": 92,
+          "presentPct": 92,
+          "type": "ts",
+          "types": {
+            "ts": 44
+          }
+        },
+        "atcmodel": {
+          "fillPct": 56,
+          "presentPct": 60,
+          "type": "string",
+          "types": {
+            "string": 27,
+            "null": 2
+          }
+        },
+        "attachments": {
+          "fillPct": 15,
+          "presentPct": 15,
+          "type": "array",
+          "types": {
+            "array": 7
+          }
+        },
+        "continuity": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "playlist": {
+          "fillPct": 0,
+          "presentPct": 38,
+          "type": "null",
+          "types": {
+            "null": 18
+          }
+        }
+      },
+      "fieldCount": 13,
+      "lastWrite": "2026-04-20",
+      "writes90d": 44,
+      "writes365d": 44
+    },
+    "products": {
+      "collection": "products",
+      "count": 104,
+      "sampled": 100,
+      "sampleDocIds": [
+        "0ayiNALL1HDVvCXDHcZ4",
+        "1E1PQ4J9JHgxDyDpUQzQ",
+        "1c6g7jr5T4vNcVBWsFDH"
+      ],
+      "tsField": null,
+      "fields": {
+        "id": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "atcmodel": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "product": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "mode": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "deliveryplanning": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "extendedperformancedays": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "performancedays": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "minimumrequiredamount": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "integrationdays": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "number",
+          "types": {
+            "number": 100
+          }
+        },
+        "originalfee": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "number",
+          "types": {
+            "number": 99
+          }
+        },
+        "type": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 99
+          }
+        },
+        "unlimited": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "boolean",
+          "types": {
+            "boolean": 99
+          }
+        },
+        "modeflow": {
+          "fillPct": 95,
+          "presentPct": 95,
+          "type": "array",
+          "types": {
+            "array": 95
+          }
+        },
+        "delaydays": {
+          "fillPct": 66,
+          "presentPct": 99,
+          "type": "number",
+          "types": {
+            "number": 66,
+            "null": 33
+          }
+        },
+        "directive": {
+          "fillPct": 47,
+          "presentPct": 98,
+          "type": "null",
+          "types": {
+            "null": 51,
+            "string": 42,
+            "array": 5
+          }
+        },
+        "playlist": {
+          "fillPct": 28,
+          "presentPct": 28,
+          "type": "array",
+          "types": {
+            "array": 28
+          }
+        },
+        "selfbooking": {
+          "fillPct": 28,
+          "presentPct": 28,
+          "type": "boolean",
+          "types": {
+            "boolean": 28
+          }
+        },
+        "deliverytype": {
+          "fillPct": 18,
+          "presentPct": 99,
+          "type": "null",
+          "types": {
+            "null": 81,
+            "array": 18
+          }
+        },
+        "count": {
+          "fillPct": 16,
+          "presentPct": 16,
+          "type": "string",
+          "types": {
+            "string": 16
+          }
+        },
+        "image": {
+          "fillPct": 15,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "string": 15,
+            "null": 85
+          }
+        },
+        "attachments": {
+          "fillPct": 8,
+          "presentPct": 8,
+          "type": "array",
+          "types": {
+            "array": 8
+          }
+        },
+        "diagnosticswithin4days": {
+          "fillPct": 3,
+          "presentPct": 3,
+          "type": "boolean",
+          "types": {
+            "boolean": 3
+          }
+        },
+        "checkforqueue": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        },
+        "enablebooking": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "boolean",
+          "types": {
+            "boolean": 1
+          }
+        }
+      },
+      "fieldCount": 24
+    },
+    "package": {
+      "collection": "package",
+      "count": 49,
+      "sampled": 49,
+      "sampleDocIds": [
+        "0BAa2iNaOn6aYnGhVzTE",
+        "3bObji9c0r8QuyspxaoA",
+        "6sS2bi43yB9DZZpUvcwb"
+      ],
+      "tsField": null,
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "package": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 49
+          }
+        },
+        "nonjourney": {
+          "fillPct": 4,
+          "presentPct": 4,
+          "type": "boolean",
+          "types": {
+            "boolean": 2
+          }
+        }
+      },
+      "fieldCount": 3
+    },
+    "journey-to-product": {
+      "collection": "journey-to-product",
+      "count": 41,
+      "sampled": 41,
+      "sampleDocIds": [
+        "0kGTmXtvs9cU8ne6OR6n",
+        "1rsIIoKGeEBE1n01a4qz",
+        "2DLhibS0ZYLWIKP0NlNl"
+      ],
+      "tsField": null,
+      "fields": {
+        "journey": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 41
+          }
+        },
+        "product": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 41
+          }
+        },
+        "journeyrequiredjourneycoach": {
+          "fillPct": 85,
+          "presentPct": 85,
+          "type": "boolean",
+          "types": {
+            "boolean": 35
+          }
+        },
+        "id": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "string",
+          "types": {
+            "string": 5
+          }
+        }
+      },
+      "fieldCount": 4
+    }
+  },
+  "config": {
+    "journey": {
+      "collection": "journey",
+      "count": 48,
+      "sampled": 48,
+      "variantCount": 7,
+      "variants": [
+        {
+          "count": 19,
+          "exampleId": "1TgyhjEt97ZIjY1stgBb",
+          "keys": [
+            "addonproducts",
+            "extras",
+            "id",
+            "journey",
+            "journeyupgrades",
+            "originalfee",
+            "sequence",
+            "type",
+            "updatedAt"
+          ],
+          "shape": "{originalfee:number, journeyupgrades:array[0], extras:array[0], id:str(20), addonproducts:array[0], type:str(3), journey:str(26), sequence:number, updatedAt:ts}"
+        },
+        {
+          "count": 9,
+          "exampleId": "5ieaVGJGUMFWCpw0GdCG",
+          "keys": [
+            "addonproducts",
+            "atcmodel",
+            "extras",
+            "id",
+            "journey",
+            "journeyupgrades",
+            "originalfee",
+            "playlist",
+            "sequence",
+            "type",
+            "updatedAt"
+          ],
+          "shape": "{originalfee:number, journeyupgrades:array[0], journey:str(8), extras:array[0], id:str(20), type:str(10), addonproducts:array[0], atcmodel:str(3), playlist:null, sequence:number, updatedAt:ts}"
+        },
+        {
+          "count": 9,
+          "exampleId": "9e8eryFH3ilV4jITfGUP",
+          "keys": [
+            "addonproducts",
+            "atcmodel",
+            "extras",
+            "id",
+            "journey",
+            "journeyupgrades",
+            "originalfee",
+            "sequence",
+            "type",
+            "updatedAt"
+          ],
+          "shape": "{journeyupgrades:array[0], journey:str(20), extras:array[0], id:str(20), addonproducts:array[0], originalfee:number, atcmodel:null, type:str(3), sequence:number, updatedAt:ts}"
+        },
+        {
+          "count": 6,
+          "exampleId": "DqPYgBq7S4ujRetOQT1b",
+          "keys": [
+            "addonproducts",
+            "atcmodel",
+            "attachments",
+            "extras",
+            "id",
+            "journey",
+            "journeyupgrades",
+            "originalfee",
+            "playlist",
+            "sequence",
+            "type",
+            "updatedAt"
+          ],
+          "shape": "{id:str(20), originalfee:number, journeyupgrades:array[0], extras:array[0], type:str(3), addonproducts:array[0], atcmodel:str(4), playlist:null, sequence:number, updatedAt:ts, attachments:array[0], journey:str(16)}"
+        },
+        {
+          "count": 2,
+          "exampleId": "aDUgJkudKX9I8Rt8iEGi",
+          "keys": [
+            "addonproducts",
+            "atcmodel",
+            "extras",
+            "id",
+            "journey",
+            "journeyupgrades",
+            "originalfee",
+            "type"
+          ],
+          "shape": "{id:str(20), journey:str(14), originalfee:number, extras:array[0], addonproducts:array[0], journeyupgrades:array[0], type:str(10), atcmodel:str(3)}"
+        },
+        {
+          "count": 2,
+          "exampleId": "i0fTjfj5N6v18C0MRCYQ",
+          "keys": [
+            "addonproducts",
+            "atcmodel",
+            "extras",
+            "id",
+            "journey",
+            "journeyupgrades",
+            "originalfee",
+            "playlist",
+            "type"
+          ],
+          "shape": "{id:str(20), journey:str(11), originalfee:number, extras:array[0], addonproducts:array[0], journeyupgrades:array[0], type:str(10), atcmodel:str(7), playlist:null}"
+        }
+      ]
+    },
+    "products": {
+      "collection": "products",
+      "count": 104,
+      "sampled": 104,
+      "variantCount": 13,
+      "variants": [
+        {
+          "count": 56,
+          "exampleId": "1l6fb8vYBfptCMIz2v4E",
+          "keys": [
+            "atcmodel",
+            "delaydays",
+            "deliveryplanning",
+            "deliverytype",
+            "directive",
+            "extendedperformancedays",
+            "id",
+            "image",
+            "integrationdays",
+            "minimumrequiredamount",
+            "mode",
+            "modeflow",
+            "originalfee",
+            "performancedays",
+            "product",
+            "type",
+            "unlimited"
+          ],
+          "shape": "{minimumrequiredamount:str(1), atcmodel:str(3), product:str(28), unlimited:boolean, id:str(20), delaydays:number, mode:str(13), deliveryplanning:str(8), originalfee:number, image:null, deliverytype:null, type:str(10), directive:null, extendedperformancedays:number, performancedays:number, integrationdays:number, modeflow:array[8]<str(16)>}"
+        },
+        {
+          "count": 18,
+          "exampleId": "4wWYSv6CpxtiMfI4McBC",
+          "keys": [
+            "atcmodel",
+            "delaydays",
+            "deliveryplanning",
+            "deliverytype",
+            "directive",
+            "extendedperformancedays",
+            "id",
+            "image",
+            "integrationdays",
+            "minimumrequiredamount",
+            "mode",
+            "modeflow",
+            "originalfee",
+            "performancedays",
+            "playlist",
+            "product",
+            "selfbooking",
+            "type",
+            "unlimited"
+          ],
+          "shape": "{id:str(20), product:str(17), mode:str(13), deliverytype:null, minimumrequiredamount:str(1), unlimited:boolean, integrationdays:number, delaydays:number, image:null, directive:str(33), originalfee:number, deliveryplanning:str(8), performancedays:number, extendedperformancedays:number, type:str(3), modeflow:array[9]<str(16)>, selfbooking:boolean, playlist:array[0], atcmodel:str(17)}"
+        },
+        {
+          "count": 11,
+          "exampleId": "1E1PQ4J9JHgxDyDpUQzQ",
+          "keys": [
+            "atcmodel",
+            "count",
+            "delaydays",
+            "deliveryplanning",
+            "deliverytype",
+            "directive",
+            "extendedperformancedays",
+            "id",
+            "image",
+            "integrationdays",
+            "minimumrequiredamount",
+            "mode",
+            "modeflow",
+            "originalfee",
+            "performancedays",
+            "product",
+            "type",
+            "unlimited"
+          ],
+          "shape": "{product:str(10), count:str(1), minimumrequiredamount:str(1), id:str(20), mode:str(8), deliveryplanning:str(6), originalfee:number, image:null, atcmodel:str(1), unlimited:boolean, deliverytype:null, delaydays:null, type:str(10), directive:null, extendedperformancedays:number, performancedays:number, integrationdays:number, modeflow:array[8]<str(8)>}"
+        },
+        {
+          "count": 5,
+          "exampleId": "2d0yd2DpiqE1ffXIf8kG",
+          "keys": [
+            "atcmodel",
+            "attachments",
+            "delaydays",
+            "deliveryplanning",
+            "deliverytype",
+            "directive",
+            "extendedperformancedays",
+            "id",
+            "image",
+            "integrationdays",
+            "minimumrequiredamount",
+            "mode",
+            "modeflow",
+            "originalfee",
+            "performancedays",
+            "playlist",
+            "product",
+            "selfbooking",
+            "type",
+            "unlimited"
+          ],
+          "shape": "{id:str(20), product:str(19), mode:str(13), deliverytype:null, minimumrequiredamount:str(6), atcmodel:str(12), unlimited:boolean, integrationdays:number, delaydays:number, image:null, directive:null, originalfee:number, deliveryplanning:str(8), extendedperformancedays:number, type:str(3), modeflow:array[9]<str(16)>, selfbooking:boolean, playlist:array[0], performancedays:number, attachments:array[1]<{name:str(26), type:str(15), size:number, uploadedAt:ts, url:str(193)}>}"
+        },
+        {
+          "count": 4,
+          "exampleId": "1c6g7jr5T4vNcVBWsFDH",
+          "keys": [
+            "atcmodel",
+            "delaydays",
+            "deliveryplanning",
+            "deliverytype",
+            "directive",
+            "extendedperformancedays",
+            "id",
+            "image",
+            "integrationdays",
+            "minimumrequiredamount",
+            "mode",
+            "originalfee",
+            "performancedays",
+            "product",
+            "type",
+            "unlimited"
+          ],
+          "shape": "{minimumrequiredamount:str(5), atcmodel:str(3), product:str(29), id:str(20), image:str(165), mode:str(8), deliveryplanning:str(6), originalfee:number, unlimited:boolean, deliverytype:null, delaydays:null, type:str(10), directive:null, extendedperformancedays:number, performancedays:number, integrationdays:number}"
+        },
+        {
+          "count": 2,
+          "exampleId": "AED3TRIhKpyCtIWQvQMc",
+          "keys": [
+            "atcmodel",
+            "count",
+            "delaydays",
+            "deliveryplanning",
+            "deliverytype",
+            "directive",
+            "extendedperformancedays",
+            "id",
+            "image",
+            "integrationdays",
+            "minimumrequiredamount",
+            "mode",
+            "modeflow",
+            "originalfee",
+            "performancedays",
+            "playlist",
+            "product",
+            "selfbooking",
+            "type",
+            "unlimited"
+          ],
+          "shape": "{count:str(1), id:str(20), product:str(34), unlimited:boolean, minimumrequiredamount:str(6), image:null, delaydays:null, mode:str(23), deliveryplanning:str(6), deliverytype:null, directive:null, originalfee:number, type:str(10), modeflow:array[8]<str(23)>, extendedperformancedays:number, performancedays:number, playlist:array[0], selfbooking:boolean, atcmodel:str(3), integrationdays:number}"
+        }
+      ]
+    },
+    "package": {
+      "collection": "package",
+      "count": 49,
+      "sampled": 49,
+      "variantCount": 2,
+      "variants": [
+        {
+          "count": 47,
+          "exampleId": "0BAa2iNaOn6aYnGhVzTE",
+          "keys": [
+            "docid",
+            "package"
+          ],
+          "shape": "{docid:str(20), package:str(13)}"
+        },
+        {
+          "count": 2,
+          "exampleId": "6sS2bi43yB9DZZpUvcwb",
+          "keys": [
+            "docid",
+            "nonjourney",
+            "package"
+          ],
+          "shape": "{package:str(8), docid:str(20), nonjourney:boolean}"
+        }
+      ]
+    },
+    "journey-to-product": {
+      "collection": "journey-to-product",
+      "count": 41,
+      "sampled": 41,
+      "variantCount": 3,
+      "variants": [
+        {
+          "count": 35,
+          "exampleId": "0kGTmXtvs9cU8ne6OR6n",
+          "keys": [
+            "journey",
+            "journeyrequiredjourneycoach",
+            "product"
+          ],
+          "shape": "{journey:ref, product:array[5]<ref>, journeyrequiredjourneycoach:boolean}"
+        },
+        {
+          "count": 5,
+          "exampleId": "8bJpX6nVgUUunPthc4Uz",
+          "keys": [
+            "id",
+            "journey",
+            "product"
+          ],
+          "shape": "{product:array[1]<ref>, journey:ref, id:str(20)}"
+        },
+        {
+          "count": 1,
+          "exampleId": "bMmqOlHTxOVyOBQ1s9p6",
+          "keys": [
+            "journey",
+            "product"
+          ],
+          "shape": "{product:array[1]<ref>, journey:ref}"
+        }
+      ]
+    }
+  },
+  "traces": {
+    "journeyTrace": {
+      "profileid": "mA072qKbzrAthut6CdFV",
+      "journeyCount": 1,
+      "journeys": [
+        {
+          "id": "00Aiq4OUe3IJGK7rD0qq",
+          "journeystatus": "completed",
+          "journeyref": "journey/YYsg9Lux3oaNjEC8jqex",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "onboarded": true,
+          "purchasedate": "2025-03-04 13:56:12",
+          "journeytype": "new"
+        }
+      ],
+      "products": [
+        {
+          "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+          "deliverymode": "Installation Event Mode",
+          "mode": "After Extended Performance Mode",
+          "status": "completed",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": null
+        },
+        {
+          "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+          "deliverymode": "Event Mode",
+          "mode": null,
+          "status": "cancelled",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": "ppDajRs7K5hG51P1bbE6"
+        },
+        {
+          "productref": "products/cpzUxE5I2FRqs3hkgHO2",
+          "deliverymode": "Event Mode",
+          "mode": "After Extended Performance Mode",
+          "status": "completed",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": "8sLSCm6bNBa4QL47Ats5"
+        },
+        {
+          "productref": "products/IWnYE1whSGrjT7duRSv4",
+          "deliverymode": "Event Mode",
+          "mode": "After Extended Performance Mode",
+          "status": "completed",
+          "subscriptionstart": "2018-01-01 00:00:00",
+          "subscriptionend": "2022-07-30 00:00:00",
+          "queuevariationid": null
+        },
+        {
+          "productref": "products/IWnYE1whSGrjT7duRSv4",
+          "deliverymode": "Event Mode",
+          "mode": "After Extended Performance Mode",
+          "status": "completed",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": "5vwCfehSsxNcENmkEM7x"
+        },
+        {
+          "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+          "deliverymode": "Installation Event Mode",
+          "mode": null,
+          "status": "cancelled",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": null
+        },
+        {
+          "productref": "products/IWnYE1whSGrjT7duRSv4",
+          "deliverymode": "Event Mode",
+          "mode": "Event Mode",
+          "status": "ongoing",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": null
+        },
+        {
+          "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+          "deliverymode": "Event Mode",
+          "mode": "After Extended Performance Mode",
+          "status": "completed",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": "rkx1mx2bkzpjHjSKF860"
+        },
+        {
+          "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+          "deliverymode": "Event Mode",
+          "mode": null,
+          "status": "cancelled",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": "gaxV11w9xDmYBhcmSCsc"
+        },
+        {
+          "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+          "deliverymode": "Event Mode",
+          "mode": null,
+          "status": "cancelled",
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": "gaxV11w9xDmYBhcmSCsc"
+        },
+        {
+          "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+          "deliverymode": "Installation Event Mode",
+          "mode": "Journey Planning Mode",
+          "status": null,
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": null
+        },
+        {
+          "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+          "deliverymode": "Installation Event Mode",
+          "mode": "After Extended Performance Mode",
+          "status": "completed",
+          "subscriptionstart": "2018-01-01 00:00:00",
+          "subscriptionend": "2022-07-30 00:00:00",
+          "queuevariationid": null
+        },
+        {
+          "productref": "products/IWnYE1whSGrjT7duRSv4",
+          "deliverymode": "Event Mode",
+          "mode": "Journey Planning Mode",
+          "status": null,
+          "subscriptionstart": "2025-03-04 13:56:12",
+          "subscriptionend": "2027-03-03 18:30:00",
+          "queuevariationid": null
+        },
+        {
+          "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+          "deliverymode": "Event Mode",
+          "mode": "Journey Planning Mode",
+          "status": null,
+          "subscriptionstart": null,
+          "subscriptionend": null,
+          "queuevariationid": null
+        }
+      ],
+      "productCount": 14,
+      "appointmentCount": 0,
+      "appointments": [],
+      "deliverableCount": 9,
+      "deliverableStatuses": {
+        "(blank)": 4,
+        "completed": 4,
+        "ongoing": 1
+      }
+    },
+    "recencyNuance": {
+      "participantjourneyproduct/subscriptionstart/90d": 336,
+      "participantjourneyproduct/purchasedate/90d": 265,
+      "participantjourneyproduct/updated/90d": 0
+    }
+  }
+}

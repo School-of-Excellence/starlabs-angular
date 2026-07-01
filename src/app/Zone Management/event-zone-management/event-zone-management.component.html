@@ -139,12 +139,12 @@
                       <div class="zone-team">
                         <span class="team-label">
                           <strong>Coordinator:&nbsp;</strong>
-                          <span *ngFor="let name of zone['coordinators']; let islast = last">{{mapProfile[name]}}{{!islast ? ", " : ""}}</span>
+                          <span *ngFor="let name of zone['coordinators']; let islast = last"><span style="display:inline-flex;align-items:center;gap:6px;"><app-profile-picture [profileId]="name" [name]="mapProfile[name]" [size]="22"></app-profile-picture><span>{{mapProfile[name]}}</span></span>{{!islast ? ", " : ""}}</span>
                         </span>
                         <br>
                         <span class="team-label">
                           <strong>Mentor:&nbsp;</strong> 
-                          <span *ngFor="let name of zone['mentors']; let islast = last">{{mapProfile[name]}}{{!islast ? ", " : ""}}</span>
+                          <span *ngFor="let name of zone['mentors']; let islast = last"><span style="display:inline-flex;align-items:center;gap:6px;"><app-profile-picture [profileId]="name" [name]="mapProfile[name]" [size]="22"></app-profile-picture><span>{{mapProfile[name]}}</span></span>{{!islast ? ", " : ""}}</span>
                         </span>
                       </div>
                     </div>

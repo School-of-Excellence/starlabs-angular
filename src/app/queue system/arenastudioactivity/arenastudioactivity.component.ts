@@ -16,6 +16,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-arenastudioactivity',
@@ -31,7 +32,8 @@ import { MatChipsModule } from '@angular/material/chips';
     MatCardModule,
     MatIconModule,
     MatTooltipModule,
-    MatChipsModule
+    MatChipsModule,
+    ProfilePictureComponent
   ],
   templateUrl: './arenastudioactivity.component.html',
   styleUrl: './arenastudioactivity.component.css'

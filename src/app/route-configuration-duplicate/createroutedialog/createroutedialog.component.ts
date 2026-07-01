@@ -15,6 +15,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { AuthguardService } from '../../authguard.service';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-createroutedialog',
@@ -32,7 +33,8 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatDivider,
     MatProgressSpinner,
     MatButtonToggleModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    ProfilePictureComponent
   ],
   templateUrl: './createroutedialog.component.html',
   styleUrl: './createroutedialog.component.css'

@@ -1,0 +1,57 @@
+# DATA_OUTPUTS — #4 Dynamic Studio probes (production fir-sample-aae4a, read-only, 2026-06-05)
+
+## studio_discover.js — runtime collections (counts + schema keys)
+
+### "live assignment" — 12790 docs
+   keys: bonusactivity, bonusactivityparticipant, changeworkbrief, created, docid, pairing, participantid, participantsactivity, queueid, signature, stagename, status, studioid, updated, zoomdata, zoomlinkrequired
+
+### "arena participant" — 1239 docs
+   keys: docid, liveassignmentstatus, pairingmode, profileid, queueid, stagerole, status, tentativenextready
+
+### "studioZoomLink" — 0 docs
+   keys: (empty/none)
+
+### "studio" — 0 docs
+   keys: (empty/none)
+
+### "live studio" — 0 docs
+   keys: (empty/none)
+
+### "studio session" — 0 docs
+   keys: (empty/none)
+
+### "queue_token" — 7267 docs
+   keys: arenaid, createdon, currentstage, cwmentoring, cwperson, cwshadowing, denynote, diagnosticmentoring, diagnosticperson, diagnosticshadowing, docid, liveassignmentid, logdate, people_involved, previousstage, productname, productref, profile_id, profile_name, queuename, queueref, quicknotes, readyimplementation, stagestatus, tokennumber, tokenstatus
+
+### "queue stage log" — 69040 docs
+   keys: arenaid, createdAttempt, createdon, currentstage, cwmentoring, cwperson, cwshadowing, deliveryRef, denynote, diagnosticmentoring, diagnosticperson, diagnosticshadowing, docid, formref, liveassignmentid, logdate, logdocid, manuallymoved, movedby, movedthrough, participantproductid, people_involved, previousstage, productname, productref, profile_id, profile_name, queuename, queueposition, queueref, quicknotes, selectedstageslot, stagestatus, status, studioid, tokennumber, tokenstatus, variationid
+
+### "arena event" — 0 docs
+   keys: (empty/none)
+
+### "arena participant log" — 0 docs
+   keys: (empty/none)
+
+## studio_runtime_probe.js — runtime prevalence
+=== live assignment (12790) ===
+ status: {"completed":12780,"live":10}
+ pairing size (specialists/session): {"0":4,"1":10706,"2":1894,"3":139,"4":27,"5":3,"6":17}
+ has zoomdata: 10565 (83%)
+
+=== queue studio pairing (2335) ===
+ openvidu=true: 1 (0%)  -> rest use Zoom
+ participants per studio: {"0":1,"1":1761,"2":528,"3":31,"4":8,"5":2,"6":4}
+
+=== studioinvitation (7464) ===
+ clientresponse: {"(pending/null)":2570,"approved":4249,"denied":645}
+
+=== arena participant (1239) ===
+ pairingmode: {"manual":1238,"(none)":1}
+ has stagerole: 1239 (100%)
+
+=== queue generation (96) video config ===
+ enablezoommeetingsdk=true: 2  | zoomlinkrequired=false: 32
+
+## loveletter_probe.js — engagement collections
+"love letter": 1094 docs | keys: created, docid, interimlogid, loveletter, profileid
+"ask AH": 857 docs | keys: askah, created, docid, installationaskah, interimlogid, profileid

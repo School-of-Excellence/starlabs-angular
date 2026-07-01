@@ -23,10 +23,12 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-profile-summary',
   imports: [
+    ProfilePictureComponent,
     CommonModule,
     MatTableModule,
     MatPaginatorModule,

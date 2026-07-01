@@ -2,11 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import * as XLSX from 'xlsx';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-view-notification-participants',
   imports: [
-    CommonModule
+    CommonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './view-notification-participants.component.html',
   styleUrl: './view-notification-participants.component.css'

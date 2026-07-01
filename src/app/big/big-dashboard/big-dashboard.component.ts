@@ -33,6 +33,7 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import { Storage,ref,uploadBytes,getDownloadURL } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-big-dashboard',
@@ -52,7 +53,8 @@ import { AhNotificationComponent } from '../../Participants Profile Management/p
     MatChipsModule,
     ReactiveFormsModule,
     MatInputModule,
-    MatButtonModule
+    MatButtonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './big-dashboard.component.html',
   styleUrl: './big-dashboard.component.css'

@@ -15,6 +15,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 // import { NewReleaseDialogComponent } from '../../Participants Profile Management/new-profile/new-profile.component';
 
 @Component({
@@ -23,6 +24,7 @@ import { FormsModule } from '@angular/forms';
   styleUrls: ['./eco-system-new.component.css'],
   standalone: true,
   imports: [
+    ProfilePictureComponent,
     NgIf,
     NgFor,
     NgClass,

@@ -232,7 +232,10 @@
                     </ngx-mat-select-search>
                   </mat-option>
                   <mat-option *ngFor="let profile of filteredEventParticipants" [value]="profile['profileid']">
-                    {{mapprofile[profile['profileid']]}}
+                    <span style="display:inline-flex;align-items:center;gap:8px;">
+                      <app-profile-picture [profileId]="profile['profileid']" [name]="mapprofile[profile['profileid']]" [size]="24"></app-profile-picture>
+                      <span>{{mapprofile[profile['profileid']]}}</span>
+                    </span>
                   </mat-option>
                 </mat-select>
               </mat-form-field>
@@ -606,9 +609,12 @@
           <div class="participant-info">
             <div class="participant-header">
               <div class="participant-name">
-                <a [routerLink]="'/userprofile/' + participant.profileid" target="_blank" rel="noopener">
-                  {{participant.name || 'Unknown'}}
-                </a>
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="participant.profileid" [name]="participant.name" [size]="32"></app-profile-picture>
+                  <a [routerLink]="'/userprofile/' + participant.profileid" target="_blank" rel="noopener">
+                    {{participant.name || 'Unknown'}}
+                  </a>
+                </span>
               </div>
               <div class="atc-id" *ngIf="participant.atcid">
                 ATC ID: {{participant.atcid}}
