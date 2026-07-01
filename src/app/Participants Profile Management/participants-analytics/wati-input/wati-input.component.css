@@ -397,3 +397,34 @@
   .schedule-header-left { gap: 10px; }
   .schedule-icon-ring { width: 36px; height: 36px; border-radius: 10px; }
 }
+
+.category-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.category-field { flex: 1; }
+.add-cat-btn { flex-shrink: 0; margin-top: -16px; }
+
+.manage-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+}
+.manage-dialog {
+  background: var(--mat-dialog-background-color, #fff);
+  border-radius: 12px; padding: 24px; min-width: 320px; max-width: 400px;
+}
+.manage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.manage-add-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+.manage-input { flex: 1; }
+.manage-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.manage-empty-state { color: #999; font-size: 13px; }
+.category-tag-card { padding: 16px 20px; }
+.category-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.category-tag-field { flex: 1; max-width: 340px; }

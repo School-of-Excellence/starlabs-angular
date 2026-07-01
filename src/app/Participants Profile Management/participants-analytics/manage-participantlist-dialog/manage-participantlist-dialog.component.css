@@ -1176,33 +1176,33 @@ button mat-icon {
 .conflict-global-banner {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: 12px;
+  padding: 14px 16px;
   background: #fff3e0;
   border: 1px solid #ffb74d;
   border-radius: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .conflict-banner-icon {
   color: #f57c00;
-  font-size: 18px;
-  height: 18px;
-  width: 18px;
+  font-size: 22px;
+  height: 22px;
+  width: 22px;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .conflict-banner-text {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  font-size: 11px;
+  gap: 4px;
+  font-size: 13px;
   color: #5d4037;
 }
 
 .conflict-banner-text strong {
-  font-size: 13px;
+  font-size: 14px;
   color: #e65100;
 }
 
@@ -1382,9 +1382,9 @@ tr.mat-row.has-conflicts:hover {
   background: #fffde7;
   border: 1px solid #ffe082;
   border-radius: 12px;
-  width: min(960px, 92vw);
-  max-width: 92vw;
-  max-height: 88vh;
+  width: 660px;
+  max-width: 95vw;
+  max-height: 70vh;
   overflow-y: auto;
   z-index: 1101;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -1457,34 +1457,6 @@ tr.mat-row.has-conflicts:hover {
   border: 1px solid #f9a825 !important;
   color: #5d4037 !important;
   font-size: 12px !important;
-}
-
-@media (max-width: 640px) {
-  .conflict-dialog-box {
-    width: 96vw;
-    max-width: 96vw;
-    max-height: 90vh;
-    border-radius: 10px;
-  }
-
-  .conflict-dialog-header {
-    padding: 12px 14px;
-  }
-
-  .conflict-dialog-body {
-    padding: 12px 14px;
-  }
-
-  .conflict-dialog-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 12px;
-  }
-
-  .conflict-dialog-person {
-    min-width: 0;
-  }
 }
 
 .conflict-global-banner:hover {

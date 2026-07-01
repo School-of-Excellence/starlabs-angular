@@ -359,6 +359,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   bulkMoveCurrentStageObj: any = null;
   availableStagesForBulkMove: any[] = [];
   bulkMoveResults: { token: any; variationName: string; isDFU: boolean }[] = [];
+  bulkMoveComputedResult: {
+    movable: { token: any; variationName: string; isDFU: boolean }[];
+    skippedDFU: { token: any; variationName: string; isDFU: boolean }[];
+    skippedVariation: { token: any; variationName: string; isDFU: boolean }[];
+  } = { movable: [], skippedDFU: [], skippedVariation: [] };  
   // Stage Activity Panel
   showStageActivityPanel: boolean = false;
   selectedStageForActivity: string = '';
@@ -373,6 +378,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   evolutionMappingLiveFilter: 'all' | 'live' | 'unlive' = 'all';
   evolutionMappingLiveMap: { [profileId: string]: boolean } = {};
   evolutionMappingLiveLoaded: boolean = false;
+  //variation filter
+  selectedVariations: string[] = [];
+  variationDropdownOpen: boolean = false;
 
   // Add this property
   isRoundRobinRunning = false;
@@ -942,6 +950,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.evolutionMappingLiveLoaded = false;
     this.clearSearch();
     this.processTokensIntoStages(this.allTokensData);
+    this.selectedVariations = [];
+    this.variationDropdownOpen = false;
   }
 
   areAllSelected(): boolean {
@@ -1771,6 +1781,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.evolutionMappingLiveFilter = 'all';
     this.evolutionMappingLiveMap = {};
     this.evolutionMappingLiveLoaded = false;
+    this.selectedVariations = [];
+    this.variationDropdownOpen = false;
 
     let count = 0
     this.currentQueueParticipants = [];
@@ -2198,6 +2210,11 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         token => this.getTokenHighlight(token.profile_id) === 'orange'
       );
     }
+    if (this.selectedVariations.length > 0) {
+      filteredTokens = filteredTokens.filter(token =>
+        token.variationid && this.selectedVariations.includes(token.variationid)
+      );
+    }
     if (this.selectedCustomerSupportCategories.length > 0) {
       filteredTokens = filteredTokens.filter(token => {
         const entries = this.customerSupportMap[token.profile_id] || [];
@@ -2206,12 +2223,22 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         );
       });
     }
+    if (this.selectedEventParticipation) {
     if (this.selectedArenaEventId) {
       const profileIds = this.arenaEventProfileMap[this.selectedArenaEventId];
       filteredTokens = filteredTokens.filter(token =>
         profileIds?.has(token.profile_id)
       );
+    } else {
+      const allProfileIds = new Set<string>();
+      Object.values(this.arenaEventProfileMap).forEach(profileSet => {
+        profileSet.forEach(id => allProfileIds.add(id));
+      });
+      filteredTokens = filteredTokens.filter(token =>
+        allProfileIds.has(token.profile_id)
+      );
     }
+  }
 
     if (this.atcFilterActive) {
       if (this.atcFilter === 'validated') {
@@ -5207,6 +5234,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     if (this.atcFilterActive) count++;
     if (this.noAtcFilterActive) count++;
     count += this.selectedCustomerSupportCategories.length;
+    count += this.selectedVariations.length;
     if (this.selectedArenaEventId) count++;
     if (this.evolutionMappingLiveFilter !== 'all') count++;
     return count;
@@ -5287,6 +5315,20 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.selectedCustomerSupportCategories.push(category);
     }
     this.processTokensIntoStages(this.allTokensData);
+  }
+
+  toggleVariationSelection(variationId: string) {
+    const index = this.selectedVariations.indexOf(variationId);
+    if (index > -1) {
+      this.selectedVariations.splice(index, 1);
+    } else {
+      this.selectedVariations.push(variationId);
+    }
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
+  getVariationName(variationId: string): string {
+    return this.mapVariation[variationId]?.variationname || variationId;
   }
 
   getArenaEventName(docid: string): string {
@@ -6057,32 +6099,75 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       isDFU: this.getTokenHighlight(token.profile_id) === 'orange'
     }));
 
-    this.checkAvailablestages(selected[0], sourceStage.stagename, sourceStage.type);
+    const addedStages = new Set<string>();
+    const allStageOptions: any[] = [];
 
-    const stageListPerToken = selected.map(token =>
-      token.variationid && this.mapVariation[token.variationid]
-        ? (this.mapVariation[token.variationid]['stages'] as string[]) ?? []
-        : (this.selectedQueue?.stages as string[]) ?? []
-    );
+    this.selectedQueue.stages.forEach((stage: string) => {
+      const matchingColumns = this.stageQueue.filter(qs => qs.stagename === stage);
 
-    this.availableStagesForBulkMove = this.availableStages.filter(stage => {
-      const typeMatch = stage.stagename.match(/^(.*?)\s*\((.*?)\)$/);
-      const baseName = typeMatch ? typeMatch[1].trim() : stage.stagename;
-      const stageType = typeMatch ? typeMatch[2]?.trim() : null;
-
-      if (stageType === 'Activity') return false;
-
-      return stageListPerToken.every(list => list.includes(baseName));
+      if (matchingColumns.length > 1) {
+        matchingColumns
+          .filter(col => col.type && col.type !== 'Activity')
+          .forEach(col => {
+            const stageOption = `${stage} (${col.type})`;
+            if (!addedStages.has(stageOption)) {
+              allStageOptions.push({ stagename: stageOption, markascompleted: false });
+              addedStages.add(stageOption);
+            }
+          });
+      } else {
+        if (!addedStages.has(stage)) {
+          allStageOptions.push({ stagename: stage, markascompleted: false });
+          addedStages.add(stage);
+        }
+      }
     });
 
+    this.availableStagesForBulkMove = allStageOptions;
+
+    this.bulkMoveComputedResult = { movable: [], skippedDFU: [], skippedVariation: [] };
     this.showBulkMovePanel = true;
   }
+
+  onBulkTargetStageChange(targetStageName: string) {
+    if (!targetStageName) {
+      this.bulkMoveComputedResult = { movable: [], skippedDFU: [], skippedVariation: [] };
+      return;
+    }
+
+    const typeMatch = targetStageName.match(/^(.*?)\s*\((.*?)\)$/);
+    const baseName = typeMatch ? typeMatch[1].trim() : targetStageName;
+
+    const movable: { token: any; variationName: string; isDFU: boolean }[] = [];
+    const skippedDFU: { token: any; variationName: string; isDFU: boolean }[] = [];
+    const skippedVariation: { token: any; variationName: string; isDFU: boolean }[] = [];
+
+    for (const r of this.bulkMoveResults) {
+      if (r.isDFU) {
+        skippedDFU.push(r);
+        continue;
+      }
+
+      const stageList: string[] = r.token.variationid && this.mapVariation[r.token.variationid]
+        ? (this.mapVariation[r.token.variationid]['stages'] as string[]) ?? []
+        : (this.selectedQueue?.stages as string[]) ?? [];
+
+      if (!stageList.includes(baseName)) {
+        skippedVariation.push(r);
+      } else {
+        movable.push(r);
+      }
+    }
+
+    this.bulkMoveComputedResult = { movable, skippedDFU, skippedVariation };
+  }
+
 
   async executeBulkMove(): Promise<void> {
     const target = this.availableStagesForBulkMove.find(s => s.stagename === this.bulkMoveTargetStageKey);
     if (!target) return;
 
-    const tokensToMove = this.bulkMoveResults.filter(r => !r.isDFU).map(r => r.token);
+    const tokensToMove = this.bulkMoveComputedResult.movable.map(r => r.token);
     if (!tokensToMove.length) return;
 
     const fromStageName = this.bulkMoveCurrentStageObj.stagename;
@@ -6115,13 +6200,13 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.bulkMoveCompleted = true;
   }
 
-  get bulkMovableCount(): number {
-    return this.bulkMoveResults.filter(r => !r.isDFU).length;
-  }
+    get bulkMovableCount(): number {
+      return this.bulkMoveComputedResult.movable.length;
+    }
 
-  get bulkDFUCount(): number {
-    return this.bulkMoveResults.filter(r => r.isDFU).length;
-  }
+    get bulkDFUCount(): number {
+      return this.bulkMoveComputedResult.skippedDFU.length;
+    }
 
   closeBulkMovePanel(): void {
     if (this.bulkMoveInProgress) return;
@@ -6137,7 +6222,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.bulkMoveTargetStageKey = '';
     this.bulkMoveCurrentStageObj = null;
     this.availableStagesForBulkMove = [];
-    this.bulkMoveResults = [];
+    this.bulkMoveResults = [];  
+    this.bulkMoveComputedResult = { movable: [], skippedDFU: [], skippedVariation: [] };
   }
 
   async fetchStageActivity() {
