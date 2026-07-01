@@ -1,19 +1,19 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-06-21 (dynamic-studio-v2 stageTokenList leak + name flicker fix)_ · **New session? Read `specs/ORIENTATION.md` first**, then this + today's journal `specs/journals/2026-06-21-dynamic-studio-v2-stagetokenlist-leak-flicker.md`.
+_Last updated: 2026-06-26 (Offline ATC: local-first draft cache shipped)_ · **New session? Read `specs/ORIENTATION.md` first**, then this + today's journal `specs/journals/2026-06-26-atc-draft-local-first-cache.md` and ADR `specs/plans/2026-06-26-atc-draft-local-first-cache.md`.
 
 ## Current state
-- Active work stream is **Dynamic Studio v2** (`src/app/queue system/dynamic-studio-v2/`), the in-studio "My Arena" specialist screen. Recent landed work on `production`: in-studio queue/studio navigator (legacy multi-queue parity), qnav activity names + invited-studio group, profile-picture avatars next to participant names.
-- This is an Angular 19 SSR PWA on Firebase. App is auth-gated; the in-studio screen needs an authenticated specialist live in a studio with real `queue_token` data, so it is not reachable from the dev preview without a seeded account.
-- Standing test infrastructure (separate from app feature work): the Flutter e2e suite (11/11 green) and the `starlabs-cicd` queue-e2e Firebase project remain available — see earlier journals if reviving that thread.
+- **Offline ATC draft saving was reworked.** Firestore's persistence cache (the b815 root cause + prime suspect for app-wide slowness) is removed from `src/main.ts`; durability now lives in a new local-first cache `ATCDraftService` (`src/app/shared/atc-draft.service.ts`, pure logic in `atc-draft.logic.ts`). `FirestoreRecoveryService` is deleted. Both ATC flows (`prescribe-atc`, `edit-atc`) are wired to it. A conflict picker dialog (`src/app/ATC/shared/draft-conflict-dialog.component.ts`) handles the two-device case; the rejected version is archived to `…/{docId}/conflicts/{rev}` — never lost.
+- **Not yet built/run as the real app** (per project rule: Claude never builds/runs ATC). During development the reconciliation logic was verified by a throwaway non-ATC Node harness (**43/43** checks: decision tables, dirty lifecycle, rev create/update, took-remote, two-device conflict both branches + archive, submit self-heal, two-offline-devices, race-mid-transaction) plus a clean type-check of the 3 new Angular-facing files against the project tsconfig. The harness has been **removed** — those test cases are to be recreated in the separate Playwright e2e project (see journal + test plan for the case list).
+- Angular 19 SSR PWA on Firebase, auth-gated. Branch: `offline-ATC`. **Uncommitted** — all changes are local.
 
-## Last session changes (2026-06-21) — why
-- **Fixed `stageTokenList` console spam + flickering participant names** on the in-studio screen. Root cause: `onStudioSelect()` created its `studio conversation` and `queue_token` Firestore listeners **anonymously** — the already-declared `studioconversationSubscription` / `tokenSubscription` handles were never assigned, so `resetSubscription()`'s teardown was a no-op. Every `onStudioSelect` call (click, auto-enter, "Bring to Studio", re-enter; outer pairing sub re-fires on every check-in/out) stacked another live `queue_token` listener; all of them fired on each token change, each reassigning `this.stageTokenList` → repeated logs + N writes.
-- The visible flicker came from the stage/token `*ngFor`s having **no `trackBy`**: each fresh array of fresh objects rebuilt every avatar/name. Added `trackByStageName` + `trackByTokenDocId`.
-- Verified: preview HMR rebuilt the `dynamic-studio-v2-component` chunk clean. Full visual repro not reachable from preview (auth-gated). Same latent leak still exists in legacy `dynamic-studio.component.ts` (L811) — left untouched per scope.
+## Last session changes (2026-06-26) — why
+- Removed `persistentLocalCache`/`persistentMultipleTabManager` (kills b815 + the slowness/media regression). Durability moved to our own IndexedDB (`atc_draft_cache`), so offline draft list/load are now served by the cache (replacing the removed `getDocsFromCache`).
+- Conflict detection = server `rev` counter compared in a `runTransaction` (clocks can't order two offline devices). Policy = whole-draft user pick + archive-the-loser (operator: "data loss is never an option, minimal easy UX"). Reconciliation runs at draft-open so the components' existing field-hydration is untouched; autosave refuses to clobber on divergence and surfaces it on next open.
+- The harness caught a real `ng build` blocker (closure-narrowed `outcome` literal → TS2367) before any build; fixed via a holder object. Learned `LocalDraftService` is non-ATC (left untouched) and the default DB was already memory-cache (low blast radius).
 
 ## Pending / next
-- Live QA on a real multi-token studio: confirm `stageTokenList` now logs once per selection (not in a repeating cycle) and names no longer flicker.
-- Optional cleanup once verified: remove the leftover `console.log(token)` / `console.log(this.stageTokenList, 'stageTokenList')` debug lines.
-- If legacy `dynamic-studio` is still reachable, port the same handle-storage fix to its `onStudioSelect`/token subscription.
-- Commit + push are operator-gated (working line `cicd`; do not touch `main` without approval).
+- **Operator manual matrix** (`specs/plans/2026-06-26-atc-draft-local-first-cache-TESTPLAN.md`): two-tab b815 check, two-device conflict + archive, crash/refresh durability, offline list/load, submit self-heal, media path, **migration off old `atc_draft_outbox`**, and the app-wide perf/media-regression re-check.
+- **Recreate the reconciliation test cases in the separate Playwright e2e project** (the 43 checks are listed in the journal + test plan; the dev harness was removed).
+- No in-app read UI for the `conflicts/{rev}` archive yet (Firestore console only).
+- Commit + push are operator-gated. Branch is `offline-ATC`; do not touch `main` without approval.
