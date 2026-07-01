@@ -127,6 +127,9 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
   private profileSubscription?: Subscription;
   private filterSubscription?: Subscription;
 
+  // category map
+  private templateCategoryMap = new Map<string, string>(); 
+
   // Data sources
   dataSource = new MatTableDataSource<any>([]);
   emailArchives: any[] = [];
@@ -183,6 +186,23 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
     total: 0
   };
 
+  // Category filter + dialog
+  categoryOptions: string[] = ['All Categories'];
+  showCategoryDialog = false;
+  selectedCategoryForSidebar: string = '';
+  categoryParticipants: any[] = [];
+  filteredCategoryParticipants: any[] = [];
+  categoryParticipantSearch = '';
+  isCategoryLoading = false;
+
+  // Pagination
+  categoryPageSize = 30;
+  categoryCurrentPage = 0;
+  categoryDisplayedParticipants: any[] = [];
+
+  // Sidebar column def (kept for table inside dialog)
+  categorySidebarColumns: string[] = ['email', 'templatename', 'sent', 'open', 'failed'];
+
   constructor(private authguard: AuthguardService) {
     this.filterForm = this.fb.group({
       search: [''],
@@ -191,7 +211,8 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       status: ['All Statuses'],
       emailSearch: [''],
       profileSearch: [''],
-      profileFilter: ['']
+      profileFilter: [''],
+      categoryFilter: ['All Categories'] 
     });
   }
 
@@ -199,6 +220,7 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
     this.initializeProfileData();
     this.setupFilterSubscriptions();
     this.loadInitialData();
+    this.loadAllCategories();
   }
 
   ngAfterViewInit(): void {
@@ -274,16 +296,17 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private setupFilterSubscriptions(): void {
-    this.filterSubscription = combineLatest([
-      this.filterForm.get('search')!.valueChanges.pipe(startWith('')),
-      this.filterForm.get('status')!.valueChanges.pipe(startWith('All Statuses')),
-      this.filterForm.get('emailSearch')!.valueChanges.pipe(startWith('')),
-      this.filterForm.get('profileSearch')!.valueChanges.pipe(startWith('')),
-      this.filterForm.get('profileFilter')!.valueChanges.pipe(startWith(''))
-    ]).subscribe(() => {
-      this.applyFilters();
-    });
-  }
+  this.filterSubscription = combineLatest([
+    this.filterForm.get('search')!.valueChanges.pipe(startWith('')),
+    this.filterForm.get('status')!.valueChanges.pipe(startWith('All Statuses')),
+    this.filterForm.get('emailSearch')!.valueChanges.pipe(startWith('')),
+    this.filterForm.get('profileSearch')!.valueChanges.pipe(startWith('')),
+    this.filterForm.get('profileFilter')!.valueChanges.pipe(startWith('')),
+    this.filterForm.get('categoryFilter')!.valueChanges.pipe(startWith('All Categories')) 
+  ]).subscribe(() => {
+    this.applyFilters();
+  });
+}
 
   private setupProfileOptions(): void {
     this.profileOptions = [];
@@ -296,6 +319,38 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     });
     this.profileOptions.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private async loadAllCategories(): Promise<void> {
+    try {
+      const templatesSnapshot = await getDocs(
+        collection(this.firestore, 'email templates')
+      );
+
+      const uniqueCategories = new Set<string>();
+      this.templateCategoryMap.clear();
+
+      templatesSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data['category']) {
+          uniqueCategories.add(data['category']);
+          this.templateCategoryMap.set(doc.id, data['category']);
+          if (data['templateid']) {
+            this.templateCategoryMap.set(data['templateid'], data['category']);
+          }
+          if (data['templatealias']) {
+            this.templateCategoryMap.set(data['templatealias'], data['category']);
+          }
+        }
+      });
+
+      this.categoryOptions = [
+        'All Categories',
+        ...Array.from(uniqueCategories).sort()
+      ];
+    } catch (error) {
+      console.error('Error loading template categories:', error);
+    }
   }
 
   private setupProfileAutocomplete(): void {
@@ -563,14 +618,12 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private extractStatusOptions(data: any[]): void {
-    const uniqueStatuses = new Set<string>();
-    data.forEach(record => {
-      if (record.status) {
-        uniqueStatuses.add(record.status);
-      }
-    });
-    this.statusOptions = ['All Statuses', ...Array.from(uniqueStatuses).sort()];
-  }
+  const uniqueStatuses = new Set<string>();
+  data.forEach(record => {
+    if (record.status) uniqueStatuses.add(record.status);
+  });
+  this.statusOptions = ['All Statuses', ...Array.from(uniqueStatuses).sort()];
+}
 
   private customFilterPredicate(data: any, filterObj: any): boolean {
     if (filterObj.search && filterObj.search.trim()) {
@@ -616,27 +669,305 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!statusMatch) return false;
     }
 
+    if (filterObj.categoryFilter && filterObj.categoryFilter !== 'All Categories') {
+  const selectedCat = filterObj.categoryFilter;
+
+  const catMatch =
+    data.category === selectedCat ||
+    (data.templatedocid && this.templateCategoryMap.get(data.templatedocid) === selectedCat) ||
+    (data.templateid && this.templateCategoryMap.get(data.templateid) === selectedCat) ||
+    (data.templatealias && this.templateCategoryMap.get(data.templatealias) === selectedCat);
+
+  if (!catMatch) return false;
+}
+
     return true;
   }
 
   applyFilters(): void {
-    const profileFilterValue = this.filterForm.get('profileFilter')?.value;
-    const filterValue = JSON.stringify({
-      search: this.filterForm.get('search')?.value || '',
-      emailSearch: this.filterForm.get('emailSearch')?.value || '',
-      profileSearch: this.filterForm.get('profileSearch')?.value || '',
-      profileFilter: profileFilterValue || null,
-      status: this.filterForm.get('status')?.value || 'All Statuses'
+  const profileFilterValue = this.filterForm.get('profileFilter')?.value;
+  const filterValue = JSON.stringify({
+    search: this.filterForm.get('search')?.value || '',
+    emailSearch: this.filterForm.get('emailSearch')?.value || '',
+    profileSearch: this.filterForm.get('profileSearch')?.value || '',
+    profileFilter: profileFilterValue || null,
+    status: this.filterForm.get('status')?.value || 'All Statuses',
+    categoryFilter: this.filterForm.get('categoryFilter')?.value || 'All Categories' // ← ADD
+  });
+
+  this.dataSource.filter = filterValue;
+  if (this.dataSource.paginator) this.dataSource.paginator.firstPage();
+  this.calculateStats();
+}
+
+openCategorySidebar(category: string): void {
+  if (!category || category === 'All Categories') return;
+  this.selectedCategoryForSidebar = category;
+  this.categoryParticipantSearch = '';
+  this.isCategoryLoading = true;
+  this.showCategoryDialog = true;
+  this.categoryCurrentPage = 0;
+  this.buildCategoryParticipants(category);
+}
+
+private buildCategoryParticipants(category: string): void {
+  // Match archives whose template belongs to the selected category
+  const matchingRecords = this.dataSource.data.filter((r: any) => {
+    // Check direct category field on archive (if present)
+    if (r.category === category) return true;
+
+    // Check via templatedocid
+    if (r.templatedocid && this.templateCategoryMap.get(r.templatedocid) === category) return true;
+
+    // Check via templateid
+    if (r.templateid && this.templateCategoryMap.get(r.templateid) === category) return true;
+
+    // Check via templatealias
+    if (r.templatealias && this.templateCategoryMap.get(r.templatealias) === category) return true;
+
+    return false;
+  });
+
+  const participantMap = new Map<string, {
+    email: string;
+    name: string;
+    profileid: string;
+    templates: Set<string>;
+    sent: boolean;
+    open: boolean;
+    failed: boolean;
+    notSent: boolean;
+  }>();
+
+  matchingRecords.forEach((record: any) => {
+    const templateName = record.templateid || record.templatename || 'No Template';
+    const logs: EmailLog[] = record.logs || [];
+    const allRecipients: string[] = record.emailid || [];
+
+    const sentSet = new Set<string>();
+    const openSet = new Set<string>();
+    const failedSet = new Set<string>();
+
+    logs.forEach(log => {
+      const email = log.email?.toLowerCase();
+      if (!email) return;
+      const s = log.msgstatus?.toLowerCase();
+      if (s === 'sent') sentSet.add(email);
+      if (s === 'open' || s === 'opened') openSet.add(email);
+      if (s === 'failed' || s === 'error') failedSet.add(email);
     });
 
-    this.dataSource.filter = filterValue;
+    allRecipients.forEach((rawEmail: string) => {
+      const emailKey = rawEmail.toLowerCase();
+      const profileId = record.emailmap?.[rawEmail] || record.emailmap?.[emailKey] || '';
+      const profile = profileId
+        ? this.mapProfile[profileId]
+        : this.findProfileByEmail(emailKey);
 
-    if (this.dataSource.paginator) {
-      this.dataSource.paginator.firstPage();
-    }
+      if (!participantMap.has(emailKey)) {
+        participantMap.set(emailKey, {
+          email: rawEmail,
+          name: profile?.name || 'Unknown',
+          profileid: profileId || profile?.id || '',
+          templates: new Set<string>(),
+          sent: false,
+          open: false,
+          failed: false,
+          notSent: false
+        });
+      }
 
-    this.calculateStats();
+      const entry = participantMap.get(emailKey)!;
+      entry.templates.add(templateName);
+      if (sentSet.has(emailKey)) entry.sent = true;
+      if (openSet.has(emailKey)) entry.open = true;
+      if (failedSet.has(emailKey)) entry.failed = true;
+      if (!sentSet.has(emailKey)) entry.notSent = true;
+    });
+  });
+
+ this.categoryParticipants = Array.from(participantMap.values()).map(p => ({
+    ...p,
+    templateNames: Array.from(p.templates).join(', '),
+    templateList: Array.from(p.templates)  
+  }));
+
+  this.enrichParticipantsWithTemplateStatus(this.categoryParticipants, category);
+
+  this.filterCategoryParticipants();
+  this.isCategoryLoading = false;
+}
+
+fetchSentCount(p: any): number {
+  return (p.templateStatuses || []).filter((ts: any) => ts.sent && !ts.failed).length;
+}
+fetchOpenCount(p: any): number {
+  return (p.templateStatuses || []).filter((ts: any) => ts.open).length;
+}
+fetchFailedCount(p: any): number {
+  return (p.templateStatuses || []).filter((ts: any) => ts.failed).length;
+}
+
+private enrichParticipantsWithTemplateStatus(participants: any[], category: string): void {
+  const matchingRecords = this.dataSource.data.filter((r: any) => {
+    if (r.category === category) return true;
+    if (r.templatedocid && this.templateCategoryMap.get(r.templatedocid) === category) return true;
+    if (r.templateid && this.templateCategoryMap.get(r.templateid) === category) return true;
+    if (r.templatealias && this.templateCategoryMap.get(r.templatealias) === category) return true;
+    return false;
+  });
+
+  // emailKey -> templateName -> status flags
+  const emailTemplateMap = new Map<string, Map<string, { sent: boolean; open: boolean; failed: boolean }>>();
+
+  matchingRecords.forEach((record: any) => {
+    const templateName = record.templateid || record.templatename || 'No Template';
+    const logs: EmailLog[] = record.logs || [];
+    const recordRecipients = new Set<string>(
+      (record.emailid || []).map((e: string) => e.toLowerCase())
+    );
+
+    // Skip this record entirely if it has no recipients
+    if (recordRecipients.size === 0) return;
+
+    const sentSet = new Set<string>();
+    const openSet = new Set<string>();
+    const failedSet = new Set<string>();
+
+    logs.forEach((log: EmailLog) => {
+      const email = log.email?.toLowerCase();
+      if (!email) return;
+      const s = log.msgstatus?.toLowerCase();
+      if (s === 'sent') sentSet.add(email);
+      if (s === 'open' || s === 'opened') openSet.add(email);
+      if (s === 'failed' || s === 'error') failedSet.add(email);
+    });
+
+    // Only add template entry for emails that are actually in this record's recipient list
+    recordRecipients.forEach((emailKey: string) => {
+      if (!emailTemplateMap.has(emailKey)) {
+        emailTemplateMap.set(emailKey, new Map());
+      }
+      const tMap = emailTemplateMap.get(emailKey)!;
+
+      // Only add if at least sent or failed — skip if no activity at all
+      const wasSent = sentSet.has(emailKey);
+      const wasFailed = failedSet.has(emailKey);
+      const wasOpened = openSet.has(emailKey);
+
+      if (wasSent || wasFailed || wasOpened) {
+        tMap.set(templateName, {
+          sent: wasSent,
+          open: wasOpened,
+          failed: wasFailed
+        });
+      }
+    });
+  });
+
+  // Attach only the templates with actual activity
+  participants.forEach(p => {
+    const emailKey = p.email.toLowerCase();
+    const tMap = emailTemplateMap.get(emailKey);
+    p.templateStatuses = tMap
+      ? Array.from(tMap.entries()).map(([name, flags]) => ({
+          templateName: name,
+          sent: flags.sent,
+          open: flags.open,
+          failed: flags.failed
+        }))
+      : [];
+  });
+}
+
+filterCategoryParticipants(): void {
+  const search = this.categoryParticipantSearch.toLowerCase().trim();
+  const base = !search
+    ? [...this.categoryParticipants]
+    : this.categoryParticipants.filter(p =>
+        p.email.toLowerCase().includes(search) ||
+        p.name.toLowerCase().includes(search) ||
+        p.profileid.toLowerCase().includes(search) ||
+        p.templateNames.toLowerCase().includes(search)
+      );
+  this.filteredCategoryParticipants = base;
+  this.categoryCurrentPage = 0;
+  this.updateCategoryPage();
+}
+
+updateCategoryPage(): void {
+  const start = this.categoryCurrentPage * this.categoryPageSize;
+  this.categoryDisplayedParticipants = this.filteredCategoryParticipants.slice(start, start + this.categoryPageSize);
+}
+
+get categoryTotalPages(): number {
+  return Math.ceil(this.filteredCategoryParticipants.length / this.categoryPageSize);
+}
+
+categoryNextPage(): void {
+  if (this.categoryCurrentPage < this.categoryTotalPages - 1) {
+    this.categoryCurrentPage++;
+    this.updateCategoryPage();
   }
+}
+
+categoryPrevPage(): void {
+  if (this.categoryCurrentPage > 0) {
+    this.categoryCurrentPage--;
+    this.updateCategoryPage();
+  }
+}
+
+onCategoryParticipantSearchChange(): void {
+  this.filterCategoryParticipants();
+}
+
+closeCategorySidebar(): void {
+  this.showCategoryDialog = false;
+  this.selectedCategoryForSidebar = '';
+  this.categoryParticipants = [];
+  this.filteredCategoryParticipants = [];
+  this.categoryDisplayedParticipants = [];
+  this.categoryParticipantSearch = '';
+}
+
+get categorySidebarSentCount(): number {
+  return this.categoryParticipants.filter(p => p.sent).length;
+}
+get categorySidebarOpenCount(): number {
+  return this.categoryParticipants.filter(p => p.open).length;
+}
+get categorySidebarFailedCount(): number {
+  return this.categoryParticipants.filter(p => p.failed).length;
+}
+
+exportCategoryParticipants(): void {
+  if (!this.filteredCategoryParticipants.length) {
+    this.showSnackBar('No participants to export');
+    return;
+  }
+  const headers = ['Email', 'Name', 'Profile ID', 'Templates', 'Sent', 'Opened', 'Failed'];
+  const rows = [headers.join(',')];
+  this.filteredCategoryParticipants.forEach(p => {
+    rows.push([
+      `"${p.email}"`,
+      `"${p.name}"`,
+      `"${p.profileid}"`,
+      `"${p.templateNames}"`,
+      p.sent ? 'Yes' : 'No',
+      p.open ? 'Yes' : 'No',
+      p.failed ? 'Yes' : 'No'
+    ].join(','));
+  });
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `category-${this.selectedCategoryForSidebar}-participants.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+  this.showSnackBar('Exported successfully');
+}
 
   calculateStats(): void {
     const records = this.dataSource.filteredData || this.dataSource.data;
@@ -695,9 +1026,10 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       fromDate: this.getDateDaysAgo(7),
       toDate: new Date(),
       status: 'All Statuses',
+      categoryFilter: 'All Categories',
       emailSearch: '',
       profileSearch: '',
-      profileFilter: ''
+      profileFilter: '',
     });
     this.applyDateFilter();
   }

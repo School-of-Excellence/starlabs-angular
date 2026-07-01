@@ -1,8 +1,8 @@
-<div *ngIf="router.url.includes('/login') || router.url.includes('joinroom') || router.url.includes('embed=true')">
+<div *ngIf="router.url.includes('/login') || router.url.includes('joinroom') || router.url.includes('joinlivekit') || router.url.includes('embed=true')">
   <router-outlet></router-outlet>
 </div>
 
-<div *ngIf="!router.url.includes('/login') && !router.url.includes('joinroom') && !router.url.includes('embed=true')">
+<div *ngIf="!router.url.includes('/login') && !router.url.includes('joinroom') && !router.url.includes('joinlivekit') && !router.url.includes('embed=true')">
   <mat-toolbar class="toolbar mat-elevation-z8" *ngIf="!router.url.includes('/openmeeting') &&  !router.url.includes('arenadesigninsights') && !router.url.includes('/arena/')">
     <button class="text-light" mat-icon-button (click)="toggleLeftDrawer()" matTooltip="Toggle Navigation Menu">
       <mat-icon>menu</mat-icon>
@@ -20,18 +20,30 @@
         <a routerLink="/EISDashboard" class="title">STARLABS</a>
       </div>
 
-      <div>
-        <button class="menuicon me-4" mat-icon-button [matMenuTriggerFor]="notificationMenu"
+      <div style="display: flex; align-items: center;">        
+        <div class="user-pill">
+          <app-profile-picture
+            *ngIf="profileData['profileid']"
+            [profileId]="profileData['profileid']"
+            [name]="profileData['name']"
+            [size]="32"
+            [skipProfileImg]="true">
+          </app-profile-picture>
+          <span class="profile-name">{{ profileData['name'] }}</span>
+        </div>
+        <div class="toolbar-divider"></div>
+        <!-- Icons -->
+        <button class="menuicon" mat-icon-button [matMenuTriggerFor]="notificationMenu"
           (click)="loadNotifications()">
           <mat-icon [matBadge]="unreadCount" [matBadgeHidden]="unreadCount === 0" matBadgeColor="warn"
-            matBadgeSize="small">
-            notifications
-          </mat-icon>
+            matBadgeSize="small">notifications</mat-icon>
         </button>
+
         <button class="menuicon" mat-icon-button [matMenuTriggerFor]="userMenu"
           [matTooltip]="profileData['name']+'`s Menu'">
           <mat-icon>settings</mat-icon>
         </button>
+
         <mat-menu #notificationMenu="matMenu" class="notification-menu">
           <div class="notification-header" (click)="$event.stopPropagation()">
             <h3>My Notifications</h3>
