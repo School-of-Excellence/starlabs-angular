@@ -1,73 +1,88 @@
 <div class="mainscreen mb-2">
-  <div class="row">
-    <div class="col-sm">
-      <h5 class="title mb-3" style="font-size: 20px;" *ngIf="liveAssignment == null" data-testid="studio-arena-title">My Arena ({{ongoingQueue["queuename"]}})</h5>
-    </div>
-  </div>
 
-  <div *ngIf="noStudioInAnyQueue" class="no-studio-alert mb-3" data-testid="studio-no-studio-alert">
-    <mat-icon>info</mat-icon>
-    <span>No studios available in any of your ongoing queues.</span>
-  </div>
-
-  <div *ngIf="queuesWithStudios.length > 1" class="queue-card-list mb-3">
-    <div class="queue-card-list__label">Your Queues</div>
-    <div class="queue-card-row">
-      <div *ngFor="let queue of queuesWithStudios; trackBy: trackByDocId" data-testid="studio-queue-card" [attr.data-queueid]="queue['docid']"
-        class="queue-card"
-        [class.queue-card--active]="queue['docid'] === ongoingQueue['docid']"
-        (click)="selectQueueCard(queue)">
-        <div class="queue-card__body">
-          <span class="queue-card__name">{{ queue['queuename'] }}</span>
-          <span class="queue-card__meta" data-testid="studio-queue-card-count">
-            <mat-icon class="queue-card__icon">groups</mat-icon>
-            {{ queueStudioCounts[queue['docid']] || 0 }} studio{{ (queueStudioCounts[queue['docid']] || 0) === 1 ? '' : 's' }}
-          </span>
-        </div>
-        <mat-icon class="queue-card__chevron">chevron_right</mat-icon>
-      </div>
+  <!-- ============ LOBBY: studios directly (mockup) — no studio selected ============ -->
+  <ng-container *ngIf="liveAssignment == null && !selectedStudio['docid']">
+    <div class="ds-lobby-head">
+      <h1 class="ds-lobby-title" data-testid="studio-arena-title">{{ mapProfile[profileid] ? (mapProfile[profileid] + "'s Studio") : 'My Studio' }}</h1>
+      <div class="ds-lobby-sub">Run your 1-on-1 sessions with participants from your queues</div>
     </div>
-  </div>
 
-  <div *ngIf="outsideLiveAssignment.length != 0" class="otherstudio">
-    <h6 class="secondtitle fs-6 mb-2">Other Studio that you are invited to Join</h6>
-    <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index; trackBy: trackByDocId" class="mr-3" (click)="visitOtherStudio(studio)">
-      <span>Studio {{i+1}}:</span>&nbsp;
-      <span *ngFor="let participant of studio['pairing']; let j = index; trackBy: trackByDocId">
-        <span *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{activity}}&nbsp;</span>
-        <span>({{mapProfile[participant]}})</span>
-        <span *ngIf="j+1 != studio['pairing'].length">,&nbsp;</span>
-      </span>
-    </button>
-    <div class="mt-2">
-      <span class="label font-italic">Click on the studio to join the call</span>
+    <div *ngIf="noStudioInAnyQueue" class="no-studio-alert mb-3" data-testid="studio-no-studio-alert">
+      <mat-icon>info</mat-icon>
+      <span>No studios available in any of your ongoing queues.</span>
     </div>
-  </div>
 
-  <!-- Section: Your Studios — hidden once we're inside a live assignment -->
-  <div class="sec sec--studios" *ngIf="studioList.length > 0 && liveAssignment == null">
-    <div class="sec__head">
-      <mat-icon class="sec__head-icon">meeting_room</mat-icon>
-      <span class="sec__head-title">Your Studios</span>
-      <span class="sec__head-count">{{ studioList.length }}</span>
-    </div>
-    <div class="sec__body">
-      <button mat-stroked-button *ngFor="let studio of studioList; let i = index; trackBy: trackByDocId" class="me-3 mt-2" [ngClass]="selectedStudio['docid'] == studio['docid'] ? 'primarystudio' : studio['checkin'] ? 'secondarystudio' : ''" [value]="studio" (click)="onStudioSelect(studio)" data-testid="studio-select-btn" [attr.data-studioid]="studio['docid']">
-        <span>My Studio {{i+1}}:</span>&nbsp;
-        <span *ngFor="let participant of studio['participants']; let j = index; trackBy: trackByDocId">
-          <span>{{mapActivity[studio["participantsactivity"][participant]]}}</span>
-          <span *ngIf="participant == profileid && studio['participants'].length != 1">&nbsp;(You)</span>
-          <span *ngIf="participant != profileid">&nbsp;({{mapProfile[participant]}})</span>
-          <span *ngIf="j+1 != studio['participants'].length">,&nbsp;</span>
+    <!-- Other studios you've been invited to join -->
+    <div *ngIf="outsideLiveAssignment.length != 0" class="otherstudio">
+      <h6 class="secondtitle fs-6 mb-2">Other Studio that you are invited to Join</h6>
+      <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index; trackBy: trackByDocId" class="mr-3" (click)="visitOtherStudio(studio)">
+        <span>Studio {{i+1}}:</span>&nbsp;
+        <span *ngFor="let participant of studio['pairing']; let j = index; trackBy: trackByDocId">
+          <span *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{activity}}&nbsp;</span>
+          <span>({{mapProfile[participant]}})</span>
+          <span *ngIf="j+1 != studio['pairing'].length">,&nbsp;</span>
         </span>
-        <mat-icon *ngIf="mapStudioLiveAssignment[studio['docid']]" class="ml-2" data-testid="studio-live-tv-icon">live_tv</mat-icon>
       </button>
-
-      <div class="mt-3 mb-3" *ngIf="selectedStudio['docid'] && liveAssignment == null">
-        <mat-slide-toggle labelPosition="before" data-testid="studio-checkin-toggle" [checked]="selectedStudio['checkin']" [disabled]="onhold == true" (change)="onhold ? $event.source.checked = selectedStudio['checkin'] : checkinStudio($event.checked)">Studio Checkin</mat-slide-toggle>
+      <div class="mt-2">
+        <span class="label font-italic">Click on the studio to join the call</span>
       </div>
     </div>
-  </div>
+
+    <!-- All studios across every queue, shown directly as cards -->
+    <div class="studio-grid" *ngIf="allStudios.length">
+      <div class="studio-card" *ngFor="let s of allStudios; trackBy: trackByStudioId"
+           [class.studio-card--in]="s.checkin"
+           (click)="openStudioCard(s)" data-testid="studio-select-btn" [attr.data-studioid]="s.studioId">
+        <div class="studio-top">
+          <span class="studio-icon"><mat-icon>sensors</mat-icon></span>
+          <div style="flex:1;min-width:0">
+            <div class="studio-name">{{ s.activity }}</div>
+            <div class="studio-queue">{{ s.queueName }}</div>
+          </div>
+          <span class="studio-badge studio-badge--in" *ngIf="s.checkin" data-testid="studio-checkedin-badge">
+            <span class="studio-badge__dot"></span>Checked in
+          </span>
+          <mat-icon class="studio-live" *ngIf="s.isLive" data-testid="studio-live-tv-icon">live_tv</mat-icon>
+        </div>
+        <div class="studio-foot">
+          <span class="studio-spec"><mat-icon>group</mat-icon>{{ s.specialists }}</span>
+          <span class="studio-open">Open <mat-icon>chevron_right</mat-icon></span>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ============ LIST: a studio is selected — check-in + waiting ============ -->
+  <ng-container *ngIf="liveAssignment == null && selectedStudio['docid']">
+    <button class="ds-back-link" (click)="backToStudios()" data-testid="studio-back-link">
+      <mat-icon>chevron_left</mat-icon> All studios
+    </button>
+    <div class="ds-list-head">
+      <span class="studio-icon"><mat-icon>sensors</mat-icon></span>
+      <div style="min-width:0">
+        <h1 class="ds-list-title">
+          <ng-container *ngFor="let participant of selectedStudio['participants']; let j = index; trackBy: trackByDocId">{{ mapActivity[selectedStudio['participantsactivity'][participant]] }}<span *ngIf="participant == profileid && selectedStudio['participants'].length != 1"> (You)</span><span *ngIf="participant != profileid"> ({{ mapProfile[participant] }})</span>{{ j+1 != selectedStudio['participants'].length ? ', ' : '' }}</ng-container>
+        </h1>
+        <div class="ds-list-sub">{{ ongoingQueue['queuename'] }}</div>
+      </div>
+    </div>
+
+    <!-- Studio Check-in card -->
+    <div class="checkin-card">
+      <div style="min-width:0">
+        <div class="checkin-card__title">Studio Check-in</div>
+        <div class="checkin-card__sub">Toggle on to go online. Waiting participants appear only when your studio is enabled.</div>
+      </div>
+      <mat-slide-toggle data-testid="studio-checkin-toggle" [checked]="selectedStudio['checkin']" [disabled]="onhold == true" (change)="onhold ? ($event.source.checked = selectedStudio['checkin']) : checkinStudio($event)"></mat-slide-toggle>
+    </div>
+
+    <!-- Offline empty state -->
+    <div class="empty-card" *ngIf="!selectedStudio['checkin']">
+      <span class="empty-card__ic"><mat-icon>sensors_off</mat-icon></span>
+      <div class="empty-card__t">Studio is offline</div>
+      <div class="empty-card__b">Toggle Studio Check-in ON to see participants waiting in this studio.</div>
+    </div>
+  </ng-container>
 
   <!-- Participant Conversation -->
   <div class="chat-container" *ngIf="studiochatList.length != 0" (click)="toggleChatContainer()">
@@ -248,35 +263,48 @@
   <!-- =================== LIVE ASSIGNMENT (STEPPER V2 — NEW DESIGN) =================== -->
   <div *ngIf="liveAssignment != null" class="ds-app dyn-studio-v2-app">
 
-    <!-- ============================ SIDEBAR ============================ -->
-    <aside class="ds-sidebar">
-
-      <!-- Participant profile -->
-      <div class="ds-side-profile">
-        <div class="ds-side-id">
-          <div class="ds-avatar"
-            (click)="(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile) && (expandedImage = (mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile))">
-            <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
-              [src]="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
-              [alt]="mapProfile[participantProfileId]">
-            <span *ngIf="!(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile)">
-              {{ (mapProfile[participantProfileId] || '?').charAt(0) | uppercase }}
-            </span>
-            <span class="ds-online" *ngIf="participantReady"></span>
-          </div>
-          <div style="min-width:0; flex:1;">
-            <div class="ds-side-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
-          </div>
-          <button type="button" class="ds-collapse" [class.open]="sidebarProfileOpen"
-            (click)="toggleSidebarProfile()"
-            [attr.aria-expanded]="sidebarProfileOpen"
-            [attr.aria-label]="sidebarProfileOpen ? 'Collapse details' : 'Show details'"
-            [title]="sidebarProfileOpen ? 'Collapse details' : 'Show details'">
-            <mat-icon class="ic">expand_more</mat-icon>
-          </button>
+    <!-- ============================ HEADER (mockup: participant + status + actions) ============================ -->
+    <header class="ds-header">
+      <!-- Participant identity -->
+      <div class="ds-hdr-id">
+        <div class="ds-avatar"
+          (click)="(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile) && (expandedImage = (mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile))">
+          <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+            [src]="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+            [alt]="mapProfile[participantProfileId]">
+          <span *ngIf="!(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile)">
+            {{ (mapProfile[participantProfileId] || '?').charAt(0) | uppercase }}
+          </span>
+          <span class="ds-online" *ngIf="participantReady"></span>
         </div>
+        <div class="ds-hdr-idbody">
+          <div class="ds-hdr-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
+          <div class="ds-hdr-metaline">
+            <span class="ds-hdr-uplabel" *ngIf="participantUPVisitLabel">
+              <mat-icon class="ic">emoji_events</mat-icon>{{ participantUPVisitLabel }} at uP!
+            </span>
+            <span class="ds-hdr-dot" *ngIf="participantUPVisitLabel && liveAssignment['token']?.productname">·</span>
+            <span class="ds-hdr-product" *ngIf="liveAssignment['token']?.productname" [title]="liveAssignment['token']?.productname">{{ liveAssignment["token"]?.productname }}</span>
+          </div>
+          <!-- Specialists included — shown inline next to the participant name -->
+          <div class="ds-hdr-specialists" *ngIf="additionalSpecialists.length">
+            <mat-icon class="ic">groups</mat-icon>
+            <span class="ds-hdr-specialists__label">With</span>
+            <span class="ds-hdr-specialists__names">
+              <ng-container *ngFor="let sp of additionalSpecialists; let last = last; trackBy: trackByDocId">{{ sp.name }}<span *ngIf="sp.activity" class="ds-hdr-specialists__role"> ({{ sp.activity }})</span>{{ last ? '' : ', ' }}</ng-container>
+            </span>
+          </div>
+        </div>
+        <!-- COMMENTED OUT: header details toggle + popover (product/variation/journey/specialists).
+             Specialists now shown inline by the name above; kept here (ngIf false) for easy restore. -->
+        <button type="button" class="ds-hdr-detailsbtn" [class.open]="sidebarProfileOpen"
+          *ngIf="false"
+          (click)="toggleSidebarProfile()" [attr.aria-expanded]="sidebarProfileOpen"
+          title="Participant details" aria-label="Participant details">
+          <mat-icon class="ic">expand_more</mat-icon>
+        </button>
 
-        <div class="ds-side-meta" *ngIf="sidebarProfileOpen">
+        <div class="ds-hdr-details" *ngIf="false">
           <div class="ds-meta-row" *ngIf="participantUPVisitLabel">
             <span class="ds-meta-ic"><mat-icon class="ic">emoji_events</mat-icon></span>
             <span class="ds-chip-val ds-chip-val--lead">{{ participantUPVisitLabel }} at uP!</span>
@@ -298,113 +326,93 @@
             <span class="ds-chip-label">Journey</span>
             <span class="ds-chip-val" [title]="participantJourneyName">{{ participantJourneyName }}</span>
           </div>
-        </div>
-      </div>
-
-      <!-- Extra specialists invited into this studio via "Invite More
-           Specialist(s)". Shown right under the participant profile so the
-           host can see who else is in their studio (name + activity). -->
-      <div class="ds-extra-specialists" *ngIf="additionalSpecialists.length"
-           [class.is-open]="extraSpecialistsOpen">
-        <button type="button" class="ds-extra-specialists__head"
-                (click)="toggleExtraSpecialists()"
-                [attr.aria-expanded]="extraSpecialistsOpen">
-          <mat-icon class="ic">groups</mat-icon>
-          <span class="ds-extra-specialists__title">Specialists included</span>
-          <span class="ds-extra-specialists__count">{{ additionalSpecialists.length }}</span>
-          <mat-icon class="ic ds-extra-specialists__chevron">expand_more</mat-icon>
-        </button>
-        <div class="ds-extra-specialists__list" *ngIf="extraSpecialistsOpen">
-          <div class="ds-extra-specialist" *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
-            <span class="ds-extra-specialist__avatar">{{ (sp.name || '?').charAt(0) | uppercase }}</span>
-            <span class="ds-extra-specialist__body">
-              <span class="ds-extra-specialist__name" [title]="sp.name">{{ sp.name }}</span>
-              <span class="ds-extra-specialist__activity" *ngIf="sp.activity" [title]="sp.activity">{{ sp.activity }}</span>
-            </span>
+          <div class="ds-hdr-details__specialists" *ngIf="additionalSpecialists.length">
+            <div class="ds-hdr-details__specialists-head">
+              <mat-icon class="ic">groups</mat-icon>
+              <span>Specialists included</span>
+              <span class="ds-hdr-details__count">{{ additionalSpecialists.length }}</span>
+            </div>
+            <div class="ds-extra-specialist" *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
+              <span class="ds-extra-specialist__avatar">{{ (sp.name || '?').charAt(0) | uppercase }}</span>
+              <span class="ds-extra-specialist__body">
+                <span class="ds-extra-specialist__name" [title]="sp.name">{{ sp.name }}</span>
+                <span class="ds-extra-specialist__activity" *ngIf="sp.activity" [title]="sp.activity">{{ sp.activity }}</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Sidebar actions -->
-      <div class="ds-side-actions">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn">
-          <mat-icon class="ic">person_add</mat-icon>
-          Invite More Specialist(s)
-        </button>
-        <!-- Return the participant to the queued section of the SAME stage
-             without advancing them. Closes this studio. -->
-        <button type="button" class="btn btn-ghost btn-sm" (click)="moveBackToQueue()">
-          <mat-icon class="ic">undo</mat-icon>
-          Move Back to Queue
-        </button>
-      </div>
-
-      <!-- Stepper -->
-      <div class="ds-stepscroll">
-        <nav class="ds-steplist">
-          <button
-            *ngFor="let step of visibleSteps; let i = index; let last = last; trackBy: trackByDocId"
-            type="button"
-            class="ds-step"
-            [class.active]="step.id === activeStepId"
-            [class.done]="isStepCompleted(step.id)"
-            (click)="setActiveStep(step.id)">
-            <span class="ds-connector" *ngIf="!last"></span>
-            <span class="ds-node">
-              <mat-icon class="ic" *ngIf="isStepCompleted(step.id)">check</mat-icon>
-              <span *ngIf="!isStepCompleted(step.id)">{{ i + 1 }}</span>
-            </span>
-            <span class="ds-step-body">
-              <span class="ds-step-title">{{ step.label }}</span>
-              <span class="ds-step-sub" *ngIf="step.id === 'current-forms'">Current Cycle</span>
-              <span class="ds-step-sub" *ngIf="step.id === 'prev-history'">Previous Cycle(s)</span>
-              <span class="ds-step-sub" *ngIf="step.id === 'view-atc'">Current Cycle</span>
-              <span class="ds-step-sub" *ngIf="step.id === 'getstarted'">Connect with participant</span>
-              <span class="ds-step-sub" *ngIf="step.id === 'prescribe-atc'">Current Cycle</span>
-            </span>
-          </button>
-        </nav>
-      </div>
-    </aside>
-
-    <!-- ============================ TOPBAR ============================ -->
-    <header class="ds-topbar">
-      <div class="ds-waiting ds-waiting--full ds-waiting--compact"
-           [ngClass]="'tone-' + topBarStatus.tone"
-           [class.is-joined]="participantHasJoinedCall">
-        <div class="ds-waiting-icon">
-          <mat-icon class="ic">{{ topBarStatus.icon }}</mat-icon>
+      <!-- Status pill (center) -->
+      <div class="ds-hdr-status">
+        <div class="ds-waiting ds-waiting--compact"
+             [ngClass]="'tone-' + topBarStatus.tone"
+             [class.is-joined]="participantHasJoinedCall">
+          <div class="ds-waiting-icon"><mat-icon class="ic">{{ topBarStatus.icon }}</mat-icon></div>
+          <div class="ds-waiting-body">
+            <div class="ds-waiting-title">{{ topBarStatus.title }}</div>
+            <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
+          </div>
         </div>
-        <div class="ds-waiting-body">
-          <div class="ds-waiting-title">{{ topBarStatus.title }}</div>
-          <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
-        </div>
-
-        <!-- ATC count for the current queue — quick summary chip shown in
-             the topbar so the specialist sees it across all steps. Click
-             jumps to the View Submitted ATC step. -->
-        <div class="ds-waiting-chips">
-          <button type="button" class="ds-chip ds-chip--atc"
-                  *ngIf="atcInThisQueueCount > 0 && getStepIndex('view-atc') >= 0"
-                  (click)="setActiveStep('view-atc')"
-                  [matTooltip]="'View prescribed ATC for this queue'">
-            <mat-icon class="ic">check_circle</mat-icon>
-            <b>{{ atcInThisQueueCount }}</b>
-            ATC given for this queue
-          </button>
-        </div>
-
-        <!-- Jump to Meeting is only shown while the participant is in the
-             waiting room — i.e. they're on the meeting screen ready to join
-             the call but the specialist hasn't started it yet. -->
-        <button type="button" class="btn btn-green btn-lg ds-waiting-cta"
+        <button type="button" class="btn btn-green btn-sm ds-hdr-jump"
                 *ngIf="participantInWaitingRoom"
                 (click)="setActiveStep('getstarted')">
           <mat-icon class="ic">play_arrow</mat-icon>
           Jump to Meeting
         </button>
       </div>
+
+      <!-- Actions (right) -->
+      <div class="ds-hdr-actions">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn">
+          <mat-icon class="ic">person_add</mat-icon>
+          Invite More
+        </button>
+        <button type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()">
+          <mat-icon class="ic">undo</mat-icon>
+          Send back to Waiting
+        </button>
+        <div class="ds-menu-anchor" *ngIf="hasNextStageOptions">
+          <button type="button" class="btn btn-green btn-sm"
+                  (click)="toggleNextStageMenu('header')"
+                  [class.is-open]="nextStageMenuOpen === 'header'"
+                  title="Complete the session and choose where this participant goes next"
+                  data-testid="studio-move-next-stage-btn">
+            Move Next Stage
+            <mat-icon class="ic">expand_more</mat-icon>
+          </button>
+          <ng-container *ngIf="nextStageMenuOpen === 'header'">
+            <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
+            <div class="ds-nextmenu ds-nextmenu--down">
+              <div class="ds-nextmenu__head">Choose next stage</div>
+              <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+            </div>
+          </ng-container>
+        </div>
+      </div>
     </header>
+
+    <!-- ============================ STEPPER (horizontal) ============================ -->
+    <nav class="ds-stepbar">
+      <div class="ds-stepbar-inner">
+        <ng-container *ngFor="let step of visibleSteps; let i = index; let last = last; trackBy: trackByDocId">
+          <button
+            type="button"
+            class="ds-hstep"
+            [class.active]="step.id === activeStepId"
+            [class.done]="isStepCompleted(step.id)"
+            (click)="setActiveStep(step.id)">
+            <span class="ds-hstep-node">
+              <mat-icon class="ic" *ngIf="isStepCompleted(step.id)">check</mat-icon>
+              <span *ngIf="!isStepCompleted(step.id)">{{ i + 1 }}</span>
+            </span>
+            <span class="ds-hstep-label">{{ step.label }}</span>
+          </button>
+          <mat-icon class="ic ds-hstep-chev" *ngIf="!last">chevron_right</mat-icon>
+        </ng-container>
+      </div>
+    </nav>
+
 
     <!-- ============================ MAIN ============================ -->
     <main class="ds-main">
@@ -413,8 +421,9 @@
            and the studios in the active queue reachable WITHOUT leaving the
            live session. Switching while live is confirm-guarded. Only shown
            when there is something to switch between. -->
+      <!-- COMMENTED OUT: in-studio queue/studio switcher rows (ngIf false for easy restore). -->
       <div class="ds-qnav"
-           *ngIf="queuesWithStudios.length > 1 || studioList.length > 1 || outsideLiveAssignment.length">
+           *ngIf="false && (queuesWithStudios.length > 1 || studioList.length > 1 || outsideLiveAssignment.length)">
         <div class="ds-qnav__group" *ngIf="queuesWithStudios.length > 1">
           <span class="ds-qnav__label"><mat-icon class="ic">layers</mat-icon>Queues</span>
           <div class="ds-qnav__chips">
@@ -488,22 +497,21 @@
           <div class="ds-step-header">
             <div class="ds-eyebrow">
               <span class="num">{{ activeStepIndex + 1 }}</span>
-              <span *ngIf="activeStepId === 'current-forms'">Submitted Forms · Current Cycle</span>
-              <span *ngIf="activeStepId === 'prev-history'">ATC &amp; Love Letters · Previous Cycle(s)</span>
-              <span *ngIf="activeStepId === 'view-atc'">View Submitted ATC · Current Cycle</span>
+              <span *ngIf="activeStepId === 'current-forms'">Review Forms · Current Cycle</span>
+              <span *ngIf="activeStepId === 'prev-history'">Previous ATC · Previous Cycle(s)</span>
+              <span *ngIf="activeStepId === 'view-atc'">This Cycle ATCs · Current Cycle</span>
               <span *ngIf="activeStepId === 'getstarted'">Zoom Session</span>
               <span *ngIf="activeStepId === 'prescribe-atc'">Prescribe ATC · Current Cycle</span>
-              <span *ngIf="activeStepId === 'ael-validation'">AEL Validation</span>
-              <span *ngIf="activeStepId === 'mark-completed'">Mark as Completed</span>
+              <span *ngIf="activeStepId === 'ael-validation'">Validate AEL</span>
             </div>
           </div>
 
           <!-- (ATC prescribed banner + Submitted Forms info banner moved into
                the topbar status pill as compact chips — saves vertical space.) -->
 
-          <!-- ========================= STEP 1: Submitted Forms ========================= -->
+          <!-- ========================= STEP 1: Review Forms + Love Letters ========================= -->
           <ng-container *ngIf="activeStepId === 'current-forms'">
-            <div class="card">
+            <div class="card" *ngIf="participantForm && participantForm.length">
               <div class="form-row form-row--compact" *ngFor="let form of participantForm; let i = index; trackBy: trackByDocId">
                 <div class="form-row__main">
                   <span class="form-row__num">{{ i + 1 }}.</span>
@@ -516,32 +524,8 @@
                 </button>
               </div>
             </div>
-          </ng-container>
 
-          <!-- ========================= STEP 2: ATC & Love Letters =========================
-               Mounted ONCE (prevHistoryMounted) then toggled with [hidden] instead of
-               *ngIf, so the heavy <app-view-participant-atc> child loads a single time and
-               persists rather than re-fetching all its ATC getDocs on every step change. -->
-          <ng-container *ngIf="prevHistoryMounted">
-            <div class="step-compact" [hidden]="activeStepId !== 'prev-history'">
-            <!-- Previous ATC History -->
-            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')">
-              <div class="card-pad">
-                <h3 class="section-title">Previous ATC History</h3>
-                @defer (on viewport) {
-                  <app-view-participant-atc
-                    [profileid]="liveAssignment['participantid']"
-                    [excludeQueueId]="ongoingQueue['docid']">
-                  </app-view-participant-atc>
-                } @placeholder {
-                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
-                } @loading {
-                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
-                }
-              </div>
-            </div>
-
-            <!-- Love Letters -->
+            <!-- Love Letters (moved here from the Previous ATC step, per mockup) -->
             <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('loveletters')">
               <div class="card-head tint-slate">
                 <div class="card-head-title">
@@ -577,6 +561,31 @@
                 </div>
               </div>
             </div>
+          </ng-container>
+
+          <!-- ========================= STEP 2: ATC & Love Letters =========================
+               Mounted ONCE (prevHistoryMounted) then toggled with [hidden] instead of
+               *ngIf, so the heavy <app-view-participant-atc> child loads a single time and
+               persists rather than re-fetching all its ATC getDocs on every step change. -->
+          <ng-container *ngIf="prevHistoryMounted">
+            <div class="step-compact" [hidden]="activeStepId !== 'prev-history'">
+            <!-- Previous ATC History -->
+            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')">
+              <div class="card-pad">
+                <h3 class="section-title">Previous ATC History</h3>
+                @defer (on viewport) {
+                  <app-view-participant-atc
+                    [profileid]="liveAssignment['participantid']"
+                    [excludeQueueId]="ongoingQueue['docid']">
+                  </app-view-participant-atc>
+                } @placeholder {
+                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
+                } @loading {
+                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
+                }
+              </div>
+            </div>
+
 
             <!-- Evolution Wishlist -->
             <div class="card"
@@ -700,7 +709,8 @@
                      primary path; the raw start_url is the fallback if it
                      doesn't launch. Hint + link are grouped so it reads as one
                      "if that didn't work, use this" block. -->
-                <div class="zoom-fallback" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
+                <!-- COMMENTED OUT: raw Zoom start_url shown openly (ngIf false for easy restore). -->
+                <div class="zoom-fallback" *ngIf="false && liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
                   <div class="zoom-link-hint">
                     <mat-icon class="ic">info</mat-icon>
                     <span>Use <strong>Start Meeting</strong> above. If it doesn’t open, join with this backup link:</span>
@@ -719,24 +729,31 @@
                 </div>
               </div>
 
-              <!-- Generate New Link (placed at the BOTTOM as a separate row).
-                   Shown whenever the link is broken (regardless of the 10s
-                   throttle) OR when zoomlinkGenerator has unlocked normally. -->
+              <!-- Recording reminder (mockup) -->
+              <div class="zoom-record-note">
+                <mat-icon class="ic">fiber_manual_record</mat-icon>
+                Once the call starts, make sure Zoom recording is enabled.
+              </div>
+
+              <!-- Generate new link & resend (mockup). Always available when zoom
+                   is enabled; disabled during the 10s throttle unless the link is
+                   broken (in which case regeneration is allowed immediately). -->
               <div class="choice choice--secondary"
-                   *ngIf="(isZoomLinkBroken || (liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator)) && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
+                   *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
                 <div class="choice-secondary__head">
                   <div class="choice-secondary__text">
-                    <div class="choice-title">Link broken or expired?</div>
+                    <div class="choice-title">{{ isZoomLinkBroken ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
                     <div class="choice-desc">
-                      Generate a fresh link — it's sent to the participant automatically.
+                      Generate a new link — it's resent to the participant automatically.
                     </div>
                   </div>
                   <button type="button" class="btn btn-lg"
                           [class.btn-ghost]="!isZoomLinkBroken"
                           [class.btn-primary]="isZoomLinkBroken"
+                          [disabled]="!isZoomLinkBroken && !zoomlinkGenerator"
                           (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">
                     <mat-icon class="ic">refresh</mat-icon>
-                    Generate New Link
+                    Generate new link &amp; resend to participant
                   </button>
                 </div>
               </div>
@@ -863,22 +880,14 @@
                   <div class="empty-text">No AEL Found</div>
                 </div>
 
-                <div class="ael-form" *ngIf="participantAEL['crossovermetric'] != null && participantAEL['crossovermetric'] != undefined">
-                  <div class="ael-field" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; let i = index; trackBy: trackById">
-                    <label class="ael-label">{{ i + 1 }}. {{ crossover.key }} <span class="req">*</span></label>
-                    <mat-form-field appearance="outline" style="width:100%;">
-                      <mat-label>Current Level</mat-label>
-                      <mat-select [(ngModel)]="crossover.value['value']" (selectionChange)="participantAEL['aelStatus'] = 'edited'">
-                        <mat-option *ngFor="let option of aelLevelList; trackBy: trackByDocId" [value]="option['startpoint'] + '---' + option['endpoint']">{{option["startpoint"]}} to {{option["endpoint"]}}</mat-option>
-                      </mat-select>
-                    </mat-form-field>
-                  </div>
-                </div>
-
                 <div class="ael-actions" *ngIf="participantAEL['crossovermetric'] != null">
-                  <button type="button" class="btn btn-green btn-lg" (click)="updateCurrentAEL()" data-testid="studio-ael-validate-btn" [disabled]="participantAEL['aelStatus'] === 'validated'">
-                    <mat-icon class="ic">check</mat-icon>
-                    {{ participantAEL['aelStatus'] == "edited" ? "Update Changes & Mark as Validated" : participantAEL['aelStatus'] == "validated" ? "AEL Validated" : "Mark as Validated" }}
+                  <button type="button" class="btn btn-lg"
+                          [class.btn-green]="participantAEL['aelStatus'] === 'validated'"
+                          [class.btn-primary]="participantAEL['aelStatus'] !== 'validated'"
+                          (click)="openAelModal()"
+                          data-testid="studio-ael-validate-btn">
+                    <mat-icon class="ic">{{ participantAEL['aelStatus'] === 'validated' ? 'check' : 'tune' }}</mat-icon>
+                    {{ participantAEL['aelStatus'] == "validated" ? "AEL Validated" : participantAEL['aelStatus'] == "edited" ? "Review &amp; Validate AEL" : "Validate AEL" }}
                   </button>
                   <span class="ael-validated-note" *ngIf="participantAEL['aelStatus'] === 'validated'">
                     <mat-icon class="ic">check</mat-icon>
@@ -890,66 +899,8 @@
           </ng-container>
 
           <!-- ========================= STEP 7: Mark as Completed ========================= -->
-          <ng-container *ngIf="activeStepId === 'mark-completed'">
-            <!-- Move to next month review -->
-            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('movetonextqueue')">
-              <div class="card-head tint-slate">
-                <div class="card-head-title">
-                  <mat-icon class="ic">calendar_today</mat-icon>
-                  Move Participant to Next Month Review
-                </div>
-              </div>
-              <div class="card-pad">
-                <button type="button" class="btn btn-lg"
-                        [class.btn-ghost]="!nextMonthReviewMarked"
-                        [class.btn-green]="nextMonthReviewMarked"
-                        [disabled]="nextMonthReviewSaving || nextMonthReviewMarked"
-                        (click)="movetoNextMonthReview()">
-                  <mat-icon class="ic">{{ nextMonthReviewMarked ? 'check_circle' : 'arrow_forward' }}</mat-icon>
-                  {{ nextMonthReviewSaving ? 'Marking…' : nextMonthReviewMarked ? 'Marked for next month review' : 'Mark participant for next month review' }}
-                </button>
-                <div class="ael-validated-note" *ngIf="nextMonthReviewMarked" style="margin-top:12px;">
-                  <mat-icon class="ic">check</mat-icon>
-                  This participant has been added to next month&rsquo;s review list.
-                </div>
-              </div>
-            </div>
-
-            <!-- Complete this stage -->
-            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.nextstage?.length">
-              <div class="card-head tint-green">
-                <div class="card-head-title">
-                  <mat-icon class="ic">verified</mat-icon>
-                  Complete {{ liveAssignment['stagename'] }} Stage
-                </div>
-              </div>
-              <div class="card-pad">
-                <div style="font-size:14.5px;color:var(--ink-2);font-weight:600;margin-bottom:18px;">
-                  Choose where this participant goes after the {{ liveAssignment['stagename'] }} stage.
-                </div>
-                <div style="display:flex;flex-direction:column;align-items:flex-start;gap:12px;">
-                  <ng-container *ngFor="let config of ongoingQueue['stageproperty'][liveAssignment['stagename']]?.nextstage; trackBy: trackByDocId">
-                    <button
-                      *ngIf="(liveAssignment['token']?.variationid == null || liveAssignment['token']?.variationid == undefined) && (!config.variations || config.variations.length === 0)"
-                      type="button"
-                      class="btn btn-green btn-lg"
-                      (click)="moveStage(config.stage, config.markascompleted)" data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
-                      <mat-icon class="ic">check</mat-icon>
-                      {{ config.calltoaction }}
-                    </button>
-                    <button
-                      *ngIf="liveAssignment['token']?.variationid != null && liveAssignment['token']?.variationid != undefined && queueVariation[liveAssignment['token']?.variationid] && queueVariation[liveAssignment['token']?.variationid].includes(liveAssignment['stagename']) && config.variations && config.variations.includes(liveAssignment['token']?.variationid)"
-                      type="button"
-                      class="btn btn-green btn-lg"
-                      (click)="moveStage(config.stage, config.markascompleted)" data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
-                      <mat-icon class="ic">check</mat-icon>
-                      {{ config.calltoaction }}
-                    </button>
-                  </ng-container>
-                </div>
-              </div>
-            </div>
-          </ng-container>
+          <!-- (Mark as Completed step removed — its actions moved to the
+               "Move to Next Stage" dropdown, see #nextStageItems below.) -->
 
         </div>
       </div>
@@ -967,12 +918,100 @@
           Next
           <mat-icon class="ic">arrow_forward</mat-icon>
         </button>
-        <button type="button" class="btn btn-green" *ngIf="activeStepIndex === visibleSteps.length - 1" disabled>
+        <div class="ds-menu-anchor" *ngIf="activeStepIndex === visibleSteps.length - 1 && hasNextStageOptions">
+          <button type="button" class="btn btn-green"
+                  (click)="toggleNextStageMenu('footer')"
+                  [class.is-open]="nextStageMenuOpen === 'footer'"
+                  data-testid="studio-move-next-stage-footer-btn">
+            <mat-icon class="ic">check</mat-icon>
+            Move to Next Stage
+            <mat-icon class="ic">expand_less</mat-icon>
+          </button>
+          <ng-container *ngIf="nextStageMenuOpen === 'footer'">
+            <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
+            <div class="ds-nextmenu ds-nextmenu--up">
+              <div class="ds-nextmenu__head">Choose next stage</div>
+              <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+            </div>
+          </ng-container>
+        </div>
+        <button type="button" class="btn btn-green" *ngIf="activeStepIndex === visibleSteps.length - 1 && !hasNextStageOptions" disabled>
           <mat-icon class="ic">check</mat-icon>
           Complete Session
         </button>
       </footer>
   </main>
+
+    <!-- ===================== MOVE-TO-NEXT-STAGE MENU ITEMS (mockup) =====================
+         Shared by the header + footer "Move to Next Stage" dropdowns. Same
+         actions as the old Mark-as-Completed step (movetoNextMonthReview /
+         moveStage) — relocated into a popup. No backend change. -->
+    <ng-template #nextStageItems>
+      <!-- Mark for next month review -->
+      <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('movetonextqueue')"
+              type="button" class="ds-nextmenu__item"
+              [disabled]="nextMonthReviewSaving || nextMonthReviewMarked"
+              (click)="movetoNextMonthReview()">
+        <mat-icon class="ic">{{ nextMonthReviewMarked ? 'check_circle' : 'calendar_today' }}</mat-icon>
+        <span>{{ nextMonthReviewSaving ? 'Marking…' : nextMonthReviewMarked ? 'Marked for next month review' : 'Mark for next month review' }}</span>
+      </button>
+      <!-- Next-stage routes -->
+      <ng-container *ngFor="let config of ongoingQueue['stageproperty'][liveAssignment['stagename']]?.nextstage; trackBy: trackByDocId">
+        <button
+          *ngIf="(liveAssignment['token']?.variationid == null || liveAssignment['token']?.variationid == undefined) && (!config.variations || config.variations.length === 0)"
+          type="button" class="ds-nextmenu__item ds-nextmenu__item--go"
+          (click)="moveStage(config.stage, config.markascompleted); closeNextStageMenu()"
+          data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
+          <mat-icon class="ic">check_circle</mat-icon>
+          <span>{{ config.calltoaction }}</span>
+        </button>
+        <button
+          *ngIf="liveAssignment['token']?.variationid != null && liveAssignment['token']?.variationid != undefined && queueVariation[liveAssignment['token']?.variationid] && queueVariation[liveAssignment['token']?.variationid].includes(liveAssignment['stagename']) && config.variations && config.variations.includes(liveAssignment['token']?.variationid)"
+          type="button" class="ds-nextmenu__item ds-nextmenu__item--go"
+          (click)="moveStage(config.stage, config.markascompleted); closeNextStageMenu()"
+          data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
+          <mat-icon class="ic">check_circle</mat-icon>
+          <span>{{ config.calltoaction }}</span>
+        </button>
+      </ng-container>
+    </ng-template>
+
+    <!-- ===================== AEL SLIDER MODAL (mockup) =====================
+         Slider-per-area over the existing band list (aelLevelList). UI only:
+         each slider notch maps to a stored "start---end" band — no model change. -->
+    <div class="ael-modal-backdrop" *ngIf="aelModalOpen" (click)="closeAelModal()">
+      <div class="ael-modal" (click)="$event.stopPropagation()">
+        <div class="ael-modal__head">
+          <span class="ael-modal__title"><mat-icon class="ic">verified</mat-icon> Validate AEL</span>
+          <button type="button" class="ael-modal__x" (click)="closeAelModal()" aria-label="Close">
+            <mat-icon class="ic">close</mat-icon>
+          </button>
+        </div>
+        <div class="ael-modal__body">
+          <p class="ael-modal__sub">
+            Review the participant&rsquo;s Accelerated Evolution Level across all areas.
+            Drag any slider to adjust, then validate.
+          </p>
+          <div class="ael-slider-row" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; trackBy: trackById">
+            <span class="ael-slider-row__area" [title]="crossover.key">{{ crossover.key }}</span>
+            <input type="range" class="ael-slider-row__range"
+                   min="0" [max]="aelLevelList.length - 1" step="1"
+                   [value]="aelBandIndex(crossover.value['value'])"
+                   (input)="setAelBand(crossover, $any($event.target).value)">
+            <span class="ael-slider-row__val">{{ aelBandLabel(crossover.value['value']) }}</span>
+          </div>
+        </div>
+        <div class="ael-modal__foot">
+          <button type="button" class="btn btn-ghost" (click)="closeAelModal()">Cancel</button>
+          <button type="button" class="btn btn-green" (click)="validateAelFromModal()"
+                  data-testid="studio-ael-modal-validate-btn"
+                  [disabled]="participantAEL['aelStatus'] === 'validated'">
+            <mat-icon class="ic">check</mat-icon>
+            {{ participantAEL['aelStatus'] == "validated" ? "AEL Validated" : "Mark AEL validated" }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Form-in-dialog template (used by viewform()).
          Renders the submitted form INLINE — markup mirrors the overlay in

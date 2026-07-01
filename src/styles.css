@@ -227,6 +227,23 @@ html:has(.dyn-studio-v2-app) {
   overflow: hidden !important;
   height: 100vh !important;
 }
+/* When the studio un-pins on short/narrow viewports (tablet, mobile, high
+   browser zoom) it re-enters normal document flow, so the host page must be
+   allowed to scroll again — otherwise the overflowing content is stuck with
+   no scrollbar. Keep these breakpoints in sync with the .ds-app un-pin rule
+   in dynamic-studio-v2.component.css (max-width:640px / max-height:460px). */
+@media (max-width: 640px), (max-height: 460px) {
+  body:has(.dyn-studio-v2-app),
+  html:has(.dyn-studio-v2-app) {
+    overflow: auto !important;
+  }
+  .mat-drawer-content:has(.dyn-studio-v2-app),
+  .mat-drawer-container:has(.dyn-studio-v2-app) {
+    overflow: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+}
 
 /* =============================================================
    Event Participation Confirmations — CDK overlay theming.

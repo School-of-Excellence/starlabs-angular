@@ -17,10 +17,12 @@
   --ink: #1A2332;
   --ink-2: #566072;
   --ink-3: #8A93A3;
-  --primary: #1E5663;
-  --primary-ink: #143F49;
-  --primary-soft: #E2EEEF;
-  --primary-line: #BFD8DC;
+  /* Accent retheme → mockup purple (dynamic-studio-full.html). Token-driven so
+     the whole .ds-app workspace picks it up automatically. */
+  --primary: #7C3AED;
+  --primary-ink: #6D28D9;
+  --primary-soft: #F3EEFF;
+  --primary-line: #DDD6FE;
   --green: #1B8E50;
   --green-bright: #1FA15B;
   --green-soft: #E4F4EA;
@@ -61,11 +63,13 @@
   font-size: var(--base-fs);
   line-height: 1.45;
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: var(--topbar-h) 1fr;
+  /* Mockup layout: no left sidebar. Stacked — header, horizontal stepper, main. */
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1fr;
   grid-template-areas:
-    "sidebar topbar"
-    "sidebar main";
+    "header"
+    "stepper"
+    "main";
   /* The component lives inside the STARLABS shell's .mainscreen wrapper.
      We take over the visible area BELOW the host toolbar so:
        1. The toolbar (hamburger, logo, bell, settings) stays visible.
@@ -79,6 +83,9 @@
   bottom: 0;
   width: 100vw;
   height: calc(100vh - var(--host-toolbar-h));
+  /* dvh: iOS Safari/Chrome mobile exclude the URL bar from 100vh, which clips
+     the footer. Browsers without dvh support ignore this and keep the vh line. */
+  height: calc(100dvh - var(--host-toolbar-h));
   z-index: 30;
   overflow: hidden;
 }
@@ -317,8 +324,8 @@
 .ds-app .ds-avatar {
   width: 50px;
   height: 50px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, #2E7180, #1E5663);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8B5CF6, #7C3AED);
   color: #fff;
   font-weight: 800;
   font-size: 18px;
@@ -622,6 +629,310 @@
   font-weight: 600;
   margin-top: 2px;
   line-height: 1.3;
+}
+
+/* ============================================================== HEADER (mockup)
+   Replaces the old left sidebar + topbar. Participant identity + status pill +
+   session actions in one horizontal bar, with a details popover. */
+.ds-app .ds-header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.4vw + 6px, 24px);
+  padding: 12px clamp(16px, 1.8vw + 8px, 32px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  position: relative;
+  z-index: 20;
+}
+.ds-app .ds-hdr-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  position: relative;
+}
+.ds-app .ds-hdr-idbody { min-width: 0; }
+.ds-app .ds-hdr-name {
+  font-size: clamp(16px, 0.8vw + 10px, 21px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-metaline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-2);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-uplabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  color: var(--primary-ink);
+}
+.ds-app .ds-hdr-uplabel .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--amber-bright); }
+.ds-app .ds-hdr-dot { color: var(--ink-3); }
+.ds-app .ds-hdr-detailsbtn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.ds-app .ds-hdr-detailsbtn:hover { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-hdr-detailsbtn .ic { transition: transform .3s var(--ease); }
+.ds-app .ds-hdr-detailsbtn.open .ic { transform: rotate(180deg); }
+.ds-app .ds-hdr-details {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  width: min(340px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px 14px;
+}
+.ds-app .ds-hdr-details__specialists { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.ds-app .ds-hdr-details__specialists-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.ds-app .ds-hdr-details__specialists-head .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-hdr-details__count {
+  margin-left: auto;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.ds-app .ds-hdr-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+.ds-app .ds-hdr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-left: clamp(8px, 1vw, 16px);
+  border-left: 1px solid var(--border);
+}
+
+/* Specialists included — inline row under the participant name in the header */
+.ds-app .ds-hdr-specialists {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-specialists .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--primary); }
+.ds-app .ds-hdr-specialists__label { color: var(--ink-3); font-weight: 700; }
+.ds-app .ds-hdr-specialists__names {
+  color: var(--primary-ink);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ds-app .ds-hdr-specialists__role { color: var(--ink-3); font-weight: 600; }
+
+/* ---------------------------------------------- HORIZONTAL STEPPER (mockup pane)
+   A single rounded white pane carrying numbered steps with chevrons between
+   them. Active = purple-soft chip; done = green node. Matches the mockup
+   (dynamic-studio-full.html .stepper). */
+.ds-app .ds-stepbar {
+  grid-area: stepper;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px clamp(16px, 1.8vw + 8px, 32px);
+  overflow: hidden;
+}
+.ds-app .ds-stepbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  /* the pane */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow-md);
+}
+.ds-app .ds-hstep {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 8px 13px;
+  border-radius: 11px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.ds-app .ds-hstep:hover { background: var(--surface-2); }
+.ds-app .ds-hstep-node {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  background: #F0F0F3;
+  color: var(--ink-3);
+}
+.ds-app .ds-hstep-node .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-hstep-label { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ds-app .ds-hstep-chev { color: var(--ink-3); font-size: 17px; width: 17px; height: 17px; line-height: 17px; flex-shrink: 0; }
+.ds-app .ds-hstep.done .ds-hstep-label { color: var(--ink); }
+.ds-app .ds-hstep.done .ds-hstep-node { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-hstep.active { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-hstep.active .ds-hstep-node { background: var(--primary); color: #fff; }
+.ds-app .ds-hstep.active .ds-hstep-label { font-weight: 800; }
+
+/* ---- Responsive header + stepper ------------------------------------------
+   Goal: never horizontally scroll. The header wraps its three groups; the
+   stepper wraps rows, then progressively sheds chrome as width shrinks. */
+
+/* Tablet / small laptop: drop the chevrons (they dangle once steps wrap). */
+@media (max-width: 1080px) {
+  .ds-app .ds-hstep-chev { display: none; }
+}
+
+/* Tablet & down — let status + actions wrap under the identity. */
+@media (max-width: 1024px) {
+  .ds-app .ds-header { flex-wrap: wrap; }
+  .ds-app .ds-hdr-status { margin-left: 0; order: 3; flex: 1 1 100%; }
+  .ds-app .ds-hdr-actions {
+    order: 2;
+    margin-left: auto;
+    padding-left: 0;
+    border-left: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .ds-app .ds-hdr-metaline { display: none; }
+  .ds-app .ds-hdr-details { left: auto; right: 0; }
+}
+
+/* Phone: compact stepper — show only the ACTIVE step's label, others are
+   node-only chips, so all steps fit without scrolling. Buttons shrink. */
+@media (max-width: 680px) {
+  .ds-app .ds-stepbar { padding: 8px 12px 10px; }
+  .ds-app .ds-hstep { padding: 6px 8px; gap: 6px; }
+  .ds-app .ds-hstep:not(.active) .ds-hstep-label { display: none; }
+  .ds-app .ds-hstep-node { width: 24px; height: 24px; }
+  .ds-app .ds-hstep.active .ds-hstep-label { max-width: 48vw; }
+  .ds-app .ds-header { gap: 10px; padding: 10px 12px; }
+  .ds-app .ds-hdr-name { max-width: 60vw; }
+  .ds-app .ds-hdr-actions .btn { padding: 8px 10px; font-size: 12.5px; }
+  .ds-app .ds-main-scroll { padding: 14px 12px 20px; }
+  .ds-app .card-pad { padding: 16px 16px; }
+}
+
+/* ---- Short viewport (laptop zoom / tablet) — keep the pinned app optimized ---
+   A 14" laptop at 150% zoom is ~1008×552 CSS px. We KEEP the fixed app layout
+   (sticky header/stepper/footer, content scrolls inside) and just shrink the
+   chrome so the content keeps most of the height — applied at any width, not
+   only >1024, so zoomed laptops and tablets stay pinned instead of un-pinning. */
+@media (max-height: 900px) {
+  .ds-app .ds-header { padding-top: 9px; padding-bottom: 9px; }
+  .ds-app .ds-stepbar { padding-top: 8px; padding-bottom: 8px; }
+  .ds-app .ds-hstep { padding-top: 5px; padding-bottom: 5px; }
+  .ds-app .ds-footer { min-height: 0; }
+  .ds-app .ds-main-scroll {
+    padding-top: clamp(12px, 1.4vw, 20px);
+    padding-bottom: clamp(12px, 1.2vw, 18px);
+  }
+  .ds-app .ds-step-header { margin-bottom: 12px; }
+  .ds-app .card-pad { padding: 18px 20px; }
+  .ds-app .ds-stagenote-bar { padding-top: 8px; padding-bottom: 8px; }
+}
+/* Heavier zoom / shorter height: smaller step nodes + tighter header. */
+@media (max-height: 760px) {
+  .ds-app .ds-hstep-node { width: 24px; height: 24px; }
+  .ds-app .ds-step-header { margin-bottom: 8px; }
+}
+/* When ALSO width-limited, collapse the stepper to one row (only the active step
+   keeps its label) so 7 pills never wrap and steal content height. On a wide but
+   short screen the labels stay — the pills fit one row anyway. */
+@media (max-height: 760px) and (max-width: 1180px) {
+  .ds-app .ds-hstep:not(.active) .ds-hstep-label { display: none; }
+}
+
+/* ---- Phone / extreme fallback ---------------------------------------------
+   Only for genuinely small viewports (phones, or an extremely short window) do
+   we UN-PIN the shell into normal document flow so the host page scrolls. Above
+   this — tablets and zoomed laptops — we stay pinned + compact (above), which is
+   the intended "app" experience. Keep in sync with the scroll-lock override in
+   src/styles.css. */
+@media (max-width: 640px), (max-height: 460px) {
+  .ds-app.dyn-studio-v2-app {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    z-index: auto;
+    /* Let every row size to its content instead of forcing main into 1fr. */
+    grid-template-rows: auto auto auto;
+  }
+  .ds-app.dyn-studio-v2-app .ds-main { overflow: visible; }
+  .ds-app.dyn-studio-v2-app .ds-main-scroll { overflow: visible; flex: 0 0 auto; }
+  /* Footer flows at the end of the content rather than being pinned. */
+  .ds-app.dyn-studio-v2-app .ds-footer { position: static; }
 }
 
 /* ============================================================== MAIN */
@@ -1329,6 +1640,20 @@
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
+/* Recording reminder (mockup .record-note) — amber inline note. */
+.ds-app .zoom-record-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: var(--r-md);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ds-app .zoom-record-note .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--red); }
 .ds-app .zoom-link-hint {
   display: flex;
   align-items: center;
@@ -2422,8 +2747,8 @@
   min-width: 200px;
   transition: all .2s ease;
 }
-.queue-card:hover { border-color: #1E5663; }
-.queue-card--active { border-color: #1E5663; background: #E2EEEF; }
+.queue-card:hover { border-color: #7C3AED; }
+.queue-card--active { border-color: #7C3AED; background: #F3EEFF; }
 .queue-card__name { font-weight: 800; color: #1A2332; }
 .queue-card__meta { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #566072; }
 .queue-card__icon, .queue-card__chevron { color: #8A93A3; }
@@ -2442,24 +2767,34 @@
   margin-bottom: 8px;
 }
 .sec__head-count {
-  background: #E2EEEF;
-  color: #143F49;
+  background: #F3EEFF;
+  color: #6D28D9;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
 }
-.primarystudio { background: #E2EEEF !important; color: #143F49 !important; font-weight: 700; }
+.primarystudio { background: #F3EEFF !important; color: #6D28D9 !important; font-weight: 700; }
 .secondarystudio { background: #FCF3E0 !important; color: #B45309 !important; font-weight: 700; }
 
-.stagename {
-  font-weight: 800;
-  color: #1A2332;
-  background: #F8FAFC;
-  padding: 10px 14px;
-  border-bottom: 1px solid #E2E7EF;
+/* Stage group → mockup .group-card (rounded, soft shadow) + .group-head. */
+.mainscreen [data-testid="studio-stage-col"] > .mat-elevation-z2 {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06) !important;
 }
-.stagequeue { padding: 8px 12px; }
+.stagename {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #6B7280;
+  background: #fff;
+  padding: 14px 18px;
+  border-bottom: 1px solid #E5E7EB;
+}
+.stagequeue { padding: 12px; }
 .token {
   background: #fff;
   border: 1px solid #E2E7EF;
@@ -2506,8 +2841,8 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #E2EEEF;
-  color: #143F49;
+  background: #EDE9FE;
+  color: #6D28D9;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2515,7 +2850,7 @@
   font-size: 14px;
   overflow: hidden;
   flex-shrink: 0;
-  border: 1px solid #BFD8DC;
+  border: 1px solid #DDD6FE;
 }
 .wait-token__avatar img {
   width: 100%;
@@ -2531,14 +2866,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Mockup .badge-pre — amber "Preassigned" pill. */
 .wait-token__preassigned {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
+  gap: 3px;
+  font-size: 10.5px;
   font-weight: 700;
-  font-style: italic;
-  color: #143F49;
+  color: #B45309;
+  background: #FEF3C7;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: fit-content;
 }
 .wait-token__preassigned .ic { font-size: 13px; width: 13px; height: 13px; line-height: 13px; }
 .wait-token__meta {
@@ -2550,9 +2889,9 @@
 .wait-token__token {
   font-size: 13px;
   font-weight: 800;
-  color: #143F49;
-  background: #E2EEEF;
-  border: 1px solid #BFD8DC;
+  color: #6D28D9;
+  background: #F3EEFF;
+  border: 1px solid #DDD6FE;
   padding: 4px 10px;
   border-radius: 999px;
 }
@@ -2577,18 +2916,18 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #1E5663;
+  background: #7C3AED;
   color: #FFFFFF;
   border: none;
   padding: 9px 16px;
-  border-radius: 9px;
+  border-radius: 10px;
   font-weight: 700;
   font-size: 13.5px;
   cursor: pointer;
   transition: background .2s ease, transform .2s ease;
   font-family: inherit;
 }
-.wait-token__btn:hover { background: #143F49; }
+.wait-token__btn:hover { background: #6D28D9; }
 .wait-token__btn .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
 /* Approved invite — green so it reads as "ready to assign", not a fresh invite. */
 .wait-token__btn--approved { background: #15803D; }
@@ -2620,9 +2959,9 @@
 }
 /* This studio's own pending invite — blue "awaiting response" with a Cancel. */
 .wait-token__chip--self {
-  background: #E8F1F4;
-  color: #176B7E;
-  border-color: #BBD9E1;
+  background: #F3EEFF;
+  color: #6D28D9;
+  border-color: #DDD6FE;
 }
 .wait-token__chip-cancel {
   display: inline-flex;
@@ -2639,7 +2978,7 @@
   cursor: pointer;
   opacity: .7;
 }
-.wait-token__chip-cancel:hover { opacity: 1; background: rgba(23,107,126,.14); }
+.wait-token__chip-cancel:hover { opacity: 1; background: rgba(124,58,237,.14); }
 .wait-token__chip-cancel .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
 
 @media (max-width: 720px) {
@@ -3255,3 +3594,223 @@
   line-height: 15px;
   color: var(--ink-4);
 }
+
+/* ============================================================== AEL SLIDER MODAL (mockup) */
+.ds-app .ael-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 17, 21, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  padding: 16px;
+}
+.ds-app .ael-modal {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.ds-app .ael-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ds-app .ael-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.ds-app .ael-modal__title .ic { color: var(--primary); }
+.ds-app .ael-modal__x {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-app .ael-modal__x:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .ael-modal__body { padding: 20px; overflow-y: auto; }
+.ds-app .ael-modal__sub {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.ds-app .ael-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.ds-app .ael-slider-row__area {
+  width: 92px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-app .ael-slider-row__range {
+  flex: 1;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.ds-app .ael-slider-row__val {
+  width: 62px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-ink);
+}
+.ds-app .ael-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================== MOVE-TO-NEXT-STAGE DROPDOWN (mockup) */
+.ds-app .ds-menu-anchor { position: relative; display: inline-flex; }
+.ds-app .ds-menu-anchor .btn.is-open { box-shadow: 0 6px 16px -6px rgba(124, 58, 237, .55); }
+.ds-app .ds-nextmenu-backdrop { position: fixed; inset: 0; z-index: 55; }
+.ds-app .ds-nextmenu {
+  position: absolute;
+  right: 0;
+  min-width: 288px;
+  max-width: min(360px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  z-index: 60;
+}
+.ds-app .ds-nextmenu--down { top: 100%; margin-top: 8px; }
+.ds-app .ds-nextmenu--up { bottom: 100%; margin-bottom: 8px; }
+.ds-app .ds-nextmenu__head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 6px 10px 8px;
+}
+.ds-app .ds-nextmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: background .15s var(--ease);
+}
+.ds-app .ds-nextmenu__item + .ds-nextmenu__item { margin-top: 2px; }
+.ds-app .ds-nextmenu__item:hover:not(:disabled) { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-nextmenu__item:disabled { opacity: .55; cursor: default; }
+.ds-app .ds-nextmenu__item .ic { color: var(--primary); flex-shrink: 0; }
+.ds-app .ds-nextmenu__item--go .ic { color: var(--green-bright); }
+.ds-app .ds-nextmenu__item--go:hover:not(:disabled) { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-nextmenu__item--go:hover:not(:disabled) .ic { color: var(--green); }
+
+/* ============================================================== LOBBY: STUDIO GRID (mockup) */
+.ds-lobby-head { margin-bottom: 24px; }
+.ds-lobby-title { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; color: #0D0F12; margin: 0; }
+.ds-lobby-sub { font-size: 13px; color: #6B7280; margin-top: 4px; }
+
+.studio-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.studio-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 18px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.studio-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
+.studio-top { display: flex; align-items: center; gap: 11px; }
+.studio-icon {
+  width: 40px; height: 40px; border-radius: 11px;
+  background: #EDE9FE; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.studio-icon mat-icon { font-size: 20px; width: 20px; height: 20px; color: #6D28D9; }
+.studio-name { font-size: 14.5px; font-weight: 800; color: #0D0F12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-queue { font-size: 12px; color: #6B7280; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-live { color: #16A34A; font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+.studio-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #F3F4F6; padding-top: 11px; }
+.studio-spec { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; min-width: 0; }
+.studio-spec mat-icon { font-size: 15px; width: 15px; height: 15px; flex-shrink: 0; }
+.studio-spec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-open { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700; color: #7C3AED; flex-shrink: 0; }
+.studio-open mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+/* ---- LIST screen (after picking a studio) ---- */
+.ds-back-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #6B7280; font-size: 12.5px; font-weight: 600;
+  background: none; border: none; cursor: pointer; padding: 0; margin-bottom: 14px;
+}
+.ds-back-link mat-icon { font-size: 17px; width: 17px; height: 17px; }
+.ds-list-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.ds-list-title { font-size: 20px; font-weight: 800; color: #0D0F12; margin: 0; }
+.ds-list-sub { font-size: 13px; color: #6B7280; margin-top: 2px; }
+
+.checkin-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 18px 20px; margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.checkin-card__title { font-size: 14px; font-weight: 700; color: #0D0F12; }
+.checkin-card__sub { font-size: 12.5px; color: #6B7280; margin-top: 3px; }
+
+.empty-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 48px 32px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+}
+.empty-card__ic {
+  width: 60px; height: 60px; border-radius: 18px; background: #F3F4F6;
+  display: flex; align-items: center; justify-content: center;
+}
+.empty-card__ic mat-icon { font-size: 26px; width: 26px; height: 26px; color: #9CA3AF; }
+.empty-card__t { font-size: 15px; font-weight: 700; color: #0D0F12; }
+.empty-card__b { font-size: 12.5px; color: #6B7280; max-width: 400px; line-height: 1.6; }
+
+/* Lobby studio card — "checked in" indicator (so you can see, from outside,
+   which studio you're currently checked into). */
+.studio-card--in { border: 1.5px solid #BBF7D0; box-shadow: 0 1px 3px rgba(22,163,74,0.12), 0 4px 16px rgba(22,163,74,0.10); }
+.studio-badge {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  font-size: 11px; font-weight: 800; letter-spacing: .01em;
+  padding: 4px 10px; border-radius: 999px;
+}
+.studio-badge--in { color: #15803D; background: #DCFCE7; }
+.studio-badge__dot { width: 7px; height: 7px; border-radius: 999px; background: #16A34A; }

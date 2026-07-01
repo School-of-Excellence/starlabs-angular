@@ -57,6 +57,11 @@ export class DynamicStudioV2Component {
   queueStudioCounts: { [queueid: string]: number } = {}
   queuesWithStudios: any[] = []
   noStudioInAnyQueue = false
+  // Flat list of ALL the user's studios across every queue (mockup lobby: shows
+  // studios directly, no queue-selection step). Built from the same
+  // "queue studio pairing" subscription that powers the per-queue counts.
+  allStudios: any[] = []
+  private allStudioChunks: any[][] = []
   queueStudioCountSubscriptions: Subscription[] = []
   mapVariationName = {}
   queueVariation = {}
@@ -182,6 +187,14 @@ export class DynamicStudioV2Component {
   aelLevelList = []
   private aelLevelListLoaded = false
   participantAEL = {}
+  // AEL slider modal (mockup): opened from the AEL step. The slider indexes the
+  // existing band list (aelLevelList) so the stored "start---end" value model is
+  // unchanged — this is UI only.
+  aelModalOpen = false
+  // "Move to Next Stage" dropdown (mockup): replaces the old Mark-as-Completed
+  // step. Same moveStage()/movetoNextMonthReview() actions, now in a popup
+  // opened from the header or footer trigger.
+  nextStageMenuOpen: 'header' | 'footer' | null = null
   isLoadingStudios: boolean;
 
   // Stepper state (v2)
@@ -754,14 +767,16 @@ export class DynamicStudioV2Component {
     const widgets: string[] = stageprop?.studiowidgets || []
     const steps: { id: string, label: string, icon: string, color: string }[] = []
 
-    // 1. Submitted form(s) - Current uP! cycle
-    if (this.participantForm && this.participantForm.length) {
-      steps.push({ id: 'current-forms', label: 'Submitted Forms', icon: 'description', color: '#0ea5e9' })
+    // 1. Review Forms + Love Letters - Current uP! cycle. Love Letters now live
+    // here (mockup step 1), so the step also shows when only the loveletters
+    // widget is configured, even with no submitted forms.
+    if ((this.participantForm && this.participantForm.length) || widgets.includes('loveletters')) {
+      steps.push({ id: 'current-forms', label: 'Review Forms', icon: 'description', color: '#0ea5e9' })
     }
 
-    // 2. ATC & Love Letter - Previous uP! cycle(s)
-    if (widgets.includes('previousatc') || widgets.includes('loveletters') || widgets.includes('evolutionwishlist')) {
-      steps.push({ id: 'prev-history', label: 'Previous ATC & Love Letters', icon: 'history', color: '#84cc16' })
+    // 2. Previous ATC - Previous uP! cycle(s). (Love Letters moved to step 1.)
+    if (widgets.includes('previousatc') || widgets.includes('evolutionwishlist')) {
+      steps.push({ id: 'prev-history', label: 'Previous ATC', icon: 'history', color: '#84cc16' })
     }
 
     // 3. View submitted ATC - Current uP! cycle
@@ -769,7 +784,7 @@ export class DynamicStudioV2Component {
         widgets.includes('prescribedunvalidatedatc') ||
         widgets.includes('assignedatc') ||
         widgets.includes('viewtripleatc')) {
-      steps.push({ id: 'view-atc', label: 'View Submitted ATC', icon: 'fact_check', color: '#22c55e' })
+      steps.push({ id: 'view-atc', label: 'This Cycle ATCs', icon: 'fact_check', color: '#22c55e' })
     }
 
     // 4. Zoom session — the meeting itself (always shown)
@@ -787,13 +802,11 @@ export class DynamicStudioV2Component {
 
     // 6. AEL validation
     if (widgets.includes('validateael')) {
-      steps.push({ id: 'ael-validation', label: 'AEL Validation', icon: 'verified', color: '#14b8a6' })
+      steps.push({ id: 'ael-validation', label: 'Validate AEL', icon: 'verified', color: '#14b8a6' })
     }
 
-    // 7. Mark as completed
-    if (widgets.includes('movetonextqueue') || stageprop?.nextstage?.length) {
-      steps.push({ id: 'mark-completed', label: 'Mark as Completed', icon: 'flag', color: '#a855f7' })
-    }
+    // (Mark as Completed is NOT a step anymore — per mockup its actions live in
+    // the "Move to Next Stage" dropdown triggered from the header/footer.)
 
     // Reset userNavigated flag when the live assignment changes (new session)
     const assignmentId = this.liveAssignment?.['docid'] || this.liveAssignment?.['token']?.tokenid || ''
@@ -1129,7 +1142,11 @@ export class DynamicStudioV2Component {
     this.studioPairingSubscription = null
     this.liveassignmentSubscription = null
     this.tokenSubscription = null
-    // this.studioInvitationSubscription = null
+    // Must null it (like every other sub here): resetSubscription() already
+    // unsubscribed it above, and getStudio() only rebuilds the invitation
+    // listener when this handle is null/closed. Leaving a closed non-null object
+    // here left the "Bring to Studio" countdown subscription permanently dead.
+    this.studioInvitationSubscription = null
     this.studioGroupingInvitationSubscription = null
     this.tripleATCSubscription = null
     this.outsideLiveAssignmentSubscription = null
@@ -1261,6 +1278,7 @@ export class DynamicStudioV2Component {
     if (chunks.length === 0) return
 
     const chunkResults: { [qid: string]: number }[] = chunks.map(() => ({}))
+    this.allStudioChunks = chunks.map(() => [])
     let firstEmitCount = 0
     const resolveFirst: { resolve?: () => void } = {}
     const firstEmitPromise = new Promise<void>(res => (resolveFirst.resolve = res))
@@ -1282,6 +1300,8 @@ export class DynamicStudioV2Component {
         const isFirst = Object.keys(chunkResults[idx]).length === 0 && !(chunkResults[idx] as any).__seeded
         ;(chunkResults[idx] as any).__seeded = true
         chunkResults[idx] = local
+        this.allStudioChunks[idx] = studios.filter(s => [null, undefined, false].includes(s['delete']))
+        this.rebuildAllStudios()
         this.recomputeQueueStudioCounts(chunkResults)
         if (isFirst) {
           firstEmitCount += 1
@@ -1324,6 +1344,53 @@ export class DynamicStudioV2Component {
     this.ongoingQueue = queue
     this.selectedQueue = queue
     this.onQueueSelect()
+  }
+
+  /** Build the flat, cross-queue studio-card list for the mockup lobby. */
+  private rebuildAllStudios(){
+    const flat = ([] as any[]).concat(...this.allStudioChunks)
+    this.allStudios = flat.map(s => {
+      const queueId = s['queueref']?.id
+      const queue = this.ongoingQueueList.find(q => q['docid'] === queueId)
+      const participants: string[] = s['participants'] || []
+      const activities = [...new Set(participants
+        .map(p => this.mapActivity[s['participantsactivity']?.[p]])
+        .filter(Boolean))]
+      const specialists = participants
+        .map(p => p === this.profileid ? 'You' : (this.mapProfile[p] || ''))
+        .filter(Boolean)
+      return {
+        studioId: s['docid'],
+        queueId,
+        queueName: queue?.['queuename'] || '',
+        studio: s,
+        activity: activities.join(', ') || 'Studio',
+        specialists: specialists.join(', '),
+        isLive: !!this.mapStudioLiveAssignment?.[s['docid']],
+        checkin: !!s['checkin']
+      }
+    }).sort((a, b) => (a.queueName + a.activity).localeCompare(b.queueName + b.activity))
+  }
+
+  /** Lobby card click: switch to the studio's queue if needed, then open it. */
+  async openStudioCard(entry: any){
+    if (!entry) return
+    const queue = this.ongoingQueueList.find(q => q['docid'] === entry.queueId)
+    if (queue && queue['docid'] !== this.ongoingQueue?.['docid']){
+      this.checkoutQueue()
+      this.ongoingQueue = queue
+      this.selectedQueue = queue
+      await this.onQueueSelect()
+    }
+    const studio = this.studioList.find(s => s['docid'] === entry.studioId) ?? entry.studio
+    if (studio) this.onStudioSelect(studio)
+  }
+
+  /** Back from a studio's waiting list to the lobby studio grid. */
+  backToStudios(){
+    this.selectedStudio = {}
+    this.stageTokenList = []
+    this.liveAssignment = null
   }
 
   /**
@@ -1618,9 +1685,9 @@ export class DynamicStudioV2Component {
           // it stayed falsy and a fresh listener leaked on every emission.
           this.studioInvitationSubscription = null
         }
-        if(!this.studioInvitationSubscription){
+        if(!this.studioInvitationSubscription || this.studioInvitationSubscription.closed){
           console.log(this.studioInvitationSubscription, 'studioInvitationSubscription');
-          
+
           this.studioInvitationSubscription = collectionData(query(collection(this.firestore,"studioinvitation"), where("specialistpairing", 'array-contains', this.profileid),where("queueref", '==', doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("studioid", "in", studioID),where("expirydate", ">=", new Date())), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async invitationSnap => {
           // this.studioInvitationSubscription = this.firestore.collection("studioinvitation", ref => ref.where("specialistpairing", 'array-contains', this.profileid).where("queueref", '==', this.firestore.collection("queue generation").doc(this.ongoingQueue["docid"]).ref).where("studioid", "in", studioID).where("expirydate", ">=", new Date())).valueChanges().subscribe(async invitationSnap => {
             console.log(invitationSnap)
@@ -1677,7 +1744,10 @@ export class DynamicStudioV2Component {
                   if(this.invitationCountdown == null){
                     this.invitationCountdown = await this.openQueueInvitationApproval({
                       disableClose:true,
-                      data: this.studioInvitation,
+                      // timerSeconds = classify/studiotimer.timerinseconds (the
+                      // same value used to set the invitation's expiry) so the
+                      // dialog ring scales to the configured duration directly.
+                      data: { ...this.studioInvitation, timerSeconds: this.invitationTimerSeconds },
                       maxHeight: "90vh",
                       maxWidth: '95vw',
                     })
@@ -1870,7 +1940,19 @@ export class DynamicStudioV2Component {
    * batch-checks-out the others before proceeding with this check-in.
    * Checkouts (value === false) skip the conflict check entirely.
    */
-  async checkinStudio(value){
+  async checkinStudio(event){
+    // Accept either the MatSlideToggleChange event (from the template) or a raw
+    // boolean (defensive). When the user cancels the conflict dialog we must
+    // snap the toggle back to its real state — a one-way [checked] binding won't
+    // do it because the model value never changed.
+    const toggle = (event && typeof event === 'object') ? event.source : null
+    const value = (event && typeof event === 'object') ? event.checked : event
+    const revertToggle = () => {
+      if (toggle) {
+        toggle.checked = !!this.selectedStudio?.['checkin']
+        this.cdr.detectChanges()
+      }
+    }
     if (value === true) {
       const conflicts = await this.findActiveCheckins(this.selectedStudio?.['docid'])
       if (conflicts.length > 0) {
@@ -1886,7 +1968,7 @@ export class DynamicStudioV2Component {
             autoFocus: false,
           }).afterClosed()
         )
-        if (!confirmed) return
+        if (!confirmed) { revertToggle(); return }
         // Batch-checkout the conflicting studios atomically before continuing.
         try {
           const batch = writeBatch(this.firestore)
@@ -1909,6 +1991,7 @@ export class DynamicStudioV2Component {
         } catch (err) {
           console.log('Failed to checkout other studios', err)
           alert('Could not check out of the other studio. Please try again.')
+          revertToggle()
           return
         }
       }
@@ -3825,6 +3908,39 @@ export class DynamicStudioV2Component {
     }
   }
   
+  // ---- Move to Next Stage dropdown (mockup) — same actions, popup UI ----
+  get hasNextStageOptions(): boolean {
+    const sp = this.ongoingQueue?.['stageproperty']?.[this.liveAssignment?.['stagename']] || {}
+    return !!(sp?.nextstage?.length) || !!(sp?.studiowidgets?.includes('movetonextqueue'))
+  }
+  toggleNextStageMenu(which: 'header' | 'footer'){ this.nextStageMenuOpen = this.nextStageMenuOpen === which ? null : which }
+  closeNextStageMenu(){ this.nextStageMenuOpen = null }
+
+  // ---- AEL slider modal helpers (UI only; band model unchanged) ----
+  openAelModal(){ if(this.participantAEL['aelStatus'] !== 'validated' && this.participantAEL['crossovermetric'] != null) this.aelModalOpen = true }
+  closeAelModal(){ this.aelModalOpen = false }
+  /** index of the current band ("start---end") within aelLevelList (0 if none). */
+  aelBandIndex(value: any): number {
+    const idx = this.aelLevelList.findIndex(o => (o['startpoint'] + '---' + o['endpoint']) === value)
+    return idx < 0 ? 0 : idx
+  }
+  /** set the band from a slider index; keeps the exact stored value string. */
+  setAelBand(crossover: any, idx: any){
+    const o = this.aelLevelList[+idx]
+    if(!o) return
+    crossover.value['value'] = o['startpoint'] + '---' + o['endpoint']
+    this.participantAEL['aelStatus'] = 'edited'
+  }
+  /** human label for the current band, e.g. "0 – 10". */
+  aelBandLabel(value: any): string {
+    const o = this.aelLevelList[this.aelBandIndex(value)]
+    return o ? (o['startpoint'] + ' – ' + o['endpoint']) : '—'
+  }
+  async validateAelFromModal(){
+    await this.updateCurrentAEL()
+    this.aelModalOpen = false
+  }
+
   async updateCurrentAEL(){
     var reviewed = false
     // Generate new document ID
@@ -4240,6 +4356,10 @@ export class DynamicStudioV2Component {
   // non-reordering inner lists).
   trackByDocId(index: number, item: any): any {
     return item?.docid ?? item?.id ?? index;
+  }
+
+  trackByStudioId(index: number, item: any): any {
+    return item?.studioId ?? index;
   }
 
   async joinOpenViduRoom(){
