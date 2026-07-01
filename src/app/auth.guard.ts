@@ -6,6 +6,7 @@ import { Auth, authState } from '@angular/fire/auth';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ConfirmComponent } from './DialogBox/confirm/confirm.component';
 import { MatDialog } from '@angular/material/dialog';
+import { environment } from '../environments/environment';
 
 export const authGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthguardService);
@@ -26,6 +27,13 @@ export const authGuard: CanActivateFn = (route, state) => {
         return false;
       }
       if (state.url === '/EISDashboard') {
+        return true;
+      }
+      // Test-only bypass for the new Sales Numbers screens while they have no
+      // role/profile config. Active only on starlabs-test, never in production.
+      const testBypassRoutes = ['/sales-numbers', '/sales-teams'];
+      if (environment.firebase.projectId === 'starlabs-test'
+          && testBypassRoutes.includes('/' + state.url.split('?')[0].split('/')[1])) {
         return true;
       }
       try {
