@@ -120,7 +120,7 @@ export class CohortDetailComponent implements OnDestroy {
   mentorsList = [];
   selectedMentors = [];
   isCohortUpdates : boolean = false;
-  showDisabledStudio = false;
+  showDisabledStudio = true;
 
   // Studios tab UI state
   studioGroupFilter: Set<string> = new Set<string>(); // selected group codes (uP! / LYL / B!G). Empty = all.
@@ -1435,6 +1435,7 @@ createStudioCombination() {
 
   removePairing(index) {
     this.newStudioPairing.splice(index, 1);
+    this.calculateUnassignedParticipants();
   }
 
   getDuplicatedStudios(studioToCreate) {
@@ -1573,6 +1574,7 @@ createStudioCombination() {
         await batch.commit();
         this.studioCreateMode = false;
         this.newStudioPairing = [];
+        this.showDisabledStudio = true;
       } catch (error) {
         console.error('Error creating studio pairing:', error);
       }

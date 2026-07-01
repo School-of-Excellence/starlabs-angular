@@ -72,7 +72,7 @@
       <!-- Event Selection (only visible when type is 'event') -->
       <div class="form-group" *ngIf="isEventType()">
         <label class="form-label">Select Event <span class="required">*</span></label>
-        <mat-select formControlName="eventref" [compareWith]="compareFn" (selectionChange)="onChangeEvent()" class="form-select" placeholder="Choose an event">
+        <mat-select formControlName="eventref" [compareWith]="compareFn" (selectionChange)="onEventSelectionChange()" class="form-select" placeholder="Choose an event">
           <mat-option *ngFor="let event of data?.eventCollectionList" [value]="event.ref">
             {{event.name}}
           </mat-option>
@@ -99,6 +99,9 @@
       <div class="form-group">
         <label class="form-label">Select Queue</label>
         <mat-select formControlName="queueref" class="form-select" placeholder="Choose an queue">
+          <mat-option [value]="null">
+            None
+          </mat-option>
           <mat-option *ngFor="let queue of queueList" [value]="queue.docid">
             {{queue.queuename}}
           </mat-option>
@@ -475,9 +478,9 @@
             <mat-icon>history</mat-icon>
             <span>Existing: <strong>{{existingParticipantsNotInList.length}}</strong></span>
           </div>
-          <div class="summary-item invitation" *ngIf="bigInvitationCount > 0">
+          <div class="summary-item invitation" *ngIf="participantsApprovedForEvent.length > 0">
             <mat-icon>event_available</mat-icon>
-            <span>Approved for Event: <strong>{{bigInvitationCount}}</strong></span>
+            <span>Approved for Event: <strong>{{participantsApprovedForEvent.length}}</strong></span>
           </div>
         </div>
       </div>
@@ -511,7 +514,7 @@
     <button class="btn btn-secondary" (click)="onCancel()">Cancel</button>
     <button class="btn btn-primary" (click)="onSubmit()" 
         [disabled]="cohortsForm.invalid 
-        || (cohortsForm.controls['cohortCategory'].value == 'studio' && [null , undefined , ''].includes(cohortsForm.controls['bigactivity']?.value)) 
+        || (cohortsForm.controls['cohortCategory'].value == 'studio' && ([null , undefined , ''].includes(cohortsForm.controls['bigactivity']?.value)) || [null , undefined , ''].includes(cohortsForm.controls['queueref']?.value))
         || ( isEventType() && [null , undefined , ''].includes(cohortsForm.controls['eventref']?.value))
         || loadingInvitations 
         || loadingMentors 

@@ -77,6 +77,7 @@ export class ManageCohertsComponent {
   participantSearchQuery: string = '';
   participantDropdownOpen: boolean = false;
   filteredParticipantsList: any[] = [];
+  participantsApprovedForEvent : any[] = [];
   
   // Existing participants (selected but not in current filtered list)
   existingParticipantsNotInList: any[] = [];
@@ -607,7 +608,7 @@ export class ManageCohertsComponent {
   
   // Update the list of existing participants that are not in the current filtered list
   updateExistingParticipantsNotInList() {
-    const filteredProfileIds = this.filteredParticipants.map(p => p.profileid);
+    const filteredProfileIds = [...this.participantsApprovedForEvent];
     
     // Find selected participants that are NOT in the current filtered list
     const existingIds = this.selectedParticipants.filter(id => !filteredProfileIds.includes(id));
@@ -663,7 +664,7 @@ export class ManageCohertsComponent {
   
   // Get the count of participants in current list (not existing)
   getParticipantsInListCount(): number {
-    const filteredProfileIds = this.filteredParticipants.map(p => p.profileid);
+    const filteredProfileIds = [...this.participantsApprovedForEvent];
     return this.selectedParticipants.filter(id => filteredProfileIds.includes(id)).length;
   }
 
@@ -902,12 +903,15 @@ export class ManageCohertsComponent {
     
     if (eventRef != null && eventRef != undefined) {
       this.loadingInvitations = true;
+      // this.cohortsForm.get('cohortType').setValue(null);
+      // this.selectedParticipants = [];
       
       try {
         const participationQuery = query(collection(this.firestore, "event participation request"),where("eventref", "==", eventRef),where("status", "in", ['attended','approved']));
         const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef));
         const assignedParticipantIds = new Set<string>(); 
         const approvedParticipant = new Set();
+        const participantsNotInCohort = [];
         
         const [participationSnap , cohortsSnap] = await Promise.all([getDocs(participationQuery) , getDocs(cohortQuery)]);
         cohortsSnap.docs.forEach((cohortDoc)=>{
@@ -921,26 +925,31 @@ export class ManageCohertsComponent {
 
         participationSnap.docs.forEach(docSnap => {
           const data: any = docSnap.data();
-          if(data['profileid'] != null && !assignedParticipantIds.has(data['profileid']) && !approvedParticipant.has(data['profileid'])){
-            approvedParticipant.add({
+          if(data['profileid'] != null && !approvedParticipant.has(data['profileid'])){
+            if(!assignedParticipantIds.has(data['profileid']) || this.selectedParticipants.includes(data['profileid'])){
+              participantsNotInCohort.push({
               id: docSnap.id,
               name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
               profileid: data['profileid'],
               ...data
-            });
+            })
+            }
+            approvedParticipant.add(data['profileid']);
           }
-        })
+        });
+
         
-        this.bigInvitationParticipants = Array.from(approvedParticipant.values());
+        this.bigInvitationParticipants = [...participantsNotInCohort];
         // Extract participant IDs from event participation request
-        const approvedParticipantIds = Array.from(approvedParticipant.values());
         
-        this.bigInvitationCount = approvedParticipantIds.length;
+        this.bigInvitationCount = participantsNotInCohort.length;
+        this.participantsApprovedForEvent = Array.from(approvedParticipant.values())
+        console.log('  qdwedw ' , Array.from(approvedParticipant.values()))
         
-        console.log(approvedParticipantIds);
+        console.log(participantsNotInCohort);
         console.log(this.data.totalParticipants);
         
-        this.filteredParticipants = approvedParticipantIds;
+        this.filteredParticipants = participantsNotInCohort;
         console.log(this.filteredParticipants);
         
         this.filteredParticipantsList = [...this.filteredParticipants];
@@ -949,7 +958,7 @@ export class ManageCohertsComponent {
         // Update existing participants list - previously selected ones not in new event list
         this.updateExistingParticipantsNotInList();
         
-        console.log('Approved participants from event participation request:', approvedParticipantIds);
+        console.log('Approved participants from event participation request not in any cohort:', participantsNotInCohort);
         
       } catch (error) {
         console.error('Error fetching event participation request:', error);
@@ -970,6 +979,12 @@ export class ManageCohertsComponent {
       this.filteredParticipantsList = [...this.filteredParticipants];
       this.updateExistingParticipantsNotInList();
     }
+  }
+
+  onEventSelectionChange(){
+    this.cohortsForm.get('participantidlist').setValue(null);
+    this.selectedParticipants = [];
+    this.onChangeEvent()
   }
 
   // Fetch participant profiles directly if totalParticipants not available
