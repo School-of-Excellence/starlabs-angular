@@ -9,14 +9,14 @@
     </nav>
     
     <nav class="navbar navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
-      <div>
+      <div class="status-row">
         <span class="icon-text-container" (click)="autoSave()">
           <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
           <span>{{draftStatus.message}}</span>
           <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
         </span>
         <!-- explicit retry shown only when a save failed -->
-        <button *ngIf="draftStatus.code == -1" mat-button class="retry-button" (click)="autoSave()">Retry</button>
+        <button *ngIf="draftStatus.code == -1" type="button" class="retry-button" (click)="autoSave()">Retry</button>
       </div>
       <!-- <div *ngIf="autosaveonprogress">
         <span class="icon-text-container">
