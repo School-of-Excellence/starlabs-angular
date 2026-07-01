@@ -32,7 +32,7 @@ export interface SalesTeam {
 // Aggregated metrics for one group (a salesperson or a team).
 // Cancellations are split gross vs assured so the global GSV/ASV filter drives them too.
 export interface SalesGroupMetric {
-  group: string;                // salesperson name or team name
+  group: string;                // salesperson / team / product-segment name
   grossCount: number;
   gsv: number;                  // gross sales value
   assuredCount: number;
@@ -41,20 +41,13 @@ export interface SalesGroupMetric {
   cancelledValue: number;
   assuredCancelledCount: number;   // cancellations whose sale was assured
   assuredCancelledValue: number;
-}
-
-// The four Net-Contribution headline numbers — count first, value secondary.
-export interface NetContribution {
-  // counts (primary)
-  totalCount: number;                    // gross sales count in range
-  cancelledFromCurrentMonthCount: number;
-  salesAfterCancellationCount: number;   // gross count - live cancellation count
-  liveCancellationCount: number;
-  // values (secondary, shown small)
-  total: number;                // GSV in range
-  cancelledFromCurrentMonth: number; // cancellations whose original sale is in the current month
-  salesAfterCancellation: number;    // total - live cancellations
-  liveCancellation: number;     // all cancellations whose cancel date is in range
+  // sale-type split (gross + assured counts), for the inline New/Upgrade/Add-on figures on the cards
+  newGrossCount: number;
+  newAssuredCount: number;
+  upgradeGrossCount: number;
+  upgradeAssuredCount: number;
+  addonsGrossCount: number;
+  addonsAssuredCount: number;
 }
 
 // One month bucket for the sales-vs-cancellations comparison chart.
@@ -67,17 +60,14 @@ export interface MonthlyPoint {
 }
 
 export interface DashboardData {
+  segments: SalesGroupMetric[]; // the product-segment cards: Ecosystem, DFU, FTO + Gift (fixed order)
+  allSegment: SalesGroupMetric; // the "All" rollup card (also used as table totals)
   groups: SalesGroupMetric[];   // by salesperson or by team, per current view
-  byProduct: SalesGroupMetric[]; // breakdown by specific product
-  bySource: SalesGroupMetric[];  // breakdown by lead source
-  byType: SalesGroupMetric[];    // breakdown by sale type (New/Upgrade/Add-on)
-  totals: SalesGroupMetric;     // roll-up across all groups
-  net: NetContribution;
+  bySource: SalesGroupMetric[]; // breakdown by lead source
+  totals: SalesGroupMetric;     // roll-up across all groups (== allSegment)
   monthly: MonthlyPoint[];
   sources: string[];            // distinct source values present (for the filter)
   originalSources: string[];    // distinct originalsource values
   salespeople: string[];        // distinct salespeople present
   teams: string[];              // team names
-  products: string[];           // distinct product values (for the filter)
-  types: string[];              // distinct sale types present (for the filter)
 }

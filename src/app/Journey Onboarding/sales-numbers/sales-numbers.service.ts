@@ -4,7 +4,7 @@ import {
   doc, setDoc, updateDoc, deleteDoc,
 } from '@angular/fire/firestore';
 import {
-  SaleLead, SalesTeam, SalesGroupMetric, NetContribution,
+  SaleLead, SalesTeam, SalesGroupMetric,
   MonthlyPoint, DashboardData,
 } from './sales-numbers.models';
 
@@ -12,10 +12,12 @@ export interface SalesFilters {
   sources: string[];
   originalSources: string[];
   salespeople: string[];
-  products: string[];
-  types: string[];
   team: string; // '' = all teams
 }
+
+// map a product category to its card segment (FTO + Gift are clubbed)
+const SEGMENT_OF: Record<string, string> = { Ecosystem: 'Ecosystem', DFU: 'DFU', FTO: 'FTO + Gift', Gift: 'FTO + Gift' };
+const SEGMENT_ORDER = ['Ecosystem', 'DFU', 'FTO + Gift'];
 
 const DOWNGRADE_TYPES = ['downgradetoold', 'downgradetonew', 'downgrade'];
 
@@ -162,77 +164,35 @@ export class SalesNumbersService {
     for (const t of teams) for (const m of t.members) memberToTeam.set(m, t.team);
     const teamOf = (person: string) => memberToTeam.get(person) ?? 'Unassigned';
 
-    // composable per-field filter predicates (an empty filter passes everything)
+    // composable per-field filter predicates (an empty filter passes everything).
+    // NOTE: there is no product/type filter any more — product is shown as segment cards,
+    // and sale type is folded into each card as the New/Upgrade/Add-on split.
     const fSource = (l: SaleLead) => !filters.sources.length || filters.sources.includes(l.source);
     const fOriginal = (l: SaleLead) => !filters.originalSources.length || filters.originalSources.includes(l.originalsource);
     const fPerson = (l: SaleLead) => !filters.salespeople.length || filters.salespeople.includes(l.salespersonname);
     const fTeam = (l: SaleLead) => !filters.team || teamOf(l.salespersonname) === filters.team;
-    const fProduct = (l: SaleLead) => !filters.products.length || filters.products.includes(l.product);
-    const fType = (l: SaleLead) => !filters.types.length || filters.types.includes(l.saleType);
 
-    const passesFilters = (l: SaleLead) => fSource(l) && fOriginal(l) && fPerson(l) && fTeam(l) && fProduct(l) && fType(l);
-    // each dimension's own breakdown IGNORES its own filter (so all its values always show) but honours the rest
-    const passesExceptSource = (l: SaleLead) => fOriginal(l) && fPerson(l) && fTeam(l) && fProduct(l) && fType(l);
-    const passesExceptType = (l: SaleLead) => fSource(l) && fOriginal(l) && fPerson(l) && fTeam(l) && fProduct(l);
+    const passesFilters = (l: SaleLead) => fSource(l) && fOriginal(l) && fPerson(l) && fTeam(l);
+    // the source breakdown ignores its own source filter (so all sources always show) but honours the rest
+    const passesExceptSource = (l: SaleLead) => fOriginal(l) && fPerson(l) && fTeam(l);
 
     const filtered = sales.filter(passesFilters);
     const groupKey = (l: SaleLead) => (view === 'team' ? teamOf(l.salespersonname) : l.salespersonname);
 
-    // active-metric pickers (the global GSV/ASV filter)
-    const aCount = (m: SalesGroupMetric) => (asv ? m.assuredCount : m.grossCount);
     const aValue = (m: SalesGroupMetric) => (asv ? m.asv : m.gsv);
-    const aCancelCount = (m: SalesGroupMetric) => (asv ? m.assuredCancelledCount : m.cancelledCount);
-    const aCancelValue = (m: SalesGroupMetric) => (asv ? m.assuredCancelledValue : m.cancelledValue);
     const byActive = (a: SalesGroupMetric, b: SalesGroupMetric) => aValue(b) - aValue(a);
 
-    const map = this.accumulate(filtered, groupKey, start, end);
-    const groups = [...map.values()].sort(byActive);
+    // person/team breakdown table
+    const groups = [...this.accumulate(filtered, groupKey, start, end).values()].sort(byActive);
 
-    // product breakdown — by SPECIFIC product (uP!, LYL, ...), honouring the category filter above
-    const byProduct = [...this.accumulate(filtered, (l) => l.productName || 'Unspecified', start, end).values()].sort(byActive);
-
-    // type breakdown — by sale type (new/upgrade/addons). Ignores the type filter, honours the rest.
-    const byType = [...this.accumulate(sales.filter(passesExceptType), (l) => l.saleType || 'Other', start, end).values()].sort(byActive);
-
-    // source breakdown — by lead source. Ignores the source filter, honours the rest.
+    // source breakdown — ignores the source filter, honours the rest
     const bySource = [...this.accumulate(sales.filter(passesExceptSource), (l) => l.source || 'Unspecified', start, end).values()].sort(byActive);
 
-    const totals: SalesGroupMetric = groups.reduce((acc, g) => ({
-      group: 'All',
-      grossCount: acc.grossCount + g.grossCount,
-      gsv: acc.gsv + g.gsv,
-      assuredCount: acc.assuredCount + g.assuredCount,
-      asv: acc.asv + g.asv,
-      cancelledCount: acc.cancelledCount + g.cancelledCount,
-      cancelledValue: acc.cancelledValue + g.cancelledValue,
-      assuredCancelledCount: acc.assuredCancelledCount + g.assuredCancelledCount,
-      assuredCancelledValue: acc.assuredCancelledValue + g.assuredCancelledValue,
-    }), { group: 'All', grossCount: 0, gsv: 0, assuredCount: 0, asv: 0, cancelledCount: 0, cancelledValue: 0, assuredCancelledCount: 0, assuredCancelledValue: 0 });
-
-    // ---- Net Contribution panel (follows the active metric) ----
-    const cmStart = new Date(); cmStart.setDate(1); cmStart.setHours(0, 0, 0, 0);
-    const cmEnd = new Date(cmStart); cmEnd.setMonth(cmEnd.getMonth() + 1); cmEnd.setMilliseconds(-1);
-    const inCurrentMonth = (d: Date | null) => !!d && d >= cmStart && d <= cmEnd;
-
-    let cancelledFromCurrentMonth = 0, cancelledFromCurrentMonthCount = 0;
-    for (const l of filtered) {
-      if (this.isCancelled(l) && inCurrentMonth(l.purchasedate) && (!asv || this.hasAssured(l))) {
-        cancelledFromCurrentMonth += l.totalpurchasevalue;
-        cancelledFromCurrentMonthCount++;
-      }
-    }
-    const totalCount = aCount(totals), totalValue = aValue(totals);
-    const liveCancelCount = aCancelCount(totals), liveCancelValue = aCancelValue(totals);
-    const net: NetContribution = {
-      totalCount,
-      cancelledFromCurrentMonthCount,
-      salesAfterCancellationCount: totalCount - liveCancelCount,
-      liveCancellationCount: liveCancelCount,
-      total: totalValue,
-      cancelledFromCurrentMonth,
-      salesAfterCancellation: totalValue - liveCancelValue,
-      liveCancellation: liveCancelValue,
-    };
+    // product-segment cards (Ecosystem / DFU / FTO+Gift), plus the All rollup
+    const segMap = this.accumulate(filtered, (l) => SEGMENT_OF[l.product] || 'Other', start, end);
+    const segments = SEGMENT_ORDER.map((key) => segMap.get(key) ?? this.zeroMetric(key));
+    const allSegment = [...this.accumulate(filtered, () => 'All', start, end).values()][0] ?? this.zeroMetric('All');
+    const totals = allSegment; // the All card is also the table roll-up
 
     // ---- monthly sales vs cancellations (chart) — honours filters AND the active metric ----
     const chartSales = salesForChart
@@ -248,10 +208,16 @@ export class SalesNumbersService {
     const originalSources = this.distinct(sales.map((l) => l.originalsource));
     const salespeople = this.distinct([...sales.map((l) => l.salespersonname), ...memberToTeam.keys()]);
     const teamNames = this.distinct(teams.map((t) => t.team));
-    const products = this.distinct(sales.map((l) => l.product));
-    const types = this.distinct(sales.map((l) => l.saleType));
 
-    return { groups, byProduct, bySource, byType, totals, net, monthly, sources, originalSources, salespeople, teams: teamNames, products, types };
+    return { segments, allSegment, groups, bySource, totals, monthly, sources, originalSources, salespeople, teams: teamNames };
+  }
+
+  private zeroMetric(group: string): SalesGroupMetric {
+    return {
+      group, grossCount: 0, gsv: 0, assuredCount: 0, asv: 0, cancelledCount: 0, cancelledValue: 0,
+      assuredCancelledCount: 0, assuredCancelledValue: 0,
+      newGrossCount: 0, newAssuredCount: 0, upgradeGrossCount: 0, upgradeAssuredCount: 0, addonsGrossCount: 0, addonsAssuredCount: 0,
+    };
   }
 
   // Build a per-group metric map: gross/assured sales (by purchasedate in range) and
@@ -261,10 +227,7 @@ export class SalesNumbersService {
     const map = new Map<string, SalesGroupMetric>();
     const ensure = (g: string): SalesGroupMetric => {
       let m = map.get(g);
-      if (!m) {
-        m = { group: g, grossCount: 0, gsv: 0, assuredCount: 0, asv: 0, cancelledCount: 0, cancelledValue: 0, assuredCancelledCount: 0, assuredCancelledValue: 0 };
-        map.set(g, m);
-      }
+      if (!m) { m = this.zeroMetric(g); map.set(g, m); }
       return m;
     };
     const inRange = (d: Date | null) => !!d && d >= start && d <= end;
@@ -273,7 +236,11 @@ export class SalesNumbersService {
       if (this.isGross(l) && inRange(l.purchasedate)) {
         m.grossCount++;
         m.gsv += l.totalpurchasevalue;
-        if (this.isAssured(l)) { m.assuredCount++; m.asv += l.totalpurchasevalue; }
+        const assured = this.isAssured(l);
+        if (assured) { m.assuredCount++; m.asv += l.totalpurchasevalue; }
+        if (l.saleType === 'new') { m.newGrossCount++; if (assured) m.newAssuredCount++; }
+        else if (l.saleType === 'upgrade') { m.upgradeGrossCount++; if (assured) m.upgradeAssuredCount++; }
+        else if (l.saleType === 'addons') { m.addonsGrossCount++; if (assured) m.addonsAssuredCount++; }
       }
       if (this.isCancelled(l) && inRange(l.date)) {
         m.cancelledCount++;

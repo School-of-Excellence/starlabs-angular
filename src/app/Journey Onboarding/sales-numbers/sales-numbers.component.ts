@@ -42,7 +42,7 @@ export class SalesNumbersComponent implements OnInit {
   view: 'person' | 'team' = 'person';
   metric: 'gsv' | 'asv' = 'asv'; // global metric filter; ASV by default
 
-  filters: SalesFilters = { sources: [], originalSources: [], salespeople: [], products: ['Ecosystem'], types: [], team: '' };
+  filters: SalesFilters = { sources: [], originalSources: [], salespeople: [], team: '' };
 
   // data caches (sales refetched only when the range changes; filters/view re-aggregate locally)
   private teamsCache: SalesTeam[] = [];
@@ -117,14 +117,47 @@ export class SalesNumbersComponent implements OnInit {
   onFilterChange(): void { this.recompute(); }
 
   clearFilters(): void {
-    this.filters = { sources: [], originalSources: [], salespeople: [], products: [], types: [], team: '' };
+    this.filters = { sources: [], originalSources: [], salespeople: [], team: '' };
     this.recompute();
   }
 
-  // pretty label for a sale type value
-  typeLabel(t: string): string {
-    return t === 'new' ? 'New Sale' : t === 'upgrade' ? 'Upgrade' : t === 'addons' ? 'Add-on' : t;
+  // active-team chip: empty when no team is selected
+  get activeTeam(): string { return this.filters.team; }
+
+  // vivid iOS system colours (solid icon tile + total)
+  segColor(name: string): string {
+    switch (name) {
+      case 'Ecosystem': return '#007AFF';  // systemBlue
+      case 'DFU': return '#34C759';         // systemGreen
+      case 'FTO + Gift': return '#FF9500';  // systemOrange
+      case 'All': return '#5856D6';         // systemIndigo
+      default: return '#8E8E93';
+    }
   }
+  // soft same-hue card wash
+  segWash(name: string): string {
+    switch (name) {
+      case 'Ecosystem': return 'rgba(0,122,255,0.10)';
+      case 'DFU': return 'rgba(52,199,89,0.11)';
+      case 'FTO + Gift': return 'rgba(255,149,0,0.11)';
+      case 'All': return 'rgba(88,86,214,0.10)';
+      default: return 'transparent';
+    }
+  }
+  segIcon(name: string): string {
+    switch (name) {
+      case 'Ecosystem': return 'hub';
+      case 'DFU': return 'trending_up';
+      case 'FTO + Gift': return 'card_giftcard';
+      case 'All': return 'functions';
+      default: return 'sell';
+    }
+  }
+
+  // sale-type split counts, metric-aware (used by the segment cards)
+  newCount(g: SalesGroupMetric): number { return this.metric === 'asv' ? g.newAssuredCount : g.newGrossCount; }
+  upgradeCount(g: SalesGroupMetric): number { return this.metric === 'asv' ? g.upgradeAssuredCount : g.upgradeGrossCount; }
+  addonsCount(g: SalesGroupMetric): number { return this.metric === 'asv' ? g.addonsAssuredCount : g.addonsGrossCount; }
 
   private buildChart(): void {
     if (!this.data) return;
