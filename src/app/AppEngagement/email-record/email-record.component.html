@@ -61,6 +61,26 @@
             <mat-icon matSuffix>assignment</mat-icon>
           </mat-form-field>
 
+          <!-- Category Filter -->
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Category</mat-label>
+            <mat-select formControlName="categoryFilter">
+              <mat-option *ngFor="let cat of categoryOptions" [value]="cat">
+                {{cat}}
+              </mat-option>
+            </mat-select>
+            <mat-icon matSuffix>category</mat-icon>
+          </mat-form-field>
+
+          <!-- View Category Participants Button -->
+          <button mat-stroked-button color="accent"
+            *ngIf="filterForm.get('categoryFilter')?.value && filterForm.get('categoryFilter')?.value !== 'All Categories'"
+            (click)="openCategorySidebar(filterForm.get('categoryFilter')?.value)"
+            class="view-category-btn">
+            <mat-icon>people</mat-icon>
+            View Participants
+          </button>
+
           <!-- Profile Autocomplete Filter -->
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Filter by Profile</mat-label>
@@ -235,7 +255,7 @@
             </th>
             <td mat-cell *matCellDef="let record" class="email-cell">
               <div class="email-content">
-                <button mat-button class="recipient-chip clickable-chip" 
+                <button mat-button class="participant-chip clickable-chip" 
                   (click)="openParticipantsPopup(record, 'all')"
                   matTooltip="Click to view all participants">
                   <mat-icon>group</mat-icon>
@@ -594,5 +614,165 @@
     </mat-card>
   </div>
   <!-- ==================== END UNIFIED PARTICIPANTS POPUP ==================== -->
+<!-- ==================== CATEGORY SIDEBAR ==================== -->
+<div class="cat-dialog-overlay" *ngIf="showCategoryDialog" (click)="closeCategorySidebar()">
+  <div class="cat-dialog" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="cat-dialog-header">
+      <div class="cat-dialog-header-left">
+        <mat-icon>category</mat-icon>
+        <div>
+          <h3 class="cat-dialog-title">Category Participants</h3>
+          <p class="cat-dialog-subtitle">{{selectedCategoryForSidebar}}</p>
+        </div>
+      </div>
+      <button mat-icon-button (click)="closeCategorySidebar()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Loading -->
+    <div *ngIf="isCategoryLoading" class="cat-dialog-loading">
+      <mat-icon class="spin">sync</mat-icon>
+      Loading participants...
+    </div>
+
+    <ng-container *ngIf="!isCategoryLoading">
+
+      <!-- Stats row -->
+      <div class="cat-dialog-stats">
+        <div class="cat-stat total">
+          <mat-icon>people</mat-icon>
+          <span class="cat-stat-num">{{categoryParticipants.length}}</span>
+          <span class="cat-stat-lbl">Total</span>
+        </div>
+        <div class="cat-stat sent">
+          <mat-icon>send</mat-icon>
+          <span class="cat-stat-num">{{categorySidebarSentCount}}</span>
+          <span class="cat-stat-lbl">Sent</span>
+        </div>
+        <div class="cat-stat open">
+          <mat-icon>visibility</mat-icon>
+          <span class="cat-stat-num">{{categorySidebarOpenCount}}</span>
+          <span class="cat-stat-lbl">Opened</span>
+        </div>
+        <div class="cat-stat failed">
+          <mat-icon>cancel</mat-icon>
+          <span class="cat-stat-num">{{categorySidebarFailedCount}}</span>
+          <span class="cat-stat-lbl">Failed</span>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="cat-dialog-search">
+        <mat-form-field appearance="outline" style="width:100%">
+          <mat-label>Search participants</mat-label>
+          <input matInput
+            [(ngModel)]="categoryParticipantSearch"
+            (input)="onCategoryParticipantSearchChange()"
+            placeholder="Email, name, template...">
+          <mat-icon matPrefix>search</mat-icon>
+          <button matSuffix mat-icon-button
+            *ngIf="categoryParticipantSearch"
+            (click)="categoryParticipantSearch=''; onCategoryParticipantSearchChange()">
+            <mat-icon>clear</mat-icon>
+          </button>
+        </mat-form-field>
+        <div class="cat-result-count">
+          Showing {{categoryDisplayedParticipants.length}} of {{filteredCategoryParticipants.length}} participants
+        </div>
+      </div>
+
+    <div class="cat-dialog-list">
+
+  <div *ngIf="filteredCategoryParticipants.length === 0 && !isCategoryLoading" class="cat-dialog-empty">
+    <mat-icon>search_off</mat-icon>
+    <p>No participants found</p>
+  </div>
+
+  <ng-container *ngIf="categoryDisplayedParticipants.length > 0">
+
+    <!-- Table Header: 3 columns only -->
+    <div class="cat-table-header">
+      <div class="cat-col-profile">Profile</div>
+      <div class="cat-col-templates">Template(s)</div>
+      <div class="cat-col-total">Total</div>
+    </div>
+
+    <!-- Table Rows -->
+    <div class="cat-table-row" *ngFor="let p of categoryDisplayedParticipants">
+
+      <!-- Profile -->
+      <div class="cat-col-profile">
+        <div class="cat-avatar">
+          {{ (p.name && p.name !== 'Unknown' ? p.name : p.email).charAt(0).toUpperCase() }}
+        </div>
+        <div>
+          <div class="cat-pname">{{ p.name && p.name !== 'Unknown' ? p.name : p.email }}</div>
+          <div class="cat-pemail" *ngIf="p.name && p.name !== 'Unknown'">{{ p.email }}</div>
+          <div class="cat-pid" *ngIf="p.profileid">#{{ p.profileid }}</div>
+        </div>
+      </div>
+
+      <!-- Templates: horizontal blocks, one per template -->
+      <div class="cat-col-templates">
+        <div class="cat-tpl-block" *ngFor="let ts of p.templateStatuses">
+          <div class="cat-tpl-name">{{ ts.templateName }}</div>
+          <div class="cat-tpl-pills">
+            <span class="cat-pill pill-sent" *ngIf="ts.sent && !ts.failed">
+              <mat-icon>check</mat-icon> Sent
+            </span>
+            <span class="cat-pill pill-open" *ngIf="ts.open">
+              <mat-icon>visibility</mat-icon> Seen
+            </span>
+            <span class="cat-pill pill-failed" *ngIf="ts.failed">
+              <mat-icon>close</mat-icon> Failed
+            </span>
+            <span class="cat-dash" *ngIf="!ts.sent && !ts.failed && !ts.open">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div class="cat-col-total">
+        <span class="cat-pill pill-sent" *ngIf="p.sent">
+          <mat-icon>check_circle</mat-icon> {{ fetchSentCount(p) }} sent
+        </span>
+        <span class="cat-pill pill-open" *ngIf="p.open">
+          <mat-icon>visibility</mat-icon> {{ fetchOpenCount(p) }} seen
+        </span>
+        <span class="cat-pill pill-failed" *ngIf="p.failed">
+          <mat-icon>cancel</mat-icon> {{ fetchFailedCount(p) }} failed
+        </span>
+        <span class="cat-dash" *ngIf="!p.sent && !p.open && !p.failed">—</span>
+      </div>
+
+    </div>
+
+    <!-- Pagination -->
+    <div class="cat-dialog-pagination" *ngIf="categoryTotalPages > 1">
+      <button mat-icon-button (click)="categoryPrevPage()" [disabled]="categoryCurrentPage === 0">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <span class="cat-page-info">Page {{ categoryCurrentPage + 1 }} of {{ categoryTotalPages }}</span>
+      <button mat-icon-button (click)="categoryNextPage()" [disabled]="categoryCurrentPage >= categoryTotalPages - 1">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+
+  </ng-container>
 
 </div>
+
+<!-- Footer -->
+<div class="cat-dialog-footer">
+  <button mat-button (click)="closeCategorySidebar()">
+    <mat-icon>close</mat-icon> Close
+  </button>
+  <button mat-raised-button color="primary" (click)="exportCategoryParticipants()">
+    <mat-icon>download</mat-icon> Export
+  </button>
+</div>
+
+<!-- ==================== END CATEGORY SIDEBAR ==================== -->
