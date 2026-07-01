@@ -3,7 +3,7 @@
 </div>
 
 <div *ngIf="!router.url.includes('/login') && !router.url.includes('joinroom') && !router.url.includes('joinlivekit') && !router.url.includes('embed=true')">
-  <mat-toolbar class="toolbar mat-elevation-z8" *ngIf="!router.url.includes('/openmeeting') &&  !router.url.includes('arenadesigninsights')">   
+  <mat-toolbar class="toolbar mat-elevation-z8" *ngIf="!router.url.includes('/openmeeting') &&  !router.url.includes('arenadesigninsights') && !router.url.includes('/arena/')">
     <button class="text-light" mat-icon-button (click)="toggleLeftDrawer()" matTooltip="Toggle Navigation Menu">
       <mat-icon>menu</mat-icon>
     </button>

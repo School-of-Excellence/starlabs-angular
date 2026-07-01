@@ -16,10 +16,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-journeycoach-opportunities',
   imports: [
+    ProfilePictureComponent,
     MatProgressSpinnerModule,
     CommonModule,
     MatFormFieldModule,

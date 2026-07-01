@@ -342,7 +342,7 @@
               <div class="talk-bubble1 round">
                 <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
                   <span class="d-flex justify-content-between">
-                    <p>{{mapProfileData[list['senderprofileid']]['name']}}</p>
+                    <p>{{mapProfileData[list['senderprofileid']]?.['name']}}</p>
                     <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
                         [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
                   </span>
@@ -488,6 +488,42 @@
                 <mat-icon class="fsb-option-check">{{preassignedFilter === 'not-preassigned' ? 'radio_button_checked' :
                   'radio_button_unchecked'}}</mat-icon>
                 <span>Not pre-assigned</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- APPROVED ROW -->
+        <div class="fsb-expandable">
+          <div class="fsb-row" [class.fsb-row-active]="approvedFilter !== 'all'"
+            [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot" (click)="toggleApprovedDropdown()">
+            <mat-icon class="fsb-icon">check_circle</mat-icon>
+            <span class="fsb-label">Approved</span>
+            <span class="fsb-value-text" *ngIf="approvedFilter === 'all'">All participants</span>
+            <span class="fsb-value-text fsb-value-active" *ngIf="approvedFilter !== 'all'">
+              {{approvedFilter === 'approved' ? 'Approved only' : 'Not approved'}}
+            </span>
+            <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="approvedDropdownOpen">expand_more</mat-icon>
+          </div>
+          <div class="fsb-dropdown" *ngIf="approvedDropdownOpen">
+            <div class="fsb-dropdown-options">
+              <div class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'all'"
+                (click)="approvedFilter='all'; onApprovedFilterChange(); approvedDropdownOpen=false; $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{approvedFilter === 'all' ? 'radio_button_checked' :
+                  'radio_button_unchecked'}}</mat-icon>
+                <span>All participants</span>
+              </div>
+              <div class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'approved'"
+                (click)="approvedFilter='approved'; onApprovedFilterChange(); approvedDropdownOpen=false; $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{approvedFilter === 'approved' ? 'radio_button_checked' :
+                  'radio_button_unchecked'}}</mat-icon>
+                <span>Approved only</span>
+              </div>
+              <div class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'not-approved'"
+                (click)="approvedFilter='not-approved'; onApprovedFilterChange(); approvedDropdownOpen=false; $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{approvedFilter === 'not-approved' ? 'radio_button_checked' :
+                  'radio_button_unchecked'}}</mat-icon>
+                <span>Not approved</span>
               </div>
             </div>
           </div>
@@ -1369,7 +1405,14 @@
 
                     <!-- Name with TEXT highlighting only -->
                     <span class="label">Name:</span>
+                    <app-profile-picture
+                      [profileId]="token.profile_id"
+                      [name]="mapProfileData[token.profile_id]?.['name'] || ''"
+                      [size]="24"
+                      style="display:inline-block;vertical-align:middle;margin:0 4px;"></app-profile-picture>
                     <span [innerHTML]="highlightText(mapProfileData[token.profile_id]?.['name'] || '')"></span>
+                    <mat-icon *ngIf="isApproved(token)" class="approved-check"
+                      [matTooltip]="'Approved for ' + approvedEventName(token)">check_circle</mat-icon>
                     <span *ngIf="column.type != null && column.type != 'Activity'">&nbsp;({{token['status'] == null ?
                       'Queued' : token['status']}})</span>
 

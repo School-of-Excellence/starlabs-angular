@@ -17,6 +17,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-approve-offtime',
@@ -31,7 +32,8 @@ import { MatButtonModule } from '@angular/material/button';
     MatSortModule,
     MatPaginatorModule,
     MatCheckboxModule,
-    MatButtonModule
+    MatButtonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './approve-offtime.component.html',
   styleUrl: './approve-offtime.component.css'

@@ -16,6 +16,7 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-participant-delivery-sequence',
@@ -34,7 +35,8 @@ import { MatButtonModule } from '@angular/material/button';
     ReactiveFormsModule,
     MatInputModule,
     MatCheckboxModule,
-    MatButtonModule
+    MatButtonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './participant-delivery-sequence.component.html',
   styleUrl: './participant-delivery-sequence.component.css'

@@ -16,6 +16,7 @@ import { CommonModule } from '@angular/common';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { LinebreaksPipe, LinkPipe } from "../../custompipe.pipe";
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-flag-review-screen',
@@ -32,7 +33,8 @@ import { LinebreaksPipe, LinkPipe } from "../../custompipe.pipe";
     MatDividerModule,
     ReactiveFormsModule,
     LinebreaksPipe,
-    LinkPipe
+    LinkPipe,
+    ProfilePictureComponent
   ],
   templateUrl: './flag-review-screen.component.html',
   styleUrl: './flag-review-screen.component.css'

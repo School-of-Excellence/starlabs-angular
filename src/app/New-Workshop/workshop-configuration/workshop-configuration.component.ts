@@ -39,6 +39,7 @@ import { MatTimepickerModule } from '@angular/material/timepicker';
 import { AuthguardService } from '../../authguard.service';
 import { WorkshopCategoryComponent } from '../workshop-category/workshop-category.component';
 import { UploadEpisodeDialogComponent } from '../../content/episodes-dashboard/upload-episode-dialog/upload-episode-dialog.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface WorkshopConfig {
   detailpage?: {
@@ -159,7 +160,8 @@ interface CurriculumItem {
     NgxEditorModule,
     MatSlideToggleModule,
     MatTimepickerModule,
-    MatChipsModule
+    MatChipsModule,
+    ProfilePictureComponent
 ],
   templateUrl: './workshop-configuration.component.html',
   styleUrls: ['./workshop-configuration.component.css']

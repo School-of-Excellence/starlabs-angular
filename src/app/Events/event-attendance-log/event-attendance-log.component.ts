@@ -15,6 +15,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-event-attendance-log',
@@ -31,7 +32,8 @@ import { MatIconModule } from '@angular/material/icon';
     MatPaginatorModule,
     MatSortModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    ProfilePictureComponent
   ],
   providers:[
     provideNativeDateAdapter()

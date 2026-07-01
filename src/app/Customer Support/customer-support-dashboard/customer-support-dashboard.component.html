@@ -235,7 +235,9 @@
                 <p *ngIf="assignData.length != 0"><b>Assigned To:</b></p>
                 <div style="line-height: 0.7;">
                   <div *ngFor="let assign of assignData['assignto']; let idx = index">
-                    <p>{{idx + 1}}{{'.'}} &nbsp;{{mapProfileData[assign]?.name}}</p>
+                    <p><span style="display:inline-flex;align-items:center;gap:8px;">{{idx + 1}}{{'.'}}
+                        &nbsp;<app-profile-picture [profileId]="assign" [name]="mapProfileData[assign]?.name"
+                          [size]="24"></app-profile-picture><span>{{mapProfileData[assign]?.name}}</span></span></p>
                   </div>
                 </div>
               </div>
@@ -291,8 +293,10 @@
                           [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
                           ngDefaultControl></ngx-mat-select-search>
                       </mat-option>
-                      <mat-option *ngFor="let user of returnFilterMember()"
-                        [value]="user">{{mapProfileData[user]['name']}}</mat-option>
+                      <mat-option *ngFor="let user of returnFilterMember()" [value]="user"><span
+                          style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                            [profileId]="user" [name]="mapProfileData[user]['name']"
+                            [size]="24"></app-profile-picture><span>{{mapProfileData[user]['name']}}</span></span></mat-option>
                     </mat-select>
                   </mat-form-field>
 
@@ -306,8 +310,10 @@
                           [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
                           ngDefaultControl></ngx-mat-select-search>
                       </mat-option>
-                      <mat-option *ngFor="let user of returnReviewedUser()"
-                        [value]="user">{{mapProfileData[user]['name']}}</mat-option>
+                      <mat-option *ngFor="let user of returnReviewedUser()" [value]="user"><span
+                          style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                            [profileId]="user" [name]="mapProfileData[user]['name']"
+                            [size]="24"></app-profile-picture><span>{{mapProfileData[user]['name']}}</span></span></mat-option>
                     </mat-select>
                   </mat-form-field>
 
@@ -403,7 +409,7 @@
                   </tr>
                 </tbody>
                 <tbody class="table-body">
-                  <tr *ngFor="let element of paginatedData; let idx = index" [ngClass]="{
+                  <tr *ngFor="let element of paginatedData; let idx = index; trackBy: trackByTicket" [ngClass]="{
                         'flagrow': element['flag'], 
                         'websiteticket': !element['flag'] && ['website'].includes(element['ticketfrom']),
                         'status-open': element.status?.status.toLowerCase() == 'open',
@@ -413,12 +419,18 @@
                     <td style="width: 8vw;" (click)="messageIssue($event,element, false)">{{
                       element.reporteddate.toDate() | date: 'MMM d,y HH:mm'}}</td>
                     <td style="width: 5vw;" (click)="messageIssue($event,element, false)">
-                      {{[null,undefined,""].includes(mapProfileData[element.reportedBy]) ? '' :
-                      mapProfileData[element.reportedBy]['name']}}</td>
+                      <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                          [profileId]="element.reportedBy"
+                          [name]="[null,undefined,''].includes(mapProfileData[element.reportedBy]) ? '' : mapProfileData[element.reportedBy]['name']"
+                          [size]="28"></app-profile-picture><span>{{[null,undefined,""].includes(mapProfileData[element.reportedBy])
+                          ? '' :
+                          mapProfileData[element.reportedBy]['name']}}</span></span></td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element, false)">{{element.category}}</td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element, false)"
                       (mouseenter)="showPopup(element, $event)" (mouseleave)="hidePopup()" class="clickable">
-                      <span>{{element.name}}</span>
+                      <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                          [profileId]="element.clientid" [name]="element.name"
+                          [size]="28"></app-profile-picture><span>{{element.name}}</span></span>
                     </td>
                     <td style="width: 10vw;" (click)="messageIssue($event,element, false)">{{[null, undefined,
                       ""].includes(element.journey) ? "No Journey" : mapJourney[element.journey.id]}}</td>
@@ -451,8 +463,11 @@
                       <button mat-raised-button (click)="messageIssue($event,element, true)"
                         style="background-color: red; color: white;" *ngIf="!isIdPresent(element)">{{'Review'}}</button>
                       <button mat-raised-button (click)="messageIssue($event,element, true)"
-                        style="background-color: green; color: white;"
-                        *ngIf="isIdPresent(element)">{{mapProfileData[getMostRecentTimestampKey(element['review'])]?.name}}</button>
+                        style="background-color: green; color: white;" *ngIf="isIdPresent(element)"><span
+                          style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                            [profileId]="getMostRecentTimestampKey(element['review'])"
+                            [name]="mapProfileData[getMostRecentTimestampKey(element['review'])]?.name"
+                            [size]="24"></app-profile-picture><span>{{mapProfileData[getMostRecentTimestampKey(element['review'])]?.name}}</span></span></button>
                     </td>
 
                     <!-- Flag Column -->
@@ -555,14 +570,20 @@
                     <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{element.issueno}}</td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{
                       element.reporteddate.toDate() | date: 'MMM d, y HH:mm'}}</td>
-                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{
-                      [null,undefined,""].includes(mapProfileData[element.reportedBy]) ? '' :
-                      mapProfileData[element.reportedBy]['name']}}</td>
+                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">
+                      <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                          [profileId]="element.reportedBy"
+                          [name]="[null,undefined,''].includes(mapProfileData[element.reportedBy]) ? '' : mapProfileData[element.reportedBy]['name']"
+                          [size]="28"></app-profile-picture><span>{{[null,undefined,""].includes(mapProfileData[element.reportedBy])
+                          ? '' :
+                          mapProfileData[element.reportedBy]['name']}}</span></span></td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{element.status.date.toDate()
                       | date: 'MMM d, y HH:mm'}}</td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element,false)"
                       (mouseenter)="showPopup(element, $event)" (mouseleave)="hidePopup()" class="clickable">
-                      <span>{{element.name}}</span>
+                      <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                          [profileId]="element.clientid" [name]="element.name"
+                          [size]="28"></app-profile-picture><span>{{element.name}}</span></span>
                     </td>
                     <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{element.closed}}</td>
                     <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{element.category}}</td>
@@ -593,8 +614,11 @@
                       <button mat-raised-button (click)="messageIssue($event,element, true)"
                         style="background-color: red; color: white;" *ngIf="!isIdPresent(element)">{{'Review'}}</button>
                       <button mat-raised-button (click)="messageIssue($event,element, true)"
-                        style="background-color: green; color: white;"
-                        *ngIf="isIdPresent(element)">{{mapProfileData[getMostRecentTimestampKey(element['review'])]?.name}}</button>
+                        style="background-color: green; color: white;" *ngIf="isIdPresent(element)"><span
+                          style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
+                            [profileId]="getMostRecentTimestampKey(element['review'])"
+                            [name]="mapProfileData[getMostRecentTimestampKey(element['review'])]?.name"
+                            [size]="24"></app-profile-picture><span>{{mapProfileData[getMostRecentTimestampKey(element['review'])]?.name}}</span></span></button>
                     </td>
 
                     <!-- Flag Column -->
@@ -671,8 +695,13 @@
               <p *ngIf="popupData['notes'].length != 0"><b>Notes:</b></p>
               <div style="line-height: 1.0;">
                 <div *ngFor="let notes of popupData['notes']; let idx = index">
-                  <p><b>{{idx+1}}</b> &nbsp;&nbsp; {{[null, undefined,''].includes(mapProfileData[notes['writtenBy']]) ?
-                    '...' : mapProfileData[notes['writtenBy']]['name']}} : {{notes['date'].toDate() | date: 'short' }}
+                  <p><span style="display:inline-flex;align-items:center;gap:8px;"><b>{{idx+1}}</b> &nbsp;&nbsp;
+                      <app-profile-picture [profileId]="notes['writtenBy']"
+                        [name]="[null, undefined,''].includes(mapProfileData[notes['writtenBy']]) ? '' : mapProfileData[notes['writtenBy']]['name']"
+                        [size]="24"></app-profile-picture><span>{{[null, undefined,''].includes(mapProfileData[notes['writtenBy']])
+                        ?
+                        '...' : mapProfileData[notes['writtenBy']]['name']}}</span></span> : {{notes['date'].toDate() |
+                    date: 'short' }}
                   </p>
                   <p>&nbsp;{{notes.remarks}}</p>
                 </div>

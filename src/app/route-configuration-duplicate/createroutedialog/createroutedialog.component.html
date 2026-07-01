@@ -99,7 +99,11 @@
           }"
         >
           <div class="option-content">
-            <span class="option-avatar">{{ getInitials(profileId) }}</span>
+            <app-profile-picture
+              [profileId]="profileId"
+              [name]="getProfileFields(profileId, 'name')"
+              [size]="24"
+            ></app-profile-picture>
             <div class="option-details">
               <span>{{ getProfileFields(profileId, "name") }}</span>
               <span class="option-email">
@@ -244,7 +248,11 @@
               }"
             >
               <div class="option-content">
-                <span class="option-avatar">{{ getInitials(profileId) }}</span>
+                <app-profile-picture
+                  [profileId]="profileId"
+                  [name]="getProfileFields(profileId, 'name')"
+                  [size]="24"
+                ></app-profile-picture>
                 <div class="option-details">
                   <span>{{ getProfileFields(profileId, "name") }}</span>
                   <span class="option-email">

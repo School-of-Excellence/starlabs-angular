@@ -1,16 +1,16 @@
 # queue-e2e — THIN CALLER for the Stage-2 hermetic Playwright gate.
 #
-# The gate logic now lives in the hub (starlabs-e2e-tests/.github/workflows/web-e2e.yml). This file just
-# wires the app's PR triggers + path filters to it. To change boot/seed/run behavior, edit the hub workflow
-# once and every repo inherits it — no per-repo copy to keep in sync (SETUP.md §6.3 "invert to reusable").
+# The gate logic lives in the hub (starlabs-e2e-tests/.github/workflows/web-e2e.yml). This file just wires the
+# app's PR triggers + path filters to it. To change boot/seed/run behavior, edit the hub workflow once and every
+# repo inherits it — no per-repo copy to keep in sync (SETUP.md §6.3 "invert to reusable").
 #
-# Requires: org secret CICD_PAT (read access to the private e2e + cloud-function repos), passed via
+# Requires: a repo secret REPO_PAT (read access to the private e2e + cloud-function repos), passed via
 # `secrets: inherit`. The hub repo must allow its workflows to be reused org-wide (Settings → Actions → Access).
 name: queue-e2e (emulator gate)
 
 on:
   pull_request:
-    branches: [development, cicd-dev]   # cicd-dev = TEST stand-in for development. Remove after validation.
+    branches: []   # sudo branches — gate runs on PR to either. Switch to [development] at cutover.
     types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - 'src/app/queue system/**'
@@ -18,12 +18,20 @@ on:
       - 'angular.json'
       - 'package.json'
       - '.github/workflows/queue-e2e.yml'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Spec subset (space-separated). Empty = the default gate set.'
+        type: string
+        default: ''
+      evidence:
+        description: '1 = capture screenshots + traces (to debug a CI-only failure)'
+        type: string
+        default: '0'
 
 jobs:
   gate:
     # Cost control: skip the heavy gate on DRAFT PRs unless explicitly labeled `run-e2e`.
-    # (On GitHub Free a required check can't be enforced anyway; this keeps Actions minutes sane.)
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.draft == false ||
@@ -32,4 +40,9 @@ jobs:
     with:
       cf_branch: development
       e2e_ref: main
+      firebase_project: starlabs-cicd   # MUST match the app's projectId or auth silently fails (SETUP §3)
+      # PR gate = operator.spec (real suite, 13/0 in CI) + the logic self-tests. A manual workflow_dispatch can
+      # override `only`/`evidence` to debug a specific spec.
+      only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || 'queue/operator.spec.ts queue/invariants-selftest.spec.ts queue/oracle-selftest.spec.ts' }}
+      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '0' }}
     secrets: inherit

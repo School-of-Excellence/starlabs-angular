@@ -24,6 +24,7 @@ interface PipelineRef {
   dealstageIds?: string[];
 }
 import { AuthguardService } from '../../authguard.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { environment } from '../../../environments/environment';
 
 interface PipelineDoc {
@@ -93,6 +94,7 @@ interface SourceBucket {
   selector: 'app-onboarding-pipeline',
   standalone: true,
   imports: [
+    ProfilePictureComponent,
     CommonModule,
     FormsModule,
     MatButtonModule,

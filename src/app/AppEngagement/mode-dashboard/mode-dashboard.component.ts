@@ -19,6 +19,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ProductModeConfigupdateComponent } from '../product-mode-config/product-mode-configupdate/product-mode-configupdate.component';
 import { Router } from '@angular/router';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 @Component({
   selector: 'app-mode-dashboard',
   imports: [CommonModule,
@@ -33,7 +34,8 @@ import { LoadingProgressComponent } from '../../loading-progress/loading-progres
      MatFormFieldModule, 
      MatInputModule,
      MatCheckboxModule,
-     FormsModule,],
+     FormsModule,
+     ProfilePictureComponent,],
   templateUrl: './mode-dashboard.component.html',
   styleUrl: './mode-dashboard.component.css'
 })
