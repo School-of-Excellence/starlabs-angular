@@ -24,6 +24,7 @@ import { ChannelRecordComponent } from '../channel-record/channel-record.compone
 
 @Component({
   selector: 'app-notification-record',
+  standalone: true,
   imports: [
     CommonModule,
     MatInputModule,

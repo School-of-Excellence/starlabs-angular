@@ -256,6 +256,16 @@
                     </div>
                   </div>
                 </div>
+                <div class="conflict-global-banner"
+                    *ngIf="globalConflictMap.size > 0"
+                    (click)="openConflictDialog()"
+                    style="cursor: pointer; margin-top: 12px;">
+                  <mat-icon class="conflict-banner-icon">warning</mat-icon>
+                  <div class="conflict-banner-text">
+                    <strong>Participants found in multiple lists — review &amp; resolve</strong>
+                    <span>{{ globalConflictMap.size }} participant(s) affected · Click to view</span>
+                  </div>
+                </div>
               </div>
 
               <!-- Create List Form -->
