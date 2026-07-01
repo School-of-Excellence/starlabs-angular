@@ -29,10 +29,11 @@ export const authGuard: CanActivateFn = (route, state) => {
       if (state.url === '/EISDashboard') {
         return true;
       }
-      // Test-only bypass for the new Arena Event Planning screen while it has no
-      // role/profile config. Active only on starlabs-test, never in production.
+      // Test-only bypass for new screens that have no role/profile config yet.
+      // Active only on starlabs-test, never in production.
+      const testBypassRoutes = ['/arena-event-planning', '/sales-numbers', '/sales-teams'];
       if (environment.firebase.projectId === 'starlabs-test'
-          && ('/' + state.url.split('?')[0].split('/')[1]) === '/arena-event-planning') {
+          && testBypassRoutes.includes('/' + state.url.split('?')[0].split('/')[1])) {
         return true;
       }
       try {

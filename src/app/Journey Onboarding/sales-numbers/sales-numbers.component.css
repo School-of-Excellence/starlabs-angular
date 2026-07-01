@@ -1,0 +1,420 @@
+/* ===========================================================================
+   iOS-MINIMALIST DESIGN SYSTEM — Sales Numbers
+   Visual-only restyle. Tokens defined on :host, reused throughout.
+   =========================================================================== */
+:host {
+  /* surfaces */
+  --ios-bg: #F2F2F7;            /* grouped background */
+  --ios-surface: #FFFFFF;       /* cards / panels */
+  --ios-fill: #EFEFF4;          /* input fill */
+  --ios-fill-segment: rgba(118,118,128,.12); /* segmented track */
+  --ios-chip: rgba(118,118,128,.12);         /* chip fill (shared token) */
+  --ios-tile: #F7F7FA;          /* inner tiles */
+
+  /* text */
+  --ios-label: #1C1C1E;         /* primary label (never pure black) */
+  --ios-secondary: #8A8A8E;     /* secondary text */
+
+  /* accents */
+  --ios-blue: #0A84FF;          /* single accent */
+  --ios-green: #34C759;         /* positive */
+  --ios-red: #FF3B30;           /* negative */
+  --ios-indigo: #5E5CE6;        /* net */
+
+  /* hairlines & shadows */
+  --ios-separator: rgba(60,60,67,.10);
+  --ios-separator-soft: rgba(60,60,67,.08);
+  --ios-shadow-sm: 0 1px 2px rgba(17,24,39,.04);
+  --ios-shadow-md: 0 1px 2px rgba(17,24,39,.04), 0 6px 20px rgba(17,24,39,.05);
+  --ios-shadow-lift: 0 2px 4px rgba(17,24,39,.05), 0 12px 30px rgba(17,24,39,.08);
+
+  /* radii */
+  --ios-r-card: 20px;
+  --ios-r-control: 12px;
+  --ios-r-pill: 980px;
+
+  /* motion */
+  --ios-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --ios-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+
+  display: block;
+  background: var(--ios-bg);
+  font-family: var(--ios-font);
+}
+
+.sn-wrap {
+  padding: 32px 24px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+  font-family: var(--ios-font);
+  color: var(--ios-label);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------- header */
+.sn-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.sn-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: var(--ios-label);
+}
+.sn-sub {
+  margin: 6px 0 0;
+  color: var(--ios-secondary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* header CTA styled via the unified .sn-btn-secondary system below */
+.sn-header { align-items: center; }
+
+/* ---------------------------------------------------------------- controls */
+.sn-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 32px;
+  margin-bottom: 18px;
+  padding: 0 4px;
+}
+.sn-control-group { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.sn-control-group.sn-right { margin-left: auto; }
+.sn-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ios-secondary);
+}
+/* date pickers share the filter field rhythm */
+.sn-date { width: 160px; }
+
+/* ---------------------------------------------------------------- filters */
+.sn-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card);
+  box-shadow: var(--ios-shadow-sm);
+  margin-bottom: 24px;
+}
+/* uniform grid rhythm — every filter field equal width, equal height */
+.sn-filter-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+}
+.sn-filter { width: 100%; }
+@media (max-width: 1100px) {
+  .sn-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .sn-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.sn-loading { display: flex; justify-content: center; padding: 60px 0; }
+
+/* ============================================================================
+   UNIFIED BUTTON SYSTEM — one radius/height/weight/hover/active across both screens
+   primary = flat iOS blue · secondary = quiet pill · destructive = red
+   ============================================================================ */
+/* secondary (quiet pill): header CTA + Clear */
+:host ::ng-deep .sn-wrap .sn-btn-secondary.mat-mdc-button-base,
+:host ::ng-deep .sn-wrap a.sn-btn-secondary {
+  height: 44px;
+  border-radius: var(--ios-r-pill);
+  border: 1px solid var(--ios-separator);
+  background: var(--ios-surface);
+  color: var(--ios-blue);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 0 18px;
+  box-shadow: var(--ios-shadow-sm);
+  transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease), background-color .2s var(--ios-ease), color .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .sn-btn-secondary .mat-mdc-button-touch-target { height: 44px; }
+:host ::ng-deep .sn-wrap .sn-btn-secondary:hover { box-shadow: var(--ios-shadow-md); transform: translateY(-1px); }
+:host ::ng-deep .sn-wrap .sn-btn-secondary:active { transform: scale(0.98); box-shadow: var(--ios-shadow-sm); }
+/* Clear sits at the end of the filter row, aligned to field height */
+:host ::ng-deep .sn-filters .sn-btn-secondary { flex: 0 0 auto; align-self: flex-end; }
+
+/* ============================================================================
+   iOS SEGMENTED CONTROLS — restyle mat-button-toggle-group as UISegmentedControl
+   ============================================================================ */
+:host ::ng-deep .sn-wrap .mat-button-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  background: var(--ios-fill-segment);
+  border-radius: 10px;
+  border: none;
+  padding: 3px;
+  gap: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-group .mat-button-toggle {
+  border: none;
+  background: transparent;
+  color: var(--ios-secondary);
+  border-radius: 7px;
+  transition: background-color .25s var(--ios-ease), color .25s var(--ios-ease), box-shadow .25s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-group .mat-button-toggle + .mat-button-toggle {
+  border-left: none;
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle .mat-button-toggle-label-content {
+  line-height: 30px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: inherit;
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-appearance-standard {
+  background: transparent;
+  color: var(--ios-secondary);
+}
+/* selected pill */
+:host ::ng-deep .sn-wrap .mat-button-toggle-checked {
+  background: var(--ios-surface);
+  color: var(--ios-label);
+  border-radius: 7px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-checked .mat-button-toggle-label-content { color: var(--ios-label); }
+/* remove Material ink / ripple / focus overlay */
+:host ::ng-deep .sn-wrap .mat-button-toggle .mat-button-toggle-focus-overlay { opacity: 0 !important; }
+:host ::ng-deep .sn-wrap .mat-button-toggle-ripple { display: none; }
+:host ::ng-deep .sn-wrap .mat-button-toggle-button:active { transform: scale(0.98); }
+
+/* ============================================================================
+   iOS FILLED INPUTS / SELECTS — restyle mat-form-field (outline -> filled)
+   ============================================================================ */
+:host ::ng-deep .sn-wrap .mat-mdc-form-field {
+  font-family: var(--ios-font);
+}
+:host ::ng-deep .sn-wrap .mat-mdc-text-field-wrapper {
+  background: var(--ios-fill);
+  border-radius: var(--ios-r-control);
+}
+/* hide Material's outline notch entirely */
+:host ::ng-deep .sn-wrap .mdc-notched-outline__leading,
+:host ::ng-deep .sn-wrap .mdc-notched-outline__notch,
+:host ::ng-deep .sn-wrap .mdc-notched-outline__trailing {
+  border: none !important;
+}
+:host ::ng-deep .sn-wrap .mat-mdc-text-field-wrapper {
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
+  box-shadow: inset 0 0 0 2px rgba(10,132,255,.35);
+}
+/* consistent field height; room for the always-floating label */
+:host ::ng-deep .sn-wrap .mat-mdc-form-field-infix {
+  min-height: 44px;
+  padding-top: 20px;
+  padding-bottom: 8px;
+}
+:host ::ng-deep .sn-wrap .mat-mdc-text-field-wrapper {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+:host ::ng-deep .sn-wrap .mat-mdc-select-value-text,
+:host ::ng-deep .sn-wrap .mat-mdc-input-element { color: var(--ios-label); }
+/* always-floating label: small, fixed at top, secondary tone */
+:host ::ng-deep .sn-wrap .mat-mdc-floating-label,
+:host ::ng-deep .sn-wrap .mdc-floating-label--float-above {
+  color: var(--ios-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+/* placeholder / empty-select value reads as quiet secondary text */
+:host ::ng-deep .sn-wrap .mat-mdc-select-placeholder,
+:host ::ng-deep .sn-wrap input.mat-mdc-input-element::placeholder {
+  color: var(--ios-secondary);
+  opacity: 1;
+}
+/* kill the subscript/hint gap so every field is the same height */
+:host ::ng-deep .sn-wrap .mat-mdc-form-field-subscript-wrapper { display: none; }
+:host ::ng-deep .sn-wrap .mat-mdc-form-field-bottom-align::before { display: none; }
+
+/* ============================================================================
+   KPI CARDS — large iOS metric strip
+   ============================================================================ */
+.sn-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+:host ::ng-deep .sn-kpi.mat-mdc-card,
+.sn-kpi {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  min-height: 188px;
+  padding: 28px 28px !important;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card) !important;
+  box-shadow: var(--ios-shadow-md);
+  overflow: hidden;
+  transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-kpi.mat-mdc-card:hover,
+.sn-kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ios-shadow-lift);
+}
+/* subtle left accent stripe (refined iOS hues) */
+.sn-kpi::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 4px;
+  background: rgba(60,60,67,.18);
+}
+.sn-kpi.gsv::before { background: var(--ios-blue); }
+.sn-kpi.asv::before { background: var(--ios-green); }
+.sn-kpi.net::before { background: var(--ios-indigo); }
+.sn-kpi.cancel::before { background: var(--ios-red); }
+
+.sn-kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ios-secondary);
+  min-height: 30px; /* keep the big numbers aligned across cards with 1- or 2-line labels */
+  line-height: 1.25;
+}
+.sn-kpi-value {
+  font-size: 50px;
+  font-weight: 700;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  color: var(--ios-label);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.sn-kpi-meta {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ios-label);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.sn-kpi-hint {
+  font-size: 12px;
+  color: var(--ios-secondary);
+  opacity: .85;
+}
+
+/* ============================================================================
+   PANELS
+   ============================================================================ */
+:host ::ng-deep .sn-panel.mat-mdc-card,
+.sn-panel {
+  padding: 24px 24px !important;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card) !important;
+  box-shadow: var(--ios-shadow-md);
+  margin-bottom: 24px;
+}
+.sn-panel h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+  color: var(--ios-label);
+}
+
+
+/* ============================================================================
+   TABLE — airy, hairline separators, tabular nums
+   ============================================================================ */
+.sn-table { width: 100%; background: transparent; }
+:host ::ng-deep .sn-table.mat-mdc-table { background: transparent; }
+.sn-table th {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ios-secondary);
+}
+:host ::ng-deep .sn-table .mat-mdc-header-row { background: transparent; }
+:host ::ng-deep .sn-table .mat-mdc-header-cell {
+  border-bottom: 1px solid var(--ios-separator);
+  padding: 10px 14px;
+}
+:host ::ng-deep .sn-table .mat-mdc-row,
+:host ::ng-deep .sn-table .mat-mdc-footer-row { background: transparent; }
+:host ::ng-deep .sn-table .mat-mdc-cell {
+  border-bottom: 1px solid var(--ios-separator-soft);
+  padding: 16px 14px;
+  height: 52px;
+  color: var(--ios-label);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+:host ::ng-deep .sn-table .mat-mdc-row:hover .mat-mdc-cell {
+  background: rgba(118,118,128,.05);
+}
+.sn-table td.pos { color: var(--ios-green); font-weight: 600; }
+.sn-table td.neg { color: var(--ios-red); font-weight: 600; }
+/* numeric columns right-aligned, tabular figures (group/name column stays left) */
+:host ::ng-deep .sn-table th.sn-num,
+:host ::ng-deep .sn-table td.sn-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.sn-cell-sub {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--ios-secondary);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* total / footer row — stronger top separator */
+:host ::ng-deep .sn-table .sn-total-row .mat-mdc-footer-cell {
+  font-weight: 700;
+  border-top: 1.5px solid var(--ios-separator);
+  border-bottom: none;
+  color: var(--ios-label);
+  padding: 18px 14px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.sn-empty { color: var(--ios-secondary); font-size: 14px; padding: 14px 0; }
+
+/* ---------------------------------------------------------------- responsive */
+@media (max-width: 1000px) {
+  .sn-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .sn-kpis { grid-template-columns: 1fr; }
+  .sn-control-group.sn-right { margin-left: 0; }
+}

@@ -1,0 +1,276 @@
+/* ===========================================================================
+   iOS-MINIMALIST DESIGN SYSTEM — Sales Teams
+   Visual-only restyle. Tokens defined on :host, reused throughout.
+   =========================================================================== */
+:host {
+  /* surfaces */
+  --ios-bg: #F2F2F7;
+  --ios-surface: #FFFFFF;
+  --ios-fill: #EFEFF4;
+  --ios-fill-segment: rgba(118,118,128,.12);
+  --ios-chip: rgba(118,118,128,.12);
+  --ios-tile: #F7F7FA;          /* inner tiles (shared token) */
+
+  /* text */
+  --ios-label: #1C1C1E;
+  --ios-secondary: #8A8A8E;
+
+  /* accents */
+  --ios-blue: #0A84FF;
+  --ios-green: #34C759;
+  --ios-red: #FF3B30;
+  --ios-indigo: #5E5CE6;        /* net (shared token) */
+
+  /* hairlines & shadows */
+  --ios-separator: rgba(60,60,67,.10);
+  --ios-separator-soft: rgba(60,60,67,.08);
+  --ios-shadow-sm: 0 1px 2px rgba(17,24,39,.04);
+  --ios-shadow-md: 0 1px 2px rgba(17,24,39,.04), 0 6px 20px rgba(17,24,39,.05);
+  --ios-shadow-lift: 0 2px 4px rgba(17,24,39,.05), 0 12px 30px rgba(17,24,39,.08);
+
+  /* radii */
+  --ios-r-card: 20px;
+  --ios-r-control: 12px;
+  --ios-r-pill: 980px;
+
+  /* motion */
+  --ios-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --ios-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+
+  display: block;
+  background: var(--ios-bg);
+  font-family: var(--ios-font);
+}
+
+.st-wrap {
+  padding: 32px 24px 48px;
+  max-width: 1080px;
+  margin: 0 auto;
+  color: var(--ios-label);
+  font-family: var(--ios-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------- header */
+/* back link styled via the unified .st-back button rules below */
+.st-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 8px 0 0;
+  letter-spacing: -0.02em;
+  color: var(--ios-label);
+}
+.st-sub {
+  margin: 6px 0 0;
+  color: var(--ios-secondary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.st-loading { display: flex; justify-content: center; padding: 60px 0; }
+
+/* ---------------------------------------------------------------- panels */
+:host ::ng-deep .st-panel.mat-mdc-card,
+.st-panel {
+  padding: 24px !important;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card) !important;
+  box-shadow: var(--ios-shadow-md);
+  margin-bottom: 24px;
+}
+.st-panel h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+  color: var(--ios-label);
+}
+
+/* ---------------------------------------------------------------- create team */
+.st-create { display: flex; align-items: flex-end; gap: 16px; }
+.st-newname { width: 280px; }
+
+/* ============================================================================
+   UNIFIED BUTTON SYSTEM — mirrors sales-numbers; one system across both screens
+   primary = flat iOS blue · secondary = quiet pill · destructive = red
+   ============================================================================ */
+/* primary (flat iOS blue): Create team */
+:host ::ng-deep .st-wrap .st-btn-primary.mat-mdc-button-base {
+  height: 44px;
+  border-radius: var(--ios-r-control);
+  background: var(--ios-blue);
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 0 20px;
+  box-shadow: var(--ios-shadow-sm);
+  transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease), opacity .2s var(--ios-ease);
+}
+:host ::ng-deep .st-wrap .st-btn-primary .mat-mdc-button-touch-target { height: 44px; }
+:host ::ng-deep .st-wrap .st-btn-primary:hover { box-shadow: var(--ios-shadow-md); transform: translateY(-1px); }
+:host ::ng-deep .st-wrap .st-btn-primary:active { transform: scale(0.98); box-shadow: var(--ios-shadow-sm); }
+:host ::ng-deep .st-wrap .st-btn-primary[disabled] { opacity: .45; box-shadow: none; }
+
+/* secondary (quiet pill): back link */
+:host ::ng-deep .st-wrap .st-back.mat-mdc-button-base {
+  height: 40px;
+  margin-left: -8px;
+  color: var(--ios-blue);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: var(--ios-r-pill);
+  transition: transform .2s var(--ios-ease), background-color .2s var(--ios-ease);
+}
+:host ::ng-deep .st-wrap .st-back:hover { background: var(--ios-fill); }
+:host ::ng-deep .st-wrap .st-back:active { transform: scale(0.98); }
+
+/* ============================================================================
+   iOS FILLED INPUTS / SELECTS — restyle mat-form-field (outline -> filled)
+   ============================================================================ */
+:host ::ng-deep .st-wrap .mat-mdc-form-field { font-family: var(--ios-font); }
+:host ::ng-deep .st-wrap .mat-mdc-text-field-wrapper {
+  background: var(--ios-fill);
+  border-radius: var(--ios-r-control);
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .st-wrap .mdc-notched-outline__leading,
+:host ::ng-deep .st-wrap .mdc-notched-outline__notch,
+:host ::ng-deep .st-wrap .mdc-notched-outline__trailing {
+  border: none !important;
+}
+:host ::ng-deep .st-wrap .mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
+  box-shadow: inset 0 0 0 2px rgba(10,132,255,.35);
+}
+/* consistent field height; room for the always-floating label (matches sales-numbers) */
+:host ::ng-deep .st-wrap .mat-mdc-form-field-infix {
+  min-height: 44px;
+  padding-top: 20px;
+  padding-bottom: 8px;
+}
+:host ::ng-deep .st-wrap .mat-mdc-text-field-wrapper {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+:host ::ng-deep .st-wrap .mat-mdc-select-value-text,
+:host ::ng-deep .st-wrap .mat-mdc-input-element { color: var(--ios-label); }
+:host ::ng-deep .st-wrap .mat-mdc-floating-label,
+:host ::ng-deep .st-wrap .mdc-floating-label--float-above {
+  color: var(--ios-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+:host ::ng-deep .st-wrap .mat-mdc-select-placeholder,
+:host ::ng-deep .st-wrap input.mat-mdc-input-element::placeholder {
+  color: var(--ios-secondary);
+  opacity: 1;
+}
+:host ::ng-deep .st-wrap .mat-mdc-form-field-subscript-wrapper { display: none; }
+:host ::ng-deep .st-wrap .mat-mdc-form-field-bottom-align::before { display: none; }
+
+/* ============================================================================
+   TEAM CARDS
+   ============================================================================ */
+.st-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+:host ::ng-deep .st-team.mat-mdc-card,
+.st-team {
+  padding: 20px !important;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card) !important;
+  box-shadow: var(--ios-shadow-md);
+  transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .st-team.mat-mdc-card:hover,
+.st-team:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ios-shadow-lift);
+}
+.st-team-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.st-team-head h2 {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ios-label);
+}
+.st-count {
+  font-size: 13px;
+  color: var(--ios-secondary);
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* delete icon button — quiet, red on hover */
+:host ::ng-deep .st-team-head button[mat-icon-button] {
+  color: var(--ios-secondary);
+  transition: transform .2s var(--ios-ease), color .2s var(--ios-ease);
+}
+:host ::ng-deep .st-team-head button[mat-icon-button]:hover { color: var(--ios-red); }
+:host ::ng-deep .st-team-head button[mat-icon-button]:active { transform: scale(0.92); }
+
+.st-empty { color: var(--ios-secondary); font-size: 13px; margin: 8px 0 0; }
+
+/* ============================================================================
+   iOS-STYLE CHIPS — filled, full radius, medium weight; strip Material chrome
+   ============================================================================ */
+:host ::ng-deep .st-team .mat-mdc-chip-set { margin-top: 4px; }
+:host ::ng-deep .st-team .mat-mdc-standard-chip,
+:host ::ng-deep .st-team .mat-mdc-chip {
+  background: var(--ios-chip) !important;
+  border-radius: var(--ios-r-pill) !important;
+  border: none !important;
+  box-shadow: none !important;
+  --mdc-chip-elevated-container-color: var(--ios-chip);
+  --mdc-chip-outline-width: 0;
+}
+:host ::ng-deep .st-team .mat-mdc-chip .mdc-evolution-chip__text-label,
+:host ::ng-deep .st-team .mat-mdc-chip .mdc-evolution-chip__action--primary {
+  color: var(--ios-label);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+:host ::ng-deep .st-team .mat-mdc-chip .mat-mdc-chip-remove {
+  color: var(--ios-secondary);
+  opacity: .9;
+  transition: color .2s var(--ios-ease), transform .2s var(--ios-ease);
+}
+:host ::ng-deep .st-team .mat-mdc-chip .mat-mdc-chip-remove:hover { color: var(--ios-red); }
+:host ::ng-deep .st-team .mat-mdc-chip .mat-mdc-chip-remove .mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+:host ::ng-deep .st-team .mat-mdc-chip .mat-mdc-chip-focus-overlay { display: none; }
+
+/* ============================================================================
+   ROSTER — airy hairline rows
+   ============================================================================ */
+.st-roster { display: flex; flex-direction: column; gap: 0; margin-top: 12px; }
+.st-roster-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ios-separator-soft);
+  transition: background-color .2s var(--ios-ease);
+}
+.st-roster-row:last-child { border-bottom: none; }
+.st-roster-row:hover { background: rgba(118,118,128,.04); }
+.st-person {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ios-label);
+  letter-spacing: -0.01em;
+}
+.st-assign { width: 200px; }
