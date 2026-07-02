@@ -23,7 +23,6 @@ import { VideoPlayerComponent } from '../../video-player/video-player.component'
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 
 export interface ProductTableData {
@@ -53,8 +52,7 @@ export interface ProductTableData {
     RouterModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
-    MatCheckboxModule,
-    ProfilePictureComponent
+    MatCheckboxModule
   ],
   templateUrl: './userprofile.component.html',
   styleUrl: './userprofile.component.css'
