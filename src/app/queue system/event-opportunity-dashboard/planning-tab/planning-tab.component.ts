@@ -2,7 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, S
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
-  Firestore, collection, collectionData, query, where, getDocs,
+  Firestore, collection, collectionData, query, where, getDocs, getDoc,
   doc, setDoc, updateDoc, deleteDoc, DocumentReference
 } from '@angular/fire/firestore';
 import { CdkDragDrop, moveItemInArray, DragDropModule } from '@angular/cdk/drag-drop';
@@ -13,25 +13,31 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { PlanningDataService } from './planning-data.service';
+import { AuthguardService } from '../../../authguard.service';
 
 interface PhaseStageRow { queueid: string; stagename: string; }
 type Col = 'c_a' | 'c_na' | 'c_d' | 'n_a' | 'n_na' | 'n_d';
 interface Cells { c_a: number; c_na: number; c_d: number; n_a: number; n_na: number; n_d: number; total: number; }
 interface MatrixLine { key: string; label: string; kind: 'stage' | 'slot' | 'rate'; cells: Cells; stages: PhaseStageRow[]; }
 interface MatrixRow { phase: any; pct: number; target: number | null; status: 'ontrack' | 'risk' | 'behind' | 'none'; pop: number; lines: MatrixLine[]; }
-interface CardDef { key: string; label: string; value: number; }
+interface CardDef { key: string; label: string; value: number; desc?: string; }
 interface DrillRow { name: string; phone: string; status: string; confirmed: boolean; inQueue: boolean; }
 interface CellDrillRow { name: string; phone: string; queueName: string; stage: string; status: string; confirmed: boolean; slot: string; }
 interface CellRef { phaseDocid: string; lineKey: string; col: Col | 'total'; label: string; }
+/** A phase as stored inside a saved filter (self-contained snapshot). */
+interface FilterPhase { phasename: string; targetPct: number | null; rows: { [key: string]: PhaseStageRow[] }; }
+/** A saved filter = a named bundle of {queue selection, event selection, phases}. */
+interface PlanningFilter { docid: string; title: string; queueIds: string[]; eventIds: string[]; phases: FilterPhase[]; created?: any; updated?: any; }
 
 @Component({
   selector: 'app-planning-tab',
   standalone: true,
   imports: [
     CommonModule, FormsModule, ReactiveFormsModule, DragDropModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatIconModule, MatButtonModule, MatTooltipModule
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatIconModule, MatButtonModule, MatTooltipModule, MatSnackBarModule
   ],
   templateUrl: './planning-tab.component.html',
   styleUrl: './planning-tab.component.css'
@@ -46,27 +52,149 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   @Input() mapProfile: any = {};
   @Input() mapNumber: any = {};
   @Input() refreshKey = 0;
+  /** True only while the Planning tab is the visible tab. Gates the expensive recompute. */
+  @Input() active = false;
   /** Events ('event collection' docs: {id, ref, name}). */
   @Input() eventList: any[] = [];
   /** Active queues ('queue generation' docs). */
   @Input() queueList: any[] = [];
-  /** Emits the new queue selection up to the dashboard (drives the live data). */
-  @Output() queueChange = new EventEmitter<string[]>();
-
+  /** Current logged-in user's profileid — stamped onto saved filters as lasteditedby. */
+  @Input() currentProfileId: string = '';
   /** Selected events (multi). */
   selectedEventIds: string[] = [];
-  /** Local mirror of the parent-owned queue selection, for stable two-way binding. */
-  queueModel: string[] = [];
+
+  // ---------- Journey filter + DFU-ongoing omit ----------
+  /** journeyid → journey name (from the 'journey' collection). */
+  journeyMap: { [id: string]: string } = {};
+  journeyList: { id: string; name: string }[] = [];
+  /** Selected journey names (a participant is kept only if their effective journey matches). */
+  selectedJourneys: string[] = [];
+  /** When on, participants who are "DFU ongoing" are omitted from every number/list. */
+  omitDfuOngoing = false;
+  /** profileid → participant-metadata doc (activeproduct, currentjourney, lastcompletedjourney, lastsubscribedjourney). */
+  private participantMeta: { [id: string]: any } = {};
+  /** product ids with mode == 'Priority Mode' — holding one of these = DFU ongoing. */
+  private priorityProductIds = new Set<string>();
+
+  onJourneysChange(names: string[]): void {
+    this.selectedJourneys = names || [];
+    this.selectedCardKey = null; this.drillList = [];
+    this.recomputeView();
+  }
+  onToggleDfuOmit(): void {
+    this.omitDfuOngoing = !this.omitDfuOngoing;
+    this.selectedCardKey = null; this.drillList = [];
+    this.recomputeView();
+  }
+
+  /** DFU ongoing = holds a Priority-Mode product (mirrors dynamic-queue-manager-clone). */
+  private isDfuOngoing(id: string): boolean {
+    const active = this.participantMeta?.[id]?.['activeproduct'] || [];
+    return Array.isArray(active) && active.some((pid: string) => this.priorityProductIds.has(pid));
+  }
+  /**
+   * The participant's journey id(s), chosen by customer status — mirrors journeycoach-dashboard's
+   * mapCustomerStatusVariable: active→activejourney, non active→lastcompletedjourney,
+   * discontinued→lastsubscribedjourney. Fields hold journey IDs (scalar or array).
+   */
+  private journeyIdsFor(id: string): string[] {
+    const meta = this.participantMeta?.[id];
+    if (!meta) return [];
+    const status = (this.statusMap.get(id) || '').toLowerCase();
+    const field = status === 'active' ? 'activejourney'
+      : status === 'discontinued' ? 'lastsubscribedjourney'
+      : 'lastcompletedjourney';
+    const v = meta[field];
+    if (v == null) return [];
+    return Array.isArray(v) ? v.flat().filter(Boolean).map(String) : [String(v)];
+  }
+  private passesParticipantFilters(id: string): boolean {
+    if (this.omitDfuOngoing && this.isDfuOngoing(id)) return false;
+    if (this.selectedJourneys.length) {
+      const ids = this.journeyIdsFor(id);
+      if (!ids.some(j => this.selectedJourneys.includes(j))) return false;
+    }
+    return true;
+  }
+
+  /**
+   * The Planning tab now has its OWN, independent queue selection — owned by the parent
+   * as `planningQueues` and fed back through the `selectedQueueList` input. `scope` is
+   * simply that selection (separate from the Board's own queue selection).
+   */
+  get scope(): string[] { return [...(this.selectedQueueList || [])]; }
+
+  /** Emits the Planning tab's own queue selection up to the dashboard (loads its data). */
+  @Output() queueSelectionChange = new EventEmitter<string[]>();
+
+  /** Restore a saved filter's queue selection UP to the dashboard so its data loads. Apply-only. */
+  @Output() patchQueues = new EventEmitter<string[]>();
+
+  /** Planning's own queue picker changed → tell the parent to load these queues. */
+  onPlanningQueuesChange(ids: string[]): void {
+    this.selectedCardKey = null; this.drillList = [];
+    this.selectedCell = null; this.cellDrillRows = [];
+    this.queueSelectionChange.emit([...(ids || [])]);
+  }
+
+  /** trackBy for the all-queues option list ('queue generation' docs). */
+  trackByQueueDoc(_i: number, q: any): string { return q?.['docid']; }
+
+  /** trackBy for the matrix — keeps DOM (incl. open stage dropdowns) alive across recomputes. */
+  trackByPhaseRow(_i: number, row: MatrixRow): string { return row?.phase?.['docid']; }
+  trackByLineKey(_i: number, ln: MatrixLine): string { return ln?.key; }
+
+  // ---------- Saved filters ----------
+  savedFilters: PlanningFilter[] = [];
+  activeFilterId: string | null = null;
+  private filtersSub?: Subscription;
+
+  // Save widget (floating)
+  showSaveWidget = false;
+  saveTitle = '';
+  saveMode: 'new' | 'update' = 'new';
+  pendingChanges: string[] = [];
+
+  private get activeFilter(): PlanningFilter | null {
+    return this.savedFilters.find(f => f.docid === this.activeFilterId) || null;
+  }
+
+  /** True when the current phases/selection differ from the applied filter (or there's unsaved new work). */
+  get isDirty(): boolean {
+    const active = this.activeFilter;
+    if (!active) return this.planningPhases.length > 0;
+    return this.filterSignature(active) !== this.currentSignature();
+  }
+
+  /** Stable string signature of the current working state (queues + events + phases). */
+  private currentSignature(): string {
+    return this.signature([...this.selectedQueueList], [...this.selectedEventIds],
+      this.planningPhases.map(p => ({ phasename: p['phasename'], targetPct: p['targetPct'] ?? null, rows: p['rows'] || {} })));
+  }
+  private filterSignature(f: PlanningFilter): string {
+    return this.signature(f.queueIds || [], f.eventIds || [], f.phases || []);
+  }
+  private signature(queueIds: string[], eventIds: string[], phases: FilterPhase[]): string {
+    const stageRowKeys = this.rowDefs.filter(rd => rd.kind !== 'rate').map(rd => rd.key);
+    return JSON.stringify({
+      q: [...queueIds].sort(),
+      e: [...eventIds].sort(),
+      p: phases.map(p => ({
+        n: p.phasename, t: p.targetPct ?? null,
+        r: stageRowKeys.map(k => (p.rows?.[k] || []).map(s => `${s.queueid}|${s.stagename}`).sort())
+      }))
+    });
+  }
 
   /** Phase roll-up: 'all' = clear every member stage. */
   phaseRollupRule: 'all' | 'any' = 'all';
 
   // Column groups (Confirmed / Not confirmed × Active / Non-Active / Discontinued)
   readonly confirmedCols: { k: Col; label: string }[] = [
-    { k: 'c_a', label: 'Active' }, { k: 'c_na', label: 'Non Active' }, { k: 'c_d', label: 'Added/Lefted' }
+    { k: 'c_a', label: 'Active' }, { k: 'c_na', label: 'Non Active' }, { k: 'c_d', label: 'Discontinued' }
   ];
   readonly notConfirmedCols: { k: Col; label: string }[] = [
-    { k: 'n_a', label: 'Active' }, { k: 'n_na', label: 'Non Active' }, { k: 'n_d', label: 'Added/Lefted' }
+    { k: 'n_a', label: 'Active' }, { k: 'n_na', label: 'Non Active' }, { k: 'n_d', label: 'Discontinued' }
   ];
   get allCols(): { k: Col; label: string }[] { return [...this.confirmedCols, ...this.notConfirmedCols]; }
 
@@ -87,10 +215,9 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   setRowStages(phase: any, key: string, stages: PhaseStageRow[]): void {
-    const rows = { ...(phase['rows'] || {}), [key]: stages || [] };
-    updateDoc(doc(this.firestore, 'stage opportunity count', phase['docid']),
-      { rows, queuelist: this.selectedQueueList, kind: 'phase', updated: new Date() })
-      .catch(err => console.error('Save phase row failed', err));
+    // In-memory only — persisted when the working draft is saved as a filter.
+    phase['rows'] = { ...(phase['rows'] || {}), [key]: stages || [] };
+    this.rebuildMatrix();
   }
 
   // Event-derived sets
@@ -183,44 +310,88 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   constructor(
     private firestore: Firestore,
     private fb: FormBuilder,
-    private planningData: PlanningDataService
+    private planningData: PlanningDataService,
+    private snackBar: MatSnackBar,
+    private guard: AuthguardService
   ) {
     this.phaseForm = this.fb.group({
       phasename: [null, Validators.required],
-      targetPct: [null]
+      targetPct: [null, [Validators.min(0), Validators.max(100)]]
     });
   }
 
   ngOnInit(): void {
-    this.queueModel = [...(this.selectedQueueList || [])];
-    this.loadPhases();
-    if (this.selectedEventRefs.length) this.loadEventSets().then(() => this.recompute());
-    else this.recompute();
+    this.loadFilters();
+    this.loadStageOptions();
+    this.loadJourneysAndMeta();
+    this.loadQueueEligibility();
+    this.requestRecompute();
+  }
+
+  /** Load the journey list, participant-metadata map, and Priority-Mode product ids (for the filters). */
+  private async loadJourneysAndMeta(): Promise<void> {
+    try {
+      this.journeyMap = await this.guard.getJourneyMap();
+      this.journeyList = Object.entries(this.journeyMap)
+        .map(([id, name]) => ({ id, name: String(name ?? id) }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } catch (e) { console.error('Journey map load failed', e); }
+    try {
+      const meta = await this.guard.getParticipantMetaMap();
+      this.participantMeta = meta?.['docdata'] || {};
+    } catch (e) { console.error('Participant metadata load failed', e); }
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'products'), where('mode', '==', 'Priority Mode')));
+      this.priorityProductIds = new Set(snap.docs.map(d => d.id));
+    } catch (e) { console.error('Priority products load failed', e); }
+    if (this.active) this.recomputeView();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['selectedQueueList']) {
-      this.queueModel = [...(this.selectedQueueList || [])];
-    }
     const queueChanged = !!changes['selectedQueueList'] && !changes['selectedQueueList'].firstChange;
     const refreshChanged = !!changes['refreshKey'] && !changes['refreshKey'].firstChange;
     const tokensChanged = !!changes['queueTokens'] && !changes['queueTokens'].firstChange;
     const completionChanged = !!changes['allCompletedStageCount'] && !changes['allCompletedStageCount'].firstChange;
-    // Queue/refresh: reload phases + recompute. Don't rely solely on refreshKey moving with the queue list.
+    const becameActive = !!changes['active'] && !changes['active'].firstChange && this.active;
+    // Queue/refresh: refresh stage options. Phases are in-memory (owned by the active filter /
+    // working draft), so they are NOT reloaded/wiped when the queue list moves.
     if (queueChanged || refreshChanged) {
-      this.loadPhases();
-      this.recompute();
+      this.loadStageOptions();
+      if (queueChanged) this.loadQueueEligibility();
+      this.requestRecompute();
     } else if (tokensChanged || completionChanged) {
-      // The parent loads queueTokens / completion counts asynchronously, often arriving in a
-      // later change-detection pass than the refreshKey bump. Recompute when they land so the
-      // cards don't stay stuck on stale (empty) data while the matrix shows the real numbers.
-      this.recompute();
+      // queueTokens / completion arrive asynchronously (and in bursts during queue load).
+      this.requestRecompute();
     }
+    // Becoming visible: run any recompute that was deferred while the tab was hidden.
+    if (becameActive && this.pendingRecompute) this.runRecompute();
   }
 
-  ngOnDestroy(): void { this.phasesSub?.unsubscribe(); }
+  ngOnDestroy(): void {
+    this.phasesSub?.unsubscribe();
+    this.filtersSub?.unsubscribe();
+    if (this.recomputeTimer) clearTimeout(this.recomputeTimer);
+  }
+
+  // ---- Recompute scheduling: gate on visibility + coalesce bursts ----
+  private pendingRecompute = false;
+  private recomputeTimer: any = null;
+
+  /** Ask for a recompute. Deferred while the tab is hidden; debounced while visible to tame bursts. */
+  private requestRecompute(): void {
+    if (!this.active) { this.pendingRecompute = true; return; }
+    if (this.recomputeTimer) clearTimeout(this.recomputeTimer);
+    this.recomputeTimer = setTimeout(() => this.runRecompute(), 200);
+  }
+
+  private runRecompute(): void {
+    this.pendingRecompute = false;
+    if (this.recomputeTimer) { clearTimeout(this.recomputeTimer); this.recomputeTimer = null; }
+    this.recompute();
+  }
 
   queueName(queueId: string): string { return this.mapQueue?.[queueId]?.['queuename'] || queueId; }
+  trackByQueueId(_i: number, id: string): string { return id; }
 
   get selectedEventRefs(): DocumentReference[] {
     return (this.eventList || []).filter(e => this.selectedEventIds.includes(e['id'])).map(e => e['ref']);
@@ -236,13 +407,6 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     this.loadEventSets().then(() => this.recompute()).finally(() => this.dataLoading = false);
   }
 
-  onQueueChange(ids: string[]): void {
-    this.queueModel = ids || [];
-    this.selectedCell = null;
-    this.cellDrillRows = [];
-    this.cellPage = 0;
-    this.queueChange.emit(this.queueModel);
-  }
 
   // ---------- Data ----------
 
@@ -255,21 +419,88 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private async recompute(): Promise<void> {
-    const holders = this.queueHolderIds();
+    // Load statuses for the RAW (unfiltered) holders so the journey filter (which needs
+    // customerstatus) has data to work with; filtering happens after in queueHolderIds().
+    const holders = this.rawQueueHolderIds();
     const ids = [...new Set<string>([...holders, ...this.approvedSet, ...this.requestedSet])];
     this.statusMap = await this.planningData.loadCustomerStatus(ids);
+    this.recomputeView();
+  }
+
+  /**
+   * Recompute cards + matrix + drills from already-loaded data (statusMap, tokens,
+   * completion) with NO Firestore fetch. Used by the local queue filter so narrowing
+   * the Planning view is instant and never reloads.
+   */
+  private recomputeView(): void {
     this.computeCards();
     this.rebuildMatrix();
     this.refreshDrill();
     this.refreshCellDrill();
   }
 
-  private queueHolderIds(): Set<string> {
+  /** All token holders across the planning scope — unfiltered (for status loading). */
+  private rawQueueHolderIds(): Set<string> {
     const s = new Set<string>();
-    for (const q of this.selectedQueueList) {
+    for (const q of this.scope) {
       this.tokensForQueue(q).forEach(t => { if (t['profile_id']) s.add(t['profile_id']); });
     }
     return s;
+  }
+
+  /** Holders after applying the journey filter + DFU-ongoing omit — used by every number/list. */
+  private queueHolderIds(): Set<string> {
+    const raw = this.rawQueueHolderIds();
+    if (!this.selectedJourneys.length && !this.omitDfuOngoing) return raw;
+    const out = new Set<string>();
+    raw.forEach(id => { if (this.passesParticipantFilters(id)) out.add(id); });
+    return out;
+  }
+
+  // ---------- Type #2 : eligible-but-unbooked (in queue-planning segment, not in queue_token) ----------
+  /** profileids who belong to any segment that appears in the selected queue's `queue planning`. */
+  private planningSegmentMembers = new Set<string>();
+
+  /** Load the segment membership for the current queue scope (queue planning → participant list). */
+  private async loadQueueEligibility(): Promise<void> {
+    this.planningSegmentMembers = new Set<string>();
+    const queues = this.scope;
+    if (!queues.length) { if (this.active) this.recomputeView(); return; }
+    try {
+      // 1) segment ids configured in this queue's planning
+      const segIds = new Set<string>();
+      for (const qid of queues) {
+        const planSnap = await getDocs(query(collection(this.firestore, 'queue planning'), where('queueid', '==', qid)));
+        planSnap.docs.forEach(d => {
+          ((d.data() as any)['planning'] || []).forEach((v: any) =>
+            (v['segments'] || []).forEach((s: any) => { if (s['segmentid']) segIds.add(s['segmentid']); }));
+        });
+      }
+      // 2) each segment doc lists its participant lists (participantlistid)
+      const listIds = new Set<string>();
+      for (const sid of segIds) {
+        const segDoc = await getDoc(doc(this.firestore, 'segments', sid));
+        if (segDoc.exists()) ((segDoc.data() as any)['participantlistid'] || []).forEach((lid: string) => { if (lid) listIds.add(lid); });
+      }
+      // 3) participant list → union of profilelist
+      for (const lid of listIds) {
+        const listDoc = await getDoc(doc(this.firestore, 'participant list', lid));
+        if (listDoc.exists()) ((listDoc.data() as any)['profilelist'] || []).forEach((p: string) => { if (p) this.planningSegmentMembers.add(p); });
+      }
+    } catch (e) { console.error('Queue eligibility (Type #2) load failed', e); }
+    if (this.active) this.recomputeView();
+  }
+
+  /** The Potential set (product owners not already approved/requested for the event). */
+  private potentialIds(): string[] {
+    return [...this.ownerSet].filter(o => !this.approvedSet.has(o) && !this.requestedSet.has(o));
+  }
+
+  /** Type #2 = Potential ∩ (in queue-planning segment) ∩ (NOT in queue_token). */
+  private type2Ids(): string[] {
+    if (!this.planningSegmentMembers.size) return [];
+    const holders = this.rawQueueHolderIds();
+    return this.potentialIds().filter(id => this.planningSegmentMembers.has(id) && !holders.has(id));
   }
 
   private statusBucket(id: string): 'a' | 'na' | 'd' {
@@ -297,12 +528,13 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     let confInQ = 0;
     holders.forEach(id => { if (ap.has(id)) confInQ++; });
     this.cards = [
-      { key: 'confEvent', label: 'Confirmed for the event', value: ap.size },
-      { key: 'inQueue', label: 'Total in the queue', value: holders.size },
-      { key: 'confInQueue', label: 'Confirmed + in queue', value: confInQ },
-      { key: 'confNotInQueue', label: 'Confirmed + not in queue', value: Math.max(0, ap.size - confInQ) },
-      { key: 'notConfInQueue', label: 'Not confirmed + in queue', value: Math.max(0, holders.size - confInQ) },
-      { key: 'potential', label: 'Potential', value: this.potentialTotal }
+      { key: 'confEvent', label: 'Confirmed for the event', value: ap.size, desc: 'Approved/attended event requests' },
+      { key: 'inQueue', label: 'Total in the queue', value: holders.size, desc: 'Hold a token in the selected queue' },
+      { key: 'confInQueue', label: 'Confirmed + in queue', value: confInQ, desc: 'Event-confirmed AND in the queue' },
+      { key: 'confNotInQueue', label: 'Confirmed + not in queue', value: Math.max(0, ap.size - confInQ), desc: 'Event-confirmed but no queue token' },
+      { key: 'notConfInQueue', label: 'Not confirmed + in queue', value: Math.max(0, holders.size - confInQ), desc: 'In queue but not event-confirmed' },
+      { key: 'potential', label: 'Potential', value: this.potentialTotal, desc: 'Own the product, not yet in the event' },
+      { key: 'type2', label: 'Eligible · not in queue', value: this.type2Ids().length, desc: 'Potential in a queue segment, not in queue' }
     ];
   }
 
@@ -317,11 +549,15 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   private confirmedSlotSetForStage(queueId: string, stageName: string): Set<string> {
     const out = new Set<string>();
+    const now = Date.now();
     this.tokensForQueue(queueId).forEach(t => {
       const pid = t['profile_id'];
       if (!pid) return;
       const slot = (t['selectedstageslot'] || {})[stageName];
-      if (slot && slot['slotconfirmation']) out.add(pid);
+      if (!slot || !slot['slotconfirmation']) return;
+      // Only count a confirmed slot whose end time is still in the future (upcoming, not past).
+      const end = this.toDate(slot['enddate']);
+      if (end && end.getTime() > now) out.add(pid);
     });
     return out;
   }
@@ -351,12 +587,13 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   private rebuildMatrix(): void {
     const holders = [...this.queueHolderIds()];
+    const scope = this.scope;
     this.matrixRows = (this.planningPhases || []).map(phase => {
       const z = (): Cells => ({ c_a: 0, c_na: 0, c_d: 0, n_a: 0, n_na: 0, n_d: 0, total: 0 });
       const lines: MatrixLine[] = this.rowDefs.map(rd => {
         const cells = z();
         if (rd.kind !== 'rate') {
-          const stages = this.getRowStages(phase, rd.key).filter(s => this.selectedQueueList.includes(s.queueid));
+          const stages = this.getRowStages(phase, rd.key).filter(s => scope.includes(s.queueid));
           for (const id of holders) {
             if (!this.rowMatches(rd, stages, id)) continue;
             const col = this.colKey(id, this.approvedSet.has(id));
@@ -457,7 +694,8 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
       case 'confInQueue': return [...holders].filter(id => ap.has(id));
       case 'confNotInQueue': return [...ap].filter(id => !holders.has(id));
       case 'notConfInQueue': return [...holders].filter(id => !ap.has(id));
-      case 'potential': return [...this.ownerSet].filter(o => !ap.has(o) && !this.requestedSet.has(o));
+      case 'potential': return this.potentialIds();
+      case 'type2': return this.type2Ids();
       default: return [];
     }
   }
@@ -513,7 +751,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   private cellIds(phase: any, lineKey: string, col: Col | 'total'): string[] {
     const rd = this.rowDefs.find(r => r.key === lineKey);
     if (!rd) return [];
-    const stages = this.getRowStages(phase, lineKey).filter(s => this.selectedQueueList.includes(s.queueid));
+    const stages = this.getRowStages(phase, lineKey).filter(s => this.scope.includes(s.queueid));
     return [...this.queueHolderIds()].filter(id => {
       if (!this.rowMatches(rd, stages, id)) return false;
       return col === 'total' || this.colKey(id, this.approvedSet.has(id)) === col;
@@ -534,10 +772,10 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
       return null;
     };
     if (preferQueueIds && preferQueueIds.size) {
-      const preferred = lookup(this.selectedQueueList.filter(q => preferQueueIds.has(q)));
+      const preferred = lookup(this.scope.filter(q => preferQueueIds.has(q)));
       if (preferred) return preferred;
     }
-    return lookup(this.selectedQueueList) || { queueName: '—', stage: '—' };
+    return lookup(this.scope) || { queueName: '—', stage: '—' };
   }
 
   /** Whether the currently-open cell belongs to a slot row (drives the "Selected slot" column). */
@@ -548,7 +786,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   private computeCellDrill(phase: any, lineKey: string, col: Col | 'total'): void {
     const isSlot = this.rowDefs.find(r => r.key === lineKey)?.kind === 'slot';
-    const stagesInScope = this.getRowStages(phase, lineKey).filter(s => this.selectedQueueList.includes(s.queueid));
+    const stagesInScope = this.getRowStages(phase, lineKey).filter(s => this.scope.includes(s.queueid));
     const prefer = new Set(stagesInScope.map(s => s.queueid));
     this.cellDrillRows = this.cellIds(phase, lineKey, col).map(id => {
       const qs = this.participantQueueStage(id, prefer);
@@ -604,25 +842,181 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     if (!this.cellDrillRows.length) this.closeCell();
   }
 
-  // ---------- Phase config ----------
+  // ---------- Saved filters (load / apply / save / diff) ----------
 
-  private loadPhases(): void {
-    this.phasesSub?.unsubscribe();
-    if (!this.selectedQueueList.length) { this.planningPhases = []; this.rebuildMatrix(); return; }
-    this.loadStageOptions();
-    this.phasesSub = collectionData(query(
-      collection(this.firestore, 'stage opportunity count'),
-      where('queuelist', 'array-contains-any', this.selectedQueueList)
-    )).subscribe({
+  private newId(): string { return doc(collection(this.firestore, 'planning_phases')).id; }
+
+  private loadFilters(): void {
+    this.filtersSub?.unsubscribe();
+    this.filtersSub = collectionData(collection(this.firestore, 'planning_phases')).subscribe({
       next: (docs: any[]) => {
-        this.planningPhases = docs
-          .filter(d => d['kind'] === 'phase')
-          .filter(d => (d['queuelist'] || []).every((q: string) => this.selectedQueueList.includes(q)))
-          .sort((a, b) => (a['sequence'] ?? 999) - (b['sequence'] ?? 999));
-        this.rebuildMatrix();
+        this.savedFilters = docs
+          .map(d => d as PlanningFilter)
+          .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
       },
-      error: err => console.error('Load phases failed', err)
+      error: err => console.error('Load filters failed', err)
     });
+  }
+
+  private cloneRows(rows: { [key: string]: PhaseStageRow[] } | undefined): { [key: string]: PhaseStageRow[] } {
+    const out: { [key: string]: PhaseStageRow[] } = {};
+    Object.keys(rows || {}).forEach(k => out[k] = (rows![k] || []).map(s => ({ queueid: s.queueid, stagename: s.stagename })));
+    return out;
+  }
+
+  /** Apply a saved filter: restore queues (→ Board loads data), events and phases, then recompute. */
+  applyFilter(f: PlanningFilter): void {
+    // Already applied → do nothing (no redundant refetch/reload).
+    if (this.activeFilterId === f.docid) return;
+    this.activeFilterId = f.docid;
+    this.selectedEventIds = [...(f.eventIds || [])];
+    this.planningPhases = (f.phases || []).map(p => ({
+      docid: this.newId(), phasename: p.phasename, targetPct: p.targetPct ?? null, rows: this.cloneRows(p.rows)
+    }));
+    this.selectedCardKey = null; this.drillList = [];
+    this.selectedCell = null; this.cellDrillRows = [];
+    this.showSaveWidget = false;
+    // Show the loader while the filter's data is (re)loaded.
+    this.dataLoading = true;
+    // Push the queue set up so the Board loads its data; tokens arriving will trigger recompute.
+    this.patchQueues.emit([...(f.queueIds || [])]);
+    const done = () => this.dataLoading = false;
+    if (this.selectedEventRefs.length) this.loadEventSets().then(() => this.recompute()).finally(done);
+    else { this.approvedSet = new Set(); this.requestedSet = new Set(); this.ownerSet = new Set(); this.potentialTotal = 0; Promise.resolve(this.recompute()).finally(done); }
+  }
+
+  isActiveFilter(f: PlanningFilter): boolean { return this.activeFilterId === f.docid; }
+
+  /** Start a brand-new filter: reset EVERY selection (queue, event, journey, DFU) + phases. */
+  newFilter(): void {
+    this.activeFilterId = null;
+    this.planningPhases = [];
+    this.showSaveWidget = false;
+    // Reset all dropdowns/toggles
+    this.selectedEventIds = [];
+    this.selectedJourneys = [];
+    this.omitDfuOngoing = false;
+    // Reset event-derived sets so cards zero out
+    this.approvedSet = new Set(); this.requestedSet = new Set(); this.ownerSet = new Set(); this.potentialTotal = 0;
+    // Drills / form
+    this.selectedCardKey = null; this.drillList = [];
+    this.selectedCell = null; this.cellDrillRows = [];
+    this.closePhaseForm();
+    // Clear the planning queue selection up in the parent (empties its data too)
+    this.queueSelectionChange.emit([]);
+    this.rebuildMatrix();
+  }
+
+  /** Open the floating save panel: compute the diff vs the applied filter and prefill the title. */
+  openSaveWidget(): void {
+    const active = this.activeFilter;
+    this.saveMode = active ? 'update' : 'new';
+    this.saveTitle = active ? (active.title || '') : '';
+    this.pendingChanges = this.computeChanges(active);
+    this.showSaveWidget = true;
+  }
+
+  closeSaveWidget(): void { this.showSaveWidget = false; }
+
+  /** Save the current working state as a new filter, or update the applied one. */
+  saveFilter(): void {
+    const title = (this.saveTitle || '').trim();
+    if (!title) return;
+    const phases: FilterPhase[] = this.planningPhases.map(p => ({
+      phasename: p['phasename'], targetPct: p['targetPct'] ?? null, rows: this.cloneRows(p['rows'])
+    }));
+    const base = { title, queueIds: [...this.selectedQueueList], eventIds: [...this.selectedEventIds], phases, lasteditedby: this.currentProfileId || null };
+    const active = this.activeFilter;
+    if (this.saveMode === 'update' && active) {
+      updateDoc(doc(this.firestore, 'planning_phases', active.docid), { ...base, updated: new Date() })
+        .then(() => { this.showSaveWidget = false; this.toast('Filter updated'); })
+        .catch(err => { console.error('Update filter failed', err); alert('Could not save filter: ' + (err?.code || err?.message || err)); });
+    } else {
+      const docid = this.newId();
+      setDoc(doc(this.firestore, 'planning_phases', docid), { ...base, docid, created: new Date() })
+        .then(() => { this.activeFilterId = docid; this.showSaveWidget = false; this.toast('Filter created'); })
+        .catch(err => { console.error('Create filter failed', err); alert('Could not save filter: ' + (err?.code || err?.message || err)); });
+    }
+  }
+
+  private toast(msg: string): void {
+    this.snackBar.open(msg, 'Close', { duration: 2500, horizontalPosition: 'center', verticalPosition: 'bottom' });
+  }
+
+  deleteFilter(f: PlanningFilter, ev?: Event): void {
+    ev?.stopPropagation();
+    if (!confirm(`Delete the filter "${f.title}"?`)) return;
+    deleteDoc(doc(this.firestore, 'planning_phases', f.docid))
+      .then(() => { if (this.activeFilterId === f.docid) this.activeFilterId = null; })
+      .catch(err => console.error('Delete filter failed', err));
+  }
+
+  private eventLabel(id: string): string {
+    return (this.eventList || []).find(e => e['id'] === id)?.['name'] || id;
+  }
+
+  private readonly rowLabel = (k: string) => this.rowDefs.find(rd => rd.key === k)?.label || k;
+  private stageNames(arr: PhaseStageRow[]): string[] { return (arr || []).map(s => s.stagename); }
+
+  /** Every configured line of a phase, e.g. `Not Completed: StageA, StageB`. */
+  private phaseDetailLines(name: string, targetPct: any, rows: any, prefix = ''): string[] {
+    const out: string[] = [];
+    const t = targetPct ?? null;
+    out.push(`${prefix}Phase "${name}"${t != null ? ` · target ${t}%` : ''}`);
+    for (const rd of this.rowDefs) {
+      if (rd.kind === 'rate') continue;
+      const stages = this.stageNames((rows || {})[rd.key] || []);
+      if (stages.length) out.push(`${prefix}   ${this.rowLabel(rd.key)}: ${stages.join(', ')}`);
+    }
+    return out;
+  }
+
+  /** FULL list of what is being saved (new) or what changed vs the applied filter (update). */
+  private computeChanges(active: PlanningFilter | null): string[] {
+    // NEW filter — list everything that will be saved, in full.
+    if (!active) {
+      const out: string[] = [];
+      out.push(`Queues: ${this.selectedQueueList.length ? this.selectedQueueList.map(q => this.queueName(q)).join(', ') : '—'}`);
+      out.push(`Events: ${this.selectedEventIds.length ? this.selectedEventIds.map(e => this.eventLabel(e)).join(', ') : '—'}`);
+      out.push(`Phases: ${this.planningPhases.length}`);
+      for (const p of this.planningPhases) out.push(...this.phaseDetailLines(p['phasename'], p['targetPct'], p['rows'], '  '));
+      return out;
+    }
+    // UPDATE — every difference, spelled out.
+    const lines: string[] = [];
+    if (active.title !== (this.saveTitle || '').trim() && (this.saveTitle || '').trim()) {
+      lines.push(`Title: "${active.title}" → "${(this.saveTitle || '').trim()}"`);
+    }
+    const diffSet = (oldArr: string[], curArr: string[], label: string, name: (x: string) => string) => {
+      const oldS = new Set(oldArr), curS = new Set(curArr);
+      const added = curArr.filter(x => !oldS.has(x)).map(name);
+      const removed = oldArr.filter(x => !curS.has(x)).map(name);
+      if (added.length) lines.push(`${label} added: ${added.join(', ')}`);
+      if (removed.length) lines.push(`${label} removed: ${removed.join(', ')}`);
+    };
+    diffSet(active.queueIds || [], this.selectedQueueList, 'Queue', q => this.queueName(q));
+    diffSet(active.eventIds || [], this.selectedEventIds, 'Event', e => this.eventLabel(e));
+    const oldByName = new Map((active.phases || []).map(p => [p.phasename, p]));
+    const curByName = new Map(this.planningPhases.map(p => [p['phasename'], p]));
+    for (const [name, cur] of curByName) {
+      const old = oldByName.get(name);
+      if (!old) { lines.push(...this.phaseDetailLines(name, cur['targetPct'], cur['rows'], 'Added ')); continue; }
+      const oldT = old.targetPct ?? null, newT = cur['targetPct'] ?? null;
+      if (oldT !== newT) lines.push(`"${name}" target: ${oldT ?? '—'}% → ${newT ?? '—'}%`);
+      for (const rd of this.rowDefs) {
+        if (rd.kind === 'rate') continue;
+        const oldStages = this.stageNames(old.rows?.[rd.key] || []);
+        const curStages = this.stageNames((cur['rows'] || {})[rd.key] || []);
+        const oldS = new Set(oldStages), curS = new Set(curStages);
+        const added = curStages.filter(s => !oldS.has(s));
+        const removed = oldStages.filter(s => !curS.has(s));
+        if (added.length) lines.push(`"${name}" · ${this.rowLabel(rd.key)} +${added.join(', ')}`);
+        if (removed.length) lines.push(`"${name}" · ${this.rowLabel(rd.key)} −${removed.join(', ')}`);
+      }
+    }
+    for (const name of oldByName.keys()) if (!curByName.has(name)) lines.push(`Phase removed: "${name}"`);
+    if (!lines.length) lines.push('No changes');
+    return lines;
   }
 
   private async loadStageOptions(): Promise<void> {
@@ -664,29 +1058,23 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     const t = this.phaseForm.value.targetPct;
     const targetPct = (t === null || t === undefined || t === '') ? null : Math.max(0, Math.min(100, Number(t)));
     if (this.isEditMode && this.editingPhase) {
-      updateDoc(doc(this.firestore, 'stage opportunity count', this.editingPhase['docid']),
-        { phasename: name, targetPct, queuelist: this.selectedQueueList, kind: 'phase', updated: new Date() })
-        .then(() => this.closePhaseForm())
-        .catch(err => { console.error('Save phase failed', err); alert('Could not save phase: ' + (err?.code || err?.message || err)); });
+      this.editingPhase['phasename'] = name;
+      this.editingPhase['targetPct'] = targetPct;
     } else {
-      const docid = doc(collection(this.firestore, 'stage opportunity count')).id;
-      const docData = {
-        phasename: name,
-        targetPct,
-        rows: { complete: [], notComplete: [], slotConfirmed: [], slotNotConfirmed: [] },
-        queuelist: this.selectedQueueList, kind: 'phase', docid, sequence: this.planningPhases.length, created: new Date()
-      };
-      setDoc(doc(this.firestore, 'stage opportunity count', docid), docData)
-        .then(() => this.closePhaseForm())
-        .catch(err => { console.error('Create phase failed', err); alert('Could not create phase: ' + (err?.code || err?.message || err)); });
+      this.planningPhases = [...this.planningPhases, {
+        docid: this.newId(), phasename: name, targetPct,
+        rows: { notComplete: [], slotConfirmed: [], slotNotConfirmed: [], complete: [] }
+      }];
     }
+    this.closePhaseForm();
+    this.rebuildMatrix();
   }
 
   deletePhase(phase: any): void {
     const ok = confirm(`Are you sure you want to delete the phase "${phase['phasename']}"?`);
     if (!ok) return;
-    deleteDoc(doc(this.firestore, 'stage opportunity count', phase['docid']))
-      .catch(err => console.error('Delete phase failed', err));
+    this.planningPhases = this.planningPhases.filter(p => p !== phase);
+    this.rebuildMatrix();
   }
 
   onPhaseDrop(event: CdkDragDrop<any[]>): void {
@@ -694,11 +1082,6 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     moveItemInArray(this.planningPhases, event.previousIndex, event.currentIndex);
     this.planningPhases = [...this.planningPhases];
     this.rebuildMatrix();
-    const updates = this.planningPhases.map((item, index) => {
-      item.sequence = index;
-      return updateDoc(doc(this.firestore, 'stage opportunity count', item.docid), { sequence: index });
-    });
-    Promise.all(updates).catch(err => console.error('Error updating phase sequence:', err));
   }
 
   closePhaseForm(): void {

@@ -47,6 +47,10 @@ export class DynamicStudioV2Component {
   @ViewChild('atcDialogTpl') atcDialogTpl!: TemplateRef<any>;
   @ViewChild('checkinConflictTpl') checkinConflictTpl!: TemplateRef<any>;
   @ViewChild('chatScroll') chatScroll: ElementRef
+  // The scrollable content area of the live studio. Reset to the top whenever the
+  // active step changes so a new stage always shows its top content (previously
+  // it kept the scroll position from the stage you switched away from).
+  @ViewChild('dsMainScroll') dsMainScroll?: ElementRef<HTMLElement>
   profileRoles = {}
   profileid = null
   mapProfile = {}
@@ -844,6 +848,7 @@ export class DynamicStudioV2Component {
     if (id === 'prev-history') this.prevHistoryMounted = true
     // Lazily check for an AI-generated ATC only when the specialist opens the prescribe step.
     if (id === 'prescribe-atc') this.checkAiAtcAvailability()
+    this.scrollMainToTop()
   }
 
   goToStep(offset: number) {
@@ -856,6 +861,26 @@ export class DynamicStudioV2Component {
     this.userNavigated = true
     // next/prev arrows bypass setActiveStep — trigger the AI-ATC check when landing here too.
     if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
+    this.scrollMainToTop()
+  }
+
+  // Scroll the content area back to the top on every step change so a new stage
+  // always shows its top content instead of inheriting the previous stage's
+  // scroll position. Runs after render (the step content swaps via *ngIf, so the
+  // new, possibly taller content must exist before we reset). Guards the un-pinned
+  // (short/mobile) mode where the window scrolls instead of the inner container.
+  private scrollMainToTop() {
+    const reset = () => {
+      const el = this.dsMainScroll?.nativeElement
+      if (el && el.scrollTop) el.scrollTop = 0
+      // Un-pinned fallback: the page itself scrolls, so send the container's top
+      // to the viewport top only if it's currently above the fold.
+      if (el && getComputedStyle(el).overflowY === 'visible' && el.getBoundingClientRect().top < 0) {
+        el.scrollIntoView({ block: 'start' })
+      }
+    }
+    reset()
+    setTimeout(reset) // catch the case where new content mounts after this tick
   }
 
   getStepIndex(id: string): number {

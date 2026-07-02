@@ -263,10 +263,9 @@
   <!-- =================== LIVE ASSIGNMENT (STEPPER V2 — NEW DESIGN) =================== -->
   <div *ngIf="liveAssignment != null" class="ds-app dyn-studio-v2-app">
 
-    <!-- ============================ HEADER (mockup: participant + status + actions) ============================ -->
-    <header class="ds-header">
-      <!-- Participant identity -->
-      <div class="ds-hdr-id">
+    <!-- ============================ SIDEBAR (identity + vertical stepper) ============================ -->
+    <aside class="ds-side">
+      <div class="ds-side-id">
         <div class="ds-avatar"
           (click)="(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile) && (expandedImage = (mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile))">
           <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
@@ -277,74 +276,47 @@
           </span>
           <span class="ds-online" *ngIf="participantReady"></span>
         </div>
-        <div class="ds-hdr-idbody">
-          <div class="ds-hdr-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
-          <div class="ds-hdr-metaline">
-            <span class="ds-hdr-uplabel" *ngIf="participantUPVisitLabel">
-              <mat-icon class="ic">emoji_events</mat-icon>{{ participantUPVisitLabel }} at uP!
-            </span>
-            <span class="ds-hdr-dot" *ngIf="participantUPVisitLabel && liveAssignment['token']?.productname">·</span>
-            <span class="ds-hdr-product" *ngIf="liveAssignment['token']?.productname" [title]="liveAssignment['token']?.productname">{{ liveAssignment["token"]?.productname }}</span>
+        <div class="ds-side-idbody">
+          <div class="ds-side-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
+          <div class="ds-side-sub">
+            <span *ngIf="participantUPVisitLabel">{{ participantUPVisitLabel }} at uP!</span><span *ngIf="participantUPVisitLabel && liveAssignment['token']?.productname"> &middot; </span><span *ngIf="liveAssignment['token']?.productname" [title]="liveAssignment['token']?.productname">{{ liveAssignment['token']?.productname }}</span>
           </div>
-          <!-- Specialists included — shown inline next to the participant name -->
-          <div class="ds-hdr-specialists" *ngIf="additionalSpecialists.length">
-            <mat-icon class="ic">groups</mat-icon>
-            <span class="ds-hdr-specialists__label">With</span>
-            <span class="ds-hdr-specialists__names">
-              <ng-container *ngFor="let sp of additionalSpecialists; let last = last; trackBy: trackByDocId">{{ sp.name }}<span *ngIf="sp.activity" class="ds-hdr-specialists__role"> ({{ sp.activity }})</span>{{ last ? '' : ', ' }}</ng-container>
-            </span>
-          </div>
-        </div>
-        <!-- COMMENTED OUT: header details toggle + popover (product/variation/journey/specialists).
-             Specialists now shown inline by the name above; kept here (ngIf false) for easy restore. -->
-        <button type="button" class="ds-hdr-detailsbtn" [class.open]="sidebarProfileOpen"
-          *ngIf="false"
-          (click)="toggleSidebarProfile()" [attr.aria-expanded]="sidebarProfileOpen"
-          title="Participant details" aria-label="Participant details">
-          <mat-icon class="ic">expand_more</mat-icon>
-        </button>
-
-        <div class="ds-hdr-details" *ngIf="false">
-          <div class="ds-meta-row" *ngIf="participantUPVisitLabel">
-            <span class="ds-meta-ic"><mat-icon class="ic">emoji_events</mat-icon></span>
-            <span class="ds-chip-val ds-chip-val--lead">{{ participantUPVisitLabel }} at uP!</span>
-          </div>
-          <div class="ds-meta-row">
-            <span class="ds-meta-ic"><mat-icon class="ic">inventory_2</mat-icon></span>
-            <span class="ds-chip-label">Product</span>
-            <span class="ds-chip-val" [title]="liveAssignment['token']?.productname">
-              {{ liveAssignment["token"]?.productname || '—' }}
-            </span>
-          </div>
-          <div class="ds-meta-row" *ngIf="liveAssignment['token']?.variationid != null">
-            <span class="ds-meta-ic"><mat-icon class="ic">tune</mat-icon></span>
-            <span class="ds-chip-label">Variation</span>
-            <span class="ds-chip-val">{{ mapVariationName[liveAssignment['token']?.variationid] }}</span>
-          </div>
-          <div class="ds-meta-row" *ngIf="participantJourneyName">
-            <span class="ds-meta-ic"><mat-icon class="ic">route</mat-icon></span>
-            <span class="ds-chip-label">Journey</span>
-            <span class="ds-chip-val" [title]="participantJourneyName">{{ participantJourneyName }}</span>
-          </div>
-          <div class="ds-hdr-details__specialists" *ngIf="additionalSpecialists.length">
-            <div class="ds-hdr-details__specialists-head">
+          <div class="ds-side-specialists" *ngIf="additionalSpecialists.length"
+               [class.ds-side-specialists--multi]="additionalSpecialists.length > 1">
+            <div class="ds-side-specialists__head">
               <mat-icon class="ic">groups</mat-icon>
-              <span>Specialists included</span>
-              <span class="ds-hdr-details__count">{{ additionalSpecialists.length }}</span>
+              <span class="ds-side-specialists__label">With<span *ngIf="additionalSpecialists.length > 1"> · {{ additionalSpecialists.length }}</span></span>
             </div>
-            <div class="ds-extra-specialist" *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
-              <span class="ds-extra-specialist__avatar">{{ (sp.name || '?').charAt(0) | uppercase }}</span>
-              <span class="ds-extra-specialist__body">
-                <span class="ds-extra-specialist__name" [title]="sp.name">{{ sp.name }}</span>
-                <span class="ds-extra-specialist__activity" *ngIf="sp.activity" [title]="sp.activity">{{ sp.activity }}</span>
-              </span>
-            </div>
+            <ul class="ds-side-specialists__list">
+              <li class="ds-side-specialists__item" *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
+                <span class="ds-side-specialists__name">{{ sp.name }}</span><span *ngIf="sp.activity" class="ds-side-specialists__role"> ({{ sp.activity }})</span>
+              </li>
+            </ul>
           </div>
         </div>
       </div>
 
-      <!-- Status pill (center) -->
-      <div class="ds-hdr-status">
+      <div class="ds-side-steps">
+        <div class="ds-side-steps__label">Session Steps</div>
+        <nav class="ds-vsteplist">
+          <button *ngFor="let step of visibleSteps; let i = index; trackBy: trackByDocId"
+                  type="button" class="ds-vstep"
+                  [class.active]="step.id === activeStepId"
+                  [class.done]="isStepCompleted(step.id)"
+                  (click)="setActiveStep(step.id)">
+            <span class="ds-vstep-node">
+              <mat-icon class="ic" *ngIf="isStepCompleted(step.id)">check</mat-icon>
+              <span *ngIf="!isStepCompleted(step.id)">{{ i + 1 }}</span>
+            </span>
+            <span class="ds-vstep-label">{{ step.label }}</span>
+          </button>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- ============================ TOPBAR (status + actions) ============================ -->
+    <header class="ds-topbar2">
+      <div class="ds-topbar2__left">
         <div class="ds-waiting ds-waiting--compact"
              [ngClass]="'tone-' + topBarStatus.tone"
              [class.is-joined]="participantHasJoinedCall">
@@ -354,23 +326,19 @@
             <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
           </div>
         </div>
-        <button type="button" class="btn btn-green btn-sm ds-hdr-jump"
-                *ngIf="participantInWaitingRoom"
-                (click)="setActiveStep('getstarted')">
-          <mat-icon class="ic">play_arrow</mat-icon>
-          Jump to Meeting
+        <button type="button" class="btn btn-primary btn-sm" *ngIf="participantInWaitingRoom" (click)="setActiveStep('getstarted')">
+          <mat-icon class="ic">videocam</mat-icon>
+          Join Call
         </button>
       </div>
-
-      <!-- Actions (right) -->
-      <div class="ds-hdr-actions">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn">
+      <div class="ds-topbar2__right">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn" title="Invite More">
           <mat-icon class="ic">person_add</mat-icon>
           Invite More
         </button>
-        <button type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()">
+        <button type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()" title="Send back to Waiting Again">
           <mat-icon class="ic">undo</mat-icon>
-          Send back to Waiting
+          Send back to Waiting Again
         </button>
         <div class="ds-menu-anchor" *ngIf="hasNextStageOptions">
           <button type="button" class="btn btn-green btn-sm"
@@ -379,11 +347,11 @@
                   title="Complete the session and choose where this participant goes next"
                   data-testid="studio-move-next-stage-btn">
             Move Next Stage
-            <mat-icon class="ic">expand_less</mat-icon>
+            <mat-icon class="ic">arrow_forward</mat-icon>
           </button>
           <ng-container *ngIf="nextStageMenuOpen === 'header'">
             <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
-            <div class="ds-nextmenu ds-nextmenu--up">
+            <div class="ds-nextmenu ds-nextmenu--down">
               <div class="ds-nextmenu__head">Choose next stage</div>
               <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
             </div>
@@ -391,27 +359,6 @@
         </div>
       </div>
     </header>
-
-    <!-- ============================ STEPPER (horizontal) ============================ -->
-    <nav class="ds-stepbar">
-      <div class="ds-stepbar-inner">
-        <ng-container *ngFor="let step of visibleSteps; let i = index; let last = last; trackBy: trackByDocId">
-          <button
-            type="button"
-            class="ds-hstep"
-            [class.active]="step.id === activeStepId"
-            [class.done]="isStepCompleted(step.id)"
-            (click)="setActiveStep(step.id)">
-            <span class="ds-hstep-node">
-              <mat-icon class="ic" *ngIf="isStepCompleted(step.id)">check</mat-icon>
-              <span *ngIf="!isStepCompleted(step.id)">{{ i + 1 }}</span>
-            </span>
-            <span class="ds-hstep-label">{{ step.label }}</span>
-          </button>
-          <mat-icon class="ic ds-hstep-chev" *ngIf="!last">chevron_right</mat-icon>
-        </ng-container>
-      </div>
-    </nav>
 
 
     <!-- ============================ MAIN ============================ -->
@@ -490,7 +437,7 @@
         </div>
       </div>
 
-      <div class="ds-main-scroll">
+      <div class="ds-main-scroll" #dsMainScroll>
         <div class="ds-main-inner">
 
           <!-- Eyebrow / step header -->
@@ -905,9 +852,26 @@
         </div>
       </div>
 
-      <!-- Footer navigation removed — step nav is via the top stepper; Move to
-           Next Stage lives in the left top-bar. -->
   </main>
+
+    <!-- ============================ FOOTER (Back / Step / Next) ============================ -->
+    <footer class="ds-footer">
+      <button type="button" class="btn btn-ghost" (click)="goToStep(-1)" [disabled]="activeStepIndex === 0">
+        <mat-icon class="ic">arrow_back</mat-icon>
+        Back
+      </button>
+      <div class="ds-footer-center">
+        Step <b>{{ activeStepIndex + 1 }}</b> of <b>{{ visibleSteps.length }}</b>
+      </div>
+      <button type="button" class="btn btn-primary" *ngIf="activeStepIndex !== visibleSteps.length - 1" (click)="goToStep(1)">
+        Next
+        <mat-icon class="ic">arrow_forward</mat-icon>
+      </button>
+      <button type="button" class="btn btn-ghost" *ngIf="activeStepIndex === visibleSteps.length - 1" disabled>
+        <mat-icon class="ic">check</mat-icon>
+        Last step
+      </button>
+    </footer>
 
     <!-- ===================== MOVE-TO-NEXT-STAGE MENU ITEMS (mockup) =====================
          Shared by the header + footer "Move to Next Stage" dropdowns. Same

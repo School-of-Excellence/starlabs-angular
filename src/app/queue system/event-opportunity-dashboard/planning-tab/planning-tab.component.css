@@ -74,6 +74,7 @@
 .pl-card.sel .pl-card-val { color:var(--tint); }
 .pl-card-val { font-size:28px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1; }
 .pl-card-lbl { font-size:12px; line-height:1.3; color:var(--secondary); margin-top:4px; }
+.pl-card-desc { font-size:10.5px; line-height:1.35; color:var(--tertiary); margin-top:5px; }
 
 /* ---------- phase section header + per-phase head ---------- */
 .pl-phase-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:16px 2px 12px; }
@@ -351,3 +352,68 @@ table.t.t--slot { min-width:720px; }
 .grp-target.ontrack{ color:var(--green-ink); }
 .grp-target.risk{ color:#9a5b00; }
 .grp-target.behind{ color:var(--red); }
+
+/* ============================================================
+   SAVED FILTERS — top bar + floating save widget
+   ============================================================ */
+.pl-savedbar {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 4px 10px; margin-bottom:4px;
+  border-bottom:0.5px solid var(--hairline); flex-wrap:wrap;
+}
+.pl-savedbar-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--secondary); }
+.pl-savedbar-lbl mat-icon { font-size:16px; width:16px; height:16px; color:var(--tint); }
+.pl-savedchips { display:flex; flex-wrap:wrap; gap:6px; }
+.pl-fchip {
+  display:inline-flex; align-items:center; gap:6px;
+  border:0.5px solid var(--tint-hair); background:var(--surface); color:var(--label);
+  border-radius:var(--r-pill); padding:5px 8px 5px 12px; font-size:12.5px; font-weight:600;
+  cursor:pointer; transition:background .12s var(--ease), border-color .12s var(--ease), color .12s var(--ease);
+}
+.pl-fchip:hover { background:var(--tint-soft); }
+.pl-fchip.on { background:var(--tint); color:#fff; border-color:var(--tint); }
+.pl-fchip-x { font-size:15px; width:15px; height:15px; opacity:.6; border-radius:50%; }
+.pl-fchip-x:hover { opacity:1; }
+
+.pl-savefab { position:fixed; right:24px; bottom:24px; z-index:1000; }
+.pl-savepill {
+  display:inline-flex; align-items:center; gap:8px;
+  border:none; background:var(--tint); color:#fff;
+  border-radius:var(--r-pill); padding:10px 16px; font-size:13px; font-weight:700;
+  cursor:pointer; box-shadow:var(--sh-tint); transition:transform .12s var(--ease), box-shadow .12s var(--ease);
+}
+.pl-savepill:hover { transform:translateY(-1px); }
+.pl-savepill mat-icon { font-size:18px; width:18px; height:18px; }
+.pl-savedot { width:8px; height:8px; border-radius:50%; background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.28); }
+
+.pl-savecard {
+  width:320px; max-width:82vw; background:var(--surface);
+  border:0.5px solid var(--hairline); border-radius:var(--r-core);
+  box-shadow:var(--sh); padding:14px;
+}
+.pl-savecard-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.pl-savecard-title { font-size:15px; font-weight:700; color:var(--label); }
+.pl-savecard-changes { background:var(--surface-sunk); border-radius:var(--r-control); padding:10px 12px; margin-bottom:12px; }
+.pl-savecard-sub { font-size:11px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--secondary); margin-bottom:6px; }
+.pl-savecard-changes ul { margin:0; padding-left:16px; }
+.pl-savecard-changes li { font-size:12.5px; color:var(--label-2); line-height:1.5; }
+.pl-savecard .full-width { width:100%; }
+.pl-savecard-actions { display:flex; justify-content:flex-end; gap:8px; align-items:center; }
+
+/* journey filter + DFU-omit toggle */
+.pl-fil-journey { width:min(300px,100%); }
+.pl-toggles { display:flex; justify-content:center; gap:10px; margin:-2px 0 10px; }
+.pl-toggle-chip {
+  display:inline-flex; align-items:center; gap:6px;
+  border:0.5px solid var(--tint-hair); background:var(--surface); color:var(--label-2);
+  border-radius:var(--r-pill); padding:6px 14px 6px 10px; font-size:12.5px; font-weight:600;
+  cursor:pointer; transition:background .12s var(--ease), color .12s var(--ease), border-color .12s var(--ease);
+}
+.pl-toggle-chip:hover { background:var(--tint-soft); }
+.pl-toggle-chip.on { background:var(--tint); color:#fff; border-color:var(--tint); }
+.pl-toggle-chip mat-icon { font-size:18px; width:18px; height:18px; }
+
+/* "+" add-new-filter chip */
+.pl-fchip-add { padding:5px 10px; color:var(--tint); }
+.pl-fchip-add mat-icon { font-size:18px; width:18px; height:18px; margin:0; }
+.pl-fchip-add:hover { background:var(--tint-soft); }
