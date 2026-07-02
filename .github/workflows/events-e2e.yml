@@ -54,3 +54,5 @@ jobs:
     secrets: inherit
 
 # Re-trigger: hub fix 6323c45 (EVT-15/16 pickQueueOption poll) is on systems-emulator; re-run gate.
+
+# Re-trigger #2: hub 674deab (force-click unstable EOD queue mat-option) on systems-emulator.
