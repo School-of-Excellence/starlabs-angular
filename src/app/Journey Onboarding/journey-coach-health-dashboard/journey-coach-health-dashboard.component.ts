@@ -176,6 +176,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   readonly QUIET_DAYS = 60;
   readonly RENEWAL_DAYS = 90;
   readonly LAPSED_DAYS = 90;       // show lapses up to this many days past end
+  readonly HEALTH_TTL_DAYS = 60;   // a coach-set health tag is valid 60 days, then reverts to Not assessed
   readonly ALL = '__all__';
   readonly UNASSIGNED = '__unassigned__';
   // The participant's CURRENT journey product is the single pjp doc whose journeystatus is one of
@@ -343,6 +344,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private recentEventByProfile: Record<string, { eventName: string; date: Date | null; status: string }> = {};
   // profileid -> latest coach-set Health State (manual coach assessment)
   private coachHealthByProfile: Record<string, { state: CoachHealthState; note: string; date: Date | null }> = {};
+  // profileid -> latest 'addressed' snapshot (the Needs-Attention issues active when the coach marked
+  // it addressed). Signal so needsAttentionRows() recomputes when a coach marks/unmarks addressed.
+  addressedByProfile = signal<Record<string, { issues: string[]; date: Date | null }>>({});
   // eventref id -> {name, start} resolved on demand (paged mode), cached across pages
   private eventInfoCache: Record<string, { name: string; start: Date | null }> = {};
 
@@ -479,10 +483,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     });
     // Global flags (star) — needed by computeRows so the Flagged KPI/lever are right from render.
     const flagsP = this.loadFlags();
+    // Base-wide 'addressed' snapshots — needed so Needs Attention excludes addressed participants from render.
+    const addressedP = this.loadAddressed();
     // coach names are resolved from profileMap, so loadCoaches chains after it (still parallel
     // with meta / journey / flags).
     const coachesP = profileP.then(() => this.loadCoaches());
-    await Promise.all([profileP, metaP, journeyP, flagsP, coachesP]);
+    await Promise.all([profileP, metaP, journeyP, flagsP, addressedP, coachesP]);
     this.setProgress(35, 'Resolving your base…');
 
     const matchedCoach = !!(this.coachId && this.coaches.some(c => c.id === this.coachId));
@@ -1146,7 +1152,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         priority: 0, priorityBand: 'Low', reason: '',
         pjpIds: [d['__id']],
         recentEventRequest: this.recentEventByProfile[profileid] ?? null,
-        coachHealthState: this.coachHealthByProfile[profileid] ?? null,
+        coachHealthState: this.freshHealth(this.coachHealthByProfile[profileid]),
         healthState: null, healthCoverage: 0,
       };
       // going-quiet = ACTIVE participant with no coach contact in QUIET_DAYS+ days.
@@ -1301,6 +1307,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       onToggleFlag: (note: string) => this.toggleFlag(row, note),
       onAssignCoach: (coachIdOrNull: string | null) =>
         coachIdOrNull ? this.assignCoachToRow(row, coachIdOrNull) : this.unassignCoach(row),
+      addressed: this.isAddressed(row),
+      needsAttention: row.goingQuiet || row.lapsed || row.notStarted || row.renewalWindow || row.openTickets > 0,
+      onMarkAddressed: (next: boolean) => this.markAddressed(row, next),
     };
     this.dialog.open(ParticipantSlideoverComponent, {
       data,
@@ -1613,6 +1622,89 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return coachHealthLabel(s);
   }
 
+  /** A coach-set health tag is valid for HEALTH_TTL_DAYS; a null/undated or older tag is expired. */
+  private isHealthFresh(date: Date | null | undefined): boolean {
+    if (!date) return false;
+    return (Date.now() - date.getTime()) <= this.HEALTH_TTL_DAYS * 86400000;
+  }
+  /** Return the health entry only while it is still valid, else null (reverts to Not assessed).
+   *  Single choke point so the chip, the summary distribution, and the health filter all agree. */
+  private freshHealth(
+    entry: { state: CoachHealthState; note: string; date: Date | null } | null | undefined,
+  ): { state: CoachHealthState; note: string; date: Date | null } | null {
+    return entry && this.isHealthFresh(entry.date) ? entry : null;
+  }
+
+  // ---- "Mark addressed": a coach-set acknowledgement that drops a participant out of Needs
+  //      Attention until a NEW issue appears (stored as an 'addressed' healthtracker_activity event). ----
+  /** The Needs-Attention issue keys currently active on a row. */
+  private activeIssues(r: PortfolioRow): string[] {
+    const out: string[] = [];
+    if (r.goingQuiet) out.push('goingQuiet');
+    if (r.lapsed) out.push('lapsed');
+    if (r.notStarted) out.push('notStarted');
+    if (r.renewalWindow) out.push('renewalWindow');
+    if (r.openTickets > 0) out.push('tickets');
+    return out;
+  }
+  /** True when the coach marked this participant addressed AND no NEW issue type has appeared since
+   *  (current issues are a subset of the snapshot). A new issue re-surfaces them into Needs Attention. */
+  isAddressed(r: PortfolioRow): boolean {
+    const rec = this.addressedByProfile()[r.profileid];
+    if (!rec || !rec.issues.length) return false;
+    const cur = this.activeIssues(r);
+    if (!cur.length) return false;                       // nothing active -> not in Needs Attention anyway
+    return cur.every(i => rec.issues.includes(i));
+  }
+
+  /** Load the latest 'addressed' snapshot per participant from the unified activity log (base-wide;
+   *  addressed events are rare, so one type-scoped read is cheaper than per-page batches). Degrades
+   *  to none on permission-denied. */
+  private async loadAddressed(): Promise<void> {
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'healthtracker_activity'), where('type', '==', 'addressed')));
+      const latest: Record<string, { issues: string[]; date: Date | null; ms: number }> = {};
+      snap.forEach(d => {
+        const data: any = d.data();
+        const pid = data['profileid'];
+        if (!pid) return;
+        const dt = this.toDate(data['timestamp']);
+        const ms = dt ? dt.getTime() : 0;
+        const cur = latest[pid];
+        if (!cur || ms >= cur.ms) latest[pid] = { issues: Array.isArray(data['issues']) ? data['issues'] : [], date: dt, ms };
+      });
+      const out: Record<string, { issues: string[]; date: Date | null }> = {};
+      for (const pid of Object.keys(latest)) out[pid] = { issues: latest[pid].issues, date: latest[pid].date };
+      this.addressedByProfile.set(out);
+    } catch (e) {
+      console.warn('addressed load failed (non-fatal)', e);
+    }
+  }
+
+  /** Mark (or re-open) a participant. Marking snapshots the currently-active issues; re-opening
+   *  clears them. Optimistic — reverts + toasts on write failure (same pattern as flag/health). */
+  async markAddressed(row: PortfolioRow, addressed = true): Promise<void> {
+    const issues = addressed ? this.activeIssues(row) : [];
+    if (addressed && !issues.length) {
+      this.guard.openSnackBar(`${row.name} has no active issues to address`, 'Close');
+      return;
+    }
+    const map = this.addressedByProfile();
+    const prev = map[row.profileid] ?? null;
+    this.addressedByProfile.set({ ...map, [row.profileid]: { issues, date: new Date() } });
+    this.applyFilters();
+    try {
+      await this.logActivity(row.profileid, 'addressed', { issues });
+      this.guard.openSnackBar(addressed ? `Marked addressed — ${row.name} leaves Needs Attention` : `Re-opened ${row.name}`, 'Close');
+    } catch (e: any) {
+      const rb = { ...this.addressedByProfile() };
+      if (prev) rb[row.profileid] = prev; else delete rb[row.profileid];
+      this.addressedByProfile.set(rb);
+      this.applyFilters();
+      this.guard.openSnackBar('Could not update: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+    }
+  }
+
   /** Per-row assign / change coach — works for any participant (assign or reassign).
    *  Writes real coachedby for every pjp doc of the row (reusing the Phase-B write pattern),
    *  reflects locally (coachedby + coach name + unassignedCount), and snackbars the result. */
@@ -1708,7 +1800,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   needsAttentionRows = computed<PortfolioRow[]>(() =>
     this.allRows()
-      .filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)
+      .filter(r => (r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0) && !this.isAddressed(r))
       .sort((a, b) => b.priority - a.priority));
   // backing computed for the parens-free `needsAttentionCount` getter (template binds the getter).
   private _needsAttentionCount = computed<number>(() => {
@@ -1786,6 +1878,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.financeFilters = [];
     this.view = 'base';
     this.setLever(lever);
+  }
+
+  /** Summary "Unassigned" card → Participants tab scoped to the no-coach view, which renders the
+   *  bulk select + assign-coach bar so a coach can be tagged onto them. */
+  goToUnassigned(): void {
+    this.view = 'base';
+    void this.onCoachChange(this.UNASSIGNED);
   }
 
   /** Summary "Payments locked" card → Participants tab filtered to the existing 'locked' finance
@@ -2319,7 +2418,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // needsAttention: SAME predicate as needsAttentionRows() (goingQuiet | lapsed | notStarted |
     // renewalWindow | openTickets>0). No new scoring — reuses the existing per-row flags.
     if (this.activeLever === 'needsAttention'
-      && !(r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)) return false;
+      && (!(r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0) || this.isAddressed(r))) return false;
     if (this.activeLever === 'flagged' && !r.flagged) return false;
     if (this.activeLever === 'goingQuiet' && !r.goingQuiet) return false;
     if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
