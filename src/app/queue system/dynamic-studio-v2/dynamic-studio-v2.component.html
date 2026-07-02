@@ -379,11 +379,11 @@
                   title="Complete the session and choose where this participant goes next"
                   data-testid="studio-move-next-stage-btn">
             Move Next Stage
-            <mat-icon class="ic">expand_more</mat-icon>
+            <mat-icon class="ic">expand_less</mat-icon>
           </button>
           <ng-container *ngIf="nextStageMenuOpen === 'header'">
             <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
-            <div class="ds-nextmenu ds-nextmenu--down">
+            <div class="ds-nextmenu ds-nextmenu--up">
               <div class="ds-nextmenu__head">Choose next stage</div>
               <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
             </div>
@@ -905,41 +905,8 @@
         </div>
       </div>
 
-      <!-- Footer navigation -->
-      <footer class="ds-footer">
-        <button type="button" class="btn btn-ghost" (click)="goToStep(-1)" [disabled]="activeStepIndex === 0">
-          <mat-icon class="ic">arrow_back</mat-icon>
-          Back
-        </button>
-        <div class="ds-footer-center">
-          Step <b>{{ activeStepIndex + 1 }}</b> of <b>{{ visibleSteps.length }}</b>
-        </div>
-        <button type="button" class="btn btn-dark" *ngIf="activeStepIndex !== visibleSteps.length - 1" (click)="goToStep(1)">
-          Next
-          <mat-icon class="ic">arrow_forward</mat-icon>
-        </button>
-        <div class="ds-menu-anchor" *ngIf="activeStepIndex === visibleSteps.length - 1 && hasNextStageOptions">
-          <button type="button" class="btn btn-green"
-                  (click)="toggleNextStageMenu('footer')"
-                  [class.is-open]="nextStageMenuOpen === 'footer'"
-                  data-testid="studio-move-next-stage-footer-btn">
-            <mat-icon class="ic">check</mat-icon>
-            Move to Next Stage
-            <mat-icon class="ic">expand_less</mat-icon>
-          </button>
-          <ng-container *ngIf="nextStageMenuOpen === 'footer'">
-            <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
-            <div class="ds-nextmenu ds-nextmenu--up">
-              <div class="ds-nextmenu__head">Choose next stage</div>
-              <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
-            </div>
-          </ng-container>
-        </div>
-        <button type="button" class="btn btn-green" *ngIf="activeStepIndex === visibleSteps.length - 1 && !hasNextStageOptions" disabled>
-          <mat-icon class="ic">check</mat-icon>
-          Complete Session
-        </button>
-      </footer>
+      <!-- Footer navigation removed — step nav is via the top stepper; Move to
+           Next Stage lives in the left top-bar. -->
   </main>
 
     <!-- ===================== MOVE-TO-NEXT-STAGE MENU ITEMS (mockup) =====================

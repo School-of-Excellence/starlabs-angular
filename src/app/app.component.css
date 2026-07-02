@@ -2,9 +2,21 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  max-height: 64px;
+  /* Fixed 64px at any zoom / screen size — Material otherwise drops the toolbar
+     to 56px at the mobile breakpoint (which also breaks the studio's 64px
+     host-toolbar offset). */
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
   background-color: #234c58!important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+/* Pin the inner Material toolbar row too (it carries the min-height). */
+::ng-deep .toolbar.mat-toolbar-single-row,
+::ng-deep .toolbar .mat-toolbar-row {
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
 }
 
 .header {

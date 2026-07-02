@@ -63,13 +63,13 @@
   font-size: var(--base-fs);
   line-height: 1.45;
   display: grid;
-  /* Mockup layout: no left sidebar. Stacked — header, horizontal stepper, main. */
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto 1fr;
+  /* Stepper across the top; participant top-bar as a LEFT column; main to the
+     right. No footer. */
+  grid-template-columns: clamp(240px, 22vw, 320px) 1fr;
+  grid-template-rows: auto 1fr;
   grid-template-areas:
-    "header"
-    "stepper"
-    "main";
+    "stepper stepper"
+    "header  main";
   /* The component lives inside the STARLABS shell's .mainscreen wrapper.
      We take over the visible area BELOW the host toolbar so:
        1. The toolbar (hamburger, logo, bell, settings) stays visible.
@@ -637,16 +637,20 @@
 .ds-app .ds-header {
   grid-area: header;
   display: flex;
-  align-items: center;
-  gap: clamp(12px, 1.4vw + 6px, 24px);
-  padding: 12px clamp(16px, 1.8vw + 8px, 32px);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  padding: 18px 16px;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   min-width: 0;
   position: relative;
   z-index: 20;
+  overflow: visible;
 }
+/* Identity block: avatar + name stacked in the left column. */
+.ds-app .ds-header .ds-hdr-id { flex-wrap: wrap; }
 .ds-app .ds-hdr-id {
   display: flex;
   align-items: center;
@@ -736,21 +740,27 @@
   border-radius: 999px;
   font-size: 11px;
 }
+/* Left-column layout: status pill + actions stack full-width under the identity. */
 .ds-app .ds-hdr-status {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
-  margin-left: auto;
   min-width: 0;
 }
+.ds-app .ds-hdr-status .ds-waiting { width: 100%; }
 .ds-app .ds-hdr-actions {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
-  flex-shrink: 0;
-  padding-left: clamp(8px, 1vw, 16px);
-  border-left: 1px solid var(--border);
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
+.ds-app .ds-hdr-actions .btn,
+.ds-app .ds-hdr-actions .ds-menu-anchor,
+.ds-app .ds-hdr-actions .ds-menu-anchor > .btn { width: 100%; justify-content: center; }
 
 /* Specialists included — inline row under the participant name in the header */
 .ds-app .ds-hdr-specialists {
@@ -847,20 +857,40 @@
   .ds-app .ds-hstep-chev { display: none; }
 }
 
-/* Tablet & down — let status + actions wrap under the identity. */
+/* Tablet & down — a 240px left column gets cramped, so stack vertically:
+   stepper on top, the top-bar as a horizontal row, then main. */
 @media (max-width: 1024px) {
-  .ds-app .ds-header { flex-wrap: wrap; }
-  .ds-app .ds-hdr-status { margin-left: 0; order: 3; flex: 1 1 100%; }
+  .ds-app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "stepper"
+      "header"
+      "main";
+  }
+  .ds-app .ds-header {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    padding: 12px clamp(16px, 1.8vw + 8px, 32px);
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .ds-app .ds-hdr-status { flex-direction: row; align-items: center; margin-left: auto; flex: initial; }
+  .ds-app .ds-hdr-status .ds-waiting { width: auto; }
   .ds-app .ds-hdr-actions {
-    order: 2;
-    margin-left: auto;
-    padding-left: 0;
-    border-left: none;
+    flex-direction: row;
+    align-items: center;
     flex-wrap: wrap;
     justify-content: flex-end;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
   }
-  .ds-app .ds-hdr-metaline { display: none; }
-  .ds-app .ds-hdr-details { left: auto; right: 0; }
+  .ds-app .ds-hdr-actions .btn,
+  .ds-app .ds-hdr-actions .ds-menu-anchor,
+  .ds-app .ds-hdr-actions .ds-menu-anchor > .btn { width: auto; }
 }
 
 /* Phone: compact stepper — show only the ACTIVE step's label, others are
