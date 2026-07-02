@@ -56,3 +56,6 @@ jobs:
 # Re-trigger: hub fix 6323c45 (EVT-15/16 pickQueueOption poll) is on systems-emulator; re-run gate.
 
 # Re-trigger #2: hub 674deab (force-click unstable EOD queue mat-option) on systems-emulator.
+
+# re-validate 2026-07-02: EVT-15/16 real root-cause on hub systems-emulator (d635ea1) — /eventopportunitydashboard
+# serves legacy EOD v1 on cicd-dev (v2 only on cicd), so EVT-15/16 self-skip there (CN-14 class), not force-click.
