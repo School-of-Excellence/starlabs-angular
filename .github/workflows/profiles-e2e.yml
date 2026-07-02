@@ -52,3 +52,7 @@ jobs:
       only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || '' }}
       evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}
     secrets: inherit
+
+# re-validate 2026-07-01: PA-09 fix on hub systems-emulator (49ed922) — analytics name-cell
+# route diverges cicd(/profilesummary) vs cicd-dev(/userprofile); regex broadened to accept both.
+# e2e_ref: systems-emulator resolves the branch tip at run time → this run picks up 49ed922.
