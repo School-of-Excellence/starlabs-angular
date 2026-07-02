@@ -57,3 +57,6 @@ jobs:
       only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || '' }}
       evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}
     secrets: inherit
+
+# re-validate 2026-07-02: bucket-4 #3 — interimreport-log composite index [lastupdate DESC, createdon DESC]
+# merged to hub main (PR #7, a3ae150). Expect PM-15 (Interim Report Log counts) to go from skipped -> passing.
