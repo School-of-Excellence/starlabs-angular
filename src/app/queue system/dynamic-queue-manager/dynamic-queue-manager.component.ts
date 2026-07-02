@@ -2032,6 +2032,7 @@ async sendNotification(tokens) {
           logged: true, 
           landingpage: result["landingpage"],
           profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
         }).then(()=>{
           console.log( notificationimage);
           this.selectedTokens.clear();

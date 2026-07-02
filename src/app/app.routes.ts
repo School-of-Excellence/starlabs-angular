@@ -35,7 +35,7 @@ export const routes: Routes = [
   {path: 'queuelist', loadComponent: () => import('./queue system/queue-list/queue-list.component').then(m => m.QueueListComponent), canActivate:[authGuard]},
   // {path: 'content-upload-v2', loadComponent: () => import('./content-upload-version2/content-upload-version2.component').then(m => m.ContentUploadVersion2Component)},
   // {path: 'userprofile_old/:id', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
-
+  {path: 'eiflixtelemetry', loadComponent: () => import('./eiflix-telemetry/eiflix-telemetry.component').then(m => m.EiflixTelemetryComponent), canActivate:[authGuard]},
   {
     path: 'content-upload-v2',
     loadComponent: () =>
