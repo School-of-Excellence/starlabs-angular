@@ -169,6 +169,7 @@ table.pmx { border-collapse:collapse; width:100%; min-width:640px; font-size:13p
 .grp-pct { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; font-variant-numeric:tabular-nums; }
 .grp-name { display:flex; flex-direction:column; gap:1px; }
 .grp-title { font-size:15px; font-weight:600; letter-spacing:-.01em; color:var(--label); }
+.grp-pending { font-size:11.5px; font-weight:600; color:var(--secondary); }
 .grp-stages { font-size:11.5px; color:var(--secondary); }
 .grp-actions { display:flex; align-items:center; justify-content:flex-end; gap:2px; }
 
@@ -191,6 +192,11 @@ table.pmx { border-collapse:collapse; width:100%; min-width:640px; font-size:13p
 .pmx td.num.clickable:focus-visible { outline:none; box-shadow:inset 0 0 0 2px var(--tint); }
 .pmx td.num.sel { background:var(--tint); color:#fff; font-weight:700; }
 .pmx td.num.sel.zero { color:#fff; }
+
+/* derived confirmation-rate row — read-only percentages */
+.pmx .line.rate-line td { background:var(--tint-soft); }
+.pmx .line.rate-line td.lbl { background:transparent; }
+.pmx td.num.rate { color:var(--tint); font-weight:700; }
 
 /* ============================================================
    DRILL-DOWNS — one coherent component family (.dd + .cell-dd)

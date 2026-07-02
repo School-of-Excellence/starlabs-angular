@@ -128,6 +128,7 @@
         </span>
         <span class="grp-name">
           <span class="grp-title">{{ row.phase.phasename }}</span>
+          <span class="grp-pending">Pending (Potential) - {{ potentialTotal }}</span>
           <span class="grp-stages" *ngIf="row.target == null">configure each row below</span>
           <span class="grp-target" *ngIf="row.target != null" [class.ontrack]="row.status==='ontrack'" [class.risk]="row.status==='risk'" [class.behind]="row.status==='behind'">Target {{ row.target }}% · {{ phaseStatusLabel(row.status) }}</span>
         </span>
@@ -140,21 +141,21 @@
       <table class="pmx">
         <thead>
           <tr>
-            <th class="lbl" rowspan="2"></th>
+            <th class="lbl grp-h">Event confirmation</th>
             <th colspan="3" class="grp-h grp-conf">Confirmed</th>
-            <th colspan="3" class="grp-h grp-nconf">Not confirmed</th>
-            <th rowspan="2" class="tot-h">Total</th>
+            <th colspan="3" class="grp-h grp-nconf">Not Confirmed</th>
           </tr>
           <tr>
+            <th class="lbl">Categories</th>
             <th *ngFor="let c of confirmedCols">{{ c.label }}</th>
             <th *ngFor="let c of notConfirmedCols">{{ c.label }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr class="line" *ngFor="let ln of row.lines">
+          <tr class="line" [class.rate-line]="ln.kind === 'rate'" *ngFor="let ln of row.lines">
             <td class="lbl">
               <div class="row-lbl">{{ ln.label }}</div>
-              <mat-form-field appearance="outline" class="row-cfg">
+              <mat-form-field appearance="outline" class="row-cfg" *ngIf="ln.kind !== 'rate'">
                 <mat-select panelClass="eod-ios-pane" [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)"
                   [placeholder]="ln.kind === 'slot' ? 'Add slot stage' : 'Add queue stage'"
                   [attr.aria-label]="ln.kind === 'slot' ? 'Slot stage' : 'Queue stage'">
@@ -165,26 +166,22 @@
                 </mat-select>
               </mat-form-field>
             </td>
-            <td *ngFor="let c of allCols" class="num"
-                [class.zero]="ln.cells[c.k] === 0"
-                [class.clickable]="ln.cells[c.k] > 0"
-                [class.sel]="isCellSel(row.phase, ln, c.k)"
-                [attr.role]="ln.cells[c.k] > 0 ? 'button' : null"
-                [attr.tabindex]="ln.cells[c.k] > 0 ? 0 : null"
-                [attr.aria-pressed]="ln.cells[c.k] > 0 ? isCellSel(row.phase, ln, c.k) : null"
-                (keydown.enter)="selectCell(row.phase, ln, c.k)"
-                (keydown.space)="selectCell(row.phase, ln, c.k); $event.preventDefault()"
-                (click)="selectCell(row.phase, ln, c.k)">{{ ln.cells[c.k] }}</td>
-            <td class="tot num"
-                [class.zero]="ln.cells.total === 0"
-                [class.clickable]="ln.cells.total > 0"
-                [class.sel]="isCellSel(row.phase, ln, 'total')"
-                [attr.role]="ln.cells.total > 0 ? 'button' : null"
-                [attr.tabindex]="ln.cells.total > 0 ? 0 : null"
-                [attr.aria-pressed]="ln.cells.total > 0 ? isCellSel(row.phase, ln, 'total') : null"
-                (keydown.enter)="selectCell(row.phase, ln, 'total')"
-                (keydown.space)="selectCell(row.phase, ln, 'total'); $event.preventDefault()"
-                (click)="selectCell(row.phase, ln, 'total')">{{ ln.cells.total }}</td>
+            <ng-container *ngFor="let c of allCols">
+              <!-- Rate rows show a derived percentage: not zero-dimmed, not clickable. -->
+              <td *ngIf="ln.kind === 'rate'; else countCell" class="num rate">{{ ln.cells[c.k] }}%</td>
+              <ng-template #countCell>
+                <td class="num"
+                    [class.zero]="ln.cells[c.k] === 0"
+                    [class.clickable]="ln.cells[c.k] > 0"
+                    [class.sel]="isCellSel(row.phase, ln, c.k)"
+                    [attr.role]="ln.cells[c.k] > 0 ? 'button' : null"
+                    [attr.tabindex]="ln.cells[c.k] > 0 ? 0 : null"
+                    [attr.aria-pressed]="ln.cells[c.k] > 0 ? isCellSel(row.phase, ln, c.k) : null"
+                    (keydown.enter)="selectCell(row.phase, ln, c.k)"
+                    (keydown.space)="selectCell(row.phase, ln, c.k); $event.preventDefault()"
+                    (click)="selectCell(row.phase, ln, c.k)">{{ ln.cells[c.k] }}</td>
+              </ng-template>
+            </ng-container>
           </tr>
         </tbody>
       </table>

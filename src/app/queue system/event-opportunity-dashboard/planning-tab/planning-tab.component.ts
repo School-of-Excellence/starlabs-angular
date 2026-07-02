@@ -19,7 +19,7 @@ import { PlanningDataService } from './planning-data.service';
 interface PhaseStageRow { queueid: string; stagename: string; }
 type Col = 'c_a' | 'c_na' | 'c_d' | 'n_a' | 'n_na' | 'n_d';
 interface Cells { c_a: number; c_na: number; c_d: number; n_a: number; n_na: number; n_d: number; total: number; }
-interface MatrixLine { key: string; label: string; kind: 'stage' | 'slot'; cells: Cells; stages: PhaseStageRow[]; }
+interface MatrixLine { key: string; label: string; kind: 'stage' | 'slot' | 'rate'; cells: Cells; stages: PhaseStageRow[]; }
 interface MatrixRow { phase: any; pct: number; target: number | null; status: 'ontrack' | 'risk' | 'behind' | 'none'; pop: number; lines: MatrixLine[]; }
 interface CardDef { key: string; label: string; value: number; }
 interface DrillRow { name: string; phone: string; status: string; confirmed: boolean; inQueue: boolean; }
@@ -63,19 +63,23 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   // Column groups (Confirmed / Not confirmed × Active / Non-Active / Discontinued)
   readonly confirmedCols: { k: Col; label: string }[] = [
-    { k: 'c_a', label: 'Active' }, { k: 'c_na', label: 'Non-Active' }, { k: 'c_d', label: 'Discont' }
+    { k: 'c_a', label: 'Active' }, { k: 'c_na', label: 'Non Active' }, { k: 'c_d', label: 'Added/Lefted' }
   ];
   readonly notConfirmedCols: { k: Col; label: string }[] = [
-    { k: 'n_a', label: 'Active' }, { k: 'n_na', label: 'Non-Active' }, { k: 'n_d', label: 'Discont' }
+    { k: 'n_a', label: 'Active' }, { k: 'n_na', label: 'Non Active' }, { k: 'n_d', label: 'Added/Lefted' }
   ];
   get allCols(): { k: Col; label: string }[] { return [...this.confirmedCols, ...this.notConfirmedCols]; }
 
-  /** The four readiness rows, each independently configured with its own stages. */
-  readonly rowDefs: { key: string; label: string; kind: 'stage' | 'slot' }[] = [
-    { key: 'complete', label: 'Complete', kind: 'stage' },
-    { key: 'notComplete', label: 'Not complete', kind: 'stage' },
-    { key: 'slotConfirmed', label: 'Slot confirmation', kind: 'slot' },
-    { key: 'slotNotConfirmed', label: 'Slot not confirmed', kind: 'slot' }
+  /**
+   * Readiness rows (Categories), in the order the Planning table renders them.
+   * 'rate' rows are derived percentages (not stage-configurable, not drillable).
+   */
+  readonly rowDefs: { key: string; label: string; kind: 'stage' | 'slot' | 'rate' }[] = [
+    { key: 'notComplete', label: 'Not Completed', kind: 'stage' },
+    { key: 'slotConfirmed', label: 'Slot Confirmed', kind: 'slot' },
+    { key: 'confRate', label: 'Confir. rate', kind: 'rate' },
+    { key: 'slotNotConfirmed', label: 'Not Confirmed', kind: 'slot' },
+    { key: 'complete', label: 'Completed', kind: 'stage' }
   ];
 
   getRowStages(phase: any, key: string): PhaseStageRow[] {
@@ -305,7 +309,10 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   // ---------- Token / completion helpers ----------
 
   private tokensForQueue(queueId: string): any[] {
-    return (this.queueTokens || []).filter(t => t?.['queueref']?.id === queueId);
+    // Inactive tokens (tokenstatus === 'inActive') are dropped from every planning number.
+    return (this.queueTokens || []).filter(t =>
+      t?.['queueref']?.id === queueId &&
+      String(t?.['tokenstatus'] ?? '').toLowerCase() !== 'inactive');
   }
 
   private confirmedSlotSetForStage(queueId: string, stageName: string): Set<string> {
@@ -347,15 +354,26 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     this.matrixRows = (this.planningPhases || []).map(phase => {
       const z = (): Cells => ({ c_a: 0, c_na: 0, c_d: 0, n_a: 0, n_na: 0, n_d: 0, total: 0 });
       const lines: MatrixLine[] = this.rowDefs.map(rd => {
-        const stages = this.getRowStages(phase, rd.key).filter(s => this.selectedQueueList.includes(s.queueid));
         const cells = z();
-        for (const id of holders) {
-          if (!this.rowMatches(rd, stages, id)) continue;
-          const col = this.colKey(id, this.approvedSet.has(id));
-          cells[col]++; cells.total++;
+        if (rd.kind !== 'rate') {
+          const stages = this.getRowStages(phase, rd.key).filter(s => this.selectedQueueList.includes(s.queueid));
+          for (const id of holders) {
+            if (!this.rowMatches(rd, stages, id)) continue;
+            const col = this.colKey(id, this.approvedSet.has(id));
+            cells[col]++; cells.total++;
+          }
         }
         return { key: rd.key, label: rd.label, kind: rd.kind, cells, stages: this.getRowStages(phase, rd.key) };
       });
+      // Confirmation rate = Slot Confirmed ÷ Not Completed, per column (0 when the denominator is 0).
+      const rateLine = lines.find(l => l.kind === 'rate');
+      const notCompCells = lines.find(l => l.key === 'notComplete')?.cells;
+      const slotConfCells = lines.find(l => l.key === 'slotConfirmed')?.cells;
+      if (rateLine && notCompCells && slotConfCells) {
+        (['c_a', 'c_na', 'c_d', 'n_a', 'n_na', 'n_d', 'total'] as (Col | 'total')[]).forEach(k => {
+          rateLine.cells[k] = notCompCells[k] > 0 ? Math.round((slotConfCells[k] / notCompCells[k]) * 100) : 0;
+        });
+      }
       const completeLine = lines.find(l => l.key === 'complete');
       const pct = holders.length > 0 && completeLine ? Math.round((completeLine.cells.total / holders.length) * 100) : 0;
       const rawTarget = phase['targetPct'];
@@ -366,7 +384,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   /** Does a queue participant match a readiness row's predicate over that row's configured stages? */
-  private rowMatches(rd: { key: string; kind: 'stage' | 'slot' }, stages: PhaseStageRow[], id: string): boolean {
+  private rowMatches(rd: { key: string; kind: 'stage' | 'slot' | 'rate' }, stages: PhaseStageRow[], id: string): boolean {
     if (!stages.length) return false;
     const all = (sets: Set<string>[]) =>
       this.phaseRollupRule === 'any' ? sets.some(s => s.has(id)) : sets.every(s => s.has(id));
@@ -468,6 +486,8 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   selectCell(phase: any, line: MatrixLine, col: Col | 'total'): void {
+    // Derived rate rows show percentages, not a participant set — nothing to drill into.
+    if (line.kind === 'rate') return;
     const count = line.cells[col];
     if (this.isCellSel(phase, line, col) || !count) { this.closeCell(); return; }
     this.cellPage = 0;
