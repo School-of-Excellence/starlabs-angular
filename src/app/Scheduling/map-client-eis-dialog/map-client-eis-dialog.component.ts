@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-map-client-eis-dialog',
@@ -21,7 +22,8 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatIconModule,
     MatSelectModule,
     MatButtonModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    ProfilePictureComponent
   ],
   templateUrl: './map-client-eis-dialog.component.html',
   styleUrl: './map-client-eis-dialog.component.css'

@@ -1,7 +1,7 @@
 import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp, updateDoc, setDoc
+  doc, getDoc, writeBatch, serverTimestamp, updateDoc, setDoc
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -30,7 +30,7 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
-type SegmentKey = 'totalRequested' | 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended';
+type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'overallRequested';
 
 interface ImportPreviewRow { name: string; email: string; }
 interface Split { key: string; label: string; count: number; }
@@ -109,7 +109,6 @@ export class ProductFunnelComponent implements OnInit {
   ];
 
   readonly cards: { key: SegmentKey; label: string; cls: string; desc: string; tip?: string }[] = [
-    { key: 'totalRequested', label: 'Total requested', cls: '', desc: 'requested + approved', tip: 'Everyone who requested or has already been approved/initiated' },
     { key: 'potential', label: 'Potential', cls: '', desc: 'hold the product', tip: 'Everyone in the system who holds this product, across all events' },
     { key: 'requested', label: 'Requested', cls: '', desc: 'said yes' },
     { key: 'notRequested', label: 'Not requested', cls: '', desc: 'owners, no request', tip: 'Hold the product but have not requested' },
@@ -129,7 +128,6 @@ export class ProductFunnelComponent implements OnInit {
     {
       about: 'Owners not yet initiated — your approval pool', total: 'potential', rows: [
         { key: 'potential', depth: 0 },
-        { key: 'totalRequested', depth: 1 },
         { key: 'requested', depth: 1 },
         { key: 'eligible', depth: 2 },
         { key: 'noProduct', depth: 2 },
@@ -179,7 +177,7 @@ export class ProductFunnelComponent implements OnInit {
     return this.statusPalette[(idx >= 0 ? idx : 0) % this.statusPalette.length];
   }
   private computeSplits(rows: PRow[]): void {
-    const keys: SegmentKey[] = ['totalRequested', 'potential', 'requested', 'notRequested', 'eligible', 'noProduct', 'inQueue', 'approved', 'attended', 'noShow', 'unattended'];
+    const keys: SegmentKey[] = ['potential', 'requested', 'notRequested', 'eligible', 'noProduct', 'inQueue', 'approved', 'attended', 'noShow', 'unattended'];
     const out = {} as Record<SegmentKey, Split[]>;
     const allStatuses = new Map<string, string>();
     for (const k of keys) {
@@ -214,6 +212,7 @@ export class ProductFunnelComponent implements OnInit {
   segment: SegmentKey = 'eligible';
   searchText = '';
   financeFilter = 'all';
+  // Customer-status filter (clicking the Active / Non-Active / Discontinued chips below Potential, or the dropdown).
   customerFilter = 'all';   // 'all' or a key from customerFilterOptions
   readonly customerFilterOptions = [
     { key: 'active', label: 'Active' },
@@ -223,8 +222,35 @@ export class ProductFunnelComponent implements OnInit {
   selection = new SelectionModel<PRow>(true, []);
 
   counts: Record<SegmentKey, number> = {
-    totalRequested: 0, potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0
+    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, overallRequested: 0
   };
+
+  // Everyone who ever raised their hand for this event. `requested` excludes the approved
+  // cohort (see loadData), so this is a clean total, not a double-count.
+  get overallRequested(): number { return this.counts.requested + this.counts.approved; }
+
+  // Customer-status split of the Potential pool (Active / Non-Active / Discontinued), shown as
+  // clickable chips below the Potential card. Counts come from the precomputed statusSplits.
+  potentialStatusCount(key: string): number {
+    return (this.statusSplits['potential'] ?? []).find(s => s.key === key)?.count ?? 0;
+  }
+  // Click a chip: jump to Potential and toggle that customer-status filter.
+  setCustomerChip(key: string): void {
+    this.segment = 'potential';
+    this.customerFilter = this.customerFilter === key ? 'all' : key;
+    this.pageIndex = 0;
+    this.defaultSelection();
+    this.refreshMeta();
+  }
+
+  // Post-approval checks (Clearance / Venue / Contract / Queue stage) — shown only on the approved cohort.
+  productMinimum: number | null = null;                 // product.minimumrequiredamount, for the auto finance hint
+  financeClearedByPid = new Map<string, boolean>();     // manual finance sign-off, from the finance_clearance collection
+  venuePaidByPid = new Map<string, boolean>();          // manual venue-fee sign-off, from the venue_clearance collection
+  queueStageByPid = new Map<string, string>();          // queue_token.currentstage per participant (queue events)
+  queueStagesLoaded = false;
+  private queueStagesLoading = false;
+  private currentUserId: string | null = null;          // for the venue_clearance audit field
 
   // owner email → row, and active-queue profile ids — used by bulk import categorisation
   private ownerByEmail = new Map<string, PRow>();
@@ -256,6 +282,8 @@ export class ProductFunnelComponent implements OnInit {
     this.mapEmailData = profile.mapEmailData;
     this.mapProduct = await this.guard.getProductMap();
     this.mapJourney = await this.guard.getJourneyMap();
+    const u: any = await this.guard.getUser();
+    this.currentUserId = u?.email ?? u?.uid ?? null;
     await this.loadData();
   }
 
@@ -269,17 +297,32 @@ export class ProductFunnelComponent implements OnInit {
     this.loading = true;
     this.loadError = false;
     this.splitsReady = false;
+    this.queueStageByPid = new Map<string, string>();
+    this.queueStagesLoaded = false;
     const arena = this.arena;
     try {
-      const [ownSnap, eprSnap, scanSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap, financeSnap, venueSnap, productSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
           where('arenaeventid', '==', arena['docid']),
           where('status', 'in', ['requested', 'approved', 'attended', 'unattended']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
-          where('eventref', '==', arena['eventref'])))
+          where('eventref', '==', arena['eventref']))),
+        // Finance + venue clearance are isolated collections — tolerate them being absent / not yet ruled.
+        getDocs(query(collection(this.firestore, 'finance_clearance'),
+          where('arenaeventid', '==', arena['docid']))).catch(() => null),
+        getDocs(query(collection(this.firestore, 'venue_clearance'),
+          where('arenaeventid', '==', arena['docid']))).catch(() => null),
+        getDoc(arena['productref']).catch(() => null)
       ]);
+
+      // Product minimum (for the auto finance hint) + the two manual sign-off maps.
+      this.productMinimum = (productSnap && productSnap.exists()) ? Number(productSnap.data()?.['minimumrequiredamount'] ?? 0) : 0;
+      this.financeClearedByPid = new Map<string, boolean>();
+      financeSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.financeClearedByPid.set(x['profileid'], x['financeCleared'] === true); });
+      this.venuePaidByPid = new Map<string, boolean>();
+      venueSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.venuePaidByPid.set(x['profileid'], x['venuePaid'] === true); });
 
       const owners = new Map<string, string>();
       ownSnap.docs.forEach(d => {
@@ -380,7 +423,6 @@ export class ProductFunnelComponent implements OnInit {
       this.activeProfileIds = active;
 
       this.counts = {
-        totalRequested: requestedData.size + cohort.size,
         potential: owners.size,
         requested: requestedData.size,
         notRequested: [...owners.keys()].filter(o => !requestedData.has(o) && !cohort.has(o)).length,
@@ -390,7 +432,8 @@ export class ProductFunnelComponent implements OnInit {
         approved: cohort.size,
         attended: rows.filter(r => r.attended).length,
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
-        unattended: rows.filter(r => r.isUnattended).length
+        unattended: rows.filter(r => r.isUnattended).length,
+        overallRequested: requestedData.size + cohort.size
       };
 
       this.deliverySetList = await this.loadDeliverySets(arena);
@@ -512,13 +555,73 @@ export class ProductFunnelComponent implements OnInit {
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
+    if (this.showApprovalChecks) this.ensureQueueStages();
+  }
+
+  // ---- Post-approval checks (Clearance / Venue / Contract / Queue stage) ----
+  get showApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
+  }
+  get colSpan(): number {
+    return (this.showSelect ? 1 : 0) + 7 + (this.showApprovalChecks ? 4 : 0);
+  }
+  // Auto hint beside the Finance checkbox: has the participant paid at least the product minimum?
+  meetsMinPayment(r: PRow): boolean {
+    return (+(r.paid || 0)) >= (this.productMinimum ?? 0);
+  }
+  // Lazily load queue_token.currentstage for the whole event once (queue events only).
+  async ensureQueueStages() {
+    if (this.queueStagesLoaded || this.queueStagesLoading || this.arena?.['type'] !== 'queue') return;
+    this.queueStagesLoading = true;
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'queue_token'),
+        where('queueref', '==', this.arena['eventref'])));
+      snap.docs.forEach(d => { const x = d.data(); if (x['profile_id'] && x['currentstage']) this.queueStageByPid.set(x['profile_id'], x['currentstage']); });
+      this.queueStagesLoaded = true;
+    } catch (e) {
+      console.log('queue stage load failed', e);
+    } finally {
+      this.queueStagesLoading = false;
+    }
+  }
+  // Manual AR toggle — persisted to the isolated venue_clearance collection (optimistic, reverts on failure).
+  async toggleVenuePaid(r: PRow, checked: boolean) {
+    const prev = this.venuePaidByPid.get(r.profileid) === true;
+    this.venuePaidByPid.set(r.profileid, checked);
+    try {
+      const id = `${this.arena['docid']}_${r.profileid}`;
+      await setDoc(doc(this.firestore, 'venue_clearance', id), {
+        arenaeventid: this.arena['docid'], profileid: r.profileid,
+        venuePaid: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
+      }, { merge: true });
+    } catch (e) {
+      console.log('venue clearance write failed', e);
+      this.venuePaidByPid.set(r.profileid, prev);
+      this.snackbar.open('Could not save venue status', 'OK', { duration: 4000 });
+    }
+  }
+
+  // Manual finance sign-off — persisted to the isolated finance_clearance collection (optimistic, reverts on failure).
+  async toggleFinanceCleared(r: PRow, checked: boolean) {
+    const prev = this.financeClearedByPid.get(r.profileid) === true;
+    this.financeClearedByPid.set(r.profileid, checked);
+    try {
+      const id = `${this.arena['docid']}_${r.profileid}`;
+      await setDoc(doc(this.firestore, 'finance_clearance', id), {
+        arenaeventid: this.arena['docid'], profileid: r.profileid,
+        financeCleared: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
+      }, { merge: true });
+    } catch (e) {
+      console.log('finance clearance write failed', e);
+      this.financeClearedByPid.set(r.profileid, prev);
+      this.snackbar.open('Could not save finance status', 'OK', { duration: 4000 });
+    }
   }
 
   private inSegment(r: PRow): boolean { return this.matchesSegment(r, this.segment); }
 
   private matchesSegment(r: PRow, key: SegmentKey): boolean {
     switch (key) {
-      case 'totalRequested': return r.isRequested || r.isApproved;
       case 'potential': return r.isOwner;
       case 'requested': return r.isRequested;
       case 'notRequested': return r.isNotRequested;
@@ -529,6 +632,7 @@ export class ProductFunnelComponent implements OnInit {
       case 'attended': return r.attended;
       case 'noShow': return r.attendanceState === 'no_show';
       case 'unattended': return r.isUnattended;
+      case 'overallRequested': return r.isRequested || r.isApproved;
     }
     return false;
   }
@@ -602,6 +706,17 @@ export class ProductFunnelComponent implements OnInit {
   // ---- Display helpers ----
   formatMonthYear(ms: number): string {
     return ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '';
+  }
+  // Compact money for the table (Indian scale): 5000 -> 5K, 122000 -> 1.2L, 25000000 -> 2.5Cr.
+  shortAmount(v: any): string {
+    const n = +(v || 0);
+    if (!n) return '0';
+    const abs = Math.abs(n);
+    const fmt = (x: number, unit: number) => (x / unit).toFixed(abs % unit === 0 ? 0 : 1).replace(/\.0$/, '');
+    if (abs >= 1e7) return fmt(n, 1e7) + 'Cr';
+    if (abs >= 1e5) return fmt(n, 1e5) + 'L';
+    if (abs >= 1e3) return fmt(n, 1e3) + 'K';
+    return String(n);
   }
   financeDotClass(f: string): string {
     const n = (f || '').toLowerCase().replace('fullypaid', 'fully paid').replace(/\s+/g, ' ').trim();

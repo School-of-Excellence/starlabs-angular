@@ -146,6 +146,12 @@
                   {{ sp.name }}<span class="kc__role-act" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
                 </span>
               </div>
+              <button type="button" class="kc__chat-btn" (click)="rightTab = 'chat'; openStudioChat(s.docid)" matTooltip="Open chat">
+                <mat-icon>chat</mat-icon>
+                <span *ngIf="getStudioUnreadCount(s.docid) > 0" class="kc__chat-badge">
+                  {{ getStudioUnreadCount(s.docid) > 99 ? '99+' : getStudioUnreadCount(s.docid) }}
+                </span>
+              </button>
             </div>
             <div class="kc__meta kc__meta--placeholder">No participant assigned</div>
           </article>
@@ -176,7 +182,17 @@
               </span>
             </div>
             <div class="kc__foot">
-              <span class="kc__timer kc__timer--amber">{{ inviteCountdown(item.invitation) }}</span>
+              <span class="kc__timer kc__timer--amber" matTooltip="Time until invitation expires">
+                <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">hourglass_top</mat-icon>
+                {{ inviteCountdown(item.invitation) }}
+              </span>
+              <button type="button" class="kc__chat-btn kc__chat-btn--inline" *ngIf="item.studio"
+                      (click)="rightTab = 'chat'; openStudioChat(item.studio.docid)" matTooltip="Open chat">
+                <mat-icon>chat</mat-icon>
+                <span *ngIf="getStudioUnreadCount(item.studio.docid) > 0" class="kc__chat-badge">
+                  {{ getStudioUnreadCount(item.studio.docid) > 99 ? '99+' : getStudioUnreadCount(item.studio.docid) }}
+                </span>
+              </button>
             </div>
             <div class="kc__cta">
               <span class="kc__pill kc__pill--amber">{{ attemptsLabel(item.invitation) }}</span>
@@ -239,6 +255,12 @@
                 <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">hourglass_top</mat-icon>
                 {{ sinceStudioEntry(a) }}
               </span>
+              <button type="button" class="kc__chat-btn kc__chat-btn--inline" (click)="rightTab = 'chat'; openStudioChat(a.studioid)" matTooltip="Open chat">
+                <mat-icon>chat</mat-icon>
+                <span *ngIf="getStudioUnreadCount(a.studioid) > 0" class="kc__chat-badge">
+                  {{ getStudioUnreadCount(a.studioid) > 99 ? '99+' : getStudioUnreadCount(a.studioid) }}
+                </span>
+              </button>
             </div>
           </article>
           <div class="kcol__empty" *ngIf="joinedAssignments.length === 0">— none —</div>
@@ -332,8 +354,7 @@
                   <span class="kc__ended-lbl">Duration</span>
                   <span class="kc__ended-val kc__ended-val--strong">{{ sessionElapsed(a) }}</span>
                 </div>
-                <div class="kc__ended-line" *ngIf="specialistAtStudio(a)">Returned to studio · awaiting completion</div>
-                <div class="kc__ended-line" *ngIf="!specialistAtStudio(a)">Awaiting specialist to return to studio</div>
+                <div class="kc__ended-line">Awaiting completion</div>
               </div>
             </div>
 
@@ -356,6 +377,12 @@
                 <span class="kc__timer-label">{{ callEnded(a) ? 'Total time' : 'Running for' }}</span>
                 {{ sessionElapsed(a) }}
               </span>
+              <button type="button" class="kc__chat-btn kc__chat-btn--inline" (click)="rightTab = 'chat'; openStudioChat(a.studioid)" matTooltip="Open chat">
+                <mat-icon>chat</mat-icon>
+                <span *ngIf="getStudioUnreadCount(a.studioid) > 0" class="kc__chat-badge">
+                  {{ getStudioUnreadCount(a.studioid) > 99 ? '99+' : getStudioUnreadCount(a.studioid) }}
+                </span>
+              </button>
             </div>
           </article>
           <div class="kcol__empty" *ngIf="activeAssignments.length === 0">— none —</div>
@@ -380,8 +407,11 @@
         <button class="rtab" [class.rtab--active]="rightTab === 'done'" (click)="rightTab = 'done'">
           <mat-icon>check_circle</mat-icon> Done <span class="rtab__count">{{ seDoneCount }}</span>
         </button>
-        <button class="rtab" [class.rtab--active]="rightTab === 'chat'" (click)="rightTab = 'chat'">
+        <button class="rtab" [class.rtab--active]="rightTab === 'chat'" (click)="rightTab = 'chat'; backToChatList()">
           <mat-icon>chat</mat-icon> Chat
+          <span *ngIf="unreadChatCount > 0" class="rtab__badge">
+            {{ unreadChatCount > 99 ? '99+' : unreadChatCount }}
+          </span>
         </button>
       </div>
 
@@ -394,11 +424,97 @@
         <div class="arena__right-empty" *ngIf="completedAssignments.length === 0">No completed sessions yet.</div>
       </div>
 
-      <!-- Chat (placeholder for now) -->
+     <!-- Chat -->
       <div class="arena__right-pane arena__right-pane--chat" *ngIf="rightTab === 'chat'">
-        <div class="arena__right-empty">Chat feed coming soon.</div>
+        <div class="chat-thread-list" *ngIf="!selectedChatStudioId">
+          <div *ngFor="let studio of studios"
+              class="chat-thread-row"
+              (click)="openStudioChat(studio.docid)">
+            <div class="chat-thread-row__name">
+              {{ getStudioChatName(studio.docid) }}
+              <span *ngIf="getStudioUnreadCount(studio.docid) > 0" class="chat-thread-row__badge">
+                {{ getStudioUnreadCount(studio.docid) > 99 ? '99+' : getStudioUnreadCount(studio.docid) }}
+              </span>
+            </div>
+            <div class="chat-thread-row__preview">{{ chatThreads[studio.docid]?.lastmessage || 'No messages yet' }}</div>
+          </div>
+          <div class="arena__right-empty" *ngIf="studios.length === 0">No studios on this board yet.</div>
+        </div>
+
+        <div class="chat-thread-active" *ngIf="selectedChatStudioId">
+          <div class="chat-thread-active__head">
+            <button type="button" class="chat-back-btn" (click)="backToChatList()">
+              <mat-icon>arrow_back</mat-icon>
+            </button>
+            <span class="chat-thread-active__title">{{ getStudioChatName(selectedChatStudioId) }}</span>
+          </div>
+
+          <div class="chat-messages" #chatMessagesScroll>
+            <div *ngIf="chatHasMore" class="chat-showmore">
+              <button type="button" (click)="loadMoreChatMessages()" [disabled]="chatLoadingMore">
+                {{ chatLoadingMore ? 'Loading...' : 'Show more' }}
+              </button>
+            </div>
+
+          <ng-container *ngFor="let msg of chatMessages">
+            <div class="chat-msg" [class.chat-msg--mine]="msg['sent_by'] === profileid">
+              <div class="chat-msg__sender-label">
+                {{ mapProfile[msg['sent_by']] || 'A&H Team' }}
+              </div>
+              <div class="chat-msg__bubble">
+                <p *ngIf="msg['message']" [innerHTML]="processMessage(msg['message'], msg['sent_by'] === profileid ? '#ffffff' : '#1a56db')"></p>
+                  <div *ngFor="let f of msg['files']">
+                    <img *ngIf="isImageFile(f.filename)" [src]="f.fileurl" class="chat-msg__img" style="cursor:pointer;" (click)="expandedImage = f.fileurl">
+                    <div *ngIf="!isImageFile(f.filename)" class="chat-msg__file">
+                      <mat-icon>attach_file</mat-icon>
+                      <span>{{ f.filename }}</span>
+                      <a [href]="f.fileurl" target="_blank" (click)="$event.stopPropagation()">
+                        <mat-icon>download</mat-icon>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                <div class="chat-msg__time">
+                  {{ msg['sentat']?.toDate ? (msg['sentat'].toDate() | date:'shortTime') : (msg['sentat'] | date:'shortTime') }}
+                </div>
+              </div>
+            </ng-container>
+
+            <div *ngIf="!chatMessages.length" class="arena__right-empty">No messages yet</div>
+          </div>
+
+          <div *ngIf="chatAttachedFiles.length" class="chat-previews">
+            <div *ngFor="let f of chatAttachedFiles; let i = index" class="chat-preview">
+              <img *ngIf="f.fileurl" [src]="f.fileurl">
+              <mat-icon *ngIf="!f.fileurl">attach_file</mat-icon>
+              <button type="button" (click)="removeChatFile(i)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <div class="chat-input-row">
+            <input #arenaChatFileInput type="file" multiple style="display:none"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+              (change)="onChatFileSelected($event)">
+            <textarea [(ngModel)]="chatText" placeholder="Type a message..." rows="1"(keydown)="onChatKeydown($event)"class="arena-chat-input-textarea"></textarea>
+            <button type="button" (click)="arenaChatFileInput.click()">
+              <mat-icon>attach_file</mat-icon>
+            </button>
+            <button type="button" (click)="sendChatMessage()"
+              [disabled]="chatUploading || (!chatText.trim() && !chatAttachedFiles.length)">
+              <mat-icon>{{ chatUploading ? 'hourglass_top' : 'send' }}</mat-icon>
+            </button>
+          </div>
+        </div>
       </div>
       </ng-container>
     </aside>
   </main>
+  <div class="preview-backdrop" *ngIf="expandedImage" (click)="expandedImage = null">
+    <div class="preview-panel" (click)="$event.stopPropagation()">
+      <button class="preview-close-btn" (click)="expandedImage = null">✕</button>
+      <img class="preview-image" [src]="expandedImage" alt="Preview">
+    </div>
+  </div>
 </div>

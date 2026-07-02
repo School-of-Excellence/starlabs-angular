@@ -4,8 +4,7 @@
     <div class="loading-text">Loading Dashboard</div>
   </div>
 </div>
-<div class="mainscreen" (click)="showEventFilterDropdown = false; showVideoFilterDropdown = false; showJourneyTypeDropdown = false">
-    <!-- Page Header -->
+<div class="mainscreen" (click)="showEventFilterDropdown = false; showVideoFilterDropdown = false; showJourneyTypeDropdown = false; showArenaEventPicker = false">
   <div class="page-header">
     <h1 class="page-title">Participant Video Mapping</h1>
     <!-- Summary Cards inline with title -->
@@ -68,6 +67,99 @@
         <mat-icon>no_photography</mat-icon>
         No Profile Image
       </button>
+      <div class="ep-filter-wrapper">
+
+        <button mat-stroked-button class="ep-filter-btn"
+          [class.ep-filter-active]="arenaEventFilterActive"
+          [disabled]="arenaEventParentLoading"
+          (click)="showArenaEventPicker = !showArenaEventPicker;
+                  loadArenaEventParentList();
+                  $event.stopPropagation()">
+          <mat-icon>event</mat-icon>
+          <span *ngIf="!arenaEventFilterActive">Event Filter</span>
+          <span *ngIf="arenaEventFilterActive">
+            {{ arenaEventFilterActive.subEventName }} ({{ totalRecords }})
+          </span>
+          <mat-spinner *ngIf="arenaEventParentLoading" diameter="14"
+            style="display:inline-block; margin-left:4px;">
+          </mat-spinner>
+        </button>
+
+        <div class="ep-dropdown" *ngIf="showArenaEventPicker"
+          (click)="$event.stopPropagation()">
+
+          <div *ngIf="arenaEventParentLoading" class="ep-loading">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Loading...</span>
+          </div>
+
+          <ng-container *ngIf="!arenaEventParentLoading && !selectedArenaParent">
+            <input class="ep-search-input" type="text"
+              [formControl]="arenaEventParentSearchCtrl"
+              placeholder="Search events or queues..."
+              (click)="$event.stopPropagation()">
+            <div class="ep-list">
+              <div *ngFor="let item of filteredArenaParentList"
+                class="ep-list-item"
+                (click)="onArenaParentSelect(item)">
+                <span>{{ item.name }}</span>
+                <span class="ep-type-badge">{{ item.type }}</span>
+              </div>
+              <div *ngIf="filteredArenaParentList.length === 0" class="ep-empty">
+                No results found
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="!arenaEventParentLoading && selectedArenaParent">
+            <div class="ep-back-btn"
+              (click)="selectedArenaParent = null; arenaSubEventList = [];
+                      selectedArenaSubEventId = null; arenaSubEventLoading = false">
+              <mat-icon>arrow_back</mat-icon>
+              <span>{{ selectedArenaParent.name }}</span>
+            </div>
+
+            <div *ngIf="arenaSubEventLoading" class="ep-loading">
+              <mat-spinner diameter="20"></mat-spinner>
+              <span>Loading...</span>
+            </div>
+
+            <div class="ep-list" *ngIf="!arenaSubEventLoading">
+              <div *ngFor="let event of arenaSubEventList"
+                class="ep-list-item"
+                [class.ep-list-item-selected]="selectedArenaSubEventId === event.docid"
+                (click)="selectedArenaSubEventId = event.docid">
+                <mat-icon style="font-size:18px; width:18px; height:18px;
+                                margin-right:8px; flex-shrink:0;">
+                  {{ selectedArenaSubEventId === event.docid
+                    ? 'radio_button_checked'
+                    : 'radio_button_unchecked' }}
+                </mat-icon>
+                <span>{{ event.name }}</span>
+              </div>
+              <div *ngIf="arenaSubEventList.length === 0" class="ep-empty">
+                No arena events found
+              </div>
+            </div>
+
+            <button mat-raised-button color="primary" class="ep-apply-btn"
+              *ngIf="!arenaSubEventLoading"
+              [disabled]="!selectedArenaSubEventId"
+              (click)="applyArenaEventFilter()">
+              Apply
+            </button>
+          </ng-container>
+
+        </div>
+
+        <button mat-icon-button class="ep-reset-btn"
+          *ngIf="arenaEventFilterActive"
+          matTooltip="Reset Event Filter"
+          (click)="resetArenaEventFilter()">
+          <mat-icon>close</mat-icon>
+        </button>
+
+      </div>
       <button mat-stroked-button class="clear-btn" (click)="clearFilters()">Clear</button>
     </div>
     <button class="export-btn" (click)="exportToExcel()" [disabled]="exportLoading">
@@ -328,6 +420,9 @@
           <span class="log-subtitle">Evolution Log · {{ logEventCount }} events attended</span>
         </div>
         <div class="log-header-actions">
+          <button class="add-video-btn" (click)="openAddVideo()">
+          + Add Video
+        </button>
           <button mat-icon-button (click)="closeLog()">
             <mat-icon>close</mat-icon>
           </button>

@@ -23,7 +23,10 @@
     "e2e:T9": "npx playwright test --config=e2e/playwright.config.ts T9-sustained",
     "e2e:T10": "npx playwright test --config=e2e/playwright.config.ts T10-rejoin",
     "start:emulator": "ng serve --configuration emulator",
-    "build:emulator": "ng build --configuration emulator"
+    "build:emulator": "ng build --configuration emulator",
+    "perf:auth": "npx tsx e2e/perf/capture-auth.ts",
+    "perf:trace": "npx playwright test --config=e2e/perf/playwright.perf.config.ts",
+    "perf:trace:report": "npx playwright show-report e2e/perf/report"
   },
   "private": true,
   "dependencies": {
@@ -65,7 +68,7 @@
     "firebase": "^11.10.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
-    "livekit-client": "^1.15.13",
+    "livekit-client": "2.19.1",
     "marked": "^15.0.12",
     "ng-apexcharts": "1.15.0",
     "ngx-editor": "^19.0.0-beta.1",

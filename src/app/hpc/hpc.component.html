@@ -22,7 +22,10 @@
             ></ngx-mat-select-search>
           </mat-option>
             <mat-option *ngFor="let profileid of filteredNames" [value]="profileid.id">
-              {{ profileid.name }}
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profileid.id" [name]="profileid.name" [size]="24"></app-profile-picture>
+                <span>{{ profileid.name }}</span>
+              </span>
             </mat-option>
           </mat-select>
         </mat-form-field>
@@ -53,7 +56,10 @@
             ></ngx-mat-select-search>
           </mat-option>
             <mat-option *ngFor="let profileid of filteredNames" [value]="profileid.id">
-              {{ profileid.name }}
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profileid.id" [name]="profileid.name" [size]="24"></app-profile-picture>
+                <span>{{ profileid.name }}</span>
+              </span>
             </mat-option>
           </mat-select>
         </mat-form-field>

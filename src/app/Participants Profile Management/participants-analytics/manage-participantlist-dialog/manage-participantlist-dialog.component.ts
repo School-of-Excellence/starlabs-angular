@@ -57,6 +57,17 @@ interface ListConflictSummary {
   count: number;
   conflicts: SegmentConflict[];
 }
+interface SegmentConflict {
+  profileId: string;
+  profileName: string;
+  segmentIds: string[];
+  segmentNames: string[];
+}
+
+interface ListConflictSummary {
+  count: number;
+  conflicts: SegmentConflict[];
+}
 
 @Component({
   selector: 'app-manage-participantlist-dialog',
@@ -251,7 +262,7 @@ onViewParticipants(event : any, log: any): void {
   }));
 
   this.showParticipantsPopup = true;
-}
+  }
 
   get filteredParticipantsPopup() {
     const term = this.participantsPopupSearch.trim().toLowerCase();
@@ -298,13 +309,11 @@ onViewParticipants(event : any, log: any): void {
         orderBy('created_date', 'desc'),
         limit(200)
       );
-      console.log("log data console")
       const snap = await getDocs(q);
       this.logs = snap.docs
         .map(d => d.data())
         .filter(d => d?.['type'] === 'list');
       this.filteredLogs = [...this.logs];
-      console.log('Loaded logs:', this.logs.length);
     } catch (e) {
       console.error('loadLogs error:', e);
     } finally {

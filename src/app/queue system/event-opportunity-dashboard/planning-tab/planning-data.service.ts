@@ -44,6 +44,15 @@ export interface PlanningRoster {
   loadError: boolean;
 }
 
+/** Confirmation sets for one or more selected events (union). */
+export interface EventSets {
+  approvedIds: Set<string>;   // uP! confirmed (approved / attended / scanned) for the event(s)
+  requestedIds: Set<string>;  // requested, not yet confirmed
+  ownerIds: Set<string>;      // product owners across the event(s)' products
+  potential: number;          // owners not in approved+requested
+  loadError: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PlanningDataService {
 
@@ -222,5 +231,154 @@ export class PlanningDataService {
       console.error('Planning roster load failed for queue', queueId, err);
       return { ...empty, loadError: true };
     }
+  }
+
+  /**
+   * Builds the requested/approved cohort for an EVENT (an 'event collection' doc),
+   * by resolving its arena(s) and reading event participation requests — the same
+   * source the Event Participation Confirmation screen uses. This is the population;
+   * phase progress is joined from the selected queue in the component.
+   */
+  async loadEventCohort(eventRef: DocumentReference): Promise<PlanningRoster> {
+    const empty: PlanningRoster = { queueId: '', hasArena: false, participants: [], potential: 0, loadError: false };
+    try {
+      const arenaSnap = await getDocs(query(
+        collection(this.firestore, 'arena events'),
+        where('eventref', '==', eventRef)
+      ));
+      if (arenaSnap.empty) return empty;
+
+      const approvedIds = new Set<string>();
+      const requestedIds = new Set<string>();
+      const productRefs: DocumentReference[] = [];
+      for (const ad of arenaSnap.docs) {
+        const arena: any = ad.data();
+        if (arena['delete'] === true) continue;
+        const arenaEventId = arena['docid'] || ad.id;
+        if (arena['productref']) productRefs.push(arena['productref']);
+        const eprSnap = await getDocs(query(
+          collection(this.firestore, 'event participation request'),
+          where('arenaeventid', '==', arenaEventId),
+          where('status', 'in', ['requested', 'approved', 'attended'])
+        ));
+        eprSnap.docs.forEach(d => {
+          const x: any = d.data();
+          const pid = x['profileid'];
+          if (!pid) return;
+          if (x['status'] === 'approved' || x['status'] === 'attended') approvedIds.add(pid);
+          else if (x['status'] === 'requested') requestedIds.add(pid);
+        });
+      }
+      approvedIds.forEach(p => requestedIds.delete(p));
+      const cohort = [...new Set<string>([...approvedIds, ...requestedIds])];
+
+      // Potential = product owners (across the event's products) not in the cohort.
+      const owners = new Set<string>();
+      const cohortSet = new Set(cohort);
+      const seenProduct = new Set<string>();
+      for (const pr of productRefs) {
+        if (seenProduct.has(pr.id)) continue;
+        seenProduct.add(pr.id);
+        const ownSnap = await getDocs(query(
+          collection(this.firestore, 'participantsproduct'),
+          where('productref', '==', pr), where('status', '==', null)
+        ));
+        ownSnap.docs.forEach(d => { const x: any = d.data(); if (x['profileid']) owners.add(x['profileid']); });
+      }
+      const potential = [...owners].filter(o => !cohortSet.has(o)).length;
+
+      const activeMap = new Map<string, boolean>();
+      for (let i = 0; i < cohort.length; i += 30) {
+        const chunk = cohort.slice(i, i + 30);
+        try {
+          const snap = await getDocs(query(
+            collection(this.firestore, 'participant metadata'),
+            where('profileid', 'in', chunk)
+          ));
+          snap.docs.forEach(d => {
+            const x: any = d.data();
+            if (x['profileid']) activeMap.set(x['profileid'], String(x['customerstatus'] || '').toLowerCase() === 'active');
+          });
+        } catch (e) { /* tolerate a failed chunk */ }
+      }
+
+      const participants: PlanningParticipant[] = cohort.map(pid => ({
+        profileId: pid,
+        confirmed: approvedIds.has(pid),
+        requested: requestedIds.has(pid),
+        active: activeMap.get(pid) === true
+      }));
+
+      return { queueId: '', hasArena: true, participants, potential, loadError: false };
+    } catch (err) {
+      console.error('Planning event-cohort load failed', err);
+      return { ...empty, loadError: true };
+    }
+  }
+
+  /** Union confirmation/owner sets across one or more selected events. */
+  async loadEventSets(eventRefs: DocumentReference[]): Promise<EventSets> {
+    const empty: EventSets = { approvedIds: new Set(), requestedIds: new Set(), ownerIds: new Set(), potential: 0, loadError: false };
+    if (!eventRefs.length) return empty;
+    try {
+      const approvedIds = new Set<string>();
+      const requestedIds = new Set<string>();
+      const ownerIds = new Set<string>();
+      const seenProduct = new Set<string>();
+      for (const eventRef of eventRefs) {
+        const arenaSnap = await getDocs(query(
+          collection(this.firestore, 'arena events'),
+          where('eventref', '==', eventRef)
+        ));
+        for (const ad of arenaSnap.docs) {
+          const arena: any = ad.data();
+          if (arena['delete'] === true) continue;
+          const arenaEventId = arena['docid'] || ad.id;
+          const eprSnap = await getDocs(query(
+            collection(this.firestore, 'event participation request'),
+            where('arenaeventid', '==', arenaEventId),
+            where('status', 'in', ['requested', 'approved', 'attended'])
+          ));
+          eprSnap.docs.forEach(d => {
+            const x: any = d.data(); const pid = x['profileid']; if (!pid) return;
+            if (x['status'] === 'approved' || x['status'] === 'attended') approvedIds.add(pid);
+            else if (x['status'] === 'requested') requestedIds.add(pid);
+          });
+          const pr = arena['productref'];
+          if (pr && !seenProduct.has(pr.id)) {
+            seenProduct.add(pr.id);
+            const ownSnap = await getDocs(query(
+              collection(this.firestore, 'participantsproduct'),
+              where('productref', '==', pr), where('status', '==', null)
+            ));
+            ownSnap.docs.forEach(d => { const x: any = d.data(); if (x['profileid']) ownerIds.add(x['profileid']); });
+          }
+        }
+      }
+      approvedIds.forEach(p => requestedIds.delete(p));
+      const inCohort = new Set<string>([...approvedIds, ...requestedIds]);
+      const potential = [...ownerIds].filter(o => !inCohort.has(o)).length;
+      return { approvedIds, requestedIds, ownerIds, potential, loadError: false };
+    } catch (err) {
+      console.error('Planning event-sets load failed', err);
+      return { ...empty, loadError: true };
+    }
+  }
+
+  /** profileId -> raw customerstatus (lowercased) for the given profiles. */
+  async loadCustomerStatus(profileIds: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    const ids = [...new Set(profileIds.filter(Boolean))];
+    for (let i = 0; i < ids.length; i += 30) {
+      const chunk = ids.slice(i, i + 30);
+      try {
+        const snap = await getDocs(query(
+          collection(this.firestore, 'participant metadata'),
+          where('profileid', 'in', chunk)
+        ));
+        snap.docs.forEach(d => { const x: any = d.data(); if (x['profileid']) out.set(x['profileid'], String(x['customerstatus'] || '').toLowerCase()); });
+      } catch (e) { /* tolerate a failed chunk */ }
+    }
+    return out;
   }
 }

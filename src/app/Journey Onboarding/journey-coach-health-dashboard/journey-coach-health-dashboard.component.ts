@@ -34,6 +34,7 @@ import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSig
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
 import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload } from './participant-slideover.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import {
   CoachHealthState, ActivityType, COACH_HEALTH_OPTIONS,
   coachHealthLabel, coachHealthStateClass, normalizeCoachHealth,
@@ -159,7 +160,7 @@ interface ScoreboardRow {
   selector: 'app-journey-coach-health-dashboard',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink,
+    CommonModule, FormsModule, RouterLink, ProfilePictureComponent,
     MatTableModule, MatPaginatorModule, MatSortModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatChipsModule, MatIconModule, MatButtonModule, MatMenuModule,
@@ -1604,6 +1605,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.guard.openSnackBar('Could not update flag: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
     }
   }
+
+
 
   /** Title-case label for a coach-set Health State (Happy / Neutral / Unhappy / At-risk / Critical). */
   healthLabel(s: CoachHealthState | null | undefined): string {

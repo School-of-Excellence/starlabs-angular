@@ -198,8 +198,8 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
         // Count non-ghost participants
         const participantJoined = (this.mapOpenViduRoom[roomName] ?? {})["participantjoined"] ?? []
 
-        // ✅ CHANGED: Use participants instead of remoteParticipants (v1.x)
-        const nonGhostParticipants = Array.from(room.participants.values()).filter(
+        // livekit-client v2: remoteParticipants (Map) replaces the v1 `participants`
+        const nonGhostParticipants = Array.from(room.remoteParticipants.values()).filter(
           (p: RemoteParticipant) => !p.identity.includes(this.ghostID) && participantJoined.includes(p.identity)
         );
         
@@ -235,7 +235,7 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     // Seed initial mute + quality for participants who join after Monitor connects
     room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       const key = `${roomName}:::${participant.identity}`;
-      const isMuted = Array.from(participant.audioTracks.values()).some(p => p.isMuted);
+      const isMuted = Array.from(participant.audioTrackPublications.values()).some(p => p.isMuted);
       if (isMuted) this.participantsMute.update(m => { m.set(key, true); return m; });
       this.participantsQuality.update(m => { m.set(key, participant.connectionQuality); return m; });
     });
@@ -252,9 +252,9 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       this.roomConnecting.update(m => { m.set(roomName, false); return m; });
 
       // Seed initial mute + quality state for participants already in the room
-      room.participants.forEach((participant: RemoteParticipant) => {
+      room.remoteParticipants.forEach((participant: RemoteParticipant) => {
         const key = `${roomName}:::${participant.identity}`;
-        const isMuted = Array.from(participant.audioTracks.values()).some(p => p.isMuted);
+        const isMuted = Array.from(participant.audioTrackPublications.values()).some(p => p.isMuted);
         if (isMuted) this.participantsMute.update(m => { m.set(key, true); return m; });
         this.participantsQuality.update(m => { m.set(key, participant.connectionQuality); return m; });
       });
@@ -384,8 +384,8 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   private setAudioSubscription(roomId: string, subscribe: boolean) {
     const room = this.roomConnections.get(roomId);
     if (!room) return;
-    room.participants.forEach(participant => {
-      participant.audioTracks.forEach(pub => pub.setSubscribed(subscribe));
+    room.remoteParticipants.forEach(participant => {
+      participant.audioTrackPublications.forEach(pub => pub.setSubscribed(subscribe));
     });
   }
 

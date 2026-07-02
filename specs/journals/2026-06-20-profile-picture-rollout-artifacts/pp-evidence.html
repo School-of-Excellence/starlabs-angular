@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProfilePicture rollout — evidence harness</title>
+<style>
+  /* ===== Real ProfilePictureComponent CSS (verbatim from
+     src/app/ProfilePicture/profile-picture/profile-picture.component.css) ===== */
+  .pp-host { display: inline-flex; flex-shrink: 0; }
+  .profile-img {
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .profile-img:hover { opacity: 0.85; }
+  .preview-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    z-index: 9999; display: flex; align-items: center; justify-content: center;
+  }
+  .preview-panel { position: relative; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .preview-image { width: 320px; height: 320px; border-radius: 16px; object-fit: cover; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+  .preview-name { color: #fff; font-size: 18px; font-weight: 600; }
+  .preview-close-btn {
+    position: absolute; top: -16px; right: -16px; background: rgba(255,255,255,0.15);
+    border: none; border-radius: 50%; width: 36px; height: 36px; display: flex;
+    align-items: center; justify-content: center; cursor: pointer; color: #fff; font-size: 16px;
+  }
+
+  /* ===== Harness chrome ===== */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; background: #eef2f7; color: #1f2937; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .banner { background: #0f172a; color: #fff; border-radius: 14px; padding: 20px 24px; margin-bottom: 22px; }
+  .banner h1 { margin: 0 0 6px; font-size: 22px; }
+  .banner p { margin: 0; font-size: 13px; color: #cbd5e1; line-height: 1.5; }
+  .panel { background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,.08); padding: 0; margin-bottom: 22px; overflow: hidden; }
+  .panel-head { padding: 14px 20px; border-bottom: 1px solid #eef0f3; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .panel-head .num { background: #4A90E2; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  .panel-head h2 { margin: 0; font-size: 16px; }
+  .panel-head .route { font-size: 12px; color: #6b7280; font-family: ui-monospace, Menlo, monospace; }
+  .panel-head .file { font-size: 11px; color: #9aa3af; font-family: ui-monospace, Menlo, monospace; }
+  .panel-body { padding: 18px 20px; }
+
+  /* generic name row (matches the inline-flex wrapper added in the templates) */
+  .name-row { display: inline-flex; align-items: center; gap: 8px; }
+
+  /* delivery kanban card */
+  .kanban { display: flex; gap: 14px; flex-wrap: wrap; }
+  .kcol { min-width: 250px; flex: 1; background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid #10b981; border-radius: 10px; }
+  .kcol.red { border-left-color: #ef4444; } .kcol.orange { border-left-color: #f59e0b; }
+  .kcol-head { padding: 12px 14px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; font-weight: 600; font-size: 13px; }
+  .kcard { padding: 12px 14px; border-bottom: 1px solid #f6f7f8; }
+  .participant-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .participant-name { font-size: 14px; font-weight: 500; color: #1f2937; }
+  .kcard .meta { font-size: 11px; color: #9aa3af; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: #6b7280; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; padding: 8px 10px; border-bottom: 2px solid #eef0f3; }
+  td { padding: 9px 10px; border-bottom: 1px solid #f1f3f5; vertical-align: middle; }
+
+  /* dialog (resolve zone) */
+  .dlg { max-width: 460px; border: 1px solid #e5e7eb; border-radius: 12px; padding: 8px 0; }
+  .dlg-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; }
+  .dlg-row .badge { margin-left: auto; font-size: 11px; background: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 10px; }
+
+  /* big mentor cards */
+  .mentor-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .mentor-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; min-width: 220px; }
+  .mentor-head { display: flex; align-items: center; gap: 8px; }
+  .mentor-name { margin: 0; font-weight: 600; font-size: 14px; }
+  .mentor-card .role { font-size: 11px; color: #9aa3af; margin-top: 6px; }
+
+  .note { font-size: 11px; color: #9aa3af; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">
+    <h1>Profile-picture rollout — visual evidence</h1>
+    <p>
+      The shared <code>&lt;app-profile-picture&gt;</code> component (circular avatar + click-to-enlarge preview)
+      placed next to every participant/person name sourced from <code>profile_data</code> / <code>participant&nbsp;metadata</code>.
+      Markup &amp; CSS below are the exact structure committed to each <strong>live-routed</strong> component.
+      Avatars use real images to demonstrate the rendered result &amp; the enlarge preview
+      (the live screens are Firebase-auth gated). <strong>Click any avatar to enlarge.</strong>
+    </p>
+  </div>
+
+  <!-- 1 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="num">1</span><h2>Delivery Dashboard</h2>
+      <span class="route">/delivery-dashboard</span>
+      <span class="file">delivery-dashboard-clone.component.html — kanban cards + funnel/UP tables (6 sites)</span>
+    </div>
+    <div class="panel-body">
+      <div class="kanban">
+        <div class="kcol"><div class="kcol-head"><span>Initiated</span><span>3</span></div>
+          <div class="kcard" data-pp="1"><div class="participant-name-row"></div><div class="meta">Jun 12, 2026 · 4D</div></div>
+          <div class="kcard" data-pp="2"><div class="participant-name-row"></div><div class="meta">Jun 11, 2026 · 6D</div></div>
+        </div>
+        <div class="kcol red"><div class="kcol-head"><span>Welcome Call</span><span>2</span></div>
+          <div class="kcard" data-pp="3"><div class="participant-name-row"></div><div class="meta">Welcome · Scheduled</div></div>
+        </div>
+        <div class="kcol orange"><div class="kcol-head"><span>Clarity Call</span><span>1</span></div>
+          <div class="kcard" data-pp="4"><div class="participant-name-row"></div><div class="meta">Clarity · Completed</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="num">2</span><h2>Sales Report</h2>
+      <span class="route">/sales-report</span>
+      <span class="file">sales-dashboard-clone.component.html — expanded detail tables (6 sites)</span>
+    </div>
+    <div class="panel-body">
+      <table>
+        <tr><th>Participant</th><th>Journey</th><th>Value</th><th>Date</th></tr>
+        <tr><td data-pp="5"></td><td>A&amp;H Light</td><td>₹45,000</td><td>02-Jun-2026</td></tr>
+        <tr><td data-pp="6"></td><td>EI Solution</td><td>₹1,20,000</td><td>28-May-2026</td></tr>
+        <tr><td data-pp="7"></td><td>WISH</td><td>₹18,000</td><td>15-May-2026</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="num">3</span><h2>Event Attendance Log</h2>
+      <span class="route">/event_attendance_log</span>
+      <span class="file">event-attendance-log.component.html — mat-table name cell</span>
+    </div>
+    <div class="panel-body">
+      <table>
+        <tr><th>Participant</th><th>Event</th><th>Status</th></tr>
+        <tr><td data-pp="8"></td><td>uP! Readiness Gate</td><td>Attended</td></tr>
+        <tr><td data-pp="9"></td><td>BIG Arena</td><td>Attended</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="num">4</span><h2>Event Participation Approve</h2>
+      <span class="route">/event_participation_approve</span>
+      <span class="file">event-participation-approve.component.html — Approved / Mark-Attendance / Attended tables (3 sites)</span>
+    </div>
+    <div class="panel-body">
+      <table>
+        <tr><th>Client</th><th>Requested</th><th>Action</th></tr>
+        <tr><td data-pp="10"></td><td>CPM Event</td><td>Approved</td></tr>
+        <tr><td data-pp="11"></td><td>CTD Event</td><td>Mark attendance</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="num">5</span><h2>Resolve Participant Zone (dialog)</h2>
+      <span class="route">/eventzonemanagement → dialog</span>
+      <span class="file">resolve-participant-zone.component.html — unassigned / conflict lists (2 sites)</span>
+    </div>
+    <div class="panel-body">
+      <div class="dlg">
+        <div class="dlg-row" data-pp="12"><span class="badge">Unassigned</span></div>
+        <div class="dlg-row" data-pp="13"><span class="badge">Conflict</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="num">6</span><h2>Live Event Health (Diagnostics)</h2>
+      <span class="route">/liveeventhealth</span>
+      <span class="file">live-event-health.component.html — mat-table name cell (+ profileid added to row)</span>
+    </div>
+    <div class="panel-body">
+      <table>
+        <tr><th>Participant</th><th>Validation</th><th>Zone</th></tr>
+        <tr><td data-pp="14"></td><td>✓ Valid</td><td>Main Arena</td></tr>
+        <tr><td data-pp="15"></td><td>✓ Valid</td><td>Main Arena</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="num">7</span><h2>BIG Dashboard</h2>
+      <span class="route">/big-dashboard</span>
+      <span class="file">big-dashboard.component.html — mentor / author / validator cards (8 sites, profile_data-bound)</span>
+    </div>
+    <div class="panel-body">
+      <div class="mentor-grid">
+        <div class="mentor-card"><div class="mentor-head" data-pp="16"></div><div class="role">Author</div></div>
+        <div class="mentor-card"><div class="mentor-head" data-pp="17"></div><div class="role">Mentor</div></div>
+        <div class="mentor-card"><div class="mentor-head" data-pp="18"></div><div class="role">Validated By</div></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">Harness file: <code>src/assets/pp-evidence.html</code> — generated for screenshot evidence; deleted after capture.</p>
+</div>
+
+<script>
+  // Sample participants (name + a real, viewable portrait). profileId mirrors the prop passed in the templates.
+  const NAMES = [
+    'Aarav Sharma','Priya Menon','Rohan Iyer','Diya Nair','Karthik Rao','Ananya Gupta',
+    'Vikram Singh','Meera Pillai','Arjun Desai','Sneha Reddy','Aditya Bose','Ishaan Verma',
+    'Kavya Joshi','Nikhil Kumar','Tara Krishnan','Rahul Mehta','Pooja Shah','Manav Kapoor'
+  ];
+  // SVG data-URI fallback so an image is ALWAYS visible even offline.
+  function svgAvatar(initials, hue){
+    const s = `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'>
+      <rect width='120' height='120' fill='hsl(${hue},55%,55%)'/>
+      <text x='50%' y='54%' font-family='Segoe UI,Arial' font-size='46' fill='#fff'
+        text-anchor='middle' dominant-baseline='middle'>${initials}</text></svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(s);
+  }
+  function initials(n){ return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+
+  function makePP(id, size){
+    const name = NAMES[(id-1) % NAMES.length];
+    const fallback = svgAvatar(initials(name), (id*37)%360);
+    const real = `https://i.pravatar.cc/150?img=${id}`;
+    const span = document.createElement('span');
+    span.className = 'pp-host';
+    const img = document.createElement('img');
+    img.className = 'profile-img';
+    img.width = size; img.height = size; img.alt = name;
+    img.src = real;
+    img.dataset.fallback = fallback;
+    img.onerror = function(){ if(this.src!==fallback){ this.src = fallback; } };
+    img.addEventListener('click', function(e){ e.stopPropagation(); openPreview(this.src, name); });
+    span.appendChild(img);
+    return { span, name };
+  }
+
+  function openPreview(src, name){
+    const back = document.createElement('div'); back.className = 'preview-backdrop';
+    back.innerHTML = `<div class="preview-panel"><button class="preview-close-btn">✕</button>
+      <img class="preview-image" src="${src}" alt="${name}"><div class="preview-name">${name}</div></div>`;
+    back.addEventListener('click', ()=>back.remove());
+    back.querySelector('.preview-panel').addEventListener('click', e=>e.stopPropagation());
+    document.body.appendChild(back);
+  }
+
+  // Mount avatars next to names per the data-pp slots
+  document.querySelectorAll('[data-pp]').forEach(slot => {
+    const id = parseInt(slot.getAttribute('data-pp'), 10);
+    const size = slot.closest('.mentor-head') || slot.classList.contains('dlg-row') ? 32 : 28;
+    const { span, name } = makePP(id, slot.querySelector('.participant-name-row') ? 32 : size);
+
+    const nameRow = slot.querySelector('.participant-name-row');
+    if (nameRow) {                         // delivery kanban card
+      nameRow.appendChild(span);
+      const t = document.createElement('span'); t.className = 'participant-name'; t.textContent = name;
+      nameRow.appendChild(t);
+    } else if (slot.classList.contains('dlg-row')) {   // resolve-zone dialog row
+      slot.insertBefore(span, slot.firstChild);
+      const t = document.createElement('span'); t.className = 'participant-name'; t.textContent = name;
+      slot.insertBefore(t, span.nextSibling);
+    } else if (slot.classList.contains('mentor-head')) { // big mentor card
+      slot.appendChild(span);
+      const t = document.createElement('p'); t.className = 'mentor-name'; t.textContent = name;
+      slot.appendChild(t);
+    } else {                                // table cell
+      const row = document.createElement('span'); row.className = 'name-row';
+      row.appendChild(span);
+      const t = document.createElement('span'); t.textContent = name;
+      row.appendChild(t);
+      slot.appendChild(row);
+    }
+  });
+</script>
+</body>
+</html>

@@ -13,10 +13,12 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatInputModule } from '@angular/material/input';
 import { where } from 'firebase/firestore';
+import { ProfilePictureComponent } from '../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-participant-touchpoint',
   imports: [
+    ProfilePictureComponent,
     CommonModule,
     MatInputModule,
     FormsModule,

@@ -14,6 +14,7 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { ArenaSpaceDialogComponent } from '../arena-space-dialog/arena-space-dialog.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-view-arena-space',
@@ -27,7 +28,8 @@ import { ArenaSpaceDialogComponent } from '../arena-space-dialog/arena-space-dia
     MatTooltipModule,
     CommonModule,
     MatIconModule,
-    MatFormFieldModule
+    MatFormFieldModule,
+    ProfilePictureComponent
 
   ],
   templateUrl: './view-arena-space.component.html',

@@ -26,10 +26,12 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-view-participants-form',
   imports: [
+    ProfilePictureComponent,
     MatTableModule,
     MatSortModule,
     MatPaginatorModule,

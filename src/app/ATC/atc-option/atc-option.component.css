@@ -37,3 +37,39 @@
     color: rgb(3, 48, 63);
     border: 1px solid rgb(3, 48, 63);
   }
+.aiatc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #efe9fc;
+  color: #6c4ad6;
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.aiatc-badge .icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+/* origin badge: tells the specialist whether a draft is the synced server copy or an unsynced local one */
+.source-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #e3f0e6;
+  color: #1d6b34;
+  vertical-align: middle;
+}
+.source-badge.local {
+  background: #fdeccf;
+  color: #9a6206;
+}

@@ -47,7 +47,12 @@
         </ngx-mat-select-search>
         </mat-option>
         <mat-option [value]="null">None</mat-option>
-        <mat-option *ngFor="let doc of filteredProfiles" [value]="doc['profile_id']">{{doc['profile_name']}}</mat-option>
+        <mat-option *ngFor="let doc of filteredProfiles" [value]="doc['profile_id']">
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            <app-profile-picture [profileId]="doc['profile_id']" [name]="doc['profile_name']" [size]="24"></app-profile-picture>
+            <span>{{doc['profile_name']}}</span>
+          </span>
+        </mat-option>
       </mat-select>
     </mat-form-field>
 
@@ -85,7 +90,10 @@
         <div class="participant-row" [class.expanded]="isRowExpanded(token.profile_id)">
           <!-- Sticky participant name column -->
           <div class="participant-name flex-column">
-            <span>{{mapProfile[token.profile_id]}}</span>
+            <span style="display:inline-flex;align-items:center;gap:8px;">
+              <app-profile-picture [profileId]="token.profile_id" [name]="mapProfile[token.profile_id]" [size]="28"></app-profile-picture>
+              <span>{{mapProfile[token.profile_id]}}</span>
+            </span>
             <span>{{token['tokennumber']}}</span>
             <span>Current Stage: &nbsp;&nbsp;{{token['currentstage']}}</span>
             <span>Status : &nbsp;&nbsp;{{ [null,'queued','invited'].includes(token['status']) ? "Queued" : (token['status'] === 'ready' ? "Waiting" : "Live") }}</span>
