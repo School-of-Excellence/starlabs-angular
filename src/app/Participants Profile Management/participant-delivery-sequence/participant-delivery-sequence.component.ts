@@ -82,6 +82,11 @@ export class ParticipantDeliverySequenceComponent {
     guard.getAppointmentMap().then(data => this.mapAppointment = data)
     guard.getRoles().then(async roles => {
       this.developer = roles["developer"] ?? false
+      // Only developers can use the profile switcher, so only they need the
+      // full profile list. Load it in the background — never block render on it.
+      if (this.developer) {
+        this.loadProfileList()
+      }
       // if (roles["admin"] || roles["ah"] || roles["integrator"] || roles["scheduler"] || this.developer) {
       await this.mapData().then(() => {
         route.params.subscribe(data => {
@@ -128,9 +133,11 @@ export class ParticipantDeliverySequenceComponent {
     this.selectedAppointments = []
   }
 
-  async mapData() {
-    // Profile
-    await getDocs(query(collection(this.firestore, "profile_data"), orderBy("name"))).then(profile => {
+  // The full profile list only feeds the "Select Profile" switcher, which is
+  // disabled for non-developers. Load it lazily and in the background so it
+  // never blocks the participant's delivery data from rendering.
+  loadProfileList() {
+    getDocs(query(collection(this.firestore, "profile_data"), orderBy("name"))).then(profile => {
       var data = []
       for (let i = 0; i < profile.docs.length; i++) {
         const doc = profile.docs[i];
@@ -145,6 +152,9 @@ export class ParticipantDeliverySequenceComponent {
       }
       this.profileList = data
     })
+  }
+
+  async mapData() {
     // Journey
     getDocs(collection(this.firestore, "journey")).then(journey => {
       for (let i = 0; i < journey.docs.length; i++) {
@@ -168,8 +178,8 @@ export class ParticipantDeliverySequenceComponent {
           path: apptDoc.ref.path,
           type: "appointment"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Form
     getDocs(query(collection(this.firestore, "delivery forms"), orderBy("formname"))).then(form => {
@@ -180,8 +190,8 @@ export class ParticipantDeliverySequenceComponent {
           path: formDoc.ref.path,
           type: "form"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Report
     getDocs(query(collection(this.firestore, "delivery report"), orderBy("reportname"))).then(report => {
@@ -192,8 +202,8 @@ export class ParticipantDeliverySequenceComponent {
           path: reportDoc.ref.path,
           type: "report"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Event
     getDocs(query(collection(this.firestore, "delivery events"), orderBy("eventname"))).then(event => {
@@ -204,8 +214,8 @@ export class ParticipantDeliverySequenceComponent {
           path: eventDoc.ref.path,
           type: "event"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Queue
     getDocs(query(collection(this.firestore, "delivery queue"), orderBy("queuename"))).then(queue => {
@@ -216,8 +226,8 @@ export class ParticipantDeliverySequenceComponent {
           path: queueDoc.ref.path,
           type: "queue"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Fieldwork
     getDocs(query(collection(this.firestore, "delivery fieldwork"), orderBy("fieldworkname"))).then(fieldwork => {
@@ -228,8 +238,8 @@ export class ParticipantDeliverySequenceComponent {
           path: fieldworkDoc.ref.path,
           type: "fieldwork"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
   }
 
@@ -248,12 +258,29 @@ export class ParticipantDeliverySequenceComponent {
   onProfileSelect() {
     console.log("Pro-", this.selectedProfileid)
     this.getParticipantAppointment()
-    var selectedProfile = this.profileList[this.profileList.findIndex(e => e.id == this.selectedProfileid)]
-    this.profileDataStatus = selectedProfile.status
-    this.sequencechanged = selectedProfile.sequencechanged
-    this.migrationrequired = selectedProfile.migrationrequired
     this.clearProductData()
+    // Load the participant's delivery data immediately — this is the main content.
     this.getParticipantDeliverySequence()
+    // Fetch only THIS profile's status/flags (single doc read) instead of
+    // scanning the whole profile list. Runs in parallel, doesn't block render.
+    this.patchProfileStatus()
+  }
+
+  patchProfileStatus() {
+    // Prefer the already-loaded list (developers) to avoid a redundant read.
+    var cached = this.profileList.find(e => e.id == this.selectedProfileid)
+    if (cached != null) {
+      this.profileDataStatus = cached.status
+      this.sequencechanged = cached.sequencechanged
+      this.migrationrequired = cached.migrationrequired
+      return
+    }
+    getDoc(doc(this.firestore, "profile_data", this.selectedProfileid)).then(snap => {
+      var profiledata = snap.data() ?? {}
+      this.profileDataStatus = profiledata["datastatus"] ?? "Not entered"
+      this.sequencechanged = profiledata["sequencechanged"] ?? false
+      this.migrationrequired = profiledata["migrationrequired"] ?? false
+    })
   }
 
   async getParticipantDeliverySequence() {

@@ -1,0 +1,386 @@
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12h4l3-8 4 16 3-8h4" stroke="#04222a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><h1>Session Telemetry</h1><div class="sub">{{ collectionName }}</div></div>
+    </div>
+    <div class="tabs">
+      <button [class.active]="tab === 'overview'" (click)="setTab('overview')">Overview</button>
+      <button [class.active]="tab === 'sessions'" (click)="setTab('sessions')">Sessions</button>
+    </div>
+    <div class="right">
+      <div class="gstats">
+        <span><b>{{ totalLogs }}</b> logs</span>
+        <span><b>{{ totalSessions }}</b> sessions</span>
+        <span><b>{{ totalErrors }}</b> errors</span>
+        <span><b>{{ users.length }}</b> users</span>
+      </div>
+      <button class="loadbtn" (click)="reload()" [disabled]="loading">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 4v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {{ loading ? 'Loading…' : 'Reload' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================ OVERVIEW TAB ============================ -->
+  <div class="ovscroll" *ngIf="tab === 'overview'">
+    <div class="ovbar">
+      <span class="live"><span class="dot"></span>{{ collectionName }} · snapshot</span>
+      <div class="seg">
+        <button [class.active]="ovPlat === 'all'" (click)="setOvPlat('all')">all</button>
+        <button [class.active]="ovPlat === 'android'" (click)="setOvPlat('android')">android</button>
+        <button [class.active]="ovPlat === 'ios'" (click)="setOvPlat('ios')">ios</button>
+      </div>
+      <div class="seg">
+        <button [class.active]="ovWin === 7" (click)="setOvWin(7)">7d</button>
+        <button [class.active]="ovWin === 30" (click)="setOvWin(30)">30d</button>
+        <button [class.active]="ovWin === 0" (click)="setOvWin(0)">all</button>
+      </div>
+    </div>
+
+    <div class="empty" *ngIf="loading">loading telemetry…</div>
+    <div class="empty" *ngIf="!loading && error">{{ error }}</div>
+    <div class="empty" *ngIf="!loading && !error && !ovView">no telemetry in this range</div>
+
+    <ng-container *ngIf="!loading && !error && ovView as o">
+      <!-- health snapshot -->
+      <div class="sec"><h2>Health snapshot</h2><div class="hint">{{ ovWin ? 'last ' + ovWin + ' days' : 'all time' }} · {{ ovPlat === 'all' ? 'all platforms' : ovPlat }}</div></div>
+      <div class="kpis">
+        <div class="kpi" *ngFor="let c of o.kpis" [style.--accent]="c.accent">
+          <div class="l"><span class="ki" [innerHTML]="ovIconSafe[c.icon]"></span>{{ c.label }}</div>
+          <div class="v" [ngClass]="c.vclass">{{ c.value }}</div>
+          <div class="d">{{ c.sub }}</div>
+        </div>
+      </div>
+
+      <!-- trends -->
+      <div class="sec"><h2>Trends</h2><div class="hint">where the volume &amp; pain is</div></div>
+      <div class="grid g-2-1">
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['bolt']"></div><div class="t">Activity over time</div><div class="meta">stacked by severity</div></div>
+          <div class="legend" style="margin-bottom:12px">
+            <span><i style="background:#60a5fa"></i>info</span><span><i style="background:#fbbf24"></i>warning</span><span><i style="background:#f87171"></i>error</span><span><i style="background:#ef4444"></i>fatal</span>
+          </div>
+          <div class="tl-wrap">
+            <div class="tl-ymax">{{ o.tlMax }}/day</div>
+            <div class="tl">
+              <div class="tl-col" *ngFor="let col of o.tlCols" [title]="col.title">
+                <div class="tl-seg" *ngFor="let s of col.segs" [style.height.%]="s.h" [style.background]="s.color"></div>
+              </div>
+            </div>
+            <div class="tl-x"><span *ngFor="let col of o.tlCols">{{ col.label }}</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['layers']"></div><div class="t">Logs by type</div><div class="meta">{{ o.totalDisp }} total</div></div>
+          <div class="donut-row">
+            <div class="donut">
+              <svg viewBox="0 0 140 140">
+                <circle r="54" cx="70" cy="70" fill="none" stroke="#1f2430" stroke-width="15"/>
+                <circle *ngFor="let s of o.typeDonut.segs" r="54" cx="70" cy="70" fill="none" [attr.stroke]="s.color" stroke-width="15" [attr.stroke-dasharray]="s.dash" [attr.stroke-dashoffset]="s.offset" transform="rotate(-90 70 70)"/>
+              </svg>
+              <div class="donut-c"><div class="dc-v">{{ o.totalDisp }}</div><div class="dc-s">logs</div></div>
+            </div>
+            <div class="dlist">
+              <div class="di" *ngFor="let s of o.typeDonut.segs"><i [style.background]="s.color"></i><span class="dn">{{ s.label }}</span><span class="dv">{{ s.value }}</span><span class="dp">{{ s.pct }}%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- crashes / delays / network -->
+      <div class="sec"><h2>Crashes · delays · network</h2><div class="hint">what to fix first</div></div>
+      <div class="grid g-3">
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['crash']"></div><div class="t">Top crashes &amp; errors</div><div class="meta">by occurrences</div></div>
+          <ng-container *ngIf="o.sigList.length; else noSig">
+            <div class="sig-item" *ngFor="let g of o.sigList">
+              <div class="sig-top"><span class="badge" [ngClass]="g.fatal ? 'b-fatal' : 'b-error'">{{ g.errorType }}</span><span class="sig-msg">{{ g.msg }}</span><span class="sig-cnt" [style.color]="g.fatal ? 'var(--red-deep)' : 'var(--red)'">{{ g.count }}</span></div>
+              <div class="sig-sub"><span><b>{{ g.users }}</b> users</span><span>last <b>{{ g.last }}</b></span></div>
+            </div>
+          </ng-container>
+          <ng-template #noSig><div class="nores" style="padding:18px 0">no errors in range 🎉</div></ng-template>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['clock']"></div><div class="t">Slowest screens</div><div class="meta">p95 load time</div></div>
+          <div class="bars" *ngIf="o.slowScreens.length; else noSlow">
+            <div class="bar" *ngFor="let b of o.slowScreens">
+              <div class="bar-h"><span class="bar-l">{{ b.label }}</span><span class="bar-v">{{ b.disp }}</span></div>
+              <div class="bar-t"><div class="bar-f" [style.width.%]="b.pct" [style.background]="b.color"></div></div>
+              <div class="bar-s">{{ b.sub }}</div>
+            </div>
+          </div>
+          <ng-template #noSlow><div class="nores" style="padding:18px 0">no load samples</div></ng-template>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['wifi']"></div><div class="t">Network health</div><div class="meta">{{ o.netCount }} calls</div></div>
+          <div class="codes">
+            <div class="code-row" *ngFor="let c of o.codeRows"><span class="code-k">{{ c.k }}</span><div class="code-t"><div class="code-f" [style.width.%]="c.pct" [style.background]="c.color"></div></div><span class="code-v">{{ c.v }}</span></div>
+          </div>
+          <div class="mini-stats">
+            <div class="ms"><div class="l">slow rate</div><div class="v" [style.color]="o.slowRate >= 10 ? 'var(--amber)' : 'var(--green)'">{{ o.slowRate }}%</div></div>
+            <div class="ms"><div class="l">p95 latency</div><div class="v" [ngClass]="o.p95Class">{{ o.p95lat }}ms</div></div>
+            <div class="ms"><div class="l">avg latency</div><div class="v">{{ o.avgLat }}ms</div></div>
+            <div class="ms"><div class="l">offline events</div><div class="v" [style.color]="o.offline ? 'var(--amber)' : 'var(--green)'">{{ o.offline }}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- navigation / audience -->
+      <div class="sec"><h2>Navigation · audience</h2><div class="hint">where users go &amp; what they run</div></div>
+      <div class="grid g-3">
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['nav']"></div><div class="t">Top screens</div><div class="meta">by navigations</div></div>
+          <div class="bars">
+            <div class="bar" *ngFor="let b of o.topScreens">
+              <div class="bar-h"><span class="bar-l">{{ b.label }}</span><span class="bar-v">{{ b.value }}</span></div>
+              <div class="bar-t"><div class="bar-f" [style.width.%]="b.pct" style="background:var(--blue)"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['device']"></div><div class="t">Platform &amp; app version</div><div class="meta">unique users</div></div>
+          <div class="donut-row">
+            <div class="donut">
+              <svg viewBox="0 0 140 140">
+                <circle r="54" cx="70" cy="70" fill="none" stroke="#1f2430" stroke-width="15"/>
+                <circle *ngFor="let s of o.platDonut.segs" r="54" cx="70" cy="70" fill="none" [attr.stroke]="s.color" stroke-width="15" [attr.stroke-dasharray]="s.dash" [attr.stroke-dashoffset]="s.offset" transform="rotate(-90 70 70)"/>
+              </svg>
+              <div class="donut-c"><div class="dc-v">{{ o.users }}</div><div class="dc-s">users</div></div>
+            </div>
+            <div class="dlist">
+              <div class="di" *ngFor="let s of o.platDonut.segs"><i [style.background]="s.color"></i><span class="dn">{{ s.label }}</span><span class="dv">{{ s.value }}</span><span class="dp">{{ s.pct }}%</span></div>
+            </div>
+          </div>
+          <div class="bars" style="margin-top:16px">
+            <div class="bar" *ngFor="let b of o.verItems">
+              <div class="bar-h"><span class="bar-l">{{ b.label }}</span><span class="bar-v">{{ b.disp }}</span></div>
+              <div class="bar-t"><div class="bar-f" [style.width.%]="b.pct" style="background:var(--signal)"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['pkg']"></div><div class="t">Top devices</div><div class="meta">unique users</div></div>
+          <div class="bars">
+            <div class="bar" *ngFor="let b of o.devItems">
+              <div class="bar-h"><span class="bar-l">{{ b.label }}</span><span class="bar-v">{{ b.disp }}</span></div>
+              <div class="bar-t"><div class="bar-f" [style.width.%]="b.pct" style="background:var(--violet)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- crashes & errors table -->
+      <div class="sec"><h2>Crashes &amp; errors</h2><div class="hint">click a row to see its stack trace · search, filter &amp; sort</div></div>
+      <div class="panel">
+        <div class="panel-h"><div class="ic" [innerHTML]="ovIconSafe['crash']"></div><div class="t">Crashes &amp; errors</div><div class="meta">{{ feedVM.total }} in range</div></div>
+
+        <div class="feed-ctl">
+          <div class="feed-search">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input [(ngModel)]="feedSearch" (ngModelChange)="onFeedSearch()" placeholder="Search message, type, user, screen…" />
+          </div>
+          <div class="seg">
+            <button [class.active]="feedLevel === 'all'" (click)="setFeedLevel('all')">all</button>
+            <button [class.active]="feedLevel === 'error'" (click)="setFeedLevel('error')">error</button>
+            <button [class.active]="feedLevel === 'fatal'" (click)="setFeedLevel('fatal')">fatal</button>
+          </div>
+        </div>
+
+        <table class="feed feed2">
+          <thead>
+            <tr>
+              <th class="cw"></th>
+              <th class="sortable" (click)="setFeedSort('time')">time <span class="sarr" *ngIf="feedSort === 'time'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th class="sortable" (click)="setFeedSort('user')">user <span class="sarr" *ngIf="feedSort === 'user'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th class="sortable" (click)="setFeedSort('type')">type <span class="sarr" *ngIf="feedSort === 'type'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th class="sortable" (click)="setFeedSort('screen')">screen <span class="sarr" *ngIf="feedSort === 'screen'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th>message</th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let r of feedVM.rows">
+              <tr class="frow" [class.exp]="feedExpanded.has(r.id)" (click)="toggleFeedRow(r.id)">
+                <td class="cw"><span class="rchev" [class.open]="feedExpanded.has(r.id)"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
+                <td class="tm">{{ r.time }}<br><span style="color:var(--low)">{{ r.rel }}</span></td>
+                <td><div class="usr"><div class="ava">{{ r.initials }}</div><div>{{ r.name }}<br><span style="font-family:var(--mono);font-size:10px;color:var(--low)">{{ r.platform }}</span></div></div></td>
+                <td><span class="badge" [ngClass]="r.fatal ? 'b-fatal' : 'b-error'">{{ r.errorType }}</span></td>
+                <td class="scr">{{ r.route }}</td>
+                <td class="msg" [title]="r.msg">{{ r.msg }}</td>
+              </tr>
+              <tr class="fdetail" *ngIf="feedExpanded.has(r.id)">
+                <td colspan="6">
+                  <div class="fd-wrap">
+                    <div class="fd-meta">
+                      <span><span class="k">level</span> <span class="badge" [ngClass]="r.fatal ? 'b-fatal' : 'b-error'">{{ r.level }}</span></span>
+                      <span><span class="k">errorType</span> {{ r.errorType }}</span>
+                      <span *ngIf="r.source"><span class="k">source</span> {{ r.source }}</span>
+                      <span><span class="k">screen</span> {{ r.route }}</span>
+                      <span><span class="k">session</span> {{ r.sessionId }}</span>
+                      <span><span class="k">when</span> {{ r.date }} {{ r.time }}</span>
+                    </div>
+                    <div class="fd-msg">{{ r.msg }}</div>
+                    <div class="fd-st">
+                      <div class="fd-st-h">stack trace</div>
+                      <pre *ngIf="r.stackTrace; else noStack">{{ r.stackTrace }}</pre>
+                      <ng-template #noStack><div class="fd-nost">no stack trace captured for this event</div></ng-template>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+            <tr *ngIf="!feedVM.rows.length"><td colspan="6"><div class="nores" style="padding:22px 0;text-align:center">no events match your search / filters</div></td></tr>
+          </tbody>
+        </table>
+
+        <div class="feed-pg" *ngIf="feedVM.total">
+          <span class="pg-info">showing {{ feedVM.from }}–{{ feedVM.to }} of {{ feedVM.total }}</span>
+          <div class="pg-btns">
+            <button (click)="feedPrev()" [disabled]="feedVM.page === 0">‹ prev</button>
+            <span class="pg-cur">page {{ feedVM.page + 1 }} / {{ feedVM.pageCount }}</span>
+            <button (click)="feedNext()" [disabled]="feedVM.page >= feedVM.pageCount - 1">next ›</button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- ============================ SESSIONS TAB ============================ -->
+  <div class="split" *ngIf="tab === 'sessions'">
+    <div class="rail">
+      <div class="rail-head">
+        <div class="t">{{ users.length }} users · {{ totalSessions }} sessions · {{ totalLogs }} logs</div>
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input [(ngModel)]="query" placeholder="Find user or device…" />
+        </div>
+      </div>
+      <div class="users">
+        <div class="uitem" *ngFor="let r of railUsers" [class.active]="r.idx === ui" (click)="selectUser(r.idx)">
+          <div class="ava">{{ r.initials }}<span class="stat" [ngClass]="r.sev"></span></div>
+          <div class="uinfo"><div class="n">{{ r.name }}</div><div class="s">{{ r.deviceModel }}</div></div>
+          <div class="ucount"><b>{{ r.sessionCount }}</b> sess<br>{{ r.totalLogs }} logs</div>
+        </div>
+        <div *ngIf="!railUsers.length" style="padding:24px;text-align:center;color:var(--low);font-family:var(--mono);font-size:12px">
+          {{ loading ? 'loading…' : 'no match' }}
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="empty" *ngIf="loading">loading telemetry…</div>
+      <div class="empty" *ngIf="!loading && error">{{ error }}</div>
+      <div class="empty" *ngIf="!loading && !error && !mainVM">select a user</div>
+
+      <ng-container *ngIf="!loading && !error && mainVM as m">
+        <div class="uhead">
+          <div class="ava">{{ m.initials }}<span class="stat" [ngClass]="m.sev"></span></div>
+          <div class="uh-info">
+            <h2>{{ m.name }}</h2>
+            <div class="ids">
+              <span><span class="k">device</span> {{ m.device }}</span>
+              <span><span class="k">os</span> {{ m.os }}</span>
+              <span><span class="k">app</span> v{{ m.appVersion }}</span>
+              <span><span class="k">profile</span> {{ m.profileid }}</span>
+            </div>
+          </div>
+          <div class="pillset">
+            <span class="status-pill" [ngClass]="m.sev"><span class="d"></span>{{ m.sevText }}</span>
+            <span class="env-tag">{{ m.environment }} · {{ m.platform }}</span>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat-cell"><div class="l">Sessions</div><div class="v sig">{{ m.sessionCount }}</div></div>
+          <div class="stat-cell"><div class="l">Total logs</div><div class="v">{{ m.totalLogs }}</div></div>
+          <div class="stat-cell"><div class="l">Active days</div><div class="v">{{ m.activeFrom }} – {{ m.activeTo }}</div></div>
+          <div class="stat-cell"><div class="l">Errors / fatal</div><div class="v" [ngClass]="m.errCls">{{ m.errors }} / {{ m.fatals }}</div></div>
+          <div class="stat-cell"><div class="l">Last network</div><div class="v" [ngClass]="m.networkCls">{{ m.networkVal }}</div></div>
+          <div class="stat-cell"><div class="l">Locale</div><div class="v">{{ m.locale }}</div></div>
+        </div>
+
+        <div class="controls">
+          <div class="ctl">
+            <span class="gl">date range</span>
+            <div class="daterow">
+              <input type="date" [min]="selUser?.dateMin" [max]="selUser?.dateMax" [(ngModel)]="from" (ngModelChange)="recomputeMain()">
+              <span class="arr">→</span>
+              <input type="date" [min]="selUser?.dateMin" [max]="selUser?.dateMax" [(ngModel)]="to" (ngModelChange)="recomputeMain()">
+              <button class="resetbtn" (click)="resetDates()">reset</button>
+            </div>
+          </div>
+          <div class="ctl">
+            <span class="gl">type</span>
+            <div class="chiprow">
+              <button class="chipf" *ngFor="let t of typeChips" [class.active]="fType === t.k" (click)="setType(t.k)">
+                <span class="dotleg" *ngIf="t.c" [style.background]="t.c"></span>{{ t.label }}<span class="n">{{ m.tC[t.k] || 0 }}</span>
+              </button>
+            </div>
+          </div>
+          <div class="ctl">
+            <span class="gl">level</span>
+            <div class="chiprow">
+              <button class="chipf" *ngFor="let lv of levelChips" [class.active]="fLevel === lv.k" (click)="setLevel(lv.k)">
+                <span class="dotleg" *ngIf="lv.c" [style.background]="lv.c"></span>{{ lv.label }}<span class="n">{{ m.lC[lv.k] || 0 }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="tznote">{{ m.tznote }}</div>
+
+        <ng-container *ngIf="m.sessions.length; else noSess">
+          <div class="sess" *ngFor="let s of m.sessions" [class.open]="s.open">
+            <div class="sess-head" (click)="toggleSession(s.sessionId)">
+              <span class="chev"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <div class="sess-when">
+                <div class="rng">{{ s.rng }}<span class="dur">{{ s.dur }}</span></div>
+                <div class="meta"><span><span class="k">session</span> {{ s.sessionId }}</span><span><span class="k">screens</span> {{ s.screens }}</span><span><span class="k">logs</span> {{ s.logsCount }}</span></div>
+              </div>
+              <div class="sess-right">
+                <div class="typedots">
+                  <span *ngIf="s.dots.nav"><i style="background:var(--blue)"></i>{{ s.dots.nav }}</span>
+                  <span *ngIf="s.dots.net"><i style="background:var(--violet)"></i>{{ s.dots.net }}</span>
+                  <span *ngIf="s.dots.evt"><i style="background:var(--green)"></i>{{ s.dots.evt }}</span>
+                  <span *ngIf="s.dots.err"><i style="background:var(--red)"></i>{{ s.dots.err }}</span>
+                </div>
+                <span class="mini-pill" [ngClass]="s.sev">{{ s.sevText }}</span>
+              </div>
+            </div>
+
+            <div class="sess-body" *ngIf="s.open">
+              <div class="crumbline" *ngIf="s.crumbs.length">
+                <ng-container *ngFor="let c of s.crumbs; let i = index">
+                  <span class="crumb" [class.origin]="c.origin" [class.last]="c.last">{{ c.text }}</span>
+                  <span class="carrow" *ngIf="i < s.crumbs.length - 1"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </ng-container>
+              </div>
+
+              <div class="timeline" *ngIf="s.steps.length; else noEvents">
+                <div class="step" *ngFor="let st of s.steps" [class.last]="st.last">
+                  <div class="time"><div class="abs">{{ st.abs }}</div><div class="rel">{{ st.rel }}</div></div>
+                  <div class="node-col"><div class="node" [ngClass]="'lv-' + st.level" [innerHTML]="st.iconHtml"></div></div>
+                  <div class="bd">
+                    <div class="card" [ngClass]="st.cardCls">
+                      <div class="card-top"><span class="typebadge" [ngClass]="'tb-' + st.type">{{ st.type }}</span><span class="title">{{ st.title }}</span></div>
+                      <div class="chips">
+                        <span class="chip" *ngFor="let ch of st.chips" [ngClass]="ch.cls">
+                          <svg *ngIf="ch.clock" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>{{ ch.text }}
+                        </span>
+                      </div>
+                      <details class="stack" *ngIf="st.stackTrace">
+                        <summary><svg class="tw" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>view stack trace</summary>
+                        <pre>{{ st.stackTrace }}</pre>
+                      </details>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <ng-template #noEvents><div class="nores">no events match the current filters</div></ng-template>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #noSess><div class="nores" style="padding:30px;text-align:center">no sessions in this date range</div></ng-template>
+      </ng-container>
+    </div>
+  </div>
+</div>

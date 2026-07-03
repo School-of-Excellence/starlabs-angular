@@ -1,0 +1,229 @@
+<div class="sn-wrap">
+
+  <!-- Header -->
+  <div class="sn-header">
+    <div>
+      <h1>Sales Numbers</h1>
+    </div>
+    <a mat-stroked-button color="primary" class="sn-btn-secondary" routerLink="/sales-teams">
+      <mat-icon>groups</mat-icon> Manage Teams
+    </a>
+  </div>
+
+  <!-- Toolbar: controls + filters in one cohesive card -->
+  <div class="sn-toolbar">
+  <!-- Controls -->
+  <div class="sn-controls">
+    <div class="sn-control-group">
+      <span class="sn-label">Time frame</span>
+      <mat-button-toggle-group [(ngModel)]="timeframe" (change)="reload()" hideSingleSelectionIndicator>
+        <mat-button-toggle value="last7">7 Days</mat-button-toggle>
+        <mat-button-toggle value="last30">30 Days</mat-button-toggle>
+        <mat-button-toggle value="month">Month range</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    <div class="sn-control-group" *ngIf="timeframe === 'month'">
+      <mat-form-field appearance="outline" class="sn-date" floatLabel="always" subscriptSizing="dynamic">
+        <mat-label>From</mat-label>
+        <input matInput [matDatepicker]="fromPicker" [(ngModel)]="monthStart" (dateChange)="onMonthRangeChange()" placeholder="Start date">
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromPicker></mat-datepicker>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="sn-date" floatLabel="always" subscriptSizing="dynamic">
+        <mat-label>To</mat-label>
+        <input matInput [matDatepicker]="toPicker" [(ngModel)]="monthEnd" (dateChange)="onMonthRangeChange()" placeholder="End date">
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+        <mat-datepicker #toPicker></mat-datepicker>
+      </mat-form-field>
+    </div>
+
+    <div class="sn-control-group">
+      <span class="sn-label">Metric</span>
+      <mat-button-toggle-group [(ngModel)]="metric" (change)="recompute()" hideSingleSelectionIndicator>
+        <mat-button-toggle value="gsv">GSV</mat-button-toggle>
+        <mat-button-toggle value="asv">ASV</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    <div class="sn-control-group sn-right">
+      <span class="sn-label">View by</span>
+      <mat-button-toggle-group [(ngModel)]="view" (change)="recompute()" hideSingleSelectionIndicator>
+        <mat-button-toggle value="person">Sales Person</mat-button-toggle>
+        <mat-button-toggle value="team">Team</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="sn-filters" *ngIf="data">
+    <div class="sn-filter-grid">
+      <mat-form-field appearance="outline" class="sn-filter" floatLabel="always" subscriptSizing="dynamic">
+        <mat-label>Source</mat-label>
+        <mat-select multiple [(ngModel)]="filters.sources" (selectionChange)="onFilterChange()" placeholder="All sources">
+          <mat-option *ngFor="let s of data.sources" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sn-filter" floatLabel="always" subscriptSizing="dynamic">
+        <mat-label>Original Source</mat-label>
+        <mat-select multiple [(ngModel)]="filters.originalSources" (selectionChange)="onFilterChange()" placeholder="All original sources">
+          <mat-option *ngFor="let s of data.originalSources" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sn-filter" floatLabel="always" subscriptSizing="dynamic">
+        <mat-label>Sales Person</mat-label>
+        <mat-select multiple [(ngModel)]="filters.salespeople" (selectionChange)="onFilterChange()" placeholder="All salespeople">
+          <mat-option *ngFor="let p of data.salespeople" [value]="p">{{ p }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sn-filter" floatLabel="always" subscriptSizing="dynamic">
+        <mat-label>Team</mat-label>
+        <mat-select [(ngModel)]="filters.team" (selectionChange)="onFilterChange()" placeholder="All teams">
+          <mat-option value="">All teams</mat-option>
+          <mat-option *ngFor="let t of data.teams" [value]="t">{{ t }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <button mat-button class="sn-btn-secondary" (click)="clearFilters()"><mat-icon>clear</mat-icon> Clear</button>
+  </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="sn-loading" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <ng-container *ngIf="!loading && data">
+
+    <!-- active-team chip: cards below are scoped to this team -->
+    <div class="sn-active-team" *ngIf="activeTeam">
+      <mat-icon>groups</mat-icon>
+      <span>Scoped to <strong>{{ activeTeam }}</strong></span>
+      <button mat-icon-button aria-label="Clear team" (click)="filters.team = ''; onFilterChange()"><mat-icon>close</mat-icon></button>
+    </div>
+
+    <!-- Product-segment cards: Ecosystem / DFU / FTO + Gift / All (each honours all filters incl. team) -->
+    <div class="sn-segs">
+      <mat-card class="sn-seg" *ngFor="let s of data.segments" [style.background]="segWash(s.group)">
+        <div class="sn-seg-head">
+          <span class="sn-seg-icon" [style.background]="segColor(s.group)"><mat-icon>{{ segIcon(s.group) }}</mat-icon></span>
+          <span class="sn-seg-name">{{ s.group }}</span>
+        </div>
+        <span class="sn-seg-total" [style.color]="segColor(s.group)">{{ activeCount(s) }}</span>
+        <span class="sn-seg-value">{{ inr(activeValue(s)) }} {{ metric === 'asv' ? 'assured' : 'gross' }}</span>
+        <div class="sn-seg-split">
+          <div class="sn-seg-row"><span>New</span><span>{{ newCount(s) }}</span></div>
+          <div class="sn-seg-row"><span>Upgrade</span><span>{{ upgradeCount(s) }}</span></div>
+          <div class="sn-seg-row"><span>Add-on</span><span>{{ addonsCount(s) }}</span></div>
+        </div>
+        <div class="sn-seg-foot">
+          <div class="sn-seg-row"><span>Cancelled</span><span class="neg">{{ activeCancelledCount(s) }}</span></div>
+          <div class="sn-seg-row"><span>Net</span><span class="pos">{{ activeNetCount(s) }}</span></div>
+        </div>
+      </mat-card>
+
+      <mat-card class="sn-seg sn-seg-all" [style.background]="segWash('All')">
+        <div class="sn-seg-head">
+          <span class="sn-seg-icon" [style.background]="segColor('All')"><mat-icon>functions</mat-icon></span>
+          <span class="sn-seg-name">All sales</span>
+          <span class="sn-seg-badge">Total</span>
+        </div>
+        <span class="sn-seg-total" [style.color]="segColor('All')">{{ activeCount(data.allSegment) }}</span>
+        <span class="sn-seg-value">{{ inr(activeValue(data.allSegment)) }} {{ metric === 'asv' ? 'assured' : 'gross' }}</span>
+        <div class="sn-seg-split">
+          <div class="sn-seg-row"><span>New</span><span>{{ newCount(data.allSegment) }}</span></div>
+          <div class="sn-seg-row"><span>Upgrade</span><span>{{ upgradeCount(data.allSegment) }}</span></div>
+          <div class="sn-seg-row"><span>Add-on</span><span>{{ addonsCount(data.allSegment) }}</span></div>
+        </div>
+        <div class="sn-seg-foot">
+          <div class="sn-seg-row"><span>Cancelled</span><span class="neg">{{ activeCancelledCount(data.allSegment) }}</span></div>
+          <div class="sn-seg-row"><span>Net</span><span class="pos">{{ activeNetCount(data.allSegment) }}</span></div>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- GSV vs ASV by group -->
+    <mat-card class="sn-panel">
+      <h2>{{ view === 'team' ? 'By Team' : 'By Sales Person' }} — {{ metricHeader }}</h2>
+      <table mat-table [dataSource]="data.groups" class="sn-table">
+        <ng-container matColumnDef="group">
+          <th mat-header-cell *matHeaderCellDef>{{ view === 'team' ? 'Team' : 'Sales Person' }}</th>
+          <td mat-cell *matCellDef="let g">{{ g.group }}</td>
+          <td mat-footer-cell *matFooterCellDef>All</td>
+        </ng-container>
+        <ng-container matColumnDef="sales">
+          <th mat-header-cell *matHeaderCellDef class="sn-num">{{ metricHeader }}</th>
+          <td mat-cell *matCellDef="let g" class="sn-num">{{ activeCount(g) }}<span class="sn-cell-sub">{{ inr(activeValue(g)) }}</span></td>
+          <td mat-footer-cell *matFooterCellDef class="sn-num">{{ activeCount(data.totals) }}<span class="sn-cell-sub">{{ inr(activeValue(data.totals)) }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="cancelled">
+          <th mat-header-cell *matHeaderCellDef class="sn-num">Cancelled</th>
+          <td mat-cell *matCellDef="let g" class="neg sn-num">{{ activeCancelledCount(g) }}<span class="sn-cell-sub">{{ inr(activeCancelledValue(g)) }}</span></td>
+          <td mat-footer-cell *matFooterCellDef class="neg sn-num">{{ activeCancelledCount(data.totals) }}<span class="sn-cell-sub">{{ inr(activeCancelledValue(data.totals)) }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="net">
+          <th mat-header-cell *matHeaderCellDef class="sn-num">Net</th>
+          <td mat-cell *matCellDef="let g" class="pos sn-num">{{ activeNetCount(g) }}<span class="sn-cell-sub">{{ inr(activeNet(g)) }}</span></td>
+          <td mat-footer-cell *matFooterCellDef class="pos sn-num">{{ activeNetCount(data.totals) }}<span class="sn-cell-sub">{{ inr(activeNet(data.totals)) }}</span></td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="groupColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: groupColumns"></tr>
+        <tr mat-footer-row *matFooterRowDef="groupColumns" class="sn-total-row"></tr>
+      </table>
+      <p class="sn-empty" *ngIf="!data.groups.length">No sales in this range for the selected filters.</p>
+    </mat-card>
+
+    <!-- By Source breakdown -->
+    <mat-card class="sn-panel">
+      <h2>By Source — {{ metricHeader }}</h2>
+      <table mat-table [dataSource]="data.bySource" class="sn-table">
+        <ng-container matColumnDef="group">
+          <th mat-header-cell *matHeaderCellDef>Source</th>
+          <td mat-cell *matCellDef="let g">{{ g.group }}</td>
+          <td mat-footer-cell *matFooterCellDef>All</td>
+        </ng-container>
+        <ng-container matColumnDef="sales">
+          <th mat-header-cell *matHeaderCellDef class="sn-num">{{ metricHeader }}</th>
+          <td mat-cell *matCellDef="let g" class="sn-num">{{ activeCount(g) }}<span class="sn-cell-sub">{{ inr(activeValue(g)) }}</span></td>
+          <td mat-footer-cell *matFooterCellDef class="sn-num">{{ activeCount(data.totals) }}<span class="sn-cell-sub">{{ inr(activeValue(data.totals)) }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="cancelled">
+          <th mat-header-cell *matHeaderCellDef class="sn-num">Cancelled</th>
+          <td mat-cell *matCellDef="let g" class="neg sn-num">{{ activeCancelledCount(g) }}<span class="sn-cell-sub">{{ inr(activeCancelledValue(g)) }}</span></td>
+          <td mat-footer-cell *matFooterCellDef class="neg sn-num">{{ activeCancelledCount(data.totals) }}<span class="sn-cell-sub">{{ inr(activeCancelledValue(data.totals)) }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="net">
+          <th mat-header-cell *matHeaderCellDef class="sn-num">Net</th>
+          <td mat-cell *matCellDef="let g" class="pos sn-num">{{ activeNetCount(g) }}<span class="sn-cell-sub">{{ inr(activeNet(g)) }}</span></td>
+          <td mat-footer-cell *matFooterCellDef class="pos sn-num">{{ activeNetCount(data.totals) }}<span class="sn-cell-sub">{{ inr(activeNet(data.totals)) }}</span></td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="groupColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: groupColumns"></tr>
+        <tr mat-footer-row *matFooterRowDef="groupColumns" class="sn-total-row"></tr>
+      </table>
+      <p class="sn-empty" *ngIf="!data.bySource.length">No sales in this range for the selected filters.</p>
+    </mat-card>
+
+    <!-- Sales vs Cancellations per month -->
+    <mat-card class="sn-panel">
+      <h2>Sales vs Cancellations per Month</h2>
+      <apx-chart
+        [series]="chartSeries"
+        [chart]="chartDetails"
+        [xaxis]="chartXaxis"
+        [colors]="chartColors"
+        [plotOptions]="chartPlotOptions"
+        [dataLabels]="chartDataLabels"
+        [legend]="chartLegend"
+        [grid]="chartGrid">
+      </apx-chart>
+    </mat-card>
+
+  </ng-container>
+</div>

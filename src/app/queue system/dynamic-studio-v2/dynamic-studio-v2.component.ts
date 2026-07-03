@@ -1,5 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef, QueryList, ElementRef, ViewChildren, ViewChild, NgZone, TemplateRef, inject } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -9,6 +9,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { collection, collectionData, doc, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -45,6 +46,7 @@ export class DynamicStudioV2Component {
   @ViewChild('formDialogTpl') formDialogTpl!: TemplateRef<any>;
   @ViewChild('atcDialogTpl') atcDialogTpl!: TemplateRef<any>;
   @ViewChild('checkinConflictTpl') checkinConflictTpl!: TemplateRef<any>;
+  @ViewChild('chatScroll') chatScroll: ElementRef
   profileRoles = {}
   profileid = null
   mapProfile = {}
@@ -208,6 +210,19 @@ export class DynamicStudioV2Component {
   private lastStepSignature: string = ''
   private userNavigated: boolean = false
   private lastAssignmentId: string = ''
+  //Chat
+  isChatOpen = false
+  chatMessages: any[] = []
+  chatText = ''
+  chatAttachedFiles: any[] = []
+  chatUploading = false
+  chatHasMore = false
+  hasUnreadChat = false
+  unreadChatCount = 0
+  private allChatMessages: any[] = []
+  private chatDisplayCount = 10
+  private chatUnreadSub: Subscription = null
+  private chatLiveSub: Subscription = null
 
   // Sidebar profile collapse state (Milestone/Product/Variation/Journey rows)
   sidebarProfileOpen: boolean = true
@@ -258,6 +273,7 @@ export class DynamicStudioV2Component {
     const sig = la['docid'] + '|' + la['stagename'] + '|' + (la['token']?.['docid'] ?? 'pending')
     if (sig === this.widgetFetchSignature) return  // already loaded this combination
     this.widgetFetchSignature = sig
+    this.initChatThread()
 
     // New assignment/stage → reset per-session action state so confirmations
     // from a previous participant don't carry over.
@@ -926,7 +942,8 @@ export class DynamicStudioV2Component {
     public formbuilder: FormBuilder,
     private ngZone: NgZone,
     private route: ActivatedRoute,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private storage: Storage
   ) {
     const overrideProfileId = this.route.snapshot.queryParamMap.get('profileid')
     var loading = this.dialog.open(LoadingProgressComponent, {
@@ -1051,10 +1068,13 @@ export class DynamicStudioV2Component {
     // Start the studio-presence heartbeat. It writes only when there is a
     // currently selected studio with a live assignment, so an idle / empty
     // studio screen produces no writes.
-    this.startStudioPresence()
+      this.startStudioPresence()
+      this.requestNotificationPermission()
   }
 
   ngOnDestroy(){
+   this.chatUnreadSub?.unsubscribe()
+   this.chatLiveSub?.unsubscribe()
    // takeUntil tears down only on a notifier `next` — emitting it BEFORE
    // `complete()` is what actually unsubscribes every takeUntil(subscriptionHandle)
    // stream. The previous order (complete() then next()) left ~18 realtime
@@ -1087,15 +1107,11 @@ export class DynamicStudioV2Component {
     })
   }
 
-  processMessage(message: string): string {
+  processMessage(message: string, linkColor: string = '#1a56db'): SafeHtml {
     if (!message) return '';
-    
-    // Handle linebreaks and links in one go
     let processed = message.replace(/\n/g, '<br>');
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    processed = processed.replace(urlRegex, '<a href="$1" target="_blank">$1</a>');
-    
-    return processed;
+    processed = processed.replace(urlRegex, `<a href="$1" target="_blank" rel="noopener" style="color:${linkColor};word-break:break-word;overflow-wrap:anywhere;">$1</a>`);    return this.sanitizer.bypassSecurityTrustHtml(processed);
   }
 
   resetSubscription(){
@@ -1446,6 +1462,7 @@ export class DynamicStudioV2Component {
   }
 
   async getStudio(){
+    await this.clearChatThread()
     this.selectedStudio = {}
     this.liveAssignment = null
     this.isLoadingStudios = true;
@@ -1710,10 +1727,12 @@ export class DynamicStudioV2Component {
       data: {msg: "Setting up Studio..."},
       disableClose: true
     })
+    await this.clearChatThread()
     this.selectedParticipant = false
     this.selectedStudio = studio
     console.log(this.selectedStudio)
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
+    this.initChatThread()
     console.log(this.liveAssignment, 'this.liveAssignment');
     // Switching the active studio changes which invitations count as
     // "another studio's" — re-derive the chip map.
@@ -2395,6 +2414,7 @@ export class DynamicStudioV2Component {
             status: null,
           })
         }
+        await this.clearChatThread()
         this.snackBar.open('Participant moved back to the queue.', 'OK', { duration: 2500 })
       } catch(err) {
         console.error("[moveBackToQueue] failed", err)
@@ -2598,6 +2618,7 @@ export class DynamicStudioV2Component {
             await updateDoc(doc(this.firestore,"queue studio pairing",studioid),{
               status: null,
             })
+            await this.clearChatThread()
             loading.close()
           }
         })
@@ -2681,6 +2702,7 @@ export class DynamicStudioV2Component {
     await updateDoc(doc(this.firestore,"queue studio pairing",studioid),{
       status: null,
     })
+    await this.clearChatThread()
     this.liveAssignment = null
   }
 
@@ -4277,4 +4299,291 @@ export class DynamicStudioV2Component {
       console.log(err)
     }
   }
+
+  async initChatThread() {
+    if (!this.selectedStudio['docid']) return
+    const threadRef = doc(this.firestore, 'studio_chat', this.selectedStudio['docid'])
+    const snap = await getDoc(threadRef)
+    const liveassignementId = this.liveAssignment?.['docid'] ?? null
+    const participants = this.selectedStudio['participants'] ?? []
+    const specialistid = {}
+    const participantid = this.liveAssignment?.['participantid'] ?? null
+    if (this.liveAssignment) {
+      ;[...(this.liveAssignment['pairing'] ?? []), ...Object.keys(this.liveAssignment['bonusactivity'] ?? {})].forEach(id => {
+        specialistid[id] = participantid
+      })
+    }
+
+    if (!snap.exists()) {
+      await setDoc(threadRef, {
+        studioid: this.selectedStudio['docid'],
+        queueid: this.ongoingQueue['docid'],
+        liveassignmentid: liveassignementId ? [liveassignementId] : [],
+        currentliveassignmentid: liveassignementId,
+        specialistid,
+        lastmessage: null,
+        lastmessageat: null,
+        createdat: serverTimestamp(),
+        profileid: participants
+      })
+    } else {
+      const update: any = { profileid: arrayUnion(...participants) }
+      if (liveassignementId) {
+        update.currentliveassignmentid = liveassignementId
+        update.specialistid = specialistid
+        update.liveassignmentid = arrayUnion(liveassignementId)
+      }
+      await updateDoc(threadRef, update)
+    }
+
+    this.chatUnreadSub?.unsubscribe()
+    let previousMsgIds: Set<string> | null = null
+    this.chatUnreadSub = collectionData(query(collection(this.firestore, 'studio_chat', this.selectedStudio['docid'], 'messages'),where('pending', 'array-contains', this.profileid))).pipe(takeUntil(this.subscriptionHandle)).subscribe(msgs =>
+    {
+      this.unreadChatCount = msgs.length
+      if (!this.isChatOpen && previousMsgIds !== null) {
+        msgs.forEach((m: any) => {
+          if (m['messageid'] && !previousMsgIds.has(m['messageid']) && m['sent_by'] !== this.profileid) {
+            this.showChatNotification(m['message'] || 'Sent an attachment', 'A&H Team')
+          }
+        })
+      }
+      previousMsgIds = new Set(msgs.map((m: any) => m['messageid']))
+    })
+  }
+
+  async clearChatThread() {
+    this.closeChat()
+    this.chatUnreadSub?.unsubscribe()
+    if (!this.selectedStudio['docid']) return
+    await updateDoc(doc(this.firestore, 'studio_chat', this.selectedStudio['docid']), {
+      currentliveassignmentid: null,
+      specialistid: null,
+      lastsessionendedat: serverTimestamp()
+    }).catch(() => {})
+  }
+
+  async openChat() {
+    this.isChatOpen = true
+    const studioid = this.selectedStudio['docid']
+    this.chatMessages = []
+    this.allChatMessages = []
+    this.chatHasMore = false
+    this.chatDisplayCount = 10
+    this.chatLiveSub?.unsubscribe()
+
+    const threadSnap = await getDoc(doc(this.firestore, 'studio_chat', studioid))
+    const threadData = threadSnap.data() ?? {}
+    const currentAssignmentId: string | null = threadData['currentliveassignmentid'] ?? null
+    const sessionend = threadData['lastsessionendedat'] ?? null
+
+    let allMsgs: any[] = []
+
+    if (currentAssignmentId) {
+      const [sessionMsgs, nullMsgs] = await Promise.all([getDocs(query(collection(this.firestore, 'studio_chat', studioid, 'messages'),where('liveassignmentid', '==', currentAssignmentId),orderBy('sentat', 'asc'))),sessionend
+          ? getDocs(query(collection(this.firestore, 'studio_chat', studioid, 'messages'),where('sentat', '>', sessionend),orderBy('sentat', 'asc')))
+          : getDocs(query(collection(this.firestore, 'studio_chat', studioid, 'messages'),orderBy('sentat', 'asc'))) ])
+      const sessionData = sessionMsgs.docs.map(d => d.data())
+      const nullData = nullMsgs.docs.map(d => d.data()).filter((m: any) => m['liveassignmentid'] == null)
+      const merged = [...sessionData, ...nullData]
+      merged.sort((a: any, b: any) => (a['sentat']?.toMillis?.() ?? 0) - (b['sentat']?.toMillis?.() ?? 0))
+      const seen = new Set()
+      allMsgs = merged.filter((m: any) => {
+        if (seen.has(m['messageid'])) return false
+        seen.add(m['messageid'])
+        return true
+      })
+    } else if (sessionend) {
+      const snap = await getDocs(query(collection(this.firestore, 'studio_chat', studioid, 'messages'),where('sentat', '>', sessionend),orderBy('sentat', 'asc')))
+      allMsgs = snap.docs.map(d => d.data()).filter((m: any) => m['liveassignmentid'] == null)
+    } else {
+      const snap = await getDocs(query(collection(this.firestore, 'studio_chat', studioid, 'messages'),orderBy('sentat', 'asc')))
+      allMsgs = snap.docs.map(d => d.data()).filter((m: any) => m['liveassignmentid'] == null)
+    }
+
+    this.allChatMessages = allMsgs
+    this.chatDisplayCount = 10
+    this.chatHasMore = allMsgs.length > this.chatDisplayCount
+    this.chatMessages = allMsgs.slice(-this.chatDisplayCount)
+
+    this.markChatRead()
+    setTimeout(() => {
+      if (this.chatScroll) this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight
+    }, 50)
+
+    const sinceTime = this.chatMessages.length? this.chatMessages[this.chatMessages.length - 1]['sentat']: sessionend
+    const liveQuery = sinceTime? query(collection(this.firestore, 'studio_chat', studioid, 'messages'),orderBy('sentat', 'asc'),where('sentat', '>', sinceTime))
+      : query(collection(this.firestore, 'studio_chat', studioid, 'messages'),orderBy('sentat', 'asc'))
+
+    this.chatLiveSub = collectionData(liveQuery).pipe(takeUntil(this.subscriptionHandle)).subscribe(newMsgs => {
+      newMsgs.forEach((m: any) => {
+        if (this.allChatMessages.some(e => e['messageid'] === m['messageid'])) return
+        const mid = m['liveassignmentid']
+        const currentId = this.liveAssignment?.['docid'] ?? null
+        if (mid === currentId) {
+        } else if (mid == null && currentId !== null) {
+          if (sessionend) {
+            const msgMs = typeof m['sentat']?.toMillis === 'function' ? m['sentat'].toMillis() : 0
+            const cutoffMs = typeof sessionend.toMillis === 'function' ? sessionend.toMillis() : 0
+            if (msgMs <= cutoffMs) return
+          }
+        } else {
+          return
+        }
+        this.allChatMessages = [...this.allChatMessages, m]
+        this.chatMessages = this.allChatMessages.slice(-this.chatDisplayCount)
+        this.markChatRead()
+        if (m['sent_by'] !== this.profileid) {
+          this.showChatNotification(m['message'] || 'Sent an attachment', 'A&H Team')
+        }
+        setTimeout(() => {
+          if (this.chatScroll) this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight
+        }, 50)
+      })
+    })
+  }
+
+  loadMoreChatMessages() {
+    this.chatDisplayCount = Math.min(this.chatDisplayCount + 10, this.allChatMessages.length)
+    this.chatHasMore = this.allChatMessages.length > this.chatDisplayCount
+    this.chatMessages = this.allChatMessages.slice(-this.chatDisplayCount)
+  }
+
+  private markChatRead() {
+    const unread = this.chatMessages.filter(m =>
+      m['sent_by'] !== this.profileid && (m['pending'] ?? []).includes(this.profileid)
+    )
+    if (!unread.length) return
+    const batch = writeBatch(this.firestore)
+    unread.forEach(m => {
+      batch.update(
+        doc(this.firestore, 'studio_chat', this.selectedStudio['docid'], 'messages', m['messageid']),
+        { pending: arrayRemove(this.profileid), read_by: arrayUnion(this.profileid) }
+      )
+    })
+    batch.commit().catch(() => {})
+  }
+
+  onChatFileSelected(event: any) {
+    Array.from(event.target.files as FileList).forEach((file: File) => {
+      if (file.size > 10 * 1024 * 1024) {
+        this.snackBar.open(`${file.name} exceeds 10MB`, 'OK', { duration: 2500 })
+        return
+      }
+      const entry: any = { file, filename: file.name, filetype: file.type, fileurl: '', mediatype: file.type }
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader()
+        reader.onload = e => { entry.fileurl = e.target?.result as string }
+        reader.readAsDataURL(file)
+      }
+      this.chatAttachedFiles.push(entry)
+    })
+  }
+
+  isImageFile(filename: string): boolean {
+    return /\.(jpg|jpeg|png|gif|webp)$/i.test(filename || '')
+  }
+
+  removeChatFile(index: number) {
+    this.chatAttachedFiles.splice(index, 1)
+  }
+
+  async sendChatMessage() {
+    if (this.chatUploading) return
+    if (!this.chatText.trim() && !this.chatAttachedFiles.length) return
+    if (!this.selectedStudio['docid']) return
+    this.chatUploading = true
+    const studioid = this.selectedStudio['docid']
+    const queueid = this.ongoingQueue['docid']
+    const msgid = doc(collection(this.firestore, 'studio_chat', studioid, 'messages')).id
+    const text = this.chatText.trim()
+    this.chatText = ''
+    const threadSnap = await getDoc(doc(this.firestore, 'studio_chat', studioid))
+    const profileids: string[] = threadSnap.data()?.['profileid'] ?? []
+    const pending = profileids.filter(id => id !== this.profileid)
+    let files: any[] = []
+    try {
+      files = await Promise.all(
+        this.chatAttachedFiles.map(async f => {
+          const fileName = `${Date.now()}_${f.filename}`
+          const storageRef = ref(this.storage, `studio-chat/${queueid}/${studioid}/${fileName}`)
+          const snap = await uploadBytes(storageRef, f.file)
+          const url = await getDownloadURL(snap.ref)
+          return { filename: f.filename, fileurl: url }
+        })
+      )
+    } catch {
+      this.snackBar.open('File upload failed', 'OK', { duration: 2500 })
+      this.chatUploading = false
+      return
+    }
+    this.chatAttachedFiles = []
+    const newMsg = {
+      messageid: msgid,
+      message: text || null,
+      sent_by: this.profileid,
+      sentat: serverTimestamp(),
+      files,
+      read_by: [this.profileid],
+      pending,
+      liveassignmentid: this.liveAssignment?.['docid'] ?? null,
+      studioid,
+      queueid
+    }
+    await Promise.all([
+      setDoc(doc(this.firestore, 'studio_chat', studioid, 'messages', msgid), newMsg),
+      updateDoc(doc(this.firestore, 'studio_chat', studioid), {
+        lastmessage: text || 'media',
+        lastmessageat: serverTimestamp()
+      })
+    ])
+    if (!this.chatMessages.some(m => m['messageid'] === msgid)) {
+      this.chatMessages = [...this.chatMessages, { ...newMsg, sentat: new Date() }]
+    }
+    setTimeout(() => {
+      if (this.chatScroll) this.chatScroll.nativeElement.scrollTop = this.chatScroll.nativeElement.scrollHeight
+    }, 50)
+    this.chatUploading = false
+  }
+
+  private requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  onChatKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      this.sendChatMessage()
+    }
+  }
+
+  closeChat() {
+    this.isChatOpen = false
+    this.chatMessages = []
+    this.allChatMessages = []
+    this.chatDisplayCount = 10
+    this.chatLiveSub?.unsubscribe()
+  }
+
+  private showChatNotification(message: string, senderName: string) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    const notification = new Notification(`New message from ${senderName}`, {
+      body: message || 'Sent an attachment',
+      icon: '/assets/icons/icon-72x72.png'
+    });
+
+    notification.onclick = () => {
+      window.focus();
+      this.isChatOpen = true;
+      this.openChat();
+      notification.close();
+    };
+
+    setTimeout(() => notification.close(), 5000);
+  }
+
 }

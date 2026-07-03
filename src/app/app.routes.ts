@@ -35,7 +35,7 @@ export const routes: Routes = [
   {path: 'queuelist', loadComponent: () => import('./queue system/queue-list/queue-list.component').then(m => m.QueueListComponent), canActivate:[authGuard]},
   // {path: 'content-upload-v2', loadComponent: () => import('./content-upload-version2/content-upload-version2.component').then(m => m.ContentUploadVersion2Component)},
   // {path: 'userprofile_old/:id', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
-
+  {path: 'eiflixtelemetry', loadComponent: () => import('./eiflix-telemetry/eiflix-telemetry.component').then(m => m.EiflixTelemetryComponent), canActivate:[authGuard]},
   {
     path: 'content-upload-v2',
     loadComponent: () =>
@@ -213,6 +213,8 @@ export const routes: Routes = [
 
   // Journey Onboarding
   {path: 'salesleads', loadComponent: () => import('./Journey Onboarding/saleslead/saleslead.component').then(m => m.SalesleadComponent), canActivate:[authGuard]},
+  {path: 'sales-numbers', loadComponent: () => import('./Journey Onboarding/sales-numbers/sales-numbers.component').then(m => m.SalesNumbersComponent), canActivate:[authGuard]},
+  {path: 'sales-teams', loadComponent: () => import('./Journey Onboarding/sales-teams/sales-teams.component').then(m => m.SalesTeamsComponent), canActivate:[authGuard]},
   {path: 'onboardingremarks', loadComponent: () => import('./Journey Onboarding/onboarding-remark/onboarding-remark.component').then(m => m.OnboardingRemarkComponent), canActivate: [authGuard]},
   {path: 'opportunities', loadComponent: () => import('./Journey Onboarding/journeycoach-opportunities/journeycoach-opportunities.component').then(m => m.JourneycoachOpportunitiesComponent), canActivate: [authGuard]},
   {path: 'JourneycoachDashboard-new', loadComponent: () => import('./Journey Onboarding/journeycoach-dashboard/journeycoach-dashboard.component').then(m => m.JourneycoachDashboardComponent), canActivate:[authGuard]},
@@ -299,6 +301,9 @@ export const routes: Routes = [
   // OpenVidu
   {path: 'monitorliveassignment', loadComponent: () => import('./OpenVidu/monitor-liveassignment/monitor-liveassignment.component').then(m => m.MonitorLiveassignmentComponent), canActivate: [authGuard]},
   {path: 'joinroom/:roomid', loadComponent: () => import('./OpenVidu/join-openvidu-call/join-openvidu-call.component').then(m => m.JoinOpenviduCallComponent), canActivate: [authGuard]},
+
+  // LiveKit (new call flow with DeepFilterNet3 client-side noise suppression)
+  {path: 'joinlivekit/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},
   {path: 'participantstudio', loadComponent: () => import('./OpenVidu/list-openvidu-room/list-openvidu-room.component').then(m => m.ListOpenviduRoomComponent), canActivate: [authGuard]},
   {path: 'openvidurecordings', loadComponent: () => import('./OpenVidu/openvidu-recording/openvidu-recording.component').then(m => m.OpenviduRecordingComponent), canActivate: [authGuard]},
 
@@ -310,7 +315,7 @@ export const routes: Routes = [
 
   {path: 'eventzonemanagement',loadComponent: () => import('./Zone Management/event-zone-management/event-zone-management.component').then(m => m.EventZoneManagementComponent), canActivate: [authGuard] },
 
-  {path: 'channel-templates',loadComponent: () => import('./Channel Communication/channeltemplates/channeltemplates.component').then(m => m.ChannelTemplatesComponent), canActivate: [authGuard]},
+  {path: 'channel-templates',loadComponent: () => import('./Channel Communication/channeltemplates/channeltemplates.component').then(m => m.ChannelTemplatesComponent),canActivate: [authGuard]},
 
   // ai generated atc view screen
   {path: 'viewaigeneratedatc', loadComponent: () => import('./view-ai-generated-atc/view-ai-generated-atc.component').then(m => m.ViewAiGeneratedAtcComponent), canActivate: [authGuard]},
@@ -323,6 +328,7 @@ export const routes: Routes = [
 
   //queue-web
   {path: 'queue-web', loadComponent: () => import('./queue system/QueueWebVerison1/queue-web-version1.component').then(m => m.QueueWebVersion1Component), canActivate: [authGuard] },
+  {path: 'evolution-prep-participants', loadComponent: () => import('./queue system/evolution-prep-participants/evolution-prep-participants.component').then(m => m.EvolutionPrepParticipantsComponent), canActivate: [authGuard]},
 
   // Dev - Test
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },

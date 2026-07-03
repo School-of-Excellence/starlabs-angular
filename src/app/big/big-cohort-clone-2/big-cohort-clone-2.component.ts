@@ -1038,6 +1038,7 @@ export class BigCohortClone2Component {
           logged: true, 
           landingpage: result["landingpage"],
           profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
         }).then(()=>{
           console.log( notificationimage)
           alert("A&H Update sent to App user " + profileID.length.toString())
