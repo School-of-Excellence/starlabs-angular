@@ -908,48 +908,20 @@ export class ZoomClientviewComponent {
       .catch(error => console.error('Error updating clip timing:', error));
   }
 
-  // Jump the specialist to the "Prescribe ATC" step of Dynamic Studio WITHOUT
-  // leaving the Zoom call. If a Dynamic Studio tab is already open (same origin),
-  // ask it (via BroadcastChannel) to switch to the step and focus itself. If no
-  // studio tab answers within a short window, open one in a NEW tab. Either way
-  // the current Zoom route is never navigated away from.
+  // Open the "Prescribe ATC" step of Dynamic Studio in a NEW tab WITHOUT leaving
+  // the Zoom call (the current Zoom route is never navigated).
+  //
+  // We deliberately open a fresh tab rather than reusing an already-open studio
+  // tab: a background tab cannot bring itself to the foreground (browsers block
+  // cross-tab focus), so "reusing" it would silently change a tab the user can't
+  // see — which felt like nothing happened. window.open foregrounds the new tab,
+  // so this actually takes the user to the step. A stable window name means
+  // repeated clicks reuse+refocus that same tab instead of piling up new ones.
+  // Called directly in the click gesture so the popup blocker allows it.
   goToPrescribeAtc() {
-    const step = 'prescribe-atc';
-    const url = `${window.location.origin}/dynamicstudio?step=${step}`;
-
-    // Open the tab NOW, inside the click gesture — a deferred window.open (e.g.
-    // from setTimeout) is treated as non-user-initiated and silently blocked by
-    // the popup blocker, which is why the button appeared to do nothing.
-    let spare: Window | null = null;
-    try { spare = window.open('', '_blank'); } catch { spare = null; }
-
-    let settled = false;
-    const openFresh = () => {
-      if (settled) return;
-      settled = true;
-      if (spare && !spare.closed) spare.location.href = url;
-      else window.open(url, '_blank');
-    };
-
-    try {
-      const channel = new BroadcastChannel('starlabs-dynamic-studio');
-      channel.onmessage = (ev: MessageEvent) => {
-        // An already-open studio tab answered → it navigates + focuses itself,
-        // so discard the spare tab we pre-opened and don't open a new one.
-        if (ev?.data?.type === 'studio-here' && !settled) {
-          settled = true;
-          try { spare?.close(); } catch { /* ignore */ }
-          channel.close();
-        }
-      };
-      // Ping any open studio tab to switch to the step.
-      channel.postMessage({ type: 'goto-step', step });
-      // No studio tab answered in time → turn the spare into a fresh studio tab.
-      setTimeout(() => { openFresh(); channel.close(); }, 350);
-    } catch {
-      // BroadcastChannel unsupported → just use the spare / a new tab.
-      openFresh();
-    }
+    const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
+    const win = window.open(url, 'starlabsDynamicStudio');
+    try { win?.focus(); } catch { /* focus may be a no-op — the tab still opens */ }
   }
 
   handleKeyDown(event: KeyboardEvent) {

@@ -209,10 +209,6 @@ export class DynamicStudioV2Component {
   // constructor — it would be overwritten by the visibleSteps re-sync. Instead we
   // stash the request here and apply it in that re-sync once the step exists.
   private pendingDeepLinkStep: string = ''
-  // Cross-tab channel: the in-call Zoom view (same origin) pings this to jump the
-  // stepper to a step (e.g. Prescribe ATC) in an ALREADY-OPEN studio tab instead
-  // of opening a duplicate. Closed on destroy.
-  private studioChannel: BroadcastChannel | null = null
   // Precomputed index of activeStepId within visibleSteps. Kept in sync at the
   // three points activeStepId / the step list can change (the visibleSteps
   // getter's re-sync block, setActiveStep, goToStep) so the template can read a
@@ -1142,39 +1138,6 @@ export class DynamicStudioV2Component {
     // studio screen produces no writes.
       this.startStudioPresence()
       this.requestNotificationPermission()
-      this.wireStudioChannel()
-  }
-
-  // Listen for step-jump pings from the in-call Zoom view (same-origin tab).
-  // When one arrives we ack (so the Zoom tab knows a studio is open and skips
-  // opening a new tab), jump the stepper to the requested step, and try to focus
-  // this tab. Cross-tab focus may be blocked by the browser, but the step still
-  // switches so the tab is ready when the user brings it forward.
-  private wireStudioChannel() {
-    try {
-      this.studioChannel = new BroadcastChannel('starlabs-dynamic-studio')
-      this.studioChannel.onmessage = (ev: MessageEvent) => {
-        const data = ev?.data
-        if (data?.type !== 'goto-step' || !data.step) return
-        this.studioChannel?.postMessage({ type: 'studio-here' })
-        this.ngZone.run(() => {
-          this.jumpToStep(data.step)
-          try { window.focus() } catch { /* focus stealing may be blocked */ }
-        })
-      }
-    } catch { /* BroadcastChannel unsupported — new-tab deep-link still works */ }
-  }
-
-  // Switch the stepper to `stepId`. If the step isn't in the list yet (assignment
-  // still loading), stash it as the pending deep-link so the visibleSteps re-sync
-  // applies it once it appears — same path as the ?step= query param.
-  private jumpToStep(stepId: string) {
-    if (this.visibleSteps.find(s => s.id === stepId)) {
-      this.setActiveStep(stepId)
-    } else {
-      this.pendingDeepLinkStep = stepId
-    }
-    this.cdr.detectChanges()
   }
 
   ngOnDestroy(){
@@ -1198,8 +1161,6 @@ export class DynamicStudioV2Component {
    this.resetSubscription();
    if (this.presenceTimer) { clearInterval(this.presenceTimer); this.presenceTimer = null }
    this.stopStudioPresence()
-   this.studioChannel?.close()
-   this.studioChannel = null
   }
 
   // Trigger periodic change detection so `participantReady` re-evaluates
