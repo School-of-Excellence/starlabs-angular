@@ -9,7 +9,7 @@
   border-radius: 5px;
   border: none;
   cursor: pointer;
-  overflow-y: auto;
+  overflow: visible; /* no scrollbar — chips auto-remove after 10s so they don't pile up */
   display: flex;
   flex-direction: column;
   align-items: start; /* Center align items */
@@ -18,7 +18,6 @@
      Zoom UI underneath. Size to the thumbnails so only the chips are
      interactive. */
   width: 116px;
-  max-height: calc(100vh - 140px);
 }
 
 .slider-item {

@@ -1,5 +1,5 @@
 import { Component, OnInit, NgZone } from '@angular/core';
-import { collection, doc, docData, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from '@angular/fire/firestore';
+import { arrayUnion, collection, doc, docData, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute } from '@angular/router';
 import { ZoomMtg } from '@zoom/meetingsdk';
@@ -889,29 +889,23 @@ export class ZoomClientviewComponent {
     window.addEventListener('keydown', this.boundKeyDown);
   }
 
-  async onClick() {
-    try {
-      const clickTimestamp = new Date().toISOString();
-      const clipTiming = {
-        timestamp: clickTimestamp,
-        capturedby: this.profileid
-      };
-      var data;
-      await getDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid'])).then(snap => {
-        data = snap.data();
-      });
-      console.log(data);
-
-      let clipTimings = data['cliptimings'] ? data.cliptimings : [];
-      clipTimings.push(clipTiming);
-      await updateDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid']), { cliptimings: clipTimings });
-
-      console.log('Clip timing updated successfully:', clipTiming);
-      this.showPopup();
-      this.captureScreenshot();
-    } catch (error) {
-      console.error('Error updating clip timing:', error);
-    }
+  onClick() {
+    const clipTiming = {
+      timestamp: new Date().toISOString(),
+      capturedby: this.profileid
+    };
+    // Give instant feedback — the snackbar and the frame grab must NOT wait on
+    // Firestore. Previously the snackbar only appeared after an awaited getDoc +
+    // updateDoc round-trip, so "capture" felt sluggish.
+    this.showPopup();
+    this.captureScreenshot();
+    // Persist the clip timing in the background. arrayUnion appends atomically,
+    // so we skip the read-modify-write getDoc entirely (one round-trip, not two).
+    updateDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid']), {
+      cliptimings: arrayUnion(clipTiming)
+    })
+      .then(() => console.log('Clip timing updated successfully:', clipTiming))
+      .catch(error => console.error('Error updating clip timing:', error));
   }
 
   // Jump the specialist to the "Prescribe ATC" step of Dynamic Studio WITHOUT
@@ -922,22 +916,39 @@ export class ZoomClientviewComponent {
   goToPrescribeAtc() {
     const step = 'prescribe-atc';
     const url = `${window.location.origin}/dynamicstudio?step=${step}`;
+
+    // Open the tab NOW, inside the click gesture — a deferred window.open (e.g.
+    // from setTimeout) is treated as non-user-initiated and silently blocked by
+    // the popup blocker, which is why the button appeared to do nothing.
+    let spare: Window | null = null;
+    try { spare = window.open('', '_blank'); } catch { spare = null; }
+
+    let settled = false;
+    const openFresh = () => {
+      if (settled) return;
+      settled = true;
+      if (spare && !spare.closed) spare.location.href = url;
+      else window.open(url, '_blank');
+    };
+
     try {
       const channel = new BroadcastChannel('starlabs-dynamic-studio');
-      let acked = false;
       channel.onmessage = (ev: MessageEvent) => {
-        if (ev?.data?.type === 'studio-here') acked = true;
+        // An already-open studio tab answered → it navigates + focuses itself,
+        // so discard the spare tab we pre-opened and don't open a new one.
+        if (ev?.data?.type === 'studio-here' && !settled) {
+          settled = true;
+          try { spare?.close(); } catch { /* ignore */ }
+          channel.close();
+        }
       };
-      // Ping any open studio tab to navigate + focus.
+      // Ping any open studio tab to switch to the step.
       channel.postMessage({ type: 'goto-step', step });
-      // No studio tab answered → open a fresh one (deep-links via ?step=).
-      setTimeout(() => {
-        if (!acked) window.open(url, '_blank');
-        channel.close();
-      }, 350);
+      // No studio tab answered in time → turn the spare into a fresh studio tab.
+      setTimeout(() => { openFresh(); channel.close(); }, 350);
     } catch {
-      // BroadcastChannel unsupported → just open a new tab.
-      window.open(url, '_blank');
+      // BroadcastChannel unsupported → just use the spare / a new tab.
+      openFresh();
     }
   }
 
