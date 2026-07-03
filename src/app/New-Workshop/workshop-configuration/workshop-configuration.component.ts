@@ -726,11 +726,13 @@ async ngOnInit() {
       meta.get('workshopDays')?.setValidators([Validators.required, Validators.min(1)]);
       meta.get('lastChallengeMessage')?.enable();
       this.getDailyCommunicationArray().controls.forEach(c => c.enable());
+      this.getDailyCommunication2Array().controls.forEach(c => c.enable());
     } else {
       meta.get('workshopDays')?.disable();
       meta.get('workshopDays')?.clearValidators();
       meta.get('lastChallengeMessage')?.disable();
       this.getDailyCommunicationArray().controls.forEach(c => c.disable());
+      this.getDailyCommunication2Array().controls.forEach(c => c.disable());
     }
     meta.get('workshopDays')?.updateValueAndValidity();
     meta.get('lastChallengeMessage')?.updateValueAndValidity();
@@ -779,28 +781,35 @@ async ngOnInit() {
   }
   
   private dailyCommunicationBuffer: string[] = [];
+  private dailyCommunicationBuffer2: string[] = [];
 
   syncDailyCommunicationArray(days: number): void {
     if (!days || days < 1) return;
-    const arr = this.getDailyCommunicationArray();
     const isEnabled = this.settingsForm.get('evergreenWorkshop')?.value;
+    // Keep both parallel message arrays sized to the number of workshop days.
+    this.syncOneDailyArray(this.getDailyCommunicationArray(), this.dailyCommunicationBuffer, days, isEnabled);
+    this.syncOneDailyArray(this.getDailyCommunication2Array(), this.dailyCommunicationBuffer2, days, isEnabled);
+  }
+  private syncOneDailyArray(arr: FormArray, buffer: string[], days: number, isEnabled: boolean): void {
     arr.controls.forEach((ctrl, i) => {
-      this.dailyCommunicationBuffer[i] = ctrl.value || this.dailyCommunicationBuffer[i] || '';
+      buffer[i] = ctrl.value || buffer[i] || '';
     });
-
     while (arr.length > days) {
       arr.removeAt(arr.length - 1);
     }
     while (arr.length < days) {
       const index = arr.length;
       arr.push(this.fb.control({
-        value: this.dailyCommunicationBuffer[index] || '',
+        value: buffer[index] || '',
         disabled: !isEnabled
       }));
     }
   }
   getDailyCommunicationArray(): FormArray{
     return this.settingsForm.get('evergreenWorkshopMeta.dailyCommunication') as FormArray;
+  }
+  getDailyCommunication2Array(): FormArray{
+    return this.settingsForm.get('evergreenWorkshopMeta.dailyCommunication2') as FormArray;
   }
   addDailyCommunication(): void{
     const isEnabled = this.settingsForm.get('evergreenWorkshop')?.value;
@@ -809,11 +818,20 @@ async ngOnInit() {
         value:'', disabled:!isEnabled
       })
     )
+    this.getDailyCommunication2Array().push(
+      this.fb.control({
+        value:'', disabled:!isEnabled
+      })
+    )
   }
   removeDailyCommunication(index: number):void{
     const arr = this.getDailyCommunicationArray();
+    const arr2 = this.getDailyCommunication2Array();
     if (arr.length > 1) {
       arr.removeAt(index);
+      if (index < arr2.length) {
+        arr2.removeAt(index);
+      }
     }
   }
   async getWorkshopCategories() {
@@ -961,6 +979,9 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         lastChallengeMessage: [{ value: '', disabled: true }],
         dailyCommunication: this.fb.array([
           this.fb.control({value:'',disabled:true})
+        ]),
+        dailyCommunication2: this.fb.array([
+          this.fb.control({value:'',disabled:true})
         ])
       }),
       referralworkshop: [false],
@@ -973,6 +994,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       payment: [false],
       paymentmap: this.fb.group({
         amount: [null],
+        amountstriked: [null],
         api: [''],
         id: ['']
       }),
@@ -2132,6 +2154,7 @@ private rebuildActivityIds(): void {
         payment: data['payment'] || false,
         paymentmap: {
           amount: data['paymentmap']?.amount ?? null,
+          amountstriked: data['paymentmap']?.amountstriked ?? null,
           api: data['paymentmap']?.api ?? '',
           id: data['paymentmap']?.id ?? '',
         },
@@ -2184,14 +2207,22 @@ private rebuildActivityIds(): void {
       const isEvergreenEnabled = !!data['evergreenWorkshop'];
       const workshopDays = data['evergreenWorkshopMeta']?.workshopDays || 0;
       const savedComms: string[] = data['evergreenWorkshopMeta']?.dailyCommunication || [];
+      const savedComms2: string[] = data['evergreenWorkshopMeta']?.dailyCommunication2 || [];
       this.dailyCommunicationBuffer = [...savedComms];
-      
+      this.dailyCommunicationBuffer2 = [...savedComms2];
+
       const dailyArray = this.getDailyCommunicationArray();
+      const dailyArray2 = this.getDailyCommunication2Array();
       dailyArray.clear();
+      dailyArray2.clear();
 
       for (let i = 0; i < workshopDays; i++) {
         dailyArray.push(this.fb.control({
           value: savedComms[i] || '',
+          disabled: !isEvergreenEnabled
+        }));
+        dailyArray2.push(this.fb.control({
+          value: savedComms2[i] || '',
           disabled: !isEvergreenEnabled
         }));
       }
@@ -2201,6 +2232,7 @@ private rebuildActivityIds(): void {
         meta.get('workshopDays')?.enable();
         meta.get('lastChallengeMessage')?.enable();
         dailyArray.controls.forEach(c => c.enable());
+        dailyArray2.controls.forEach(c => c.enable());
       }
 
       // Split loaded selections into the "Select Profile" / "Select New Profile"
