@@ -1,7 +1,7 @@
 import { Component, OnInit, NgZone } from '@angular/core';
 import { collection, doc, docData, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { ZoomMtg } from '@zoom/meetingsdk';
 import { HttpClient } from '@angular/common/http';
 import { Storage } from '@angular/fire/storage';
@@ -111,7 +111,6 @@ export class ZoomClientviewComponent {
 
   constructor(
     private route: ActivatedRoute,
-    private router: Router,
     private firestore: Firestore,
     private ngZone: NgZone,
     private storage: Storage,
@@ -915,11 +914,31 @@ export class ZoomClientviewComponent {
     }
   }
 
-  // Jump the specialist straight to the "Prescribe ATC" step of Dynamic Studio.
-  // Opened via the in-call bubble (host only). Deep-links using the `step` query
-  // param that dynamic-studio-v2 reads on load.
+  // Jump the specialist to the "Prescribe ATC" step of Dynamic Studio WITHOUT
+  // leaving the Zoom call. If a Dynamic Studio tab is already open (same origin),
+  // ask it (via BroadcastChannel) to switch to the step and focus itself. If no
+  // studio tab answers within a short window, open one in a NEW tab. Either way
+  // the current Zoom route is never navigated away from.
   goToPrescribeAtc() {
-    this.router.navigate(['/dynamicstudio'], { queryParams: { step: 'prescribe-atc' } });
+    const step = 'prescribe-atc';
+    const url = `${window.location.origin}/dynamicstudio?step=${step}`;
+    try {
+      const channel = new BroadcastChannel('starlabs-dynamic-studio');
+      let acked = false;
+      channel.onmessage = (ev: MessageEvent) => {
+        if (ev?.data?.type === 'studio-here') acked = true;
+      };
+      // Ping any open studio tab to navigate + focus.
+      channel.postMessage({ type: 'goto-step', step });
+      // No studio tab answered → open a fresh one (deep-links via ?step=).
+      setTimeout(() => {
+        if (!acked) window.open(url, '_blank');
+        channel.close();
+      }, 350);
+    } catch {
+      // BroadcastChannel unsupported → just open a new tab.
+      window.open(url, '_blank');
+    }
   }
 
   handleKeyDown(event: KeyboardEvent) {
