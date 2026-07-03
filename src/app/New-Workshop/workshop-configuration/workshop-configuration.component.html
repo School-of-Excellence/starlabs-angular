@@ -1240,15 +1240,27 @@
                               rows="4" cdkTextareaAutosize cdkAutosizeMinRows="3" cdkAutosizeMaxRows="8"></textarea>
                             <mat-hint>Shown to participants after completing the final challenge</mat-hint>
                           </mat-form-field>
-                          <div formArrayName="dailyCommunication" class="settings-subsection">
+                          <div class="settings-subsection">
                             <h4 class="settings-subsection-title">Daily Communication</h4>
-                            <mat-form-field *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
-                              appearance="outline" class="w-100">
-                              <mat-label>Day {{ i + 1 }} Message</mat-label>
-                              <textarea matInput [formControlName]="i"
-                                placeholder="Enter message for day {{ i + 1 }}..."
-                                cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
-                            </mat-form-field>
+                            <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
+                              class="daily-comm-day">
+                              <ng-container formArrayName="dailyCommunication">
+                                <mat-form-field appearance="outline" class="w-100">
+                                  <mat-label>Day {{ i + 1 }} Message 1</mat-label>
+                                  <textarea matInput [formControlName]="i"
+                                    placeholder="Enter message 1 for day {{ i + 1 }}..."
+                                    cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
+                                </mat-form-field>
+                              </ng-container>
+                              <ng-container formArrayName="dailyCommunication2">
+                                <mat-form-field appearance="outline" class="w-100">
+                                  <mat-label>Day {{ i + 1 }} Message 2</mat-label>
+                                  <textarea matInput [formControlName]="i"
+                                    placeholder="Enter message 2 for day {{ i + 1 }}..."
+                                    cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
+                                </mat-form-field>
+                              </ng-container>
+                            </div>
                           </div>
                         </div>
                       </ng-container>
@@ -1314,6 +1326,10 @@
                           <mat-form-field appearance="outline" class="w-100">
                             <mat-label>Amount</mat-label>
                             <input matInput type="number" formControlName="amount" placeholder="Enter amount" min="0" />
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Amount Striked</mat-label>
+                            <input matInput type="number" formControlName="amountstriked" placeholder="Enter striked amount" min="0" />
                           </mat-form-field>
                           <mat-form-field appearance="outline" class="w-100">
                             <mat-label>API</mat-label>
