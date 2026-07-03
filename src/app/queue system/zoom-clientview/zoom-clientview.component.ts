@@ -826,6 +826,20 @@ export class ZoomClientviewComponent {
                   this.isJoined = true;
                 });
 
+                // Safari sizes the SDK gallery to a stale/short window height at
+                // join time (its innerHeight differs from Chrome and isn't
+                // re-measured after layout settles) — leaving a white strip below
+                // the gallery and clipping the top of the video-off name labels
+                // the SDK draws. Fire a few `resize` events after join so the SDK
+                // re-lays-out to the correct current size. No-op on Chrome.
+                this.ngZone.runOutsideAngular(() => {
+                  [150, 600, 1200].forEach(delay => {
+                    setTimeout(() => {
+                      try { window.dispatchEvent(new Event('resize')); } catch { /* ignore */ }
+                    }, delay);
+                  });
+                });
+
                 // Host has actually entered the Zoom meeting — release any
                 // participant waiting on the studio gate, and start the
                 // heartbeat so participants can tell when the host leaves.
@@ -936,32 +950,30 @@ export class ZoomClientviewComponent {
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
 
-    // Pre-open a blank tab synchronously (in the click gesture) so the new-tab
-    // fallback is never popup-blocked. Discarded the instant a Studio tab answers.
-    let spare: Window | null = null;
-    try { spare = window.open('', '_blank'); } catch { spare = null; }
-
+    // NO spare/blank tab (that's what caused the flash). A deferred window.open
+    // (~250ms later) is NOT popup-blocked — the click's transient activation is
+    // still valid — so we can just wait for a Studio tab to answer and only open
+    // a tab if none does.
     let settled = false;
     const openNewTab = () => {
       if (settled) return;
       settled = true;
-      if (spare && !spare.closed) spare.location.href = url;
-      else window.open(url, 'starlabsDynamicStudio');
+      window.open(url, 'starlabsDynamicStudio');
     };
 
     try {
       const channel = new BroadcastChannel('starlabs-dynamic-studio');
       channel.onmessage = (ev: MessageEvent) => {
         if (ev?.data?.type === 'studio-here' && !settled) {
+          // A Studio tab is open and switched itself to the step → NO new tab,
+          // NO flash.
           settled = true;
-          // A Studio tab took the ping and switched itself to the step → no new tab.
-          try { spare?.close(); } catch { /* ignore */ }
           try { channel.close(); } catch { /* ignore */ }
         }
       };
       channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
-      // No Studio tab answered quickly → turn the spare into a fresh Studio tab.
-      setTimeout(() => { openNewTab(); try { channel.close(); } catch {} }, 300);
+      // No Studio tab answered → open a fresh one (deferred open still allowed).
+      setTimeout(() => { openNewTab(); try { channel.close(); } catch {} }, 250);
     } catch {
       openNewTab();
     }
