@@ -924,16 +924,47 @@ export class ZoomClientviewComponent {
       .catch(error => console.error('Error updating clip timing:', error));
   }
 
-  // Go to the "Prescribe ATC" step of Dynamic Studio. Open the tab DIRECTLY in
-  // the click gesture — the browser foregrounds it immediately, so it always
-  // opens visibly. The stable window name means repeat clicks reuse + refocus
-  // that same tab instead of piling up new ones. (We can't reuse the host's
-  // pre-existing, independently-opened Studio tab: this Zoom page is
-  // cross-origin isolated, so it can't target that tab by name — hence a
-  // dedicated Prescribe-ATC Studio tab.) The Zoom call is never navigated.
+  // Go to the "Prescribe ATC" step of Dynamic Studio.
+  //  • If a Studio tab is already open → tell it (via BroadcastChannel) to switch
+  //    straight to the Prescribe ATC screen, and DON'T open a new tab. (This Zoom
+  //    page is cross-origin isolated, so window.open can't reach/reuse that tab by
+  //    name — BroadcastChannel is the only cross-tab path. The browser won't let
+  //    that background tab foreground itself, so the host switches to it manually.)
+  //  • If no Studio tab answers → open a new tab.
+  // The Zoom call is never navigated. Runs in the click gesture so the fallback
+  // open isn't popup-blocked.
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
-    window.open(url, 'starlabsDynamicStudio');
+
+    // Pre-open a blank tab synchronously (in the click gesture) so the new-tab
+    // fallback is never popup-blocked. Discarded the instant a Studio tab answers.
+    let spare: Window | null = null;
+    try { spare = window.open('', '_blank'); } catch { spare = null; }
+
+    let settled = false;
+    const openNewTab = () => {
+      if (settled) return;
+      settled = true;
+      if (spare && !spare.closed) spare.location.href = url;
+      else window.open(url, 'starlabsDynamicStudio');
+    };
+
+    try {
+      const channel = new BroadcastChannel('starlabs-dynamic-studio');
+      channel.onmessage = (ev: MessageEvent) => {
+        if (ev?.data?.type === 'studio-here' && !settled) {
+          settled = true;
+          // A Studio tab took the ping and switched itself to the step → no new tab.
+          try { spare?.close(); } catch { /* ignore */ }
+          try { channel.close(); } catch { /* ignore */ }
+        }
+      };
+      channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
+      // No Studio tab answered quickly → turn the spare into a fresh Studio tab.
+      setTimeout(() => { openNewTab(); try { channel.close(); } catch {} }, 300);
+    } catch {
+      openNewTab();
+    }
   }
 
   handleKeyDown(event: KeyboardEvent) {

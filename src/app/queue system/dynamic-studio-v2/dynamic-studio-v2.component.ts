@@ -1160,9 +1160,37 @@ export class DynamicStudioV2Component {
     // studio screen produces no writes.
       this.startStudioPresence()
       this.requestNotificationPermission()
+      this.wireStudioChannel()
+  }
+
+  // Listen for step-jump pings from the in-call Zoom view (a separate,
+  // cross-origin-isolated tab that can't reach this one by window name). When a
+  // ping arrives we ACK (so the Zoom view knows a studio tab is already open and
+  // does NOT open a new one) and switch the stepper straight to the requested
+  // step — "open that screen directly" in the already-open tab.
+  private studioChannel: BroadcastChannel | null = null
+  private wireStudioChannel() {
+    try {
+      this.studioChannel = new BroadcastChannel('starlabs-dynamic-studio')
+      this.studioChannel.onmessage = (ev: MessageEvent) => {
+        const data = ev?.data
+        if (data?.type !== 'goto-step' || !data.step) return
+        this.studioChannel?.postMessage({ type: 'studio-here' })
+        this.ngZone.run(() => {
+          if (this.visibleSteps.find(s => s.id === data.step)) this.setActiveStep(data.step)
+          else this.pendingDeepLinkStep = data.step
+          this.cdr.detectChanges()
+          // Best-effort: browsers block a background tab from foregrounding
+          // itself, so this may be a no-op — the tab still switches to the step.
+          try { window.focus() } catch { /* ignore */ }
+        })
+      }
+    } catch { /* BroadcastChannel unsupported — Zoom view falls back to a new tab */ }
   }
 
   ngOnDestroy(){
+   this.studioChannel?.close()
+   this.studioChannel = null
    this.chatUnreadSub?.unsubscribe()
    this.chatLiveSub?.unsubscribe()
    // takeUntil tears down only on a notifier `next` — emitting it BEFORE
