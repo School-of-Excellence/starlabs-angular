@@ -1195,6 +1195,16 @@ export class DynamicStudioV2Component {
         })
       }
     } catch { /* BroadcastChannel unsupported — Zoom view falls back to a new tab */ }
+
+    // Also handle a goto-step delivered by the service worker (fired when the host
+    // clicks the "Prescribe ATC" notification, which focuses this tab).
+    try {
+      navigator.serviceWorker?.addEventListener('message', (ev: MessageEvent) => {
+        const data = ev?.data
+        if (data?.type !== 'goto-step' || !data.step) return
+        this.ngZone.run(() => this.jumpToStep(data.step))
+      })
+    } catch { /* ignore */ }
   }
 
   // Blink the browser tab title so an already-open (but background) studio tab is

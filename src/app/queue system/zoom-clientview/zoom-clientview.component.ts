@@ -924,16 +924,12 @@ export class ZoomClientviewComponent {
       .catch(error => console.error('Error updating clip timing:', error));
   }
 
-  // Open the "Prescribe ATC" step of Dynamic Studio in a NEW tab WITHOUT leaving
-  // the Zoom call (the current Zoom route is never navigated).
-  //
-  // We deliberately open a fresh tab rather than reusing an already-open studio
-  // tab: a background tab cannot bring itself to the foreground (browsers block
-  // cross-tab focus), so "reusing" it would silently change a tab the user can't
-  // see — which felt like nothing happened. window.open foregrounds the new tab,
-  // so this actually takes the user to the step. A stable window name means
-  // repeated clicks reuse+refocus that same tab instead of piling up new ones.
-  // Called directly in the click gesture so the popup blocker allows it.
+  // Go to the "Prescribe ATC" step of Dynamic Studio WITHOUT leaving the Zoom call
+  // (the current Zoom route is never navigated). If a Studio tab is already open,
+  // REUSE it (it switches to the step) and surface it (notification/snackbar +
+  // tab-title flash) rather than opening a duplicate; only open a new tab when no
+  // Studio tab answers. Runs in the click gesture so the fallback open isn't
+  // popup-blocked. See surfaceOpenStudioTab() for why we can't auto-focus it.
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
 
@@ -963,11 +959,7 @@ export class ZoomClientviewComponent {
           settled = true;
           try { spare?.close(); } catch { /* ignore */ }
           try { channel.close(); } catch { /* ignore */ }
-          this.ngZone.run(() => this.snackBar.open(
-            'Prescribe ATC is ready in your Dynamic Studio tab — switch to it to continue.',
-            'Close',
-            { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
-          ));
+          this.ngZone.run(() => this.surfaceOpenStudioTab());
         }
       };
       // Ask any open studio tab to switch to the step.
@@ -977,6 +969,35 @@ export class ZoomClientviewComponent {
     } catch {
       // BroadcastChannel unsupported → just use the spare / a new tab.
       openFresh();
+    }
+  }
+
+  // An open Studio tab took the reuse ping. The browser will NOT let this
+  // cross-origin-isolated Zoom tab foreground the Studio tab (window.focus,
+  // named window.open under COOP, and SW focus-from-message all fail — verified).
+  // The ONE thing that can bring the existing tab to the front is a service-worker
+  // notification the host clicks (notificationclick → WindowClient.focus is
+  // allowed). So: if notifications are granted, show that click-to-focus
+  // notification; otherwise fall back to a snackbar. Either way the Studio tab is
+  // also flashing its own tab title.
+  private surfaceOpenStudioTab() {
+    const step = 'prescribe-atc';
+    const url = `${window.location.origin}/dynamicstudio?step=${step}`;
+    const controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+    const canNotify = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+    if (controller && canNotify) {
+      try { controller.postMessage({ type: 'notify-focus-studio', step, url }); } catch { /* ignore */ }
+      this.snackBar.open(
+        'Prescribe ATC is ready — click the notification to open your Studio tab.',
+        'Close',
+        { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
+      );
+    } else {
+      this.snackBar.open(
+        'Prescribe ATC is ready in your Dynamic Studio tab — switch to it to continue.',
+        'Close',
+        { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
+      );
     }
   }
 
