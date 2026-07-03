@@ -74,6 +74,11 @@ export class DynamicStudioV2Component {
   // Activity
   activitySubscription:Subscription = null
   mapActivity:any = {}
+  // activityId -> [profileId] of specialists who can run that activity, sourced
+  // from `big cohorts` (bigactivity -> participantidlist). Powers the
+  // activity-scoped specialist chips in the Enter-Studio popup (mirrors the
+  // big-planner screen's filterInvitedParticipant logic).
+  activitySpecialistMap: { [activityId: string]: string[] } = {}
   // Studio
   additionalActivities = {}
   mapStudio = {}
@@ -214,6 +219,8 @@ export class DynamicStudioV2Component {
   // reach this tab by window name) pings this to switch the stepper to a step in
   // an ALREADY-OPEN studio tab instead of the Zoom view opening a duplicate.
   private studioChannel: BroadcastChannel | null = null
+  private studioTitleFlashTimer: any = null
+  private studioTitleOriginal: string = ''
   // Precomputed index of activeStepId within visibleSteps. Kept in sync at the
   // three points activeStepId / the step list can change (the visibleSteps
   // getter's re-sync block, setActiveStep, goToStep) so the template can read a
@@ -1137,6 +1144,22 @@ export class DynamicStudioV2Component {
         this.mapActivity[data["docid"]] = data["activity"]
       })
     })
+    // Build activity -> specialists map from cohorts (see big-planner). We take
+    // ALL active cohorts and union their participant lists per `bigactivity`, so
+    // the Enter-Studio popup can offer the right specialists for each activity.
+    collectionData(collection(this.firestore,"big cohorts"), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(cohorts=>{
+      const map: { [activityId: string]: string[] } = {}
+      cohorts.forEach(cohort=>{
+        const activityId = cohort["bigactivity"]
+        if(activityId == null) return
+        if(cohort["status"] != null && cohort["status"] !== "active") return
+        const ids: string[] = Array.isArray(cohort["participantidlist"]) ? cohort["participantidlist"] : []
+        const set = new Set<string>(map[activityId] ?? [])
+        ids.forEach(id => set.add(id))
+        map[activityId] = Array.from(set)
+      })
+      this.activitySpecialistMap = map
+    })
     this.enableZoomLinkGenerator()
     // Start the studio-presence heartbeat. It writes only when there is a
     // currently selected studio with a live assignment, so an idle / empty
@@ -1165,9 +1188,36 @@ export class DynamicStudioV2Component {
         this.ngZone.run(() => {
           this.jumpToStep(data.step)
           try { window.focus() } catch { /* cross-tab focus is blocked; best-effort */ }
+          // Browsers won't let this background tab foreground itself, so make it
+          // easy to spot in the tab bar: flash the tab title until the host
+          // switches to it. Stops the moment the tab becomes visible.
+          this.flashStudioTab()
         })
       }
     } catch { /* BroadcastChannel unsupported — Zoom view falls back to a new tab */ }
+  }
+
+  // Blink the browser tab title so an already-open (but background) studio tab is
+  // noticeable after a Prescribe ATC ping. Auto-stops on tab focus or after 30s.
+  private flashStudioTab() {
+    if (typeof document === 'undefined' || !document.hidden) return
+    if (this.studioTitleFlashTimer) return // already flashing
+    this.studioTitleOriginal = document.title
+    let on = false
+    const stop = () => {
+      if (this.studioTitleFlashTimer) { clearInterval(this.studioTitleFlashTimer); this.studioTitleFlashTimer = null }
+      if (this.studioTitleOriginal) document.title = this.studioTitleOriginal
+      document.removeEventListener('visibilitychange', onVis)
+    }
+    const onVis = () => { if (!document.hidden) stop() }
+    document.addEventListener('visibilitychange', onVis)
+    this.ngZone.runOutsideAngular(() => {
+      this.studioTitleFlashTimer = setInterval(() => {
+        on = !on
+        document.title = on ? '🔔 Prescribe ATC — Studio' : this.studioTitleOriginal
+      }, 900)
+      setTimeout(stop, 30000)
+    })
   }
 
   // Switch the stepper to `stepId`. If the step isn't in the list yet (assignment
@@ -1205,6 +1255,7 @@ export class DynamicStudioV2Component {
    this.stopStudioPresence()
    this.studioChannel?.close()
    this.studioChannel = null
+   if (this.studioTitleFlashTimer) { clearInterval(this.studioTitleFlashTimer); this.studioTitleFlashTimer = null; if (this.studioTitleOriginal) document.title = this.studioTitleOriginal }
   }
 
   // Trigger periodic change detection so `participantReady` re-evaluates
@@ -2522,6 +2573,7 @@ export class DynamicStudioV2Component {
         studio: this.selectedStudio,
         mapprofile: this.mapProfile,
         mapactivity: this.mapActivity,
+        activityspecialists: this.activitySpecialistMap,
         additionalactivities: this.additionalActivities
       },
       autoFocus: false,
