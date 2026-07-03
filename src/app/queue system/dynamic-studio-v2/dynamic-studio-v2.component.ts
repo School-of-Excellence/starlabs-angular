@@ -203,6 +203,12 @@ export class DynamicStudioV2Component {
 
   // Stepper state (v2)
   activeStepId: string = ''
+  // Deep-link target: a step id requested via the `?step=` query param (e.g. the
+  // "Prescribe ATC" bubble in the in-call Zoom view). The stepper is built async
+  // once the live assignment loads, so we can't set activeStepId in the
+  // constructor — it would be overwritten by the visibleSteps re-sync. Instead we
+  // stash the request here and apply it in that re-sync once the step exists.
+  private pendingDeepLinkStep: string = ''
   // Precomputed index of activeStepId within visibleSteps. Kept in sync at the
   // three points activeStepId / the step list can change (the visibleSteps
   // getter's re-sync block, setActiveStep, goToStep) so the template can read a
@@ -826,9 +832,16 @@ export class DynamicStudioV2Component {
     const signature = steps.map(s => s.id).join('|')
     if (signature !== this.lastStepSignature) {
       this.lastStepSignature = signature
+      // Deep-link: honor a `?step=` request once its step actually exists in the
+      // list. Consumed once so later step-list changes fall back to normal rules.
+      if (this.pendingDeepLinkStep && steps.find(s => s.id === this.pendingDeepLinkStep)) {
+        this.activeStepId = this.pendingDeepLinkStep
+        this.userNavigated = true
+        this.pendingDeepLinkStep = ''
+      }
       // If user hasn't navigated, always snap to first step (handles async step inserts).
       // If user has navigated and their step disappeared, also reset.
-      if (!this.userNavigated || !steps.find(s => s.id === this.activeStepId)) {
+      else if (!this.userNavigated || !steps.find(s => s.id === this.activeStepId)) {
         this.activeStepId = steps[0]?.id || ''
       }
       // Auto-select may land on the prescribe step without going through setActiveStep().
@@ -849,6 +862,7 @@ export class DynamicStudioV2Component {
     // Lazily check for an AI-generated ATC only when the specialist opens the prescribe step.
     if (id === 'prescribe-atc') this.checkAiAtcAvailability()
     this.scrollMainToTop()
+    this.scrollActiveStepIntoView()
   }
 
   goToStep(offset: number) {
@@ -862,6 +876,7 @@ export class DynamicStudioV2Component {
     // next/prev arrows bypass setActiveStep — trigger the AI-ATC check when landing here too.
     if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
     this.scrollMainToTop()
+    this.scrollActiveStepIntoView()
   }
 
   // Scroll the content area back to the top on every step change so a new stage
@@ -881,6 +896,19 @@ export class DynamicStudioV2Component {
     }
     reset()
     setTimeout(reset) // catch the case where new content mounts after this tick
+  }
+
+  // Keep the ACTIVE step chip in view in the left stepper — so advancing via the
+  // footer Next/Back also scrolls the sidebar stepper to follow (when it scrolls).
+  // `block:'nearest'` moves the nearest scroll container the minimum needed, so it
+  // works for both the vertical sidebar list and the horizontal wrapped band.
+  private scrollActiveStepIntoView() {
+    const run = () => {
+      const active = document.querySelector('.ds-app .ds-vstep.active') as HTMLElement | null
+      active?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+    }
+    run()
+    setTimeout(run)
   }
 
   getStepIndex(id: string): number {
@@ -984,6 +1012,8 @@ export class DynamicStudioV2Component {
     private storage: Storage
   ) {
     const overrideProfileId = this.route.snapshot.queryParamMap.get('profileid')
+    // Honor a deep-linked step (e.g. ?step=prescribe-atc from the Zoom in-call bubble).
+    this.pendingDeepLinkStep = this.route.snapshot.queryParamMap.get('step') || ''
     var loading = this.dialog.open(LoadingProgressComponent, {
       data: {msg: "Loading..."},
       disableClose: true
@@ -1411,8 +1441,36 @@ export class DynamicStudioV2Component {
     if (studio) this.onStudioSelect(studio)
   }
 
-  /** Back from a studio's waiting list to the lobby studio grid. */
-  backToStudios(){
+  /**
+   * Back from a studio's waiting list to the lobby studio grid ("All studios").
+   * If we're currently CHECKED IN to this studio, check out FIRST — leaving the
+   * studio should take you offline here, so opening another studio afterwards no
+   * longer triggers a checkout-conflict prompt. Direct write (mirrors the
+   * checkout-log shape in checkinStudio) so it isn't gated by the check-in
+   * schedule/hold logic — leaving is always allowed.
+   */
+  async backToStudios(){
+    const studio = this.selectedStudio
+    if (studio?.['checkin'] && studio?.['docid']){
+      // Leaving the studio checks you out — confirm first so it isn't a silent
+      // background surprise. Cancel keeps you in the studio, still checked in.
+      if (!window.confirm('You are checked in to this studio. Going back to All Studios will check you out. Continue?')) return
+      studio['checkin'] = false
+      try {
+        await updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), { checkin: false })
+        const logid = doc(collection(this.firestore, 'studio checkin log')).id
+        setDoc(doc(this.firestore, 'studio checkin log', logid), {
+          logparticipant: this.profileid,
+          queueref: studio['queueref'],
+          logdate: new Date(),
+          activity: 'checkout',
+          participants: studio['participants'] || [],
+          studio: studio['docid']
+        })
+      } catch (err) {
+        console.log('Checkout on back failed', err)
+      }
+    }
     this.selectedStudio = {}
     this.stageTokenList = []
     this.liveAssignment = null

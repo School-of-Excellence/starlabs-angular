@@ -1,7 +1,7 @@
 import { Component, OnInit, NgZone } from '@angular/core';
 import { collection, doc, docData, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ZoomMtg } from '@zoom/meetingsdk';
 import { HttpClient } from '@angular/common/http';
 import { Storage } from '@angular/fire/storage';
@@ -111,6 +111,7 @@ export class ZoomClientviewComponent {
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private firestore: Firestore,
     private ngZone: NgZone,
     private storage: Storage,
@@ -901,6 +902,13 @@ export class ZoomClientviewComponent {
     } catch (error) {
       console.error('Error updating clip timing:', error);
     }
+  }
+
+  // Jump the specialist straight to the "Prescribe ATC" step of Dynamic Studio.
+  // Opened via the in-call bubble (host only). Deep-links using the `step` query
+  // param that dynamic-studio-v2 reads on load.
+  goToPrescribeAtc() {
+    this.router.navigate(['/dynamicstudio'], { queryParams: { step: 'prescribe-atc' } });
   }
 
   handleKeyDown(event: KeyboardEvent) {

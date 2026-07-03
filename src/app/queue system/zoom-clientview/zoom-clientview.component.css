@@ -57,6 +57,39 @@ position: fixed;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+/* Host-only "Prescribe ATC" bubble — stacked just above the capture button,
+   left of Zoom's End control. Uses the Dynamic Studio prescribe-step accent
+   (#ef4444) so it reads as the same action across surfaces. */
+.prescribe-bubble {
+  position: fixed;
+  bottom: 56px;
+  right: 90px;
+  z-index: 99999;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #ef4444;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+.prescribe-bubble:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+}
+.prescribe-bubble mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
 /* ============================================================
    Specialist-wait screen (participant side, queue/studio flow)
    ============================================================ */

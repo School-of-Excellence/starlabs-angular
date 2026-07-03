@@ -119,6 +119,13 @@
   </div>
   <button *ngIf="profileHost && isJoined" class="float" (click)="onClick()">capture</button>
 
+  <!-- Host-only quick jump to the Prescribe ATC step of Dynamic Studio -->
+  <button *ngIf="profileHost && isJoined" class="prescribe-bubble" (click)="goToPrescribeAtc()"
+          title="Prescribe ATC">
+    <mat-icon>add_circle</mat-icon>
+    <span>Prescribe ATC</span>
+  </button>
+
   <!-- Big center overlay shown to the HOST when recording is paused/stopped
        while another person is in the call. Replaces the older top snackbar
        so it's impossible to miss. -->
