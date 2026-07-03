@@ -513,12 +513,12 @@
 <div *ngIf="!loading && meetingRoomStatus == 'left'" class="text-center w-100 p-5 fw-700 fs-4">
   You left the Meeting.
   <br>
-  Refresh to Join the Call again
+  Refresh to Join the Call again.
 </div>
 
 <div *ngIf="!loading && meetingRoomStatus == 'ended'" class="text-center w-100 p-5 fw-700 fs-4">
   <div *ngIf="roomDetail.hosts.includes(loggedinProfileid); else nonHostTest">
-    The Meeting is Ended. Close and Join Meeting to start again
+    The Meeting is Ended. Close and Join Meeting to start again.
   </div>
   <ng-template #nonHostTest>
     The Meeting is Closed or not Started yet. Only Host can Start the Meeting.
