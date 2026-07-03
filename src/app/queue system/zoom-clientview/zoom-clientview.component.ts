@@ -406,30 +406,38 @@ export class ZoomClientviewComponent {
       ZM.inMeetingServiceListener('onUserLeave', () => this.refreshRemoteCountSnapshot());
       ZM.inMeetingServiceListener('onUserUpdate', () => this.refreshRemoteCountSnapshot());
       const handleRecordingChange = (data: any) => {
-        // The Zoom Web SDK's onRecordingStatusChange passes { state: '...' }
-        // (e.g. 'Recording', 'Paused', 'Stopped', 'Connecting'). Earlier code
-        // read recordingStatus/status which don't exist on this event, so the
-        // object fell through to "[object Object]" and the status never
-        // updated — leaving the prompt stuck on 'paused' after resume.
-        // Read `state` first, then the other shapes for older SDK builds.
-        const raw = (
-          data?.state ??
-          data?.recordingStatus ??
-          data?.status ??
-          (typeof data === 'string' ? data : '')
-        ).toString();
-        const s: string = raw.toLowerCase();
-        console.log('[recording-prompt] status event raw=', raw, 'payload=', data);
+        // Zoom Client View (SDK 6.1.0) fires `onRecordingChange` with a NUMERIC
+        // action code — the SDK's own enum is { stop: 0, start: 1, pause: 2 } —
+        // typically as `data.state` (some builds pass a bare number, or string
+        // states like 'Recording' / 'Paused' / 'Stopped' / 'Connecting'). Read
+        // the numeric code first, then fall back to the string shapes.
         let newStatus: 'started' | 'paused' | 'stopped' | 'unknown' = this.recordingStatus;
-        // Order matters — "NotRecording"/"Stopped" must classify as stopped
-        // before the 'record' check would label it 'started'. "Paused" /
-        // "PauseRecord" must hit the paused branch before 'record' steals it.
-        if (s.includes('not') || s.includes('stop') || s.includes('end') || s.includes('disconnect')) {
-          newStatus = 'stopped';
-        } else if (s.includes('paus')) {
-          newStatus = 'paused';
-        } else if (s.includes('start') || s.includes('record') || s.includes('connect') || s.includes('resume')) {
-          newStatus = 'started';
+        const code =
+          typeof data === 'number' ? data :
+          typeof data?.state === 'number' ? data.state :
+          typeof data?.action === 'number' ? data.action : null;
+        if (code !== null) {
+          newStatus = code === 2 ? 'paused' : code === 1 ? 'started' : code === 0 ? 'stopped' : newStatus;
+          console.log('[recording-prompt] status event code=', code, 'payload=', data);
+        } else {
+          const raw = (
+            data?.state ??
+            data?.recordingStatus ??
+            data?.status ??
+            (typeof data === 'string' ? data : '')
+          ).toString();
+          const s: string = raw.toLowerCase();
+          console.log('[recording-prompt] status event raw=', raw, 'payload=', data);
+          // Order matters — "NotRecording"/"Stopped" must classify as stopped
+          // before the 'record' check would label it 'started'. "Paused" /
+          // "PauseRecord" must hit the paused branch before 'record' steals it.
+          if (s.includes('not') || s.includes('stop') || s.includes('end') || s.includes('disconnect')) {
+            newStatus = 'stopped';
+          } else if (s.includes('paus')) {
+            newStatus = 'paused';
+          } else if (s.includes('start') || s.includes('record') || s.includes('connect') || s.includes('resume')) {
+            newStatus = 'started';
+          }
         }
 
         if (newStatus !== this.recordingStatus) {
@@ -450,8 +458,14 @@ export class ZoomClientviewComponent {
         }
         this.evaluateRecordingPrompt();
       };
+      // The Client View SDK 6.1.0 event is `onRecordingChange` (verified against
+      // the bundled SDK — it's the only recording event that exists). The names
+      // used before, `onRecordingStatusChange` / `onRecordChange`, do NOT exist
+      // in this SDK, so pause/stop was NEVER received → recordingStatus stayed
+      // 'unknown' → the "resume recording" prompt never opened. Register the
+      // correct event; keep the old names as harmless fallbacks for other builds.
+      ZM.inMeetingServiceListener('onRecordingChange', handleRecordingChange);
       ZM.inMeetingServiceListener('onRecordingStatusChange', handleRecordingChange);
-      // Some SDK builds use this older event name
       ZM.inMeetingServiceListener('onRecordChange', handleRecordingChange);
     } catch (e) {
       console.warn('Could not wire Zoom recording listeners', e);
