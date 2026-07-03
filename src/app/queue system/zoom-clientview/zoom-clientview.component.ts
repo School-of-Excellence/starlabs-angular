@@ -924,52 +924,21 @@ export class ZoomClientviewComponent {
       .catch(error => console.error('Error updating clip timing:', error));
   }
 
-  // Go to the "Prescribe ATC" step of Dynamic Studio.
-  //  • If a Studio tab is already open → tell it (via BroadcastChannel) to switch
-  //    straight to the Prescribe ATC screen, and DON'T open a new tab. (This Zoom
-  //    page is cross-origin isolated, so window.open can't reach/reuse that tab by
-  //    name — BroadcastChannel is the only cross-tab path. The browser won't let
-  //    that background tab foreground itself, so the host switches to it manually.)
-  //  • If no Studio tab answers → open a new tab.
-  // The Zoom call is never navigated. Runs in the click gesture so the fallback
-  // open isn't popup-blocked.
+  // Go to the "Prescribe ATC" step of Dynamic Studio, VISIBLY: open it in a new
+  // tab that comes to the FRONT, so the click always lands the host on the screen.
+  //
+  // Why a new tab and not "switch to your already-open Studio tab": the browser
+  // lets a page open + focus a tab it CREATES on your click, but forbids a page
+  // from pulling your view to a DIFFERENT, pre-existing tab it didn't create
+  // (anti-hijack) — and this Zoom page is cross-origin isolated (for its video),
+  // so it can't even reference that tab. So reusing + foregrounding the existing
+  // Studio tab is impossible; a fresh front tab is the only visible option.
+  // The stable window name makes repeat clicks reuse + refocus this same tab
+  // rather than piling up new ones. The Zoom call is never navigated.
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
-
-    // NO spare/blank tab (that's what caused the flash). A deferred window.open
-    // (~250ms later) is NOT popup-blocked — the click's transient activation is
-    // still valid — so we can just wait for a Studio tab to answer and only open
-    // a tab if none does.
-    let settled = false;
-    const openNewTab = () => {
-      if (settled) return;
-      settled = true;
-      window.open(url, 'starlabsDynamicStudio');
-    };
-
-    try {
-      const channel = new BroadcastChannel('starlabs-dynamic-studio');
-      channel.onmessage = (ev: MessageEvent) => {
-        if (ev?.data?.type === 'studio-here' && !settled) {
-          // A Studio tab is open and switched itself to the step → NO new tab,
-          // NO flash. The browser won't let that BACKGROUND tab foreground
-          // itself, so without feedback the click looks like "nothing happened".
-          // Show a visible toast telling the host to switch to that tab.
-          settled = true;
-          try { channel.close(); } catch { /* ignore */ }
-          this.ngZone.run(() => this.snackBar.open(
-            'Prescribe ATC opened in your Dynamic Studio tab — switch to that tab.',
-            'Close',
-            { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
-          ));
-        }
-      };
-      channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
-      // No Studio tab answered → open a fresh one (deferred open still allowed).
-      setTimeout(() => { openNewTab(); try { channel.close(); } catch {} }, 250);
-    } catch {
-      openNewTab();
-    }
+    const w = window.open(url, 'starlabsDynamicStudio');
+    try { w?.focus(); } catch { /* ignore */ }
   }
 
   handleKeyDown(event: KeyboardEvent) {
