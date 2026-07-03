@@ -40,10 +40,11 @@
 }
 
 .float {
-position: fixed;
-  bottom: 12px;
-  right: 90px;
-  /* sits just left of Zoom's End button */
+  position: fixed;
+  /* Sits ABOVE the Zoom control bar on the LEFT — clear of the End /
+     "End meeting for all" controls (bottom-right) and their upward popup. */
+  bottom: 88px;
+  left: 16px;
   z-index: 99999;
   background-color: #f12155;
   color: white;
@@ -56,13 +57,14 @@ position: fixed;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-/* Host-only "Prescribe ATC" bubble — stacked just above the capture button,
-   left of Zoom's End control. Uses the Dynamic Studio prescribe-step accent
-   (#ef4444) so it reads as the same action across surfaces. */
+/* Host-only "Prescribe ATC" bubble — stacked just above the capture button on
+   the LEFT, above the Zoom control bar. Kept away from the End /
+   "End meeting for all" controls at the bottom-right. Uses the Dynamic Studio
+   prescribe-step accent (#ef4444) so it reads as the same action across surfaces. */
 .prescribe-bubble {
   position: fixed;
-  bottom: 56px;
-  right: 90px;
+  bottom: 132px;
+  left: 16px;
   z-index: 99999;
   display: inline-flex;
   align-items: center;
