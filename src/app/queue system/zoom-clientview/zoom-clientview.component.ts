@@ -406,21 +406,23 @@ export class ZoomClientviewComponent {
       ZM.inMeetingServiceListener('onUserLeave', () => this.refreshRemoteCountSnapshot());
       ZM.inMeetingServiceListener('onUserUpdate', () => this.refreshRemoteCountSnapshot());
       const handleRecordingChange = (data: any) => {
-        // Zoom Client View (SDK 6.1.0) fires `onRecordingChange` with a NUMERIC
-        // action code — the SDK's own enum is { stop: 0, start: 1, pause: 2 } —
-        // typically as `data.state` (some builds pass a bare number, or string
-        // states like 'Recording' / 'Paused' / 'Stopped' / 'Connecting'). Read
-        // the numeric code first, then fall back to the string shapes.
+        // Zoom Client View (SDK 6.1.0) fires `onRecordingChange` with the state on
+        // `data.recording` as a STRING — verified live: { recording: 'recording' }
+        // while running, { recording: 'pause' } when paused (and 'stop'/'none'
+        // shapes for stopped). Read `data.recording` FIRST; keep the other field
+        // names + a numeric fallback for other SDK builds.
         let newStatus: 'started' | 'paused' | 'stopped' | 'unknown' = this.recordingStatus;
-        const code =
+        const numeric =
           typeof data === 'number' ? data :
           typeof data?.state === 'number' ? data.state :
           typeof data?.action === 'number' ? data.action : null;
-        if (code !== null) {
-          newStatus = code === 2 ? 'paused' : code === 1 ? 'started' : code === 0 ? 'stopped' : newStatus;
-          console.log('[recording-prompt] status event code=', code, 'payload=', data);
+        if (numeric !== null) {
+          // SDK numeric enum: { stop: 0, start: 1, pause: 2 }
+          newStatus = numeric === 2 ? 'paused' : numeric === 1 ? 'started' : numeric === 0 ? 'stopped' : newStatus;
+          console.log('[recording-prompt] status event code=', numeric, 'payload=', data);
         } else {
           const raw = (
+            data?.recording ??
             data?.state ??
             data?.recordingStatus ??
             data?.status ??
@@ -428,10 +430,10 @@ export class ZoomClientviewComponent {
           ).toString();
           const s: string = raw.toLowerCase();
           console.log('[recording-prompt] status event raw=', raw, 'payload=', data);
-          // Order matters — "NotRecording"/"Stopped" must classify as stopped
-          // before the 'record' check would label it 'started'. "Paused" /
-          // "PauseRecord" must hit the paused branch before 'record' steals it.
-          if (s.includes('not') || s.includes('stop') || s.includes('end') || s.includes('disconnect')) {
+          // Order matters — "none"/"stop" must classify as stopped before the
+          // 'record' check would label it 'started'. "pause"/"Paused" must hit the
+          // paused branch before 'record' steals it.
+          if (s.includes('not') || s.includes('stop') || s.includes('end') || s.includes('disconnect') || s.includes('none')) {
             newStatus = 'stopped';
           } else if (s.includes('paus')) {
             newStatus = 'paused';
