@@ -4546,6 +4546,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
           metadata: {
             'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
           }

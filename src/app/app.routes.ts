@@ -31,13 +31,11 @@ export const routes: Routes = [
   {path: 'deliveryactivities', loadComponent: () => import('./Product Designer/delivery-set/delivery-set.component').then(m => m.DeliverySetComponent), canActivate:[authGuard]},
   {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
   {path: 'arena/:queueid/:stage', loadComponent: () => import('./queue system/arena-board/arena-board.component').then(m => m.ArenaBoardComponent), canActivate:[authGuard]},
-  {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
-  {path: 'arena/:queueid/:stage', loadComponent: () => import('./queue system/arena-board/arena-board.component').then(m => m.ArenaBoardComponent), canActivate:[authGuard]},
   {path: 'formtemplate', loadComponent: () => import('./Product Designer/delivery-set/formtemplate/formtemplate.component').then(m => m.FormtemplateComponent), canActivate:[authGuard]},
   {path: 'queuelist', loadComponent: () => import('./queue system/queue-list/queue-list.component').then(m => m.QueueListComponent), canActivate:[authGuard]},
   // {path: 'content-upload-v2', loadComponent: () => import('./content-upload-version2/content-upload-version2.component').then(m => m.ContentUploadVersion2Component)},
   // {path: 'userprofile_old/:id', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
-
+  {path: 'eiflixtelemetry', loadComponent: () => import('./eiflix-telemetry/eiflix-telemetry.component').then(m => m.EiflixTelemetryComponent), canActivate:[authGuard]},
   {
     path: 'content-upload-v2',
     loadComponent: () =>
@@ -215,6 +213,8 @@ export const routes: Routes = [
 
   // Journey Onboarding
   {path: 'salesleads', loadComponent: () => import('./Journey Onboarding/saleslead/saleslead.component').then(m => m.SalesleadComponent), canActivate:[authGuard]},
+  {path: 'sales-numbers', loadComponent: () => import('./Journey Onboarding/sales-numbers/sales-numbers.component').then(m => m.SalesNumbersComponent), canActivate:[authGuard]},
+  {path: 'sales-teams', loadComponent: () => import('./Journey Onboarding/sales-teams/sales-teams.component').then(m => m.SalesTeamsComponent), canActivate:[authGuard]},
   {path: 'onboardingremarks', loadComponent: () => import('./Journey Onboarding/onboarding-remark/onboarding-remark.component').then(m => m.OnboardingRemarkComponent), canActivate: [authGuard]},
   {path: 'opportunities', loadComponent: () => import('./Journey Onboarding/journeycoach-opportunities/journeycoach-opportunities.component').then(m => m.JourneycoachOpportunitiesComponent), canActivate: [authGuard]},
   {path: 'JourneycoachDashboard-new', loadComponent: () => import('./Journey Onboarding/journeycoach-dashboard/journeycoach-dashboard.component').then(m => m.JourneycoachDashboardComponent), canActivate:[authGuard]},
