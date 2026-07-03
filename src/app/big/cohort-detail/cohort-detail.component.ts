@@ -1004,14 +1004,12 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   toggleOpenVidu(studio) {
-    // console.log(studio["checkin"],!studio["checkin"]);
     updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), {
       openvidu: !(studio['openvidu'] ?? false),
     });
   }
 
   deleteStudio(studio) {
-    // console.log(studio['docid']);
     updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), {
       delete: true,
     });
@@ -1032,7 +1030,6 @@ export class CohortDetailComponent implements OnDestroy {
       (q) => q?.docid === this.selectedQueue,
     );
 
-    console.log('selected queue',queue ,this.searchableQueueList)
     if (!this.selectedQueue || !queue) {
       this.liveAssignmentList = [];
       this.studioPairingList = [];
@@ -1222,8 +1219,7 @@ export class CohortDetailComponent implements OnDestroy {
           return r;
         }, {});
         this.studioPreAssign = localPreAssign;
-        // console.log(this.stageTokenMap)
-        // console.log(this.studioPreAssign)
+        
       });
   }
 
@@ -1350,8 +1346,7 @@ export class CohortDetailComponent implements OnDestroy {
   updatePreAssigned(studioid, value) {
     var batch = writeBatch(this.firestore);
     var selectedToken = value.map((e) => e['docid']);
-    // console.log("Selected Token", selectedToken)
-    // console.log("Assigned Token", assignedToken)
+    
     let stages = Object.keys(this.stageStudioMap).filter((element) => {
       let studioList = this.stageStudioMap[element].filter(
         (e) => e['docid'] == studioid,
@@ -1468,7 +1463,6 @@ createStudioCombination() {
       const participants = studio['participants'] || [];
       const activityMap = studio['participantsactivity'] || {};
       const cohortActivity = this.cohort['bigactivity'];
-      // console.log(cohortActivity , )
       if (
         participants.length === participantList.length &&
         Object.values(activityMap).includes(cohortActivity)
@@ -1878,7 +1872,6 @@ createStudioCombination() {
     event.stopPropagation()
     this.dragPayload = { kind: 'studio', studioIndex , participantId  }
     event.dataTransfer.effectAllowed = 'move'
-    console.log('drag success ')
     try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
   }
 
@@ -1887,29 +1880,22 @@ createStudioCombination() {
     event.stopPropagation()
     this.dragPayload = { kind: 'participant', participantId  }
     event.dataTransfer.effectAllowed = 'move'
-    console.log('drag success ')
     try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
   }
 
   onStudioDragOver(event: DragEvent) {
-    console.log('message from onstudiodragover');
     if (!this.dragPayload) return
     event.preventDefault()
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
   }
 
   async onStudioDrop(event: DragEvent, studioIndex: any) {
-    console.log('on drpo')
     event.preventDefault()
     event.stopPropagation()
     const payload = this.dragPayload
     this.dragPayload = null
-    console.log(payload)
-    console.log('inside of studio')
     if (!payload || [null , undefined , ''].includes(studioIndex)) return
-    console.log('inside of studio' , 1)
     if (payload.kind === 'participant' && payload.participantId) {
-      console.log('inside of studio' , 2)
       this.newStudioPairing = this.newStudioPairing.map((studio , index)=>{
       if (
         index === studioIndex &&
@@ -1923,8 +1909,6 @@ createStudioCombination() {
 
       return {...studio}
       });
-
-      console.log(this.newStudioPairing)
 
       this.calculateUnassignedParticipants();
     } else if(payload.kind === 'studio' && payload.participantId && ![null , undefined , ''].includes(payload.studioIndex)){
@@ -1951,7 +1935,4 @@ createStudioCombination() {
     }
   }
 
-  selectionChange(value){
-    console.log(value)
-  }
 }

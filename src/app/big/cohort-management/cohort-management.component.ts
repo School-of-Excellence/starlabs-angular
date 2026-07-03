@@ -188,9 +188,9 @@ export class CohortManagementComponent {
 
   async moveSelectedParticipantsTo(sourceCohort: any, targetCohort: any): Promise<void> {
     const ids = Array.from(this.selectedParticipantIds)
-    if(ids.length) return
+    if(ids.length === 0) return
       // Await each move so the isMovingParticipant guard releases between calls
-    this.moveParticipantToCohort(ids, sourceCohort, targetCohort)
+    await this.moveParticipantToCohort(ids, sourceCohort, targetCohort)
     
     this.selectedParticipantIds.clear()
     this.participantSelectCohortId = null
@@ -484,7 +484,6 @@ export class CohortManagementComponent {
       const activeLiveAssignment = await getDocs(query(collection(this.firestore , 'live assignment') , where('status' , '==' , 'live') , where('studioid' , 'in' , studioIds)));
 
       if(activeLiveAssignment.docs.length > 0){
-        console.log(activeLiveAssignment)
         return true;
       }
       }
@@ -1023,7 +1022,6 @@ export class CohortManagementComponent {
         const data: any = e.data();
         return this.bigActivityMap[e.id] = data;
       });
-      console.log(this.bigActivityMap);
     });
   }
 
@@ -1235,7 +1233,6 @@ export class CohortManagementComponent {
     });
 
     const selectedQueueRef = this.selectedQueueEvent.map(id => doc(this.firestore, 'queue generation', id));
-    console.log(selectedQueueRef[0].path);
 
     this.queuestudioSubscription = collectionSnapshots(
       query(
@@ -1244,7 +1241,6 @@ export class CohortManagementComponent {
         orderBy("created", "desc")
       )
     ).pipe(takeUntil(this.subscription)).subscribe(snapData => {
-      console.log(snapData.length);
 
       this.studioPairingList = snapData.map(doc => ({ id: doc.id, docid: doc.id, ...doc.data() }));
 
@@ -1577,7 +1573,6 @@ export class CohortManagementComponent {
       if(result){
         for(let participant of result){
           const uid = (await this.getUidsFromProfileIds([participant.profileId]))[0];
-          // console.log(await this.getUidsFromProfileIds([participant.profileId]));
 
           (participant.cohorts ?? []).forEach((cohort)=>{
             batch.update(cohort['chatref'] , {
@@ -1838,14 +1833,13 @@ export class CohortManagementComponent {
         let sorucecohortmembers = [];
         let targetcohortmembers = [];
         
-        if(sourceCohort?.chatref.path) { sorucecohortmembers = (await getDoc(doc(this.firestore, sourceCohort?.chatref.path))).data()['members'] ?? [] }
-        if(targetCohort?.chatref.path) targetcohortmembers = (await getDoc(doc(this.firestore, targetCohort?.chatref.path))).data()['members'] ?? [];
+        if(sourceCohort?.chatref?.path) { sorucecohortmembers = (await getDoc(doc(this.firestore, sourceCohort?.chatref.path))).data()['members'] ?? [] }
+        if(targetCohort?.chatref?.path) targetcohortmembers = (await getDoc(doc(this.firestore, targetCohort?.chatref.path))).data()['members'] ?? [];
 
         const data = [];
 
         for (let pid of participantId) {
           const uid = (await this.getUidsFromProfileIds([pid]))[0];
-          console.log(uid)
           const d = {
             profileId: pid,
             uid : uid,
@@ -1872,7 +1866,6 @@ export class CohortManagementComponent {
 
 
         this.chatConfigModelData = data
-        console.log(this.chatConfigModelData);
         this.chatModelRef = this.dialog.open(this.chatConfig);
 
         const result = await this.chatModelRef.afterClosed().toPromise();
@@ -2497,7 +2490,6 @@ export class CohortManagementComponent {
   }
 
   setCategoryFilter(category: 'all' | 'studio' | 'readiness' | 'educational' | 'operational') {
-    console.log('comes in')
     this.categoryFilter = category;
     this.categoryDropdownOpen = false;
     this.onFilter();

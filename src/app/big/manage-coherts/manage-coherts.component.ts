@@ -285,6 +285,7 @@ export class ManageCohertsComponent {
   }
 
   clearActivity(){
+    console.log(this.cohortsForm.controls['bigactivity'].value);
     this.cohortsForm.controls['bigactivity'].setValue(null)
   }
 
@@ -934,7 +935,6 @@ export class ManageCohertsComponent {
   // Fetch participants from 'event participation request' when event is selected
   async onChangeEvent() {
     const eventRef = this.cohortsForm.get("eventref")?.value;
-    console.log('selected event : ' , eventRef.id)
     
     // DON'T reset participants when event changes - keep the selection
     // this.selectedParticipants = [];
@@ -985,13 +985,8 @@ export class ManageCohertsComponent {
         
         this.bigInvitationCount = participantsNotInCohort.length;
         this.participantsApprovedForEvent = Array.from(approvedParticipant.values())
-        console.log('  qdwedw ' , Array.from(approvedParticipant.values()))
-        
-        console.log(participantsNotInCohort);
-        console.log(this.data.totalParticipants);
         
         this.filteredParticipants = participantsNotInCohort;
-        console.log(this.filteredParticipants);
         
         this.filteredParticipantsList = [...this.filteredParticipants];
         console.log('Filtered participants with names:', this.filteredParticipants.length);
@@ -1166,7 +1161,6 @@ export class ManageCohertsComponent {
     let { removed } = this.getParticipantChanges(cohortData['participantidlist'] || []);
     const removedUids = await this.getUidsFromProfileIds(removed);
     const exceptionUids = await this.getUidsFromProfileIds(this.removedParticipantsInChat);
-    console.log('comes in')
     
     try {
       // Convert selected participant profile IDs to UIDs

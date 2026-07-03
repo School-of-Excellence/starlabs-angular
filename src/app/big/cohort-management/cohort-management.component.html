@@ -84,7 +84,7 @@
           (click)="$event.stopPropagation(); toggleZoneInSelection(option.ref.id)">
           <mat-icon>{{isZoneSelected(option.ref.id) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
           <div class="zone-option">
-            <span class="zone-name">{{option.name}}</span>
+            <span class="zone-name">{{option.zonename}}</span>
             <span class="zone-sub" *ngIf="option.cohorts?.length">
               {{option.cohorts.length}} cohort(s) · {{mapAcceleratorEvent[option.eventref?.id] || 'No event'}}
             </span>
@@ -543,7 +543,7 @@
                 <div>
                   <div class="cp-row row"
                     *ngFor="let participant of (isParticipantExpanded(cohorts['docid'])
-                      ? getFilteredParticipants(cohorts).slice(0,5)
+                      ? getFilteredParticipants(cohorts)
                       : getFilteredParticipants(cohorts).slice(0,5))"
                     [class.selectable]="isParticipantSelectActive(cohorts['docid'])"
                     [class.checked]="isParticipantSelectActive(cohorts['docid']) && isParticipantChecked(participant)"
@@ -906,7 +906,6 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end" class="dialog-actions">
-    <button mat-stroked-button  (click)="chatModelClose(false)">Cancel</button>
-    <button mat-raised-button color="primary" (click)="chatModelClose(chatConfigModelData)">Next</button>
+    <button mat-raised-button color="primary" (click)="chatModelClose(chatConfigModelData)">Apply</button>
   </mat-dialog-actions>
 </ng-template>
