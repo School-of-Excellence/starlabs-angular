@@ -826,20 +826,6 @@ export class ZoomClientviewComponent {
                   this.isJoined = true;
                 });
 
-                // Safari sizes the SDK gallery to a stale/short window height at
-                // join time (its innerHeight differs from Chrome and isn't
-                // re-measured after layout settles) — leaving a white strip below
-                // the gallery and clipping the top of the video-off name labels
-                // the SDK draws. Fire a few `resize` events after join so the SDK
-                // re-lays-out to the correct current size. No-op on Chrome.
-                this.ngZone.runOutsideAngular(() => {
-                  [150, 600, 1200].forEach(delay => {
-                    setTimeout(() => {
-                      try { window.dispatchEvent(new Event('resize')); } catch { /* ignore */ }
-                    }, delay);
-                  });
-                });
-
                 // Host has actually entered the Zoom meeting — release any
                 // participant waiting on the studio gate, and start the
                 // heartbeat so participants can tell when the host leaves.
@@ -966,9 +952,16 @@ export class ZoomClientviewComponent {
       channel.onmessage = (ev: MessageEvent) => {
         if (ev?.data?.type === 'studio-here' && !settled) {
           // A Studio tab is open and switched itself to the step → NO new tab,
-          // NO flash.
+          // NO flash. The browser won't let that BACKGROUND tab foreground
+          // itself, so without feedback the click looks like "nothing happened".
+          // Show a visible toast telling the host to switch to that tab.
           settled = true;
           try { channel.close(); } catch { /* ignore */ }
+          this.ngZone.run(() => this.snackBar.open(
+            'Prescribe ATC opened in your Dynamic Studio tab — switch to that tab.',
+            'Close',
+            { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
+          ));
         }
       };
       channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
