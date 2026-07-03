@@ -793,9 +793,12 @@ export class ZoomClientviewComponent {
         console.log("zoom");
 
         ZoomMtg.init({
+          // Host lands back on their Dynamic Studio; a participant is sent to
+          // the queue web screen (NOT the participant studio) after the host
+          // ends the call.
           leaveUrl: this.profileHost
             ? `${window.location.origin}/dynamicstudio`
-            : `${window.location.origin}/participantstudio`,
+            : `${window.location.origin}/queue-web`,
           patchJsMedia: true,
           defaultView: 'gallery',
           success: (success: any) => {

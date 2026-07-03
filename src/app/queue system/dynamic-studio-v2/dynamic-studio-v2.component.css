@@ -4180,6 +4180,8 @@
 .studio-icon mat-icon { font-size: 20px; width: 20px; height: 20px; color: #6D28D9; }
 .studio-name { font-size: 14.5px; font-weight: 800; color: #0D0F12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .studio-queue { font-size: 12px; color: #6B7280; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-specialists { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #4B5563; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-specialists mat-icon { font-size: 14px; width: 14px; height: 14px; line-height: 14px; color: #9CA3AF; flex-shrink: 0; }
 .studio-live { color: #16A34A; font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
 .studio-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; border-top: 1px solid #F3F4F6; padding-top: 11px; }
 .studio-spec { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; min-width: 0; }

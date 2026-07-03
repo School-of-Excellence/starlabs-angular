@@ -78,12 +78,19 @@
   height: clamp(24px, 3.7vh, 32px) !important;
 }
 
+/* Fill exactly the space BELOW the sticky toolbar so the document never
+   overflows the viewport. Previously .drawer-container was a full 100vh while
+   sitting under the ~64px toolbar, making the page (toolbar + 100vh) taller
+   than the viewport — that extra height was the stray "overall" page scroll,
+   and scrolling the body dragged the sticky toolbar with it. The toolbar-height
+   expression is kept IN SYNC with .toolbar's clamp() above. */
 .mainscreen{
-  height: max-content;
+  height: calc(100vh - clamp(40px, 7.4vh, 64px));
+  overflow: hidden;
 }
 
 .drawer-container{
-  height: 100vh;
+  height: 100%;
   width: 100%;
 }
 

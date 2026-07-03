@@ -210,6 +210,15 @@ body {
   width: 80vw;
   flex-direction: column;
 }
+/* Enter-studio "Participant accepted" popup — rounded white card */
+.enter-studio-dialog .mat-mdc-dialog-surface {
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, .18) !important;
+}
+.enter-studio-dialog .mat-mdc-dialog-container {
+  --mdc-dialog-container-color: #fff;
+}
 /* =============================================================
    Dynamic Studio V2 — body scroll lock
    When the studio takes over the viewport with position:fixed,
@@ -244,6 +253,19 @@ html:has(.dyn-studio-v2-app) {
     min-height: 100vh;
   }
 }
+
+/* =============================================================
+   Zoom meeting view — kill the Safari white strip.
+   Safari sizes the Zoom SDK gallery a touch under the window height, so the
+   default white page background showed as a strip along the bottom (Chrome
+   filled it). Paint ONLY the outer document background black — it sits BEHIND
+   #zmmtg-root and its control bar, so the gap reads black without covering the
+   Zoom controls. COLOR-ONLY, no layout change (won't clip names). Scoped to the
+   meeting view via #zmmtg-root (only present on that route).
+   NOTE: do NOT also set `#zmmtg-root { background:#000 }` — that paints over the
+   Zoom control toolbar area and hides the controls in Safari.
+   ============================================================= */
+body:has(#zmmtg-root) { background: #000; }
 
 /* =============================================================
    Event Participation Confirmations — CDK overlay theming.
@@ -301,3 +323,31 @@ html:has(.dyn-studio-v2-app) {
 
 /* Snackbars (sx-snack via MAT_SNACK_BAR_DEFAULT_OPTIONS) */
 .sx-snack { --mdc-snackbar-container-shape: 12px; --mat-snack-bar-button-color: #4da3ff; }
+
+/* ============================================================
+   Safari-only fix: the Zoom Meeting SDK footer control bar (Unmute / Video /
+   Participants / … / Leave) renders hidden/behind the video in Safari while it
+   works in Chrome. `@supports (-webkit-hyphens: none)` matches Safari only, so
+   Chrome/Firefox are untouched. Pin the footer to the viewport bottom, force it
+   on top of the video canvas, and make it (and its icons) visible.
+   ============================================================ */
+@supports (-webkit-hyphens: none) {
+  #zmmtg-root .footer.main-footer {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 2147482000 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  #zmmtg-root .footer.main-footer,
+  #zmmtg-root .footer.main-footer * {
+    visibility: visible !important;
+  }
+  #zmmtg-root .footer.main-footer svg,
+  #zmmtg-root .footer.main-footer .footer-button-base__img-layer {
+    opacity: 1 !important;
+  }
+}

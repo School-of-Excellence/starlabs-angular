@@ -38,6 +38,11 @@
           <div style="flex:1;min-width:0">
             <div class="studio-name">{{ s.activity }}</div>
             <div class="studio-queue">{{ s.queueName }}</div>
+            <!-- Specialist(s) working this studio — helps identify who's
+                 collaborating when several specialists share one studio. -->
+            <div class="studio-specialists" *ngIf="s.specialists" data-testid="studio-specialists">
+              <mat-icon>group</mat-icon>{{ s.specialists }}
+            </div>
           </div>
           <span class="studio-badge studio-badge--in" *ngIf="s.checkin" data-testid="studio-checkedin-badge">
             <span class="studio-badge__dot"></span>Checked in
@@ -1368,6 +1373,44 @@
         <button type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
           <mat-icon class="ic">logout</mat-icon>
           Check out &amp; continue
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+
+  <!-- Hard-block alert: a co-specialist on this studio is already live in
+       another studio, so check-in is refused (they can't be in two at once). -->
+  <ng-template #collaboratorBusyTpl let-data>
+    <div class="checkin-conflict">
+      <header class="checkin-conflict__head">
+        <mat-icon class="ic">block</mat-icon>
+        <h3 class="checkin-conflict__title">Can't check in — a collaborator is busy</h3>
+      </header>
+      <div class="checkin-conflict__body">
+        <p class="checkin-conflict__copy">
+          The following specialist on this studio is already in an activity in
+          another studio. You can check in once they finish there:
+        </p>
+        <ul class="checkin-conflict__studios">
+          <li *ngFor="let c of data.collaborators; trackBy: trackByDocId">
+            <mat-icon class="ic">person</mat-icon>
+            <div class="checkin-conflict__studio-info">
+              <div class="checkin-conflict__queue">{{ c.collaboratorName }}</div>
+              <div class="checkin-conflict__stage" *ngIf="c.stageName">
+                <mat-icon class="ic ic-sm">arrow_forward</mat-icon>
+                <span>{{ c.stageName }}</span>
+                <span class="checkin-conflict__live-tag">LIVE</span>
+              </div>
+              <div class="checkin-conflict__stage checkin-conflict__stage--muted" *ngIf="!c.stageName">
+                <span>In a live activity elsewhere</span>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <footer class="checkin-conflict__foot">
+        <button type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
+          Got it
         </button>
       </footer>
     </div>

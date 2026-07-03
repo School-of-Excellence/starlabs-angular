@@ -371,26 +371,32 @@
   color: #334155;
 }
 .rec-prompt-card__hint {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;    /* keep icon aligned to the first line when text wraps */
   gap: 8px;
-  padding: 9px 16px;          /* unchanged */
+  padding: 9px 16px;
   margin-bottom: 22px;
   background: #fef3c7;
   border: 1px solid #fcd34d;
-  border-radius: 10px;        /* was 999px */
+  border-radius: 10px;
   font-size: 12.5px;
   font-weight: 600;
   color: #92400e;
-  width: 100%;                /* add this */
-  box-sizing: border-box;     /* add this */
-  text-align: left;           /* add this */
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+.rec-prompt-card__hint > span {
+  flex: 1;                    /* the whole message is a single flowing block */
+  line-height: 1.5;
 }
 .rec-prompt-card__hint mat-icon {
+  flex-shrink: 0;            /* icon stays 16px, never squeezed by the text */
   font-size: 16px;
   width: 16px;
   height: 16px;
   line-height: 16px;
+  margin-top: 1px;
   color: #b45309;
 }
 .rec-prompt-card__actions {
