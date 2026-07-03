@@ -231,8 +231,8 @@ html:has(.dyn-studio-v2-app) {
    browser zoom) it re-enters normal document flow, so the host page must be
    allowed to scroll again — otherwise the overflowing content is stuck with
    no scrollbar. Keep these breakpoints in sync with the .ds-app un-pin rule
-   in dynamic-studio-v2.component.css (max-width:640px / max-height:380px). */
-@media (max-width: 640px), (max-height: 380px) {
+   in dynamic-studio-v2.component.css (max-width:459px / max-height:380px). */
+@media (max-width: 459px), (max-height: 380px) {
   body:has(.dyn-studio-v2-app),
   html:has(.dyn-studio-v2-app) {
     overflow: auto !important;

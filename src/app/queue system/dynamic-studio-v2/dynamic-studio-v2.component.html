@@ -45,7 +45,6 @@
           <mat-icon class="studio-live" *ngIf="s.isLive" data-testid="studio-live-tv-icon">live_tv</mat-icon>
         </div>
         <div class="studio-foot">
-          <span class="studio-spec"><mat-icon>group</mat-icon>{{ s.specialists }}</span>
           <span class="studio-open">Open <mat-icon>chevron_right</mat-icon></span>
         </div>
       </div>
@@ -55,7 +54,7 @@
   <!-- ============ LIST: a studio is selected — check-in + waiting ============ -->
   <ng-container *ngIf="liveAssignment == null && selectedStudio['docid']">
     <button class="ds-back-link" (click)="backToStudios()" data-testid="studio-back-link">
-      <mat-icon>chevron_left</mat-icon> All studios
+      <mat-icon>arrow_back</mat-icon> Back to all studios
     </button>
     <div class="ds-list-head">
       <span class="studio-icon"><mat-icon>sensors</mat-icon></span>
@@ -245,9 +244,17 @@
                 </div>
               </div>
             </div>
+            <!-- This stage has no one waiting. -->
+            <div *ngIf="!stage.tokenlist?.length" class="wait-empty">
+              <mat-icon class="ic">group_off</mat-icon> No participants
+            </div>
           </div>
         </div>
       </div>
+    </div>
+    <!-- Checked in, but NO stages exist / nobody is waiting anywhere. -->
+    <div *ngIf="!stageTokenList?.length" class="wait-empty wait-empty--all">
+      <mat-icon class="ic">group_off</mat-icon> No participants waiting
     </div>
   </div>
 
@@ -332,11 +339,11 @@
         </button>
       </div>
       <div class="ds-topbar2__right">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn" title="Invite More">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn">
           <mat-icon class="ic">person_add</mat-icon>
           Invite More
         </button>
-        <button type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()" title="Send back to Waiting Again">
+        <button type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()">
           <mat-icon class="ic">undo</mat-icon>
           Send back to Waiting Again
         </button>
@@ -344,14 +351,15 @@
           <button type="button" class="btn btn-green btn-sm"
                   (click)="toggleNextStageMenu('header')"
                   [class.is-open]="nextStageMenuOpen === 'header'"
-                  title="Complete the session and choose where this participant goes next"
+                  matTooltip="Complete the session and choose where this participant goes next"
+                  matTooltipShowDelay="150"
                   data-testid="studio-move-next-stage-btn">
             Move Next Stage
             <mat-icon class="ic">arrow_forward</mat-icon>
           </button>
           <ng-container *ngIf="nextStageMenuOpen === 'header'">
             <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
-            <div class="ds-nextmenu ds-nextmenu--down">
+            <div class="ds-nextmenu ds-nextmenu--center">
               <div class="ds-nextmenu__head">Choose next stage</div>
               <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
             </div>
@@ -581,41 +589,20 @@
 
           <!-- ========================= STEP 4: Zoom Session ========================= -->
           <ng-container *ngIf="activeStepId === 'getstarted'">
-            <div class="zoom-intro">
-              <div class="zoom-intro__avatar">
-                <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
-                  [src]="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
-                  [alt]="mapProfile[participantProfileId]">
-                <span *ngIf="!(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile)">
-                  {{ (mapProfile[participantProfileId] || '?').charAt(0) | uppercase }}
-                </span>
-              </div>
-              <div>
-                <div class="zoom-intro__title">
-                  <ng-container *ngIf="participantReady">{{ mapProfile[participantProfileId] }} is ready &amp; waiting</ng-container>
-                  <ng-container *ngIf="!participantReady">Ready to meet {{ mapProfile[participantProfileId] }}</ng-container>
-                </div>
-                <div class="zoom-intro__sub">
-                  <ng-container *ngIf="participantReady">
-                    They have opened the meeting screen and are standing by. Start the call when you're ready.
-                  </ng-container>
-                  <ng-container *ngIf="!participantReady">
-                    Choose how to connect. The participant has already been invited.
-                  </ng-container>
-                </div>
-              </div>
-            </div>
-
             <div class="zoom-stack">
               <!-- In-house Meeting (primary, full width) -->
               <div class="choice choice--primary" *ngIf="selectedStudio['openvidu']">
-                <div class="choice-ic blue"><mat-icon class="ic">videocam</mat-icon></div>
-                <div class="choice-title">
-                  In-house Meeting
-                  <span class="pill pill-primary" style="margin-left:8px;">Recommended</span>
-                </div>
-                <div class="choice-desc">
-                  Start a secure video call right here in the app. No external link to share, no app switching — fastest way to begin the session.
+                <div class="choice-head">
+                  <div class="choice-ic blue"><mat-icon class="ic">videocam</mat-icon></div>
+                  <div class="choice-headtext">
+                    <div class="choice-title">
+                      In-house Meeting
+                      <span class="pill pill-primary" style="margin-left:8px;">Recommended</span>
+                    </div>
+                    <div class="choice-desc">
+                      Start a secure video call right here in the app. No external link to share, no app switching — fastest way to begin the session.
+                    </div>
+                  </div>
                 </div>
                 <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
                         (click)="joinOpenViduRoom()" data-testid="studio-openvidu-start-btn">
@@ -627,10 +614,14 @@
               <!-- Zoom Meeting (URL hidden — only the in-house Start Meeting button is used) -->
               <div class="choice choice--primary"
                    *ngIf="ongoingQueue['zoomlinkrequired'] != false && [false,undefined].includes(ongoingQueue['enablezoommeetingsdk']) && selectedStudio['openvidu'] != true">
-                <div class="choice-ic blue"><mat-icon class="ic">videocam</mat-icon></div>
-                <div class="choice-title">Zoom Meeting</div>
-                <div class="choice-desc">
-                  Start the call when you're ready. The participant has already been invited.
+                <div class="choice-head">
+                  <div class="choice-ic blue"><mat-icon class="ic">videocam</mat-icon></div>
+                  <div class="choice-headtext">
+                    <div class="choice-title">Zoom Meeting</div>
+                    <div class="choice-desc">
+                      Start the call when you're ready. The participant has already been invited.
+                    </div>
+                  </div>
                 </div>
                 <!-- Inline status: ready / pending / broken -->
                 <div class="zoom-status" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
@@ -651,6 +642,24 @@
                   <mat-icon class="ic">play_arrow</mat-icon>
                   <span class="start-meeting-btn__label">Start Meeting</span>
                 </button>
+
+                <!-- Generate a fresh link — MOVED inside this meeting card so it's
+                     part of the Start Meeting section, not a separate block. -->
+                <div class="zoom-regen"
+                     *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
+                  <div class="zoom-regen__text">
+                    <div class="choice-title">{{ isZoomLinkBroken ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
+                    <div class="choice-desc">Generate a new link — it's resent to the participant automatically.</div>
+                  </div>
+                  <button type="button" class="btn btn-sm"
+                          [class.btn-ghost]="!isZoomLinkBroken"
+                          [class.btn-primary]="isZoomLinkBroken"
+                          [disabled]="!isZoomLinkBroken && !zoomlinkGenerator"
+                          (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">
+                    <mat-icon class="ic">refresh</mat-icon>
+                    Generate new link &amp; resend
+                  </button>
+                </div>
 
                 <!-- Backup-link UX: the in-app Start Meeting button is the
                      primary path; the raw start_url is the fallback if it
@@ -682,28 +691,6 @@
                 Once the call starts, make sure Zoom recording is enabled.
               </div>
 
-              <!-- Generate new link & resend (mockup). Always available when zoom
-                   is enabled; disabled during the 10s throttle unless the link is
-                   broken (in which case regeneration is allowed immediately). -->
-              <div class="choice choice--secondary"
-                   *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
-                <div class="choice-secondary__head">
-                  <div class="choice-secondary__text">
-                    <div class="choice-title">{{ isZoomLinkBroken ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
-                    <div class="choice-desc">
-                      Generate a new link — it's resent to the participant automatically.
-                    </div>
-                  </div>
-                  <button type="button" class="btn btn-lg"
-                          [class.btn-ghost]="!isZoomLinkBroken"
-                          [class.btn-primary]="isZoomLinkBroken"
-                          [disabled]="!isZoomLinkBroken && !zoomlinkGenerator"
-                          (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">
-                    <mat-icon class="ic">refresh</mat-icon>
-                    Generate new link &amp; resend to participant
-                  </button>
-                </div>
-              </div>
             </div>
           </ng-container>
 
