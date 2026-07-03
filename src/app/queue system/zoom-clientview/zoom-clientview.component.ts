@@ -369,7 +369,10 @@ export class ZoomClientviewComponent {
       const ZM: any = ZoomMtg as any;
       ZM.inMeetingServiceListener('onMeetingStatus', (data: any) => {
         const status = data?.meetingStatus;
-        if (status !== 3 || this.meetingEndStamped) return; // 3 = disconnected/ended
+        if (status !== 3) return; // 3 = disconnected/ended
+        // Left / ended the call → hide the in-call controls (Capture / Prescribe ATC).
+        this.ngZone.run(() => { this.isJoined = false; });
+        if (this.meetingEndStamped) return;
         this.meetingEndStamped = true;
         const ref = doc(this.firestore, 'live assignment', this.documentId);
         if (this.profileHost) {
@@ -781,9 +784,10 @@ export class ZoomClientviewComponent {
           patchJsMedia: true,
           defaultView: 'gallery',
           success: (success: any) => {
-            this.ngZone.run(() => {
-              this.isJoined = true;
-            });
+            // NOTE: this is the SDK *init* success — the meeting isn't joined
+            // yet. `isJoined` (which gates the in-call Capture / Prescribe ATC
+            // buttons) is flipped in the ZoomMtg.join success below, so those
+            // controls only appear once the user is actually inside the call.
             console.log(success);
             var zoomConfig: zoomConfig = {
               sdkKey: "rjad2eLZSIKlamaIwi09tw",
@@ -799,6 +803,13 @@ export class ZoomClientviewComponent {
               success: (success: any) => {
                 console.log(success);
                 console.log("zoom successfully joined");
+
+                // Now actually inside the meeting — reveal the in-call controls
+                // (Capture / Prescribe ATC). Runs outside Angular (join is fired
+                // inside runOutsideAngular), so re-enter the zone to update the view.
+                this.ngZone.run(() => {
+                  this.isJoined = true;
+                });
 
                 // Host has actually entered the Zoom meeting — release any
                 // participant waiting on the studio gate, and start the
