@@ -924,81 +924,16 @@ export class ZoomClientviewComponent {
       .catch(error => console.error('Error updating clip timing:', error));
   }
 
-  // Go to the "Prescribe ATC" step of Dynamic Studio WITHOUT leaving the Zoom call
-  // (the current Zoom route is never navigated). If a Studio tab is already open,
-  // REUSE it (it switches to the step) and surface it (notification/snackbar +
-  // tab-title flash) rather than opening a duplicate; only open a new tab when no
-  // Studio tab answers. Runs in the click gesture so the fallback open isn't
-  // popup-blocked. See surfaceOpenStudioTab() for why we can't auto-focus it.
+  // Go to the "Prescribe ATC" step of Dynamic Studio. Open the tab DIRECTLY in
+  // the click gesture — the browser foregrounds it immediately, so it always
+  // opens visibly. The stable window name means repeat clicks reuse + refocus
+  // that same tab instead of piling up new ones. (We can't reuse the host's
+  // pre-existing, independently-opened Studio tab: this Zoom page is
+  // cross-origin isolated, so it can't target that tab by name — hence a
+  // dedicated Prescribe-ATC Studio tab.) The Zoom call is never navigated.
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
-
-    // Pre-open a tab synchronously (inside the click gesture) so we're never
-    // popup-blocked. This is an about:blank popup which — even though this Zoom
-    // page is cross-origin isolated — stays in our browsing-context group, so we
-    // keep a usable handle we can either navigate or discard.
-    let spare: Window | null = null;
-    try { spare = window.open('', '_blank'); } catch { spare = null; }
-
-    let settled = false;
-    const openFresh = () => {
-      if (settled) return;
-      settled = true;
-      if (spare && !spare.closed) spare.location.href = url;
-      else window.open(url, 'starlabsDynamicStudio');
-    };
-
-    try {
-      const channel = new BroadcastChannel('starlabs-dynamic-studio');
-      channel.onmessage = (ev: MessageEvent) => {
-        // An already-open studio tab answered → it switched to the Prescribe ATC
-        // step itself. Don't open a duplicate: discard the spare tab. The studio
-        // tab can't foreground itself (browsers block cross-tab focus), so tell
-        // the host where it went.
-        if (ev?.data?.type === 'studio-here' && !settled) {
-          settled = true;
-          try { spare?.close(); } catch { /* ignore */ }
-          try { channel.close(); } catch { /* ignore */ }
-          this.ngZone.run(() => this.surfaceOpenStudioTab());
-        }
-      };
-      // Ask any open studio tab to switch to the step.
-      channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
-      // No studio tab answered in time → turn the spare into a fresh studio tab.
-      setTimeout(() => { openFresh(); try { channel.close(); } catch {} }, 350);
-    } catch {
-      // BroadcastChannel unsupported → just use the spare / a new tab.
-      openFresh();
-    }
-  }
-
-  // An open Studio tab took the reuse ping. The browser will NOT let this
-  // cross-origin-isolated Zoom tab foreground the Studio tab (window.focus,
-  // named window.open under COOP, and SW focus-from-message all fail — verified).
-  // The ONE thing that can bring the existing tab to the front is a service-worker
-  // notification the host clicks (notificationclick → WindowClient.focus is
-  // allowed). So: if notifications are granted, show that click-to-focus
-  // notification; otherwise fall back to a snackbar. Either way the Studio tab is
-  // also flashing its own tab title.
-  private surfaceOpenStudioTab() {
-    const step = 'prescribe-atc';
-    const url = `${window.location.origin}/dynamicstudio?step=${step}`;
-    const controller = navigator.serviceWorker && navigator.serviceWorker.controller;
-    const canNotify = typeof Notification !== 'undefined' && Notification.permission === 'granted';
-    if (controller && canNotify) {
-      try { controller.postMessage({ type: 'notify-focus-studio', step, url }); } catch { /* ignore */ }
-      this.snackBar.open(
-        'Prescribe ATC is ready — click the notification to open your Studio tab.',
-        'Close',
-        { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
-      );
-    } else {
-      this.snackBar.open(
-        'Prescribe ATC is ready in your Dynamic Studio tab — switch to it to continue.',
-        'Close',
-        { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
-      );
-    }
+    window.open(url, 'starlabsDynamicStudio');
   }
 
   handleKeyDown(event: KeyboardEvent) {

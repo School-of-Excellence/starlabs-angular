@@ -215,12 +215,6 @@ export class DynamicStudioV2Component {
   // constructor — it would be overwritten by the visibleSteps re-sync. Instead we
   // stash the request here and apply it in that re-sync once the step exists.
   private pendingDeepLinkStep: string = ''
-  // Cross-tab channel: the in-call Zoom view (cross-origin-isolated, so it can't
-  // reach this tab by window name) pings this to switch the stepper to a step in
-  // an ALREADY-OPEN studio tab instead of the Zoom view opening a duplicate.
-  private studioChannel: BroadcastChannel | null = null
-  private studioTitleFlashTimer: any = null
-  private studioTitleOriginal: string = ''
   // Precomputed index of activeStepId within visibleSteps. Kept in sync at the
   // three points activeStepId / the step list can change (the visibleSteps
   // getter's re-sync block, setActiveStep, goToStep) so the template can read a
@@ -1166,80 +1160,6 @@ export class DynamicStudioV2Component {
     // studio screen produces no writes.
       this.startStudioPresence()
       this.requestNotificationPermission()
-      // Tag this tab so a same-group `window.open(url, 'starlabsDynamicStudio')`
-      // reuses it. (Won't help the cross-origin-isolated Zoom view — that path
-      // uses the BroadcastChannel below — but helps other same-group callers.)
-      try { if (!window.name) window.name = 'starlabsDynamicStudio' } catch { /* ignore */ }
-      this.wireStudioChannel()
-  }
-
-  // Listen for step-jump pings from the in-call Zoom view (same origin, other
-  // tab). On a ping we ack (so the Zoom view knows a studio tab exists and does
-  // NOT open a duplicate) and switch the stepper to the requested step. NOTE: a
-  // background tab cannot foreground itself (browser blocks cross-tab focus), so
-  // the Zoom view shows the host a "switch to your Studio tab" hint instead.
-  private wireStudioChannel() {
-    try {
-      this.studioChannel = new BroadcastChannel('starlabs-dynamic-studio')
-      this.studioChannel.onmessage = (ev: MessageEvent) => {
-        const data = ev?.data
-        if (data?.type !== 'goto-step' || !data.step) return
-        this.studioChannel?.postMessage({ type: 'studio-here' })
-        this.ngZone.run(() => {
-          this.jumpToStep(data.step)
-          try { window.focus() } catch { /* cross-tab focus is blocked; best-effort */ }
-          // Browsers won't let this background tab foreground itself, so make it
-          // easy to spot in the tab bar: flash the tab title until the host
-          // switches to it. Stops the moment the tab becomes visible.
-          this.flashStudioTab()
-        })
-      }
-    } catch { /* BroadcastChannel unsupported — Zoom view falls back to a new tab */ }
-
-    // Also handle a goto-step delivered by the service worker (fired when the host
-    // clicks the "Prescribe ATC" notification, which focuses this tab).
-    try {
-      navigator.serviceWorker?.addEventListener('message', (ev: MessageEvent) => {
-        const data = ev?.data
-        if (data?.type !== 'goto-step' || !data.step) return
-        this.ngZone.run(() => this.jumpToStep(data.step))
-      })
-    } catch { /* ignore */ }
-  }
-
-  // Blink the browser tab title so an already-open (but background) studio tab is
-  // noticeable after a Prescribe ATC ping. Auto-stops on tab focus or after 30s.
-  private flashStudioTab() {
-    if (typeof document === 'undefined' || !document.hidden) return
-    if (this.studioTitleFlashTimer) return // already flashing
-    this.studioTitleOriginal = document.title
-    let on = false
-    const stop = () => {
-      if (this.studioTitleFlashTimer) { clearInterval(this.studioTitleFlashTimer); this.studioTitleFlashTimer = null }
-      if (this.studioTitleOriginal) document.title = this.studioTitleOriginal
-      document.removeEventListener('visibilitychange', onVis)
-    }
-    const onVis = () => { if (!document.hidden) stop() }
-    document.addEventListener('visibilitychange', onVis)
-    this.ngZone.runOutsideAngular(() => {
-      this.studioTitleFlashTimer = setInterval(() => {
-        on = !on
-        document.title = on ? '🔔 Prescribe ATC — Studio' : this.studioTitleOriginal
-      }, 900)
-      setTimeout(stop, 30000)
-    })
-  }
-
-  // Switch the stepper to `stepId`. If the step isn't in the list yet (assignment
-  // still loading), stash it as the pending deep-link so the visibleSteps re-sync
-  // applies it once it appears — same path as the ?step= query param.
-  private jumpToStep(stepId: string) {
-    if (this.visibleSteps.find(s => s.id === stepId)) {
-      this.setActiveStep(stepId)
-    } else {
-      this.pendingDeepLinkStep = stepId
-    }
-    this.cdr.detectChanges()
   }
 
   ngOnDestroy(){
@@ -1263,9 +1183,6 @@ export class DynamicStudioV2Component {
    this.resetSubscription();
    if (this.presenceTimer) { clearInterval(this.presenceTimer); this.presenceTimer = null }
    this.stopStudioPresence()
-   this.studioChannel?.close()
-   this.studioChannel = null
-   if (this.studioTitleFlashTimer) { clearInterval(this.studioTitleFlashTimer); this.studioTitleFlashTimer = null; if (this.studioTitleOriginal) document.title = this.studioTitleOriginal }
   }
 
   // Trigger periodic change detection so `participantReady` re-evaluates
@@ -2581,6 +2498,7 @@ export class DynamicStudioV2Component {
       data: {
         participantname: invitation["participantname"] ?? this.mapProfile[invitation["profileid"]],
         studio: this.selectedStudio,
+        currentprofileid: this.profileid,
         mapprofile: this.mapProfile,
         mapactivity: this.mapActivity,
         activityspecialists: this.activitySpecialistMap,
