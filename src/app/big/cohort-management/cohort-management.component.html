@@ -500,6 +500,11 @@
                 <mat-icon>swap_horiz</mat-icon> Move
               </button>
 
+              <button class="p-move-btn" *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0"
+                (click)="deleteParticipantFromCohort(cohorts);$event.stopPropagation();">
+                <mat-icon>delete</mat-icon> Delete
+              </button>
+
               <mat-menu #moveMultiMenuOut="matMenu" class="move-participant-menu">
                 <div class="move-menu-header" (click)="$event.stopPropagation()">
                   <span class="move-menu-title">Move {{selectedParticipantIds.size}} to Cohort</span>
@@ -676,6 +681,7 @@
               </button>
             </div>
 
+            <!-- footer on participant select -->
             <div class="card-foot selected-mode"
               *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0">
               <span class="foot-label"><mat-icon>people</mat-icon> Send to <b>{{selectedParticipantIds.size}}</b>
@@ -851,3 +857,56 @@
   </div>
 
 </div><!-- /bc-root -->
+
+
+<ng-template #chatConfig >
+
+  <h2 mat-dialog-title class="dialog-title">
+    Configure Chat Memberships
+    <span class="dialog-subtitle">
+      Select the chat memberships for each participant after moving them to the target cohort.
+    </span>
+  </h2>
+
+  <mat-dialog-content class="dialog-content">
+    <div class="participant-list">
+      <ng-container *ngFor="let participant of chatConfigModelData; let last = last;">
+        <div class="participant-row">
+          <!-- <div class="participant-avatar" [class.has-image]="participant">
+            <img *ngIf="participant.avatarUrl; else initialsTpl" [src]="participant.avatarUrl"
+              [alt]="participant.name" />
+            <ng-template #initialsTpl>
+              <span class="avatar-initials">{{ getInitials(participant) }}</span>
+            </ng-template>
+          </div> -->
+
+          <div class="participant-details">
+            <div class="participant-name">{{ mapProfile[participant.profileId] }}</div>
+
+            <div class="chat-options">
+              <mat-checkbox *ngFor="let chat of participant.cohorts;" [checked]="chat.selected"
+                (change)="onChatToggle(chat, $event)" class="chat-option">
+                {{ chat.name }}
+              </mat-checkbox>
+
+              <div class="no-chats" *ngIf="!participant.cohorts.length">
+                No cohort chats available.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <mat-divider *ngIf="!last"></mat-divider>
+      </ng-container>
+
+      <div class="empty-state" *ngIf="!chatConfigModelData.length">
+        No participants to configure.
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" class="dialog-actions">
+    <button mat-stroked-button  (click)="chatModelClose(false)">Cancel</button>
+    <button mat-raised-button color="primary" (click)="chatModelClose(chatConfigModelData)">Next</button>
+  </mat-dialog-actions>
+</ng-template>

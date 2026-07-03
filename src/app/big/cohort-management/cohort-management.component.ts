@@ -1,9 +1,9 @@
-import { Component, ElementRef, HostListener, inject, Input, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, Input, TemplateRef, ViewChild } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
-import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc, collectionData } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc, collectionData  , WriteBatch , getDoc} from '@angular/fire/firestore';
 import { PlanActivityComponent } from '../plan-activity/plan-activity.component';
 import { ManageCohertsComponent } from '../manage-coherts/manage-coherts.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -23,6 +23,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
+import { MatCheckboxChange , MatCheckboxModule } from '@angular/material/checkbox';
+import { writeBatch } from 'firebase/firestore';
 
 
 @Component({
@@ -36,7 +38,8 @@ import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Par
     MatButtonModule,
     FormsModule,
     MatInputModule,
-    MatMenuModule
+    MatMenuModule,
+    MatCheckboxModule
   ],
   templateUrl: './cohort-management.component.html',
   styleUrl: './cohort-management.component.css',
@@ -45,7 +48,8 @@ import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Par
 
 export class CohortManagementComponent {
 
-  @ViewChild('cohortsearch') cohortSearch !: ElementRef<HTMLInputElement>  
+  @ViewChild('cohortsearch') cohortSearch !: ElementRef<HTMLInputElement>;
+  @ViewChild('chatConfig') chatConfig !: TemplateRef<ElementRef>;
   // ==== Design B additions ====
   selectMode = false
   selectedCohortIds = new Set<string>()
@@ -57,6 +61,8 @@ export class CohortManagementComponent {
   selectedUnassignParticipants : null | Set<any>= null;
   progressionSubscription : Subscription;
   activityLogFilters = {};
+  chatConfigModelData = [];
+  chatModelRef : any= null;
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent) {
@@ -182,10 +188,10 @@ export class CohortManagementComponent {
 
   async moveSelectedParticipantsTo(sourceCohort: any, targetCohort: any): Promise<void> {
     const ids = Array.from(this.selectedParticipantIds)
-    for (const pid of ids) {
+    if(ids.length) return
       // Await each move so the isMovingParticipant guard releases between calls
-      await (this as any).moveParticipantToCohort?.(pid, sourceCohort, targetCohort)
-    }
+    this.moveParticipantToCohort(ids, sourceCohort, targetCohort)
+    
     this.selectedParticipantIds.clear()
     this.participantSelectCohortId = null
   }
@@ -361,7 +367,7 @@ export class CohortManagementComponent {
       const sourceCohort = this.cohortsList.find(c => c['docid'] === payload.sourceCohortId);
       if (sourceCohort) {
         if (sourceCohort['eventref']?.id === targetCohort['eventref']?.id) {
-          await this.moveParticipantToCohort(payload.participantId, sourceCohort, targetCohort)
+          await this.moveParticipantToCohort([payload.participantId], sourceCohort, targetCohort)
         } else{
           alert(`Can not move participants between ${this.mapAcceleratorEvent[sourceCohort?.['eventref']?.id]} to ${this.mapAcceleratorEvent[targetCohort?.['eventref']?.id]}`)
         }
@@ -374,15 +380,114 @@ export class CohortManagementComponent {
     }
   }
 
+  async deleteParticipantFromCohort(cohort : any){
+    const con = confirm('Do you want to delete the selected Participants');
+    if (!con) return
+    try {
+      let cohortParticipants = cohort['participantidlist'] ?? [];
+
+      if ([null, undefined, ''].includes(cohort['docid']) || cohortParticipants.length == 0) return
+      cohortParticipants = cohortParticipants.filter((pid) => !this.selectedParticipantIds.has(pid));
+
+      const checkForActiveStudio = [];
+      const participants = [...this.selectedParticipantIds.values()]
+
+      for (let pid of participants) {
+        const check = await this.checkForActiveParticipantStuidosInCohort(cohort, pid);
+        if (check) checkForActiveStudio.push(this.mapProfile[pid]);
+      }
+
+      console.log(checkForActiveStudio)
+      if (checkForActiveStudio.length > 0) {
+        alert(`Selected Participant (${checkForActiveStudio.join(', ')}) has Active Studios in cohort, Please Disable all before delete`);
+        return
+      }
+
+      const batch = writeBatch(this.firestore);
+
+      const sorucecohortmembers = (await getDoc(doc(this.firestore, cohort?.chatref.path))).data()['members'] ?? [];
+
+      const data = [];
+
+      for (let pid of participants) {
+        const uid = (await this.getUidsFromProfileIds([pid]))[0];
+        if(!sorucecohortmembers.includes(uid)) continue
+        const d = {
+          profileId: pid,
+          uid : uid,
+          cohorts: []
+        }
+        if (cohort?.enableGroupChat && cohort?.chatref) {
+          d.cohorts.push({
+            ...cohort,
+            selected: sorucecohortmembers.includes(uid)
+          })
+        }
+
+        data.push(d);
+      }
+
+      console.log()
+      if(data.length > 0){
+      this.chatConfigModelData = data
+
+      this.chatModelRef = this.dialog.open(this.chatConfig);
+
+      const result = await this.chatModelRef.afterClosed().toPromise();
+
+      if (result) {
+        for (let participant of result) {
+          (participant.cohorts ?? []).forEach((cohort) => {
+            batch.update(cohort['chatref'], {
+              members: cohort.selected ? arrayUnion(participant.uid) : arrayRemove(participant.uid),
+              group_name: cohort['name'],
+              last_modification: new Date(),
+              type: 'group'
+            })
+          })
+        }
+      }
+      }
+
+      const docRef = doc(collection(this.firestore, 'big cohorts'), cohort['docid']);
+
+      batch.update(docRef, {
+        participantidlist: cohortParticipants
+      });
+
+      await batch.commit();
+      this.createLogsForParticipants(cohort , participants , 'removed');
+      this.loadCohorts();
+      this.selectedParticipantIds.clear()
+      this.participantSelectCohortId = null
+
+    } catch(error) {
+      console.log(error);
+    }
+  }
+
   async checkForActiveParticipantStuidosInCohort(cohort : any , participantId : string){
-    // console.log(cohortId)
-    // const cohort = this.cohortsList.find((cohort)=>cohort['docid']===cohortId);
     const queueId = cohort['queueref'];
     const activity = cohort['bigactivity'] ?? '';
     if(queueId){
-      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'==',queueId) , where('studioin' , '==' , true) , where('participants' , 'array-contains' , participantId));
-      const studios = await getDocs(q); 
-      return studios.docs.filter((st)=>Object.values(st.data()['participantsactivity'] ?? {}).includes(activity)).length > 0;
+      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'==',queueId), where('participants' , 'array-contains' , participantId));
+      const studios = (await getDocs(q)).docs.map((doc)=>doc.data()).filter((st)=>Object.values(st['participantsactivity'] ?? {}).includes(activity));
+
+      if(studios.length > 0){
+        const enabledStudios = studios.filter((studio)=>studio['studioin']);
+
+      if(enabledStudios.length > 0){
+        console.log(enabledStudios)
+        return true;
+      }
+      const studioIds = studios.map((studio)=>studio['docid']);
+      const activeLiveAssignment = await getDocs(query(collection(this.firestore , 'live assignment') , where('status' , '==' , 'live') , where('studioid' , 'in' , studioIds)));
+
+      if(activeLiveAssignment.docs.length > 0){
+        console.log(activeLiveAssignment)
+        return true;
+      }
+      }
     }
     return false
   }
@@ -426,6 +531,7 @@ export class CohortManagementComponent {
     const palette = ['purple', 'blue', 'green', 'amber', 'rose']
     if (!key) return palette[0]
     let h = 0
+    // console.log(key)
     for (let i = 0; i < key.length; i++) { h = ((h << 5) - h + key.charCodeAt(i)) | 0 }
     return palette[Math.abs(h) % palette.length]
   }
@@ -895,6 +1001,19 @@ export class CohortManagementComponent {
   ngOnDestroy(): void {
     this.subscription.next();
     this.subscription.complete();
+  }
+
+  async loadCohorts(){
+    this.loading = true;
+    getDocs(collection(this.firestore, "big cohorts")).then(snap => {
+      this.cohortsList = snap.docs.map(e => {
+        let element: any = e.data()
+        element['contentview'] = 'participants'
+        return element
+      })
+      this.toRunFilterFunctions();
+      this.loading = false;
+    })
   }
 
   loadActivity(){
@@ -1436,24 +1555,62 @@ export class CohortManagementComponent {
   }
 
   async assignUnassignedToCohort(participantIds: string[], targetCohort: any): Promise<void> {
+    try {
     if (!participantIds?.length || !targetCohort?.docid) return;
     const targetRef = doc(this.firestore, 'big cohorts', targetCohort.docid);
-    try {
-      await updateDoc(targetRef, { participantidlist: arrayUnion(...participantIds) });
-      if (!targetCohort.participantidlist) targetCohort.participantidlist = [];
-      participantIds.forEach(pid => {
-        if (!targetCohort.participantidlist.includes(pid)) targetCohort.participantidlist.push(pid);
+    const batch = writeBatch(this.firestore);
+
+    if(targetCohort.enableGroupChat && targetCohort['chatref']){
+      const data = participantIds.map((pid)=>{
+        return {
+          profileId : pid,
+          cohorts : [targetCohort].map((cohort)=>({...cohort , selected : true}))
+        }
       });
-      this.unassignedParticipants = (this.unassignedParticipants || []).filter(
-        (p: any) => !participantIds.includes(p.participantId || p.id)
-      );
-      this.filterUnassignSearch();
-      alert(`Assigned ${participantIds.length} participant(s) to ${targetCohort.name}`);
+
+      this.chatConfigModelData = data
+      
+      this.chatModelRef = this.dialog.open(this.chatConfig);
+
+      const result = await this.chatModelRef.afterClosed().toPromise();
+
+      if(result){
+        for(let participant of result){
+          const uid = (await this.getUidsFromProfileIds([participant.profileId]))[0];
+          // console.log(await this.getUidsFromProfileIds([participant.profileId]));
+
+          (participant.cohorts ?? []).forEach((cohort)=>{
+            batch.update(cohort['chatref'] , {
+              members: cohort.selected ? arrayUnion(uid) : arrayRemove(uid),
+              group_name: cohort['name'],
+              last_modification: new Date(),
+              type: 'group'
+            })
+          })
+        }
+      }
+
+    }
+    alert(`Assigned ${participantIds.length} participant(s) to ${targetCohort.name}`);
+    batch.update(targetRef, { participantidlist: arrayUnion(...participantIds) });
+    batch.commit();
+    
+    if (!targetCohort.participantidlist) targetCohort.participantidlist = [];
+    participantIds.forEach(pid => {
+      if (!targetCohort.participantidlist.includes(pid)) targetCohort.participantidlist.push(pid);
+    });
+    this.unassignedParticipants = (this.unassignedParticipants || []).filter(
+      (p: any) => !participantIds.includes(p.participantId || p.id)
+    );
+    this.filterUnassignSearch();
+    this.chatModelRef = null;
     } catch (err) {
       console.error('Error assigning participants:', err);
       alert('Error assigning participants. Please try again.');
     }
+
   }
+
   
   openCohortChat(cohort: any) {
     const chatDocId = cohort['docid'];
@@ -1659,40 +1816,99 @@ export class CohortManagementComponent {
     this.filterMoveMenuCohorts(cohort);
   }
   
-  async moveParticipantToCohort(participantId: string, sourceCohort: any, targetCohort: any) {
-    const hasActiveStudio = await this.checkForActiveParticipantStuidosInCohort(sourceCohort  , participantId);
-      if(hasActiveStudio){
+  async moveParticipantToCohort(participantId: string[], sourceCohort: any, targetCohort: any) {
+    try {
+      const checkForActiveStudio = [];
+
+      for (let pid of participantId) {
+        const check = await this.checkForActiveParticipantStuidosInCohort(sourceCohort, pid);
+        if (check) checkForActiveStudio.push(this.mapProfile[pid]);
+      }
+
+      if (checkForActiveStudio.length > 0) {
         alert('There are active stuido for the selected participant please disbale it before moving to another cohorts');
         return
       }
-    if (this.isMovingParticipant) return;
+      if (this.isMovingParticipant) return;
 
-    this.isMovingParticipant = true;
+      this.isMovingParticipant = true;
+      const batch = writeBatch(this.firestore);
 
-    try {
+      if (sourceCohort?.enableGroupChat || targetCohort?.enableGroupChat) {
+        let sorucecohortmembers = [];
+        let targetcohortmembers = [];
+        
+        if(sourceCohort?.chatref.path) { sorucecohortmembers = (await getDoc(doc(this.firestore, sourceCohort?.chatref.path))).data()['members'] ?? [] }
+        if(targetCohort?.chatref.path) targetcohortmembers = (await getDoc(doc(this.firestore, targetCohort?.chatref.path))).data()['members'] ?? [];
+
+        const data = [];
+
+        for (let pid of participantId) {
+          const uid = (await this.getUidsFromProfileIds([pid]))[0];
+          console.log(uid)
+          const d = {
+            profileId: pid,
+            uid : uid,
+            cohorts: []
+          }
+          if (sourceCohort?.enableGroupChat && sourceCohort?.chatref) {
+
+            d.cohorts.push({
+              ...sourceCohort,
+              selected: sorucecohortmembers.includes(uid)
+            })
+
+          }
+
+          if (targetCohort?.enableGroupChat && targetCohort?.chatref) {
+            d.cohorts.push({
+              ...targetCohort,
+              selected: targetcohortmembers.includes(uid)
+            })
+          }
+
+          data.push(d);
+        }
+
+
+        this.chatConfigModelData = data
+        console.log(this.chatConfigModelData);
+        this.chatModelRef = this.dialog.open(this.chatConfig);
+
+        const result = await this.chatModelRef.afterClosed().toPromise();
+
+        if (result) {
+          for (let participant of result) {
+            (participant.cohorts ?? []).forEach((cohort) => {
+              batch.update(cohort['chatref'], {
+                members: cohort.selected ? arrayUnion(participant.uid) : arrayRemove(participant.uid),
+                group_name: cohort['name'],
+                last_modification: new Date(),
+                type: 'group'
+              })
+            })
+          }
+        }
+      }
+
+
       const sourceCohortRef = doc(this.firestore, "big cohorts", sourceCohort.docid);
-      await updateDoc(sourceCohortRef, {
-        participantidlist: arrayRemove(participantId)
+      batch.update(sourceCohortRef, {
+        participantidlist: arrayRemove(...participantId)
       });
 
       const targetCohortRef = doc(this.firestore, "big cohorts", targetCohort.docid);
-      await updateDoc(targetCohortRef, {
-        participantidlist: arrayUnion(participantId)
+      batch.update(targetCohortRef, {
+        participantidlist: arrayUnion(...participantId)
       });
 
-      await this.createMoveLog(participantId, sourceCohort, targetCohort);
+      await batch.commit();
 
-      const sourceIndex = sourceCohort.participantidlist?.indexOf(participantId);
-      if (sourceIndex > -1) {
-        sourceCohort.participantidlist.splice(sourceIndex, 1);
-      }
-      if (!targetCohort.participantidlist) {
-        targetCohort.participantidlist = [];
-      }
-      if (!targetCohort.participantidlist.includes(participantId)) {
-        targetCohort.participantidlist.push(participantId);
+      for (let pid of participantId) {
+        await this.createMoveLog(pid, sourceCohort, targetCohort);
       }
 
+      this.loadCohorts()
       console.log(`Moved participant ${participantId} from ${sourceCohort.name} to ${targetCohort.name}`);
 
     } catch (error) {
@@ -1726,6 +1942,44 @@ export class CohortManagementComponent {
 
     await setDoc(doc(this.firestore, "big cohorts log", logDocId), logData);
     console.log('Move log created:', logDocId);
+  }
+
+  // Create log entries for specific participants with given status
+  async createLogsForParticipants(cohortData: any, participantIds: string[], status: 'added' | 'removed') {
+    if (participantIds.length === 0) return;
+
+    const loggedInProfileId = this.loggedInProfile?.profileid || this.loggedInProfile?.uid || '';
+
+    const logPromises = participantIds.map(async (participantId: string) => {
+      const logDocId = doc(collection(this.firestore, "big cohorts log")).id;
+
+      const logData = {
+        docid: logDocId,
+        createddate: new Date(),
+        profileid: participantId,
+        cohortid: cohortData['docid'],
+        cohortname: cohortData['name'],
+        eventref: cohortData['eventref'] || null,
+        addedby: loggedInProfileId,
+        addeddate: status === 'added' ? new Date() : null,
+        removedby: status === 'removed' ? loggedInProfileId : null,
+        removeddate: status === 'removed' ? new Date() : null,
+        status: status,
+        level: cohortData['level'] || 'level1',
+        marathonref: cohortData['marathonref'] || null,
+        cohortType: cohortData['cohortType'] || 'general',
+        cohortCategory: cohortData['cohortCategory'] || 'studio'
+      };
+
+      return setDoc(doc(this.firestore, "big cohorts log", logDocId), logData);
+    });
+
+    try {
+      await Promise.all(logPromises);
+      console.log(`Created ${participantIds.length} "${status}" log entries for cohort:`, cohortData['docid']);
+    } catch (error) {
+      console.error(`Error creating ${status} cohort logs:`, error);
+    }
   }
 
   @HostListener('document:click', ['$event'])
@@ -2617,7 +2871,7 @@ export class CohortManagementComponent {
         mapEventCollection: this.mapAcceleratorEvent,
         participantTagsList: this.participantTagsList,
         loggedInProfile: this.loggedInProfile,
-        queueList : this.searchableQueueList
+        queueList : this.searchableQueueList,
       },
       disableClose: false
     });
@@ -3280,6 +3534,7 @@ export class CohortManagementComponent {
         this.assignUnassignedToCohort(participants , cohort);
       }
     }
+    this.selectedUnassignParticipants.clear()
   }
 
   filterActivityLog(){
@@ -3328,10 +3583,59 @@ export class CohortManagementComponent {
       this.filteredProgressionProfiles = filteredLogs; 
   }
 
-  toggleLogedToMe(event : Event){
+  toggleLogedToMe(event: Event) {
     event.stopPropagation();
     this.activityLogFilters['assigntome'] = !this.activityLogFilters['assigntome'];
     this.filterActivityLog()
+  }
+
+  // Fetch UIDs from profile_data collection for given profile IDs
+  async getUidsFromProfileIds(profileIds: string[]): Promise<string[]> {
+    if (!profileIds || profileIds.length === 0) return [];
+
+    const uids: string[] = [];
+
+    // Process in batches of 10 (Firestore 'in' query limit)
+    const batchSize = 10;
+    for (let i = 0; i < profileIds.length; i += batchSize) {
+      const batch = profileIds.slice(i, i + batchSize);
+
+      try {
+        const profileQuery = query(
+          collection(this.firestore, "profile_data"),
+          where("profileid", "in", batch)
+        );
+
+        const profileSnap = await getDocs(profileQuery);
+
+        profileSnap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          // Get uid from user_ref (DocumentReference) or directly from uid field
+          if (data['user_ref']) {
+            // user_ref is a DocumentReference, extract the id (uid)
+            const uid = data['user_ref'].id || data['user_ref'];
+            if (uid) uids.push(uid);
+          } else if (data['uid']) {
+            uids.push(data['uid']);
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching profile UIDs for batch:', batch, error);
+      }
+    }
+
+    console.log('Converted', profileIds.length, 'profile IDs to', uids.length, 'UIDs');
+    return uids;
+  }
+
+  // chat config
+
+  onChatToggle(cohort: any, event: MatCheckboxChange): void {
+      cohort.selected = event.checked;
+  }
+
+  chatModelClose(result){
+    this.chatModelRef.close(result);
   }
 
 }

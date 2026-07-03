@@ -21,6 +21,7 @@ import { environment } from '../../../environments/environment.development';
 import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
 import { Storage,ref,uploadBytes,getDownloadURL } from '@angular/fire/storage';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { MatOptionSelectionChange } from '@angular/material/core';
 
 interface ParticipantRow {
   id: string;
@@ -967,7 +968,17 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   toggleStudio(studio) {
-    console.log(studio['studioin'], !studio['studioin']);
+    const studioCheckIn = studio['checkin'];
+    const isLiveStudio  = this.mapLiveAssignmentByStudio[studio['docid']];
+    if(studioCheckIn) {
+      alert('please checkout the studio before proceed');
+      return
+    };
+
+    if(![null , undefined , ''].includes(isLiveStudio)){
+      alert('stduio can not be disabled because studio is live');
+      return
+    }
     updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), {
       studioin: !studio['studioin'],
     });
@@ -975,6 +986,18 @@ export class CohortDetailComponent implements OnDestroy {
 
   toggleCheckin(studio) {
     // console.log(studio["checkin"],!studio["checkin"]);
+    const isLiveStudio  = this.mapLiveAssignmentByStudio[studio['docid']];
+    const isEnabled = studio['studioin'];
+
+    if(!isEnabled){
+      alert('please enable the studio to checkin');
+      return
+    }
+
+    if(![null , undefined , ''].includes(isLiveStudio)){
+      alert('stduio can not be checkout because studio is live');
+      return
+    }
     updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), {
       checkin: !studio['checkin'],
     });
@@ -1833,7 +1856,7 @@ createStudioCombination() {
   }
   }
 
-  toggleMentors(){
+  toggleMentors(event : MatOptionSelectionChange){
     const cohortId = this.cohort['docid'] ?? null;
     if(cohortId){
       if(!this.isCohortUpdates) this.isCohortUpdates = true

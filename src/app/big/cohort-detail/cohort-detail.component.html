@@ -34,11 +34,11 @@
         </mat-select>
       </mat-form-field>
     </div>
-
+<!-- 
     <div class="cd-mentor-block">
       <mat-form-field appearance="outline" class="cd-queue-select">
         <mat-label>Select Mentors</mat-label>
-        <mat-select [(ngModel)]="selectedMentors" (selectionChange)="toggleMentors()" multiple>
+        <mat-select [(ngModel)]="selectedMentors" (selectionChange)="toggleMentors($event)" multiple>
           <mat-option *ngFor="let mentorId of mentorsList" [value]="mentorId">{{mapProfile[mentorId]}}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -46,10 +46,9 @@
         <span class="cd-mentor-chip" *ngFor="let mentorId of selectedMentors">
           <span class="cd-mentor-chip-av" [class]="getAvatarColorClass(mentorId)">{{getInitialsForId(mentorId)}}</span>
           {{mapProfile[mentorId]}}
-          <!-- <span><mat-icon style="font-size:medium;">cancel</mat-icon></span> -->
         </span>
       </div>
-    </div>
+    </div> -->
 
     <button class="cd-owner-btn" [matMenuTriggerFor]="ownerMenu" *ngIf="ownerList.length > 0">
       {{selectedOwner || 'Owner'}}
@@ -160,7 +159,7 @@
     <!-- Sub-toolbar: filter pills + Re-pair -->
     <div class="cd-studios-toolbar">
       <!-- <span class="cd-studios-rule">STUDIOS CANVAS · RULE: 1 EIS PER STUDIO</span> -->
-      <span class="cd-studios-rule">Seleted Queue : {{mapQueueName[selectedQueue]}}</span>
+      <!-- <span class="cd-studios-rule">Seleted Queue : {{mapQueueName[selectedQueue]}}</span> -->
       <span class="cd-studio-pill"
         *ngFor="let code of getStudioGroupCodes()"
         [class.active]="isStudioGroupSelected(code)"
@@ -172,7 +171,7 @@
         <mat-icon>refresh</mat-icon> Re-pair
       </button> -->
       <button class="cd-repair-mini" (click)="enableStduioCreateMode()">
-        <mat-icon>add</mat-icon> {{studioCreateMode ? 'Back to video' : 'Create Studio'}}
+         {{studioCreateMode ? 'Back to Studio' : 'Create Studio'}}
       </button>
       <button (click)="createStudioCombination()" class="add-studio-btn" style="text-align:center" *ngIf="studioCreateMode">
         Add studio
