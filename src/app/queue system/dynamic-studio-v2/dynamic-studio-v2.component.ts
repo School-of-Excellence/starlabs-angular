@@ -46,6 +46,7 @@ export class DynamicStudioV2Component {
   @ViewChild('formDialogTpl') formDialogTpl!: TemplateRef<any>;
   @ViewChild('atcDialogTpl') atcDialogTpl!: TemplateRef<any>;
   @ViewChild('checkinConflictTpl') checkinConflictTpl!: TemplateRef<any>;
+  @ViewChild('collaboratorBusyTpl') collaboratorBusyTpl!: TemplateRef<any>;
   @ViewChild('chatScroll') chatScroll: ElementRef
   // The scrollable content area of the live studio. Reset to the top whenever the
   // active step changes so a new stage always shows its top content (previously
@@ -209,6 +210,10 @@ export class DynamicStudioV2Component {
   // constructor — it would be overwritten by the visibleSteps re-sync. Instead we
   // stash the request here and apply it in that re-sync once the step exists.
   private pendingDeepLinkStep: string = ''
+  // Cross-tab channel: the in-call Zoom view (cross-origin-isolated, so it can't
+  // reach this tab by window name) pings this to switch the stepper to a step in
+  // an ALREADY-OPEN studio tab instead of the Zoom view opening a duplicate.
+  private studioChannel: BroadcastChannel | null = null
   // Precomputed index of activeStepId within visibleSteps. Kept in sync at the
   // three points activeStepId / the step list can change (the visibleSteps
   // getter's re-sync block, setActiveStep, goToStep) so the template can read a
@@ -1138,6 +1143,43 @@ export class DynamicStudioV2Component {
     // studio screen produces no writes.
       this.startStudioPresence()
       this.requestNotificationPermission()
+      // Tag this tab so a same-group `window.open(url, 'starlabsDynamicStudio')`
+      // reuses it. (Won't help the cross-origin-isolated Zoom view — that path
+      // uses the BroadcastChannel below — but helps other same-group callers.)
+      try { if (!window.name) window.name = 'starlabsDynamicStudio' } catch { /* ignore */ }
+      this.wireStudioChannel()
+  }
+
+  // Listen for step-jump pings from the in-call Zoom view (same origin, other
+  // tab). On a ping we ack (so the Zoom view knows a studio tab exists and does
+  // NOT open a duplicate) and switch the stepper to the requested step. NOTE: a
+  // background tab cannot foreground itself (browser blocks cross-tab focus), so
+  // the Zoom view shows the host a "switch to your Studio tab" hint instead.
+  private wireStudioChannel() {
+    try {
+      this.studioChannel = new BroadcastChannel('starlabs-dynamic-studio')
+      this.studioChannel.onmessage = (ev: MessageEvent) => {
+        const data = ev?.data
+        if (data?.type !== 'goto-step' || !data.step) return
+        this.studioChannel?.postMessage({ type: 'studio-here' })
+        this.ngZone.run(() => {
+          this.jumpToStep(data.step)
+          try { window.focus() } catch { /* cross-tab focus is blocked; best-effort */ }
+        })
+      }
+    } catch { /* BroadcastChannel unsupported — Zoom view falls back to a new tab */ }
+  }
+
+  // Switch the stepper to `stepId`. If the step isn't in the list yet (assignment
+  // still loading), stash it as the pending deep-link so the visibleSteps re-sync
+  // applies it once it appears — same path as the ?step= query param.
+  private jumpToStep(stepId: string) {
+    if (this.visibleSteps.find(s => s.id === stepId)) {
+      this.setActiveStep(stepId)
+    } else {
+      this.pendingDeepLinkStep = stepId
+    }
+    this.cdr.detectChanges()
   }
 
   ngOnDestroy(){
@@ -1161,6 +1203,8 @@ export class DynamicStudioV2Component {
    this.resetSubscription();
    if (this.presenceTimer) { clearInterval(this.presenceTimer); this.presenceTimer = null }
    this.stopStudioPresence()
+   this.studioChannel?.close()
+   this.studioChannel = null
   }
 
   // Trigger periodic change detection so `participantReady` re-evaluates
@@ -2037,6 +2081,25 @@ export class DynamicStudioV2Component {
       }
     }
     if (value === true) {
+      // Collaborator conflict (hard block): a co-specialist on THIS studio is
+      // already busy in a live activity in another studio. Unlike the self
+      // check-in conflict below, this cannot be resolved by checking out — the
+      // busy person is someone else — so we alert and refuse the check-in.
+      const collaboratorConflicts = await this.findCollaboratorConflicts(this.selectedStudio)
+      if (collaboratorConflicts.length > 0) {
+        await firstValueFrom(
+          this.dialog.open(this.collaboratorBusyTpl, {
+            data: { collaborators: collaboratorConflicts },
+            disableClose: true,
+            width: '460px',
+            maxWidth: '92vw',
+            autoFocus: false,
+          }).afterClosed()
+        )
+        revertToggle()
+        return
+      }
+
       const conflicts = await this.findActiveCheckins(this.selectedStudio?.['docid'])
       if (conflicts.length > 0) {
         const confirmed = await firstValueFrom(
@@ -2150,6 +2213,53 @@ export class DynamicStudioV2Component {
       return enriched
     } catch (err) {
       console.log('findActiveCheckins error', err)
+      return []
+    }
+  }
+
+  /**
+   * Collaborator conflict finder. Looks at the OTHER specialists paired on
+   * `studio` (everyone in `participants` except the current user) and returns
+   * any of them who is currently in a LIVE activity in a DIFFERENT studio.
+   *
+   * "In activity" = they appear in a `live assignment` whose `status` is
+   * 'live' and whose `studioid` is not this studio. We query only by
+   * `pairing array-contains <collaborator>` (a single-field index that always
+   * exists) and filter status/studio client-side to avoid needing a composite
+   * index. Best-effort — returns [] on error so a lookup failure never blocks
+   * a legitimate check-in.
+   */
+  private async findCollaboratorConflicts(studio: any): Promise<any[]> {
+    try {
+      const collaborators: string[] = (studio?.['participants'] ?? [])
+        .filter((p: string) => p !== this.profileid)
+      if (collaborators.length === 0) return []
+
+      const conflicts: any[] = []
+      const seen = new Set<string>()
+      for (const collab of collaborators) {
+        const snap = await getDocs(query(
+          collection(this.firestore, 'live assignment'),
+          where('pairing', 'array-contains', collab),
+        ))
+        for (const d of snap.docs) {
+          const la: any = d.data()
+          if (la['status'] === 'live' && la['studioid'] && la['studioid'] !== studio?.['docid']) {
+            if (seen.has(collab)) continue
+            seen.add(collab)
+            conflicts.push({
+              collaborator: collab,
+              collaboratorName: this.mapProfile[collab] ?? collab,
+              studioid: la['studioid'],
+              stageName: la['stagename'] ?? '',
+            })
+            break
+          }
+        }
+      }
+      return conflicts
+    } catch (err) {
+      console.log('findCollaboratorConflicts error', err)
       return []
     }
   }
@@ -2402,10 +2512,14 @@ export class DynamicStudioV2Component {
     console.log(invitation)
     var token = this.stageTokenList.filter(e => e["stagename"] == invitation["stage"])[0]["tokenlist"].find(e => e["profile_id"] == invitation["profileid"])
     console.log(token)
-    var assignStudio = await this.openAssignQueueStudio({
+    // New redesigned "Participant accepted the invitation" popup. It is a
+    // restyled sibling of AssignQueueStudioComponent (left untouched for the
+    // invite/update flows) and closes with the same result contract, so the
+    // afterClosed handler below is unchanged.
+    var assignStudio = await this.openEnterStudioAssign({
       data: {
-        title: "Update Specialist and Activity in the Studio",
-        studiolist: [this.selectedStudio],
+        participantname: invitation["participantname"] ?? this.mapProfile[invitation["profileid"]],
+        studio: this.selectedStudio,
         mapprofile: this.mapProfile,
         mapactivity: this.mapActivity,
         additionalactivities: this.additionalActivities
@@ -2413,9 +2527,10 @@ export class DynamicStudioV2Component {
       autoFocus: false,
       // Don't let a stray backdrop tap dismiss the assign step — an
       // accidentally-closed dialog used to be unrecoverable. The dialog has its
-      // own "Close" button for an intentional cancel, and the waiting-list
+      // own "Cancel" button for an intentional cancel, and the waiting-list
       // "Approved · Assign studio" CTA can reopen it.
       disableClose: true,
+      panelClass: "enter-studio-dialog",
       maxWidth: "90vw",
       maxHeight: "90vh"
     })
@@ -4415,6 +4530,10 @@ export class DynamicStudioV2Component {
   private async openAssignQueueStudio(cfg?: any){
     const { AssignQueueStudioComponent } = await import('../assign-queue-studio/assign-queue-studio.component')
     return this.dialog.open(AssignQueueStudioComponent, cfg)
+  }
+  private async openEnterStudioAssign(cfg?: any){
+    const { EnterStudioAssignComponent } = await import('../enter-studio-assign/enter-studio-assign.component')
+    return this.dialog.open(EnterStudioAssignComponent, cfg)
   }
   private async openStageIncompleteConfirmation(cfg?: any){
     const { StageIncompleteConfirmationComponent } = await import('../stage-incomplete-confirmation/stage-incomplete-confirmation.component')

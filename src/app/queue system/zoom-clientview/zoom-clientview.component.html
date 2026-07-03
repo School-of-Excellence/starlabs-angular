@@ -148,6 +148,9 @@
         Zoom window to {{ recordingPromptKind === 'paused' ? 'resume' : 'start' }} recording.
       </div>
       <div class="rec-prompt-card__actions">
+        <button class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="resumeRecordingNow()">
+          {{ recordingPromptKind === 'paused' ? 'Resume recording' : 'Start recording' }}
+        </button>
         <button class="rec-prompt-card__btn" (click)="dismissRecordingPrompt()">Dismiss for 30s</button>
       </div>
     </div>

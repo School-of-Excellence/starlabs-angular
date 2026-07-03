@@ -549,6 +549,37 @@ export class ZoomClientviewComponent {
     this.recordingPromptDismissedAt = Date.now();
   }
 
+  // Called from the overlay's primary "Resume recording" button. The Meeting SDK
+  // exposes no working record-control API (ZoomMtg.record is a no-op stub in
+  // 6.1.0), BUT the Client View renders its toolbar into #zmmtg-root in THIS
+  // document, so we can trigger Zoom's own Resume/Start Recording control by
+  // clicking it directly. On success the SDK fires onRecordingChange → 'started'
+  // which closes the prompt via evaluateRecordingPrompt; we also hide optimistically.
+  resumeRecordingNow() {
+    const root: ParentNode = document.getElementById('zmmtg-root') || document;
+    // Paused → "Resume Recording"; stopped → a "Record"/"Start Recording" control.
+    const wanted = this.recordingPromptKind === 'paused'
+      ? ['resume recording']
+      : ['resume recording', 'start recording', 'record'];
+    const labelOf = (el: Element) =>
+      (el.getAttribute('aria-label') || (el as HTMLElement).title || el.textContent || '').trim().toLowerCase();
+    const matches = Array.from(root.querySelectorAll('button,[role="button"],[aria-label]'))
+      .filter(el => wanted.some(w => labelOf(el) === w)) as HTMLElement[];
+    // Prefer a visible control; fall back to any match.
+    const btn = matches.find(el => el.offsetParent !== null || el.getClientRects().length > 0) || matches[0];
+    if (btn) {
+      btn.click();
+      this.recordingPromptVisible = false;
+    } else {
+      console.warn('[recording-prompt] could not find Zoom Resume/Record control to click');
+      this.snackBar.open(
+        'Please use the Record control at the top of the Zoom window to resume.',
+        'Close',
+        { duration: 4000, horizontalPosition: 'center', verticalPosition: 'top' }
+      );
+    }
+  }
+
   private stopRecordingListeners() {
     if (this.recordingPromptTimer) {
       clearInterval(this.recordingPromptTimer);
@@ -905,8 +936,48 @@ export class ZoomClientviewComponent {
   // Called directly in the click gesture so the popup blocker allows it.
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
-    const win = window.open(url, 'starlabsDynamicStudio');
-    try { win?.focus(); } catch { /* focus may be a no-op — the tab still opens */ }
+
+    // Pre-open a tab synchronously (inside the click gesture) so we're never
+    // popup-blocked. This is an about:blank popup which — even though this Zoom
+    // page is cross-origin isolated — stays in our browsing-context group, so we
+    // keep a usable handle we can either navigate or discard.
+    let spare: Window | null = null;
+    try { spare = window.open('', '_blank'); } catch { spare = null; }
+
+    let settled = false;
+    const openFresh = () => {
+      if (settled) return;
+      settled = true;
+      if (spare && !spare.closed) spare.location.href = url;
+      else window.open(url, 'starlabsDynamicStudio');
+    };
+
+    try {
+      const channel = new BroadcastChannel('starlabs-dynamic-studio');
+      channel.onmessage = (ev: MessageEvent) => {
+        // An already-open studio tab answered → it switched to the Prescribe ATC
+        // step itself. Don't open a duplicate: discard the spare tab. The studio
+        // tab can't foreground itself (browsers block cross-tab focus), so tell
+        // the host where it went.
+        if (ev?.data?.type === 'studio-here' && !settled) {
+          settled = true;
+          try { spare?.close(); } catch { /* ignore */ }
+          try { channel.close(); } catch { /* ignore */ }
+          this.ngZone.run(() => this.snackBar.open(
+            'Prescribe ATC is ready in your Dynamic Studio tab — switch to it to continue.',
+            'Close',
+            { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
+          ));
+        }
+      };
+      // Ask any open studio tab to switch to the step.
+      channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
+      // No studio tab answered in time → turn the spare into a fresh studio tab.
+      setTimeout(() => { openFresh(); try { channel.close(); } catch {} }, 350);
+    } catch {
+      // BroadcastChannel unsupported → just use the spare / a new tab.
+      openFresh();
+    }
   }
 
   handleKeyDown(event: KeyboardEvent) {
