@@ -776,23 +776,23 @@ export class DynamicStudioV2Component {
     return total
   }
 
-  get visibleSteps(): { id: string, label: string, icon: string, color: string }[] {
+  get visibleSteps(): { id: string, label: string, sub: string, icon: string, color: string }[] {
     if (!this.liveAssignment) return []
     const stagename = this.liveAssignment['stagename']
     const stageprop = this.ongoingQueue?.['stageproperty']?.[stagename] || {}
     const widgets: string[] = stageprop?.studiowidgets || []
-    const steps: { id: string, label: string, icon: string, color: string }[] = []
+    const steps: { id: string, label: string, sub: string, icon: string, color: string }[] = []
 
     // 1. Review Forms + Love Letters - Current uP! cycle. Love Letters now live
     // here (mockup step 1), so the step also shows when only the loveletters
     // widget is configured, even with no submitted forms.
     if ((this.participantForm && this.participantForm.length) || widgets.includes('loveletters')) {
-      steps.push({ id: 'current-forms', label: 'Review Forms', icon: 'description', color: '#0ea5e9' })
+      steps.push({ id: 'current-forms', label: 'Submitted Forms', sub: 'Current Cycle', icon: 'description', color: '#0ea5e9' })
     }
 
     // 2. Previous ATC - Previous uP! cycle(s). (Love Letters moved to step 1.)
     if (widgets.includes('previousatc') || widgets.includes('evolutionwishlist')) {
-      steps.push({ id: 'prev-history', label: 'Previous ATC', icon: 'history', color: '#84cc16' })
+      steps.push({ id: 'prev-history', label: 'Previous ATC & Love Letters', sub: 'Previous Cycle(s)', icon: 'history', color: '#84cc16' })
     }
 
     // 3. View submitted ATC - Current uP! cycle
@@ -800,11 +800,11 @@ export class DynamicStudioV2Component {
         widgets.includes('prescribedunvalidatedatc') ||
         widgets.includes('assignedatc') ||
         widgets.includes('viewtripleatc')) {
-      steps.push({ id: 'view-atc', label: 'This Cycle ATCs', icon: 'fact_check', color: '#22c55e' })
+      steps.push({ id: 'view-atc', label: 'View Submitted ATC', sub: 'Current Cycle', icon: 'fact_check', color: '#22c55e' })
     }
 
     // 4. Zoom session — the meeting itself (always shown)
-    steps.push({ id: 'getstarted', label: 'Zoom Session', icon: 'videocam', color: '#4f46e5' })
+    steps.push({ id: 'getstarted', label: 'Zoom Session', sub: 'Connect with participant', icon: 'videocam', color: '#4f46e5' })
 
     // 5. Prescribe ATC — only when there's an actual prescribe / assign action
     // for the stage. The shared list widgets (validated/unvalidated/triple)
@@ -813,12 +813,12 @@ export class DynamicStudioV2Component {
     if (widgets.includes('addunvalidatedatc') ||
         widgets.includes('addvalidatedatc') ||
         widgets.includes('assignprocedure')) {
-      steps.push({ id: 'prescribe-atc', label: 'Prescribe ATC', icon: 'add_circle', color: '#ef4444' })
+      steps.push({ id: 'prescribe-atc', label: 'Prescribe ATC', sub: 'Current Cycle', icon: 'add_circle', color: '#ef4444' })
     }
 
     // 6. AEL validation
     if (widgets.includes('validateael')) {
-      steps.push({ id: 'ael-validation', label: 'Validate AEL', icon: 'verified', color: '#14b8a6' })
+      steps.push({ id: 'ael-validation', label: 'AEL Validation', sub: '', icon: 'verified', color: '#14b8a6' })
     }
 
     // (Mark as Completed is NOT a step anymore — per mockup its actions live in
@@ -951,27 +951,36 @@ export class DynamicStudioV2Component {
     }
   }
 
-  // Fetch the participant's active journey name (from metadata/<profileid>.activejourney → journey/<id>).
-  // Idempotent per participant id; safe to call repeatedly.
+  // Fetch the participant's journey NAME to show in the studio (instead of the
+  // product). Source: `participant metadata/<profileid>`. Which journey field to
+  // use depends on customer status (mirrors journeycoach-dashboard's
+  // mapCustomerStatusVariable): active → activejourney, non active →
+  // lastcompletedjourney. The resolved id is looked up in the `journey`
+  // collection for its display name. Idempotent per participant id.
   async fetchParticipantJourney(profileid: string) {
     if (!profileid || this.journeyLoadedForProfile === profileid) return
     this.journeyLoadedForProfile = profileid
     this.participantJourneyName = null
-    console.log('[Journey] fetching metadata for profile', profileid)
+    console.log('[Journey] fetching participant metadata for profile', profileid)
     try {
-      const metaSnap = await getDoc(doc(this.firestore, 'metadata', profileid))
+      const metaSnap = await getDoc(doc(this.firestore, 'participant metadata', profileid))
       if (!metaSnap.exists()) {
-        console.warn('[Journey] metadata doc does not exist for', profileid)
+        console.warn('[Journey] participant metadata doc does not exist for', profileid)
         return
       }
       const metaData: any = metaSnap.data()
-      console.log('[Journey] metadata doc data:', metaData)
-      const journeyId = metaData?.activejourney
+      console.log('[Journey] participant metadata doc data:', metaData)
+      const status = (metaData?.customerstatus ?? '').toString().trim().toLowerCase()
+      const journeyId =
+        status === 'active' ? metaData?.activejourney
+        : status === 'non active' ? metaData?.lastcompletedjourney
+        // Tolerant fallback for other/blank statuses so something still shows.
+        : (metaData?.activejourney || metaData?.lastcompletedjourney)
       if (!journeyId) {
-        console.warn('[Journey] activejourney field is empty on metadata', profileid)
+        console.warn('[Journey] no journey id for status', status, 'on', profileid)
         return
       }
-      console.log('[Journey] resolving journey doc', journeyId)
+      console.log('[Journey] resolving journey doc', journeyId, 'status', status)
       const journeySnap = await getDoc(doc(this.firestore, 'journey', journeyId))
       if (!journeySnap.exists()) {
         console.warn('[Journey] journey doc not found:', journeyId)
@@ -981,7 +990,9 @@ export class DynamicStudioV2Component {
       }
       const data: any = journeySnap.data()
       console.log('[Journey] journey data:', data)
-      this.participantJourneyName = data?.journeyname || data?.name || data?.title || journeyId
+      // The journey collection stores the display name in the `journey` field
+      // (see journeycoach-dashboard: mapjourneyname[id] = doc['journey']).
+      this.participantJourneyName = data?.journey || data?.journeyname || data?.name || data?.title || journeyId
     } catch (err) {
       console.warn('Could not fetch participant journey', err)
     }
@@ -1170,22 +1181,30 @@ export class DynamicStudioV2Component {
   // step — "open that screen directly" in the already-open tab.
   private studioChannel: BroadcastChannel | null = null
   private wireStudioChannel() {
+    const jump = (step: string) => this.ngZone.run(() => {
+      if (this.visibleSteps.find(s => s.id === step)) this.setActiveStep(step)
+      else this.pendingDeepLinkStep = step
+      this.cdr.detectChanges()
+      try { window.focus() } catch { /* background tabs can't self-focus; best-effort */ }
+    })
+    // BroadcastChannel: the Zoom view pings to switch the step (immediate reuse).
     try {
       this.studioChannel = new BroadcastChannel('starlabs-dynamic-studio')
       this.studioChannel.onmessage = (ev: MessageEvent) => {
         const data = ev?.data
         if (data?.type !== 'goto-step' || !data.step) return
         this.studioChannel?.postMessage({ type: 'studio-here' })
-        this.ngZone.run(() => {
-          if (this.visibleSteps.find(s => s.id === data.step)) this.setActiveStep(data.step)
-          else this.pendingDeepLinkStep = data.step
-          this.cdr.detectChanges()
-          // Best-effort: browsers block a background tab from foregrounding
-          // itself, so this may be a no-op — the tab still switches to the step.
-          try { window.focus() } catch { /* ignore */ }
-        })
+        jump(data.step)
       }
     } catch { /* BroadcastChannel unsupported — Zoom view falls back to a new tab */ }
+    // Service worker: when the host clicks the "Prescribe ATC" notification, the
+    // SW focuses THIS tab and posts goto-step here — switch the stepper to match.
+    try {
+      navigator.serviceWorker?.addEventListener('message', (ev: MessageEvent) => {
+        const data = ev?.data
+        if (data?.type === 'goto-step' && data.step) jump(data.step)
+      })
+    } catch { /* ignore */ }
   }
 
   ngOnDestroy(){

@@ -18,7 +18,37 @@ if (typeof window === 'undefined') {
                 });
         } else if (ev.data.type === "coepCredentialless") {
             coepCredentialless = ev.data.value;
+        } else if (ev.data.type === "notify-focus-studio") {
+            // Show a click-to-open notification. The in-call Zoom tab (a separate,
+            // cross-origin-isolated browsing context) cannot focus the Studio tab
+            // itself — but a service worker CAN focus a WindowClient from a
+            // notificationclick. This is the only sanctioned way to bring an
+            // existing background tab to the front.
+            ev.waitUntil(self.registration.showNotification("Prescribe ATC is ready", {
+                body: "Click to open your Dynamic Studio tab on the Prescribe ATC step.",
+                tag: "prescribe-atc",
+                renotify: true,
+                requireInteraction: false,
+                data: { step: ev.data.step, url: ev.data.url }
+            }));
         }
+    });
+
+    self.addEventListener("notificationclick", (ev) => {
+        const step = ev.notification && ev.notification.data && ev.notification.data.step;
+        const url = ev.notification && ev.notification.data && ev.notification.data.url;
+        ev.notification.close();
+        ev.waitUntil((async () => {
+            const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+            const studio = all.find((c) => (c.url || "").includes("/dynamicstudio"));
+            if (studio) {
+                // Tell it to switch to the step, then bring it to the front.
+                try { studio.postMessage({ type: "goto-step", step: step }); } catch (e) {}
+                try { await studio.focus(); } catch (e) {}
+            } else if (url) {
+                try { await self.clients.openWindow(url); } catch (e) {}
+            }
+        })());
     });
 
     self.addEventListener("fetch", function (event) {

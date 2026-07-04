@@ -944,36 +944,46 @@ export class ZoomClientviewComponent {
   // The stable window name makes repeat clicks reuse + refocus this same tab
   // rather than piling up new ones. The Zoom call is never navigated.
   goToPrescribeAtc() {
-    const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
+    const step = 'prescribe-atc';
+    const url = `${window.location.origin}/dynamicstudio?step=${step}`;
 
-    // Prefer REUSING an already-open Studio tab: ask it (BroadcastChannel) to
-    // switch to the step, and DON'T open a new tab. Only open a new tab if no
-    // Studio tab answers. A deferred window.open ~250ms later is still allowed by
-    // the click's transient activation, so no spare/flashing tab is needed.
-    let settled = false;
-    const openNewTab = () => {
-      if (settled) return;
-      settled = true;
-      window.open(url, 'starlabsDynamicStudio');
-    };
-
+    // 1) Pre-switch an already-open Studio tab to the step (so it's ready) and
+    //    detect whether one exists (for the no-notification fallback).
+    let studioOpen = false;
     try {
-      const channel = new BroadcastChannel('starlabs-dynamic-studio');
-      channel.onmessage = (ev: MessageEvent) => {
-        if (ev?.data?.type === 'studio-here' && !settled) {
-          // The open Studio tab switched itself to the step → NO new tab. The
-          // browser won't let it foreground itself, so show a prominent in-call
-          // popup telling the host to flip to that tab.
-          settled = true;
-          try { channel.close(); } catch { /* ignore */ }
-          this.ngZone.run(() => this.showPrescribeHint());
-        }
-      };
-      channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
-      setTimeout(() => { openNewTab(); try { channel.close(); } catch {} }, 250);
-    } catch {
-      openNewTab();
+      const ch = new BroadcastChannel('starlabs-dynamic-studio');
+      ch.onmessage = (ev: MessageEvent) => { if (ev?.data?.type === 'studio-here') studioOpen = true; };
+      ch.postMessage({ type: 'goto-step', step });
+      setTimeout(() => { try { ch.close(); } catch {} }, 1000);
+    } catch { /* ignore */ }
+
+    // 2) Show a click-to-open NOTIFICATION. Clicking it lets the service worker
+    //    focus the existing Studio tab and switch it to the step — the ONLY way
+    //    the browser allows redirecting to an already-open tab.
+    const fire = () => {
+      const c = navigator.serviceWorker && navigator.serviceWorker.controller;
+      if (c) { c.postMessage({ type: 'notify-focus-studio', step, url }); return true; }
+      return false;
+    };
+    const perm = ('Notification' in window) ? Notification.permission : 'denied';
+    if (perm === 'granted') {
+      if (fire()) return;
+    } else if (perm === 'default') {
+      Notification.requestPermission().then(p => {
+        if (!(p === 'granted' && fire())) this.fallbackPrescribe(url, studioOpen);
+      });
+      return;
     }
+
+    // 3) Notifications unavailable → in-call popup if a Studio tab is open, else a new tab.
+    this.fallbackPrescribe(url, studioOpen);
+  }
+
+  private fallbackPrescribe(url: string, studioOpen: boolean) {
+    setTimeout(() => {
+      if (studioOpen) this.ngZone.run(() => this.showPrescribeHint());
+      else window.open(url, 'starlabsDynamicStudio');
+    }, 300);
   }
 
   private showPrescribeHint() {
