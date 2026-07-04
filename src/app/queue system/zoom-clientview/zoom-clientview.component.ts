@@ -932,51 +932,12 @@ export class ZoomClientviewComponent {
       .catch(error => console.error('Error updating clip timing:', error));
   }
 
-  // Go to the "Prescribe ATC" step of Dynamic Studio, VISIBLY: open it in a new
-  // tab that comes to the FRONT, so the click always lands the host on the screen.
-  //
-  // Why a new tab and not "switch to your already-open Studio tab": the browser
-  // lets a page open + focus a tab it CREATES on your click, but forbids a page
-  // from pulling your view to a DIFFERENT, pre-existing tab it didn't create
-  // (anti-hijack) — and this Zoom page is cross-origin isolated (for its video),
-  // so it can't even reference that tab. So reusing + foregrounding the existing
-  // Studio tab is impossible; a fresh front tab is the only visible option.
-  // The stable window name makes repeat clicks reuse + refocus this same tab
-  // rather than piling up new ones. The Zoom call is never navigated.
+  // For now: just open the Prescribe ATC step in a new tab (front). The stable
+  // window name makes repeat clicks reuse + refocus that same tab. Zoom call is
+  // never navigated.
   goToPrescribeAtc() {
-    const step = 'prescribe-atc';
-    const url = `${window.location.origin}/dynamicstudio?step=${step}`;
-
-    // 1) Pre-switch an already-open Studio tab to the step (so it's ready) and
-    //    detect whether one exists (for the no-notification fallback).
-    let studioOpen = false;
-    try {
-      const ch = new BroadcastChannel('starlabs-dynamic-studio');
-      ch.onmessage = (ev: MessageEvent) => { if (ev?.data?.type === 'studio-here') studioOpen = true; };
-      ch.postMessage({ type: 'goto-step', step });
-      setTimeout(() => { try { ch.close(); } catch {} }, 1000);
-    } catch { /* ignore */ }
-
-    // 2) Fire the click-to-focus NOTIFICATION. Clicking it lets the service
-    //    worker focus the existing Studio tab and switch its step — the ONLY way
-    //    the browser allows redirecting to an already-open tab.
-    const notify = () => {
-      const c = navigator.serviceWorker && navigator.serviceWorker.controller;
-      if (c) { c.postMessage({ type: 'notify-focus-studio', step, url }); return true; }
-      return false;
-    };
-    const perm = ('Notification' in window) ? Notification.permission : 'denied';
-    if (perm === 'granted') notify();
-    else if (perm === 'default') Notification.requestPermission().then(p => { if (p === 'granted') notify(); });
-
-    // 3) Give IMMEDIATE, unmissable in-call feedback so the click never looks like
-    //    "nothing happened" (the OS notification is easy to miss). Show the in-call
-    //    popup when a Studio tab is open or a notification is on its way; otherwise
-    //    just open a fresh Studio tab.
-    setTimeout(() => this.ngZone.run(() => {
-      if (studioOpen || perm === 'granted') this.showPrescribeHint();
-      else window.open(url, 'starlabsDynamicStudio');
-    }), 350);
+    const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
+    window.open(url, 'starlabsDynamicStudio');
   }
 
   private showPrescribeHint() {
