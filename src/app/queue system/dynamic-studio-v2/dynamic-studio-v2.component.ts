@@ -3250,6 +3250,21 @@ export class DynamicStudioV2Component {
       console.log('[regenerateZoomLink] error (ignored, link regenerates server-side)', err)
     }
 
+    // A fresh link is a fresh session: clear the ended-session presence one-shots
+    // so `callEnded` resets (re-enabling "Start Meeting" for the new link) and no
+    // stale status (e.g. "participant in call") lingers from the old meeting.
+    try {
+      await updateDoc(doc(this.firestore, 'live assignment', this.liveAssignment['docid']), {
+        specialistJoinedAt: null,
+        specialistLeftAt: null,
+        participantLeftAt: null,
+        participantInCallAt: null,
+        participantReadyAt: null
+      })
+    } catch (e) {
+      console.warn('[regenerateZoomLink] could not reset presence one-shots', e)
+    }
+
     generateLoading.close()
     this.enableZoomLinkGenerator()
   }
@@ -4225,9 +4240,31 @@ export class DynamicStudioV2Component {
     return !url || url === 'Link Broken'
   }
 
+  // True once the meeting has ENDED — both parties left after the call had
+  // started (e.g. the specialist clicked "End meeting for all"). Same signal as
+  // the "Call ended" top-bar status. Once ended, the Zoom link is dead, so
+  // reusing "Start Meeting" would drop the specialist on Zoom's link-timeout
+  // page — they MUST generate a fresh link instead.
+  get callEnded(): boolean {
+    void this.presenceTick // re-run this getter on the presence tick
+    const la: any = this.liveAssignment || {}
+    return !!(la['participantLeftAt'] && la['specialistLeftAt'] && la['specialistJoinedAt'])
+  }
+
   navigateMeeting(doc:any){
     console.log(doc);
     const zoomData = doc["zoomdata"] ?? {}
+
+    // Meeting already ended → the Zoom link is dead. Don't open it (that lands on
+    // Zoom's "link timeout" page); point the specialist at "Generate new link".
+    if(this.callEnded){
+      this.snackBar.open(
+        'This meeting has ended. Generate a new link below to start again.',
+        'Dismiss',
+        { duration: 5000, horizontalPosition: 'center', verticalPosition: 'top' }
+      )
+      return
+    }
 
     if(!zoomData["start_url"] || zoomData["start_url"] == "Link Broken"){
       // Replace the blunt alert with an inline snackbar pointing the user at

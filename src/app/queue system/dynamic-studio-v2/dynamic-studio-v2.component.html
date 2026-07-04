@@ -189,14 +189,6 @@
                   </div>
                 </div>
 
-                <!-- Status only (token number is internal — not surfaced) -->
-                <div class="wait-token__meta">
-                  <span class="wait-token__status"
-                        [class.is-ready]="token.status == 'ready'">
-                    {{ token.status }}
-                  </span>
-                </div>
-
                 <!-- CTA (right) -->
                 <div class="wait-token__cta">
                   <span *ngIf="tokenInvitedByOther[token.docid] as inv"
@@ -291,7 +283,7 @@
         <div class="ds-side-idbody">
           <div class="ds-side-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
           <div class="ds-side-sub">
-            <span *ngIf="participantUPVisitLabel">{{ participantUPVisitLabel }} at uP!</span><span *ngIf="participantUPVisitLabel && liveAssignment['token']?.productname"> &middot; </span><span *ngIf="liveAssignment['token']?.productname" [title]="liveAssignment['token']?.productname">{{ liveAssignment['token']?.productname }}</span>
+            <span *ngIf="participantUPVisitLabel">{{ participantUPVisitLabel }} at uP!</span><span *ngIf="participantUPVisitLabel && participantJourneyName"> &middot; </span><span *ngIf="participantJourneyName" [title]="participantJourneyName">{{ participantJourneyName }}</span>
           </div>
           <div class="ds-side-specialists" *ngIf="additionalSpecialists.length"
                [class.ds-side-specialists--multi]="additionalSpecialists.length > 1">
@@ -320,7 +312,10 @@
               <mat-icon class="ic" *ngIf="isStepCompleted(step.id)">check</mat-icon>
               <span *ngIf="!isStepCompleted(step.id)">{{ i + 1 }}</span>
             </span>
-            <span class="ds-vstep-label">{{ step.label }}</span>
+            <span class="ds-vstep-text">
+              <span class="ds-vstep-label">{{ step.label }}</span>
+              <span class="ds-vstep-sub" *ngIf="step.sub">{{ step.sub }}</span>
+            </span>
           </button>
         </nav>
       </div>
@@ -457,12 +452,12 @@
           <div class="ds-step-header">
             <div class="ds-eyebrow">
               <span class="num">{{ activeStepIndex + 1 }}</span>
-              <span *ngIf="activeStepId === 'current-forms'">Review Forms · Current Cycle</span>
-              <span *ngIf="activeStepId === 'prev-history'">Previous ATC · Previous Cycle(s)</span>
-              <span *ngIf="activeStepId === 'view-atc'">This Cycle ATCs · Current Cycle</span>
-              <span *ngIf="activeStepId === 'getstarted'">Zoom Session</span>
+              <span *ngIf="activeStepId === 'current-forms'">Submitted Forms · Current Cycle</span>
+              <span *ngIf="activeStepId === 'prev-history'">Previous ATC & Love Letters · Previous Cycle(s)</span>
+              <span *ngIf="activeStepId === 'view-atc'">View Submitted ATC · Current Cycle</span>
+              <span *ngIf="activeStepId === 'getstarted'">Zoom Session · Connect with participant</span>
               <span *ngIf="activeStepId === 'prescribe-atc'">Prescribe ATC · Current Cycle</span>
-              <span *ngIf="activeStepId === 'ael-validation'">Validate AEL</span>
+              <span *ngIf="activeStepId === 'ael-validation'">AEL Validation</span>
             </div>
           </div>
 
@@ -637,13 +632,17 @@
                   <mat-icon class="ic">hourglass_top</mat-icon>
                   Generating Zoom link...
                 </div>
-                <div class="zoom-status zoom-status--broken" *ngIf="isZoomLinkBroken && liveAssignment['zoomdata']">
+                <div class="zoom-status zoom-status--broken" *ngIf="callEnded && liveAssignment['zoomdata']">
+                  <mat-icon class="ic">event_busy</mat-icon>
+                  This meeting has ended — generate a new link below to start a new one.
+                </div>
+                <div class="zoom-status zoom-status--broken" *ngIf="isZoomLinkBroken && !callEnded && liveAssignment['zoomdata']">
                   <mat-icon class="ic">warning</mat-icon>
                   This Zoom link is broken — please generate a new one below.
                 </div>
                 <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
                         (click)="navigateMeeting(liveAssignment)" data-testid="studio-zoom-start-btn"
-                        [disabled]="liveAssignment['zoomdata'] === undefined || isZoomLinkBroken">
+                        [disabled]="liveAssignment['zoomdata'] === undefined || isZoomLinkBroken || callEnded">
                   <mat-icon class="ic">play_arrow</mat-icon>
                   <span class="start-meeting-btn__label">Start Meeting</span>
                 </button>
@@ -653,13 +652,13 @@
                 <div class="zoom-regen"
                      *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
                   <div class="zoom-regen__text">
-                    <div class="choice-title">{{ isZoomLinkBroken ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
+                    <div class="choice-title">{{ callEnded ? 'Meeting ended — start a new one' : isZoomLinkBroken ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
                     <div class="choice-desc">Generate a new link — it's resent to the participant automatically.</div>
                   </div>
                   <button type="button" class="btn btn-sm"
-                          [class.btn-ghost]="!isZoomLinkBroken"
-                          [class.btn-primary]="isZoomLinkBroken"
-                          [disabled]="!isZoomLinkBroken && !zoomlinkGenerator"
+                          [class.btn-ghost]="!isZoomLinkBroken && !callEnded"
+                          [class.btn-primary]="isZoomLinkBroken || callEnded"
+                          [disabled]="!isZoomLinkBroken && !callEnded && !zoomlinkGenerator"
                           (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">
                     <mat-icon class="ic">refresh</mat-icon>
                     Generate new link &amp; resend
@@ -721,7 +720,7 @@
                      Scope Enhancement). The "Use AI-Generated ATC" buttons open the prescribe form
                      pre-filled from it; the plain buttons start a blank ATC. -->
                 <div *ngIf="aiAtcAvailable"
-                  style="display:flex;align-items:center;gap:8px;font-size:13px;color:#6c4ad6;font-weight:700;margin-bottom:12px;">
+                  style="display:flex;align-items:center;gap:8px;font-size:13px;color:#9A258F;font-weight:700;margin-bottom:12px;">
                   <mat-icon class="ic">auto_awesome</mat-icon>
                   An AI-generated ATC is available for this participant.
                 </div>
@@ -740,14 +739,14 @@
                   </button>
                   <button type="button" class="btn btn-primary btn-lg"
                     *ngIf="aiAtcAvailable && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc')"
-                    style="background:#6c4ad6;border-color:#6c4ad6;"
+                    style="background:#9A258F;border-color:#9A258F;"
                     (click)="useAiAtc(true)">
                     <mat-icon class="ic">auto_awesome</mat-icon>
                     Use AI-Generated ATC — No Validation
                   </button>
                   <button type="button" class="btn btn-ghost btn-lg"
                     *ngIf="aiAtcAvailable && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')"
-                    style="color:#6c4ad6;border-color:#6c4ad6;"
+                    style="color:#9A258F;border-color:#9A258F;"
                     (click)="useAiAtc(false)">
                     <mat-icon class="ic">auto_awesome</mat-icon>
                     Use AI-Generated ATC — Requires Validation
@@ -1010,9 +1009,6 @@
             <span class="count-badge count-green" *ngIf="alphaATCList.length > 0">{{ alphaATCList.length }}</span>
             <span class="card-head-empty" *ngIf="alphaATCList.length == 0">— No data available</span>
           </div>
-          <button type="button" class="btn-icon" (click)="previewATC('alpha')" title="Refresh">
-            <mat-icon class="ic">refresh</mat-icon>
-          </button>
         </div>
         <div class="card-pad" *ngIf="alphaATCList.length > 0">
           <ng-container *ngFor="let atc of alphaATCList; let i = index; trackBy: trackByDocId">
@@ -1031,9 +1027,6 @@
             <span class="count-badge count-amber" *ngIf="unvalidatedATCList.length > 0">{{ unvalidatedATCList.length }}</span>
             <span class="card-head-empty" *ngIf="unvalidatedATCList.length == 0">— No data available</span>
           </div>
-          <button type="button" class="btn-icon" (click)="previewATC('validation')" title="Refresh">
-            <mat-icon class="ic">refresh</mat-icon>
-          </button>
         </div>
         <div class="card-pad" *ngIf="unvalidatedATCList.length > 0">
           <ng-container *ngFor="let atc of unvalidatedATCList; let i = index; trackBy: trackByDocId">
