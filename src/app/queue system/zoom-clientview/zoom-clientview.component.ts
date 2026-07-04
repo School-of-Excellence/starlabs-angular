@@ -103,6 +103,11 @@ export class ZoomClientviewComponent {
   recordingPromptVisible: boolean = false;
   recordingPromptKind: 'paused' | 'stopped' = 'stopped';
 
+  // In-call popup shown after Prescribe ATC reuses an already-open Studio tab
+  // (the browser can't foreground that tab for us, so we tell the host here).
+  prescribeHintVisible: boolean = false;
+  private prescribeHintTimer: any = null;
+
   constructor(
     private route: ActivatedRoute,
     private firestore: Firestore,
@@ -940,12 +945,50 @@ export class ZoomClientviewComponent {
   // rather than piling up new ones. The Zoom call is never navigated.
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
-    // Open a tab that comes to the FRONT, on the Prescribe ATC step — this is the
-    // only way to visibly land the host on the screen (the browser won't let us
-    // foreground a different, already-open Studio tab). The stable window name
-    // makes repeat clicks reuse + refocus this same tab. Zoom call is untouched.
-    const w = window.open(url, 'starlabsDynamicStudio');
-    try { w?.focus(); } catch { /* ignore */ }
+
+    // Prefer REUSING an already-open Studio tab: ask it (BroadcastChannel) to
+    // switch to the step, and DON'T open a new tab. Only open a new tab if no
+    // Studio tab answers. A deferred window.open ~250ms later is still allowed by
+    // the click's transient activation, so no spare/flashing tab is needed.
+    let settled = false;
+    const openNewTab = () => {
+      if (settled) return;
+      settled = true;
+      window.open(url, 'starlabsDynamicStudio');
+    };
+
+    try {
+      const channel = new BroadcastChannel('starlabs-dynamic-studio');
+      channel.onmessage = (ev: MessageEvent) => {
+        if (ev?.data?.type === 'studio-here' && !settled) {
+          // The open Studio tab switched itself to the step → NO new tab. The
+          // browser won't let it foreground itself, so show a prominent in-call
+          // popup telling the host to flip to that tab.
+          settled = true;
+          try { channel.close(); } catch { /* ignore */ }
+          this.ngZone.run(() => this.showPrescribeHint());
+        }
+      };
+      channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
+      setTimeout(() => { openNewTab(); try { channel.close(); } catch {} }, 250);
+    } catch {
+      openNewTab();
+    }
+  }
+
+  private showPrescribeHint() {
+    this.prescribeHintVisible = true;
+    if (this.prescribeHintTimer) clearTimeout(this.prescribeHintTimer);
+    // Auto-dismiss so it doesn't linger over the call.
+    this.prescribeHintTimer = setTimeout(
+      () => this.ngZone.run(() => { this.prescribeHintVisible = false; }),
+      12000
+    );
+  }
+
+  dismissPrescribeHint() {
+    this.prescribeHintVisible = false;
+    if (this.prescribeHintTimer) { clearTimeout(this.prescribeHintTimer); this.prescribeHintTimer = null; }
   }
 
   handleKeyDown(event: KeyboardEvent) {
