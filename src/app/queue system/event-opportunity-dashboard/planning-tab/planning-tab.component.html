@@ -17,36 +17,64 @@
 
   <!-- Filters -->
   <div class="pl-filters">
+    <!-- Event + queue are staged (pending); data only loads on "Get". -->
     <mat-form-field appearance="outline" class="pl-fil pl-fil-event">
       <mat-label>Event</mat-label>
-      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedEventIds" multiple (ngModelChange)="onEventChange($event)">
+      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="pendingEvents" multiple (ngModelChange)="pendingEvents = $event">
         <mat-option *ngFor="let e of eventList" [value]="e.id">{{ e.name || e.queuename || e.id }}</mat-option>
       </mat-select>
     </mat-form-field>
     <!-- Planning's OWN queue selection — fully independent of the Board's top "Select queue". -->
     <mat-form-field appearance="outline" class="pl-fil pl-fil-queue">
       <mat-label>Select queue</mat-label>
-      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedQueueList" multiple (ngModelChange)="onPlanningQueuesChange($event)">
+      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="pendingQueues" multiple (ngModelChange)="pendingQueues = $event">
         <mat-option *ngFor="let q of queueList; trackBy: trackByQueueDoc" [value]="q.docid">{{ q.queuename }}</mat-option>
       </mat-select>
     </mat-form-field>
 
-    <!-- Journey filter: keep only participants whose journey (by customer status) matches. -->
-    <mat-form-field appearance="outline" class="pl-fil pl-fil-journey" *ngIf="journeyList.length > 0">
-      <mat-label>Journey</mat-label>
-      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedJourneys" multiple (ngModelChange)="onJourneysChange($event)">
-        <mat-option *ngFor="let j of journeyList" [value]="j.id">{{ j.name }}</mat-option>
-      </mat-select>
-    </mat-form-field>
+    <!-- Get: the only fetch trigger for the chosen event + queue. -->
+    <button class="ios-btn filled pl-get" type="button" (click)="loadPlanningData()"
+            [disabled]="dataLoading || (!pendingQueues.length && !pendingEvents.length)">
+      <mat-icon>{{ dataLoading ? 'autorenew' : 'download' }}</mat-icon>
+      <span>{{ dataLoading ? 'Loading…' : 'Get' }}</span>
+    </button>
+
   </div>
 
-  <!-- DFU-ongoing omit toggle -->
-  <div class="pl-toggles" *ngIf="selectedQueueList.length > 0">
-    <button type="button" class="pl-toggle-chip" [class.on]="omitDfuOngoing" (click)="onToggleDfuOmit()"
-            matTooltip="Hide participants currently in a DFU (Priority Mode) product">
-      <mat-icon>{{ omitDfuOngoing ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
-      <span>Omit DFU ongoing</span>
-    </button>
+  <!-- Bounded "Filters" group: one overall Show-only/Remove mode, then the filters below. Only once data is loaded. -->
+  <div class="pl-filterbox" *ngIf="selectedQueueList.length > 0 || selectedEventIds.length > 0">
+    <span class="pl-filterbox-lbl"><mat-icon>filter_alt</mat-icon>Filters</span>
+
+    <!-- Overall mode -->
+    <div class="pl-mode pl-mode-overall">
+      <button type="button" class="pl-mode-btn" [class.on]="filterMode==='only'" (click)="setFilterMode('only')" matTooltip="Show only participants matching the filters below">Show only</button>
+      <button type="button" class="pl-mode-btn" [class.on]="filterMode==='remove'" (click)="setFilterMode('remove')" matTooltip="Remove participants matching the filters below">Remove</button>
+    </div>
+
+    <!-- Filters (dropdowns + DFU chip, aligned in one row) -->
+    <div class="pl-frow">
+      <mat-form-field appearance="outline" class="pl-fil pl-ffield" *ngIf="journeyList.length > 0">
+        <mat-label>Journey</mat-label>
+        <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedJourneys" multiple (ngModelChange)="onJourneysChange($event)">
+          <mat-option *ngFor="let j of journeyList" [value]="j.id">{{ j.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Cohort filter — the CURRENT marathon's big-cohorts. -->
+      <mat-form-field appearance="outline" class="pl-fil pl-ffield" *ngIf="cohortList.length > 0">
+        <mat-label>{{ currentMarathonTitle ? currentMarathonTitle + ' cohort' : 'Cohort' }}</mat-label>
+        <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedCohorts" multiple (ngModelChange)="onCohortsChange($event)">
+          <mat-option *ngFor="let c of cohortList" [value]="c.id">{{ c.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button type="button" class="pl-toggle-chip" *ngIf="selectedQueueList.length > 0"
+              [class.on]="dfuOn" (click)="toggleDfu()"
+              matTooltip="Include DFU (Priority Mode) participants in the filter">
+        <mat-icon>{{ dfuOn ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+        <span>DFU ongoing</span>
+      </button>
+    </div>
   </div>
 
   <div class="pl-countdown" *ngIf="eventDate">

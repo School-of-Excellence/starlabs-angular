@@ -14,6 +14,11 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
   @Input() profileid!: string;
   @Input() queueref!: DocumentReference;
   @Input() useremail: string = '';
+  // True once the specialist has assigned this participant to the studio
+  // (queue token status === 'instudio'). Bound from queue-web's isInStudio().
+  // When it flips true we dismiss the accepted/waiting overlay so the Join
+  // Meeting screen underneath becomes visible.
+  @Input() inStudio: boolean = false;
 
   studioInvitation: Record<string, any> | null = null;
   studioInvitationPath: string | null = null;
@@ -21,9 +26,14 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
   invitationTotalSeconds: number = 0;
   joinLaterConfirm: boolean = false;
   invitationAccepted: boolean = false;
+  // After the participant taps "Got it", we keep a persistent "Invitation
+  // Accepted — waiting for the specialist" status instead of dropping them back
+  // on the bare queue screen. Cleared when they go instudio (Join Meeting).
+  waitingForStudio: boolean = false;
 
   private invitationDialogOpen: boolean = false;
   private studioInvitationUnsub: (() => void) | null = null;
+  private approvedInvitationUnsub: (() => void) | null = null;
   private invitationInterval: ReturnType<typeof setInterval> | null = null;
   private chimeInterval: ReturnType<typeof setInterval> | null = null;
   
@@ -38,12 +48,56 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
     if (this.profileid && this.queueref && !this.studioInvitationUnsub) {
       this.StudioInvitationListener();
     }
+    if (this.profileid && this.queueref && !this.approvedInvitationUnsub) {
+      this.ApprovedInvitationListener();
+    }
+    // Specialist has brought the participant into the studio → drop the
+    // accepted/waiting overlay so the Join Meeting screen shows through.
+    if (changes['inStudio'] && this.inStudio && (this.invitationAccepted || this.waitingForStudio)) {
+      this._closeInvitation();
+    }
   }
 
   ngOnDestroy(): void {
     this.studioInvitationUnsub?.();
+    this.approvedInvitationUnsub?.();
     if (this.invitationInterval) clearInterval(this.invitationInterval);
     if (this.chimeInterval) { clearInterval(this.chimeInterval); this.chimeInterval = null; }
+  }
+
+  // Reload-robust waiting state. The pending-invite listener only queries
+  // `clientresponse == null`, so after a refresh an already-accepted (approved)
+  // invite is invisible to it and the "waiting for the specialist" card is lost.
+  // This second listener re-surfaces that status on load and clears it if the
+  // approved invite disappears (the specialist assigns → the invite doc is
+  // deleted, and `inStudio` also flips so the Join Meeting screen shows).
+  private ApprovedInvitationListener(): void {
+    const q = query(
+      collection(this.firestore, 'studioinvitation'),
+      where('profileid',      '==', this.profileid),
+      where('queueref',       '==', this.queueref),
+      where('clientresponse', '==', 'approved'),
+      limit(1)
+    );
+
+    this.approvedInvitationUnsub = onSnapshot(q, (snap) => {
+      if (this.inStudio) return; // already assigned → Join Meeting governs
+      // A live pending-invitation overlay takes precedence — never stack the
+      // waiting card on top of a fresh invite the participant still has to act on.
+      const pendingOverlayOpen = this.invitationDialogOpen && !this.invitationAccepted && !!this.studioInvitation;
+      if (!snap.empty) {
+        // Only auto-restore on a fresh load. During an in-session accept the
+        // success card (invitationAccepted && !waitingForStudio) is already up
+        // and its "Got it" drives the transition — don't skip past it.
+        if (!pendingOverlayOpen && !this.invitationAccepted && !this.waitingForStudio) {
+          this.invitationAccepted = true;
+          this.waitingForStudio   = true;
+        }
+      } else if (this.waitingForStudio && !this.inStudio) {
+        // Approved invite gone while still waiting (not assigned) → back to queue.
+        this._closeInvitation();
+      }
+    });
   }
 
   private StudioInvitationListener(): void {
@@ -81,6 +135,11 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
         this.invitationTotalSeconds = secondsRemaining;
         this.joinLaterConfirm       = false;
         this.invitationAccepted     = false;
+        // A fresh pending invitation supersedes any leftover "waiting for the
+        // specialist" state (e.g. a prior approved invite that was never
+        // assigned) — the participant must act on this new invite first, so the
+        // overlay takes precedence over the waiting card.
+        this.waitingForStudio       = false;
 
         if (this.invitationInterval) clearInterval(this.invitationInterval);
         this.invitationInterval = setInterval(() => {
@@ -112,6 +171,14 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
     this.invitationTotalSeconds = 0;
     this.joinLaterConfirm       = false;
     this.invitationAccepted     = false;
+    this.waitingForStudio       = false;
+  }
+
+  // "Got it, Thanks!" — the participant has read the acceptance confirmation.
+  // Instead of closing back to the bare queue, keep a persistent "waiting for
+  // the specialist" status until they're assigned to the studio (inStudio).
+  acknowledgeAccepted(): void {
+    this.waitingForStudio = true;
   }
 
   async acceptInvitation(): Promise<void> {

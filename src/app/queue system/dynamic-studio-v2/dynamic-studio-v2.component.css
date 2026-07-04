@@ -19,10 +19,10 @@
   --ink-3: #8A93A3;
   /* Accent retheme → mockup purple (dynamic-studio-full.html). Token-driven so
      the whole .ds-app workspace picks it up automatically. */
-  --primary: #7C3AED;
-  --primary-ink: #6D28D9;
-  --primary-soft: #F3EEFF;
-  --primary-line: #DDD6FE;
+  --primary: #9A258F;
+  --primary-ink: #7C1D73;
+  --primary-soft: #F8EAF6;
+  --primary-line: #E9C9E4;
   --green: #1B8E50;
   --green-bright: #1FA15B;
   --green-soft: #E4F4EA;
@@ -330,7 +330,7 @@
   width: 50px;
   height: 50px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+  background: linear-gradient(135deg, #C04FB5, #9A258F);
   color: #fff;
   font-weight: 800;
   font-size: 18px;
@@ -930,7 +930,10 @@
   background: #F0F0F3; color: var(--ink-3);
 }
 .ds-app .ds-vstep-node .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-vstep-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .ds-app .ds-vstep-label { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-app .ds-vstep-sub { font-size: 11.5px; font-weight: 500; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-app .ds-vstep.active .ds-vstep-sub { color: var(--primary-ink); }
 .ds-app .ds-vstep.done .ds-vstep-label { color: var(--ink); }
 .ds-app .ds-vstep.done .ds-vstep-node { background: var(--green-soft); color: var(--green); }
 .ds-app .ds-vstep.active { background: var(--primary-soft); }
@@ -3122,8 +3125,8 @@
   min-width: 200px;
   transition: all .2s ease;
 }
-.queue-card:hover { border-color: #7C3AED; }
-.queue-card--active { border-color: #7C3AED; background: #F3EEFF; }
+.queue-card:hover { border-color: #9A258F; }
+.queue-card--active { border-color: #9A258F; background: #F8EAF6; }
 .queue-card__name { font-weight: 800; color: #1A2332; }
 .queue-card__meta { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #566072; }
 .queue-card__icon, .queue-card__chevron { color: #8A93A3; }
@@ -3142,14 +3145,14 @@
   margin-bottom: 8px;
 }
 .sec__head-count {
-  background: #F3EEFF;
-  color: #6D28D9;
+  background: #F8EAF6;
+  color: #7C1D73;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
 }
-.primarystudio { background: #F3EEFF !important; color: #6D28D9 !important; font-weight: 700; }
+.primarystudio { background: #F8EAF6 !important; color: #7C1D73 !important; font-weight: 700; }
 .secondarystudio { background: #FCF3E0 !important; color: #B45309 !important; font-weight: 700; }
 
 /* Stage group → mockup .group-card (rounded, soft shadow) + .group-head. */
@@ -3199,6 +3202,11 @@
   flex: initial;
   max-width: none;
   padding: 0;
+  /* Make each stage column a query container so the waiting-participant cards
+     can respond to the COLUMN's width (not the viewport). This is what fixes the
+     overlap when zoomed in / on narrow columns: the viewport can still be wide
+     while a 1/3-width column is narrow. */
+  container-type: inline-size;
 }
 .token {
   background: #fff;
@@ -3223,6 +3231,7 @@
    .ds-app shell (the waiting list shows when liveAssignment is null). */
 .wait-token {
   display: flex;
+  flex-wrap: wrap;            /* wrap instead of overflowing/overlapping when narrow */
   align-items: center;
   gap: 14px;
   background: #FFFFFF;
@@ -3246,8 +3255,8 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #EDE9FE;
-  color: #6D28D9;
+  background: #F3DEEF;
+  color: #7C1D73;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3255,7 +3264,7 @@
   font-size: 14px;
   overflow: hidden;
   flex-shrink: 0;
-  border: 1px solid #DDD6FE;
+  border: 1px solid #E9C9E4;
 }
 .wait-token__avatar img {
   width: 100%;
@@ -3294,9 +3303,9 @@
 .wait-token__token {
   font-size: 13px;
   font-weight: 800;
-  color: #6D28D9;
-  background: #F3EEFF;
-  border: 1px solid #DDD6FE;
+  color: #7C1D73;
+  background: #F8EAF6;
+  border: 1px solid #E9C9E4;
   padding: 4px 10px;
   border-radius: 999px;
 }
@@ -3321,7 +3330,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #7C3AED;
+  background: #9A258F;
   color: #FFFFFF;
   border: none;
   padding: 9px 16px;
@@ -3332,7 +3341,7 @@
   transition: background .2s ease, transform .2s ease;
   font-family: inherit;
 }
-.wait-token__btn:hover { background: #6D28D9; }
+.wait-token__btn:hover { background: #7C1D73; }
 .wait-token__btn .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
 /* Approved invite — green so it reads as "ready to assign", not a fresh invite. */
 .wait-token__btn--approved { background: #15803D; }
@@ -3364,9 +3373,9 @@
 }
 /* This studio's own pending invite — blue "awaiting response" with a Cancel. */
 .wait-token__chip--self {
-  background: #F3EEFF;
-  color: #6D28D9;
-  border-color: #DDD6FE;
+  background: #F8EAF6;
+  color: #7C1D73;
+  border-color: #E9C9E4;
 }
 .wait-token__chip-cancel {
   display: inline-flex;
@@ -3386,10 +3395,26 @@
 .wait-token__chip-cancel:hover { opacity: 1; background: rgba(124,58,237,.14); }
 .wait-token__chip-cancel .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
 
-@media (max-width: 720px) {
-  .wait-token { flex-wrap: wrap; gap: 10px; }
-  .wait-token__meta { order: 3; flex: 1 0 100%; }
-  .wait-token__cta { order: 2; margin-left: auto; }
+/* Narrow COLUMN (zoomed in, or 3 columns on a smaller screen): stack the token's
+   sections so the name, status and CTA never overlap. Container-based so it
+   responds to the column width, not the viewport (the viewport can be wide while
+   a 1/3-width column is narrow). Graceful fallback: `.wait-token` already has
+   `flex-wrap: wrap`, so browsers without @container support still wrap. */
+@container (max-width: 420px) {
+  .wait-token { gap: 10px; }
+  .wait-token__id { flex: 1 1 100%; }        /* avatar + name on their own row */
+  .wait-token__cta { order: 3; margin-left: auto; } /* CTA pushed to the right */
+}
+@container (max-width: 300px) {
+  /* Very tight: give the CTA its own full-width row so the button can't collide
+     with the status pill. */
+  .wait-token__cta { flex: 1 1 100%; margin-left: 0; }
+  .wait-token__cta .wait-token__btn,
+  .wait-token__cta .wait-token__chip {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
 }
 
 .chat-container {
@@ -4175,9 +4200,9 @@
 .studio-top { display: flex; align-items: center; gap: 11px; }
 .studio-icon {
   width: 40px; height: 40px; border-radius: 11px;
-  background: #EDE9FE; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  background: #F3DEEF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.studio-icon mat-icon { font-size: 20px; width: 20px; height: 20px; color: #6D28D9; }
+.studio-icon mat-icon { font-size: 20px; width: 20px; height: 20px; color: #7C1D73; }
 .studio-name { font-size: 14.5px; font-weight: 800; color: #0D0F12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .studio-queue { font-size: 12px; color: #6B7280; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .studio-specialists { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #4B5563; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -4187,7 +4212,7 @@
 .studio-spec { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; min-width: 0; }
 .studio-spec mat-icon { font-size: 15px; width: 15px; height: 15px; flex-shrink: 0; }
 .studio-spec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.studio-open { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700; color: #7C3AED; flex-shrink: 0; }
+.studio-open { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700; color: #9A258F; flex-shrink: 0; }
 .studio-open mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
 /* ---- LIST screen (after picking a studio) ---- */
@@ -4195,8 +4220,8 @@
    Pre-live view isn't inside .ds-app, so colours are hard-coded (no CSS vars). */
 .ds-back-link {
   display: inline-flex; align-items: center; gap: 6px;
-  color: #6D28D9; font-size: 14px; font-weight: 700;
-  background: #F3EEFF; border: 1px solid #DDD6FE;
+  color: #7C1D73; font-size: 14px; font-weight: 700;
+  background: #F8EAF6; border: 1px solid #E9C9E4;
   border-radius: 999px; padding: 9px 18px 9px 13px; margin-bottom: 18px;
   cursor: pointer; transition: background .15s ease, box-shadow .15s ease, transform .1s ease;
 }

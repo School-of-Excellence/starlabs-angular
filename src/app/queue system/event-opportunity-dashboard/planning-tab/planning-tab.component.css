@@ -402,6 +402,36 @@ table.t.t--slot { min-width:720px; }
 
 /* journey filter + DFU-omit toggle */
 .pl-fil-journey { width:min(300px,100%); }
+
+/* bounded "Filters" group (journey + DFU-omit) */
+.pl-filterbox {
+  position:relative; display:flex; flex-direction:column; align-items:center; gap:10px;
+  width:max-content; max-width:100%; margin:2px auto 16px; padding:20px 22px 14px;
+  border:0.5px solid var(--tint-hair); border-radius:var(--r-core); background:var(--surface-tray);
+}
+.pl-frow { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:12px 14px; }
+/* equal, tidy field widths so Journey + Cohort line up; the DFU chip sits inline with them */
+.pl-filterbox .pl-ffield { width:250px; max-width:100%; margin-bottom:-1.34375em; }
+.pl-frow .pl-toggle-chip { align-self:center; }
+.pl-mode-overall { align-self:center; margin-bottom:2px; }
+.pl-filterbox-lbl {
+  position:absolute; top:-9px; left:16px; display:inline-flex; align-items:center; gap:4px;
+  padding:0 8px; background:var(--bg); border-radius:var(--r-chip);
+  font-size:11px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--secondary);
+}
+.pl-filterbox-lbl mat-icon { font-size:14px; width:14px; height:14px; color:var(--tint); }
+.pl-filterbox .pl-fil-journey { margin-bottom:-1.34375em; }
+.pl-fgroup { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.pl-fgroup-lbl { font-size:12px; font-weight:600; color:var(--label-2); }
+.pl-mode { display:inline-flex; gap:2px; padding:2px; background:var(--track); border-radius:var(--r-pill); }
+.pl-mode-btn {
+  border:none; background:transparent; color:var(--label-2);
+  border-radius:var(--r-pill); padding:4px 12px; font-size:11.5px; font-weight:600; cursor:pointer;
+  transition:background .12s var(--ease), color .12s var(--ease);
+}
+.pl-mode-btn:hover { color:var(--label); }
+.pl-mode-btn.on { background:var(--surface); color:var(--tint); box-shadow:var(--sh-sm); }
+
 .pl-toggles { display:flex; justify-content:center; gap:10px; margin:-2px 0 10px; }
 .pl-toggle-chip {
   display:inline-flex; align-items:center; gap:6px;
@@ -417,3 +447,8 @@ table.t.t--slot { min-width:720px; }
 .pl-fchip-add { padding:5px 10px; color:var(--tint); }
 .pl-fchip-add mat-icon { font-size:18px; width:18px; height:18px; margin:0; }
 .pl-fchip-add:hover { background:var(--tint-soft); }
+
+/* "Get" button — the manual load trigger, aligned with the filter fields */
+.pl-get { align-self:center; height:42px; gap:6px; white-space:nowrap; }
+.pl-get mat-icon { font-size:18px; width:18px; height:18px; }
+.pl-get[disabled] { opacity:.5; cursor:default; }

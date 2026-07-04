@@ -2,7 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, S
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
-  Firestore, collection, collectionData, query, where, getDocs, getDoc,
+  Firestore, collection, collectionData, query, where, getDocs, getDoc, orderBy,
   doc, setDoc, updateDoc, deleteDoc, DocumentReference
 } from '@angular/fire/firestore';
 import { CdkDragDrop, moveItemInArray, DragDropModule } from '@angular/cdk/drag-drop';
@@ -60,19 +60,64 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   @Input() queueList: any[] = [];
   /** Current logged-in user's profileid — stamped onto saved filters as lasteditedby. */
   @Input() currentProfileId: string = '';
-  /** Selected events (multi). */
+  /** Selected events (multi) — APPLIED (data loaded for these). */
   selectedEventIds: string[] = [];
+  /** Dropdown selections pending a "Get" — nothing loads until the button is clicked. */
+  pendingEvents: string[] = [];
+  pendingQueues: string[] = [];
+
+  /** "Get": apply the pending event + queue picks and load their data (the only fetch trigger). */
+  loadPlanningData(): void {
+    this.selectedEventIds = [...this.pendingEvents];
+    this.selectedCardKey = null; this.drillList = [];
+    this.selectedCell = null; this.cellDrillRows = [];
+    this.drillPage = 0;
+    this.dataLoading = true;
+    // Apply the queue selection UP to the dashboard (loads its tokens; queueChanged → eligibility + recompute).
+    this.queueSelectionChange.emit([...this.pendingQueues]);
+    // Load the event sets for the chosen events, then recompute. (loader cleared in recompute's finally)
+    if (this.selectedEventRefs.length) {
+      this.loadEventSets().then(() => this.recompute());
+    } else {
+      this.approvedSet = new Set(); this.requestedSet = new Set(); this.ownerSet = new Set(); this.potentialTotal = 0;
+      this.recompute();
+    }
+  }
 
   // ---------- Journey filter + DFU-ongoing omit ----------
   /** journeyid → journey name (from the 'journey' collection). */
   journeyMap: { [id: string]: string } = {};
   journeyList: { id: string; name: string }[] = [];
-  /** Selected journey names (a participant is kept only if their effective journey matches). */
+  /** Selected journey ids (a filter criterion). */
   selectedJourneys: string[] = [];
-  /** When on, participants who are "DFU ongoing" are omitted from every number/list. */
-  omitDfuOngoing = false;
+  /** Whether "DFU ongoing" is part of the filter. */
+  dfuOn = false;
+  /** ONE overall mode: 'only' = show only participants matching the active filters; 'remove' = exclude them. */
+  filterMode: 'only' | 'remove' = 'only';
+
+  // ---------- Cohort filter (current marathon's big cohorts) ----------
+  /** Current marathon title (for the cohort filter label). */
+  currentMarathonTitle = '';
+  /** Cohorts of the current marathon: id + name + member profileids. */
+  cohortList: { id: string; name: string; members: Set<string> }[] = [];
+  /** Selected cohort ids (a filter criterion). */
+  selectedCohorts: string[] = [];
+  /** Union of the selected cohorts' member profileids (rebuilt on change). */
+  private selectedCohortMembers = new Set<string>();
+
+  onCohortsChange(ids: string[]): void {
+    this.selectedCohorts = ids || [];
+    this.selectedCohortMembers = new Set<string>();
+    for (const c of this.cohortList) {
+      if (this.selectedCohorts.includes(c.id)) c.members.forEach(m => this.selectedCohortMembers.add(m));
+    }
+    this.selectedCardKey = null; this.drillList = [];
+    this.recomputeView();
+  }
   /** profileid → participant-metadata doc (activeproduct, currentjourney, lastcompletedjourney, lastsubscribedjourney). */
   private participantMeta: { [id: string]: any } = {};
+  /** ids whose metadata we've already fetched this session (so we never re-query them). */
+  private metaFetched = new Set<string>();
   /** product ids with mode == 'Priority Mode' — holding one of these = DFU ongoing. */
   private priorityProductIds = new Set<string>();
 
@@ -81,8 +126,14 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     this.selectedCardKey = null; this.drillList = [];
     this.recomputeView();
   }
-  onToggleDfuOmit(): void {
-    this.omitDfuOngoing = !this.omitDfuOngoing;
+  /** Set the overall filter mode (show only / remove) — applies to every active filter. */
+  setFilterMode(m: 'only' | 'remove'): void {
+    this.filterMode = m;
+    if (this.selectedJourneys.length || this.dfuOn) { this.selectedCardKey = null; this.drillList = []; this.recomputeView(); }
+  }
+  /** Toggle whether DFU-ongoing is part of the filter. */
+  toggleDfu(): void {
+    this.dfuOn = !this.dfuOn;
     this.selectedCardKey = null; this.drillList = [];
     this.recomputeView();
   }
@@ -109,11 +160,21 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     return Array.isArray(v) ? v.flat().filter(Boolean).map(String) : [String(v)];
   }
   private passesParticipantFilters(id: string): boolean {
-    if (this.omitDfuOngoing && this.isDfuOngoing(id)) return false;
-    if (this.selectedJourneys.length) {
-      const ids = this.journeyIdsFor(id);
-      if (!ids.some(j => this.selectedJourneys.includes(j))) return false;
+    const journeyActive = this.selectedJourneys.length > 0;
+    const cohortActive = this.selectedCohorts.length > 0;
+    if (!journeyActive && !this.dfuOn && !cohortActive) return true;
+    const journeyMatch = journeyActive && this.journeyIdsFor(id).some(j => this.selectedJourneys.includes(j));
+    const dfuMatch = this.dfuOn && this.isDfuOngoing(id);
+    const cohortMatch = cohortActive && this.selectedCohortMembers.has(id);
+    if (this.filterMode === 'only') {
+      // keep only participants who match EVERY active filter
+      if (journeyActive && !journeyMatch) return false;
+      if (this.dfuOn && !dfuMatch) return false;
+      if (cohortActive && !cohortMatch) return false;
+      return true;
     }
+    // 'remove': drop participants who match ANY active filter
+    if (journeyMatch || dfuMatch || cohortMatch) return false;
     return true;
   }
 
@@ -321,9 +382,12 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.pendingQueues = [...(this.selectedQueueList || [])];
+    this.pendingEvents = [...this.selectedEventIds];
     this.loadFilters();
     this.loadStageOptions();
     this.loadJourneysAndMeta();
+    this.loadCohorts();
     this.loadQueueEligibility();
     this.requestRecompute();
   }
@@ -336,14 +400,33 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
         .map(([id, name]) => ({ id, name: String(name ?? id) }))
         .sort((a, b) => a.name.localeCompare(b.name));
     } catch (e) { console.error('Journey map load failed', e); }
-    try {
-      const meta = await this.guard.getParticipantMetaMap();
-      this.participantMeta = meta?.['docdata'] || {};
-    } catch (e) { console.error('Participant metadata load failed', e); }
+    // Participant metadata is now loaded targeted (per-id) inside recompute — no whole-collection read.
     try {
       const snap = await getDocs(query(collection(this.firestore, 'products'), where('mode', '==', 'Priority Mode')));
       this.priorityProductIds = new Set(snap.docs.map(d => d.id));
     } catch (e) { console.error('Priority products load failed', e); }
+    if (this.active) this.recomputeView();
+  }
+
+  /** Load the CURRENT marathon (latest by startdate) and its big-cohorts (id, name, member profileids). */
+  private async loadCohorts(): Promise<void> {
+    try {
+      const mSnap = await getDocs(query(collection(this.firestore, 'big marathon'), orderBy('startdate', 'asc')));
+      if (!mSnap.docs.length) return;
+      const currentMarathon: any = mSnap.docs[mSnap.docs.length - 1].data();
+      const currentMarathonId = currentMarathon['docid'] || mSnap.docs[mSnap.docs.length - 1].id;
+      this.currentMarathonTitle = String(currentMarathon['title'] ?? '');
+      const cSnap = await getDocs(collection(this.firestore, 'big cohorts'));
+      this.cohortList = cSnap.docs
+        .map(d => d.data() as any)
+        .filter(c => c['marathonref']?.id === currentMarathonId)
+        .map(c => ({
+          id: c['docid'],
+          name: String(c['name'] ?? c['docid']),
+          members: new Set<string>(((c['participantidlist'] || []) as string[]).filter(Boolean))
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } catch (e) { console.error('Cohort load failed', e); }
     if (this.active) this.recomputeView();
   }
 
@@ -352,15 +435,20 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     const refreshChanged = !!changes['refreshKey'] && !changes['refreshKey'].firstChange;
     const tokensChanged = !!changes['queueTokens'] && !changes['queueTokens'].firstChange;
     const completionChanged = !!changes['allCompletedStageCount'] && !changes['allCompletedStageCount'].firstChange;
+    // mapData carries each queue's stage list — the "Total in the queue" count needs it, and it
+    // arrives asynchronously (often AFTER tokens), so recompute when it lands or the total is stale.
+    const mapDataChanged = !!changes['mapData'] && !changes['mapData'].firstChange;
     const becameActive = !!changes['active'] && !changes['active'].firstChange && this.active;
     // Queue/refresh: refresh stage options. Phases are in-memory (owned by the active filter /
     // working draft), so they are NOT reloaded/wiped when the queue list moves.
+    if (queueChanged) this.pendingQueues = [...(this.selectedQueueList || [])];
     if (queueChanged || refreshChanged) {
       this.loadStageOptions();
       if (queueChanged) this.loadQueueEligibility();
+      if (this.active && this.scope.length) this.dataLoading = true; // show the loader during a queue reload
       this.requestRecompute();
-    } else if (tokensChanged || completionChanged) {
-      // queueTokens / completion arrive asynchronously (and in bursts during queue load).
+    } else if (tokensChanged || completionChanged || mapDataChanged) {
+      // queueTokens / completion / stage-map arrive asynchronously (and in bursts during queue load).
       this.requestRecompute();
     }
     // Becoming visible: run any recompute that was deferred while the tab was hidden.
@@ -423,8 +511,21 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     // customerstatus) has data to work with; filtering happens after in queueHolderIds().
     const holders = this.rawQueueHolderIds();
     const ids = [...new Set<string>([...holders, ...this.approvedSet, ...this.requestedSet])];
-    this.statusMap = await this.planningData.loadCustomerStatus(ids);
-    this.recomputeView();
+    try {
+      // Cache: only fetch metadata for ids we haven't fetched before. Repeated Gets / recomputes
+      // (and re-selecting the same queue) reuse the cache instead of re-calling Firestore.
+      const missing = ids.filter(id => !this.metaFetched.has(id));
+      if (missing.length) {
+        const meta = await this.planningData.loadParticipantMeta(missing);
+        Object.assign(this.participantMeta, meta);
+        missing.forEach(id => this.metaFetched.add(id));
+      }
+      this.statusMap = new Map<string, string>();
+      for (const id of ids) this.statusMap.set(id, String(this.participantMeta[id]?.['customerstatus'] ?? '').toLowerCase());
+    } finally {
+      this.recomputeView();
+      this.dataLoading = false;
+    }
   }
 
   /**
@@ -448,10 +549,19 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     return s;
   }
 
+  /**
+   * The queue's configured stages (from the queue-generation doc, same source the clone uses).
+   * Prefer mapQueue (loaded with the queue list) over mapData (arrives late) so the total is
+   * correct immediately rather than settling after mapData lands.
+   */
+  private queueStages(queueId: string): string[] {
+    return (this.mapQueue?.[queueId]?.['stages'] || this.mapData?.[queueId]?.['stages'] || []) as string[];
+  }
+
   /** Holders after applying the journey filter + DFU-ongoing omit — used by every number/list. */
   private queueHolderIds(): Set<string> {
     const raw = this.rawQueueHolderIds();
-    if (!this.selectedJourneys.length && !this.omitDfuOngoing) return raw;
+    if (!this.selectedJourneys.length && !this.dfuOn && !this.selectedCohorts.length) return raw;
     const out = new Set<string>();
     raw.forEach(id => { if (this.passesParticipantFilters(id)) out.add(id); });
     return out;
@@ -465,28 +575,29 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   private async loadQueueEligibility(): Promise<void> {
     this.planningSegmentMembers = new Set<string>();
     const queues = this.scope;
-    if (!queues.length) { if (this.active) this.recomputeView(); return; }
+    // Type #2 = Potential ∩ segment-members; Potential needs an event. Skip the (slow) segment
+    // load entirely when no event is chosen — the card would be 0 regardless.
+    if (!queues.length || !this.selectedEventIds.length) { if (this.active) this.recomputeView(); return; }
     try {
-      // 1) segment ids configured in this queue's planning
+      // 1) segment ids configured in this queue's planning (queues in parallel)
       const segIds = new Set<string>();
-      for (const qid of queues) {
-        const planSnap = await getDocs(query(collection(this.firestore, 'queue planning'), where('queueid', '==', qid)));
-        planSnap.docs.forEach(d => {
-          ((d.data() as any)['planning'] || []).forEach((v: any) =>
-            (v['segments'] || []).forEach((s: any) => { if (s['segmentid']) segIds.add(s['segmentid']); }));
-        });
-      }
-      // 2) each segment doc lists its participant lists (participantlistid)
+      const planSnaps = await Promise.all(queues.map(qid =>
+        getDocs(query(collection(this.firestore, 'queue planning'), where('queueid', '==', qid)))));
+      planSnaps.forEach(planSnap => planSnap.docs.forEach(d => {
+        ((d.data() as any)['planning'] || []).forEach((v: any) =>
+          (v['segments'] || []).forEach((s: any) => { if (s['segmentid']) segIds.add(s['segmentid']); }));
+      }));
+      // 2) each segment doc lists its participant lists (participantlistid) — all in parallel
       const listIds = new Set<string>();
-      for (const sid of segIds) {
-        const segDoc = await getDoc(doc(this.firestore, 'segments', sid));
+      const segDocs = await Promise.all([...segIds].map(sid => getDoc(doc(this.firestore, 'segments', sid))));
+      segDocs.forEach(segDoc => {
         if (segDoc.exists()) ((segDoc.data() as any)['participantlistid'] || []).forEach((lid: string) => { if (lid) listIds.add(lid); });
-      }
-      // 3) participant list → union of profilelist
-      for (const lid of listIds) {
-        const listDoc = await getDoc(doc(this.firestore, 'participant list', lid));
+      });
+      // 3) participant list → union of profilelist — all in parallel
+      const listDocs = await Promise.all([...listIds].map(lid => getDoc(doc(this.firestore, 'participant list', lid))));
+      listDocs.forEach(listDoc => {
         if (listDoc.exists()) ((listDoc.data() as any)['profilelist'] || []).forEach((p: string) => { if (p) this.planningSegmentMembers.add(p); });
-      }
+      });
     } catch (e) { console.error('Queue eligibility (Type #2) load failed', e); }
     if (this.active) this.recomputeView();
   }
@@ -523,16 +634,27 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   // ---------- Cards ----------
 
   private computeCards(): void {
-    const holders = this.queueHolderIds();
     const ap = this.approvedSet;
-    let confInQ = 0;
-    holders.forEach(id => { if (ap.has(id)) confInQ++; });
+    const holders = this.queueHolderIds(); // distinct in-queue people (for the "not in queue" split)
+    // Token-based in-queue counts — same population/logic as "Total in the queue" (no dedup).
+    const filtering = this.selectedJourneys.length > 0 || this.dfuOn || this.selectedCohorts.length > 0;
+    let inQueueTokens = 0, confInQueueTokens = 0;
+    for (const q of this.scope) {
+      for (const t of this.tokensForQueue(q)) {
+        const pid = t['profile_id'];
+        if (!pid) continue;
+        if (filtering && !this.passesParticipantFilters(pid)) continue;
+        inQueueTokens++;
+        if (ap.has(pid)) confInQueueTokens++;
+      }
+    }
+    const confNotInQueue = [...ap].filter(id => !holders.has(id)).length;
     this.cards = [
       { key: 'confEvent', label: 'Confirmed for the event', value: ap.size, desc: 'Approved/attended event requests' },
-      { key: 'inQueue', label: 'Total in the queue', value: holders.size, desc: 'Hold a token in the selected queue' },
-      { key: 'confInQueue', label: 'Confirmed + in queue', value: confInQ, desc: 'Event-confirmed AND in the queue' },
-      { key: 'confNotInQueue', label: 'Confirmed + not in queue', value: Math.max(0, ap.size - confInQ), desc: 'Event-confirmed but no queue token' },
-      { key: 'notConfInQueue', label: 'Not confirmed + in queue', value: Math.max(0, holders.size - confInQ), desc: 'In queue but not event-confirmed' },
+      { key: 'inQueue', label: 'Total in the queue', value: inQueueTokens, desc: 'Active tokens in the selected queue' },
+      { key: 'confInQueue', label: 'Confirmed + in queue', value: confInQueueTokens, desc: 'Event-confirmed AND in the queue' },
+      { key: 'confNotInQueue', label: 'Confirmed + not in queue', value: confNotInQueue, desc: 'Event-confirmed but no queue token' },
+      { key: 'notConfInQueue', label: 'Not confirmed + in queue', value: Math.max(0, inQueueTokens - confInQueueTokens), desc: 'In queue but not event-confirmed' },
       { key: 'potential', label: 'Potential', value: this.potentialTotal, desc: 'Own the product, not yet in the event' },
       { key: 'type2', label: 'Eligible · not in queue', value: this.type2Ids().length, desc: 'Potential in a queue segment, not in queue' }
     ];
@@ -541,10 +663,14 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   // ---------- Token / completion helpers ----------
 
   private tokensForQueue(queueId: string): any[] {
-    // Inactive tokens (tokenstatus === 'inActive') are dropped from every planning number.
+    // The single "in queue" definition used by EVERY planning number (matches Total in the queue
+    // and dynamic-queue-manager-clone): Active + not-deleted + currentstage is a real queue stage.
+    const stages = this.queueStages(queueId);
     return (this.queueTokens || []).filter(t =>
       t?.['queueref']?.id === queueId &&
-      String(t?.['tokenstatus'] ?? '').toLowerCase() !== 'inactive');
+      [null, undefined, false].includes(t?.['delete']) &&
+      String(t?.['tokenstatus'] ?? '').toLowerCase() === 'active' &&
+      (!stages.length || stages.includes(t?.['currentstage'])));
   }
 
   private confirmedSlotSetForStage(queueId: string, stageName: string): Set<string> {
@@ -870,6 +996,8 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     if (this.activeFilterId === f.docid) return;
     this.activeFilterId = f.docid;
     this.selectedEventIds = [...(f.eventIds || [])];
+    this.pendingEvents = [...(f.eventIds || [])];
+    this.pendingQueues = [...(f.queueIds || [])];
     this.planningPhases = (f.phases || []).map(p => ({
       docid: this.newId(), phasename: p.phasename, targetPct: p.targetPct ?? null, rows: this.cloneRows(p.rows)
     }));
@@ -894,8 +1022,13 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     this.showSaveWidget = false;
     // Reset all dropdowns/toggles
     this.selectedEventIds = [];
+    this.pendingEvents = [];
+    this.pendingQueues = [];
     this.selectedJourneys = [];
-    this.omitDfuOngoing = false;
+    this.dfuOn = false;
+    this.filterMode = 'only';
+    this.selectedCohorts = [];
+    this.selectedCohortMembers = new Set<string>();
     // Reset event-derived sets so cards zero out
     this.approvedSet = new Set(); this.requestedSet = new Set(); this.ownerSet = new Set(); this.potentialTotal = 0;
     // Drills / form

@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 interface EsaRow {
   activity: string | null;
@@ -35,7 +36,8 @@ interface EsaRow {
     FormsModule,
     MatFormFieldModule,
     MatIconModule,
-    MatSelectModule
+    MatSelectModule,
+    NgxMatSelectSearchModule
   ],
   templateUrl: './enter-studio-assign.component.html',
   styleUrl: './enter-studio-assign.component.css'
@@ -63,6 +65,14 @@ export class EnterStudioAssignComponent {
       this.mapActivity = data['mapactivity'] ?? {}
       this.mapProfile = data['mapprofile'] ?? {}
       this.activitySpecialists = data['activityspecialists'] ?? {}
+      // Precompute the activity option list ONCE (stable reference). The
+      // dropdown *ngFor binds to `filteredActivities` (a cached array), never a
+      // method — a method in *ngFor returns a new array every change-detection
+      // pass, which churns mat-select's option list and can hang the dialog.
+      this.allActivities = Object.keys(this.mapActivity)
+        .map(key => ({ key, value: this.mapActivity[key] }))
+        .sort((a, b) => (a.value || '').localeCompare(b.value || ''))
+      this.filteredActivities = this.allActivities
 
       // No mentor-selection UI: the studio's own specialists (incl. the
       // logged-in one) are always the session participants — see enterStudio().
@@ -85,6 +95,32 @@ export class EnterStudioAssignComponent {
         })
       })
     }
+  }
+
+  // ---- Activity dropdown search -----------------------------------------
+  // Bound to the ngx-mat-select-search box in each Activity dropdown. Shared
+  // across the (one-at-a-time) open dropdowns. `allActivities` is the full,
+  // sorted list (built once in the constructor); `filteredActivities` is the
+  // cached, currently-shown subset — both are STABLE array references the
+  // template iterates, so change detection doesn't thrash.
+  activitySearch = ''
+  allActivities: { key: string; value: string }[] = []
+  filteredActivities: { key: string; value: string }[] = []
+
+  /** Re-filter the cached list when the search box changes (case-insensitive). */
+  onActivitySearchChange(term: string): void {
+    this.activitySearch = term || ''
+    const t = this.activitySearch.trim().toLowerCase()
+    this.filteredActivities = t
+      ? this.allActivities.filter(e => (e.value || '').toLowerCase().includes(t))
+      : this.allActivities
+  }
+
+  /** Reset the search each time a dropdown opens so a term typed in one row
+   *  doesn't linger in the next. */
+  resetActivitySearch(): void {
+    this.activitySearch = ''
+    this.filteredActivities = this.allActivities
   }
 
   // ---- Activity rows -----------------------------------------------------

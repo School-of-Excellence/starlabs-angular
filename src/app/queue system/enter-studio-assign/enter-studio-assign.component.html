@@ -15,8 +15,12 @@
         <div class="esa__actlabel" *ngIf="row.locked">{{ mapActivity[row.activity] || 'Activity' }}</div>
         <mat-form-field *ngIf="!row.locked" class="esa__ff" appearance="outline">
           <mat-label>Activity</mat-label>
-          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)">
-            <mat-option *ngFor="let a of mapActivity | keyvalue" [value]="a.key">{{ a.value }}</mat-option>
+          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
+            <mat-option>
+              <ngx-mat-select-search [ngModel]="activitySearch" (ngModelChange)="onActivitySearchChange($event)" [ngModelOptions]="{standalone: true}"
+                [placeholderLabel]="'Search activity'" [noEntriesFoundLabel]="'No matching activity'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let a of filteredActivities" [value]="a.key">{{ a.value }}</mat-option>
           </mat-select>
         </mat-form-field>
         <span class="esa__mandatory-tag">Mandatory</span>
@@ -44,8 +48,12 @@
       <div class="esa__rowhead">
         <mat-form-field class="esa__ff" appearance="outline" subscriptSizing="dynamic">
           <mat-label>Activity</mat-label>
-          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)">
-            <mat-option *ngFor="let a of mapActivity | keyvalue" [value]="a.key">{{ a.value }}</mat-option>
+          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
+            <mat-option>
+              <ngx-mat-select-search [ngModel]="activitySearch" (ngModelChange)="onActivitySearchChange($event)" [ngModelOptions]="{standalone: true}"
+                [placeholderLabel]="'Search activity'" [noEntriesFoundLabel]="'No matching activity'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let a of filteredActivities" [value]="a.key">{{ a.value }}</mat-option>
           </mat-select>
         </mat-form-field>
         <button type="button" class="esa__rowremove" (click)="removeOptionalRow(i)" aria-label="Remove">

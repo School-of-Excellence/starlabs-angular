@@ -221,16 +221,16 @@
   padding: 10px 22px;
   border-radius: 11px;
   border: none;
-  background: #b39ae6;
+  background: #9A258F;
   color: #fff;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 5px 14px rgba(124, 58, 237, .18);
+  box-shadow: 0 5px 14px rgba(154, 37, 143, .22);
   transition: background .15s ease;
 }
 .esa__enter:hover:not(:disabled) {
-  background: #9d7fe0;
+  background: #7C1D73;
 }
 .esa__enter:disabled {
   background: #e5e7eb;
