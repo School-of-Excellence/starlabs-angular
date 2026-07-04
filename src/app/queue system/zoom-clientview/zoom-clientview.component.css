@@ -39,37 +39,17 @@
   position: relative;
 }
 
-.float {
-  position: fixed;
-  /* Sits ABOVE the Zoom control bar on the LEFT — clear of the End /
-     "End meeting for all" controls (bottom-right) and their upward popup. */
-  bottom: 88px;
-  left: 16px;
-  z-index: 99999;
-  background-color: #f12155;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 13px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-/* Host-only "Prescribe ATC" bubble — stacked just above the capture button on
-   the LEFT, above the Zoom control bar. Kept away from the End /
-   "End meeting for all" controls at the bottom-right. Uses the Dynamic Studio
-   prescribe-step accent (#ef4444) so it reads as the same action across surfaces. */
+/* Capture + Prescribe ATC — IDENTICAL host-only pill buttons, stacked bottom-left
+   above the Zoom control bar (clear of the End / "End meeting for all" controls).
+   Same shape/size/typography; the ONLY difference is the accent colour below. */
+.float,
 .prescribe-bubble {
   position: fixed;
-  bottom: 132px;
   left: 16px;
   z-index: 99999;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #ef4444;
   color: #fff;
   padding: 8px 14px;
   border-radius: 999px;
@@ -81,15 +61,26 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   transition: background-color 120ms ease, transform 120ms ease;
 }
-.prescribe-bubble:hover {
-  background-color: #dc2626;
-  transform: translateY(-1px);
-}
+.float mat-icon,
 .prescribe-bubble mat-icon {
   font-size: 18px;
   width: 18px;
   height: 18px;
 }
+.float:hover,
+.prescribe-bubble:hover {
+  transform: translateY(-1px);
+}
+
+/* Positions — stacked bottom-left */
+.float { bottom: 88px; }
+.prescribe-bubble { bottom: 132px; }
+
+/* Colours — the only visual difference between the two */
+.prescribe-bubble { background-color: #ef4444; }   /* red — matches the Prescribe ATC step */
+.prescribe-bubble:hover { background-color: #dc2626; }
+.float { background-color: #0ea5e9; }              /* sky blue — capture */
+.float:hover { background-color: #0284c7; }
 
 /* ============================================================
    Specialist-wait screen (participant side, queue/studio flow)

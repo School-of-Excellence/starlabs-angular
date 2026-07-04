@@ -117,7 +117,10 @@
       </div>
     </div>
   </div>
-  <button *ngIf="profileHost && isJoined" class="float" (click)="onClick()">capture</button>
+  <button *ngIf="profileHost && isJoined" class="float" (click)="onClick()" title="Capture">
+    <mat-icon>photo_camera</mat-icon>
+    <span>Capture</span>
+  </button>
 
   <!-- Host-only quick jump to the Prescribe ATC step of Dynamic Studio -->
   <button *ngIf="profileHost && isJoined" class="prescribe-bubble" (click)="goToPrescribeAtc()"
