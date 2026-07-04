@@ -940,39 +940,12 @@ export class ZoomClientviewComponent {
   // rather than piling up new ones. The Zoom call is never navigated.
   goToPrescribeAtc() {
     const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
-
-    // Reuse the already-open Studio tab: ask it (BroadcastChannel) to switch to
-    // the step, and DON'T open a new tab. Only open a new tab if no Studio tab
-    // answers. No spare/blank tab (that flashed); a deferred window.open ~250ms
-    // later is still allowed by the click's transient activation.
-    let settled = false;
-    const openNewTab = () => {
-      if (settled) return;
-      settled = true;
-      window.open(url, 'starlabsDynamicStudio');
-    };
-
-    try {
-      const channel = new BroadcastChannel('starlabs-dynamic-studio');
-      channel.onmessage = (ev: MessageEvent) => {
-        if (ev?.data?.type === 'studio-here' && !settled) {
-          // A Studio tab is open and switched itself to the step → NO new tab.
-          // It can't foreground itself (browser blocks that), so nudge the host.
-          settled = true;
-          try { channel.close(); } catch { /* ignore */ }
-          this.ngZone.run(() => this.snackBar.open(
-            'Prescribe ATC opened in your Dynamic Studio tab — switch to that tab.',
-            'Close',
-            { duration: 6000, horizontalPosition: 'center', verticalPosition: 'top' }
-          ));
-        }
-      };
-      channel.postMessage({ type: 'goto-step', step: 'prescribe-atc' });
-      // No Studio tab answered → open a fresh one.
-      setTimeout(() => { openNewTab(); try { channel.close(); } catch {} }, 250);
-    } catch {
-      openNewTab();
-    }
+    // Open a tab that comes to the FRONT, on the Prescribe ATC step — this is the
+    // only way to visibly land the host on the screen (the browser won't let us
+    // foreground a different, already-open Studio tab). The stable window name
+    // makes repeat clicks reuse + refocus this same tab. Zoom call is untouched.
+    const w = window.open(url, 'starlabsDynamicStudio');
+    try { w?.focus(); } catch { /* ignore */ }
   }
 
   handleKeyDown(event: KeyboardEvent) {
