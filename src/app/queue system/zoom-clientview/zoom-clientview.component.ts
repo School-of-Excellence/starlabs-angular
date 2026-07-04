@@ -957,33 +957,26 @@ export class ZoomClientviewComponent {
       setTimeout(() => { try { ch.close(); } catch {} }, 1000);
     } catch { /* ignore */ }
 
-    // 2) Show a click-to-open NOTIFICATION. Clicking it lets the service worker
-    //    focus the existing Studio tab and switch it to the step — the ONLY way
+    // 2) Fire the click-to-focus NOTIFICATION. Clicking it lets the service
+    //    worker focus the existing Studio tab and switch its step — the ONLY way
     //    the browser allows redirecting to an already-open tab.
-    const fire = () => {
+    const notify = () => {
       const c = navigator.serviceWorker && navigator.serviceWorker.controller;
       if (c) { c.postMessage({ type: 'notify-focus-studio', step, url }); return true; }
       return false;
     };
     const perm = ('Notification' in window) ? Notification.permission : 'denied';
-    if (perm === 'granted') {
-      if (fire()) return;
-    } else if (perm === 'default') {
-      Notification.requestPermission().then(p => {
-        if (!(p === 'granted' && fire())) this.fallbackPrescribe(url, studioOpen);
-      });
-      return;
-    }
+    if (perm === 'granted') notify();
+    else if (perm === 'default') Notification.requestPermission().then(p => { if (p === 'granted') notify(); });
 
-    // 3) Notifications unavailable → in-call popup if a Studio tab is open, else a new tab.
-    this.fallbackPrescribe(url, studioOpen);
-  }
-
-  private fallbackPrescribe(url: string, studioOpen: boolean) {
-    setTimeout(() => {
-      if (studioOpen) this.ngZone.run(() => this.showPrescribeHint());
+    // 3) Give IMMEDIATE, unmissable in-call feedback so the click never looks like
+    //    "nothing happened" (the OS notification is easy to miss). Show the in-call
+    //    popup when a Studio tab is open or a notification is on its way; otherwise
+    //    just open a fresh Studio tab.
+    setTimeout(() => this.ngZone.run(() => {
+      if (studioOpen || perm === 'granted') this.showPrescribeHint();
       else window.open(url, 'starlabsDynamicStudio');
-    }, 300);
+    }), 350);
   }
 
   private showPrescribeHint() {
