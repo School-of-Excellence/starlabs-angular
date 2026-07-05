@@ -69,7 +69,7 @@ export class ZoomClientviewComponent {
 
   // Custom mic/camera device menu (anchored to the caret). Zoom's own menu works
   // in Safari but appears dislocated, so we read its items and show them here.
-  menuKind: '' | 'audio' | 'video' = '';
+  menuKind: '' | 'audio' | 'video' | 'more' = '';
   menuItems: { label: string; checked: boolean; header: boolean }[] = [];
   menuLeft = 0;          // px, anchored to the clicked caret
   menuBottom = 150;      // px from viewport bottom
@@ -764,45 +764,55 @@ export class ZoomClientviewComponent {
     } catch { this.clickNativeControl(/hand/i); }
   }
 
-  // Host: start/stop cloud recording.
-  customRecording = false;
-  toggleRecord(): void {
-    const ZM: any = ZoomMtg as any;
-    const next = !this.customRecording;
-    try { ZM.record({ record: next }); this.customRecording = next; }
-    catch { this.clickNativeControl(/record/i); }
-  }
-
-  // Host: mute / unmute everyone.
-  customAllMuted = false;
-  toggleMuteAll(): void {
-    const ZM: any = ZoomMtg as any;
-    const next = !this.customAllMuted;
-    try { ZM.muteAll({ muteAll: next }); this.customAllMuted = next; }
-    catch { /* no-op */ }
-  }
-
-  // ---- Device dropdowns (mic / camera), anchored to the caret ----
-  toggleDeviceMenu(kind: 'audio' | 'video', ev: Event): void {
+  // ---- Device / More dropdowns, anchored to the clicked button ----
+  toggleDeviceMenu(kind: 'audio' | 'video' | 'more', ev: Event): void {
     ev.stopPropagation();
     if (this.menuKind === kind) { this.closeDeviceMenu(); return; }
-    // Anchor the menu above the clicked caret (clamped to the viewport).
+    // Anchor the menu above the clicked control (clamped to the viewport).
     const caret = ev.currentTarget as HTMLElement;
     const r = caret.getBoundingClientRect();
     this.menuLeft = Math.max(8, Math.min(r.left + r.width / 2 - 140, window.innerWidth - 288));
     this.menuBottom = Math.max(8, window.innerHeight - r.top + 8);
     // Open Zoom's native menu (it paints in Safari), read its items, then hide
-    // it and show our own copy anchored to the caret. Two reads (fast + slower)
-    // in case the portal renders late.
-    this.clickNativeControl(kind === 'audio' ? /more audio/i : /more video/i);
+    // it and show our own copy anchored here. Two reads (fast + slower) in case
+    // the portal renders late.
+    if (kind === 'more') this.clickNativeMore();
+    else this.clickNativeControl(kind === 'audio' ? /more audio/i : /more video/i);
     setTimeout(() => this.readNativeMenu(kind), 120);
     setTimeout(() => { if (this.menuKind === kind && this.menuItems.length <= 1) this.readNativeMenu(kind); }, 380);
+  }
+
+  // The standalone "More" button (label "More" / "More meeting controls") — NOT
+  // the "More audio/video controls" carets.
+  private clickNativeMore(): boolean {
+    const nodes = document.querySelectorAll('#zmmtg-root .footer-button-base__button');
+    for (const el of Array.from(nodes)) {
+      const t = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+      if (/\bmore\b/.test(t) && !/audio|video/.test(t)) { (el as HTMLElement).click(); return true; }
+    }
+    return false;
   }
 
   // Find the device menu for THIS kind only — search strictly within the kind's
   // own `.audio-option-menu` / `.video-option-menu` subtree (searching generic
   // dropdowns cross-matched the wrong menu).
-  private findDeviceMenu(kind: 'audio' | 'video'): Element | null {
+  private findDeviceMenu(kind: 'audio' | 'video' | 'more'): Element | null {
+    if (kind === 'more') {
+      // The More popup — a visible dropdown/menu that is NOT the audio/video
+      // option menu. Pick the visible one with the most items.
+      const cands = Array.from(document.querySelectorAll(
+        '.more-button__pop-menu, [class*="more"][class*="menu"], .dropdown-menu, [role="menu"], [class*="option-menu"]'
+      ));
+      let best: Element | null = null; let bestN = 0;
+      for (const c of cands) {
+        if (c.closest('.audio-option-menu, .video-option-menu')) continue;
+        if (/audio-option|video-option/.test('' + (c as HTMLElement).className)) continue;
+        if (!c.getClientRects().length) continue;
+        const n = c.querySelectorAll('a, li').length;
+        if (n > bestN) { bestN = n; best = c; }
+      }
+      return best;
+    }
     const base = kind === 'audio' ? '.audio-option-menu' : '.video-option-menu';
     const cands = Array.from(document.querySelectorAll(
       `${base}, ${base} .dropdown-menu, ${base} ul, ${base} [role="menu"]`
@@ -816,7 +826,7 @@ export class ZoomClientviewComponent {
     return best || document.querySelector(base);
   }
 
-  private readNativeMenu(kind: 'audio' | 'video'): void {
+  private readNativeMenu(kind: 'audio' | 'video' | 'more'): void {
     const menu = this.findDeviceMenu(kind);
     const items: { label: string; checked: boolean; header: boolean }[] = [];
     const refs: (HTMLElement | null)[] = [];

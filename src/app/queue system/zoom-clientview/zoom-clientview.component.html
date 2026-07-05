@@ -184,7 +184,7 @@
   <!-- Device menu, anchored above the pill (opens upward) -->
   <div class="sx-zc-menu" *ngIf="menuKind && isSafariBrowser" (click)="$event.stopPropagation()"
        [style.left.px]="menuLeft" [style.bottom.px]="menuBottom">
-    <div class="sx-zc-menu-title">{{ menuKind === 'audio' ? 'Audio' : 'Camera' }} options</div>
+    <div class="sx-zc-menu-title">{{ menuKind === 'audio' ? 'Audio' : menuKind === 'video' ? 'Camera' : 'More' }} options</div>
     <ng-container *ngFor="let it of menuItems; let i = index">
       <div *ngIf="it.header" class="sx-zc-menu-item sx-zc-menu-item--header">{{ it.label }}</div>
       <button *ngIf="!it.header" type="button" class="sx-zc-menu-item"
@@ -232,14 +232,9 @@
             (click)="toggleHand()" [title]="customHandRaised ? 'Lower Hand' : 'Raise Hand'">
       <mat-icon>front_hand</mat-icon><span>{{ customHandRaised ? 'Lower' : 'Raise' }}</span>
     </button>
-    <button type="button" class="sx-zc-btn" *ngIf="profileHost"
-            [class.sx-zc-btn--muted]="customRecording" (click)="toggleRecord()"
-            [title]="customRecording ? 'Stop Recording' : 'Record'">
-      <mat-icon>fiber_manual_record</mat-icon><span>{{ customRecording ? 'Stop Rec' : 'Record' }}</span>
-    </button>
-    <button type="button" class="sx-zc-btn" *ngIf="profileHost" (click)="toggleMuteAll()"
-            [title]="customAllMuted ? 'Unmute All' : 'Mute All'">
-      <mat-icon>voice_over_off</mat-icon><span>{{ customAllMuted ? 'Unmute All' : 'Mute All' }}</span>
+    <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="menuKind === 'more'"
+            (click)="toggleDeviceMenu('more', $event)" title="More">
+      <mat-icon>more_horiz</mat-icon><span>More</span>
     </button>
     <span class="sx-zc-sep"></span>
     <button type="button" class="sx-zc-btn sx-zc-btn--leave" (click)="leaveCall()" title="Leave meeting">
