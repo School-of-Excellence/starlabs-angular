@@ -1,5 +1,5 @@
-import { Component, OnInit, NgZone } from '@angular/core';
-import { collection, doc, docData, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from '@angular/fire/firestore';
+import { Component, OnInit, NgZone, HostListener } from '@angular/core';
+import { arrayUnion, collection, doc, docData, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute } from '@angular/router';
 import { ZoomMtg } from '@zoom/meetingsdk';
@@ -50,11 +50,30 @@ export class ZoomClientviewComponent {
   profileid: any;
   profileHost: boolean;
   screenshots: any = [];
+  // Pending auto-remove timers for capture chips (cleared on teardown).
+  private clipChipTimers: any[] = [];
+  private readonly CLIP_CHIP_TTL_MS = 10000; // auto-remove each capture chip after 10s
   collectiontype: any;
   documentId: any;
   private subscription: Subscription;
 
   isJoined: boolean = false;
+
+  // Safari-only custom control bar. Confirmed (bisect 2026-07-06): Safari does
+  // NOT paint the Zoom SDK 6.1.0 control bar (present + clickable but invisible)
+  // — inherent SDK/Safari bug, not fixable from CSS. So on Safari we render our
+  // OWN bar (plain Angular DOM paints fine) wired to the real Zoom actions.
+  isSafariBrowser = false;
+  customMuted = false;
+  private zoomUserId: number | string | null = null;
+
+  // Custom mic/camera device menu (anchored to the caret). Zoom's own menu works
+  // in Safari but appears dislocated, so we read its items and show them here.
+  menuKind: '' | 'audio' | 'video' | 'more' = '';
+  menuItems: { label: string; checked: boolean; header: boolean }[] = [];
+  menuLeft = 0;          // px, anchored to the clicked caret
+  menuBottom = 150;      // px from viewport bottom
+  private nativeMenuItems: (HTMLElement | null)[] = [];
 
   // Participant "wait for specialist" state (queue/studio flow only)
   waitingForSpecialist: boolean = false;
@@ -89,27 +108,21 @@ export class ZoomClientviewComponent {
   private recordingStatus: 'started' | 'paused' | 'stopped' | 'unknown' = 'unknown';
   private recordingPromptTimer: any = null;
   private recordingPromptDismissedAt: number = 0;
-  private recordingListenersWiredAt: number = 0;
   // Stable bound reference so addEventListener/removeEventListener match.
   // Using `this.handleKeyDown.bind(this)` inline at both sites produced two
   // DIFFERENT function objects, so the window 'keydown' listener was never
   // removed — leaking this component (and its Zoom SDK instance) on every visit.
   private readonly boundKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
   private readonly RECORDING_PROMPT_COOLDOWN_MS = 30000; // re-prompt 30s after dismiss
-  // After this long with status still 'unknown' AND a remote participant
-  // present, assume recording is OFF and prompt. The Zoom SDK doesn't fire
-  // initial-state events on every build, so we'd otherwise be silent forever.
-  private readonly RECORDING_GRACE_MS = 8000;
 
   // Big-center recording overlay (host only). Replaces the older snackbar.
   recordingPromptVisible: boolean = false;
   recordingPromptKind: 'paused' | 'stopped' = 'stopped';
-  // Set when the host explicitly confirms recording is running. Suppresses the
-  // prompt for good — needed because some Zoom SDK builds never fire
-  // `onRecordingStatusChange`, so we can't detect the started state ourselves
-  // and would otherwise nag forever even while recording IS on. A genuine later
-  // 'stopped'/'paused' event resets this so a real stop still re-prompts.
-  private recordingConfirmedByHost: boolean = false;
+
+  // In-call popup shown after Prescribe ATC reuses an already-open Studio tab
+  // (the browser can't foreground that tab for us, so we tell the host here).
+  prescribeHintVisible: boolean = false;
+  private prescribeHintTimer: any = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -370,17 +383,25 @@ export class ZoomClientviewComponent {
       const ZM: any = ZoomMtg as any;
       ZM.inMeetingServiceListener('onMeetingStatus', (data: any) => {
         const status = data?.meetingStatus;
-        if (status !== 3 || this.meetingEndStamped) return; // 3 = disconnected/ended
+        if (status !== 3) return; // 3 = disconnected/ended
+        // Left / ended the call → hide the in-call controls (Capture / Prescribe ATC).
+        this.ngZone.run(() => { this.isJoined = false; });
+        if (this.meetingEndStamped) return;
         this.meetingEndStamped = true;
         const ref = doc(this.firestore, 'live assignment', this.documentId);
         if (this.profileHost) {
           // Host ending the call = "End meeting for all" → everyone is gone.
           // Stamp BOTH leaves so the arena flips to "Call ended" even if the
           // participant's own client can't write before its redirect.
-          updateDoc(ref, {
+          const leaveWrite = updateDoc(ref, {
             specialistLeftAt: serverTimestamp(),
             participantLeftAt: serverTimestamp()
           }).catch(err => console.warn('Could not stamp leave on meeting end (host)', err));
+          // Return the host to the Studio tab that launched this meeting instead
+          // of loading a fresh /dynamicstudio via Zoom's leaveUrl (which spawns a
+          // duplicate Studio). Pass the leave write so the tab isn't closed until
+          // that stamp is durable. See returnToStudioTab().
+          this.returnToStudioTab(leaveWrite);
         } else {
           updateDoc(ref, {
             participantLeftAt: serverTimestamp()
@@ -390,6 +411,38 @@ export class ZoomClientviewComponent {
     } catch (e) {
       console.warn('Could not wire Zoom meeting-end listener', e);
     }
+  }
+
+  // When the host ends the call, go back to the EXISTING Dynamic Studio tab
+  // instead of letting Zoom's `leaveUrl` load a fresh /dynamicstudio (which
+  // leaves the original Studio open AND adds a duplicate). The host opened this
+  // meeting from Studio via `window.open`, so that tab is our `window.opener`.
+  // Ping it to come forward (BroadcastChannel, same one Prescribe ATC uses) and
+  // close THIS tab — closing an opener-spawned tab returns the browser to the
+  // opener, so the host lands back on their existing Studio page. If there's no
+  // opener (deep-linked straight to /openmeeting), do nothing and let Zoom's
+  // leaveUrl fallback run.
+  private returnToStudioTab(leaveWrite?: Promise<unknown>): void {
+    let opener: Window | null = null;
+    try { opener = window.opener; } catch { opener = null; }
+    if (!opener || opener.closed) return; // nothing to return to → leaveUrl fallback
+    try {
+      const ch = new BroadcastChannel('starlabs-dynamic-studio');
+      ch.postMessage({ type: 'focus-studio' });
+      setTimeout(() => { try { ch.close(); } catch {} }, 400);
+    } catch { /* BroadcastChannel unsupported — window.close still returns to the opener */ }
+    try { opener.focus(); } catch { /* cross-tab focus can be blocked; the close below still returns focus */ }
+    // Close only once the leave stamp is durable — whichever comes first:
+    //   • the write settles (server-ack when online → the stamp definitely
+    //     landed), or
+    //   • a 700ms cap (offline/slow: the mutation is already in Firestore's
+    //     multi-tab IndexedDB queue, shared with the still-open Studio tab, so
+    //     it syncs from there even though this tab goes away).
+    // This prioritises the "Call ended" stamp over racing Zoom's leaveUrl,
+    // instead of a blind fixed delay.
+    const cap = new Promise<void>(res => setTimeout(res, 700));
+    Promise.race([Promise.resolve(leaveWrite), cap])
+      .then(() => { try { window.close(); } catch {} });
   }
 
   // -------------------- Recording prompt (host-side) --------------------
@@ -405,30 +458,40 @@ export class ZoomClientviewComponent {
       ZM.inMeetingServiceListener('onUserLeave', () => this.refreshRemoteCountSnapshot());
       ZM.inMeetingServiceListener('onUserUpdate', () => this.refreshRemoteCountSnapshot());
       const handleRecordingChange = (data: any) => {
-        // The Zoom Web SDK's onRecordingStatusChange passes { state: '...' }
-        // (e.g. 'Recording', 'Paused', 'Stopped', 'Connecting'). Earlier code
-        // read recordingStatus/status which don't exist on this event, so the
-        // object fell through to "[object Object]" and the status never
-        // updated — leaving the prompt stuck on 'paused' after resume.
-        // Read `state` first, then the other shapes for older SDK builds.
-        const raw = (
-          data?.state ??
-          data?.recordingStatus ??
-          data?.status ??
-          (typeof data === 'string' ? data : '')
-        ).toString();
-        const s: string = raw.toLowerCase();
-        console.log('[recording-prompt] status event raw=', raw, 'payload=', data);
+        // Zoom Client View (SDK 6.1.0) fires `onRecordingChange` with the state on
+        // `data.recording` as a STRING — verified live: { recording: 'recording' }
+        // while running, { recording: 'pause' } when paused (and 'stop'/'none'
+        // shapes for stopped). Read `data.recording` FIRST; keep the other field
+        // names + a numeric fallback for other SDK builds.
         let newStatus: 'started' | 'paused' | 'stopped' | 'unknown' = this.recordingStatus;
-        // Order matters — "NotRecording"/"Stopped" must classify as stopped
-        // before the 'record' check would label it 'started'. "Paused" /
-        // "PauseRecord" must hit the paused branch before 'record' steals it.
-        if (s.includes('not') || s.includes('stop') || s.includes('end') || s.includes('disconnect')) {
-          newStatus = 'stopped';
-        } else if (s.includes('paus')) {
-          newStatus = 'paused';
-        } else if (s.includes('start') || s.includes('record') || s.includes('connect') || s.includes('resume')) {
-          newStatus = 'started';
+        const numeric =
+          typeof data === 'number' ? data :
+          typeof data?.state === 'number' ? data.state :
+          typeof data?.action === 'number' ? data.action : null;
+        if (numeric !== null) {
+          // SDK numeric enum: { stop: 0, start: 1, pause: 2 }
+          newStatus = numeric === 2 ? 'paused' : numeric === 1 ? 'started' : numeric === 0 ? 'stopped' : newStatus;
+          console.log('[recording-prompt] status event code=', numeric, 'payload=', data);
+        } else {
+          const raw = (
+            data?.recording ??
+            data?.state ??
+            data?.recordingStatus ??
+            data?.status ??
+            (typeof data === 'string' ? data : '')
+          ).toString();
+          const s: string = raw.toLowerCase();
+          console.log('[recording-prompt] status event raw=', raw, 'payload=', data);
+          // Order matters — "none"/"stop" must classify as stopped before the
+          // 'record' check would label it 'started'. "pause"/"Paused" must hit the
+          // paused branch before 'record' steals it.
+          if (s.includes('not') || s.includes('stop') || s.includes('end') || s.includes('disconnect') || s.includes('none')) {
+            newStatus = 'stopped';
+          } else if (s.includes('paus')) {
+            newStatus = 'paused';
+          } else if (s.includes('start') || s.includes('record') || s.includes('connect') || s.includes('resume')) {
+            newStatus = 'started';
+          }
         }
 
         if (newStatus !== this.recordingStatus) {
@@ -441,22 +504,21 @@ export class ZoomClientviewComponent {
           if (newStatus === 'started') {
             this.ngZone.run(() => { this.recordingPromptVisible = false; });
           }
-          // A genuine later stop/pause means the host's earlier "recording is
-          // on" confirmation no longer holds — allow the prompt to re-appear.
-          if (newStatus === 'stopped' || newStatus === 'paused') {
-            this.recordingConfirmedByHost = false;
-          }
         }
         this.evaluateRecordingPrompt();
       };
+      // The Client View SDK 6.1.0 event is `onRecordingChange` (verified against
+      // the bundled SDK — it's the only recording event that exists). The names
+      // used before, `onRecordingStatusChange` / `onRecordChange`, do NOT exist
+      // in this SDK, so pause/stop was NEVER received → recordingStatus stayed
+      // 'unknown' → the "resume recording" prompt never opened. Register the
+      // correct event; keep the old names as harmless fallbacks for other builds.
+      ZM.inMeetingServiceListener('onRecordingChange', handleRecordingChange);
       ZM.inMeetingServiceListener('onRecordingStatusChange', handleRecordingChange);
-      // Some SDK builds use this older event name
       ZM.inMeetingServiceListener('onRecordChange', handleRecordingChange);
     } catch (e) {
       console.warn('Could not wire Zoom recording listeners', e);
     }
-
-    this.recordingListenersWiredAt = Date.now();
 
     // After a short delay, query the current attendees list so we catch
     // any participants who were already in the call when the host (re)joined.
@@ -493,15 +555,6 @@ export class ZoomClientviewComponent {
   }
 
   private evaluateRecordingPrompt() {
-    // Host explicitly confirmed recording is running → never nag. This is the
-    // escape hatch for SDK builds that don't emit recording-status events.
-    if (this.recordingConfirmedByHost) {
-      if (this.recordingPromptVisible) {
-        this.ngZone.run(() => { this.recordingPromptVisible = false; });
-      }
-      return;
-    }
-
     // Recording is on → close any open prompt and exit. This handles the
     // "paused → started" or "stopped → started" transition mid-call.
     if (this.recordingStatus === 'started') {
@@ -515,21 +568,22 @@ export class ZoomClientviewComponent {
     // `remoteParticipantCount` is already self-excluded (snapshot subtracts 1).
     // Only prompt when at least one OTHER person is in the room.
     const otherPresent = this.remoteParticipantCount >= 1;
-    // Explicit off states always prompt. 'unknown' also prompts, but only
-    // after a grace period — that gives the Zoom SDK a few seconds to fire
-    // its initial 'Recording' event if recording was already running. If
-    // nothing arrives within the grace window, assume the host needs to
-    // start the recording manually.
-    const sinceWired = this.recordingListenersWiredAt > 0
-      ? Date.now() - this.recordingListenersWiredAt
-      : 0;
+    // Only prompt on a POSITIVE off-signal — an explicit 'paused' or 'stopped'
+    // recording event from Zoom. We deliberately do NOT treat 'unknown' as off.
+    //
+    // Previously 'unknown' (no recording event seen yet) was treated as off
+    // after an 8s grace. But several Zoom SDK builds never emit the initial
+    // 'Recording'/'started' event when recording is already running, so the
+    // status stayed 'unknown' forever and the host got nagged with
+    // "recording is not running" *while recording was actually on*. That false
+    // alarm is the exact bug we're fixing. By requiring an explicit pause/stop
+    // event, the prompt fires only when Zoom tells us recording really stopped
+    // or paused — never as a guess.
     const recordingOff = this.recordingStatus === 'paused'
-                      || this.recordingStatus === 'stopped'
-                      || (this.recordingStatus === 'unknown' && sinceWired > this.RECORDING_GRACE_MS);
+                      || this.recordingStatus === 'stopped';
     console.debug('[recording-prompt] evaluate', {
       status: this.recordingStatus,
       remote: this.remoteParticipantCount,
-      sinceWired,
       recordingOff,
     });
     if (!otherPresent || !recordingOff) return;
@@ -553,15 +607,35 @@ export class ZoomClientviewComponent {
     this.recordingPromptDismissedAt = Date.now();
   }
 
-  // Called from the overlay's "Recording is on — stop reminding me" button.
-  // The host asserts recording is running; suppress the prompt until a real
-  // stop/pause event proves otherwise. Fixes the loop where the SDK never
-  // reports the 'started' state and the prompt nags even while recording.
-  confirmRecordingOn() {
-    this.recordingConfirmedByHost = true;
-    this.recordingStatus = 'started';
-    this.recordingPromptVisible = false;
-    this.recordingPromptDismissedAt = 0;
+  // Called from the overlay's primary "Resume recording" button. The Meeting SDK
+  // exposes no working record-control API (ZoomMtg.record is a no-op stub in
+  // 6.1.0), BUT the Client View renders its toolbar into #zmmtg-root in THIS
+  // document, so we can trigger Zoom's own Resume/Start Recording control by
+  // clicking it directly. On success the SDK fires onRecordingChange → 'started'
+  // which closes the prompt via evaluateRecordingPrompt; we also hide optimistically.
+  resumeRecordingNow() {
+    const root: ParentNode = document.getElementById('zmmtg-root') || document;
+    // Paused → "Resume Recording"; stopped → a "Record"/"Start Recording" control.
+    const wanted = this.recordingPromptKind === 'paused'
+      ? ['resume recording']
+      : ['resume recording', 'start recording', 'record'];
+    const labelOf = (el: Element) =>
+      (el.getAttribute('aria-label') || (el as HTMLElement).title || el.textContent || '').trim().toLowerCase();
+    const matches = Array.from(root.querySelectorAll('button,[role="button"],[aria-label]'))
+      .filter(el => wanted.some(w => labelOf(el) === w)) as HTMLElement[];
+    // Prefer a visible control; fall back to any match.
+    const btn = matches.find(el => el.offsetParent !== null || el.getClientRects().length > 0) || matches[0];
+    if (btn) {
+      btn.click();
+      this.recordingPromptVisible = false;
+    } else {
+      console.warn('[recording-prompt] could not find Zoom Resume/Record control to click');
+      this.snackBar.open(
+        'Please use the Record control at the top of the Zoom window to resume.',
+        'Close',
+        { duration: 4000, horizontalPosition: 'center', verticalPosition: 'top' }
+      );
+    }
   }
 
   private stopRecordingListeners() {
@@ -573,8 +647,234 @@ export class ZoomClientviewComponent {
   }
   // -------------------- end attention grabbers --------------------
 
+  // ---- Safari-only custom control bar ----
+  private safariSyncTimer: any = null;
+  private initSafariControls(): void {
+    // Reliable Safari detection: UA has "Safari" but none of the other engines
+    // that also include "Safari" in their UA (Chrome/Chromium/CriOS/Edge/Android
+    // WebView/Firefox-iOS). The previous negative-lookahead regex mis-fired.
+    const ua = navigator.userAgent || '';
+    const isSafari =
+      /safari/i.test(ua) && !/chrome|chromium|crios|edg|edgios|android|fxios|opr|opera/i.test(ua);
+    // Runs inside runOutsideAngular (join callback) — flip the flag inside the
+    // zone or the *ngIf that shows the bar never re-evaluates.
+    this.ngZone.run(() => { this.isSafariBrowser = isSafari; });
+    if (!isSafari || this.safariSyncTimer) return;
+    // Mirror the mic/video state from the NATIVE control bar's own button labels
+    // ("Mute"/"Unmute", "Start Video"/"Stop Video") — the source of truth. The
+    // earlier getCurrentUser/bVideoOn path was unreliable, so the toggle UI
+    // lagged/reversed. Poll on a short timer; only re-enter Angular on a real
+    // change. Runs outside Angular. Cleared in ngOnDestroy.
+    this.ngZone.runOutsideAngular(() => {
+      this.safariSyncTimer = setInterval(() => this.syncNativeState(), 500);
+    });
+    this.syncNativeState();
+  }
+
+  private stopSafariControls(): void {
+    if (this.safariSyncTimer) { clearInterval(this.safariSyncTimer); this.safariSyncTimer = null; }
+  }
+
+  // Derive the true mic/video state from the native footer buttons' combined
+  // text + aria-label ("Mute"/"Unmute" → muted; "Start/Stop Video" → off/on).
+  // Robust to whether the SDK renders a visible label span or only aria.
+  private syncNativeState(): void {
+    const nodes = Array.from(document.querySelectorAll('#zmmtg-root .footer-button-base__button'));
+    let muted: boolean | null = null;
+    let videoOn: boolean | null = null;
+    for (const el of nodes) {
+      const t = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+      if (muted === null && /\bmute\b|\bunmute\b/.test(t) && !/mute all/.test(t)) {
+        muted = /unmute/.test(t);              // "unmute" shown ⇒ currently muted
+      }
+      if (videoOn === null && /\bvideo\b/.test(t)) {
+        if (/stop/.test(t)) videoOn = true;    // "stop video" ⇒ on
+        else if (/start/.test(t)) videoOn = false;
+      }
+    }
+    const nextMuted = muted === null ? this.customMuted : muted;
+    const nextVideo = videoOn === null ? this.customVideoOn : videoOn;
+    if (nextMuted !== this.customMuted || nextVideo !== this.customVideoOn) {
+      this.ngZone.run(() => { this.customMuted = nextMuted; this.customVideoOn = nextVideo; });
+    }
+  }
+
+  toggleCustomMute(): void {
+    // Click the native Mute/Unmute button; the poll reflects the new state.
+    this.clickNativeControl(/\b(un)?mute\b/i);
+  }
+
+  leaveCall(): void {
+    const ZM: any = ZoomMtg as any;
+    try { ZM.leaveMeeting({}); }
+    catch { try { ZM.leaveMeeting({ confirm: false }); } catch { /* no-op */ } }
+  }
+
+  // Host: end the meeting for everyone.
+  endForAll(): void {
+    const ZM: any = ZoomMtg as any;
+    try { ZM.endMeeting({}); }
+    catch { try { ZM.leaveMeeting({}); } catch { /* no-op */ } }
+  }
+
+  // ---- Controls with no Client-View API: click the (invisible) native button ----
+  // The SDK control bar is in the DOM but unpainted in Safari; its buttons are
+  // still real + clickable, so we proxy to them. Match by visible label text
+  // (English — the app loads en-US) or aria-label.
+  private clickNativeControl(match: RegExp): boolean {
+    const nodes = document.querySelectorAll(
+      '#zmmtg-root .footer-button-base__button, #zmmtg-root .footer__leave-btn, #zmmtg-root [class*="footer"][role="button"]'
+    );
+    for (const el of Array.from(nodes)) {
+      const t = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')).trim();
+      if (match.test(t)) { (el as HTMLElement).click(); return true; }
+    }
+    return false;
+  }
+
+  // Camera on/off — no Client-View API, so click the native Start/Stop Video
+  // button. The native-state poll (syncNativeState) reflects the real state.
+  customVideoOn = false;
+  toggleVideo(): void {
+    this.clickNativeControl(/\bvideo\b/i);
+  }
+
+  // Screen share — click the native Share button (API path is unreliable here).
+  shareScreen(): void {
+    const ZM: any = ZoomMtg as any;
+    try { if (typeof ZM.startScreenShare === 'function') { ZM.startScreenShare({}); return; } } catch { /* fall through */ }
+    this.clickNativeControl(/\bshare\b/i);
+  }
+
+  // Participants panel / Chat panel — toggle the native panels (they render as
+  // side panels, which DO paint; only the bottom bar was the problem).
+  toggleParticipants(): void { this.clickNativeControl(/participant/i); }
+  toggleChat(): void { this.clickNativeControl(/\bchat\b/i); }
+
+  // Raise / lower hand.
+  customHandRaised = false;
+  toggleHand(): void {
+    const ZM: any = ZoomMtg as any;
+    const next = !this.customHandRaised;
+    try {
+      if (next && typeof ZM.raiseHand === 'function') ZM.raiseHand({});
+      else if (!next && typeof ZM.lowerHand === 'function') ZM.lowerHand({});
+      else this.clickNativeControl(/hand/i);
+      this.customHandRaised = next;
+    } catch { this.clickNativeControl(/hand/i); }
+  }
+
+  // ---- Device / More dropdowns, anchored to the clicked button ----
+  toggleDeviceMenu(kind: 'audio' | 'video' | 'more', ev: Event): void {
+    ev.stopPropagation();
+    if (this.menuKind === kind) { this.closeDeviceMenu(); return; }
+    // Anchor the menu above the clicked control (clamped to the viewport).
+    const caret = ev.currentTarget as HTMLElement;
+    const r = caret.getBoundingClientRect();
+    this.menuLeft = Math.max(8, Math.min(r.left + r.width / 2 - 140, window.innerWidth - 288));
+    this.menuBottom = Math.max(8, window.innerHeight - r.top + 8);
+    // Open Zoom's native menu (it paints in Safari), read its items, then hide
+    // it and show our own copy anchored here. Two reads (fast + slower) in case
+    // the portal renders late.
+    if (kind === 'more') this.clickNativeMore();
+    else this.clickNativeControl(kind === 'audio' ? /more audio/i : /more video/i);
+    setTimeout(() => this.readNativeMenu(kind), 120);
+    setTimeout(() => { if (this.menuKind === kind && this.menuItems.length <= 1) this.readNativeMenu(kind); }, 380);
+  }
+
+  // The standalone "More" button (label "More" / "More meeting controls") — NOT
+  // the "More audio/video controls" carets.
+  private clickNativeMore(): boolean {
+    const nodes = document.querySelectorAll('#zmmtg-root .footer-button-base__button');
+    for (const el of Array.from(nodes)) {
+      const t = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+      if (/\bmore\b/.test(t) && !/audio|video/.test(t)) { (el as HTMLElement).click(); return true; }
+    }
+    return false;
+  }
+
+  // Find the device menu for THIS kind only — search strictly within the kind's
+  // own `.audio-option-menu` / `.video-option-menu` subtree (searching generic
+  // dropdowns cross-matched the wrong menu).
+  private findDeviceMenu(kind: 'audio' | 'video' | 'more'): Element | null {
+    if (kind === 'more') {
+      // The More popup — a visible dropdown/menu that is NOT the audio/video
+      // option menu. Pick the visible one with the most items.
+      const cands = Array.from(document.querySelectorAll(
+        '.more-button__pop-menu, [class*="more"][class*="menu"], .dropdown-menu, [role="menu"], [class*="option-menu"]'
+      ));
+      let best: Element | null = null; let bestN = 0;
+      for (const c of cands) {
+        if (c.closest('.audio-option-menu, .video-option-menu')) continue;
+        if (/audio-option|video-option/.test('' + (c as HTMLElement).className)) continue;
+        if (!c.getClientRects().length) continue;
+        const n = c.querySelectorAll('a, li').length;
+        if (n > bestN) { bestN = n; best = c; }
+      }
+      return best;
+    }
+    const base = kind === 'audio' ? '.audio-option-menu' : '.video-option-menu';
+    const cands = Array.from(document.querySelectorAll(
+      `${base}, ${base} .dropdown-menu, ${base} ul, ${base} [role="menu"]`
+    ));
+    let best: Element | null = null; let bestN = 0;
+    for (const c of cands) {
+      if (!c.getClientRects().length) continue;          // not rendered
+      const n = c.querySelectorAll('a, li').length;
+      if (n > bestN) { bestN = n; best = c; }
+    }
+    return best || document.querySelector(base);
+  }
+
+  private readNativeMenu(kind: 'audio' | 'video' | 'more'): void {
+    const menu = this.findDeviceMenu(kind);
+    const items: { label: string; checked: boolean; header: boolean }[] = [];
+    const refs: (HTMLElement | null)[] = [];
+    if (menu) {
+      const rows = Array.from(menu.querySelectorAll('li, a, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]'));
+      const seen = new Set<string>();
+      for (const row of rows) {
+        // Skip a container li that only wraps an <a> we'll also see.
+        if (row.tagName === 'LI' && row.querySelector('a, [role^="menuitem"]')) continue;
+        const label = (row.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!label || label.length > 90 || seen.has(label)) continue;
+        seen.add(label);
+        const clickable = row.tagName === 'A' || /menuitem/i.test(row.getAttribute('role') || '') || !!(row as HTMLElement).onclick;
+        const cls = '' + (row as HTMLElement).className;
+        const checked = /checked|selected|active/i.test(cls) || row.getAttribute('aria-checked') === 'true'
+          || !!row.querySelector('[class*="check"], [class*="selected"], .zm-icon-checkmark');
+        items.push({ label, checked, header: !clickable });
+        refs.push(row as HTMLElement);
+      }
+    }
+    // Hide the native (dislocated) menu now that we've mirrored it.
+    if (menu) { (menu as HTMLElement).style.visibility = 'hidden'; }
+    this.nativeMenuItems = refs;
+    this.ngZone.run(() => { this.menuItems = items; this.menuKind = kind; });
+  }
+
+  clickDeviceItem(i: number, item: { header: boolean }): void {
+    if (item.header) return;
+    const el = this.nativeMenuItems[i];
+    if (el) { el.style.visibility = ''; el.click(); }
+    this.closeDeviceMenu();
+  }
+
+  closeDeviceMenu(): void {
+    this.nativeMenuItems = [];
+    this.ngZone.run(() => { this.menuKind = ''; this.menuItems = []; });
+    try { document.body.click(); } catch { /* dismiss native popup */ }
+  }
+
+  // Close on any click outside the menu/pill (both stop propagation).
+  @HostListener('document:click')
+  private onDocumentClick(): void {
+    if (this.menuKind) { this.nativeMenuItems = []; this.ngZone.run(() => { this.menuKind = ''; this.menuItems = []; }); }
+  }
+
   ngOnDestroy() {
     window.removeEventListener('keydown', this.boundKeyDown);
+    this.stopSafariControls();
     this.clearScreenshots();
     this.waitingSub?.unsubscribe();
     this.waitingSub = null;
@@ -761,7 +1061,10 @@ export class ZoomClientviewComponent {
       }
       // ← END ADDED
 
-      ZoomMtg.setZoomJSLib('https://source.zoom.us/3.13.2/lib', '/av');
+      // Self-hosted SDK assets (served from /zoom via angular.json). Zoom's CDN
+      // (source.zoom.us) stopped publishing the Client View /ui bundle for 4.x+,
+      // so the only way to run 6.x is to host dist/{lib,ui} ourselves.
+      ZoomMtg.setZoomJSLib(`${window.location.origin}/zoom/lib`, '/av');
 
       ZoomMtg.preLoadWasm();
       ZoomMtg.prepareWebSDK();
@@ -774,15 +1077,19 @@ export class ZoomClientviewComponent {
         console.log("zoom");
 
         ZoomMtg.init({
+          // Host lands back on their Dynamic Studio; a participant is sent to
+          // the queue web screen (NOT the participant studio) after the host
+          // ends the call.
           leaveUrl: this.profileHost
             ? `${window.location.origin}/dynamicstudio`
-            : `${window.location.origin}/participantstudio`,
+            : `${window.location.origin}/queue-web`,
           patchJsMedia: true,
           defaultView: 'gallery',
           success: (success: any) => {
-            this.ngZone.run(() => {
-              this.isJoined = true;
-            });
+            // NOTE: this is the SDK *init* success — the meeting isn't joined
+            // yet. `isJoined` (which gates the in-call Capture / Prescribe ATC
+            // buttons) is flipped in the ZoomMtg.join success below, so those
+            // controls only appear once the user is actually inside the call.
             console.log(success);
             var zoomConfig: zoomConfig = {
               sdkKey: "rjad2eLZSIKlamaIwi09tw",
@@ -798,6 +1105,17 @@ export class ZoomClientviewComponent {
               success: (success: any) => {
                 console.log(success);
                 console.log("zoom successfully joined");
+
+                // Now actually inside the meeting — reveal the in-call controls
+                // (Capture / Prescribe ATC). Runs outside Angular (join is fired
+                // inside runOutsideAngular), so re-enter the zone to update the view.
+                this.ngZone.run(() => {
+                  this.isJoined = true;
+                });
+
+                // Safari: stand up our own control bar (SDK bar is invisible in
+                // Safari). No-op on Chrome.
+                this.initSafariControls();
 
                 // Host has actually entered the Zoom meeting — release any
                 // participant waiting on the studio gate, and start the
@@ -878,29 +1196,46 @@ export class ZoomClientviewComponent {
     window.addEventListener('keydown', this.boundKeyDown);
   }
 
-  async onClick() {
-    try {
-      const clickTimestamp = new Date().toISOString();
-      const clipTiming = {
-        timestamp: clickTimestamp,
-        capturedby: this.profileid
-      };
-      var data;
-      await getDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid'])).then(snap => {
-        data = snap.data();
-      });
-      console.log(data);
+  onClick() {
+    const clipTiming = {
+      timestamp: new Date().toISOString(),
+      capturedby: this.profileid
+    };
+    // Give instant feedback — the snackbar and the frame grab must NOT wait on
+    // Firestore. Previously the snackbar only appeared after an awaited getDoc +
+    // updateDoc round-trip, so "capture" felt sluggish.
+    this.showPopup();
+    this.captureScreenshot();
+    // Persist the clip timing in the background. arrayUnion appends atomically,
+    // so we skip the read-modify-write getDoc entirely (one round-trip, not two).
+    updateDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid']), {
+      cliptimings: arrayUnion(clipTiming)
+    })
+      .then(() => console.log('Clip timing updated successfully:', clipTiming))
+      .catch(error => console.error('Error updating clip timing:', error));
+  }
 
-      let clipTimings = data['cliptimings'] ? data.cliptimings : [];
-      clipTimings.push(clipTiming);
-      await updateDoc(doc(this.firestore, 'live assignment', this.zoomdata['docid']), { cliptimings: clipTimings });
+  // For now: just open the Prescribe ATC step in a new tab (front). The stable
+  // window name makes repeat clicks reuse + refocus that same tab. Zoom call is
+  // never navigated.
+  goToPrescribeAtc() {
+    const url = `${window.location.origin}/dynamicstudio?step=prescribe-atc`;
+    window.open(url, 'starlabsDynamicStudio');
+  }
 
-      console.log('Clip timing updated successfully:', clipTiming);
-      this.showPopup();
-      this.captureScreenshot();
-    } catch (error) {
-      console.error('Error updating clip timing:', error);
-    }
+  private showPrescribeHint() {
+    this.prescribeHintVisible = true;
+    if (this.prescribeHintTimer) clearTimeout(this.prescribeHintTimer);
+    // Auto-dismiss so it doesn't linger over the call.
+    this.prescribeHintTimer = setTimeout(
+      () => this.ngZone.run(() => { this.prescribeHintVisible = false; }),
+      12000
+    );
+  }
+
+  dismissPrescribeHint() {
+    this.prescribeHintVisible = false;
+    if (this.prescribeHintTimer) { clearTimeout(this.prescribeHintTimer); this.prescribeHintTimer = null; }
   }
 
   handleKeyDown(event: KeyboardEvent) {
@@ -940,9 +1275,29 @@ export class ZoomClientviewComponent {
 
   updateSlider(dataURL: string) {
     this.screenshots.push(dataURL);
+    // The chip is only a still screenshot marker (not playable) and the clip
+    // TIMING is already saved to Firestore, so it doesn't need to linger. Auto-
+    // remove this chip from the on-screen slider after a short window.
+    const timer = setTimeout(() => {
+      this.ngZone.run(() => {
+        const i = this.screenshots.indexOf(dataURL);
+        if (i > -1) this.screenshots.splice(i, 1);
+      });
+      // keep the localStorage backup in sync
+      try {
+        const arr = JSON.parse(localStorage.getItem('screenshots') || '[]');
+        const j = arr.indexOf(dataURL);
+        if (j > -1) { arr.splice(j, 1); localStorage.setItem('screenshots', JSON.stringify(arr)); }
+      } catch {}
+      const t = this.clipChipTimers.indexOf(timer);
+      if (t > -1) this.clipChipTimers.splice(t, 1);
+    }, this.CLIP_CHIP_TTL_MS);
+    this.clipChipTimers.push(timer);
   }
 
   clearScreenshots() {
+    this.clipChipTimers.forEach(t => clearTimeout(t));
+    this.clipChipTimers = [];
     localStorage.removeItem('screenshots');
     this.screenshots = [];
   }
