@@ -2,9 +2,24 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  max-height: 64px;
+  /* Zoom-stable height: sized in viewport units so the bar keeps a CONSTANT
+     PHYSICAL height as the browser zooms (vh shrinks in CSS-px as you zoom in,
+     cancelling the scale) instead of growing and eating the content. Bounded by
+     clamp so it never exceeds the original 64px and stays usable on short
+     windows. Keep this expression IN SYNC with --host-toolbar-h in
+     dynamic-studio-v2.component.css (the studio offsets itself by that token). */
+  height: clamp(40px, 7.4vh, 64px) !important;
+  min-height: clamp(40px, 7.4vh, 64px) !important;
+  max-height: clamp(40px, 7.4vh, 64px) !important;
   background-color: #234c58!important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+/* Pin the inner Material toolbar row too (it carries the min-height). */
+::ng-deep .toolbar.mat-toolbar-single-row,
+::ng-deep .toolbar .mat-toolbar-row {
+  height: clamp(40px, 7.4vh, 64px) !important;
+  min-height: clamp(40px, 7.4vh, 64px) !important;
+  max-height: clamp(40px, 7.4vh, 64px) !important;
 }
 
 .header {
@@ -15,7 +30,8 @@
 }
 
 .title {
-  font-size: 1.5rem;
+  /* Zoom-stable (see .toolbar) — anchored to the original 1.5rem/24px. */
+  font-size: clamp(16px, 2.78vh, 24px);
   font-weight: 600;
   margin-left: 16px;
   color: #FFFFFF;
@@ -27,19 +43,54 @@
 .menuicon{
   padding: 0 !important;
   align-items: center !important;
-  font-size: 36px !important;
+  /* Zoom-stable (see .toolbar) — anchored to the original 36px. */
+  font-size: clamp(22px, 4.17vh, 36px) !important;
   width: max-content !important;
   height: max-content !important;
   margin-right: 10px;
   color: white;
 }
 
+/* Zoom-stable toolbar content: keep the logo/avatar/icons proportional to the
+   viewport-sized bar so they never overflow it as the browser zooms. All
+   anchored to their original px at a ~865px-tall viewport. */
+.toolbar .header .mat-icon,
+.toolbar .header mat-icon {
+  font-size: clamp(17px, 2.78vh, 24px);
+  width: clamp(17px, 2.78vh, 24px);
+  height: clamp(17px, 2.78vh, 24px);
+  line-height: clamp(17px, 2.78vh, 24px);
+}
+.toolbar .header .profile-name { font-size: clamp(10px, 1.62vh, 14px); }
+/* Material icon-buttons default to ~48px, which overflows the viewport-sized bar
+   at higher zoom. Size them (and the hamburger) in vh so they track the bar. */
+.toolbar button.mat-mdc-icon-button,
+.toolbar .mat-mdc-icon-button {
+  width: clamp(34px, 5.2vh, 44px) !important;
+  height: clamp(34px, 5.2vh, 44px) !important;
+  padding: 0 !important;
+}
+/* Avatar: the child <img class="profile-img"> is sized by an inline
+   [style.width.px]="32" binding, so overriding it needs ::ng-deep (pierce the
+   child's encapsulation) + !important (beat the inline style). Anchored to 32px. */
+::ng-deep .toolbar .header .profile-img {
+  width: clamp(24px, 3.7vh, 32px) !important;
+  height: clamp(24px, 3.7vh, 32px) !important;
+}
+
+/* Fill exactly the space BELOW the sticky toolbar so the document never
+   overflows the viewport. Previously .drawer-container was a full 100vh while
+   sitting under the ~64px toolbar, making the page (toolbar + 100vh) taller
+   than the viewport — that extra height was the stray "overall" page scroll,
+   and scrolling the body dragged the sticky toolbar with it. The toolbar-height
+   expression is kept IN SYNC with .toolbar's clamp() above. */
 .mainscreen{
-  height: max-content;
+  height: calc(100vh - clamp(40px, 7.4vh, 64px));
+  overflow: hidden;
 }
 
 .drawer-container{
-  height: 100vh;
+  height: 100%;
   width: 100%;
 }
 
@@ -271,7 +322,8 @@
 .menuicon {
   padding: 0 !important;
   align-items: center !important;
-  font-size: 36px !important;
+  /* Zoom-stable (see .toolbar) — anchored to the original 36px. */
+  font-size: clamp(22px, 4.17vh, 36px) !important;
   width: max-content !important;
   height: max-content !important;
   margin-left: 8px;

@@ -17,10 +17,12 @@
   --ink: #1A2332;
   --ink-2: #566072;
   --ink-3: #8A93A3;
-  --primary: #1E5663;
-  --primary-ink: #143F49;
-  --primary-soft: #E2EEEF;
-  --primary-line: #BFD8DC;
+  /* Accent retheme → mockup purple (dynamic-studio-full.html). Token-driven so
+     the whole .ds-app workspace picks it up automatically. */
+  --primary: #9A258F;
+  --primary-ink: #7C1D73;
+  --primary-soft: #F8EAF6;
+  --primary-line: #E9C9E4;
   --green: #1B8E50;
   --green-bright: #1FA15B;
   --green-soft: #E4F4EA;
@@ -45,10 +47,12 @@
   --topbar-h: clamp(72px, 8vh, 96px);
   --footer-h: clamp(62px, 7vh, 78px);
   --base-fs: clamp(14px, 0.9vw + 6px, 16px);
-  /* The host STARLABS mat-toolbar sits at the top of the page (64px tall,
-     sticky). Reserve that space so the studio's own topbar / status pill is
-     never hidden behind it. */
-  --host-toolbar-h: 64px;
+  /* The host STARLABS mat-toolbar sits at the top of the page (sticky). Reserve
+     that space so the studio's own topbar / status pill is never hidden behind
+     it. MUST stay IN SYNC with the .toolbar height in app.component.css — that
+     bar is now zoom-stable (viewport-unit height), so this offset tracks the
+     same clamp expression exactly (otherwise a gap/overlap appears under it). */
+  --host-toolbar-h: clamp(40px, 7.4vh, 64px);
 }
 
 /* ---------------------------------------------------------------- ROOT APP */
@@ -61,11 +65,16 @@
   font-size: var(--base-fs);
   line-height: 1.45;
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: var(--topbar-h) 1fr;
+  /* Zoom-stable chrome — sidebar/topbar/footer are sized in VIEWPORT units so
+     they keep a constant PHYSICAL size when the browser is zoomed (vw shrinks in
+     CSS-px as you zoom, cancelling it). Only main (1fr, px-based) scales with
+     zoom. Wide clamp bounds keep it adaptive across screen sizes. */
+  grid-template-columns: clamp(150px, 16vw, 300px) 1fr;
+  grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "sidebar topbar"
-    "sidebar main";
+    "sidebar main"
+    "sidebar footer";
   /* The component lives inside the STARLABS shell's .mainscreen wrapper.
      We take over the visible area BELOW the host toolbar so:
        1. The toolbar (hamburger, logo, bell, settings) stays visible.
@@ -79,6 +88,9 @@
   bottom: 0;
   width: 100vw;
   height: calc(100vh - var(--host-toolbar-h));
+  /* dvh: iOS Safari/Chrome mobile exclude the URL bar from 100vh, which clips
+     the footer. Browsers without dvh support ignore this and keep the vh line. */
+  height: calc(100dvh - var(--host-toolbar-h));
   z-index: 30;
   overflow: hidden;
 }
@@ -317,8 +329,8 @@
 .ds-app .ds-avatar {
   width: 50px;
   height: 50px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, #2E7180, #1E5663);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #C04FB5, #9A258F);
   color: #fff;
   font-weight: 800;
   font-size: 18px;
@@ -624,6 +636,769 @@
   line-height: 1.3;
 }
 
+/* ============================================================== HEADER (mockup)
+   Replaces the old left sidebar + topbar. Participant identity + status pill +
+   session actions in one horizontal bar, with a details popover. */
+.ds-app .ds-header {
+  grid-area: header;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  padding: 18px 16px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+}
+/* Identity block: avatar + name stacked in the left column. */
+.ds-app .ds-header .ds-hdr-id { flex-wrap: wrap; }
+.ds-app .ds-hdr-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  position: relative;
+}
+.ds-app .ds-hdr-idbody { min-width: 0; }
+.ds-app .ds-hdr-name {
+  font-size: clamp(16px, 0.8vw + 10px, 21px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-metaline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-2);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-uplabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  color: var(--primary-ink);
+}
+.ds-app .ds-hdr-uplabel .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--amber-bright); }
+.ds-app .ds-hdr-dot { color: var(--ink-3); }
+.ds-app .ds-hdr-detailsbtn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.ds-app .ds-hdr-detailsbtn:hover { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-hdr-detailsbtn .ic { transition: transform .3s var(--ease); }
+.ds-app .ds-hdr-detailsbtn.open .ic { transform: rotate(180deg); }
+.ds-app .ds-hdr-details {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  width: min(340px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px 14px;
+}
+.ds-app .ds-hdr-details__specialists { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.ds-app .ds-hdr-details__specialists-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.ds-app .ds-hdr-details__specialists-head .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-hdr-details__count {
+  margin-left: auto;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+/* Left-column layout: status pill + actions stack full-width under the identity. */
+.ds-app .ds-hdr-status {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+.ds-app .ds-hdr-status .ds-waiting { width: 100%; }
+.ds-app .ds-hdr-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.ds-app .ds-hdr-actions .btn,
+.ds-app .ds-hdr-actions .ds-menu-anchor,
+.ds-app .ds-hdr-actions .ds-menu-anchor > .btn { width: 100%; justify-content: center; }
+
+/* Specialists included — inline row under the participant name in the header */
+.ds-app .ds-hdr-specialists {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-specialists .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--primary); }
+.ds-app .ds-hdr-specialists__label { color: var(--ink-3); font-weight: 700; }
+.ds-app .ds-hdr-specialists__names {
+  color: var(--primary-ink);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ds-app .ds-hdr-specialists__role { color: var(--ink-3); font-weight: 600; }
+
+/* ---------------------------------------------- HORIZONTAL STEPPER (mockup pane)
+   A single rounded white pane carrying numbered steps with chevrons between
+   them. Active = purple-soft chip; done = green node. Matches the mockup
+   (dynamic-studio-full.html .stepper). */
+.ds-app .ds-stepbar {
+  grid-area: stepper;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px clamp(16px, 1.8vw + 8px, 32px);
+  overflow: hidden;
+}
+.ds-app .ds-stepbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  /* the pane */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow-md);
+}
+.ds-app .ds-hstep {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 8px 13px;
+  border-radius: 11px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.ds-app .ds-hstep:hover { background: var(--surface-2); }
+.ds-app .ds-hstep-node {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  background: #F0F0F3;
+  color: var(--ink-3);
+}
+.ds-app .ds-hstep-node .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-hstep-label { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ds-app .ds-hstep-chev { color: var(--ink-3); font-size: 17px; width: 17px; height: 17px; line-height: 17px; flex-shrink: 0; }
+.ds-app .ds-hstep.done .ds-hstep-label { color: var(--ink); }
+.ds-app .ds-hstep.done .ds-hstep-node { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-hstep.active { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-hstep.active .ds-hstep-node { background: var(--primary); color: #fff; }
+.ds-app .ds-hstep.active .ds-hstep-label { font-weight: 800; }
+
+/* ============================================================== SIDEBAR (identity + vertical stepper) */
+.ds-app .ds-side {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 14px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  min-width: 0;
+  /* Grid items default to min-height:auto, so when the profile/specialists grow
+     tall (e.g. at 175% zoom) the sidebar expands past its track and the app's
+     overflow:hidden clips the Session Steps off the bottom. min-height:0 lets it
+     respect the track height so overflow-y:auto actually scrolls the steps into
+     reach instead of hiding them. */
+  min-height: 0;
+}
+.ds-app .ds-side-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  /* Keep the identity at its NATURAL height and never let it shrink to a sliver
+     that hides the participant's visit/journey/specialists. When the sidebar as a
+     whole is too short for identity + steps (high zoom / small screens), the
+     sidebar itself scrolls (.ds-side is overflow-y:auto) so BOTH the identity and
+     the Session Steps stay fully reachable — nothing is clipped off-screen. */
+  flex: 0 0 auto;
+}
+.ds-app .ds-side-idbody { min-width: 0; }
+.ds-app .ds-side-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+}
+.ds-app .ds-side-sub {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.ds-app .ds-side-journey-label { color: var(--ink-3); font-weight: 700; }
+/* Love Letters widget (Step 2) — rounded on all sides. */
+.ds-app .ds-ll-card { border-radius: 14px; overflow: hidden; }
+/* Specialist roster: a "With · N" header over a one-per-line list, so any number
+   of bonus specialists (each with its activity) reads cleanly instead of a long
+   comma-wrapped blob. Left-aligned by default (stacked band); the two-column
+   profile-card override below centres it. */
+.ds-app .ds-side-specialists {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 6px; font-size: 12px; color: var(--ink-2); font-weight: 600; min-width: 0;
+}
+.ds-app .ds-side-specialists__head { display: inline-flex; align-items: center; gap: 5px; }
+.ds-app .ds-side-specialists .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--primary); }
+.ds-app .ds-side-specialists__label {
+  color: var(--ink-3); font-weight: 800; flex-shrink: 0;
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+}
+.ds-app .ds-side-specialists__list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; width: 100%;
+}
+.ds-app .ds-side-specialists__item { line-height: 1.3; min-width: 0; }
+.ds-app .ds-side-specialists__name { color: var(--primary-ink); font-weight: 700; }
+/* Bonus-activity role/activity name shown after each specialist — secondary weight/colour. */
+.ds-app .ds-side-specialists__role { color: var(--ink-3); font-weight: 600; }
+
+/* Compact "View all" chip — hidden by default; the short-height media query
+   below reveals it when a long roster + zoomed-in window would otherwise bury
+   the Session Steps. */
+.ds-app .ds-side-specialists__more {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin-left: 6px;
+  cursor: pointer;
+}
+.ds-app .ds-side-specialists__more:hover { background: var(--primary-line); }
+
+/* Full-roster overlay (opened from the chip) — fixed/centered so it escapes the
+   sidebar's scroll clipping. */
+.ds-app .ds-spec-overlay-backdrop { position: fixed; inset: 0; z-index: 65; background: rgba(15,18,22,.38); }
+.ds-app .ds-spec-overlay {
+  position: fixed;
+  z-index: 66;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(340px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 14px 16px;
+  animation: dsNextmenuIn .16s var(--ease);
+}
+.ds-app .ds-spec-overlay__head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 800; color: var(--ink);
+  margin-bottom: 10px;
+}
+.ds-app .ds-spec-overlay__head .ic { color: var(--primary); font-size: 18px; width: 18px; height: 18px; }
+.ds-app .ds-spec-overlay__close {
+  margin-left: auto;
+  width: 26px; height: 26px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; color: var(--ink-3); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.ds-app .ds-spec-overlay__close:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .ds-spec-overlay__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ds-app .ds-spec-overlay__list li { font-size: 13px; line-height: 1.35; }
+.ds-app .ds-spec-overlay__name { color: var(--primary-ink); font-weight: 700; }
+.ds-app .ds-spec-overlay__role { color: var(--ink-3); font-weight: 600; }
+
+/* Zoomed-in / short window: don't hide the whole roster — TRUNCATE it to as many
+   names as fit in a viewport-relative height (so shorter windows show fewer), fade
+   the cut edge, and surface the rest via the "View all" chip. */
+@media (max-height: 760px) {
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__list {
+    max-height: 20vh;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent);
+    mask-image: linear-gradient(to bottom, #000 68%, transparent);
+  }
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__more { display: inline-flex; }
+}
+/* Even shorter (more zoom) → collapse the inline roster entirely to just the
+   "With · N — View all" header, so the identity block stays short and the Session
+   Steps fit in the sidebar without scrolling. The full roster is one click away
+   via the "View all" overlay, so no information is lost. */
+@media (max-height: 560px) {
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__list { display: none; }
+}
+
+.ds-app .ds-side-steps { display: flex; flex-direction: column; gap: 4px; }
+.ds-app .ds-side-steps__label {
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); padding: 0 8px 6px;
+}
+.ds-app .ds-vsteplist { display: flex; flex-direction: column; gap: 2px; }
+.ds-app .ds-vstep {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: 11px;
+  background: transparent; color: var(--ink-2);
+  transition: background .18s var(--ease), color .18s var(--ease);
+}
+.ds-app .ds-vstep:hover { background: var(--surface-2); }
+.ds-app .ds-vstep-node {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800;
+  background: #F0F0F3; color: var(--ink-3);
+}
+.ds-app .ds-vstep-node .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-vstep-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.ds-app .ds-vstep-label { font-size: 14px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.ds-app .ds-vstep-sub { font-size: 11.5px; font-weight: 500; color: var(--ink-3); white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.ds-app .ds-vstep.active .ds-vstep-sub { color: var(--primary-ink); }
+.ds-app .ds-vstep.done .ds-vstep-label { color: var(--ink); }
+.ds-app .ds-vstep.done .ds-vstep-node { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-vstep.active { background: var(--primary-soft); }
+.ds-app .ds-vstep.active .ds-vstep-node { background: var(--primary); color: #fff; }
+.ds-app .ds-vstep.active .ds-vstep-label { color: var(--primary-ink); font-weight: 800; }
+
+/* ============================================================== TOPBAR (status + actions) */
+.ds-app .ds-topbar2 {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  position: relative;
+  z-index: 20;
+}
+.ds-app .ds-topbar2__left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ds-app .ds-topbar2__right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Footer is a grid child on the right (was inside main before). */
+.ds-app .ds-footer { grid-area: footer; }
+
+/* ============================================================== ZOOM-STABLE CHROME
+   Size the sidebar / topbar / footer (dimensions, fonts, icons, buttons) in
+   viewport units so they hold a constant PHYSICAL size as the browser zooms —
+   only the px-based main content scales. Wide clamp bounds keep them adaptive
+   across screen sizes. */
+.ds-app .ds-topbar2 { padding: clamp(7px, 0.7vh + 2px, 14px) clamp(14px, 1.4vw, 28px); }
+.ds-app .ds-side { padding: clamp(12px, 1.2vw, 20px) clamp(10px, 0.9vw, 16px); gap: clamp(12px, 1.2vh, 20px); }
+.ds-app .ds-side-id {
+  gap: clamp(10px, 1vw, 14px);
+  /* Taller identity block: breathing room above + below the avatar/name. */
+  padding: clamp(10px, 1.6vh, 20px) 4px clamp(16px, 2vh, 24px);
+}
+.ds-app .ds-side .ds-avatar {
+  width: clamp(54px, 4.4vw, 70px);
+  height: clamp(54px, 4.4vw, 70px);
+  font-size: clamp(18px, 1.5vw, 24px);
+}
+.ds-app .ds-side-name { font-size: clamp(13px, 1.05vw, 17px); }
+.ds-app .ds-side-sub { font-size: clamp(10px, 0.82vw, 13px); }
+.ds-app .ds-side-specialists { font-size: clamp(10px, 0.8vw, 12.5px); }
+.ds-app .ds-side-steps__label { font-size: clamp(9px, 0.72vw, 11px); }
+.ds-app .ds-vstep { padding: clamp(7px, 0.7vh, 11px) clamp(8px, 0.8vw, 12px); gap: clamp(8px, 0.8vw, 12px); }
+.ds-app .ds-vstep-node { width: clamp(20px, 1.7vw, 26px); height: clamp(20px, 1.7vw, 26px); font-size: clamp(10px, 0.85vw, 13px); }
+.ds-app .ds-vstep-label { font-size: clamp(11px, 0.92vw, 14px); }
+.ds-app .ds-footer { height: clamp(38px, 4.5vh, 52px); min-height: clamp(38px, 4.5vh, 52px); padding: 0 clamp(14px, 1.4vw, 28px); }
+.ds-app .ds-footer-center { font-size: clamp(10px, 0.8vw, 13px); }
+/* Chrome buttons + icons in viewport units too, so their box doesn't grow the bar. */
+.ds-app .ds-side .btn,
+.ds-app .ds-topbar2 .btn,
+.ds-app .ds-footer .btn {
+  font-size: clamp(11px, 0.85vw, 14px);
+  padding: clamp(6px, 0.7vh, 10px) clamp(10px, 1vw, 16px);
+  gap: clamp(5px, 0.5vw, 8px);
+}
+.ds-app .ds-side .ic,
+.ds-app .ds-topbar2 .ic,
+.ds-app .ds-footer .ic {
+  font-size: clamp(14px, 1.1vw, 18px);
+  width: clamp(14px, 1.1vw, 18px);
+  height: clamp(14px, 1.1vw, 18px);
+  line-height: clamp(14px, 1.1vw, 18px);
+}
+/* Topbar status pill scales with the viewport too. */
+.ds-app .ds-topbar2 .ds-waiting-title { font-size: clamp(11px, 0.85vw, 14px); }
+.ds-app .ds-topbar2 .ds-waiting-sub { font-size: clamp(9px, 0.72vw, 12px); }
+.ds-app .ds-topbar2 .ds-waiting-icon { width: clamp(26px, 2.1vw, 34px); height: clamp(26px, 2.1vw, 34px); }
+
+/* ---- Responsive header + stepper ------------------------------------------
+   Goal: never horizontally scroll. The header wraps its three groups; the
+   stepper wraps rows, then progressively sheds chrome as width shrinks. */
+
+/* Tablet / small laptop: drop the chevrons (they dangle once steps wrap). */
+@media (max-width: 1080px) {
+  .ds-app .ds-hstep-chev { display: none; }
+}
+
+/* Tablet & down — a 240px left column gets cramped, so stack vertically:
+   stepper on top, the top-bar as a horizontal row, then main. */
+@media (max-width: 1024px) {
+  /* Tablet & down — stack: topbar, sidebar (identity + steps), main, footer. */
+  .ds-app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      "topbar"
+      "sidebar"
+      "main"
+      "footer";
+  }
+  /* Lay the sidebar band HORIZONTALLY: participant identity on the left, the
+     session steps on the SAME row to its right — instead of two stacked rows
+     that waste the wide horizontal space and steal content height. Wraps to two
+     rows only when there isn't room (narrow tablets / phones). */
+  .ds-app .ds-side {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: clamp(16px, 2.4vw, 36px);
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+  .ds-app .ds-side-id {
+    flex: 0 1 auto;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  /* Steps take the remaining width and flow as a horizontal wrap. */
+  .ds-app .ds-side-steps { flex: 1 1 340px; min-width: 0; }
+  .ds-app .ds-vsteplist { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .ds-app .ds-vstep { width: auto; }
+}
+
+/* Wide-but-SHORT viewport (the classic "zoomed desktop" case — e.g. a 1512px
+   screen at 150% zoom is ~1008×540 CSS px). The ≤1024 vertical stack above
+   pushes identity + steps + note above the content, crushing the scroll area to
+   ~150px. When there's still enough WIDTH for two columns, restore the
+   sidebar-on-the-left layout so identity/steps live in the left column and the
+   content gets the full viewport height back. Genuine tablets/phones (narrower)
+   and tall windows (which have height to spare) keep stacking. */
+/* Wide-enough-but-SHORT (zoomed desktop AND tablet-at-175% ≈ 585×440): go
+   two-column so the content gets a full-height column instead of being crushed
+   under a tall stacked identity+steps band. Threshold lowered to 460px so tablet
+   zoom lands here; phones (<460) stay stacked. Narrower sidebar → more content
+   room. Steps pinned + identity scrolls (see the >1024 block). */
+@media (min-width: 460px) and (max-width: 1024px) and (max-height: 720px) {
+  .ds-app {
+    /* Wider than before so the specialist names wrap less (shorter identity),
+       leaving room to show the name + bonus-activity roster in full. */
+    grid-template-columns: clamp(168px, 22vw, 280px) 1fr;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "sidebar topbar"
+      "sidebar main"
+      "sidebar footer";
+  }
+  .ds-app .ds-side {
+    /* Reset the stacked-band's row direction + centered alignment — this is a
+       real vertical sidebar, so children stretch full-width and align left
+       (otherwise the steps block gets centered/indented vs the identity). */
+    flex-direction: column;
+    /* CRITICAL: reset flex-wrap. The wider ≤1024 tablet band sets flex-wrap:wrap
+       for the horizontal identity+steps layout. Here we're a vertical column with
+       a FIXED height, so an inherited `wrap` makes the steps overflow into a
+       hidden SECOND column beside the identity (the actual "steps got hidden at
+       175% zoom" bug). nowrap keeps identity + steps in one stacked column that
+       the sidebar scrolls (overflow-y:auto) when it's taller than the viewport. */
+    flex-wrap: nowrap;
+    align-items: stretch;
+    border-right: 1px solid var(--border);
+    border-bottom: none;
+    /* Scroll the whole sidebar as a fallback so the Session Steps are always
+       reachable at high zoom even if the identity block doesn't shrink enough. */
+    overflow-y: auto;
+    min-height: 0;
+    justify-content: flex-start;
+    gap: clamp(8px, 1.2vh, 14px);
+  }
+  /* Smaller avatar → shorter identity block, more room for name + roster. */
+  .ds-app .ds-side .ds-avatar {
+    width: clamp(40px, 3.4vw, 52px); height: clamp(40px, 3.4vw, 52px);
+    font-size: clamp(15px, 1.2vw, 20px);
+  }
+  /* COMPACT the stepper so all 6 steps take little height, leaving the identity
+     enough leftover to show its full content (name + "…at uP!" + specialists)
+     without scrolling. */
+  .ds-app .ds-side-steps { flex: 0 0 auto; min-width: 0; }
+  .ds-app .ds-side-steps__label { padding: 0 8px 3px; font-size: 9.5px; }
+  .ds-app .ds-vsteplist { flex-direction: column; flex-wrap: nowrap; gap: 1px; }
+  .ds-app .ds-vstep { width: 100%; padding: clamp(3px, 0.4vh, 6px) clamp(8px, 0.8vw, 11px); gap: clamp(7px, 0.7vw, 10px); }
+  .ds-app .ds-vstep-node { width: clamp(17px, 1.4vw, 20px); height: clamp(17px, 1.4vw, 20px); font-size: clamp(10px, 0.85vw, 12px); }
+  .ds-app .ds-vstep-label { font-size: clamp(11.5px, 0.9vw, 13px); }
+  /* Tighten the identity's internal spacing so name + "…at uP!" + the full
+     specialist roster fit in the leftover height without scrolling. */
+  .ds-app .ds-side-id { padding-bottom: clamp(6px, 0.8vh, 10px); }
+  .ds-app .ds-side-sub { margin-top: 1px; }
+  .ds-app .ds-side-specialists { margin-top: 4px; gap: 2px; }
+  .ds-app .ds-side-specialists__list { gap: 1px; }
+  .ds-app .ds-side-specialists__item { line-height: 1.22; }
+  .ds-app .ds-side-name {
+    white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25;
+  }
+  /* LEFT-aligned identity at its NATURAL height. The compacted stepper below +
+     dropped step sub-labels (see the short-height blocks) mean identity + steps
+     fit without scrolling for typical rosters; if the roster is very long the
+     WHOLE sidebar scrolls (.ds-side overflow-y:auto) so identity info is never
+     shrunk away and the steps are never clipped. */
+  .ds-app .ds-side-id {
+    flex-direction: column; align-items: flex-start; text-align: left;
+    flex: 0 0 auto; min-height: 0;
+  }
+  .ds-app .ds-side-idbody { text-align: left; width: 100%; }
+  .ds-app .ds-side-specialists { align-items: flex-start; text-align: left; }
+  .ds-app .ds-side-specialists__list { align-items: flex-start; }
+}
+
+/* Desktop two-column (>1024): on a TALL window the sidebar is much taller than
+   its content (identity + 6 steps), leaving a big void at the bottom. Vertically
+   center the identity+steps as one group so the whitespace is balanced and the
+   sidebar reads as intentional rather than top-heavy-with-a-gap. The stepper also
+   gets more breathing room so it fills more of the column. `safe center` falls
+   back to top-alignment if the content ever exceeds the sidebar height (short
+   window) so nothing gets clipped above the scroll origin. */
+@media (min-width: 1025px) {
+  /* Steps ALWAYS reachable: identity keeps its NATURAL height (never shrunk to a
+     sliver that hides the participant's visit/journey/specialists), steps sit
+     directly below it, and the WHOLE sidebar scrolls (overflow-y:auto) when the
+     two together exceed the column height. So on tall windows everything shows
+     at once; on short/zoomed windows the sidebar scrolls and nothing is clipped.
+     Top-aligned, LEFT-aligned profile (avatar on top, name / uP · product /
+     specialists all flush-left). */
+  .ds-app .ds-side { justify-content: flex-start; overflow-y: auto; min-height: 0; gap: clamp(12px, 1.6vh, 20px); }
+  .ds-app .ds-side-id {
+    flex-direction: column; align-items: flex-start; text-align: left;
+    flex: 0 0 auto; min-height: 0;
+  }
+  .ds-app .ds-side-idbody { text-align: left; width: 100%; }
+  .ds-app .ds-side-name { white-space: normal; overflow: visible; text-overflow: clip; }
+  .ds-app .ds-side-specialists { align-items: flex-start; text-align: left; }
+  .ds-app .ds-side-specialists__list { align-items: flex-start; }
+  .ds-app .ds-side-steps { flex: 0 0 auto; gap: clamp(4px, 0.5vh, 9px); }
+  .ds-app .ds-vstep { padding: clamp(8px, 0.9vh, 14px) clamp(8px, 0.8vw, 12px); }
+  /* Cleaner, tighter identity card (the loose spacing + big avatar read clumsy):
+     smaller avatar, consistent vertical rhythm, roster grouped snug under "With". */
+  .ds-app .ds-side .ds-avatar {
+    width: clamp(46px, 3.6vw, 58px); height: clamp(46px, 3.6vw, 58px);
+    font-size: clamp(16px, 1.3vw, 21px);
+  }
+  .ds-app .ds-side-id { gap: 10px; padding-bottom: 14px; }
+  .ds-app .ds-side-name { font-size: clamp(15px, 1.15vw, 18px); line-height: 1.2; }
+  .ds-app .ds-side-sub { margin-top: 3px; line-height: 1.35; }
+  .ds-app .ds-side-specialists { margin-top: 8px; gap: 3px; }
+  .ds-app .ds-side-specialists__item { line-height: 1.3; }
+}
+/* Wide-but-SHORT desktop (zoomed): identity + steps can't both fit at once, so
+   the whole sidebar scrolls (handled by .ds-side overflow-y:auto). Identity stays
+   at natural height (flex:0 0 auto from the block above) so its info is never
+   shrunk away; the dropped step sub-labels below keep the steps compact enough to
+   usually still fit without a scroll. */
+
+/* Phone: compact stepper — show only the ACTIVE step's label, others are
+   node-only chips, so all steps fit without scrolling. Buttons shrink. */
+@media (max-width: 680px) {
+  .ds-app .ds-stepbar { padding: 8px 12px 10px; }
+  .ds-app .ds-hstep { padding: 6px 8px; gap: 6px; }
+  .ds-app .ds-hstep:not(.active) .ds-hstep-label { display: none; }
+  .ds-app .ds-hstep-node { width: 24px; height: 24px; }
+  .ds-app .ds-hstep.active .ds-hstep-label { max-width: 48vw; }
+  .ds-app .ds-header { gap: 10px; padding: 10px 12px; }
+  .ds-app .ds-hdr-name { max-width: 60vw; }
+  .ds-app .ds-hdr-actions .btn { padding: 8px 10px; font-size: 12.5px; }
+  .ds-app .ds-main-scroll { padding: 14px 12px 20px; }
+  .ds-app .card-pad { padding: 16px 16px; }
+}
+
+/* ---- Short viewport (laptop zoom / tablet) — keep the pinned app optimized ---
+   A 14" laptop at 150% zoom is ~1008×552 CSS px. We KEEP the fixed app layout
+   (sticky header/stepper/footer, content scrolls inside) and just shrink the
+   chrome so the content keeps most of the height — applied at any width, not
+   only >1024, so zoomed laptops and tablets stay pinned instead of un-pinning. */
+@media (max-height: 900px) {
+  .ds-app .ds-header { padding-top: 9px; padding-bottom: 9px; }
+  .ds-app .ds-stepbar { padding-top: 8px; padding-bottom: 8px; }
+  .ds-app .ds-hstep { padding-top: 5px; padding-bottom: 5px; }
+  .ds-app .ds-footer { min-height: 0; }
+  .ds-app .ds-main-scroll {
+    padding-top: clamp(12px, 1.4vw, 20px);
+    padding-bottom: clamp(12px, 1.2vw, 18px);
+  }
+  .ds-app .ds-step-header { margin-bottom: 12px; }
+  .ds-app .card-pad { padding: 18px 20px; }
+  .ds-app .ds-stagenote-bar { padding-top: 8px; padding-bottom: 8px; }
+}
+/* Heavier zoom / shorter height: smaller step nodes + tighter header. */
+@media (max-height: 760px) {
+  .ds-app .ds-hstep-node { width: 24px; height: 24px; }
+  .ds-app .ds-step-header { margin-bottom: 8px; }
+  /* Vertical Session Steps (live sidebar): drop the per-step SUB caption and
+     tighten padding so all six steps stack in far less height. This is what keeps
+     the steps fully visible (no sidebar scroll needed) once the window is short
+     from zoom — the identity above keeps its natural height, and the compacted
+     steps fit in what's left. */
+  .ds-app .ds-vstep-sub { display: none; }
+  .ds-app .ds-vstep { padding-top: clamp(5px, 0.6vh, 9px); padding-bottom: clamp(5px, 0.6vh, 9px); }
+  .ds-app .ds-side-steps { gap: 2px; }
+}
+/* When ALSO width-limited, collapse the stepper to one row (only the active step
+   keeps its label) so 7 pills never wrap and steal content height. On a wide but
+   short screen the labels stay — the pills fit one row anyway. */
+@media (max-height: 760px) and (max-width: 1180px) {
+  .ds-app .ds-hstep:not(.active) .ds-hstep-label { display: none; }
+}
+/* ---- Very short viewport (high zoom, ~150%+ ≈ ≤560px tall) --------------------
+   Aggressively trim the fixed chrome (topbar, stage-note, step header, footer,
+   scroll padding) so the CONTENT column keeps as much height as possible while
+   the app stays pinned. The stage-note clamps to a single line here. */
+@media (max-height: 560px) {
+  /* Compact the status/actions top bar to a SINGLE row: drop the pill's
+     second line, shrink its icon, and tighten the buttons + bar padding so the
+     whole bar is as short as possible and the content column keeps the height. */
+  .ds-app .ds-topbar2 { padding-top: clamp(3px, 0.5vh, 7px); padding-bottom: clamp(3px, 0.5vh, 7px); gap: 8px 12px; }
+  .ds-app .ds-topbar2 .ds-waiting-sub { display: none; }
+  .ds-app .ds-topbar2 .ds-waiting--compact { padding: 4px 10px; gap: 7px; }
+  .ds-app .ds-topbar2 .ds-waiting-icon { width: 24px; height: 24px; }
+  .ds-app .ds-topbar2 .ds-waiting-icon .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+  .ds-app .ds-topbar2 .ds-waiting-title { font-size: 13px; line-height: 1.15; }
+  .ds-app .ds-topbar2 .btn { padding-top: 5px; padding-bottom: 5px; }
+
+  .ds-app .ds-stagenote { padding: 5px 12px; }
+  /* Higher specificity so this beats the base 2-line clamp defined later in the file. */
+  .ds-app.dyn-studio-v2-app .ds-stagenote__text.is-clamped { -webkit-line-clamp: 1; }
+  .ds-app .ds-step-header { margin-bottom: 4px; }
+  .ds-app .ds-eyebrow { font-size: 12px; }
+  .ds-app .ds-main-scroll { padding-top: 10px; padding-bottom: 12px; }
+  .ds-app .ds-footer { height: clamp(34px, 4vh, 44px); min-height: 0; }
+}
+
+/* ---- Phone / extreme fallback ---------------------------------------------
+   Only for genuinely small viewports (phones, or an extremely short window) do
+   we UN-PIN the shell into normal document flow so the host page scrolls. Above
+   this — tablets and zoomed laptops (incl. ~175% zoom ≈ 460px tall) — we stay
+   pinned + compact/two-column (above) so the content keeps the height. Only very
+   short windows (≤380px) un-pin. Keep in sync with the scroll-lock override in
+   src/styles.css.
+   NOTE: width cutoff is 459px (NOT 640) so it doesn't overlap the ≥460px
+   two-column block above — a tablet at 175% (~585×440) must stay PINNED
+   two-column, not un-pin (which would let the sidebar grow and clip the steps). */
+@media (max-width: 459px), (max-height: 380px) {
+  .ds-app.dyn-studio-v2-app {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    z-index: auto;
+    /* Let every row size to its content instead of forcing main into 1fr
+       (stacked order: topbar, sidebar, main, footer). */
+    grid-template-rows: auto auto auto auto;
+  }
+  .ds-app.dyn-studio-v2-app .ds-main { overflow: visible; }
+  .ds-app.dyn-studio-v2-app .ds-main-scroll { overflow: visible; flex: 0 0 auto; }
+  /* Footer flows at the end of the content rather than being pinned. */
+  .ds-app.dyn-studio-v2-app .ds-footer { position: static; }
+}
+
+/* Phone: the topbar's status pill + action buttons ("Invite More", "Send back
+   to Waiting Again", "Move Next Stage") need room. Stack the two groups and let
+   each button grow to a comfortable tap target instead of squeezing onto one
+   cramped row. Width-only (not height) so short landscape keeps the compact row. */
+@media (max-width: 640px) {
+  .ds-app .ds-topbar2 { padding: 10px 14px; gap: 10px; }
+  .ds-app .ds-topbar2__left,
+  .ds-app .ds-topbar2__right { flex: 1 1 100%; }
+  .ds-app .ds-topbar2__right { justify-content: flex-start; }
+  .ds-app .ds-topbar2__right .btn,
+  .ds-app .ds-topbar2 .ds-menu-anchor,
+  .ds-app .ds-topbar2 .ds-menu-anchor .btn { flex: 1 1 auto; justify-content: center; }
+  /* Footer: auto-height + tight padding so it hugs the Back/Step/Next row with
+     no leftover vertical whitespace (the fixed 46px + 12px vpad looked padded on
+     phones, esp. once un-pinned where the footer flows in normal document order). */
+  .ds-app .ds-footer { height: auto; min-height: 0; padding: 8px 16px; }
+}
+
 /* ============================================================== MAIN */
 .ds-app .ds-main {
   grid-area: main;
@@ -766,8 +1541,11 @@
 
 /* ============================================================== FOOTER */
 .ds-app .ds-footer {
+  grid-area: footer;
   flex-shrink: 0;
-  min-height: var(--footer-h);
+  /* Fixed, shorter footer. */
+  min-height: 46px;
+  height: 46px;
   background: rgba(255,255,255,.72);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
@@ -775,9 +1553,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: clamp(10px, 1vw + 4px, 16px) 20px clamp(10px, 1vw + 4px, 16px) clamp(16px, 2vw + 6px, 40px);
+  padding: 0 24px;
   gap: 12px;
 }
+.ds-app .ds-footer .btn { padding-top: 6px; padding-bottom: 6px; }
 .ds-app .ds-footer-center {
   font-size: clamp(12px, 0.4vw + 8px, 14px);
   font-weight: 700;
@@ -1209,6 +1988,22 @@
   line-height: 1.5;
   flex: 1;
 }
+/* Icon sits NEXT TO the title + description (horizontal header) instead of on
+   its own line above them. */
+.ds-app .choice-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.ds-app .choice-head .choice-ic { margin-bottom: 0; flex-shrink: 0; }
+.ds-app .choice-headtext { min-width: 0; flex: 1; }
+.ds-app .choice-head .choice-desc { margin: 6px 0 0; flex: initial; }
+/* "Need a fresh link?" regenerate row — now lives INSIDE the meeting card,
+   separated from the Start Meeting button by a divider. */
+.ds-app .zoom-regen {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.ds-app .zoom-regen__text { min-width: 0; }
+.ds-app .zoom-regen .choice-title { font-size: 14px; }
+.ds-app .zoom-regen .choice-desc { margin: 3px 0 0; flex: initial; font-size: 12.5px; }
 .ds-app .choice-alert {
   display: flex;
   align-items: center;
@@ -1242,6 +2037,48 @@
   margin: 0 0 22px;
   line-height: 1.5;
 }
+/* Read-only per-area AEL display on the AEL Validation step (legacy parity). */
+.ds-app .ael-areas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ds-app .ael-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.ds-app .ael-area__num {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.ds-app .ael-area__name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ds-app .ael-area__level {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
 .ds-app .ael-form { display: flex; flex-direction: column; gap: 22px; }
 .ds-app .ael-field { display: flex; flex-direction: column; gap: 10px; }
 .ds-app .ael-label {
@@ -1329,6 +2166,20 @@
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
+/* Recording reminder (mockup .record-note) — amber inline note. */
+.ds-app .zoom-record-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: var(--r-md);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ds-app .zoom-record-note .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--red); }
 .ds-app .zoom-link-hint {
   display: flex;
   align-items: center;
@@ -2422,8 +3273,8 @@
   min-width: 200px;
   transition: all .2s ease;
 }
-.queue-card:hover { border-color: #1E5663; }
-.queue-card--active { border-color: #1E5663; background: #E2EEEF; }
+.queue-card:hover { border-color: #9A258F; }
+.queue-card--active { border-color: #9A258F; background: #F8EAF6; }
 .queue-card__name { font-weight: 800; color: #1A2332; }
 .queue-card__meta { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #566072; }
 .queue-card__icon, .queue-card__chevron { color: #8A93A3; }
@@ -2442,24 +3293,69 @@
   margin-bottom: 8px;
 }
 .sec__head-count {
-  background: #E2EEEF;
-  color: #143F49;
+  background: #F8EAF6;
+  color: #7C1D73;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
 }
-.primarystudio { background: #E2EEEF !important; color: #143F49 !important; font-weight: 700; }
+.primarystudio { background: #F8EAF6 !important; color: #7C1D73 !important; font-weight: 700; }
 .secondarystudio { background: #FCF3E0 !important; color: #B45309 !important; font-weight: 700; }
 
-.stagename {
-  font-weight: 800;
-  color: #1A2332;
-  background: #F8FAFC;
-  padding: 10px 14px;
-  border-bottom: 1px solid #E2E7EF;
+/* Stage group → mockup .group-card (rounded, soft shadow) + .group-head. */
+.mainscreen [data-testid="studio-stage-col"] > .mat-elevation-z2 {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06) !important;
 }
-.stagequeue { padding: 8px 12px; }
+.stagename {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #6B7280;
+  background: #fff;
+  padding: 14px 18px;
+  border-bottom: 1px solid #E5E7EB;
+}
+.stagequeue { padding: 12px; }
+
+/* Empty state — shown when a stage (or the whole waiting list) has no one waiting. */
+.wait-empty {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 22px 16px; color: #9CA3AF; font-weight: 600; font-size: 13.5px;
+  font-family: 'Manrope', system-ui, sans-serif; text-align: center;
+}
+.wait-empty .ic, .wait-empty mat-icon { font-size: 18px; width: 18px; height: 18px; color: #C4C9D4; }
+.wait-empty--all {
+  background: #fff; border-radius: 16px; margin-top: 6px; padding: 44px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+}
+
+/* Waiting-list stage columns — the only `.row` inside .mainscreen (line ~159 of
+   the template). Bootstrap's `.col-sm` keeps every stage on ONE row until 576px.
+   Use `auto-fit` with a 1/3-width floor so the stages FILL the row: 1 stage →
+   full width, 2 → half each, 3 → thirds, MAX 3 per row (4+ wrap). Wider cards
+   also give each waiting participant's name room to show instead of clipping.
+   `max(300px, …)` drops to fewer columns on narrow screens. */
+.mainscreen > div > .row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(300px, calc((100% - 32px) / 3)), 1fr));
+  gap: 16px;
+  margin: 0;
+}
+.mainscreen [data-testid="studio-stage-col"].col-sm {
+  flex: initial;
+  max-width: none;
+  padding: 0;
+  /* Make each stage column a query container so the waiting-participant cards
+     can respond to the COLUMN's width (not the viewport). This is what fixes the
+     overlap when zoomed in / on narrow columns: the viewport can still be wide
+     while a 1/3-width column is narrow. */
+  container-type: inline-size;
+}
 .token {
   background: #fff;
   border: 1px solid #E2E7EF;
@@ -2483,6 +3379,7 @@
    .ds-app shell (the waiting list shows when liveAssignment is null). */
 .wait-token {
   display: flex;
+  flex-wrap: wrap;            /* wrap instead of overflowing/overlapping when narrow */
   align-items: center;
   gap: 14px;
   background: #FFFFFF;
@@ -2506,8 +3403,8 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #E2EEEF;
-  color: #143F49;
+  background: #F3DEEF;
+  color: #7C1D73;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2515,7 +3412,7 @@
   font-size: 14px;
   overflow: hidden;
   flex-shrink: 0;
-  border: 1px solid #BFD8DC;
+  border: 1px solid #E9C9E4;
 }
 .wait-token__avatar img {
   width: 100%;
@@ -2531,14 +3428,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Mockup .badge-pre — amber "Preassigned" pill. */
 .wait-token__preassigned {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
+  gap: 3px;
+  font-size: 10.5px;
   font-weight: 700;
-  font-style: italic;
-  color: #143F49;
+  color: #B45309;
+  background: #FEF3C7;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: fit-content;
 }
 .wait-token__preassigned .ic { font-size: 13px; width: 13px; height: 13px; line-height: 13px; }
 .wait-token__meta {
@@ -2550,9 +3451,9 @@
 .wait-token__token {
   font-size: 13px;
   font-weight: 800;
-  color: #143F49;
-  background: #E2EEEF;
-  border: 1px solid #BFD8DC;
+  color: #7C1D73;
+  background: #F8EAF6;
+  border: 1px solid #E9C9E4;
   padding: 4px 10px;
   border-radius: 999px;
 }
@@ -2577,18 +3478,18 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #1E5663;
+  background: #9A258F;
   color: #FFFFFF;
   border: none;
   padding: 9px 16px;
-  border-radius: 9px;
+  border-radius: 10px;
   font-weight: 700;
   font-size: 13.5px;
   cursor: pointer;
   transition: background .2s ease, transform .2s ease;
   font-family: inherit;
 }
-.wait-token__btn:hover { background: #143F49; }
+.wait-token__btn:hover { background: #7C1D73; }
 .wait-token__btn .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
 /* Approved invite — green so it reads as "ready to assign", not a fresh invite. */
 .wait-token__btn--approved { background: #15803D; }
@@ -2620,9 +3521,9 @@
 }
 /* This studio's own pending invite — blue "awaiting response" with a Cancel. */
 .wait-token__chip--self {
-  background: #E8F1F4;
-  color: #176B7E;
-  border-color: #BBD9E1;
+  background: #F8EAF6;
+  color: #7C1D73;
+  border-color: #E9C9E4;
 }
 .wait-token__chip-cancel {
   display: inline-flex;
@@ -2639,13 +3540,29 @@
   cursor: pointer;
   opacity: .7;
 }
-.wait-token__chip-cancel:hover { opacity: 1; background: rgba(23,107,126,.14); }
+.wait-token__chip-cancel:hover { opacity: 1; background: rgba(124,58,237,.14); }
 .wait-token__chip-cancel .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
 
-@media (max-width: 720px) {
-  .wait-token { flex-wrap: wrap; gap: 10px; }
-  .wait-token__meta { order: 3; flex: 1 0 100%; }
-  .wait-token__cta { order: 2; margin-left: auto; }
+/* Narrow COLUMN (zoomed in, or 3 columns on a smaller screen): stack the token's
+   sections so the name, status and CTA never overlap. Container-based so it
+   responds to the column width, not the viewport (the viewport can be wide while
+   a 1/3-width column is narrow). Graceful fallback: `.wait-token` already has
+   `flex-wrap: wrap`, so browsers without @container support still wrap. */
+@container (max-width: 420px) {
+  .wait-token { gap: 10px; }
+  .wait-token__id { flex: 1 1 100%; }        /* avatar + name on their own row */
+  .wait-token__cta { order: 3; margin-left: auto; } /* CTA pushed to the right */
+}
+@container (max-width: 300px) {
+  /* Very tight: give the CTA its own full-width row so the button can't collide
+     with the status pill. */
+  .wait-token__cta { flex: 1 1 100%; margin-left: 0; }
+  .wait-token__cta .wait-token__btn,
+  .wait-token__cta .wait-token__chip {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
 }
 
 .chat-container {
@@ -2724,20 +3641,9 @@
   .ds-app .ds-side-profile { padding: 12px 14px 10px; }
 }
 
-@media (max-width: 900px) {
-  .ds-app {
-    grid-template-columns: 1fr;
-    grid-template-rows: var(--topbar-h) auto 1fr;
-    grid-template-areas:
-      "topbar"
-      "sidebar"
-      "main";
-    height: auto;
-    overflow: visible;
-  }
-  .ds-app .ds-sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
-  .ds-app .ds-stepscroll { max-height: 380px; }
-}
+/* (Old ≤900px stacking removed — the new `@media (max-width: 1024px)` above
+   governs stacking for the sidebar/topbar/main/footer layout; un-pinning is
+   handled by the ≤640px / ≤460h fallback.) */
 
 /* ============================================================== ZOOM STACK (Step 4) */
 /* Vertical stack so In-house / Zoom card sits at the top and "Generate New
@@ -3254,4 +4160,301 @@
   height: 15px;
   line-height: 15px;
   color: var(--ink-4);
+}
+
+/* ============================================================== AEL SLIDER MODAL (mockup) */
+.ds-app .ael-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 17, 21, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  padding: 16px;
+}
+.ds-app .ael-modal {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.ds-app .ael-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ds-app .ael-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.ds-app .ael-modal__title .ic { color: var(--primary); }
+.ds-app .ael-modal__x {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-app .ael-modal__x:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .ael-modal__body { padding: 20px; overflow-y: auto; }
+.ds-app .ael-modal__sub {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.ds-app .ael-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.ds-app .ael-slider-row__area {
+  width: 92px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-app .ael-slider-row__range {
+  flex: 1;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.ds-app .ael-slider-row__val {
+  width: 62px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-ink);
+}
+.ds-app .ael-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================== MOVE-TO-NEXT-STAGE DROPDOWN (mockup) */
+.ds-app .ds-menu-anchor { position: relative; display: inline-flex; }
+.ds-app .ds-menu-anchor .btn.is-open { box-shadow: 0 6px 16px -6px rgba(124, 58, 237, .55); }
+.ds-app .ds-nextmenu-backdrop { position: fixed; inset: 0; z-index: 55; background: rgba(15, 18, 22, .38); }
+.ds-app .ds-nextmenu {
+  position: absolute;
+  right: 0;
+  min-width: 288px;
+  max-width: min(360px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  z-index: 60;
+}
+.ds-app .ds-nextmenu--down { top: 100%; margin-top: 8px; }
+.ds-app .ds-nextmenu--up { bottom: 100%; margin-bottom: 8px; }
+/* Centered-on-screen variant (modal-like) — used by the Move Next Stage menu so
+   the dropdown appears in the middle of the viewport, not cramped by the button. */
+.ds-app .ds-nextmenu--center {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  width: min(400px, 92vw);
+  max-width: 92vw;
+  padding: 12px;
+  border-radius: var(--r-lg);
+  animation: dsNextmenuIn .16s var(--ease);
+}
+@keyframes dsNextmenuIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+/* The footer has a backdrop-filter, which makes it a *containing block* for
+   position:fixed descendants — that anchored the centered "Choose next stage"
+   overlay to the footer (bottom of screen) instead of the viewport. While the
+   overlay is open, drop the footer's filter so the .ds-nextmenu--center child
+   resolves against the viewport and truly centers. The full-screen dark
+   .ds-nextmenu-backdrop covers the footer meanwhile, so losing the frost for
+   that moment is invisible. (The header's Move Next Stage already centers — its
+   .ds-topbar2 has no backdrop-filter.) */
+.ds-app .ds-footer:has(.ds-nextmenu--center) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.ds-app .ds-nextmenu__head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 6px 10px 8px;
+}
+.ds-app .ds-nextmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: background .15s var(--ease);
+}
+.ds-app .ds-nextmenu__item + .ds-nextmenu__item { margin-top: 2px; }
+.ds-app .ds-nextmenu__item:hover:not(:disabled) { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-nextmenu__item:disabled { opacity: .55; cursor: default; }
+.ds-app .ds-nextmenu__item .ic { color: var(--primary); flex-shrink: 0; }
+.ds-app .ds-nextmenu__item--go .ic { color: var(--green-bright); }
+.ds-app .ds-nextmenu__item--go:hover:not(:disabled) { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-nextmenu__item--go:hover:not(:disabled) .ic { color: var(--green); }
+
+/* ============================================================== LOBBY: STUDIO GRID (mockup) */
+.ds-lobby-head { margin-bottom: 24px; }
+.ds-lobby-title { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; color: #0D0F12; margin: 0; }
+.ds-lobby-sub { font-size: 13px; color: #6B7280; margin-top: 4px; }
+
+/* min(100%, 300px) so a single card never exceeds the viewport on a narrow
+   phone (a fixed 320px min would force horizontal scroll under ~360px). */
+/* MAX 3 cards per row: auto-fit + a 1/3-width floor. 1 card → full width,
+   2 → half each, 3 → thirds, 4+ wrap. `max(300px, …)` drops to fewer columns on
+   narrow screens so a single card never forces horizontal scroll on a phone. */
+.studio-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(max(300px, calc((100% - 28px) / 3)), 1fr)); }
+.studio-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 18px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.studio-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
+.studio-top { display: flex; align-items: center; gap: 11px; }
+.studio-icon {
+  width: 40px; height: 40px; border-radius: 11px;
+  background: #F3DEEF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.studio-icon mat-icon { font-size: 20px; width: 20px; height: 20px; color: #7C1D73; }
+.studio-name { font-size: 14.5px; font-weight: 800; color: #0D0F12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-queue { font-size: 12px; color: #6B7280; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-specialists { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #4B5563; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-specialists mat-icon { font-size: 14px; width: 14px; height: 14px; line-height: 14px; color: #9CA3AF; flex-shrink: 0; }
+.studio-live { color: #16A34A; font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+.studio-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; border-top: 1px solid #F3F4F6; padding-top: 11px; }
+.studio-spec { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; min-width: 0; }
+.studio-spec mat-icon { font-size: 15px; width: 15px; height: 15px; flex-shrink: 0; }
+.studio-spec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-open { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700; color: #9A258F; flex-shrink: 0; }
+.studio-open mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+/* ---- LIST screen (after picking a studio) ---- */
+/* Clear, tappable pill button (was a tiny grey text link that was easy to miss).
+   Pre-live view isn't inside .ds-app, so colours are hard-coded (no CSS vars). */
+.ds-back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #7C1D73; font-size: 14px; font-weight: 700;
+  background: #F8EAF6; border: 1px solid #E9C9E4;
+  border-radius: 999px; padding: 9px 18px 9px 13px; margin-bottom: 18px;
+  cursor: pointer; transition: background .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.ds-back-link:hover { background: #E9E0FF; box-shadow: 0 4px 12px -4px rgba(124, 58, 237, .35); }
+.ds-back-link:active { transform: translateY(1px); }
+.ds-back-link mat-icon { font-size: 20px; width: 20px; height: 20px; }
+.ds-list-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.ds-list-title { font-size: 20px; font-weight: 800; color: #0D0F12; margin: 0; }
+.ds-list-sub { font-size: 13px; color: #6B7280; margin-top: 2px; }
+
+.checkin-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 18px 20px; margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.checkin-card__title { font-size: 14px; font-weight: 700; color: #0D0F12; }
+.checkin-card__sub { font-size: 12.5px; color: #6B7280; margin-top: 3px; }
+
+.empty-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 48px 32px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+}
+.empty-card__ic {
+  width: 60px; height: 60px; border-radius: 18px; background: #F3F4F6;
+  display: flex; align-items: center; justify-content: center;
+}
+.empty-card__ic mat-icon { font-size: 26px; width: 26px; height: 26px; color: #9CA3AF; }
+.empty-card__t { font-size: 15px; font-weight: 700; color: #0D0F12; }
+.empty-card__b { font-size: 12.5px; color: #6B7280; max-width: 400px; line-height: 1.6; }
+
+/* Lobby studio card — "checked in" indicator (so you can see, from outside,
+   which studio you're currently checked into). */
+.studio-card--in { border: 1.5px solid #BBF7D0; box-shadow: 0 1px 3px rgba(22,163,74,0.12), 0 4px 16px rgba(22,163,74,0.10); }
+.studio-badge {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  font-size: 11px; font-weight: 800; letter-spacing: .01em;
+  padding: 4px 10px; border-radius: 999px;
+}
+.studio-badge--in { color: #15803D; background: #DCFCE7; }
+.studio-badge__dot { width: 7px; height: 7px; border-radius: 999px; background: #16A34A; }
+
+/* ============================================================== PRE-LIVE RESPONSIVE
+   The lobby / studio-list / waiting-list screens (rendered OUTSIDE the fixed
+   .ds-app grid) had no dedicated breakpoints. Tighten padding and collapse to a
+   single column on phones so nothing overflows or gets cramped. */
+
+/* Tablet & down: cap at 2 per row (1 → full, 2 → half) so cards keep enough
+   width for names; 3-up gets too cramped below ~900px. */
+@media (max-width: 900px) {
+  .mainscreen > div > .row {
+    grid-template-columns: repeat(auto-fit, minmax(max(260px, calc((100% - 12px) / 2)), 1fr));
+    gap: 12px;
+  }
+}
+
+/* Phone: single column everywhere, tighter chrome, wrap the check-in row so the
+   toggle never gets pushed off-screen. */
+@media (max-width: 640px) {
+  .mainscreen { padding: 12px 14px; }
+  .ds-lobby-head { margin-bottom: 18px; }
+  .ds-lobby-title { font-size: 19px; }
+  .studio-grid { gap: 12px; }
+  .mainscreen > div > .row { grid-template-columns: 1fr; }
+  .checkin-card {
+    flex-wrap: wrap;
+    padding: 16px;
+    gap: 12px;
+  }
+  .empty-card { padding: 32px 20px; }
+  .ds-list-head { gap: 10px; margin-bottom: 16px; }
+  .ds-list-title { font-size: 18px; }
+  /* Invited-studio buttons: let them stack full width instead of dangling. */
+  .otherstudio .mat-mdc-outlined-button { width: 100%; margin-right: 0 !important; margin-bottom: 8px; }
 }
