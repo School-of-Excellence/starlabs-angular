@@ -1,6 +1,6 @@
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
-import { Component, Inject, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, Inject, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { collection, deleteDoc, doc, Firestore, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormControl, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
@@ -27,6 +27,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthguardService } from '../../authguard.service';
+import { ManageCohertsComponent } from '../../big/manage-coherts/manage-coherts.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
@@ -58,13 +59,24 @@ import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/pr
 })
 export class QueueCreationV3Component {
 
-
+  @ViewChild('cohortCreateModel') cohortCreateModel : TemplateRef<ElementRef>;
   @ViewChild('stepper') stepper: MatStepper;
+  // Events
+  filterEvent: string = '';
+  eventList: any[] = [];
+  participantlist : any = [];
+  cohortCreateModelRef : any = null;
   editingVariation: boolean[] = [];
+  mapMarathon = {}
+  participantTagsList = [];
+  loggedInProfile : any
+  queueList : any = [];
+  cohortCreateModelData : any = null
   latestAddedIndex: number | null = null;
   showAddVariationForm: boolean = false
   currentStageIndex: number = 0
-  queueform: FormGroup
+  queueform: FormGroup;
+  queueId : string | null= null
   selectable = true;
   removable = true;
   addOnBlur = true;
@@ -101,6 +113,9 @@ export class QueueCreationV3Component {
     { value: "loveletters", name: "Love Letters" },
     { value: "evolutionwishlist", name: "Evolution Wishlist" }
   ]
+
+  cohortsToCreate : any = null;
+  mapEvents = {}
 
   //big activity
   bigactivity = []
@@ -148,9 +163,50 @@ export class QueueCreationV3Component {
       totalcapacity: [null, { validators: [Validators.required], updateOn: "change" }],
       description: [null, { validators: [Validators.required], updateOn: "change" }],
       introdescription: [null, { validators: [Validators.required], updateOn: "change" }],
-      products: this.formbuilder.array([])
+      products: this.formbuilder.array([]),
+      eventid : [null, { validators: [Validators.required], updateOn: "change" }]
     });
 
+    this.authguard.username().then((e) => this.loggedInProfile = e)
+
+    getDocs(query(collection(this.firestore, 'event collection'), orderBy('end_date', 'desc'))).then(event => {
+      for (let i = 0; i < event.docs.length; i++) {
+        const element = event.docs[i].data();
+        element['ref'] = event.docs[i].ref
+        element['docid'] = event.docs[i].id;
+        console.log('event is maping')
+        this.mapEvents[element['docid']] = element;
+        this.eventList.push(element)
+      }
+    });
+
+    getDocs(query(collection(this.firestore, "big marathon"), orderBy("startdate", "asc"))).then(snap => {
+      for (let i = 0; i < snap.docs.length; i++) {
+        const element: any = snap.docs[i].data();
+        element['ref'] = snap.docs[i].ref
+        this.mapMarathon[element['docid']] = element
+      }
+    })
+
+    getDocs(query(collection(this.firestore, 'participant metadata'),orderBy('name','asc'))).then((participants) => {
+      let participantsList = participants.docs.map(e => e.data())
+      // let list = participants.docs.forEach((e)=>this.mapParticipantMetaData[e.id] = e.data())
+      this.participantlist = participantsList;
+    }) 
+
+    getDocs(collection(this.firestore, "participant tags")).then(snap => {
+      this.participantTagsList = snap.docs.map(e => {
+        const data: any = e.data();
+        return { id: e.id, ...data };
+      });
+    });
+
+    getDocs(collection(this.firestore, "queue generation")).then(snap => {
+      this.queueList = snap.docs.map(e => {
+        const data: any = e.data();
+        return { id: e.id, ...data };
+      });
+    });
 
     if (data != null) {
       console.log(data);
@@ -177,6 +233,7 @@ export class QueueCreationV3Component {
         totalcapacity: data.totalcapacity ?? null,
         description: data.description ?? null,
         introdescription : data.introdescription ?? null,
+        eventid : [null , undefined, ''].includes(data.eventid) || Array.isArray(data.eventid) ? data.eventid : [data.eventid]
       });
 
       // Get EVent Arena
@@ -920,6 +977,7 @@ addNextStage(mainIndex: number) {
           stages: value.stages,
           packageeligibility: value.packageeligibility,
           queuewelcomemessage,
+          eventid : value.eventid ?? [],
           // isahrequired : value.isahrequired,
           // ahperson : value.ahperson,
           // ischangeworkreq: value.ischangeworkreq,
@@ -1156,12 +1214,16 @@ addNextStage(mainIndex: number) {
         }
         */
 
-        batch.commit().catch(err =>{
+        batch.commit().then((queue)=>{
+          this.queueId = metadata['docid']
+          this.checkForCohortsToCreate();
+        }).catch(err =>{
           console.log(err)
+          this.dialogRef.close();
           alert(err)
         })
         
-        this.dialogRef.close()
+        // this.dialogRef.close()
         loadingref.close()
       } else {
         alert("No Delivery Queue Assigned to the product")
@@ -1341,5 +1403,134 @@ addNextStage(mainIndex: number) {
       control.setValue(allDocids);
     }
   }
+  
+  filterEvents() {
+    return this.eventList.filter(e => e["name"].toLowerCase().includes(this.filterEvent.toLowerCase()))
+  }
+
+  getAllActivitiesFromStages(){
+    const activities = new Set();
+    const activitiesFormStgaes = this.stagePropertyArray.value;
+    activitiesFormStgaes.forEach((stage)=>{
+      const compulsoryactivity = (stage['compulsoryactivity'] ?? []).flatMap((act)=>act);
+      compulsoryactivity.filter((act)=>![null , undefined , ''].includes(act)).forEach((act)=>activities.add(act))
+    });
+    return Array.from(activities.values());
+  }
+
+  async checkForCohortsToCreate(){
+    const events = this.queueform.value.eventid ?? [];
+    const activities = this.getAllActivitiesFromStages() ?? [];
+    const eventsMap = {};
+    // const eventActivitMap = {};
+
+    events.forEach((eventId)=>{
+      eventsMap[eventId] = {}
+      activities.forEach((act)=>{
+        eventsMap[eventId][act] = false;
+      })
+    })    
+
+    if(this.data !== null && this.data.docid  ){
+      const queueId = doc(this.firestore , 'queue generation' , this.data.docid);
+      const q = query(collection(this.firestore , 'big cohorts') , where('queueref' , '==' ,queueId ));
+      const cohortSnap = await getDocs(q);
+      const eventActMap = {};
+      // const existCohortActivities = cohortSnap.docs.map((doc)=>{
+      //   const cohort = doc.data();
+      //   return cohort['bigactivity'];
+      // });
+
+      // const noCohortsActivities = activities.filter((act)=>!existCohortActivities.includes(act));
+
+
+      cohortSnap.docs.forEach((doc)=>{
+        const cohort = doc.data();
+        const eventId = cohort['eventref']?.id;
+        const bigactivity = cohort['bigactivity'];
+        eventActMap[eventId] = eventActMap[eventId] ?? [];
+        eventActMap[eventId].push(bigactivity);
+      })
+      events.forEach((eventId) => {
+        eventsMap[eventId] = {};
+        const actInEvent = eventActMap[eventId] ?? [];
+        activities.forEach((act) => {
+          if(actInEvent.includes(act)) return
+          eventsMap[eventId][act] = false;
+        });
+      });  
+    }
+    
+
+    const openModel = Object.values(eventsMap).map((obj)=>Object.keys(obj)).flatMap((act)=>act).length > 0
+    if(openModel){
+      this.cohortCreateModelData = eventsMap
+      this.cohortCreateModelRef = this.dialog.open(this.cohortCreateModel , {
+        maxWidth: '95vw',
+        maxHeight: '90vh',
+        data : eventsMap
+      });
+    } else {
+      this.dialogRef.close();
+    }
+  }
+
+  closeCohortModel(data : boolean = false){
+    if (this.cohortCreateModelRef) {
+      this.cohortCreateModelData = null;
+      this.cohortCreateModelRef.close(data);
+      this.dialogRef.close();
+    }
+  }
+
+  openCohortDialog(event : any , activity : any) {
+    const marathon = this.mapEvents[event]['bigmarathonref']?.id ?? null
+    if(!marathon) {
+      alert(`no marathon for the clicked event ${this.mapEvents[event].name}`);
+      return
+    }
+      const dialogRef = this.dialog.open(ManageCohertsComponent, {
+        width: '560px',
+        maxWidth: '95vw',
+        maxHeight: '90vh',
+        panelClass: 'cohort-dialog-container',
+        data: {
+          type: 'new',
+          doc: null,
+          cohortname : this.mapBigActivity[activity] ?? '',
+          selectedEvent : doc(this.firestore , 'event collection' ,event),
+          cohortType : 'event',
+          selectedQueue : this.queueId ?? null,
+          selectedMarathon: marathon ? this.mapMarathon[marathon]: marathon,
+          selectedParticipants: [],
+          totalParticipants: this.participantlist || [],
+          eventCollectionList: this.eventList.filter(e => e['bigmarathonref']?.id === marathon),
+          mapEventCollection: this.mapEvents,
+          participantTagsList: this.participantTagsList,
+          queueList : this.queueList,
+          loggedInProfile: this.loggedInProfile,
+          bigactivity : activity
+        },
+        disableClose: false
+      });
+  
+      dialogRef.afterClosed().subscribe((result) => {
+        if (result) {
+          const eventId = result['eventref']?.id
+          this.cohortCreateModelData[eventId][result['bigactivity'] ?? ''] = true 
+        }
+      });
+    }
+
+    textToShowInModel(){
+      if(this.cohortCreateModelData){
+        const values = Object.values(this.cohortCreateModelData).map(Object.values).flatMap((val)=>val).every((val)=>{
+          // console.log(val)
+          return val
+        });
+        return values
+      }
+      return false
+    }
 
 }

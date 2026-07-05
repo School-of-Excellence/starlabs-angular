@@ -151,7 +151,7 @@
 //   }
 // }
 import { Component, Inject } from '@angular/core';
-import { collection, Firestore, getDocs } from '@angular/fire/firestore';
+import { collection, doc, Firestore, getDocs, setDoc , query , where , limit  ,getDoc, serverTimestamp} from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { AuthguardService } from '../../../authguard.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -212,6 +212,7 @@ export class MapRecommendedplaylistToparticipantComponentComponent {
   filterRecommendedName: string = '';
   submitted = false;
   validationErrors: string[] = [];
+  playlistNameMap = {};
 
   constructor(
     private firestore: Firestore,
@@ -219,6 +220,7 @@ export class MapRecommendedplaylistToparticipantComponentComponent {
     public dialogRef: MatDialogRef<MapRecommendedplaylistToparticipantComponentComponent>,
     private auth: AuthguardService
   ) {
+    
     if (this.data) {
       this.bufferDoc.profileid = this.data.participantlist.map(e => e.profileid);
       this.auth.getRoles().then(e => this.bufferDoc.createdby = e['profile_ref'].id);
@@ -227,6 +229,7 @@ export class MapRecommendedplaylistToparticipantComponentComponent {
         this.eiflixSeries = snap.docs.map(e => {
           let element = e.data();
           element['ref'] = e.ref;
+          this.playlistNameMap[e.id] = element['seriesName'];
           return element;
         });
       });
@@ -235,6 +238,7 @@ export class MapRecommendedplaylistToparticipantComponentComponent {
         this.solarVoicePlaylist = snap.docs.map(e => {
           let element = e.data();
           element['ref'] = e.ref;
+          this.playlistNameMap[e.id] = element['name'];
           return element;
         });
       });
@@ -243,6 +247,7 @@ export class MapRecommendedplaylistToparticipantComponentComponent {
         this.generalContent = snap.docs.map(e => {
           let element = e.data();
           element['ref'] = e.ref;
+          this.playlistNameMap[e.id] = element['title'];
           return element;
         });
       });
@@ -289,27 +294,256 @@ export class MapRecommendedplaylistToparticipantComponentComponent {
     return errors;
   }
 
-  onSubmit() {
-    this.submitted = true;
-    this.validationErrors = this.validate();
+  // submit function to create bufferdoc and send communications
+  async onSubmit() {
+    try {
+      this.submitted = true;
+      this.validationErrors = this.validate();
+      const bufferMixDocData = { ...this.bufferDoc };
 
-    if (this.validationErrors.length > 0) {
-      return;
-    }
+      if (this.validationErrors.length > 0) {
+        return;
+      }
 
-    if (this.bufferDoc.expiredate) {
-      this.bufferDoc.expiredate = Timestamp.fromDate(this.bufferDoc.expiredate);
-    }
+      if (bufferMixDocData.expiredate) {
+        bufferMixDocData.expiredate = Timestamp.fromDate(
+          bufferMixDocData.expiredate,
+        );
+      }
 
-    if (!this.bufferDoc.personalised) {
-      delete this.bufferDoc.recommendedby;
-      this.dialogRef.close(this.bufferDoc);
-    } else {
-      let element = this.bufferDoc.recommendedby;
-      this.bufferDoc.recommendedby = element.profile_ref.id
-      this.bufferDoc['recommendedbyname'] = element.name;
-      this.dialogRef.close(this.bufferDoc);
+      if (!bufferMixDocData.personalised) {
+        delete bufferMixDocData.recommendedby;
+      } else {
+        let element = bufferMixDocData.recommendedby;
+        bufferMixDocData.recommendedby = element.profile_ref.id;
+        bufferMixDocData['recommendedbyname'] = element.name;
+      }
+
+      let docid = doc(collection(this.firestore, 'buffermix archive')).id;
+      bufferMixDocData['docid'] = docid;
+
+      // creating buffer doc
+      await setDoc(doc(this.firestore, 'buffermix archive', docid), this.bufferDoc);
+      console.log('Successfully buffer doc has been created');
+
+      const contentTypes = ['eiflix', 'solarvoice', 'generalcontent'];
+      const platform = [];
+      const playlist = [];
+      
+      contentTypes.forEach((type) => {
+        if (bufferMixDocData[type]?.length > 0) {
+          if (type === "eiflix") {
+            platform.push('EIFLIX');
+          } else if (type === "solarvoice") {
+            platform.push('Solar Voice')
+          } else if (type === "generalcontent") {
+            platform.push('General Content');
+          }
+
+            bufferMixDocData[type].forEach(async (docref) => {
+              if (docref) {
+                const playlistid = docref?.id ?? '';
+                playlist.push(this.playlistNameMap[playlistid] ?? "");
+              }
+            });
+          
+        }
+      });
+
+      // sending communications
+      await Promise.all([this.sendEmailMessageForPlaylist(platform , playlist , bufferMixDocData) , this.sendWatiMessage(platform , playlist , bufferMixDocData) , this.sendAppNotification(bufferMixDocData)]);
+      console.log('All communication have been send');
+      this.dialogRef.close();
+
+    } catch (error) {
+      console.error(error);
+      this.dialogRef.close();
     }
+  }
+
+  // function to send email messages to participants
+  async sendEmailMessageForPlaylist(platform : string[] , playlist : string[] , bufferDoc: any) {
+    const emailTemplateAlias = 'app_rec_v1';
+    let templateData = {};
+    const emailTo = [];
+    const emailMap = {};
+
+    this.data.participantlist.forEach((profile)=>{
+      if (![null , undefined , ''].includes(profile['email'])) {
+        emailTo.push(profile['email']);
+        emailMap[profile['email']] = profile?.profileid
+      }
+    });
+    const now = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    const stamp = `${p(now.getDate())}_${p(now.getMonth() + 1)}_${now.getFullYear()}_${p(now.getHours())}_${p(now.getMinutes())}`;
+    const broadcastname = bufferDoc?.profileid.length === 1
+      ? `Individual_${stamp}` : `Broadcast_${stamp}`;
+
+    var clientModal = {
+      _variableConfigs: {
+        name: 'analytics',
+        deeplink: 'static',
+        platform: 'static',
+        playlist: 'static',
+      },
+      name: 'name',
+      platform: platform?.join(', ') ?? '',
+      playlist: playlist.join(', ') ?? '',
+      deeplink: `https://breakthroughs.app/recommended/${bufferDoc['docid']}`,
+    };
+    await getDocs(query(collection(this.firestore, 'email templates'), where('templatealias', '==', emailTemplateAlias), limit(1))).then((templatedoc) => {
+      if (templatedoc.docs.length != 0) {
+        templateData = templatedoc.docs[0].data();
+        console.log('Email Template', templateData);
+
+        const docRef = doc(collection(this.firestore, 'email archive'))
+        const docid = docRef.id;
+
+        // email archive configurations
+        var map = {
+          docid: docid,
+          body: templateData['htmlbody'],
+          broadcastname: broadcastname,
+          createdby: 'automated',
+          datamodel: clientModal,
+          attachments: [],
+          postmarkAttachments: [],
+          date: new Date(),
+          emailid: emailTo,
+          emailmap: emailMap,
+          fileUrl: '',
+          from: 'fulfillment@antanoharini.com',
+          notes: '',
+          postmarktemplateid: "45282775",
+          profileid: bufferDoc["profileid"] ?? [],
+          sent: [],
+          status: 'send',
+          servername: templateData['servername'] || null,
+          subject: templateData['subject'],
+          templatedocid: templateData['docid'],
+          templateid: templateData['templateid'] || emailTemplateAlias || null,
+        }
+
+        setDoc(docRef, map, { merge: true }).then(() => {
+            console.log('Email Archieved Created Successfull')
+          }).catch(err => {
+            console.log('Error in create email archieve doc')
+            console.error(err);
+        })
+      } else {
+        console.error('NO Document Found in EMail Templates');
+      }
+    }).catch((error) => console.error(error))
+  }
+
+  // function to send wati messages to participants
+  async sendWatiMessage(platform : string[] , playlist : string[] , bufferDoc: any){
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const tag = `${pad(now.getDate())}_${pad(now.getMonth() + 1)}_${now.getFullYear()}_${pad(now.getHours())}_${pad(now.getMinutes())}`;
+    const broadcastname = this.bufferDoc.profileid.length === 1 ? `Individual_${tag}` : `Broadcast_${tag}`;
+    const docRef = doc(collection(this.firestore , 'wati archive'));
+
+    const numbers = [];
+    const numberMap = {};
+    const eventWatiServerId = '101723';
+    const watitemplateid = 'app_rec_v4'
+
+    this.data.participantlist.forEach((profile)=>{
+      if (![null , undefined , ''].includes(profile['phonenumber'])) {
+        numbers.push(profile['phonenumber']);
+        numberMap[profile['phonenumber']] = profile?.profileid
+      }
+    });
+
+    let waticontent = {
+      phonenumber: numbers,
+      body: {
+        parameters: [
+          { name: 'name' },
+          { name: 'platform', value: platform?.join(', ') ?? '' },
+          { name: 'playlist', value: playlist.join(', ') ?? '' },
+          { name: 'deeplink', value: `https://breakthroughs.app/recommended/${bufferDoc['docid']}` },
+        ],
+        broadcast_name: 'app_rec_v4',
+        template_name: 'app_rec_v4',
+      },
+    };
+
+    // parameter creation for wati communication
+    const parameterConfig = waticontent['body']['parameters'].map((param) => {
+      if (param.name === 'name') {
+        return {
+          excelColumn: null,
+          fillType: 'metadata',
+          metadataField: 'name',
+          name: param.name,
+          staticValue: null,
+        };
+      } else {
+        return {
+          excelColumn: null,
+          fillType: 'static',
+          metadataField: null,
+          name: param.name,
+          staticValue: param.value,
+        };
+      }
+    });
+
+
+    var map = {
+			docid: docRef.id,
+			body : null,
+			numbers: numbers,
+			createdby: null,
+			date: new Date(),
+			numbermap: numberMap,
+			broadcastname: broadcastname,
+			paramFillMode: 'static',
+			parameterConfig: parameterConfig,
+			params: [],
+			profileid: bufferDoc['profileid'] ?? [],
+			sentAt : new Date(),
+			serverid: eventWatiServerId,
+			serverurl: `https://live-mt-server.wati.io/${eventWatiServerId}`,
+			status: 'sent',
+			templateid: null,
+			templatevalidated: true,
+			validated: true,
+			watitemplateid: watitemplateid
+		};
+
+    await setDoc(docRef , map).then(()=>{
+      console.log('Trigger Wati Message');
+    }).catch((error)=>{
+      console.log('error in sending wati message');
+      console.error(error)
+    })
+  }
+
+  // function to send app notification messages to participants
+  async sendAppNotification(bufferDoc : any){
+    var docref = doc(collection(this.firestore , "notificationrecord"));
+    var notificationRecordData = {
+      title: bufferDoc['title'] ?? '',
+      message: 'A new playlist has been recommended for you on the Breakthroughs App',
+      subtitle: null,
+      date: serverTimestamp(),
+      notificationimage: null,
+      notificationtype: null,
+      landingpage: `https://breakthroughs.app/recommended/${bufferDoc['docid']}` ,
+      sticky: false,
+      logged: true,
+      profileid: bufferDoc['profileid'] ?? [],
+      success: false
+    }
+    await setDoc(docref, notificationRecordData).then(() =>{
+      console.log("Notification Record Saved");
+    }).catch(err =>{
+      console.log("Unable to store Notification Record", err)
+    })
   }
 
   onDialogCancel() {

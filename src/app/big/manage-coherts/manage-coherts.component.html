@@ -72,27 +72,40 @@
       <!-- Event Selection (only visible when type is 'event') -->
       <div class="form-group" *ngIf="isEventType()">
         <label class="form-label">Select Event <span class="required">*</span></label>
-        <mat-select formControlName="eventref" [compareWith]="compareFn" (selectionChange)="onChangeEvent()" class="form-select" placeholder="Choose an event">
+        <mat-select formControlName="eventref" [compareWith]="compareFn" (selectionChange)="onEventSelectionChange()" class="form-select" placeholder="Choose an event">
           <mat-option *ngFor="let event of data?.eventCollectionList" [value]="event.ref">
             {{event.name}}
           </mat-option>
         </mat-select>
         
         <!-- Approved Participants Count Display -->
-        <div class="invitation-info" *ngIf="bigInvitationCount > 0 || loadingInvitations">
+        <div class="invitation-info" *ngIf=" ![null , undefined , ''].includes(cohortsForm.controls['eventref']?.value) || loadingInvitations">
           <div class="invitation-loading" *ngIf="loadingInvitations">
             <mat-icon class="spin">sync</mat-icon>
-            <span>Fetching approved participants...</span>
+            <span>Fetching unassigned participants...</span>
           </div>
           <div class="invitation-count" *ngIf="!loadingInvitations && bigInvitationCount > 0">
             <mat-icon class="success-icon">check_circle</mat-icon>
-            <span><strong>{{bigInvitationCount}}</strong> approved participant(s) found for this event</span>
+            <span><strong>{{bigInvitationCount}}</strong> unassigned participant(s) found for this event</span>
           </div>
           <div class="invitation-count warning" *ngIf="!loadingInvitations && bigInvitationCount === 0 && cohortsForm.get('eventref')?.value">
             <mat-icon class="warning-icon">warning</mat-icon>
-            <span>No approved participants found for this event</span>
+            <span>No unassigned participants found for this event</span>
           </div>
         </div>
+      </div>
+
+      <!-- Queue selection -->
+      <div class="form-group" *ngIf="cohortsForm.controls['cohortCategory'].value == 'studio'">
+        <label class="form-label">Select Queue</label>
+        <mat-select formControlName="queueref" class="form-select" placeholder="Choose an queue">
+          <mat-option [value]="null">
+            None
+          </mat-option>
+          <mat-option *ngFor="let queue of queueList" [value]="queue.docid">
+            {{queue.queuename}}
+          </mat-option>
+        </mat-select>
       </div>
 
       <!-- Level Selection -->
@@ -465,9 +478,9 @@
             <mat-icon>history</mat-icon>
             <span>Existing: <strong>{{existingParticipantsNotInList.length}}</strong></span>
           </div>
-          <div class="summary-item invitation" *ngIf="bigInvitationCount > 0">
+          <div class="summary-item invitation" *ngIf="participantsApprovedForEvent.length > 0">
             <mat-icon>event_available</mat-icon>
-            <span>Approved for Event: <strong>{{bigInvitationCount}}</strong></span>
+            <span>Approved for Event: <strong>{{participantsApprovedForEvent.length}}</strong></span>
           </div>
         </div>
       </div>
@@ -501,7 +514,7 @@
     <button class="btn btn-secondary" (click)="onCancel()">Cancel</button>
     <button class="btn btn-primary" (click)="onSubmit()" 
         [disabled]="cohortsForm.invalid 
-        || (cohortsForm.controls['cohortCategory'].value == 'studio' && [null , undefined , ''].includes(cohortsForm.controls['bigactivity']?.value)) 
+        || (cohortsForm.controls['cohortCategory'].value == 'studio' && ([null , undefined , ''].includes(cohortsForm.controls['bigactivity']?.value) || [null , undefined , ''].includes(cohortsForm.controls['queueref']?.value)))
         || ( isEventType() && [null , undefined , ''].includes(cohortsForm.controls['eventref']?.value))
         || loadingInvitations 
         || loadingMentors 
