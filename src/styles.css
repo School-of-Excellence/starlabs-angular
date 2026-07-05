@@ -255,16 +255,19 @@ html:has(.dyn-studio-v2-app) {
 }
 
 /* =============================================================
-   Zoom meeting view — kill the Safari white strip.
-   Safari sizes the Zoom SDK gallery a touch under the window height, so the
-   default white page background showed as a strip along the bottom (Chrome
-   filled it). Paint ONLY the outer document background black — it sits BEHIND
-   #zmmtg-root and its control bar, so the gap reads black without covering the
-   Zoom controls. COLOR-ONLY, no layout change (won't clip names). Scoped to the
-   meeting view via #zmmtg-root (only present on that route).
-   NOTE: do NOT also set `#zmmtg-root { background:#000 }` — that paints over the
-   Zoom control toolbar area and hides the controls in Safari.
+   Zoom meeting view — hide the Safari bottom strip.
+   Safari sizes the Zoom gallery a hair under the window height, exposing a
+   strip of page background along the bottom (Chrome fills it). Paint the page
+   BLACK so that gap blends into the meeting instead of flashing white/grey.
+   COLOUR-ONLY — no layout change, so it can't clip video tiles or name labels.
+   Must target `html` AS WELL AS `body`: the zoom-clientview template renders a
+   nested <body> that can be shorter than the viewport, so `body:has()` alone
+   leaves the <html> element's default white showing below it (that was the
+   remaining strip). Scoped to the meeting route via #zmmtg-root.
+   Do NOT set `#zmmtg-root { background:#000 }` — that paints over the control
+   toolbar and hides the Zoom controls in Safari.
    ============================================================= */
+html:has(#zmmtg-root),
 body:has(#zmmtg-root) { background: #000; }
 
 /* =============================================================
@@ -323,31 +326,3 @@ body:has(#zmmtg-root) { background: #000; }
 
 /* Snackbars (sx-snack via MAT_SNACK_BAR_DEFAULT_OPTIONS) */
 .sx-snack { --mdc-snackbar-container-shape: 12px; --mat-snack-bar-button-color: #4da3ff; }
-
-/* ============================================================
-   Safari-only fix: the Zoom Meeting SDK footer control bar (Unmute / Video /
-   Participants / … / Leave) renders hidden/behind the video in Safari while it
-   works in Chrome. `@supports (-webkit-hyphens: none)` matches Safari only, so
-   Chrome/Firefox are untouched. Pin the footer to the viewport bottom, force it
-   on top of the video canvas, and make it (and its icons) visible.
-   ============================================================ */
-@supports (-webkit-hyphens: none) {
-  #zmmtg-root .footer.main-footer {
-    position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    z-index: 2147482000 !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-  }
-  #zmmtg-root .footer.main-footer,
-  #zmmtg-root .footer.main-footer * {
-    visibility: visible !important;
-  }
-  #zmmtg-root .footer.main-footer svg,
-  #zmmtg-root .footer.main-footer .footer-button-base__img-layer {
-    opacity: 1 !important;
-  }
-}
