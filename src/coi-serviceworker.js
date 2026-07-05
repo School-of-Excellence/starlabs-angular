@@ -51,19 +51,74 @@ if (typeof window === 'undefined') {
         })());
     });
 
+    // ----------------------------------------------------------------------
+    // ORIGINAL v0.1.7 fetch handler (kept for reference — replaced below).
+    // It proxied EVERY request and, on failure, ran `.catch((e) => console.error(e))`
+    // which resolves respondWith() to `undefined` → "Failed to convert value to
+    // 'Response'" + "network error response". See replacement handler below.
+    //
+    // self.addEventListener("fetch", function (event) {
+    //     const r = event.request;
+    //     if (r.cache === "only-if-cached" && r.mode !== "same-origin") {
+    //         return;
+    //     }
+    //
+    //     const request = (coepCredentialless && r.mode === "no-cors")
+    //         ? new Request(r, {
+    //             credentials: "omit",
+    //         })
+    //         : r;
+    //     event.respondWith(
+    //         fetch(request)
+    //             .then((response) => {
+    //                 if (response.status === 0) {
+    //                     return response;
+    //                 }
+    //
+    //                 const newHeaders = new Headers(response.headers);
+    //                 newHeaders.set("Cross-Origin-Embedder-Policy",
+    //                     coepCredentialless ? "credentialless" : "require-corp"
+    //                 );
+    //                 if (!coepCredentialless) {
+    //                     newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
+    //                 }
+    //                 newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
+    //
+    //                 return new Response(response.body, {
+    //                     status: response.status,
+    //                     statusText: response.statusText,
+    //                     headers: newHeaders,
+    //                 });
+    //             })
+    //             .catch((e) => console.error(e))
+    //     );
+    // });
+    // ----------------------------------------------------------------------
+
     self.addEventListener("fetch", function (event) {
         const r = event.request;
         if (r.cache === "only-if-cached" && r.mode !== "same-origin") {
             return;
         }
 
-        const request = (coepCredentialless && r.mode === "no-cors")
-            ? new Request(r, {
-                credentials: "omit",
-            })
-            : r;
+        // Only proxy SAME-ORIGIN GET requests. Those are the document + local
+        // assets that actually need COOP/COEP headers injected to make the page
+        // crossOriginIsolated (for the Zoom SDK's SharedArrayBuffer).
+        //
+        // Cross-origin resources (Google Fonts, unpkg Material theme, cdnjs
+        // Font Awesome, Firebase Storage) must NOT be re-fetched here: under
+        // COEP they load credentialless natively, and re-fetching them through
+        // this worker only risks a "Failed to fetch" that previously turned into
+        // a broken response ("Failed to convert value to 'Response'"). Letting
+        // the browser handle them directly is both correct and reliable.
+        let sameOrigin = false;
+        try { sameOrigin = new URL(r.url).origin === self.location.origin; } catch (_) { sameOrigin = false; }
+        if (r.method !== "GET" || !sameOrigin) {
+            return;
+        }
+
         event.respondWith(
-            fetch(request)
+            fetch(r)
                 .then((response) => {
                     if (response.status === 0) {
                         return response;
@@ -84,7 +139,17 @@ if (typeof window === 'undefined') {
                         headers: newHeaders,
                     });
                 })
-                .catch((e) => console.error(e))
+                .catch((e) => {
+                    // NEVER resolve respondWith() to `undefined` — that throws
+                    // "Failed to convert value to 'Response'". Surface the network
+                    // failure as a normal error Response instead so the browser
+                    // treats it like any other failed request.
+                    console.error(e);
+                    return new Response("coi-serviceworker fetch failed: " + e, {
+                        status: 502,
+                        statusText: "coi-serviceworker fetch failed",
+                    });
+                })
         );
     });
 
