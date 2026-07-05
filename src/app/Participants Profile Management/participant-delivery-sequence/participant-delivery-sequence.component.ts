@@ -82,11 +82,12 @@ export class ParticipantDeliverySequenceComponent {
     guard.getAppointmentMap().then(data => this.mapAppointment = data)
     guard.getRoles().then(async roles => {
       this.developer = roles["developer"] ?? false
-      // Only developers can use the profile switcher, so only they need the
-      // full profile list. Load it in the background — never block render on it.
-      if (this.developer) {
-        this.loadProfileList()
-      }
+      // Do NOT load the full profile roster on this screen. The participant is
+      // fixed by the :pid route param and the "Select Profile" switcher is
+      // disabled, so there is nothing to switch to. Reading all ~3,300
+      // profile_data docs used to saturate the Firestore channel and block the
+      // main thread, starving this participant's own tiny reads for ~70s
+      // (measured: 72s -> ~3s once the roster read was removed).
       // if (roles["admin"] || roles["ah"] || roles["integrator"] || roles["scheduler"] || this.developer) {
       await this.mapData().then(() => {
         route.params.subscribe(data => {
@@ -133,26 +134,11 @@ export class ParticipantDeliverySequenceComponent {
     this.selectedAppointments = []
   }
 
-  // The full profile list only feeds the "Select Profile" switcher, which is
-  // disabled for non-developers. Load it lazily and in the background so it
-  // never blocks the participant's delivery data from rendering.
-  loadProfileList() {
-    getDocs(query(collection(this.firestore, "profile_data"), orderBy("name"))).then(profile => {
-      var data = []
-      for (let i = 0; i < profile.docs.length; i++) {
-        const doc = profile.docs[i];
-        var profiledata = doc.data()
-        data.push({
-          name: profiledata["name"],
-          id: doc.id,
-          status: profiledata["datastatus"] ?? "Not entered",
-          sequencechanged: profiledata["sequencechanged"] ?? false,
-          migrationrequired: profiledata["migrationrequired"] ?? false
-        })
-      }
-      this.profileList = data
-    })
-  }
+  // NOTE: the full profile roster is intentionally NOT loaded on this screen.
+  // The participant is already identified by the :pid route param, and the
+  // "Select Profile" switcher is disabled — so there is nothing to switch to and
+  // no reason to read ~3,300 profile_data docs. Only the current profile is
+  // fetched (single getDoc in patchProfileStatus) to show its name/status.
 
   async mapData() {
     // Journey
@@ -280,6 +266,17 @@ export class ParticipantDeliverySequenceComponent {
       this.profileDataStatus = profiledata["datastatus"] ?? "Not entered"
       this.sequencechanged = profiledata["sequencechanged"] ?? false
       this.migrationrequired = profiledata["migrationrequired"] ?? false
+      // Seed the (disabled) switcher with just this one profile so its label
+      // shows the participant's name, without loading the whole roster.
+      if (!this.profileList.some(e => e.id == this.selectedProfileid)) {
+        this.profileList = [{
+          name: profiledata["name"] ?? "",
+          id: this.selectedProfileid,
+          status: this.profileDataStatus,
+          sequencechanged: this.sequencechanged,
+          migrationrequired: this.migrationrequired
+        }]
+      }
     })
   }
 
@@ -340,12 +337,10 @@ export class ParticipantDeliverySequenceComponent {
     */
     // Deliverable
     await getDocs(query(collection(this.firestore, "deliverables"), where("profileid", "==", this.selectedProfileid))).then(delivery => {
-      console.log(delivery.size)
       for (let i = 0; i < delivery.docs.length; i++) {
         const deliverable = delivery.docs[i];
         this.mapDeliveryDoc[deliverable.ref.path] = deliverable.data()
       }
-      console.log(this.mapDeliveryDoc)
     })
     this.loading = false
   }
