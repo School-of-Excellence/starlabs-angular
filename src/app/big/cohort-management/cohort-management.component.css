@@ -995,18 +995,27 @@ button {
   line-height: 1.2;
 }
 
-/* Tabs */
+/* Tabs — wraps as a whole, never mid-word; overflow items form their own
+   row instead of overlapping. This row hosts: [Participants][Activities]
+   and, only in participant-select-mode, a trailing action cluster
+   ([count badge][Select/Cancel][Move][Delete]) that is pushed to the
+   right and wraps onto its own line the moment it doesn't fit. */
 .card-tabs {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 6px;
+  column-gap: 2px;
   border-top: 1px solid var(--c-border-2);
   border-bottom: 1px solid var(--c-border-2);
-  align-items: stretch;
   background: var(--c-surface-2);
+  padding: 3px 10px;
 }
 
 .card-tab {
-  flex: 1;
-  padding: 8px 4px;
+  flex: 1 1 88px;
+  min-width: 0;
+  padding: 8px 6px;
   border: none;
   background: transparent;
   font-size: 11px;
@@ -1014,11 +1023,15 @@ button {
   color: var(--c-text-mute);
   cursor: pointer;
   border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
   font-family: inherit;
 }
 
@@ -1029,22 +1042,100 @@ button {
   background: var(--c-surface);
 }
 
+/* ── Selection toolbar cluster ─────────────────────────────────────
+   Count badge kicks the whole trailing group (badge + select-toggle +
+   move + delete) to the right of the row via margin-left:auto, and
+   flex-wrap on the parent lets that group drop to its own line on
+   narrow cards — no overlap, no fixed widths to break. */
+.p-select-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--c-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, .3);
+}
+.p-select-count mat-icon {
+  font-size: 15px !important;
+  width: 15px !important;
+  height: 15px !important;
+  line-height: 15px !important;
+}
+
 .card-tab-action {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
   padding: 0 10px;
-  border: none;
-  border-left: 1px solid var(--c-border-2);
-  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
   font-size: 10px;
   font-weight: 700;
   color: var(--c-text-mute);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
   cursor: pointer;
   font-family: inherit;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+/* When the count badge is present it already claims the auto margin —
+   the toggle button right after it should sit snug beside it, not
+   fight it for space. */
+.p-select-count + .card-tab-action {
+  margin-left: 0;
 }
 
 .card-tab-action:hover {
   background: var(--c-accent-soft);
   color: var(--c-accent-dark);
+  border-color: var(--c-accent-line);
+}
+.card-tab-action.on {
+  color: var(--c-accent-dark);
+  background: var(--c-accent-soft);
+  border-color: var(--c-accent-line);
+  font-weight: 800;
+}
+.card-tab-action .cta-check {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  line-height: 15px;
+}
+
+/* Move / Delete buttons live in the same wrapping cluster */
+.card-tabs .p-move-btn {
+  flex: 0 0 auto;
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Narrow cards: collapse the action cluster labels to icon-only so it
+   never needs more than ~90px, matching the footer's icon-only pattern. */
+@container cohortcard (max-width: 460px) {
+  .card-tab-action span:not(.cta-check),
+  .card-tabs .p-move-btn span:not(mat-icon) {
+    display: none;
+  }
+  .card-tab-action,
+  .card-tabs .p-move-btn {
+    padding: 0 8px;
+    gap: 0;
+  }
 }
 
 /* Participant list inside card */
@@ -1239,12 +1330,53 @@ button {
   border-color: var(--c-accent-line);
 }
 
-.act-icon {
-  font-size: 17px;
+/* .act-icon (legacy markup) and .ac-icon (actual class used in the
+   activities-tab template) both point at the same icon-chip styling —
+   without .ac-icon here the mat-icon rendered at browser-default size
+   the moment someone opened a card's Activities tab. */
+.act-icon,
+.ac-icon {
   flex-shrink: 0;
-  width: 24px;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  background: var(--c-accent-soft);
+  color: var(--c-accent-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   line-height: 1;
+}
+.act-icon mat-icon,
+.ac-icon mat-icon {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+}
+
+/* Deleted-assignment fallback row (shown when the linked assignment doc
+   no longer exists) — previously completely unstyled. */
+.activity-card.deleted {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 13px;
+  border-radius: var(--r-md);
+  background: var(--c-red-soft);
+  border: 1px solid #F4C6C6;
+  color: var(--c-red);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.activity-card.deleted mat-icon {
+  font-size: 17px;
+  width: 17px;
+  height: 17px;
+  line-height: 17px;
+  flex-shrink: 0;
 }
 
 .act-info {
@@ -1573,44 +1705,18 @@ button {
   cursor: pointer;
 }
 
-.card-check {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  border: 2px solid var(--c-border);
-  background: var(--c-surface);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all .12s;
-}
-
-.card-check mat-icon {
-  font-size: 0;
-  width: 14px;
-  height: 14px;
-  line-height: 14px;
-  color: transparent;
-}
-
-.dashboard-wrapper.select-mode .card-check {
-  display: flex;
-}
-
+/* NOTE: the old standalone `.card-check` (no `.select-overlay`) rule set
+   was dead code — the template only ever renders
+   `class="card-check select-overlay"`. It's removed here because its
+   `mat-icon { color: transparent }` was leaking through the cascade onto
+   the real select-overlay checkbox (a class-selector is *more specific*
+   than an element+class one only per redeclared property — since
+   `color` was never redeclared on `.card-check.select-overlay mat-icon`,
+   the transparent from this block kept winning and hid the glyph
+   entirely). The full, corrected definition now lives in one place:
+   see "Unified checkbox family" below. */
 .dashboard-wrapper.select-mode .card-actions {
   display: none;
-}
-
-.card.checked .card-check {
-  background: var(--c-accent);
-  border-color: var(--c-accent);
-}
-
-.card.checked .card-check mat-icon {
-  font-size: 14px;
-  color: #ffffff;
 }
 
 /* ==================== SELECT BAR ==================== */
@@ -1769,19 +1875,19 @@ button {
 }
 
 .p-check {
-  width: 16px !important;
-  min-width: 16px;
-  max-width: 16px;
-  height: 16px;
-  min-height: 16px;
-  max-height: 16px;
-  border-radius: 4px;
+  width: 18px !important;
+  min-width: 18px;
+  max-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  max-height: 18px;
+  border-radius: 5px;
   border: 1.5px solid var(--c-border);
   background: var(--c-surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 16px;
+  flex: 0 0 18px;
   transition: all .12s;
   overflow: visible;
   padding: 0;
@@ -1789,9 +1895,9 @@ button {
 
 .p-check mat-icon {
   font-size: 0 !important;
-  width: 12px !important;
-  height: 12px !important;
-  line-height: 12px !important;
+  width: 13px !important;
+  height: 13px !important;
+  line-height: 13px !important;
   color: transparent !important;
   overflow: visible !important;
 }
@@ -1802,47 +1908,48 @@ button {
 }
 
 .row.checked .p-check mat-icon {
-  font-size: 12px !important;
-  width: 12px !important;
-  height: 12px !important;
-  line-height: 12px !important;
+  font-size: 13px !important;
+  width: 13px !important;
+  height: 13px !important;
+  line-height: 13px !important;
   color: #ffffff !important;
   font-weight: bold;
 }
 
-/* Loading Overlay */
+/* Loading Overlay — fully opaque-enough full-viewport layer above
+   everything (z-index 9999) so no click/scroll/drag can reach the
+   dashboard underneath while data is loading. */
 .loading-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(246, 246, 248, 0.92);
+  background: rgba(255, 255, 255, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(5px);
 }
 
 .loading-container {
   text-align: center;
-  padding: 44px;
-  background: var(--c-surface);
-  border-radius: var(--r-xl);
-  box-shadow: var(--shadow-lg);
+  padding: 40px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   min-width: 300px;
-  border: 1px solid var(--c-border);
 }
 
 .loading-spinner {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   margin: 0 auto 20px;
-  border: 4px solid var(--c-border-2);
-  border-top: 4px solid var(--c-accent);
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #667eea;
   border-radius: 50%;
-  animation: spin 0.9s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
@@ -1856,10 +1963,10 @@ button {
 }
 
 .loading-text {
-  font-size: 15px;
-  color: var(--c-text-dim);
+  font-size: 16px;
+  color: #4a5568;
   margin-bottom: 20px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .loading-progress {
@@ -1868,8 +1975,8 @@ button {
 
 .progress-bar {
   width: 100%;
-  height: 6px;
-  background: var(--c-border-2);
+  height: 8px;
+  background: #e2e8f0;
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 10px;
@@ -1877,7 +1984,7 @@ button {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--c-accent), #7C6BFA);
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -2308,26 +2415,55 @@ button {
   transform: translateX(2px);
 }
 
-/* Select-mode overlay checkbox */
+/* ════════════════════════════════════════════════════════════════
+   Unified checkbox family — used in three places: the Unassigned
+   sidebar (.up-check), inside a cohort card's participant list
+   (.p-check), and the cohort-level select overlay on the card title
+   (.card-check.select-overlay). All three now share the same size,
+   radius, border weight and checked/unchecked color logic so the
+   multi-select experience reads as one component wherever it shows up.
+   ════════════════════════════════════════════════════════════════ */
 .card-check.select-overlay {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
   z-index: 2;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
   background: var(--c-surface);
-  border-radius: 6px;
+  border: 1.5px solid var(--c-border);
+  border-radius: 5px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--c-accent-dark);
+  color: var(--c-text-mute);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.card-check.select-overlay mat-icon { font-size: 18px; width: 18px; height: 18px; }
-.cohort-card.select-mode .card-top { padding-left: 40px; }
+.card-check.select-overlay:hover {
+  border-color: var(--c-accent-line);
+  background: var(--c-accent-soft);
+  color: var(--c-accent-dark);
+}
+.card-check.select-overlay mat-icon {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  line-height: 13px;
+  color: inherit; /* was inheriting `transparent` from dead legacy rule */
+}
+/* Overlay sits left of the title at the card's own left padding, so the
+   title text just needs room to start after it — no extra offset hacks. */
+.cohort-card.select-mode .card-top { padding-left: 38px; }
 .cohort-card.checked { box-shadow: 0 0 0 2px var(--c-accent), var(--shadow-md); }
+.cohort-card.checked .card-check.select-overlay {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: #ffffff;
+}
 
 /* Accent stat values (design) */
 .cohort-card .stat-val {
@@ -2356,45 +2492,10 @@ button {
   color: var(--c-amber) !important;
 }
 
-/* card-tab-action (Select toggle) */
-.card-tab-action {
-  margin-left: auto;
-  align-self: center;
-  margin-right: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-sm);
-  background: var(--c-surface);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--c-text-mute);
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  cursor: pointer;
-  font-family: inherit;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-}
-.card-tab-action .cta-check {
-  font-size: 15px;
-  width: 15px;
-  height: 15px;
-  line-height: 15px;
-}
-.card-tab-action:hover {
-  color: var(--c-accent-dark);
-  background: var(--c-accent-soft);
-  border-color: var(--c-accent-line);
-}
-.card-tab-action.on {
-  color: var(--c-accent-dark);
-  background: var(--c-accent-soft);
-  border-color: var(--c-accent-line);
-  font-weight: 800;
-}
+/* card-tab-action is fully defined earlier alongside .p-select-count and
+   .p-move-btn as one wrapping toolbar cluster — see "Selection toolbar
+   cluster" above. (Kept out of this later section on purpose so the two
+   never fall out of sync again.) */
 
 /* Foot */
 .card-foot .foot-btn.icon-only .foot-lbl,
@@ -2986,11 +3087,11 @@ button {
 .participant-row.selectable:hover{background: var(--c-accent-soft);}
 .participant-row.checked{background: var(--c-accent-soft) !important; box-shadow: inset 3px 0 0 var(--c-accent);}
 .up-check{
-  width:18px;min-width:18px;height:18px;border-radius:5px;border:2px solid var(--c-border);
+  width:18px;min-width:18px;height:18px;border-radius:5px;border:1.5px solid var(--c-border);
   background: var(--c-surface); display:inline-flex;align-items:center;justify-content:center;
-  flex-shrink:0;margin-right:10px;transition:all .12s;
+  flex-shrink:0;margin-right:10px;transition:all .12s;align-self:center;
 }
-.up-check mat-icon{font-size:0 !important;width:12px !important;height:12px !important;line-height:12px !important;color:transparent !important;overflow:visible !important}
+.up-check mat-icon{font-size:0 !important;width:13px !important;height:13px !important;line-height:13px !important;color:transparent !important;overflow:visible !important}
 .participant-row.checked .up-check{background: var(--c-accent); border-color: var(--c-accent);}
 .participant-row.checked .up-check mat-icon{font-size:13px !important;color:#fff !important}
 

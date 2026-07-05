@@ -3,9 +3,9 @@
     <div class="loading-spinner"></div>
     <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
     <div class="loading-progress">
-      <div class="progress-bar">
-        <!-- <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div> -->
-      </div>
+      <!-- <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+      </div> -->
     </div>
   </div>
 </div>
@@ -27,7 +27,7 @@
       </svg>
       <input type="text" placeholder="Search by cohort or participant" [(ngModel)]="participantSearchQuery" #cohortsearch
         (input)="onParticipantSearch()" />
-      <span class="kbd-hint">Clrt + Shift + S</span>
+      <span class="kbd-hint">Clrt + Shift + F</span>
     </div>
 
     <div class="topbar-actions">
@@ -298,7 +298,8 @@
         </div>
 
       </div>
-      <div class="sidebar-hint">drag a person onto a cohort to assign</div>
+      <div class="sidebar-hint" *ngIf="filterUnassignParticipants.length > 0">drag a person onto a cohort to assign</div>
+      <div class="sidebar-hint" style="color : black;" *ngIf="selectedAcceleratorEvent.length == 0">Select the event to get the unassigned participants</div>
     </div>
 
     <!-- ─── RIGHT: Cohort Grid ─── -->
@@ -544,7 +545,7 @@
                   <div class="cp-row row"
                     *ngFor="let participant of (isParticipantExpanded(cohorts['docid'])
                       ? getFilteredParticipants(cohorts)
-                      : getFilteredParticipants(cohorts).slice(0,5))"
+                      : getFilteredParticipants(cohorts).slice(0,4))"
                     [class.selectable]="isParticipantSelectActive(cohorts['docid'])"
                     [class.checked]="isParticipantSelectActive(cohorts['docid']) && isParticipantChecked(participant)"
                     (click)="isParticipantSelectActive(cohorts['docid']) && toggleParticipantChecked(participant, $event)"
@@ -568,11 +569,11 @@
                     <span class="active-dot" *ngIf="isParticipantLive(cohorts['queueref']?.id,participant)"></span>
                   </div>
                   <div class="cp-more"
-                    *ngIf="getFilteredParticipants(cohorts).length > 5"
+                    *ngIf="getFilteredParticipants(cohorts).length > 4"
                     (click)="toggleParticipantExpanded(cohorts['docid'], $event)">
                     {{ isParticipantExpanded(cohorts['docid'])
                         ? 'Show less'
-                        : '+' + (getFilteredParticipants(cohorts).length - 5) + ' more' }}
+                        : '+' + (getFilteredParticipants(cohorts).length - 4) + ' more' }}
                   </div>
                 </div>
               </div>
@@ -707,14 +708,14 @@
     <!-- ─── RIGHT: Activity Sidenav ─── -->
     <div class="activity-sidenav" [class.collapsed]="activitySidenavCollapsed">
       <div class="activity-sidenav-tab" (click)="toggleActivitySidenav();$event.stopPropagation()" *ngIf="activitySidenavCollapsed" title="Open activity">
-        <span class="activity-vlabel">ACTIVITY</span>
+        <span class="activity-vlabel">BIG COHORTS ACTIVITY LOG</span>
       </div>
       <ng-container *ngIf="!activitySidenavCollapsed">
         <div class="activity-header">
           <!-- <button class="activity-collapse-btn" (click)="toggleActivitySidenav();$event.stopPropagation()" title="Collapse">
             <svg class="ico sm" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
           </button> -->
-          <span class="activity-title">Activity</span>
+          <span class="activity-title">Cohorts Activity Log</span>
           <span class="activity-count">{{filteredProgressionProfiles.length}}</span>
           <span class="done-by-me" [class.active]="activityLogFilters['assigntome']" (click)="toggleLogedToMe($event)">Done By me</span>
           <span class="activity-spacer"></span>
@@ -795,7 +796,7 @@
               </div>
           </div>
           <div *ngIf="progressionLoading">Loading....</div>
-          <div class="activity-empty" *ngIf="filteredProgressionProfiles.length === 0">
+          <div class="activity-empty" *ngIf="!progressionLoading && filteredProgressionProfiles.length === 0">
             <mat-icon>history</mat-icon>
             <p>No recent activity</p>
           </div>
