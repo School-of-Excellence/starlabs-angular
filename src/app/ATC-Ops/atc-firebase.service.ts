@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { FirebaseApp } from '@angular/fire/app';
-import { Firestore, initializeFirestore } from '@angular/fire/firestore';
+import { Firestore, getFirestore } from '@angular/fire/firestore';
 import { Functions, getFunctions, httpsCallable } from '@angular/fire/functions';
 import {
   RebuildOk,
@@ -28,18 +28,14 @@ export class AtcFirebaseService {
   /**
    * Named Firestore database `firestore-atc` — READ ONLY from the UI.
    *
-   * Force long-polling: this network blocks Firestore's WebChannel streaming
-   * (symptom: "WebChannelConnection RPC 'Listen' stream transport errored"),
-   * so realtime listeners would otherwise fail the stream and only load after a
-   * slow auto-detect fallback. Forcing long-polling skips the doomed streaming
-   * attempt → fast, reliable first load. Must be the FIRST call that creates
-   * this named-DB handle (this service is the only creator, constructed once).
+   * Just FETCH the already-initialized instance — do NOT re-initialize it here.
+   * The transport (experimentalForceLongPolling, to survive this network's
+   * blocked WebChannel streaming) is configured once, at the earliest point, in
+   * `main.ts`. Calling initializeFirestore() again with different options throws
+   * "initializeFirestore() has already been called with different options"
+   * (main.ts pre-initializes this named DB in the non-emulator/prod path).
    */
-  readonly atcDb: Firestore = initializeFirestore(
-    this.app,
-    { experimentalForceLongPolling: true },
-    'firestore-atc',
-  );
+  readonly atcDb: Firestore = getFirestore(this.app, 'firestore-atc');
 
   /** Callables region for the ATC pipeline (v2 onCall). */
   readonly functions: Functions = getFunctions(this.app, 'us-central1');
