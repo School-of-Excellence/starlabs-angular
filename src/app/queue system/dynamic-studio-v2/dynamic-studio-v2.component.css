@@ -864,6 +864,12 @@
   border-right: 1px solid var(--border);
   overflow-y: auto;
   min-width: 0;
+  /* Grid items default to min-height:auto, so when the profile/specialists grow
+     tall (e.g. at 175% zoom) the sidebar expands past its track and the app's
+     overflow:hidden clips the Session Steps off the bottom. min-height:0 lets it
+     respect the track height so overflow-y:auto actually scrolls the steps into
+     reach instead of hiding them. */
+  min-height: 0;
 }
 .ds-app .ds-side-id {
   display: flex;
@@ -872,13 +878,19 @@
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
   min-width: 0;
+  /* Keep the identity at its NATURAL height and never let it shrink to a sliver
+     that hides the participant's visit/journey/specialists. When the sidebar as a
+     whole is too short for identity + steps (high zoom / small screens), the
+     sidebar itself scrolls (.ds-side is overflow-y:auto) so BOTH the identity and
+     the Session Steps stay fully reachable — nothing is clipped off-screen. */
+  flex: 0 0 auto;
 }
 .ds-app .ds-side-idbody { min-width: 0; }
 .ds-app .ds-side-name {
   font-size: 16px;
   font-weight: 800;
   color: var(--ink);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
 }
 .ds-app .ds-side-sub {
   font-size: 12.5px;
@@ -886,6 +898,9 @@
   font-weight: 600;
   margin-top: 2px;
 }
+.ds-app .ds-side-journey-label { color: var(--ink-3); font-weight: 700; }
+/* Love Letters widget (Step 2) — rounded on all sides. */
+.ds-app .ds-ll-card { border-radius: 14px; overflow: hidden; }
 /* Specialist roster: a "With · N" header over a one-per-line list, so any number
    of bonus specialists (each with its activity) reads cleanly instead of a long
    comma-wrapped blob. Left-aligned by default (stacked band); the two-column
@@ -909,6 +924,81 @@
 /* Bonus-activity role/activity name shown after each specialist — secondary weight/colour. */
 .ds-app .ds-side-specialists__role { color: var(--ink-3); font-weight: 600; }
 
+/* Compact "View all" chip — hidden by default; the short-height media query
+   below reveals it when a long roster + zoomed-in window would otherwise bury
+   the Session Steps. */
+.ds-app .ds-side-specialists__more {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin-left: 6px;
+  cursor: pointer;
+}
+.ds-app .ds-side-specialists__more:hover { background: var(--primary-line); }
+
+/* Full-roster overlay (opened from the chip) — fixed/centered so it escapes the
+   sidebar's scroll clipping. */
+.ds-app .ds-spec-overlay-backdrop { position: fixed; inset: 0; z-index: 65; background: rgba(15,18,22,.38); }
+.ds-app .ds-spec-overlay {
+  position: fixed;
+  z-index: 66;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(340px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 14px 16px;
+  animation: dsNextmenuIn .16s var(--ease);
+}
+.ds-app .ds-spec-overlay__head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 800; color: var(--ink);
+  margin-bottom: 10px;
+}
+.ds-app .ds-spec-overlay__head .ic { color: var(--primary); font-size: 18px; width: 18px; height: 18px; }
+.ds-app .ds-spec-overlay__close {
+  margin-left: auto;
+  width: 26px; height: 26px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; color: var(--ink-3); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.ds-app .ds-spec-overlay__close:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .ds-spec-overlay__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ds-app .ds-spec-overlay__list li { font-size: 13px; line-height: 1.35; }
+.ds-app .ds-spec-overlay__name { color: var(--primary-ink); font-weight: 700; }
+.ds-app .ds-spec-overlay__role { color: var(--ink-3); font-weight: 600; }
+
+/* Zoomed-in / short window: don't hide the whole roster — TRUNCATE it to as many
+   names as fit in a viewport-relative height (so shorter windows show fewer), fade
+   the cut edge, and surface the rest via the "View all" chip. */
+@media (max-height: 760px) {
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__list {
+    max-height: 20vh;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent);
+    mask-image: linear-gradient(to bottom, #000 68%, transparent);
+  }
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__more { display: inline-flex; }
+}
+/* Even shorter (more zoom) → collapse the inline roster entirely to just the
+   "With · N — View all" header, so the identity block stays short and the Session
+   Steps fit in the sidebar without scrolling. The full roster is one click away
+   via the "View all" overlay, so no information is lost. */
+@media (max-height: 560px) {
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__list { display: none; }
+}
+
 .ds-app .ds-side-steps { display: flex; flex-direction: column; gap: 4px; }
 .ds-app .ds-side-steps__label {
   font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
@@ -931,8 +1021,8 @@
 }
 .ds-app .ds-vstep-node .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
 .ds-app .ds-vstep-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-.ds-app .ds-vstep-label { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ds-app .ds-vstep-sub { font-size: 11.5px; font-weight: 500; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-app .ds-vstep-label { font-size: 14px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.ds-app .ds-vstep-sub { font-size: 11.5px; font-weight: 500; color: var(--ink-3); white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
 .ds-app .ds-vstep.active .ds-vstep-sub { color: var(--primary-ink); }
 .ds-app .ds-vstep.done .ds-vstep-label { color: var(--ink); }
 .ds-app .ds-vstep.done .ds-vstep-node { background: var(--green-soft); color: var(--green); }
@@ -1083,10 +1173,19 @@
        real vertical sidebar, so children stretch full-width and align left
        (otherwise the steps block gets centered/indented vs the identity). */
     flex-direction: column;
+    /* CRITICAL: reset flex-wrap. The wider ≤1024 tablet band sets flex-wrap:wrap
+       for the horizontal identity+steps layout. Here we're a vertical column with
+       a FIXED height, so an inherited `wrap` makes the steps overflow into a
+       hidden SECOND column beside the identity (the actual "steps got hidden at
+       175% zoom" bug). nowrap keeps identity + steps in one stacked column that
+       the sidebar scrolls (overflow-y:auto) when it's taller than the viewport. */
+    flex-wrap: nowrap;
     align-items: stretch;
     border-right: 1px solid var(--border);
     border-bottom: none;
-    overflow: hidden;
+    /* Scroll the whole sidebar as a fallback so the Session Steps are always
+       reachable at high zoom even if the identity block doesn't shrink enough. */
+    overflow-y: auto;
     min-height: 0;
     justify-content: flex-start;
     gap: clamp(8px, 1.2vh, 14px);
@@ -1115,13 +1214,14 @@
   .ds-app .ds-side-name {
     white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25;
   }
-  /* LEFT-aligned identity at its NATURAL height (no grow → no void before the
-     steps when the roster is short). The compacted stepper below means identity
-     + steps fit without scrolling for typical rosters; if the roster is very
-     long it scrolls internally (min-height:0 + overflow). */
+  /* LEFT-aligned identity at its NATURAL height. The compacted stepper below +
+     dropped step sub-labels (see the short-height blocks) mean identity + steps
+     fit without scrolling for typical rosters; if the roster is very long the
+     WHOLE sidebar scrolls (.ds-side overflow-y:auto) so identity info is never
+     shrunk away and the steps are never clipped. */
   .ds-app .ds-side-id {
     flex-direction: column; align-items: flex-start; text-align: left;
-    flex: 0 1 auto; min-height: 0; overflow-y: auto;
+    flex: 0 0 auto; min-height: 0;
   }
   .ds-app .ds-side-idbody { text-align: left; width: 100%; }
   .ds-app .ds-side-specialists { align-items: flex-start; text-align: left; }
@@ -1136,18 +1236,17 @@
    back to top-alignment if the content ever exceeds the sidebar height (short
    window) so nothing gets clipped above the scroll origin. */
 @media (min-width: 1025px) {
-  /* Steps ALWAYS visible: the sidebar itself doesn't scroll — the identity block
-     scrolls INTERNALLY if it's very tall (many specialists), and the steps are
-     pinned (flex:0 0 auto) so they never get pushed out of view. Top-aligned,
-     LEFT-aligned profile (avatar on top, name / uP · product / specialists all
-     flush-left). */
-  .ds-app .ds-side { justify-content: flex-start; overflow: hidden; min-height: 0; gap: clamp(12px, 1.6vh, 20px); }
+  /* Steps ALWAYS reachable: identity keeps its NATURAL height (never shrunk to a
+     sliver that hides the participant's visit/journey/specialists), steps sit
+     directly below it, and the WHOLE sidebar scrolls (overflow-y:auto) when the
+     two together exceed the column height. So on tall windows everything shows
+     at once; on short/zoomed windows the sidebar scrolls and nothing is clipped.
+     Top-aligned, LEFT-aligned profile (avatar on top, name / uP · product /
+     specialists all flush-left). */
+  .ds-app .ds-side { justify-content: flex-start; overflow-y: auto; min-height: 0; gap: clamp(12px, 1.6vh, 20px); }
   .ds-app .ds-side-id {
     flex-direction: column; align-items: flex-start; text-align: left;
-    /* No grow (avoids a void on tall sidebars) but shrinks + scrolls internally
-       when the identity is taller than the leftover space, so the pinned steps
-       below stay fully visible. Works now that .ds-side is column-direction. */
-    flex: 0 1 auto; min-height: 0; overflow-y: auto;
+    flex: 0 0 auto; min-height: 0;
   }
   .ds-app .ds-side-idbody { text-align: left; width: 100%; }
   .ds-app .ds-side-name { white-space: normal; overflow: visible; text-overflow: clip; }
@@ -1167,12 +1266,11 @@
   .ds-app .ds-side-specialists { margin-top: 8px; gap: 3px; }
   .ds-app .ds-side-specialists__item { line-height: 1.3; }
 }
-/* Wide-but-SHORT desktop (zoomed): the identity+steps won't fit, so switch the
-   identity to leftover-basis (1 1 0) — reliably shrinks/scrolls so steps stay
-   visible (tall desktops above keep `0 1 auto` = natural height, no void). */
-@media (min-width: 1025px) and (max-height: 720px) {
-  .ds-app .ds-side-id { flex: 0 1 auto; }
-}
+/* Wide-but-SHORT desktop (zoomed): identity + steps can't both fit at once, so
+   the whole sidebar scrolls (handled by .ds-side overflow-y:auto). Identity stays
+   at natural height (flex:0 0 auto from the block above) so its info is never
+   shrunk away; the dropped step sub-labels below keep the steps compact enough to
+   usually still fit without a scroll. */
 
 /* Phone: compact stepper — show only the ACTIVE step's label, others are
    node-only chips, so all steps fit without scrolling. Buttons shrink. */
@@ -1211,6 +1309,14 @@
 @media (max-height: 760px) {
   .ds-app .ds-hstep-node { width: 24px; height: 24px; }
   .ds-app .ds-step-header { margin-bottom: 8px; }
+  /* Vertical Session Steps (live sidebar): drop the per-step SUB caption and
+     tighten padding so all six steps stack in far less height. This is what keeps
+     the steps fully visible (no sidebar scroll needed) once the window is short
+     from zoom — the identity above keeps its natural height, and the compacted
+     steps fit in what's left. */
+  .ds-app .ds-vstep-sub { display: none; }
+  .ds-app .ds-vstep { padding-top: clamp(5px, 0.6vh, 9px); padding-bottom: clamp(5px, 0.6vh, 9px); }
+  .ds-app .ds-side-steps { gap: 2px; }
 }
 /* When ALSO width-limited, collapse the stepper to one row (only the active step
    keeps its label) so 7 pills never wrap and steal content height. On a wide but
