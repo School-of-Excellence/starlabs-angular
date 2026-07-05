@@ -377,10 +377,15 @@ export class ZoomClientviewComponent {
           // Host ending the call = "End meeting for all" → everyone is gone.
           // Stamp BOTH leaves so the arena flips to "Call ended" even if the
           // participant's own client can't write before its redirect.
-          updateDoc(ref, {
+          const leaveWrite = updateDoc(ref, {
             specialistLeftAt: serverTimestamp(),
             participantLeftAt: serverTimestamp()
           }).catch(err => console.warn('Could not stamp leave on meeting end (host)', err));
+          // Return the host to the Studio tab that launched this meeting instead
+          // of loading a fresh /dynamicstudio via Zoom's leaveUrl (which spawns a
+          // duplicate Studio). Pass the leave write so the tab isn't closed until
+          // that stamp is durable. See returnToStudioTab().
+          this.returnToStudioTab(leaveWrite);
         } else {
           updateDoc(ref, {
             participantLeftAt: serverTimestamp()
@@ -390,6 +395,38 @@ export class ZoomClientviewComponent {
     } catch (e) {
       console.warn('Could not wire Zoom meeting-end listener', e);
     }
+  }
+
+  // When the host ends the call, go back to the EXISTING Dynamic Studio tab
+  // instead of letting Zoom's `leaveUrl` load a fresh /dynamicstudio (which
+  // leaves the original Studio open AND adds a duplicate). The host opened this
+  // meeting from Studio via `window.open`, so that tab is our `window.opener`.
+  // Ping it to come forward (BroadcastChannel, same one Prescribe ATC uses) and
+  // close THIS tab — closing an opener-spawned tab returns the browser to the
+  // opener, so the host lands back on their existing Studio page. If there's no
+  // opener (deep-linked straight to /openmeeting), do nothing and let Zoom's
+  // leaveUrl fallback run.
+  private returnToStudioTab(leaveWrite?: Promise<unknown>): void {
+    let opener: Window | null = null;
+    try { opener = window.opener; } catch { opener = null; }
+    if (!opener || opener.closed) return; // nothing to return to → leaveUrl fallback
+    try {
+      const ch = new BroadcastChannel('starlabs-dynamic-studio');
+      ch.postMessage({ type: 'focus-studio' });
+      setTimeout(() => { try { ch.close(); } catch {} }, 400);
+    } catch { /* BroadcastChannel unsupported — window.close still returns to the opener */ }
+    try { opener.focus(); } catch { /* cross-tab focus can be blocked; the close below still returns focus */ }
+    // Close only once the leave stamp is durable — whichever comes first:
+    //   • the write settles (server-ack when online → the stamp definitely
+    //     landed), or
+    //   • a 700ms cap (offline/slow: the mutation is already in Firestore's
+    //     multi-tab IndexedDB queue, shared with the still-open Studio tab, so
+    //     it syncs from there even though this tab goes away).
+    // This prioritises the "Call ended" stamp over racing Zoom's leaveUrl,
+    // instead of a blind fixed delay.
+    const cap = new Promise<void>(res => setTimeout(res, 700));
+    Promise.race([Promise.resolve(leaveWrite), cap])
+      .then(() => { try { window.close(); } catch {} });
   }
 
   // -------------------- Recording prompt (host-side) --------------------
