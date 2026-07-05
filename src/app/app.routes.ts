@@ -332,6 +332,11 @@ export const routes: Routes = [
   // Dev - Test
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
 
+  // ATC generation pipeline ops
+  {path: 'queue-atc-generation', loadComponent: () => import('./ATC-Ops/atc-generation-ops/atc-generation-ops.component').then(m => m.AtcGenerationOpsComponent), canActivate: [authGuard]},
+  {path: 'queue-atc-usage', loadComponent: () => import('./ATC-Ops/atc-usage-dashboard/atc-usage-dashboard.component').then(m => m.AtcUsageDashboardComponent), canActivate: [authGuard]},
+
+  // Wildcard must stay LAST — it catches every unmatched path
   {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},
 ];
 
