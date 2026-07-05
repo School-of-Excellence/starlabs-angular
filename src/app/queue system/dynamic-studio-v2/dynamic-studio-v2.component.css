@@ -2037,6 +2037,48 @@
   margin: 0 0 22px;
   line-height: 1.5;
 }
+/* Read-only per-area AEL display on the AEL Validation step (legacy parity). */
+.ds-app .ael-areas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ds-app .ael-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.ds-app .ael-area__num {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.ds-app .ael-area__name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ds-app .ael-area__level {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
 .ds-app .ael-form { display: flex; flex-direction: column; gap: 22px; }
 .ds-app .ael-field { display: flex; flex-direction: column; gap: 10px; }
 .ds-app .ael-label {

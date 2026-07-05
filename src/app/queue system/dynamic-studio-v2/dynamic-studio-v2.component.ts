@@ -79,6 +79,10 @@ export class DynamicStudioV2Component {
   // activity-scoped specialist chips in the Enter-Studio popup (mirrors the
   // big-planner screen's filterInvitedParticipant logic).
   activitySpecialistMap: { [activityId: string]: string[] } = {}
+  // Raw `big cohorts` snapshot, cached so activitySpecialistMap can be rebuilt
+  // (scoped to the current queue's event) whenever either the cohorts OR the
+  // active queue change. See rebuildActivitySpecialistMap().
+  private allCohortsCache: any[] = []
   // Studio
   additionalActivities = {}
   mapStudio = {}
@@ -96,6 +100,13 @@ export class DynamicStudioV2Component {
   outsideLiveAssignment = []
   // Studio Assignment
   liveassignmentSubscription:Subscription = null
+  // The studio-id set the live-assignment listener was last built with. The
+  // listener filters `studioid in <this set>`, so it MUST be rebuilt whenever the
+  // specialist's studio list changes — otherwise a collaborator studio added
+  // after the listener was first created never matches, and that specialist never
+  // receives its live assignment (they get stuck on the invitation / pre-live
+  // view while the co-specialist enters). See the rebuild guard below.
+  liveAssignmentSubStudioIds = ''
   liveAssignment = null
   mapStudioLiveAssignment = {}
   // Token
@@ -205,6 +216,9 @@ export class DynamicStudioV2Component {
   // step. Same moveStage()/movetoNextMonthReview() actions, now in a popup
   // opened from the header or footer trigger.
   nextStageMenuOpen: 'header' | 'footer' | null = null
+  // Full-specialist-roster overlay, opened from the sidebar "View all" chip that
+  // appears when the roster is long AND the window is short (zoomed in).
+  specialistsOverlayOpen = false
   isLoadingStudios: boolean;
 
   // Stepper state (v2)
@@ -786,12 +800,12 @@ export class DynamicStudioV2Component {
     // 1. Review Forms + Love Letters - Current uP! cycle. Love Letters now live
     // here (mockup step 1), so the step also shows when only the loveletters
     // widget is configured, even with no submitted forms.
-    if ((this.participantForm && this.participantForm.length) || widgets.includes('loveletters')) {
+    if (this.participantForm && this.participantForm.length) {
       steps.push({ id: 'current-forms', label: 'Submitted Forms', sub: 'Current Cycle', icon: 'description', color: '#0ea5e9' })
     }
 
-    // 2. Previous ATC - Previous uP! cycle(s). (Love Letters moved to step 1.)
-    if (widgets.includes('previousatc') || widgets.includes('evolutionwishlist')) {
+    // 2. Previous ATC + Love Letters - Previous uP! cycle(s).
+    if (widgets.includes('previousatc') || widgets.includes('evolutionwishlist') || widgets.includes('loveletters')) {
       steps.push({ id: 'prev-history', label: 'Previous ATC & Love Letters', sub: 'Previous Cycle(s)', icon: 'history', color: '#84cc16' })
     }
 
@@ -855,6 +869,10 @@ export class DynamicStudioV2Component {
       // Step list changed (or active step was reset) — refresh the cached index.
       this.activeStepIndex = steps.findIndex(s => s.id === this.activeStepId)
       if (this.activeStepId === 'prev-history') this.prevHistoryMounted = true
+      // Reflect the (possibly auto-selected) step in the URL too, so a refresh
+      // on the very first step — before any manual switch — still reopens it.
+      // syncStepUrl is idempotent, so this no-ops once the URL matches.
+      this.syncStepUrl(this.activeStepId)
     }
 
     return steps
@@ -867,6 +885,7 @@ export class DynamicStudioV2Component {
     if (id === 'prev-history') this.prevHistoryMounted = true
     // Lazily check for an AI-generated ATC only when the specialist opens the prescribe step.
     if (id === 'prescribe-atc') this.checkAiAtcAvailability()
+    this.syncStepUrl(id)
     this.scrollMainToTop()
     this.scrollActiveStepIntoView()
   }
@@ -881,8 +900,40 @@ export class DynamicStudioV2Component {
     this.userNavigated = true
     // next/prev arrows bypass setActiveStep — trigger the AI-ATC check when landing here too.
     if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
+    this.syncStepUrl(this.activeStepId)
     this.scrollMainToTop()
     this.scrollActiveStepIntoView()
+  }
+
+  // Reflect the active step in the URL (`?step=<id>`) so a refresh reopens the
+  // same stage — the init reads `?step=` into pendingDeepLinkStep. replaceUrl so
+  // stepping through stages doesn't spam browser history.
+  private syncStepUrl(id: string) {
+    const current = this.route.snapshot.queryParamMap.get('step')
+    // No active step (the live session ended — participant moved to another
+    // stage / sent back to queue / studio closed). Drop the stale `?step=` param
+    // instead of leaving the URL stuck on the last step. Idempotent: only
+    // navigates when a param is actually present.
+    if (!id) {
+      if (current == null) return
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { step: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      })
+      return
+    }
+    // Idempotent: skip if the URL already points at this step. This makes it
+    // safe to call from the visibleSteps auto-select path (runs during change
+    // detection) without re-navigating on every cycle.
+    if (current === id) return
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { step: id },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    })
   }
 
   // Scroll the content area back to the top on every step change so a new stage
@@ -1149,21 +1200,17 @@ export class DynamicStudioV2Component {
         this.mapActivity[data["docid"]] = data["activity"]
       })
     })
-    // Build activity -> specialists map from cohorts (see big-planner). We take
-    // ALL active cohorts and union their participant lists per `bigactivity`, so
-    // the Enter-Studio popup can offer the right specialists for each activity.
+    // Build activity -> specialists map from cohorts (see big-planner). Cache the
+    // raw cohort list and (re)build the map via rebuildActivitySpecialistMap(),
+    // which SCOPES the cohorts to the event mapped to the current queue (a cohort's
+    // `eventref` -> an `event collection` doc, matched against the queue's
+    // `eventid`). So the Enter-Studio / Invite-More chips only offer specialists
+    // from THIS event's cohorts, not every cohort in the system. The rebuild runs
+    // both here (cohorts changed) and from getStudio() (queue loaded/switched), so
+    // whichever resolves last produces a correctly-scoped map regardless of load order.
     collectionData(collection(this.firestore,"big cohorts"), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(cohorts=>{
-      const map: { [activityId: string]: string[] } = {}
-      cohorts.forEach(cohort=>{
-        const activityId = cohort["bigactivity"]
-        if(activityId == null) return
-        if(cohort["status"] != null && cohort["status"] !== "active") return
-        const ids: string[] = Array.isArray(cohort["participantidlist"]) ? cohort["participantidlist"] : []
-        const set = new Set<string>(map[activityId] ?? [])
-        ids.forEach(id => set.add(id))
-        map[activityId] = Array.from(set)
-      })
-      this.activitySpecialistMap = map
+      this.allCohortsCache = cohorts
+      this.rebuildActivitySpecialistMap()
     })
     this.enableZoomLinkGenerator()
     // Start the studio-presence heartbeat. It writes only when there is a
@@ -1192,6 +1239,13 @@ export class DynamicStudioV2Component {
       this.studioChannel = new BroadcastChannel('starlabs-dynamic-studio')
       this.studioChannel.onmessage = (ev: MessageEvent) => {
         const data = ev?.data
+        // The Zoom view ended → bring THIS existing Studio tab forward instead of
+        // it loading a fresh /dynamicstudio. ACK so the Zoom tab knows we're here.
+        if (data?.type === 'focus-studio') {
+          this.studioChannel?.postMessage({ type: 'studio-here' })
+          this.ngZone.run(() => { try { window.focus() } catch { /* background tabs can't self-focus */ } })
+          return
+        }
         if (data?.type !== 'goto-step' || !data.step) return
         this.studioChannel?.postMessage({ type: 'studio-here' })
         jump(data.step)
@@ -1265,6 +1319,7 @@ export class DynamicStudioV2Component {
 
     this.studioPairingSubscription = null
     this.liveassignmentSubscription = null
+    this.liveAssignmentSubStudioIds = ''
     this.tokenSubscription = null
     // Must null it (like every other sub here): resetSubscription() already
     // unsubscribed it above, and getStudio() only rebuilds the invitation
@@ -1543,6 +1598,9 @@ export class DynamicStudioV2Component {
     this.selectedStudio = {}
     this.stageTokenList = []
     this.liveAssignment = null
+    // Left the studio → clear the stale `?step=` from the URL.
+    this.activeStepId = ''
+    this.syncStepUrl('')
   }
 
   /**
@@ -1597,6 +1655,39 @@ export class DynamicStudioV2Component {
     })
     await this.getStudio()
     loading.close()
+  }
+
+  /**
+   * Build activitySpecialistMap (activityId -> specialist profileIds) from the
+   * cached cohorts, SCOPED to the event mapped to the current queue. A `big
+   * cohorts` doc's `eventref` points to an `event collection` doc (a "Live
+   * Event"), and the queue-generation doc carries that event's id in its
+   * `eventid` field — same mapping big-planner uses
+   * (`where('eventref','==', doc('event collection', selectedQueue.eventid))`).
+   * So we keep only cohorts whose eventref is the event-collection doc for this
+   * queue's `eventid` — the Enter-Studio / Invite-More chips then offer
+   * specialists from THIS event's cohorts only. Active cohorts'
+   * `participantidlist`s are unioned per `bigactivity`. Safe to call before the
+   * queue resolves (produces an empty map until getStudio() re-runs it).
+   */
+  private rebuildActivitySpecialistMap(){
+    const eventId = this.ongoingQueue?.["eventid"]
+    const map: { [activityId: string]: string[] } = {}
+    if(eventId){
+      this.allCohortsCache.forEach(cohort=>{
+        const activityId = cohort["bigactivity"]
+        if(activityId == null) return
+        if(cohort["status"] != null && cohort["status"] !== "active") return
+        // Keep only cohorts of the event collection doc mapped to this queue.
+        const ref = cohort["eventref"]
+        if(ref?.id !== eventId || ref?.parent?.id !== "event collection") return
+        const ids: string[] = Array.isArray(cohort["participantidlist"]) ? cohort["participantidlist"] : []
+        const set = new Set<string>(map[activityId] ?? [])
+        ids.forEach(id => set.add(id))
+        map[activityId] = Array.from(set)
+      })
+    }
+    this.activitySpecialistMap = map
   }
 
   checkoutQueue(){
@@ -1685,6 +1776,10 @@ export class DynamicStudioV2Component {
     this.selectedStudio = {}
     this.liveAssignment = null
     this.isLoadingStudios = true;
+    // Now that the active queue is set, (re)scope the specialist chips to the
+    // event mapped to this queue. Also covers the load-order race where cohorts
+    // resolved before the queue did (map would otherwise be empty).
+    this.rebuildActivitySpecialistMap()
     // .where("participants", "array-contains", this.profileid)
     this.studioPairingSubscription = collectionData(query(collection(this.firestore,"queue studio pairing"), where("studioin", "==", true),where("queueref", "==", doc(this.firestore,"queue generation",this.ongoingQueue["docid"])))).pipe(takeUntil(this.subscriptionHandle)).subscribe(studio=>{
       this.mapStudio = studio.reduce(function(r, a){
@@ -1753,12 +1848,20 @@ export class DynamicStudioV2Component {
         
         // Check if Live Assignment is On
         var studioID = this.studioList.map(e => e["docid"])
-        if(this.liveassignmentSubscription == null){
-          // Store the handle so the `== null` guard above actually works.
-          // Before, the result was discarded, so a brand-new live-assignment
-          // listener was created on EVERY pairing emission — each one
-          // independently re-ran the auto-enter logic below, multiplying the
-          // "studio opens blank then loads" race and leaking listeners.
+        // Rebuild the listener when it doesn't exist yet OR when the specialist's
+        // studio set changed. The query filters `studioid in studioID`, and that
+        // list is captured in the subscription closure — if we only built it once
+        // (the old `== null` guard), a collaborator studio added to studioList
+        // later would never be in the filter, so its live assignment would never
+        // arrive and that specialist would stay stuck on the invitation/pre-live
+        // view while the co-specialist (whose filter already had the studio)
+        // entered. Keying on the sorted studio-id set means we rebuild only when
+        // the set actually changes (not on every check-in/status emission), so
+        // the single-specialist path is unchanged.
+        const studioIdKey = [...studioID].sort().join(',')
+        if(this.liveassignmentSubscription == null || this.liveAssignmentSubStudioIds !== studioIdKey){
+          this.liveassignmentSubscription?.unsubscribe()
+          this.liveAssignmentSubStudioIds = studioIdKey
           this.liveassignmentSubscription = collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "==", this.ongoingQueue["docid"]),where("status", "==", "live"),where("studioid", "in", studioID)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async assignment=>{
             var activeStudio = []
             assignment.forEach(e =>{
@@ -1825,6 +1928,11 @@ export class DynamicStudioV2Component {
               this.liveAssignment = null
               this.participantJourneyName = null
               this.journeyLoadedForProfile = ''
+              // Session ended (e.g. participant moved to another stage) — drop the
+              // stale `?step=` from the URL so it no longer points at a step of a
+              // studio that's no longer live.
+              this.activeStepId = ''
+              this.syncStepUrl('')
             }
           })
         }
@@ -2452,6 +2560,11 @@ export class DynamicStudioV2Component {
           participantname: this.mapProfile[token['profile_id']],
           stage: token["currentstage"],
           expirydate: new Date(new Date().getTime() + this.invitationTimerSeconds * 1000),
+          // Intended countdown window (seconds). The participant's timer counts
+          // down from THIS plain number via a local interval, so it's immune to
+          // clock skew / timezone differences between devices (see
+          // web-studio-invitation StudioInvitationListener).
+          durationSeconds: this.invitationTimerSeconds,
           queueref: token['queueref'],
           createddate: new Date(),
           clientresponse: null,
@@ -3012,6 +3125,9 @@ export class DynamicStudioV2Component {
     })
     await this.clearChatThread()
     this.liveAssignment = null
+    // Studio closed — clear the stale `?step=` from the URL.
+    this.activeStepId = ''
+    this.syncStepUrl('')
   }
 
   // async moveStage(nextstage){
@@ -3155,18 +3271,45 @@ export class DynamicStudioV2Component {
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]].push(profileid)
     })
     console.log(additionalActivities)
-    var inviteParticipant = await this.openAssignQueueStudio({
-      data: {
-        title: reviewSpecialist ? "Confirm Specialist(s) who attended this Studio" : "Update Additional Specialist and Activity in the Studio",
-        studiolist: reviewSpecialist ? [this.selectedStudio] : null,
-        mapprofile: this.mapProfile,
-        mapactivity: this.mapActivity,
-        additionalactivities: reviewSpecialist ? additionalActivities : null
-      },
-      autoFocus: false,
-      maxWidth: "90vw",
-      maxHeight: "90vh"
-    })
+    // "Invite More Specialist(s)" (reviewSpecialist == false) now uses the same
+    // chips-design dialog as the lobby "Participant accepted the invitation"
+    // popup (EnterStudioAssign, invite mode) — activity dropdown + tap-to-select
+    // specialist chips. It returns the same { bonusactivity } contract the block
+    // below already consumes. The "Confirm who attended" flow (reviewSpecialist
+    // == true, from moveStage) keeps the AssignQueueStudio dialog since it also
+    // needs studio selection + attendance semantics.
+    let inviteParticipant: any
+    if (!reviewSpecialist) {
+      inviteParticipant = await this.openEnterStudioAssign({
+        data: {
+          mode: 'invite',
+          title: 'Invite more specialist(s)',
+          subtitle: 'Add another specialist and activity to this studio.',
+          cta: 'Add to Studio',
+          currentprofileid: this.profileid,
+          mapprofile: this.mapProfile,
+          mapactivity: this.mapActivity,
+          activityspecialists: this.activitySpecialistMap
+        },
+        autoFocus: false,
+        panelClass: "enter-studio-dialog",
+        maxWidth: "90vw",
+        maxHeight: "90vh"
+      })
+    } else {
+      inviteParticipant = await this.openAssignQueueStudio({
+        data: {
+          title: "Confirm Specialist(s) who attended this Studio",
+          studiolist: [this.selectedStudio],
+          mapprofile: this.mapProfile,
+          mapactivity: this.mapActivity,
+          additionalactivities: additionalActivities
+        },
+        autoFocus: false,
+        maxWidth: "90vw",
+        maxHeight: "90vh"
+      })
+    }
     
     try {
       const result = await inviteParticipant.afterClosed().toPromise();
@@ -3232,6 +3375,9 @@ export class DynamicStudioV2Component {
       url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/studioZoomLinkRegenerate?liveassignmentid="+this.liveAssignment["docid"]+"&zoomdata="+JSON.stringify(this.liveAssignment['zoomdata'])
     }
     var generateLoading = this.dialog.open(LoadingProgressComponent, {
+      // Don't let a backdrop/ESC click dismiss the loader — it must stay up until
+      // the regenerate call resolves (success or failure) and we close it in code.
+      disableClose: true,
       data:{
         msg: "Generating Link...."
       }
@@ -4249,6 +4395,15 @@ export class DynamicStudioV2Component {
     void this.presenceTick // re-run this getter on the presence tick
     const la: any = this.liveAssignment || {}
     return !!(la['participantLeftAt'] && la['specialistLeftAt'] && la['specialistJoinedAt'])
+  }
+
+  // True while the specialist is currently inside the meeting (joined and not
+  // left, and the call hasn't ended). Used to relabel "Start Meeting" → "In
+  // Meeting" so they know they're already in.
+  get specialistInMeeting(): boolean {
+    void this.presenceTick
+    const la: any = this.liveAssignment || {}
+    return !!la['specialistJoinedAt'] && !la['specialistLeftAt'] && !this.callEnded
   }
 
   navigateMeeting(doc:any){

@@ -61,7 +61,7 @@
 </div>
 
 <!-- Success Modal -->
-<div class="inv-success-backdrop" *ngIf="invitationAccepted && !waitingForStudio">
+<div class="inv-success-backdrop" *ngIf="invitationAccepted && !waitingForStudio && !busyElsewhere">
   <div class="inv-success-dialog">
 
     <div class="inv-success-icon">
@@ -94,7 +94,7 @@
 <!-- Waiting-for-specialist status — persists after "Got it" until the
      specialist assigns the participant to the studio (inStudio → dismissed,
      Join Meeting screen shows through). -->
-<div class="inv-success-backdrop" *ngIf="waitingForStudio" data-testid="web-inv-waiting-backdrop">
+<div class="inv-success-backdrop" *ngIf="waitingForStudio && !busyElsewhere" data-testid="web-inv-waiting-backdrop">
   <div class="inv-success-dialog">
 
     <div class="inv-success-icon inv-success-icon--waiting">

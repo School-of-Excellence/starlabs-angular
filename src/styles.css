@@ -270,6 +270,24 @@ html:has(.dyn-studio-v2-app) {
 html:has(#zmmtg-root),
 body:has(#zmmtg-root) { background: #000; }
 
+/* Root cause of the strip: the Zoom SDK sets
+   `#zmmtg-root { position:fixed; top:0; height:100% }`. In Safari a fixed
+   element's `height:100%` resolves a toolbar-height SHORT of the visual
+   viewport (Chrome fills it), so #zmmtg-root ends ~50px above the true bottom —
+   the control bar sits up there and the page background shows as a strip below
+   it. Pin the element top-to-bottom (`bottom:0` + `100dvh`, the dynamic
+   viewport height) so it always reaches the real bottom and the controls land
+   where they should. Safari-only via `@supports (-webkit-hyphens:none)` so
+   Chrome — which already lays out correctly — is untouched. Height/inset only:
+   NOT background (that would hide the controls). */
+@supports (-webkit-hyphens: none) {
+  #zmmtg-root {
+    bottom: 0 !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+}
+
 /* =============================================================
    Event Participation Confirmations — CDK overlay theming.
    :host ::ng-deep cannot reach overlays (they mount at <body>), so

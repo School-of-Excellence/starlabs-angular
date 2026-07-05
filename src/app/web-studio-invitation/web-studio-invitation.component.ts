@@ -1,6 +1,6 @@
 import { Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {Firestore, collection, doc, query, where, limit,onSnapshot, updateDoc, DocumentReference} from '@angular/fire/firestore';
+import {Firestore, collection, doc, query, where, onSnapshot, updateDoc, DocumentReference} from '@angular/fire/firestore';
 
 @Component({
   selector: 'app-web-studio-invitation',
@@ -19,6 +19,12 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
   // When it flips true we dismiss the accepted/waiting overlay so the Join
   // Meeting screen underneath becomes visible.
   @Input() inStudio: boolean = false;
+  // True when the participant is actively engaged in another queue-web screen
+  // (an inline form, Evolution Mapping, or already in-studio). While this is
+  // true the "Invitation Accepted / waiting" overlay is suppressed so it can't
+  // block those screens — e.g. a stale/leftover approved invite must not cover a
+  // form the participant is filling. Bound from queue-web.
+  @Input() busyElsewhere: boolean = false;
 
   studioInvitation: Record<string, any> | null = null;
   studioInvitationPath: string | null = null;
@@ -56,6 +62,13 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
     if (changes['inStudio'] && this.inStudio && (this.invitationAccepted || this.waitingForStudio)) {
       this._closeInvitation();
     }
+    // Participant moved into another queue-web screen (form / evolution mapping
+    // / studio) → drop the waiting overlay so it can't block that screen. The
+    // approved-invite listener will re-surface it if they come back and it's
+    // still genuinely pending.
+    if (changes['busyElsewhere'] && this.busyElsewhere && (this.invitationAccepted || this.waitingForStudio)) {
+      this._closeInvitation();
+    }
   }
 
   ngOnDestroy(): void {
@@ -72,20 +85,34 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
   // approved invite disappears (the specialist assigns → the invite doc is
   // deleted, and `inStudio` also flips so the Join Meeting screen shows).
   private ApprovedInvitationListener(): void {
+    // Equality-only query (no composite index needed); staleness + newest-first
+    // are handled in code below.
     const q = query(
       collection(this.firestore, 'studioinvitation'),
       where('profileid',      '==', this.profileid),
       where('queueref',       '==', this.queueref),
-      where('clientresponse', '==', 'approved'),
-      limit(1)
+      where('clientresponse', '==', 'approved')
     );
 
     this.approvedInvitationUnsub = onSnapshot(q, (snap) => {
       if (this.inStudio) return; // already assigned → Join Meeting governs
+      // Don't surface (or resurface) the waiting overlay while the participant is
+      // busy on another screen — it would block that screen.
+      if (this.busyElsewhere) return;
       // A live pending-invitation overlay takes precedence — never stack the
       // waiting card on top of a fresh invite the participant still has to act on.
       const pendingOverlayOpen = this.invitationDialogOpen && !this.invitationAccepted && !!this.studioInvitation;
-      if (!snap.empty) {
+      // Ignore STALE approved invites: an invite whose expiry has already passed
+      // (e.g. a leftover round-robin invite that was never assigned/cleaned up)
+      // must not resurface the blocking overlay on a normal queue visit. A
+      // genuine just-accepted invite still has its expiry in the future. Pick the
+      // newest non-expired approved invite, in code (no orderBy/index).
+      const nowMs = Date.now();
+      const fresh = snap.docs
+        .filter(d => (d.data()['expirydate']?.toDate?.().getTime?.() ?? 0) > nowMs)
+        .sort((a, b) => b.data()['expirydate'].toDate().getTime() - a.data()['expirydate'].toDate().getTime());
+      const notStale = fresh.length > 0;
+      if (notStale) {
         // Only auto-restore on a fresh load. During an in-session accept the
         // success card (invitationAccepted && !waitingForStudio) is already up
         // and its "Got it" drives the transition — don't skip past it.
@@ -94,7 +121,7 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
           this.waitingForStudio   = true;
         }
       } else if (this.waitingForStudio && !this.inStudio) {
-        // Approved invite gone while still waiting (not assigned) → back to queue.
+        // Approved invite gone or expired while still waiting → back to queue.
         this._closeInvitation();
       }
     });
@@ -102,37 +129,56 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
 
   private StudioInvitationListener(): void {
 
+    // Keep the `expirydate > now` filter in the query (server-side). This uses
+    // the ASCENDING composite index that already exists in every project — only
+    // a DESCENDING `orderBy` would have needed a new index, so we still pick the
+    // newest in code (below) rather than via orderBy.
     const q = query(
       collection(this.firestore, 'studioinvitation'),
       where('profileid',      '==', this.profileid),
       where('queueref',       '==', this.queueref),
       where('clientresponse', '==', null),
-      where('expirydate',     '>',  new Date()),
-      limit(1)
+      where('expirydate',     '>',  new Date())
     );
 
     this.studioInvitationUnsub = onSnapshot(q, (snap) => {
-      if (snap.empty) {
+      // The query already excludes expired invites; sort what's left NEWEST-first
+      // (latest expirydate == most recently created) and take [0]. The client
+      // filter is kept as a belt-and-braces guard against clock skew.
+      const nowMs = Date.now();
+      const docs = snap.docs
+        .filter(d => (d.data()['expirydate']?.toDate?.().getTime?.() ?? 0) > nowMs)
+        .sort((a, b) => b.data()['expirydate'].toDate().getTime() - a.data()['expirydate'].toDate().getTime());
+
+      if (docs.length === 0) {
         if (this.invitationDialogOpen && !this.invitationAccepted) {
           this._closeInvitation();
         }
         return;
       }
 
-      const invDoc = snap.docs[0];
+      const invDoc = docs[0];
       const invData = invDoc.data();
-      const secondsRemaining = Math.floor(
-        (invData['expirydate'].toDate().getTime() - Date.now()) / 1000
-      );
+      // Countdown START value. Prefer the invite's intended window
+      // (`durationSeconds`, a plain number) so the timer is driven purely by a
+      // LOCAL 1-second interval — immune to clock skew / timezone differences
+      // between the specialist and participant devices (a device's clock can be
+      // wrong, but it still measures elapsed seconds correctly). Only fall back
+      // to the clock-based `expirydate − now` for older invites that predate the
+      // `durationSeconds` field.
+      const durationSec = Number(invData['durationSeconds']);
+      const startSeconds = (!isNaN(durationSec) && durationSec > 0)
+        ? durationSec
+        : Math.floor((invData['expirydate'].toDate().getTime() - Date.now()) / 1000);
 
-      if (secondsRemaining <= 0) return;
+      if (startSeconds <= 0) return;
 
       if (!this.invitationDialogOpen) {
         this.invitationDialogOpen   = true;
         this.studioInvitationPath   = invDoc.ref.path;
         this.studioInvitation       = invData;
-        this.invitationSeconds      = secondsRemaining;
-        this.invitationTotalSeconds = secondsRemaining;
+        this.invitationSeconds      = startSeconds;
+        this.invitationTotalSeconds = startSeconds;
         this.joinLaterConfirm       = false;
         this.invitationAccepted     = false;
         // A fresh pending invitation supersedes any leftover "waiting for the
@@ -155,9 +201,10 @@ export class WebStudioInvitationComponent implements OnInit, OnChanges, OnDestro
         this.playChime();
         this.chimeInterval = setInterval(() => this.playChime(), 2000);
 
-      } else {
-        this.invitationSeconds = secondsRemaining;
       }
+      // (No else re-sync: once the dialog is open the LOCAL interval owns the
+      // countdown. Re-reading a clock-based remaining here would reintroduce
+      // skew and cause the timer to jump.)
     });
   }
 

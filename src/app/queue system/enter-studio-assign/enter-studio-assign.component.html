@@ -1,10 +1,10 @@
 <div class="esa">
   <!-- Header -->
   <div class="esa__check" aria-hidden="true">
-    <mat-icon>check</mat-icon>
+    <mat-icon>{{ headerIcon }}</mat-icon>
   </div>
-  <h2 class="esa__title">Participant accepted the invitation</h2>
-  <p class="esa__sub" *ngIf="participantName">{{ participantName }} is ready to meet you.</p>
+  <h2 class="esa__title">{{ title }}</h2>
+  <p class="esa__sub" *ngIf="subtitle">{{ subtitle }}</p>
 
   <hr class="esa__divider">
 
@@ -41,8 +41,8 @@
 
   <!-- Optional: invite more specialists -->
   <section class="esa__section esa__section--optional">
-    <h3 class="esa__label">Invite more specialist(s) <span class="esa__opt">· optional</span></h3>
-    <p class="esa__hint">Add another specialist for this session. You can also bring in a shadow participant or another activity once inside the studio.</p>
+    <h3 class="esa__label">{{ optionalTitle }} <span class="esa__opt" *ngIf="optionalShowOptionalTag">· optional</span></h3>
+    <p class="esa__hint" *ngIf="optionalHint">{{ optionalHint }}</p>
 
     <div class="esa__row" *ngFor="let row of optionalRows; let i = index">
       <div class="esa__rowhead">
@@ -81,7 +81,7 @@
   <div class="esa__foot">
     <button type="button" class="esa__ghost" (click)="dialogRef.close(null)">Cancel</button>
     <button type="button" class="esa__enter" [disabled]="!canEnter" (click)="enterStudio()" data-testid="esa-enter-studio">
-      Enter Studio <mat-icon>arrow_forward</mat-icon>
+      {{ ctaLabel }} <mat-icon>arrow_forward</mat-icon>
     </button>
   </div>
 </div>

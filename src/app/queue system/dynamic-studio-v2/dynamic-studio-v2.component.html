@@ -283,19 +283,44 @@
         <div class="ds-side-idbody">
           <div class="ds-side-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
           <div class="ds-side-sub">
-            <span *ngIf="participantUPVisitLabel">{{ participantUPVisitLabel }} at uP!</span><span *ngIf="participantUPVisitLabel && participantJourneyName"> &middot; </span><span *ngIf="participantJourneyName" [title]="participantJourneyName">{{ participantJourneyName }}</span>
+            <span *ngIf="participantUPVisitLabel">{{ participantUPVisitLabel }} at uP!</span><span *ngIf="participantUPVisitLabel && participantJourneyName"> &middot; </span><span *ngIf="participantJourneyName" [title]="participantJourneyName"><span class="ds-side-journey-label">Journey:</span> {{ participantJourneyName }}</span>
           </div>
           <div class="ds-side-specialists" *ngIf="additionalSpecialists.length"
-               [class.ds-side-specialists--multi]="additionalSpecialists.length > 1">
+               [class.ds-side-specialists--multi]="additionalSpecialists.length > 1"
+               [class.ds-side-specialists--collapsible]="additionalSpecialists.length > 3">
             <div class="ds-side-specialists__head">
               <mat-icon class="ic">groups</mat-icon>
               <span class="ds-side-specialists__label">With<span *ngIf="additionalSpecialists.length > 1"> · {{ additionalSpecialists.length }}</span></span>
+              <!-- Compact "View all" chip: only shown (via CSS) when the roster is
+                   collapsible AND the window is short (zoomed in), so a long roster
+                   can't push the Session Steps off-screen. Opens the overlay below. -->
+              <button type="button" class="ds-side-specialists__more"
+                      (click)="specialistsOverlayOpen = true" data-testid="studio-specialists-viewall">
+                View all
+              </button>
             </div>
             <ul class="ds-side-specialists__list">
               <li class="ds-side-specialists__item" *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
                 <span class="ds-side-specialists__name">{{ sp.name }}</span><span *ngIf="sp.activity" class="ds-side-specialists__role"> ({{ sp.activity }})</span>
               </li>
             </ul>
+
+            <!-- Full-roster overlay (opened from the "View all" chip). -->
+            <ng-container *ngIf="specialistsOverlayOpen">
+              <div class="ds-spec-overlay-backdrop" (click)="specialistsOverlayOpen = false"></div>
+              <div class="ds-spec-overlay" role="dialog">
+                <div class="ds-spec-overlay__head">
+                  <mat-icon class="ic">groups</mat-icon>
+                  <span>With · {{ additionalSpecialists.length }}</span>
+                  <button type="button" class="ds-spec-overlay__close" (click)="specialistsOverlayOpen = false" aria-label="Close">&#10005;</button>
+                </div>
+                <ul class="ds-spec-overlay__list">
+                  <li *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
+                    <span class="ds-spec-overlay__name">{{ sp.name }}</span><span *ngIf="sp.activity" class="ds-spec-overlay__role"> ({{ sp.activity }})</span>
+                  </li>
+                </ul>
+              </div>
+            </ng-container>
           </div>
         </div>
       </div>
@@ -480,8 +505,34 @@
               </div>
             </div>
 
-            <!-- Love Letters (moved here from the Previous ATC step, per mockup) -->
-            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('loveletters')">
+            <!-- Love Letters now live in Step 2 (Previous ATC & Love Letters). -->
+          </ng-container>
+
+          <!-- ========================= STEP 2: ATC & Love Letters =========================
+               Mounted ONCE (prevHistoryMounted) then toggled with [hidden] instead of
+               *ngIf, so the heavy <app-view-participant-atc> child loads a single time and
+               persists rather than re-fetching all its ATC getDocs on every step change. -->
+          <ng-container *ngIf="prevHistoryMounted">
+            <div class="step-compact" [hidden]="activeStepId !== 'prev-history'">
+            <!-- Previous ATC History -->
+            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')">
+              <div class="card-pad">
+                <h3 class="section-title">Previous ATC History</h3>
+                @defer (on viewport) {
+                  <app-view-participant-atc
+                    [profileid]="liveAssignment['participantid']"
+                    [excludeQueueId]="ongoingQueue['docid']">
+                  </app-view-participant-atc>
+                } @placeholder {
+                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
+                } @loading {
+                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
+                }
+              </div>
+            </div>
+
+            <!-- Love Letters (Step 2, per mockup) — rounded on all sides -->
+            <div class="card ds-ll-card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('loveletters')">
               <div class="card-head tint-slate">
                 <div class="card-head-title">
                   <mat-icon class="ic">favorite_border</mat-icon>
@@ -514,30 +565,6 @@
                     <div class="ll-item__content" [innerHTML]="letter.loveletter || '-'"></div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </ng-container>
-
-          <!-- ========================= STEP 2: ATC & Love Letters =========================
-               Mounted ONCE (prevHistoryMounted) then toggled with [hidden] instead of
-               *ngIf, so the heavy <app-view-participant-atc> child loads a single time and
-               persists rather than re-fetching all its ATC getDocs on every step change. -->
-          <ng-container *ngIf="prevHistoryMounted">
-            <div class="step-compact" [hidden]="activeStepId !== 'prev-history'">
-            <!-- Previous ATC History -->
-            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')">
-              <div class="card-pad">
-                <h3 class="section-title">Previous ATC History</h3>
-                @defer (on viewport) {
-                  <app-view-participant-atc
-                    [profileid]="liveAssignment['participantid']"
-                    [excludeQueueId]="ongoingQueue['docid']">
-                  </app-view-participant-atc>
-                } @placeholder {
-                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
-                } @loading {
-                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
-                }
               </div>
             </div>
 
@@ -606,8 +633,8 @@
                 </div>
                 <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
                         (click)="joinOpenViduRoom()" data-testid="studio-openvidu-start-btn">
-                  <mat-icon class="ic">play_arrow</mat-icon>
-                  <span class="start-meeting-btn__label">Start Meeting</span>
+                  <mat-icon class="ic">{{ specialistInMeeting ? 'videocam' : 'play_arrow' }}</mat-icon>
+                  <span class="start-meeting-btn__label">{{ specialistInMeeting ? 'In Meeting' : 'Start Meeting' }}</span>
                 </button>
               </div>
 
@@ -643,9 +670,16 @@
                 <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
                         (click)="navigateMeeting(liveAssignment)" data-testid="studio-zoom-start-btn"
                         [disabled]="liveAssignment['zoomdata'] === undefined || isZoomLinkBroken || callEnded">
-                  <mat-icon class="ic">play_arrow</mat-icon>
-                  <span class="start-meeting-btn__label">Start Meeting</span>
+                  <mat-icon class="ic">{{ specialistInMeeting ? 'videocam' : 'play_arrow' }}</mat-icon>
+                  <span class="start-meeting-btn__label">{{ specialistInMeeting ? 'In Meeting' : 'Start Meeting' }}</span>
                 </button>
+
+                <!-- Recording reminder — placed right under Start Meeting so it's
+                     seen before joining (moved up from the bottom of the step). -->
+                <div class="zoom-record-note zoom-record-note--inline">
+                  <mat-icon class="ic">fiber_manual_record</mat-icon>
+                  Once the call starts, make sure Zoom recording is enabled.
+                </div>
 
                 <!-- Generate a fresh link — MOVED inside this meeting card so it's
                      part of the Start Meeting section, not a separate block. -->
@@ -687,12 +721,6 @@
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <!-- Recording reminder (mockup) -->
-              <div class="zoom-record-note">
-                <mat-icon class="ic">fiber_manual_record</mat-icon>
-                Once the call starts, make sure Zoom recording is enabled.
               </div>
 
             </div>
@@ -818,6 +846,18 @@
                   <div class="empty-text">No AEL Found</div>
                 </div>
 
+                <!-- Read-only display of the participant's AEL across all areas
+                     (legacy dynamic-studio parity). Shown whenever an AEL exists,
+                     even after it's validated, so the specialist can always see
+                     the current level per area — the modal is only for editing. -->
+                <div class="ael-areas" *ngIf="participantAEL['crossovermetric'] != null">
+                  <div class="ael-area" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; let i = index">
+                    <span class="ael-area__num">{{ i + 1 }}.</span>
+                    <span class="ael-area__name" [title]="crossover.key">{{ crossover.key }}</span>
+                    <span class="ael-area__level">{{ aelBandLabel(crossover.value['value']) }}</span>
+                  </div>
+                </div>
+
                 <div class="ael-actions" *ngIf="participantAEL['crossovermetric'] != null">
                   <button type="button" class="btn btn-lg"
                           [class.btn-green]="participantAEL['aelStatus'] === 'validated'"
@@ -858,10 +898,26 @@
         Next
         <mat-icon class="ic">arrow_forward</mat-icon>
       </button>
-      <button type="button" class="btn btn-ghost" *ngIf="activeStepIndex === visibleSteps.length - 1" disabled>
-        <mat-icon class="ic">check</mat-icon>
-        Last step
-      </button>
+      <!-- On the last step, the "Next" arrow becomes the Move-Next-Stage action
+           (opens the same centered "Choose next stage" menu as the header). -->
+      <div class="ds-footer-next" *ngIf="activeStepIndex === visibleSteps.length - 1">
+        <button type="button" class="btn btn-primary"
+                (click)="toggleNextStageMenu('footer')"
+                [class.is-open]="nextStageMenuOpen === 'footer'"
+                matTooltip="Complete the session and choose where this participant goes next"
+                matTooltipShowDelay="150"
+                data-testid="studio-move-next-stage-footer-btn">
+          Move Next Stage
+          <mat-icon class="ic">arrow_forward</mat-icon>
+        </button>
+        <ng-container *ngIf="nextStageMenuOpen === 'footer'">
+          <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
+          <div class="ds-nextmenu ds-nextmenu--center">
+            <div class="ds-nextmenu__head">Choose next stage</div>
+            <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+          </div>
+        </ng-container>
+      </div>
     </footer>
 
     <!-- ===================== MOVE-TO-NEXT-STAGE MENU ITEMS (mockup) =====================

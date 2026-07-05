@@ -54,6 +54,28 @@ export class EnterStudioAssignComponent {
   requiredRows: EsaRow[] = []
   optionalRows: EsaRow[] = []
 
+  // ---- Mode / copy ---------------------------------------------------------
+  // Two modes share the same chips UI:
+  //  - 'enter'  (default): the lobby "Participant accepted the invitation" popup
+  //             shown after a studio invite is approved. Studio-mandatory +
+  //             carried-over activities become locked/required rows; returns the
+  //             full studio object + participants + bonusactivity.
+  //  - 'invite': the live-studio "Invite More Specialist(s)" popup. No required
+  //             rows — the whole dialog is the optional add-specialist flow; it
+  //             returns ONLY { bonusactivity } so the caller can merge it into
+  //             the live assignment.
+  // All copy (title/subtitle/CTA/header icon/section label) is overridable via
+  // dialog data so a single component serves both flows; defaults reproduce the
+  // original 'enter' popup verbatim.
+  mode: 'enter' | 'invite' = 'enter'
+  title = 'Participant accepted the invitation'
+  subtitle = ''
+  ctaLabel = 'Enter Studio'
+  headerIcon = 'check'
+  optionalTitle = 'Invite more specialist(s)'
+  optionalShowOptionalTag = true
+  optionalHint = 'Add another specialist for this session. You can also bring in a shadow participant or another activity once inside the studio.'
+
   constructor(
     @Inject(MAT_DIALOG_DATA) data: any,
     public dialogRef: MatDialogRef<any>
@@ -65,6 +87,20 @@ export class EnterStudioAssignComponent {
       this.mapActivity = data['mapactivity'] ?? {}
       this.mapProfile = data['mapprofile'] ?? {}
       this.activitySpecialists = data['activityspecialists'] ?? {}
+
+      // Mode + overridable copy (defaults reproduce the original 'enter' popup).
+      this.mode = data['mode'] === 'invite' ? 'invite' : 'enter'
+      this.title = data['title'] ?? this.title
+      this.ctaLabel = data['cta'] ?? this.ctaLabel
+      this.subtitle = data['subtitle'] ?? (this.participantName ? `${this.participantName} is ready to meet you.` : '')
+      if (this.mode === 'invite') {
+        // Invite-more copy: no "accepted invitation" framing, no required rows.
+        this.headerIcon = 'group_add'
+        this.optionalTitle = data['optionaltitle'] ?? 'Choose activity & specialist(s)'
+        this.optionalShowOptionalTag = false
+        this.optionalHint = data['optionalhint'] ?? 'Pick an activity, then tap the specialists to add them to this studio.'
+      }
+
       // Precompute the activity option list ONCE (stable reference). The
       // dropdown *ngFor binds to `filteredActivities` (a cached array), never a
       // method — a method in *ngFor returns a new array every change-detection
@@ -77,23 +113,44 @@ export class EnterStudioAssignComponent {
       // No mentor-selection UI: the studio's own specialists (incl. the
       // logged-in one) are always the session participants — see enterStudio().
 
-      // Studio-level mandatory activities -> locked required rows.
-      const mandatory: string[] = this.studio?.['mandatoryactivities'] ?? []
-      mandatory.forEach(activityId => {
-        this.requiredRows.push({ activity: activityId, mandatory: true, locked: true, selected: new Set() })
-      })
-
-      // Activities carried over from a stage-grouping transfer (prefilled,
-      // still required, but activity is editable).
       const additional = data['additionalactivities'] ?? {}
-      Object.keys(additional).forEach(activityId => {
-        this.requiredRows.push({
-          activity: activityId,
-          mandatory: true,
-          locked: false,
-          selected: new Set<string>(additional[activityId] ?? []),
+
+      if (this.mode === 'invite') {
+        // Invite-more: the whole dialog is the optional add-specialist flow.
+        // Prefill rows from any existing bonus activities passed in; otherwise
+        // start with one empty row (activity dropdown + specialist chips).
+        const keys = Object.keys(additional)
+        if (keys.length) {
+          keys.forEach(activityId => {
+            this.optionalRows.push({
+              activity: activityId,
+              mandatory: false,
+              locked: false,
+              selected: new Set<string>(additional[activityId] ?? []),
+            })
+          })
+        } else {
+          this.optionalRows.push({ activity: null, mandatory: false, locked: false, selected: new Set() })
+        }
+      } else {
+        // Enter (lobby) mode: studio-level mandatory activities -> locked
+        // required rows.
+        const mandatory: string[] = this.studio?.['mandatoryactivities'] ?? []
+        mandatory.forEach(activityId => {
+          this.requiredRows.push({ activity: activityId, mandatory: true, locked: true, selected: new Set() })
         })
-      })
+
+        // Activities carried over from a stage-grouping transfer (prefilled,
+        // still required, but activity is editable).
+        Object.keys(additional).forEach(activityId => {
+          this.requiredRows.push({
+            activity: activityId,
+            mandatory: true,
+            locked: false,
+            selected: new Set<string>(additional[activityId] ?? []),
+          })
+        })
+      }
     }
   }
 
@@ -151,6 +208,15 @@ export class EnterStudioAssignComponent {
 
   // ---- Submit ------------------------------------------------------------
   get canEnter(): boolean {
+    if (this.mode === 'invite') {
+      // At least one specialist must be chosen, and no half-filled row
+      // (activity picked but no specialist, or vice-versa).
+      if (this.optionalRows.length === 0) return false
+      for (const r of this.optionalRows) {
+        if (!r.activity || r.selected.size === 0) return false
+      }
+      return true
+    }
     // Mentor selection is no longer gated — the logged-in specialist is always
     // included, so only the required activity rows must be complete.
     for (const r of this.requiredRows) {
@@ -164,6 +230,19 @@ export class EnterStudioAssignComponent {
 
   enterStudio() {
     if (!this.canEnter) return
+
+    if (this.mode === 'invite') {
+      // Invite-more: return ONLY the bonus-activity map so the caller merges it
+      // into the live assignment (no studio / participants payload).
+      const bonusActivity: { [participantId: string]: string } = {}
+      for (const r of this.optionalRows) {
+        if (!r.activity) continue
+        r.selected.forEach(pid => { bonusActivity[pid] = r.activity as string })
+      }
+      this.dialogRef.close({ bonusactivity: bonusActivity })
+      return
+    }
+
     const result = { ...this.studio }
     // The studio's own specialists (incl. the logged-in one) are the session
     // participants — no in-popup mentor selection.

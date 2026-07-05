@@ -4,7 +4,8 @@
     [profileid]="user.profileid"
     [queueref]="profileJourneyProduct['queuetoken']['queueref']"
     [useremail]="user.email"
-    [inStudio]="isInStudio()">
+    [inStudio]="isInStudio()"
+    [busyElsewhere]="showInlineForm || isInStudio() || profileJourneyProduct?.['currentstage'] === 'In Evolution Mapping Activity'">
   </app-web-studio-invitation>
   <!-- Loading -->
   <div class="qwv-loading" *ngIf="loadingQueue">
