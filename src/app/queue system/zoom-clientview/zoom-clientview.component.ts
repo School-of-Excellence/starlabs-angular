@@ -1,4 +1,4 @@
-import { Component, OnInit, NgZone } from '@angular/core';
+import { Component, OnInit, NgZone, HostListener } from '@angular/core';
 import { arrayUnion, collection, doc, docData, Firestore, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute } from '@angular/router';
@@ -58,6 +58,22 @@ export class ZoomClientviewComponent {
   private subscription: Subscription;
 
   isJoined: boolean = false;
+
+  // Safari-only custom control bar. Confirmed (bisect 2026-07-06): Safari does
+  // NOT paint the Zoom SDK 6.1.0 control bar (present + clickable but invisible)
+  // — inherent SDK/Safari bug, not fixable from CSS. So on Safari we render our
+  // OWN bar (plain Angular DOM paints fine) wired to the real Zoom actions.
+  isSafariBrowser = false;
+  customMuted = false;
+  private zoomUserId: number | string | null = null;
+
+  // Custom mic/camera device menu (anchored to the caret). Zoom's own menu works
+  // in Safari but appears dislocated, so we read its items and show them here.
+  menuKind: '' | 'audio' | 'video' = '';
+  menuItems: { label: string; checked: boolean; header: boolean }[] = [];
+  menuLeft = 0;          // px, anchored to the clicked caret
+  menuBottom = 150;      // px from viewport bottom
+  private nativeMenuItems: (HTMLElement | null)[] = [];
 
   // Participant "wait for specialist" state (queue/studio flow only)
   waitingForSpecialist: boolean = false;
@@ -631,8 +647,224 @@ export class ZoomClientviewComponent {
   }
   // -------------------- end attention grabbers --------------------
 
+  // ---- Safari-only custom control bar ----
+  private safariSyncTimer: any = null;
+  private initSafariControls(): void {
+    // Reliable Safari detection: UA has "Safari" but none of the other engines
+    // that also include "Safari" in their UA (Chrome/Chromium/CriOS/Edge/Android
+    // WebView/Firefox-iOS). The previous negative-lookahead regex mis-fired.
+    const ua = navigator.userAgent || '';
+    const isSafari =
+      /safari/i.test(ua) && !/chrome|chromium|crios|edg|edgios|android|fxios|opr|opera/i.test(ua);
+    // Runs inside runOutsideAngular (join callback) — flip the flag inside the
+    // zone or the *ngIf that shows the bar never re-evaluates.
+    this.ngZone.run(() => { this.isSafariBrowser = isSafari; });
+    if (!isSafari || this.safariSyncTimer) return;
+    // Mirror the mic/video state from the NATIVE control bar's own button labels
+    // ("Mute"/"Unmute", "Start Video"/"Stop Video") — the source of truth. The
+    // earlier getCurrentUser/bVideoOn path was unreliable, so the toggle UI
+    // lagged/reversed. Poll on a short timer; only re-enter Angular on a real
+    // change. Runs outside Angular. Cleared in ngOnDestroy.
+    this.ngZone.runOutsideAngular(() => {
+      this.safariSyncTimer = setInterval(() => this.syncNativeState(), 500);
+    });
+    this.syncNativeState();
+  }
+
+  private stopSafariControls(): void {
+    if (this.safariSyncTimer) { clearInterval(this.safariSyncTimer); this.safariSyncTimer = null; }
+  }
+
+  // Derive the true mic/video state from the native footer buttons' combined
+  // text + aria-label ("Mute"/"Unmute" → muted; "Start/Stop Video" → off/on).
+  // Robust to whether the SDK renders a visible label span or only aria.
+  private syncNativeState(): void {
+    const nodes = Array.from(document.querySelectorAll('#zmmtg-root .footer-button-base__button'));
+    let muted: boolean | null = null;
+    let videoOn: boolean | null = null;
+    for (const el of nodes) {
+      const t = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+      if (muted === null && /\bmute\b|\bunmute\b/.test(t) && !/mute all/.test(t)) {
+        muted = /unmute/.test(t);              // "unmute" shown ⇒ currently muted
+      }
+      if (videoOn === null && /\bvideo\b/.test(t)) {
+        if (/stop/.test(t)) videoOn = true;    // "stop video" ⇒ on
+        else if (/start/.test(t)) videoOn = false;
+      }
+    }
+    const nextMuted = muted === null ? this.customMuted : muted;
+    const nextVideo = videoOn === null ? this.customVideoOn : videoOn;
+    if (nextMuted !== this.customMuted || nextVideo !== this.customVideoOn) {
+      this.ngZone.run(() => { this.customMuted = nextMuted; this.customVideoOn = nextVideo; });
+    }
+  }
+
+  toggleCustomMute(): void {
+    // Click the native Mute/Unmute button; the poll reflects the new state.
+    this.clickNativeControl(/\b(un)?mute\b/i);
+  }
+
+  leaveCall(): void {
+    const ZM: any = ZoomMtg as any;
+    try { ZM.leaveMeeting({}); }
+    catch { try { ZM.leaveMeeting({ confirm: false }); } catch { /* no-op */ } }
+  }
+
+  // Host: end the meeting for everyone.
+  endForAll(): void {
+    const ZM: any = ZoomMtg as any;
+    try { ZM.endMeeting({}); }
+    catch { try { ZM.leaveMeeting({}); } catch { /* no-op */ } }
+  }
+
+  // ---- Controls with no Client-View API: click the (invisible) native button ----
+  // The SDK control bar is in the DOM but unpainted in Safari; its buttons are
+  // still real + clickable, so we proxy to them. Match by visible label text
+  // (English — the app loads en-US) or aria-label.
+  private clickNativeControl(match: RegExp): boolean {
+    const nodes = document.querySelectorAll(
+      '#zmmtg-root .footer-button-base__button, #zmmtg-root .footer__leave-btn, #zmmtg-root [class*="footer"][role="button"]'
+    );
+    for (const el of Array.from(nodes)) {
+      const t = ((el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '')).trim();
+      if (match.test(t)) { (el as HTMLElement).click(); return true; }
+    }
+    return false;
+  }
+
+  // Camera on/off — no Client-View API, so click the native Start/Stop Video
+  // button. The native-state poll (syncNativeState) reflects the real state.
+  customVideoOn = false;
+  toggleVideo(): void {
+    this.clickNativeControl(/\bvideo\b/i);
+  }
+
+  // Screen share — click the native Share button (API path is unreliable here).
+  shareScreen(): void {
+    const ZM: any = ZoomMtg as any;
+    try { if (typeof ZM.startScreenShare === 'function') { ZM.startScreenShare({}); return; } } catch { /* fall through */ }
+    this.clickNativeControl(/\bshare\b/i);
+  }
+
+  // Participants panel / Chat panel — toggle the native panels (they render as
+  // side panels, which DO paint; only the bottom bar was the problem).
+  toggleParticipants(): void { this.clickNativeControl(/participant/i); }
+  toggleChat(): void { this.clickNativeControl(/\bchat\b/i); }
+
+  // Raise / lower hand.
+  customHandRaised = false;
+  toggleHand(): void {
+    const ZM: any = ZoomMtg as any;
+    const next = !this.customHandRaised;
+    try {
+      if (next && typeof ZM.raiseHand === 'function') ZM.raiseHand({});
+      else if (!next && typeof ZM.lowerHand === 'function') ZM.lowerHand({});
+      else this.clickNativeControl(/hand/i);
+      this.customHandRaised = next;
+    } catch { this.clickNativeControl(/hand/i); }
+  }
+
+  // Host: start/stop cloud recording.
+  customRecording = false;
+  toggleRecord(): void {
+    const ZM: any = ZoomMtg as any;
+    const next = !this.customRecording;
+    try { ZM.record({ record: next }); this.customRecording = next; }
+    catch { this.clickNativeControl(/record/i); }
+  }
+
+  // Host: mute / unmute everyone.
+  customAllMuted = false;
+  toggleMuteAll(): void {
+    const ZM: any = ZoomMtg as any;
+    const next = !this.customAllMuted;
+    try { ZM.muteAll({ muteAll: next }); this.customAllMuted = next; }
+    catch { /* no-op */ }
+  }
+
+  // ---- Device dropdowns (mic / camera), anchored to the caret ----
+  toggleDeviceMenu(kind: 'audio' | 'video', ev: Event): void {
+    ev.stopPropagation();
+    if (this.menuKind === kind) { this.closeDeviceMenu(); return; }
+    // Anchor the menu above the clicked caret (clamped to the viewport).
+    const caret = ev.currentTarget as HTMLElement;
+    const r = caret.getBoundingClientRect();
+    this.menuLeft = Math.max(8, Math.min(r.left + r.width / 2 - 140, window.innerWidth - 288));
+    this.menuBottom = Math.max(8, window.innerHeight - r.top + 8);
+    // Open Zoom's native menu (it paints in Safari), read its items, then hide
+    // it and show our own copy anchored to the caret. Two reads (fast + slower)
+    // in case the portal renders late.
+    this.clickNativeControl(kind === 'audio' ? /more audio/i : /more video/i);
+    setTimeout(() => this.readNativeMenu(kind), 120);
+    setTimeout(() => { if (this.menuKind === kind && this.menuItems.length <= 1) this.readNativeMenu(kind); }, 380);
+  }
+
+  // Find the device menu for THIS kind only — search strictly within the kind's
+  // own `.audio-option-menu` / `.video-option-menu` subtree (searching generic
+  // dropdowns cross-matched the wrong menu).
+  private findDeviceMenu(kind: 'audio' | 'video'): Element | null {
+    const base = kind === 'audio' ? '.audio-option-menu' : '.video-option-menu';
+    const cands = Array.from(document.querySelectorAll(
+      `${base}, ${base} .dropdown-menu, ${base} ul, ${base} [role="menu"]`
+    ));
+    let best: Element | null = null; let bestN = 0;
+    for (const c of cands) {
+      if (!c.getClientRects().length) continue;          // not rendered
+      const n = c.querySelectorAll('a, li').length;
+      if (n > bestN) { bestN = n; best = c; }
+    }
+    return best || document.querySelector(base);
+  }
+
+  private readNativeMenu(kind: 'audio' | 'video'): void {
+    const menu = this.findDeviceMenu(kind);
+    const items: { label: string; checked: boolean; header: boolean }[] = [];
+    const refs: (HTMLElement | null)[] = [];
+    if (menu) {
+      const rows = Array.from(menu.querySelectorAll('li, a, [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]'));
+      const seen = new Set<string>();
+      for (const row of rows) {
+        // Skip a container li that only wraps an <a> we'll also see.
+        if (row.tagName === 'LI' && row.querySelector('a, [role^="menuitem"]')) continue;
+        const label = (row.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!label || label.length > 90 || seen.has(label)) continue;
+        seen.add(label);
+        const clickable = row.tagName === 'A' || /menuitem/i.test(row.getAttribute('role') || '') || !!(row as HTMLElement).onclick;
+        const cls = '' + (row as HTMLElement).className;
+        const checked = /checked|selected|active/i.test(cls) || row.getAttribute('aria-checked') === 'true'
+          || !!row.querySelector('[class*="check"], [class*="selected"], .zm-icon-checkmark');
+        items.push({ label, checked, header: !clickable });
+        refs.push(row as HTMLElement);
+      }
+    }
+    // Hide the native (dislocated) menu now that we've mirrored it.
+    if (menu) { (menu as HTMLElement).style.visibility = 'hidden'; }
+    this.nativeMenuItems = refs;
+    this.ngZone.run(() => { this.menuItems = items; this.menuKind = kind; });
+  }
+
+  clickDeviceItem(i: number, item: { header: boolean }): void {
+    if (item.header) return;
+    const el = this.nativeMenuItems[i];
+    if (el) { el.style.visibility = ''; el.click(); }
+    this.closeDeviceMenu();
+  }
+
+  closeDeviceMenu(): void {
+    this.nativeMenuItems = [];
+    this.ngZone.run(() => { this.menuKind = ''; this.menuItems = []; });
+    try { document.body.click(); } catch { /* dismiss native popup */ }
+  }
+
+  // Close on any click outside the menu/pill (both stop propagation).
+  @HostListener('document:click')
+  private onDocumentClick(): void {
+    if (this.menuKind) { this.nativeMenuItems = []; this.ngZone.run(() => { this.menuKind = ''; this.menuItems = []; }); }
+  }
+
   ngOnDestroy() {
     window.removeEventListener('keydown', this.boundKeyDown);
+    this.stopSafariControls();
     this.clearScreenshots();
     this.waitingSub?.unsubscribe();
     this.waitingSub = null;
@@ -870,6 +1102,10 @@ export class ZoomClientviewComponent {
                 this.ngZone.run(() => {
                   this.isJoined = true;
                 });
+
+                // Safari: stand up our own control bar (SDK bar is invisible in
+                // Safari). No-op on Chrome.
+                this.initSafariControls();
 
                 // Host has actually entered the Zoom meeting — release any
                 // participant waiting on the studio gate, and start the

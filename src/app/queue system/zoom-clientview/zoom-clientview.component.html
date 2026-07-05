@@ -178,6 +178,79 @@
     </div>
   </div>
 
+  <!-- Safari-only custom control bar. The Zoom SDK 6.1.0 control bar renders
+       invisibly in Safari (bisect-confirmed inherent bug), so on Safari we show
+       our own bar wired to the real Zoom actions. Chrome uses the native bar. -->
+  <!-- Device menu, anchored above the pill (opens upward) -->
+  <div class="sx-zc-menu" *ngIf="menuKind && isSafariBrowser" (click)="$event.stopPropagation()"
+       [style.left.px]="menuLeft" [style.bottom.px]="menuBottom">
+    <div class="sx-zc-menu-title">{{ menuKind === 'audio' ? 'Audio' : 'Camera' }} options</div>
+    <ng-container *ngFor="let it of menuItems; let i = index">
+      <div *ngIf="it.header" class="sx-zc-menu-item sx-zc-menu-item--header">{{ it.label }}</div>
+      <button *ngIf="!it.header" type="button" class="sx-zc-menu-item"
+              [class.sx-zc-menu-item--checked]="it.checked" (click)="clickDeviceItem(i, it)">
+        <mat-icon>{{ it.checked ? 'check' : '' }}</mat-icon>
+        <span>{{ it.label }}</span>
+      </button>
+    </ng-container>
+    <div class="sx-zc-menu-item sx-zc-menu-item--header" *ngIf="!menuItems.length">No devices found</div>
+  </div>
+
+  <div class="sx-zoom-controls" *ngIf="isJoined && isSafariBrowser" (click)="$event.stopPropagation()">
+    <div class="sx-zc-group">
+      <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customMuted"
+              (click)="toggleCustomMute()" [title]="customMuted ? 'Unmute' : 'Mute'">
+        <mat-icon>{{ customMuted ? 'mic_off' : 'mic' }}</mat-icon>
+        <span>{{ customMuted ? 'Unmute' : 'Mute' }}</span>
+      </button>
+      <button type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'audio'"
+              (click)="toggleDeviceMenu('audio', $event)" title="Audio device options">
+        <mat-icon>expand_less</mat-icon>
+      </button>
+    </div>
+    <div class="sx-zc-group">
+      <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="!customVideoOn"
+              (click)="toggleVideo()" [title]="customVideoOn ? 'Stop Video' : 'Start Video'">
+        <mat-icon>{{ customVideoOn ? 'videocam' : 'videocam_off' }}</mat-icon>
+        <span>{{ customVideoOn ? 'Stop Video' : 'Start Video' }}</span>
+      </button>
+      <button type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'video'"
+              (click)="toggleDeviceMenu('video', $event)" title="Camera device options">
+        <mat-icon>expand_less</mat-icon>
+      </button>
+    </div>
+    <button type="button" class="sx-zc-btn" (click)="toggleParticipants()" title="Participants">
+      <mat-icon>groups</mat-icon><span>Participants</span>
+    </button>
+    <button type="button" class="sx-zc-btn" (click)="toggleChat()" title="Chat">
+      <mat-icon>chat</mat-icon><span>Chat</span>
+    </button>
+    <button type="button" class="sx-zc-btn" (click)="shareScreen()" title="Share Screen">
+      <mat-icon>screen_share</mat-icon><span>Share</span>
+    </button>
+    <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customHandRaised"
+            (click)="toggleHand()" [title]="customHandRaised ? 'Lower Hand' : 'Raise Hand'">
+      <mat-icon>front_hand</mat-icon><span>{{ customHandRaised ? 'Lower' : 'Raise' }}</span>
+    </button>
+    <button type="button" class="sx-zc-btn" *ngIf="profileHost"
+            [class.sx-zc-btn--muted]="customRecording" (click)="toggleRecord()"
+            [title]="customRecording ? 'Stop Recording' : 'Record'">
+      <mat-icon>fiber_manual_record</mat-icon><span>{{ customRecording ? 'Stop Rec' : 'Record' }}</span>
+    </button>
+    <button type="button" class="sx-zc-btn" *ngIf="profileHost" (click)="toggleMuteAll()"
+            [title]="customAllMuted ? 'Unmute All' : 'Mute All'">
+      <mat-icon>voice_over_off</mat-icon><span>{{ customAllMuted ? 'Unmute All' : 'Mute All' }}</span>
+    </button>
+    <span class="sx-zc-sep"></span>
+    <button type="button" class="sx-zc-btn sx-zc-btn--leave" (click)="leaveCall()" title="Leave meeting">
+      <mat-icon>call_end</mat-icon><span>Leave</span>
+    </button>
+    <button type="button" class="sx-zc-btn sx-zc-btn--leave" *ngIf="profileHost"
+            (click)="endForAll()" title="End meeting for all">
+      <mat-icon>cancel</mat-icon><span>End all</span>
+    </button>
+  </div>
+
   <div id="aria-notify-area"></div>
 </body>
 </html>

@@ -255,38 +255,19 @@ html:has(.dyn-studio-v2-app) {
 }
 
 /* =============================================================
-   Zoom meeting view — hide the Safari bottom strip.
-   Safari sizes the Zoom gallery a hair under the window height, exposing a
-   strip of page background along the bottom (Chrome fills it). Paint the page
-   BLACK so that gap blends into the meeting instead of flashing white/grey.
-   COLOUR-ONLY — no layout change, so it can't clip video tiles or name labels.
-   Must target `html` AS WELL AS `body`: the zoom-clientview template renders a
-   nested <body> that can be shorter than the viewport, so `body:has()` alone
-   leaves the <html> element's default white showing below it (that was the
-   remaining strip). Scoped to the meeting route via #zmmtg-root.
-   Do NOT set `#zmmtg-root { background:#000 }` — that paints over the control
-   toolbar and hides the Zoom controls in Safari.
-   ============================================================= */
+   Zoom meeting view — blend the Safari bottom gap to black.
+   Safari sizes the Zoom gallery a hair under the window height, leaving a strip
+   of page background at the bottom. Paint the page black so it blends into the
+   meeting instead of flashing white. COLOUR ONLY — no layout change. Targets
+   `html` AND `body` (the template renders a nested <body> shorter than the
+   viewport). Harmless in Chrome.
+   Bisect (2026-07-06) confirmed the Safari control-bar being hidden is INHERENT
+   to Zoom SDK 6.1.0 (present even on 3-days-ago code), NOT a recent regression —
+   so we do NOT try to reposition #zmmtg-root (that only displaced the bar). The
+   real fix for visible Safari controls is the custom control bar rendered by the
+   component (see .sx-zoom-controls + isSafariBrowser). */
 html:has(#zmmtg-root),
 body:has(#zmmtg-root) { background: #000; }
-
-/* Root cause of the strip: the Zoom SDK sets
-   `#zmmtg-root { position:fixed; top:0; height:100% }`. In Safari a fixed
-   element's `height:100%` resolves a toolbar-height SHORT of the visual
-   viewport (Chrome fills it), so #zmmtg-root ends ~50px above the true bottom —
-   the control bar sits up there and the page background shows as a strip below
-   it. Pin the element top-to-bottom (`bottom:0` + `100dvh`, the dynamic
-   viewport height) so it always reaches the real bottom and the controls land
-   where they should. Safari-only via `@supports (-webkit-hyphens:none)` so
-   Chrome — which already lays out correctly — is untouched. Height/inset only:
-   NOT background (that would hide the controls). */
-@supports (-webkit-hyphens: none) {
-  #zmmtg-root {
-    bottom: 0 !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-  }
-}
 
 /* =============================================================
    Event Participation Confirmations — CDK overlay theming.
