@@ -92,9 +92,15 @@ export class ArenaBoardComponent implements OnDestroy {
   private flagLoadError = (e: any) => {
     console.error('[arena-board] data load error', e);
     this.loadError = 'Some board data failed to load (connection or permissions). Tap Retry.';
+    this.isLoading = false;
     return of([] as any[]);
   };
-  retryLoad(): void { this.loadError = null; window.location.reload(); }
+  retryLoad(): void { this.loadError = null; this.isLoading = true; window.location.reload(); }
+
+  // True until the first board data arrives (or a load error). Drives the
+  // full-screen loader so the coordinator sees a spinner instead of a flash of
+  // empty "— none —" columns while the Firestore streams are still connecting.
+  isLoading = true;
 
   // Tabs
   leftTab: ArenaTab = 'participants';
@@ -197,6 +203,8 @@ export class ArenaBoardComponent implements OnDestroy {
       ),
       { idField: 'docid' }
     ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
+      // First board data has arrived — drop the loader.
+      this.isLoading = false;
       // Sort by `queueposition` (same field the dynamic queue manager uses to
       // order the queue) so Waiting / Queued show the same canonical order.
       // Fall back to `tokennumber` if `queueposition` is missing.
