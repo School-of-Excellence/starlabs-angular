@@ -384,9 +384,17 @@
           </button>
           <ng-container *ngIf="nextStageMenuOpen === 'header'">
             <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
-            <div class="ds-nextmenu ds-nextmenu--center">
-              <div class="ds-nextmenu__head">Choose next stage</div>
-              <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+            <div class="ds-nextmodal" role="dialog" aria-modal="true">
+              <div class="ds-nextmodal__head">
+                <h2 class="ds-nextmodal__title">Move to Next Stage</h2>
+                <button type="button" class="ds-nextmodal__x" (click)="closeNextStageMenu()" aria-label="Close">
+                  <mat-icon class="ic">close</mat-icon>
+                </button>
+              </div>
+              <div class="ds-nextmodal__body">
+                <p class="ds-nextmodal__sub">Complete the session and choose where <b>{{ mapProfile[participantProfileId] || 'this participant' }}</b> goes next.</p>
+                <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+              </div>
             </div>
           </ng-container>
         </div>
@@ -846,26 +854,24 @@
                   <div class="empty-text">No AEL Found</div>
                 </div>
 
-                <!-- Read-only display of the participant's AEL across all areas
-                     (legacy dynamic-studio parity). Shown whenever an AEL exists,
-                     even after it's validated, so the specialist can always see
-                     the current level per area — the modal is only for editing. -->
-                <div class="ael-areas" *ngIf="participantAEL['crossovermetric'] != null">
-                  <div class="ael-area" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; let i = index">
-                    <span class="ael-area__num">{{ i + 1 }}.</span>
-                    <span class="ael-area__name" [title]="crossover.key">{{ crossover.key }}</span>
-                    <span class="ael-area__level">{{ aelBandLabel(crossover.value['value']) }}</span>
+                <!-- Old inline AEL editor (pre-slider): one dropdown per area,
+                     edited in place, then "Mark as Validated" via updateCurrentAEL(). -->
+                <div class="ael-form" *ngIf="participantAEL['crossovermetric'] != null && participantAEL['crossovermetric'] != undefined">
+                  <div class="ael-field" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; let i = index; trackBy: trackById">
+                    <label class="ael-label">{{ i + 1 }}. {{ crossover.key }} <span class="req">*</span></label>
+                    <mat-form-field appearance="outline" style="width:100%;">
+                      <mat-label>Current Level</mat-label>
+                      <mat-select [(ngModel)]="crossover.value['value']" (selectionChange)="participantAEL['aelStatus'] = 'edited'">
+                        <mat-option *ngFor="let option of aelLevelList; trackBy: trackByDocId" [value]="option['startpoint'] + '---' + option['endpoint']">{{option["startpoint"]}} to {{option["endpoint"]}}</mat-option>
+                      </mat-select>
+                    </mat-form-field>
                   </div>
                 </div>
 
                 <div class="ael-actions" *ngIf="participantAEL['crossovermetric'] != null">
-                  <button type="button" class="btn btn-lg"
-                          [class.btn-green]="participantAEL['aelStatus'] === 'validated'"
-                          [class.btn-primary]="participantAEL['aelStatus'] !== 'validated'"
-                          (click)="openAelModal()"
-                          data-testid="studio-ael-validate-btn">
-                    <mat-icon class="ic">{{ participantAEL['aelStatus'] === 'validated' ? 'check' : 'tune' }}</mat-icon>
-                    {{ participantAEL['aelStatus'] == "validated" ? "AEL Validated" : participantAEL['aelStatus'] == "edited" ? "Review &amp; Validate AEL" : "Validate AEL" }}
+                  <button type="button" class="btn btn-green btn-lg" (click)="updateCurrentAEL()" data-testid="studio-ael-validate-btn" [disabled]="participantAEL['aelStatus'] === 'validated'">
+                    <mat-icon class="ic">check</mat-icon>
+                    {{ participantAEL['aelStatus'] == "edited" ? "Update Changes & Mark as Validated" : participantAEL['aelStatus'] == "validated" ? "AEL Validated" : "Mark as Validated" }}
                   </button>
                   <span class="ael-validated-note" *ngIf="participantAEL['aelStatus'] === 'validated'">
                     <mat-icon class="ic">check</mat-icon>
@@ -912,9 +918,17 @@
         </button>
         <ng-container *ngIf="nextStageMenuOpen === 'footer'">
           <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
-          <div class="ds-nextmenu ds-nextmenu--center">
-            <div class="ds-nextmenu__head">Choose next stage</div>
-            <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+          <div class="ds-nextmodal" role="dialog" aria-modal="true">
+            <div class="ds-nextmodal__head">
+              <h2 class="ds-nextmodal__title">Move to Next Stage</h2>
+              <button type="button" class="ds-nextmodal__x" (click)="closeNextStageMenu()" aria-label="Close">
+                <mat-icon class="ic">close</mat-icon>
+              </button>
+            </div>
+            <div class="ds-nextmodal__body">
+              <p class="ds-nextmodal__sub">Complete the session and choose where <b>{{ mapProfile[participantProfileId] || 'this participant' }}</b> goes next.</p>
+              <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+            </div>
           </div>
         </ng-container>
       </div>
@@ -927,69 +941,35 @@
     <ng-template #nextStageItems>
       <!-- Mark for next month review -->
       <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('movetonextqueue')"
-              type="button" class="ds-nextmenu__item"
+              type="button" class="ds-nextmodal__item"
               [disabled]="nextMonthReviewSaving || nextMonthReviewMarked"
               (click)="movetoNextMonthReview()">
-        <mat-icon class="ic">{{ nextMonthReviewMarked ? 'check_circle' : 'calendar_today' }}</mat-icon>
-        <span>{{ nextMonthReviewSaving ? 'Marking…' : nextMonthReviewMarked ? 'Marked for next month review' : 'Mark for next month review' }}</span>
+        <span class="ds-nextmodal__icon"><mat-icon class="ic">{{ nextMonthReviewMarked ? 'check_circle' : 'calendar_today' }}</mat-icon></span>
+        <span class="ds-nextmodal__label">{{ nextMonthReviewSaving ? 'Marking…' : nextMonthReviewMarked ? 'Marked for next month review' : 'Mark for next month review' }}</span>
+        <mat-icon class="ic ds-nextmodal__chev">chevron_right</mat-icon>
       </button>
       <!-- Next-stage routes -->
       <ng-container *ngFor="let config of ongoingQueue['stageproperty'][liveAssignment['stagename']]?.nextstage; trackBy: trackByDocId">
         <button
           *ngIf="(liveAssignment['token']?.variationid == null || liveAssignment['token']?.variationid == undefined) && (!config.variations || config.variations.length === 0)"
-          type="button" class="ds-nextmenu__item ds-nextmenu__item--go"
+          type="button" class="ds-nextmodal__item"
           (click)="moveStage(config.stage, config.markascompleted); closeNextStageMenu()"
           data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
-          <mat-icon class="ic">check_circle</mat-icon>
-          <span>{{ config.calltoaction }}</span>
+          <span class="ds-nextmodal__icon"><mat-icon class="ic">send</mat-icon></span>
+          <span class="ds-nextmodal__label">{{ config.calltoaction }}</span>
+          <mat-icon class="ic ds-nextmodal__chev">chevron_right</mat-icon>
         </button>
         <button
           *ngIf="liveAssignment['token']?.variationid != null && liveAssignment['token']?.variationid != undefined && queueVariation[liveAssignment['token']?.variationid] && queueVariation[liveAssignment['token']?.variationid].includes(liveAssignment['stagename']) && config.variations && config.variations.includes(liveAssignment['token']?.variationid)"
-          type="button" class="ds-nextmenu__item ds-nextmenu__item--go"
+          type="button" class="ds-nextmodal__item"
           (click)="moveStage(config.stage, config.markascompleted); closeNextStageMenu()"
           data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
-          <mat-icon class="ic">check_circle</mat-icon>
-          <span>{{ config.calltoaction }}</span>
+          <span class="ds-nextmodal__icon"><mat-icon class="ic">send</mat-icon></span>
+          <span class="ds-nextmodal__label">{{ config.calltoaction }}</span>
+          <mat-icon class="ic ds-nextmodal__chev">chevron_right</mat-icon>
         </button>
       </ng-container>
     </ng-template>
-
-    <!-- ===================== AEL SLIDER MODAL (mockup) =====================
-         Slider-per-area over the existing band list (aelLevelList). UI only:
-         each slider notch maps to a stored "start---end" band — no model change. -->
-    <div class="ael-modal-backdrop" *ngIf="aelModalOpen" (click)="closeAelModal()">
-      <div class="ael-modal" (click)="$event.stopPropagation()">
-        <div class="ael-modal__head">
-          <span class="ael-modal__title"><mat-icon class="ic">verified</mat-icon> Validate AEL</span>
-          <button type="button" class="ael-modal__x" (click)="closeAelModal()" aria-label="Close">
-            <mat-icon class="ic">close</mat-icon>
-          </button>
-        </div>
-        <div class="ael-modal__body">
-          <p class="ael-modal__sub">
-            Review the participant&rsquo;s Accelerated Evolution Level across all areas.
-            Drag any slider to adjust, then validate.
-          </p>
-          <div class="ael-slider-row" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; trackBy: trackById">
-            <span class="ael-slider-row__area" [title]="crossover.key">{{ crossover.key }}</span>
-            <input type="range" class="ael-slider-row__range"
-                   min="0" [max]="aelLevelList.length - 1" step="1"
-                   [value]="aelBandIndex(crossover.value['value'])"
-                   (input)="setAelBand(crossover, $any($event.target).value)">
-            <span class="ael-slider-row__val">{{ aelBandLabel(crossover.value['value']) }}</span>
-          </div>
-        </div>
-        <div class="ael-modal__foot">
-          <button type="button" class="btn btn-ghost" (click)="closeAelModal()">Cancel</button>
-          <button type="button" class="btn btn-green" (click)="validateAelFromModal()"
-                  data-testid="studio-ael-modal-validate-btn"
-                  [disabled]="participantAEL['aelStatus'] === 'validated'">
-            <mat-icon class="ic">check</mat-icon>
-            {{ participantAEL['aelStatus'] == "validated" ? "AEL Validated" : "Mark AEL validated" }}
-          </button>
-        </div>
-      </div>
-    </div>
 
     <!-- Form-in-dialog template (used by viewform()).
          Renders the submitted form INLINE — markup mirrors the overlay in
