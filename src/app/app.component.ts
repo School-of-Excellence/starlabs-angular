@@ -28,6 +28,7 @@ import { MatSnackBar, MatSnackBarRef } from '@angular/material/snack-bar';
 import { UpdatesnackbarComponent } from './updatesnackbar/updatesnackbar.component';
 import { SafeImgDirective } from './shared/safe-img.directive';
 import { Title } from '@angular/platform-browser';
+import { ProfilePictureComponent } from './ProfilePicture/profile-picture/profile-picture.component';
 
 interface NavItem {
   icon: string;
@@ -78,7 +79,8 @@ interface NotificationData {
     CommonModule,
     MatExpansionModule,
     MatProgressSpinnerModule,
-    SafeImgDirective
+    SafeImgDirective,
+    ProfilePictureComponent
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
@@ -738,6 +740,7 @@ export class AppComponent implements OnInit, OnDestroy {
       if (result) {
         signOut(this.firebaseAuth).then(async () => {
           console.log("signed out");
+          
           await this.guard.clearAllCaches();
           await this.guard.deactivateCurrentUserToken(this.guard['userPreferences']['uid']);
           this.router.navigate(['/login']);

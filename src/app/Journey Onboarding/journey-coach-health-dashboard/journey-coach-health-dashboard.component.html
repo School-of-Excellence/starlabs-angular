@@ -493,7 +493,7 @@
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
           <td mat-cell *matCellDef="let r" class="col-person">
             <span class="cell-person">
-              <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
+              <app-profile-picture [profileId]="r.profileid" [name]="r.name" [size]="32"></app-profile-picture>
               <span class="cp-id-wrap">
                 <span class="cp-name">{{ r.name }}
                   <span class="flag-icon" *ngIf="r.flagged" matTooltip="Flagged">

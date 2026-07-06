@@ -15,6 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatButtonModule } from '@angular/material/button';
 import * as XLSX from 'xlsx';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-monitor-activity-log',
@@ -27,7 +28,8 @@ import * as XLSX from 'xlsx';
     FormsModule,
     NgxMatSelectSearchModule,
     MatCheckboxModule,
-    MatButtonModule
+    MatButtonModule,
+    ProfilePictureComponent
   ],
   templateUrl: './monitor-activity-log.component.html',
   styleUrl: './monitor-activity-log.component.css'

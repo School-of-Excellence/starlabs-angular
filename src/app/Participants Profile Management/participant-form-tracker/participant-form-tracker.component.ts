@@ -14,10 +14,12 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatTabChangeEvent, MatTabsModule } from '@angular/material/tabs';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-participant-form-tracker',
   imports: [
+    ProfilePictureComponent,
     MatTabsModule,
     CommonModule,
     MatTableModule,

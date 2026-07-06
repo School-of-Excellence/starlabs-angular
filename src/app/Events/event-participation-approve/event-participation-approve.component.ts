@@ -18,6 +18,7 @@ import { MatButtonModule } from '@angular/material/button';
 import * as XLSX from 'xlsx';
 import { MatInputModule } from '@angular/material/input';
 import { ActivatedRoute, Router } from '@angular/router';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-event-participation-approve',
@@ -32,7 +33,8 @@ import { ActivatedRoute, Router } from '@angular/router';
     CommonModule,
     MatSelectModule,
     MatButtonModule,
-    MatInputModule
+    MatInputModule,
+    ProfilePictureComponent
   ],
   templateUrl: './event-participation-approve.component.html',
   styleUrl: './event-participation-approve.component.css'

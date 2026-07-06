@@ -1,0 +1,2611 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenVidu Pro - Elastic
+
+Parameters:
+
+  CertificateType:
+    Description: |
+      [selfsigned] Not recommended for production use. Just for testing purposes or development environments. You don't need a FQDN to use this option.
+      [owncert] Valid for production environments. Use your own certificate. You need a FQDN to use this option.
+      [letsencrypt] Valid for production environments. Can be used with or without a FQDN (if no FQDN is provided, a random sslip.io domain will be used).
+    Type: String
+    AllowedValues:
+      - selfsigned
+      - letsencrypt
+      - owncert
+    Default: letsencrypt
+
+  PublicElasticIP:
+    Type: String
+    Description: Previously created Elastic IP for the OpenVidu Deployment.
+    AllowedPattern: ^$|^([01]?\d{1,2}|2[0-4]\d|25[0-5])\.([01]?\d{1,2}|2[0-4]\d|25[0-5])\.([01]?\d{1,2}|2[0-4]\d|25[0-5])\.([01]?\d{1,2}|2[0-4]\d|25[0-5])$
+    ConstraintDescription: The Public Elastic IP does not have a valid IPv4 format
+
+  DomainName:
+    Type: String
+    Description: Domain name for the OpenVidu Deployment.
+    AllowedPattern: ^$|^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$
+    ConstraintDescription: The domain name does not have a valid domain name format
+
+  OwnPublicCertificate:
+    Description: "If certificate type is 'owncert', this parameter will be used to specify the public certificate in base64 format"
+    Type: String
+
+  OwnPrivateCertificate:
+    Description: "If certificate type is 'owncert', this parameter will be used to specify the private certificate in base64 format"
+    Type: String
+
+  InitialMeetAdminPassword:
+    Description: 'Initial password for the "admin" user in OpenVidu Meet. If not provided, a random password will be generated.'
+    Type: String
+    NoEcho: true
+    Default: ''
+    # Only allow alphanumeric characters
+    AllowedPattern: '^[A-Za-z0-9_-]*$'
+    ConstraintDescription: 'Must contain only alphanumeric characters (A-Z, a-z, 0-9). Leave empty to generate a random password.'
+
+  InitialMeetApiKey:
+    Description: 'Initial API key for OpenVidu Meet. If not provided, no API key will be set and the user can set it later from Meet Console.'
+    Type: String
+    NoEcho: true
+    Default: ''
+    # Only allow alphanumeric characters
+    AllowedPattern: '^[A-Za-z0-9_-]*$'
+    ConstraintDescription: 'Must contain only alphanumeric characters (A-Z, a-z, 0-9). Leave empty to not set an initial API key.'
+
+  AdditionalInstallFlags:
+    Description: Additional optional flags to pass to the OpenVidu installer (comma-separated, e.g., "--flag1=value, --flag2").
+    Type: String
+    Default: ""
+    AllowedPattern: '^[A-Za-z0-9, =_.\-]*$'  # Allows letters, numbers, comma, space, underscore, dot, equals, and hyphen
+    ConstraintDescription: Must be a comma-separated list of flags (for example, --flag=value, --bool-flag).
+
+  OpenViduLicense:
+    Description: "Visit https://openvidu.io/account"
+    Type: String
+    AllowedPattern: ^(?!\s*$).+$
+    NoEcho: true
+    ConstraintDescription: OpenVidu Pro License is mandatory
+
+  RTCEngine:
+    Description: "RTCEngine media engine to use"
+    Type: String
+    AllowedValues:
+      - pion
+      - mediasoup
+    Default: pion
+
+  MasterNodeInstanceType:
+    Description: "Specifies the EC2 instance type for your OpenVidu Master Node"
+    Type: String
+    Default: c6a.xlarge
+    AllowedValues:
+      - t3.nano
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - t3a.nano
+      - t3a.micro
+      - t3a.small
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - t3a.2xlarge
+      - t4g.nano
+      - t4g.micro
+      - t4g.small
+      - t4g.medium
+      - t4g.large
+      - t4g.xlarge
+      - t4g.2xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5.9xlarge
+      - c5.12xlarge
+      - c5.18xlarge
+      - c5.24xlarge
+      - c5.metal
+      - c5a.large
+      - c5a.xlarge
+      - c5a.2xlarge
+      - c5a.4xlarge
+      - c5a.8xlarge
+      - c5a.12xlarge
+      - c5a.16xlarge
+      - c5a.24xlarge
+      - c5ad.large
+      - c5ad.xlarge
+      - c5ad.2xlarge
+      - c5ad.4xlarge
+      - c5ad.8xlarge
+      - c5ad.12xlarge
+      - c5ad.16xlarge
+      - c5ad.24xlarge
+      - c5d.large
+      - c5d.xlarge
+      - c5d.2xlarge
+      - c5d.4xlarge
+      - c5d.9xlarge
+      - c5d.12xlarge
+      - c5d.18xlarge
+      - c5d.24xlarge
+      - c5d.metal
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c5n.9xlarge
+      - c5n.18xlarge
+      - c5n.metal
+      - c6a.large
+      - c6a.xlarge
+      - c6a.2xlarge
+      - c6a.4xlarge
+      - c6a.8xlarge
+      - c6a.12xlarge
+      - c6a.16xlarge
+      - c6a.24xlarge
+      - c6a.32xlarge
+      - c6a.48xlarge
+      - c6a.metal
+      - c6g.medium
+      - c6g.large
+      - c6g.xlarge
+      - c6g.2xlarge
+      - c6g.4xlarge
+      - c6g.8xlarge
+      - c6g.12xlarge
+      - c6g.16xlarge
+      - c6g.metal
+      - c6gd.medium
+      - c6gd.large
+      - c6gd.xlarge
+      - c6gd.2xlarge
+      - c6gd.4xlarge
+      - c6gd.8xlarge
+      - c6gd.12xlarge
+      - c6gd.16xlarge
+      - c6gd.metal
+      - c6gn.medium
+      - c6gn.large
+      - c6gn.xlarge
+      - c6gn.2xlarge
+      - c6gn.4xlarge
+      - c6gn.8xlarge
+      - c6gn.12xlarge
+      - c6gn.16xlarge
+      - c6i.large
+      - c6i.xlarge
+      - c6i.2xlarge
+      - c6i.4xlarge
+      - c6i.8xlarge
+      - c6i.12xlarge
+      - c6i.16xlarge
+      - c6i.24xlarge
+      - c6i.32xlarge
+      - c6i.metal
+      - c6id.large
+      - c6id.xlarge
+      - c6id.2xlarge
+      - c6id.4xlarge
+      - c6id.8xlarge
+      - c6id.12xlarge
+      - c6id.16xlarge
+      - c6id.24xlarge
+      - c6id.32xlarge
+      - c6id.metal
+      - c6in.large
+      - c6in.xlarge
+      - c6in.2xlarge
+      - c6in.4xlarge
+      - c6in.8xlarge
+      - c6in.12xlarge
+      - c6in.16xlarge
+      - c6in.24xlarge
+      - c6in.32xlarge
+      - c6in.metal
+      - c7a.medium
+      - c7a.large
+      - c7a.xlarge
+      - c7a.2xlarge
+      - c7a.4xlarge
+      - c7a.8xlarge
+      - c7a.12xlarge
+      - c7a.16xlarge
+      - c7a.24xlarge
+      - c7a.32xlarge
+      - c7a.48xlarge
+      - c7a.metal-48xl
+      - c7g.medium
+      - c7g.large
+      - c7g.xlarge
+      - c7g.2xlarge
+      - c7g.4xlarge
+      - c7g.8xlarge
+      - c7g.12xlarge
+      - c7g.16xlarge
+      - c7g.metal
+      - c7gd.medium
+      - c7gd.large
+      - c7gd.xlarge
+      - c7gd.2xlarge
+      - c7gd.4xlarge
+      - c7gd.8xlarge
+      - c7gd.12xlarge
+      - c7gd.16xlarge
+      - c7gd.metal
+      - c7gn.medium
+      - c7gn.large
+      - c7gn.xlarge
+      - c7gn.2xlarge
+      - c7gn.4xlarge
+      - c7gn.8xlarge
+      - c7gn.12xlarge
+      - c7gn.16xlarge
+      - c7gn.metal
+      - c7i-flex.large
+      - c7i-flex.xlarge
+      - c7i-flex.2xlarge
+      - c7i-flex.4xlarge
+      - c7i-flex.8xlarge
+      - c7i-flex.12xlarge
+      - c7i-flex.16xlarge
+      - c7i.large
+      - c7i.xlarge
+      - c7i.2xlarge
+      - c7i.4xlarge
+      - c7i.8xlarge
+      - c7i.12xlarge
+      - c7i.16xlarge
+      - c7i.24xlarge
+      - c7i.48xlarge
+      - c7i.metal-24xl
+      - c7i.metal-48xl
+      - c8g.medium
+      - c8g.large
+      - c8g.xlarge
+      - c8g.2xlarge
+      - c8g.4xlarge
+      - c8g.8xlarge
+      - c8g.12xlarge
+      - c8g.16xlarge
+      - c8g.24xlarge
+      - c8g.48xlarge
+      - c8g.metal-24xl
+      - c8g.metal-48xl
+      - c8gd.medium
+      - c8gd.large
+      - c8gd.xlarge
+      - c8gd.2xlarge
+      - c8gd.4xlarge
+      - c8gd.8xlarge
+      - c8gd.12xlarge
+      - c8gd.16xlarge
+      - c8gd.24xlarge
+      - c8gd.48xlarge
+      - c8gd.metal-24xl
+      - c8gd.metal-48xl
+      - g4dn.xlarge
+      - g4dn.2xlarge
+      - g4dn.4xlarge
+      - g4dn.8xlarge
+      - g4dn.12xlarge
+      - g4dn.16xlarge
+      - g4dn.metal
+      - g5.xlarge
+      - g5.2xlarge
+      - g5.4xlarge
+      - g5.8xlarge
+      - g5.12xlarge
+      - g5.16xlarge
+      - g5.24xlarge
+      - g5.48xlarge
+      - g5g.xlarge
+      - g5g.2xlarge
+      - g5g.4xlarge
+      - g5g.8xlarge
+      - g5g.16xlarge
+      - g5g.metal
+      - g6.xlarge
+      - g6.2xlarge
+      - g6.4xlarge
+      - g6.8xlarge
+      - g6.12xlarge
+      - g6.16xlarge
+      - g6.24xlarge
+      - g6.48xlarge
+      - g6e.xlarge
+      - g6e.2xlarge
+      - g6e.4xlarge
+      - g6e.8xlarge
+      - g6e.12xlarge
+      - g6e.16xlarge
+      - g6e.24xlarge
+      - g6e.48xlarge
+      - g6f.large
+      - g6f.xlarge
+      - g6f.2xlarge
+      - g6f.4xlarge
+      - g7e.2xlarge
+      - g7e.4xlarge
+      - g7e.8xlarge
+      - g7e.12xlarge
+      - g7e.24xlarge
+      - g7e.48xlarge
+      - gr6.4xlarge
+      - gr6.8xlarge
+      - gr6f.4xlarge
+      - m6a.large
+      - m6a.xlarge
+      - m6a.2xlarge
+      - m6a.4xlarge
+      - m6a.8xlarge
+      - m6a.12xlarge
+      - m6a.16xlarge
+      - m6a.24xlarge
+      - m6a.32xlarge
+      - m6a.48xlarge
+      - m6a.metal
+      - m6g.medium
+      - m6g.large
+      - m6g.xlarge
+      - m6g.2xlarge
+      - m6g.4xlarge
+      - m6g.8xlarge
+      - m6g.12xlarge
+      - m6g.16xlarge
+      - m6g.metal
+      - m6gd.medium
+      - m6gd.large
+      - m6gd.xlarge
+      - m6gd.2xlarge
+      - m6gd.4xlarge
+      - m6gd.8xlarge
+      - m6gd.12xlarge
+      - m6gd.16xlarge
+      - m6gd.metal
+      - m6i.large
+      - m6i.xlarge
+      - m6i.2xlarge
+      - m6i.4xlarge
+      - m6i.8xlarge
+      - m6i.12xlarge
+      - m6i.16xlarge
+      - m6i.24xlarge
+      - m6i.32xlarge
+      - m6i.metal
+      - m6id.large
+      - m6id.xlarge
+      - m6id.2xlarge
+      - m6id.4xlarge
+      - m6id.8xlarge
+      - m6id.12xlarge
+      - m6id.16xlarge
+      - m6id.24xlarge
+      - m6id.32xlarge
+      - m6id.metal
+      - m6idn.large
+      - m6idn.xlarge
+      - m6idn.2xlarge
+      - m6idn.4xlarge
+      - m6idn.8xlarge
+      - m6idn.12xlarge
+      - m6idn.16xlarge
+      - m6idn.24xlarge
+      - m6idn.32xlarge
+      - m6idn.metal
+      - m6in.large
+      - m6in.xlarge
+      - m6in.2xlarge
+      - m6in.4xlarge
+      - m6in.8xlarge
+      - m6in.12xlarge
+      - m6in.16xlarge
+      - m6in.24xlarge
+      - m6in.32xlarge
+      - m6in.metal
+      - m7a.medium
+      - m7a.large
+      - m7a.xlarge
+      - m7a.2xlarge
+      - m7a.4xlarge
+      - m7a.8xlarge
+      - m7a.12xlarge
+      - m7a.16xlarge
+      - m7a.24xlarge
+      - m7a.32xlarge
+      - m7a.48xlarge
+      - m7a.metal-48xl
+      - m7g.medium
+      - m7g.large
+      - m7g.xlarge
+      - m7g.2xlarge
+      - m7g.4xlarge
+      - m7g.8xlarge
+      - m7g.12xlarge
+      - m7g.16xlarge
+      - m7g.metal
+      - m7gd.medium
+      - m7gd.large
+      - m7gd.xlarge
+      - m7gd.2xlarge
+      - m7gd.4xlarge
+      - m7gd.8xlarge
+      - m7gd.12xlarge
+      - m7gd.16xlarge
+      - m7gd.metal
+      - m7i-flex.large
+      - m7i-flex.xlarge
+      - m7i-flex.2xlarge
+      - m7i-flex.4xlarge
+      - m7i-flex.8xlarge
+      - m7i-flex.12xlarge
+      - m7i-flex.16xlarge
+      - m7i.large
+      - m7i.xlarge
+      - m7i.2xlarge
+      - m7i.4xlarge
+      - m7i.8xlarge
+      - m7i.12xlarge
+      - m7i.16xlarge
+      - m7i.24xlarge
+      - m7i.48xlarge
+      - m7i.metal-24xl
+      - m7i.metal-48xl
+      - m8g.medium
+      - m8g.large
+      - m8g.xlarge
+      - m8g.2xlarge
+      - m8g.4xlarge
+      - m8g.8xlarge
+      - m8g.12xlarge
+      - m8g.16xlarge
+      - m8g.24xlarge
+      - m8g.48xlarge
+      - m8g.metal-24xl
+      - m8g.metal-48xl
+      - m8gd.medium
+      - m8gd.large
+      - m8gd.xlarge
+      - m8gd.2xlarge
+      - m8gd.4xlarge
+      - m8gd.8xlarge
+      - m8gd.12xlarge
+      - m8gd.16xlarge
+      - m8gd.24xlarge
+      - m8gd.48xlarge
+      - m8gd.metal-24xl
+      - m8gd.metal-48xl
+      - p4d.24xlarge
+      - p4de.24xlarge
+      - p5.4xlarge
+      - p5.48xlarge
+      - p5e.48xlarge
+      - p5en.48xlarge
+      - p6-b200.48xlarge
+      - p6-b300.48xlarge
+      - p6e-gb200.36xlarge
+      - r6g.medium
+      - r6g.large
+      - r6g.xlarge
+      - r6g.2xlarge
+      - r6g.4xlarge
+      - r6g.8xlarge
+      - r6g.12xlarge
+      - r6g.16xlarge
+      - r6g.metal
+      - r6gd.medium
+      - r6gd.large
+      - r6gd.xlarge
+      - r6gd.2xlarge
+      - r6gd.4xlarge
+      - r6gd.8xlarge
+      - r6gd.12xlarge
+      - r6gd.16xlarge
+      - r6gd.metal
+      - r7g.medium
+      - r7g.large
+      - r7g.xlarge
+      - r7g.2xlarge
+      - r7g.4xlarge
+      - r7g.8xlarge
+      - r7g.12xlarge
+      - r7g.16xlarge
+      - r7g.metal
+      - r7gd.medium
+      - r7gd.large
+      - r7gd.xlarge
+      - r7gd.2xlarge
+      - r7gd.4xlarge
+      - r7gd.8xlarge
+      - r7gd.12xlarge
+      - r7gd.16xlarge
+      - r7gd.metal
+      - r8g.medium
+      - r8g.large
+      - r8g.xlarge
+      - r8g.2xlarge
+      - r8g.4xlarge
+      - r8g.8xlarge
+      - r8g.12xlarge
+      - r8g.16xlarge
+      - r8g.24xlarge
+      - r8g.48xlarge
+      - r8g.metal-24xl
+      - r8g.metal-48xl
+    ConstraintDescription: "Must be a valid EC2 instance type"
+
+  MediaNodeInstanceType:
+    Description: "Specifies the EC2 instance type for your OpenVidu Media Nodes"
+    Type: String
+    Default: c6a.xlarge
+    AllowedValues:
+      - t3.nano
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - t3a.nano
+      - t3a.micro
+      - t3a.small
+      - t3a.medium
+      - t3a.large
+      - t3a.xlarge
+      - t3a.2xlarge
+      - t4g.nano
+      - t4g.micro
+      - t4g.small
+      - t4g.medium
+      - t4g.large
+      - t4g.xlarge
+      - t4g.2xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5.9xlarge
+      - c5.12xlarge
+      - c5.18xlarge
+      - c5.24xlarge
+      - c5.metal
+      - c5a.large
+      - c5a.xlarge
+      - c5a.2xlarge
+      - c5a.4xlarge
+      - c5a.8xlarge
+      - c5a.12xlarge
+      - c5a.16xlarge
+      - c5a.24xlarge
+      - c5ad.large
+      - c5ad.xlarge
+      - c5ad.2xlarge
+      - c5ad.4xlarge
+      - c5ad.8xlarge
+      - c5ad.12xlarge
+      - c5ad.16xlarge
+      - c5ad.24xlarge
+      - c5d.large
+      - c5d.xlarge
+      - c5d.2xlarge
+      - c5d.4xlarge
+      - c5d.9xlarge
+      - c5d.12xlarge
+      - c5d.18xlarge
+      - c5d.24xlarge
+      - c5d.metal
+      - c5n.large
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c5n.9xlarge
+      - c5n.18xlarge
+      - c5n.metal
+      - c6a.large
+      - c6a.xlarge
+      - c6a.2xlarge
+      - c6a.4xlarge
+      - c6a.8xlarge
+      - c6a.12xlarge
+      - c6a.16xlarge
+      - c6a.24xlarge
+      - c6a.32xlarge
+      - c6a.48xlarge
+      - c6a.metal
+      - c6g.medium
+      - c6g.large
+      - c6g.xlarge
+      - c6g.2xlarge
+      - c6g.4xlarge
+      - c6g.8xlarge
+      - c6g.12xlarge
+      - c6g.16xlarge
+      - c6g.metal
+      - c6gd.medium
+      - c6gd.large
+      - c6gd.xlarge
+      - c6gd.2xlarge
+      - c6gd.4xlarge
+      - c6gd.8xlarge
+      - c6gd.12xlarge
+      - c6gd.16xlarge
+      - c6gd.metal
+      - c6gn.medium
+      - c6gn.large
+      - c6gn.xlarge
+      - c6gn.2xlarge
+      - c6gn.4xlarge
+      - c6gn.8xlarge
+      - c6gn.12xlarge
+      - c6gn.16xlarge
+      - c6i.large
+      - c6i.xlarge
+      - c6i.2xlarge
+      - c6i.4xlarge
+      - c6i.8xlarge
+      - c6i.12xlarge
+      - c6i.16xlarge
+      - c6i.24xlarge
+      - c6i.32xlarge
+      - c6i.metal
+      - c6id.large
+      - c6id.xlarge
+      - c6id.2xlarge
+      - c6id.4xlarge
+      - c6id.8xlarge
+      - c6id.12xlarge
+      - c6id.16xlarge
+      - c6id.24xlarge
+      - c6id.32xlarge
+      - c6id.metal
+      - c6in.large
+      - c6in.xlarge
+      - c6in.2xlarge
+      - c6in.4xlarge
+      - c6in.8xlarge
+      - c6in.12xlarge
+      - c6in.16xlarge
+      - c6in.24xlarge
+      - c6in.32xlarge
+      - c6in.metal
+      - c7a.medium
+      - c7a.large
+      - c7a.xlarge
+      - c7a.2xlarge
+      - c7a.4xlarge
+      - c7a.8xlarge
+      - c7a.12xlarge
+      - c7a.16xlarge
+      - c7a.24xlarge
+      - c7a.32xlarge
+      - c7a.48xlarge
+      - c7a.metal-48xl
+      - c7g.medium
+      - c7g.large
+      - c7g.xlarge
+      - c7g.2xlarge
+      - c7g.4xlarge
+      - c7g.8xlarge
+      - c7g.12xlarge
+      - c7g.16xlarge
+      - c7g.metal
+      - c7gd.medium
+      - c7gd.large
+      - c7gd.xlarge
+      - c7gd.2xlarge
+      - c7gd.4xlarge
+      - c7gd.8xlarge
+      - c7gd.12xlarge
+      - c7gd.16xlarge
+      - c7gd.metal
+      - c7gn.medium
+      - c7gn.large
+      - c7gn.xlarge
+      - c7gn.2xlarge
+      - c7gn.4xlarge
+      - c7gn.8xlarge
+      - c7gn.12xlarge
+      - c7gn.16xlarge
+      - c7gn.metal
+      - c7i-flex.large
+      - c7i-flex.xlarge
+      - c7i-flex.2xlarge
+      - c7i-flex.4xlarge
+      - c7i-flex.8xlarge
+      - c7i-flex.12xlarge
+      - c7i-flex.16xlarge
+      - c7i.large
+      - c7i.xlarge
+      - c7i.2xlarge
+      - c7i.4xlarge
+      - c7i.8xlarge
+      - c7i.12xlarge
+      - c7i.16xlarge
+      - c7i.24xlarge
+      - c7i.48xlarge
+      - c7i.metal-24xl
+      - c7i.metal-48xl
+      - c8g.medium
+      - c8g.large
+      - c8g.xlarge
+      - c8g.2xlarge
+      - c8g.4xlarge
+      - c8g.8xlarge
+      - c8g.12xlarge
+      - c8g.16xlarge
+      - c8g.24xlarge
+      - c8g.48xlarge
+      - c8g.metal-24xl
+      - c8g.metal-48xl
+      - c8gd.medium
+      - c8gd.large
+      - c8gd.xlarge
+      - c8gd.2xlarge
+      - c8gd.4xlarge
+      - c8gd.8xlarge
+      - c8gd.12xlarge
+      - c8gd.16xlarge
+      - c8gd.24xlarge
+      - c8gd.48xlarge
+      - c8gd.metal-24xl
+      - c8gd.metal-48xl
+      - g4dn.xlarge
+      - g4dn.2xlarge
+      - g4dn.4xlarge
+      - g4dn.8xlarge
+      - g4dn.12xlarge
+      - g4dn.16xlarge
+      - g4dn.metal
+      - g5.xlarge
+      - g5.2xlarge
+      - g5.4xlarge
+      - g5.8xlarge
+      - g5.12xlarge
+      - g5.16xlarge
+      - g5.24xlarge
+      - g5.48xlarge
+      - g5g.xlarge
+      - g5g.2xlarge
+      - g5g.4xlarge
+      - g5g.8xlarge
+      - g5g.16xlarge
+      - g5g.metal
+      - g6.xlarge
+      - g6.2xlarge
+      - g6.4xlarge
+      - g6.8xlarge
+      - g6.12xlarge
+      - g6.16xlarge
+      - g6.24xlarge
+      - g6.48xlarge
+      - g6e.xlarge
+      - g6e.2xlarge
+      - g6e.4xlarge
+      - g6e.8xlarge
+      - g6e.12xlarge
+      - g6e.16xlarge
+      - g6e.24xlarge
+      - g6e.48xlarge
+      - g6f.large
+      - g6f.xlarge
+      - g6f.2xlarge
+      - g6f.4xlarge
+      - g7e.2xlarge
+      - g7e.4xlarge
+      - g7e.8xlarge
+      - g7e.12xlarge
+      - g7e.24xlarge
+      - g7e.48xlarge
+      - gr6.4xlarge
+      - gr6.8xlarge
+      - gr6f.4xlarge
+      - m6a.large
+      - m6a.xlarge
+      - m6a.2xlarge
+      - m6a.4xlarge
+      - m6a.8xlarge
+      - m6a.12xlarge
+      - m6a.16xlarge
+      - m6a.24xlarge
+      - m6a.32xlarge
+      - m6a.48xlarge
+      - m6a.metal
+      - m6g.medium
+      - m6g.large
+      - m6g.xlarge
+      - m6g.2xlarge
+      - m6g.4xlarge
+      - m6g.8xlarge
+      - m6g.12xlarge
+      - m6g.16xlarge
+      - m6g.metal
+      - m6gd.medium
+      - m6gd.large
+      - m6gd.xlarge
+      - m6gd.2xlarge
+      - m6gd.4xlarge
+      - m6gd.8xlarge
+      - m6gd.12xlarge
+      - m6gd.16xlarge
+      - m6gd.metal
+      - m6i.large
+      - m6i.xlarge
+      - m6i.2xlarge
+      - m6i.4xlarge
+      - m6i.8xlarge
+      - m6i.12xlarge
+      - m6i.16xlarge
+      - m6i.24xlarge
+      - m6i.32xlarge
+      - m6i.metal
+      - m6id.large
+      - m6id.xlarge
+      - m6id.2xlarge
+      - m6id.4xlarge
+      - m6id.8xlarge
+      - m6id.12xlarge
+      - m6id.16xlarge
+      - m6id.24xlarge
+      - m6id.32xlarge
+      - m6id.metal
+      - m6idn.large
+      - m6idn.xlarge
+      - m6idn.2xlarge
+      - m6idn.4xlarge
+      - m6idn.8xlarge
+      - m6idn.12xlarge
+      - m6idn.16xlarge
+      - m6idn.24xlarge
+      - m6idn.32xlarge
+      - m6idn.metal
+      - m6in.large
+      - m6in.xlarge
+      - m6in.2xlarge
+      - m6in.4xlarge
+      - m6in.8xlarge
+      - m6in.12xlarge
+      - m6in.16xlarge
+      - m6in.24xlarge
+      - m6in.32xlarge
+      - m6in.metal
+      - m7a.medium
+      - m7a.large
+      - m7a.xlarge
+      - m7a.2xlarge
+      - m7a.4xlarge
+      - m7a.8xlarge
+      - m7a.12xlarge
+      - m7a.16xlarge
+      - m7a.24xlarge
+      - m7a.32xlarge
+      - m7a.48xlarge
+      - m7a.metal-48xl
+      - m7g.medium
+      - m7g.large
+      - m7g.xlarge
+      - m7g.2xlarge
+      - m7g.4xlarge
+      - m7g.8xlarge
+      - m7g.12xlarge
+      - m7g.16xlarge
+      - m7g.metal
+      - m7gd.medium
+      - m7gd.large
+      - m7gd.xlarge
+      - m7gd.2xlarge
+      - m7gd.4xlarge
+      - m7gd.8xlarge
+      - m7gd.12xlarge
+      - m7gd.16xlarge
+      - m7gd.metal
+      - m7i-flex.large
+      - m7i-flex.xlarge
+      - m7i-flex.2xlarge
+      - m7i-flex.4xlarge
+      - m7i-flex.8xlarge
+      - m7i-flex.12xlarge
+      - m7i-flex.16xlarge
+      - m7i.large
+      - m7i.xlarge
+      - m7i.2xlarge
+      - m7i.4xlarge
+      - m7i.8xlarge
+      - m7i.12xlarge
+      - m7i.16xlarge
+      - m7i.24xlarge
+      - m7i.48xlarge
+      - m7i.metal-24xl
+      - m7i.metal-48xl
+      - m8g.medium
+      - m8g.large
+      - m8g.xlarge
+      - m8g.2xlarge
+      - m8g.4xlarge
+      - m8g.8xlarge
+      - m8g.12xlarge
+      - m8g.16xlarge
+      - m8g.24xlarge
+      - m8g.48xlarge
+      - m8g.metal-24xl
+      - m8g.metal-48xl
+      - m8gd.medium
+      - m8gd.large
+      - m8gd.xlarge
+      - m8gd.2xlarge
+      - m8gd.4xlarge
+      - m8gd.8xlarge
+      - m8gd.12xlarge
+      - m8gd.16xlarge
+      - m8gd.24xlarge
+      - m8gd.48xlarge
+      - m8gd.metal-24xl
+      - m8gd.metal-48xl
+      - p4d.24xlarge
+      - p4de.24xlarge
+      - p5.4xlarge
+      - p5.48xlarge
+      - p5e.48xlarge
+      - p5en.48xlarge
+      - p6-b200.48xlarge
+      - p6-b300.48xlarge
+      - p6e-gb200.36xlarge
+      - r6g.medium
+      - r6g.large
+      - r6g.xlarge
+      - r6g.2xlarge
+      - r6g.4xlarge
+      - r6g.8xlarge
+      - r6g.12xlarge
+      - r6g.16xlarge
+      - r6g.metal
+      - r6gd.medium
+      - r6gd.large
+      - r6gd.xlarge
+      - r6gd.2xlarge
+      - r6gd.4xlarge
+      - r6gd.8xlarge
+      - r6gd.12xlarge
+      - r6gd.16xlarge
+      - r6gd.metal
+      - r7g.medium
+      - r7g.large
+      - r7g.xlarge
+      - r7g.2xlarge
+      - r7g.4xlarge
+      - r7g.8xlarge
+      - r7g.12xlarge
+      - r7g.16xlarge
+      - r7g.metal
+      - r7gd.medium
+      - r7gd.large
+      - r7gd.xlarge
+      - r7gd.2xlarge
+      - r7gd.4xlarge
+      - r7gd.8xlarge
+      - r7gd.12xlarge
+      - r7gd.16xlarge
+      - r7gd.metal
+      - r8g.medium
+      - r8g.large
+      - r8g.xlarge
+      - r8g.2xlarge
+      - r8g.4xlarge
+      - r8g.8xlarge
+      - r8g.12xlarge
+      - r8g.16xlarge
+      - r8g.24xlarge
+      - r8g.48xlarge
+      - r8g.metal-24xl
+      - r8g.metal-48xl
+    ConstraintDescription: "Must be a valid EC2 instance type"
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the Deployment.
+    AllowedPattern: ^.+$
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+  OperatingSystem:
+    Description: EC2 Operating System
+    Type: String
+    Default: "Ubuntu-24"
+    AllowedValues: ['Ubuntu-22', 'Ubuntu-24']
+
+  InitialNumberOfMediaNodes:
+    Type: Number
+    Default: 1
+    Description: Number of initial media nodes to deploy
+
+  MinNumberOfMediaNodes:
+    Type: Number
+    Default: 1
+    Description: Minimum number of media nodes to deploy
+
+  MaxNumberOfMediaNodes:
+    Type: Number
+    Default: 5
+    Description: Maximum number of media nodes to deploy
+
+  ScaleTargetCPU:
+    Type: Number
+    Default: 50
+    Description: Target CPU percentage to scale up or down
+
+  S3AppDataBucketName:
+    Type: String
+    Description: Name of the S3 bucket to store data and recordings. If empty, a bucket will be created
+
+  OpenViduVPC:
+    Description: "Dedicated VPC for OpenVidu cluster"
+    Type: AWS::EC2::VPC::Id
+    AllowedPattern: ^.+$
+    ConstraintDescription: You must specify a VPC ID
+
+  OpenViduMasterNodeSubnet:
+    Description: "Subnet for OpenVidu cluster"
+    Type: AWS::EC2::Subnet::Id
+    AllowedPattern: ^.+$
+    ConstraintDescription: You must specify a subnet ID
+
+  OpenViduMediaNodeSubnets:
+    Description: "Subnets for OpenVidu Media Nodes"
+    Type: List<AWS::EC2::Subnet::Id>
+    AllowedPattern: ^.+$
+    ConstraintDescription: You must specify a list of subnet IDs
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Domain and SSL certificate configuration
+        Parameters:
+          - CertificateType
+          - PublicElasticIP
+          - DomainName
+          - OwnPublicCertificate
+          - OwnPrivateCertificate
+      - Label:
+          default: OpenVidu Elastic configuration
+        Parameters:
+          - OpenViduLicense
+          - RTCEngine
+      - Label:
+          default: OpenVidu Meet configuration
+        Parameters:
+          - InitialMeetAdminPassword
+          - InitialMeetApiKey
+      - Label:
+          default: EC2 Instance configuration
+        Parameters:
+          - MasterNodeInstanceType
+          - MediaNodeInstanceType
+          - KeyName
+          - OperatingSystem
+      - Label:
+          default: Media Nodes Autoscaling Group configuration
+        Parameters:
+          - InitialNumberOfMediaNodes
+          - MinNumberOfMediaNodes
+          - MaxNumberOfMediaNodes
+          - ScaleTargetCPU
+      - Label:
+          default: S3 bucket for application data and recordings
+        Parameters:
+          - S3AppDataBucketName
+      - Label:
+          default: VPC configuration
+        Parameters:
+          - OpenViduVPC
+          - OpenViduMasterNodeSubnet
+          - OpenViduMediaNodeSubnets
+      - Label:
+          default: "(Optional) Additional Installer Flags"
+        Parameters:
+          - AdditionalInstallFlags
+Conditions:
+    PublicElasticIPPresent: !Not [ !Equals [!Ref PublicElasticIP, ""] ]
+    PublicElasticIPAbsent: !Equals [!Ref PublicElasticIP, ""]
+    CreateRecordingsBucket: !Equals [!Ref S3AppDataBucketName, ""]
+    IsMasterGraviton: !Or
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 't4g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c6g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c6gd']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c6gn']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c7g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c7gd']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c7gn']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c8g']
+      - !Or
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'c8gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'm6g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'm6gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'm7g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'm7gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'm8g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'm8gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'r6g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'r6gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'r7g']
+      - !Or
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'r7gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'r8g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g5g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p6e-gb200']
+    IsMediaGraviton: !Or
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 't4g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c6g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c6gd']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c6gn']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c7g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c7gd']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c7gn']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c8g']
+      - !Or
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'c8gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'm6g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'm6gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'm7g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'm7gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'm8g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'm8gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'r6g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'r6gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'r7g']
+      - !Or
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'r7gd']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'r8g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g5g']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p6e-gb200']
+    IsMasterNodeNvidia: !Or
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g4dn']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g5']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g5g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g6']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g6e']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g6f']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'gr6']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'gr6f']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'g7e']
+      - !Or
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p4d']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p4de']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p5']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p5e']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p5en']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p6-b200']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p6-b300']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MasterNodeInstanceType ]], 'p6e-gb200']
+    IsMediaNodeNvidia: !Or
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g4dn']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g5']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g5g']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g6']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g6e']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g6f']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'gr6']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'gr6f']
+      - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'g7e']
+      - !Or
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p4d']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p4de']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p5']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p5e']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p5en']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p6-b200']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p6-b300']
+        - !Equals [ !Select [ 0, !Split ['.', !Ref MediaNodeInstanceType ]], 'p6e-gb200']
+
+Mappings:
+  ArmImage:
+  # aws ssm get-parameters-by-path --path "/aws/service/canonical/ubuntu/" --recursive --query "Parameters[*].Name"  > canonical-ami.txt
+    Ubuntu-22:
+      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/jammy/stable/current/arm64/hvm/ebs-gp2/ami-id}}'
+    Ubuntu-24:
+      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/noble/stable/current/arm64/hvm/ebs-gp3/ami-id}}'
+  AmdImage:
+    Ubuntu-22:
+      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/jammy/stable/current/amd64/hvm/ebs-gp2/ami-id}}'
+    Ubuntu-24:
+      ImageId: '{{resolve:ssm:/aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id}}'
+
+Resources:
+
+  OpenViduSharedInfo:
+    Type: AWS::SecretsManager::Secret
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    Properties:
+      Name: !Sub openvidu-elastic-${AWS::Region}-${AWS::StackName}
+      Description: Secret for OpenVidu Elastic to store deployment info and seed secret
+      # All the values are initialized by the master node
+      SecretString: |
+        {
+          "OPENVIDU_URL": "none",
+          "MEET_INITIAL_ADMIN_USER": "none",
+          "MEET_INITIAL_ADMIN_PASSWORD": "none",
+          "MEET_INITIAL_API_KEY": "none",
+          "LIVEKIT_URL": "none",
+          "LIVEKIT_API_KEY": "none",
+          "LIVEKIT_API_SECRET": "none",
+          "DASHBOARD_URL": "none",
+          "GRAFANA_URL": "none",
+          "MINIO_URL": "none",
+          "DOMAIN_NAME": "none",
+          "OPENVIDU_PRO_LICENSE": "none",
+          "OPENVIDU_RTC_ENGINE": "none",
+          "REDIS_PASSWORD": "none",
+          "MONGO_ADMIN_USERNAME": "none",
+          "MONGO_ADMIN_PASSWORD": "none",
+          "MONGO_REPLICA_SET_KEY": "none",
+          "MINIO_ACCESS_KEY": "none",
+          "MINIO_SECRET_KEY": "none",
+          "DASHBOARD_ADMIN_USERNAME": "none",
+          "DASHBOARD_ADMIN_PASSWORD": "none",
+          "GRAFANA_ADMIN_USERNAME": "none",
+          "GRAFANA_ADMIN_PASSWORD": "none",
+          "OPENVIDU_VERSION": "none",
+          "ENABLED_MODULES": "none",
+          "ALL_SECRETS_GENERATED": "false"
+        }
+
+  S3AppDataBucketResource:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      ### Unique bucket name using Stack ID
+      BucketName: !Join ["-" , [ 'openvidu-appdata', !Select [0, !Split ["-", !Select [2, !Split [/, !Ref AWS::StackId ]]]]]]
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls : true
+        RestrictPublicBuckets: true
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Condition: CreateRecordingsBucket
+
+  OpenViduMasterNodeRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Sub openvidu-master-policy-${AWS::Region}-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:UpdateSecret
+                Resource: !Ref OpenViduSharedInfo
+              - Fn::If:
+                - CreateRecordingsBucket
+                - Effect: Allow
+                  Action:
+                    - s3:DeleteObject
+                    - s3:GetObject
+                    - s3:PutObject
+                  Resource: !Sub ${S3AppDataBucketResource.Arn}/*
+                - Effect: Allow
+                  Action:
+                    - s3:DeleteObject
+                    - s3:GetObject
+                    - s3:PutObject
+                  Resource: !Sub arn:${AWS::Partition}:s3:::${S3AppDataBucketName}/*
+              - Fn::If:
+                - CreateRecordingsBucket
+                - Effect: Allow
+                  Action:
+                    - s3:ListBucket
+                    - s3:GetBucketLocation
+                  Resource: !GetAtt S3AppDataBucketResource.Arn
+                - Effect: Allow
+                  Action:
+                    - s3:ListBucket
+                    - s3:GetBucketLocation
+                  Resource: !Sub arn:${AWS::Partition}:s3:::${S3AppDataBucketName}
+      RoleName:
+        Fn::Join:
+          # Generate a not too long and unique role name
+          # Getting a unique identifier from the stack id
+          - ''
+          - - openvidu-master-role-
+            - !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+
+  OpenViduMediaNodeRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+           - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: !Sub openvidu-media-policy-${AWS::Region}-${AWS::StackName}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref OpenViduSharedInfo
+              - Effect: Allow
+                Action:
+                  - autoscaling:SetInstanceHealth
+                  - autoscaling:CompleteLifecycleAction
+                  - autoscaling:RecordLifecycleActionHeartbeat
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceTag/aws:cloudformation:stack-name': !Ref 'AWS::StackName'
+              - Fn::If:
+                - CreateRecordingsBucket
+                - Effect: Allow
+                  Action:
+                    - s3:DeleteObject
+                    - s3:GetObject
+                    - s3:PutObject
+                  Resource: !Sub ${S3AppDataBucketResource.Arn}/*
+                - Effect: Allow
+                  Action:
+                    - s3:DeleteObject
+                    - s3:GetObject
+                    - s3:PutObject
+                  Resource: !Sub arn:${AWS::Partition}:s3:::${S3AppDataBucketName}/*
+              - Fn::If:
+                - CreateRecordingsBucket
+                - Effect: Allow
+                  Action:
+                    - s3:ListBucket
+                    - s3:GetBucketLocation
+                  Resource: !GetAtt S3AppDataBucketResource.Arn
+                - Effect: Allow
+                  Action:
+                    - s3:ListBucket
+                    - s3:GetBucketLocation
+                  Resource: !Sub arn:${AWS::Partition}:s3:::${S3AppDataBucketName}
+      RoleName:
+        Fn::Join:
+          # Generate a not too long and unique role name
+          # Getting a unique identifier from the stack id
+          - ''
+          - - openvidu-media-role-
+            - !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+
+  OpenViduMasterNodeInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref OpenViduMasterNodeRole
+      InstanceProfileName: !Sub openvidu-elastic-instance-profile-${AWS::Region}-${AWS::StackName}
+
+  OpenViduMediaNodeInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref OpenViduMediaNodeRole
+      InstanceProfileName: !Sub openvidu-elastic-media-instance-profile-${AWS::Region}-${AWS::StackName}
+
+  NewEIP:
+    Type: 'AWS::EC2::EIP'
+    Condition: PublicElasticIPAbsent
+    Properties:
+      InstanceId: !Ref OpenViduMasterNode
+
+  IMDSv2LaunchTemplateMasterNode:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+        LaunchTemplateName: !Sub openvidu-elastic-master-node-${AWS::Region}-${AWS::StackName}
+        LaunchTemplateData:
+          MetadataOptions:
+            HttpEndpoint: enabled
+            HttpPutResponseHopLimit: 1
+            HttpTokens: required
+
+  WaitCondition:
+    Type: 'AWS::CloudFormation::WaitCondition'
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT10M
+        Count: '1'
+
+  OpenViduMasterNode:
+    Type: AWS::EC2::Instance
+    Metadata:
+      Comment: 'Install and configure OpenVidu Elastic Master Node'
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            '/usr/local/bin/install.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                OPENVIDU_VERSION=3.7.0
+                DOMAIN=
+                YQ_VERSION=v4.53.2
+
+                # Install dependencies
+                apt-get update && apt-get install -y \
+                  curl \
+                  unzip \
+                  jq \
+                  wget
+                wget https://github.com/mikefarah/yq/releases/download/${!YQ_VERSION}/yq_linux_$(dpkg --print-architecture).tar.gz -O - |\
+                  tar xz && mv yq_linux_$(dpkg --print-architecture) /usr/bin/yq
+
+                AWS_CLI_VERSION=2.34.41
+                # Install aws-cli if not already installed
+                if ! command -v aws &> /dev/null; then
+                  curl "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m)-${!AWS_CLI_VERSION}.zip" -o "awscliv2.zip"
+                  unzip -qq awscliv2.zip
+                  ./aws/install
+                  rm -rf awscliv2.zip aws
+                fi
+
+                # Token for IMDSv2
+                TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+                # Configure Domain and other parameters
+                if [[ "${DomainName}" == '' ]]; then
+                  PublicHostname=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-hostname)
+                  RANDOM_DOMAIN_STRING=$(tr -dc 'a-z' < /dev/urandom | head -c 8)
+                  DOMAIN=openvidu-$RANDOM_DOMAIN_STRING-$(echo "$PublicHostname" | cut -d'.' -f1 | sed 's/^ec2-//').sslip.io
+                else
+                  DOMAIN=${DomainName}
+                fi
+                OPENVIDU_PRO_LICENSE="$(/usr/local/bin/store_secret.sh save OPENVIDU_PRO_LICENSE "${OpenViduLicense}")"
+                OPENVIDU_RTC_ENGINE="$(/usr/local/bin/store_secret.sh save OPENVIDU_RTC_ENGINE "${RTCEngine}")"
+                # Store version so media nodes can use it to install the same version
+                /usr/local/bin/store_secret.sh save OPENVIDU_VERSION "${!OPENVIDU_VERSION}"
+
+                # Get own private IP
+                PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+
+                # Unfortunately, EC2 instance assigned role is not immediately available after the instance is launched.
+                # Therefore, we need to retry this operation until the aws-cli command is successful.
+                MAX_RETRIES=10
+                RETRY_COUNT=0
+                while : ; do
+                    # Get current shared secret and random seed
+                    SHARED_SECRET=$(aws secretsmanager get-secret-value \
+                      --region ${AWS::Region} \
+                      --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                      --query SecretString --output text || echo 'none')
+
+                    if [[ "$SHARED_SECRET" != "none" ]]; then
+                      break
+                    fi
+
+                    RETRY_COUNT=$((RETRY_COUNT+1))
+                    if [[ $RETRY_COUNT -ge $MAX_RETRIES ]]; then
+                      exit 1
+                    fi
+                    sleep 6
+                done
+
+                # Meet initial admin user and password
+                MEET_INITIAL_ADMIN_USER="$(/usr/local/bin/store_secret.sh save MEET_INITIAL_ADMIN_USER "admin")"
+                if [[ "${InitialMeetAdminPassword}" != '' ]]; then
+                  MEET_INITIAL_ADMIN_PASSWORD="$(/usr/local/bin/store_secret.sh save MEET_INITIAL_ADMIN_PASSWORD "${InitialMeetAdminPassword}")"
+                else
+                  MEET_INITIAL_ADMIN_PASSWORD="$(/usr/local/bin/store_secret.sh generate MEET_INITIAL_ADMIN_PASSWORD)"
+                fi
+                if [[ "${InitialMeetApiKey}" != '' ]]; then
+                  MEET_INITIAL_API_KEY="$(/usr/local/bin/store_secret.sh save MEET_INITIAL_API_KEY "${InitialMeetApiKey}")"
+                else
+                  MEET_INITIAL_API_KEY="$(/usr/local/bin/store_secret.sh save MEET_INITIAL_API_KEY "")"
+                fi
+
+                # Store usernames and generate random passwords
+                OPENVIDU_PRO_LICENSE="$(/usr/local/bin/store_secret.sh save OPENVIDU_PRO_LICENSE "${OpenViduLicense}")"
+                OPENVIDU_RTC_ENGINE="$(/usr/local/bin/store_secret.sh save OPENVIDU_RTC_ENGINE "${RTCEngine}")"
+                REDIS_PASSWORD="$(/usr/local/bin/store_secret.sh generate REDIS_PASSWORD)"
+                MONGO_ADMIN_USERNAME="$(/usr/local/bin/store_secret.sh save MONGO_ADMIN_USERNAME "mongoadmin")"
+                MONGO_ADMIN_PASSWORD="$(/usr/local/bin/store_secret.sh generate MONGO_ADMIN_PASSWORD)"
+                MONGO_REPLICA_SET_KEY="$(/usr/local/bin/store_secret.sh generate MONGO_REPLICA_SET_KEY)"
+                MINIO_ACCESS_KEY="$(/usr/local/bin/store_secret.sh save MINIO_ACCESS_KEY "minioadmin")"
+                MINIO_SECRET_KEY="$(/usr/local/bin/store_secret.sh generate MINIO_SECRET_KEY)"
+                DASHBOARD_ADMIN_USERNAME="$(/usr/local/bin/store_secret.sh save DASHBOARD_ADMIN_USERNAME "dashboardadmin")"
+                DASHBOARD_ADMIN_PASSWORD="$(/usr/local/bin/store_secret.sh generate DASHBOARD_ADMIN_PASSWORD)"
+                GRAFANA_ADMIN_USERNAME="$(/usr/local/bin/store_secret.sh save GRAFANA_ADMIN_USERNAME "grafanaadmin")"
+                GRAFANA_ADMIN_PASSWORD="$(/usr/local/bin/store_secret.sh generate GRAFANA_ADMIN_PASSWORD)"
+                LIVEKIT_API_KEY="$(/usr/local/bin/store_secret.sh generate LIVEKIT_API_KEY "API" 12)"
+                LIVEKIT_API_SECRET="$(/usr/local/bin/store_secret.sh generate LIVEKIT_API_SECRET)"
+                ENABLED_MODULES="$(/usr/local/bin/store_secret.sh save ENABLED_MODULES "observability,v2compatibility,openviduMeet")"
+                ALL_SECRETS_GENERATED="$(/usr/local/bin/store_secret.sh save ALL_SECRETS_GENERATED "true")"
+
+                # Base command
+                INSTALL_COMMAND="sh <(curl -fsSL http://get.openvidu.io/pro/elastic/$OPENVIDU_VERSION/install_ov_master_node.sh)"
+
+                # Common arguments
+                COMMON_ARGS=(
+                  "--no-tty"
+                  "--install"
+                  "--environment=aws"
+                  "--deployment-type=elastic"
+                  "--node-role='master-node'"
+                  "--openvidu-pro-license=$OPENVIDU_PRO_LICENSE"
+                  "--private-ip=$PRIVATE_IP"
+                  "--domain-name=$DOMAIN"
+                  "--enabled-modules='$ENABLED_MODULES'"
+                  "--rtc-engine=$OPENVIDU_RTC_ENGINE"
+                  "--redis-password=$REDIS_PASSWORD"
+                  "--mongo-admin-user=$MONGO_ADMIN_USERNAME"
+                  "--mongo-admin-password=$MONGO_ADMIN_PASSWORD"
+                  "--mongo-replica-set-key=$MONGO_REPLICA_SET_KEY"
+                  "--minio-access-key=$MINIO_ACCESS_KEY"
+                  "--minio-secret-key=$MINIO_SECRET_KEY"
+                  "--dashboard-admin-user=$DASHBOARD_ADMIN_USERNAME"
+                  "--dashboard-admin-password=$DASHBOARD_ADMIN_PASSWORD"
+                  "--grafana-admin-user=$GRAFANA_ADMIN_USERNAME"
+                  "--grafana-admin-password=$GRAFANA_ADMIN_PASSWORD"
+                  "--meet-initial-admin-password=$MEET_INITIAL_ADMIN_PASSWORD"
+                  "--meet-initial-api-key=$MEET_INITIAL_API_KEY"
+                  "--livekit-api-key=$LIVEKIT_API_KEY"
+                  "--livekit-api-secret=$LIVEKIT_API_SECRET"
+                )
+
+                # Include additional installer flags provided by the user
+                if [[ "${AdditionalInstallFlags}" != "" ]]; then
+                  IFS=',' read -ra EXTRA_FLAGS <<< "${AdditionalInstallFlags}"
+                  for extra_flag in "${!EXTRA_FLAGS[@]}"; do
+                    # Trim whitespace around each flag
+                    extra_flag="$(echo -e "${!extra_flag}" | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')"
+                    if [[ "$extra_flag" != "" ]]; then
+                      COMMON_ARGS+=("$extra_flag")
+                    fi
+                  done
+                fi
+
+                # Certificate arguments
+                if [[ "${CertificateType}" == "selfsigned" ]]; then
+                  CERT_ARGS=(
+                    "--certificate-type=selfsigned"
+                  )
+                elif [[ "${CertificateType}" == "letsencrypt" ]]; then
+                  CERT_ARGS=(
+                    "--certificate-type=letsencrypt"
+                  )
+                else
+                  # Use base64 encoded certificates directly
+                  OWN_CERT_CRT=${OwnPublicCertificate}
+                  OWN_CERT_KEY=${OwnPrivateCertificate}
+
+                  CERT_ARGS=(
+                    "--certificate-type=owncert"
+                    "--owncert-public-key=$OWN_CERT_CRT"
+                    "--owncert-private-key=$OWN_CERT_KEY"
+                  )
+                fi
+
+                # Construct the final command with all arguments
+                FINAL_COMMAND="$INSTALL_COMMAND $(printf "%s " "${!COMMON_ARGS[@]}") $(printf "%s " "${!CERT_ARGS[@]}")"
+
+                # Install OpenVidu
+                exec bash -c "$FINAL_COMMAND"
+
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/config_s3.sh':
+              content: !Sub
+                - |
+                  #!/bin/bash
+                  set -e
+
+                  # Install dir and config dir
+                  INSTALL_DIR="/opt/openvidu"
+                  CLUSTER_CONFIG_DIR="${!INSTALL_DIR}/config/cluster"
+
+                  # Config S3 bucket
+                  EXTERNAL_S3_ENDPOINT="https://s3.${AWS::Region}.amazonaws.com"
+                  EXTERNAL_S3_REGION="${AWS::Region}"
+                  EXTERNAL_S3_PATH_STYLE_ACCESS="false"
+                  EXTERNAL_S3_BUCKET_APP_DATA=${S3RecordingsBucketResourceName}
+                  sed -i "s|EXTERNAL_S3_ENDPOINT=.*|EXTERNAL_S3_ENDPOINT=$EXTERNAL_S3_ENDPOINT|" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                  sed -i "s|EXTERNAL_S3_REGION=.*|EXTERNAL_S3_REGION=$EXTERNAL_S3_REGION|" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                  sed -i "s|EXTERNAL_S3_PATH_STYLE_ACCESS=.*|EXTERNAL_S3_PATH_STYLE_ACCESS=$EXTERNAL_S3_PATH_STYLE_ACCESS|" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                  sed -i "s|EXTERNAL_S3_BUCKET_APP_DATA=.*|EXTERNAL_S3_BUCKET_APP_DATA=$EXTERNAL_S3_BUCKET_APP_DATA|" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                - S3RecordingsBucketResourceName: !If
+                    - CreateRecordingsBucket
+                    - !Ref S3AppDataBucketResource
+                    - !Ref S3AppDataBucketName
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/after_install.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                # Get current shared secret
+                SHARED_SECRET=$(aws secretsmanager get-secret-value \
+                  --region ${AWS::Region} \
+                  --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                  --query SecretString --output text)
+
+                DOMAIN=$(echo $SHARED_SECRET | jq -r .DOMAIN_NAME)
+
+                # Generate URLs
+                OPENVIDU_URL="https://${!DOMAIN}/"
+                LIVEKIT_URL="wss://${!DOMAIN}/"
+                DASHBOARD_URL="https://${!DOMAIN}/dashboard/"
+                GRAFANA_URL="https://${!DOMAIN}/grafana/"
+                MINIO_URL="https://${!DOMAIN}/minio-console/"
+
+                # Update shared secret
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"OPENVIDU_URL": "'"$OPENVIDU_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"LIVEKIT_URL": "'"$LIVEKIT_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"DOMAIN_NAME": "'"$DOMAIN"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"DASHBOARD_URL": "'"$DASHBOARD_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"GRAFANA_URL": "'"$GRAFANA_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MINIO_URL": "'"$MINIO_URL"'" }')"
+
+                # Update shared secret
+                aws secretsmanager update-secret \
+                  --region ${AWS::Region} \
+                  --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                  --secret-string "$SHARED_SECRET"
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/update_config_from_secret.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                # Token for IMDSv2
+                TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+                # Get current shared secret
+                SHARED_SECRET=$(aws secretsmanager get-secret-value \
+                  --region ${AWS::Region} \
+                  --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                  --query SecretString --output text)
+
+                # Installation directory
+                INSTALL_DIR="/opt/openvidu"
+                CLUSTER_CONFIG_DIR="${!INSTALL_DIR}/config/cluster"
+                MASTER_NODE_CONFIG_DIR="${!INSTALL_DIR}/config/node"
+
+                # Replace DOMAIN_NAME
+                export DOMAIN=$(echo $SHARED_SECRET | jq -r .DOMAIN_NAME)
+                if [[ -n "$DOMAIN" ]]; then
+                  sed -i "s/DOMAIN_NAME=.*/DOMAIN_NAME=$DOMAIN/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                else
+                  exit 1
+                fi
+
+                # Replace rest of the values
+                sed -i "s/REDIS_PASSWORD=.*/REDIS_PASSWORD=$(echo $SHARED_SECRET | jq -r .REDIS_PASSWORD)/" "${!MASTER_NODE_CONFIG_DIR}/master_node.env"
+                sed -i "s/OPENVIDU_RTC_ENGINE=.*/OPENVIDU_RTC_ENGINE=$(echo $SHARED_SECRET | jq -r .OPENVIDU_RTC_ENGINE)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/OPENVIDU_PRO_LICENSE=.*/OPENVIDU_PRO_LICENSE=$(echo $SHARED_SECRET | jq -r .OPENVIDU_PRO_LICENSE)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/MONGO_ADMIN_USERNAME=.*/MONGO_ADMIN_USERNAME=$(echo $SHARED_SECRET | jq -r .MONGO_ADMIN_USERNAME)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/MONGO_ADMIN_PASSWORD=.*/MONGO_ADMIN_PASSWORD=$(echo $SHARED_SECRET | jq -r .MONGO_ADMIN_PASSWORD)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/MONGO_REPLICA_SET_KEY=.*/MONGO_REPLICA_SET_KEY=$(echo $SHARED_SECRET | jq -r .MONGO_REPLICA_SET_KEY)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/DASHBOARD_ADMIN_USERNAME=.*/DASHBOARD_ADMIN_USERNAME=$(echo $SHARED_SECRET | jq -r .DASHBOARD_ADMIN_USERNAME)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/DASHBOARD_ADMIN_PASSWORD=.*/DASHBOARD_ADMIN_PASSWORD=$(echo $SHARED_SECRET | jq -r .DASHBOARD_ADMIN_PASSWORD)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/MINIO_ACCESS_KEY=.*/MINIO_ACCESS_KEY=$(echo $SHARED_SECRET | jq -r .MINIO_ACCESS_KEY)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/MINIO_SECRET_KEY=.*/MINIO_SECRET_KEY=$(echo $SHARED_SECRET | jq -r .MINIO_SECRET_KEY)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/GRAFANA_ADMIN_USERNAME=.*/GRAFANA_ADMIN_USERNAME=$(echo $SHARED_SECRET | jq -r .GRAFANA_ADMIN_USERNAME)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/GRAFANA_ADMIN_PASSWORD=.*/GRAFANA_ADMIN_PASSWORD=$(echo $SHARED_SECRET | jq -r .GRAFANA_ADMIN_PASSWORD)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/LIVEKIT_API_KEY=.*/LIVEKIT_API_KEY=$(echo $SHARED_SECRET | jq -r .LIVEKIT_API_KEY)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/LIVEKIT_API_SECRET=.*/LIVEKIT_API_SECRET=$(echo $SHARED_SECRET | jq -r .LIVEKIT_API_SECRET)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+                sed -i "s/MEET_INITIAL_ADMIN_USER=.*/MEET_INITIAL_ADMIN_USER=$(echo $SHARED_SECRET | jq -r .MEET_INITIAL_ADMIN_USER)/" "${!CLUSTER_CONFIG_DIR}/master_node/meet.env"
+                sed -i "s/MEET_INITIAL_ADMIN_PASSWORD=.*/MEET_INITIAL_ADMIN_PASSWORD=$(echo $SHARED_SECRET | jq -r .MEET_INITIAL_ADMIN_PASSWORD)/" "${!CLUSTER_CONFIG_DIR}/master_node/meet.env"
+                if [[ "${InitialMeetApiKey}" != '' ]]; then
+                  sed -i "s/MEET_INITIAL_API_KEY=.*/MEET_INITIAL_API_KEY=$(echo $SHARED_SECRET | jq -r .MEET_INITIAL_API_KEY)/" "${!CLUSTER_CONFIG_DIR}/master_node/meet.env"
+                fi
+                sed -i "s/ENABLED_MODULES=.*/ENABLED_MODULES=$(echo $SHARED_SECRET | jq -r .ENABLED_MODULES)/" "${!CLUSTER_CONFIG_DIR}/openvidu.env"
+
+                # Update URLs in secret
+                OPENVIDU_URL="https://${!DOMAIN}/"
+                LIVEKIT_URL="wss://${!DOMAIN}/"
+                DASHBOARD_URL="https://${!DOMAIN}/dashboard/"
+                GRAFANA_URL="https://${!DOMAIN}/grafana/"
+                MINIO_URL="https://${!DOMAIN}/minio-console/"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"OPENVIDU_URL": "'"$OPENVIDU_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"LIVEKIT_URL": "'"$LIVEKIT_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"DOMAIN_NAME": "'"$DOMAIN"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"DASHBOARD_URL": "'"$DASHBOARD_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"GRAFANA_URL": "'"$GRAFANA_URL"'" }')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MINIO_URL": "'"$MINIO_URL"'" }')"
+                aws secretsmanager update-secret \
+                  --region ${AWS::Region} \
+                  --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                  --secret-string "$SHARED_SECRET"
+
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/update_secret_from_config.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                # Get current shared secret
+                SHARED_SECRET=$(aws secretsmanager get-secret-value \
+                  --region ${AWS::Region} \
+                  --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                  --query SecretString --output text)
+
+                # Installation directory
+                INSTALL_DIR="/opt/openvidu"
+                CLUSTER_CONFIG_DIR="${!INSTALL_DIR}/config/cluster"
+                MASTER_NODE_CONFIG_DIR="${!INSTALL_DIR}/config/node"
+
+                # Update shared secret
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"REDIS_PASSWORD": "'"$(/usr/local/bin/get_value_from_config.sh REDIS_PASSWORD "${!MASTER_NODE_CONFIG_DIR}/master_node.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"DOMAIN_NAME": "'"$(/usr/local/bin/get_value_from_config.sh DOMAIN_NAME "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"OPENVIDU_RTC_ENGINE": "'"$(/usr/local/bin/get_value_from_config.sh OPENVIDU_RTC_ENGINE "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"OPENVIDU_PRO_LICENSE": "'"$(/usr/local/bin/get_value_from_config.sh OPENVIDU_PRO_LICENSE "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MONGO_ADMIN_USERNAME": "'"$(/usr/local/bin/get_value_from_config.sh MONGO_ADMIN_USERNAME "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MONGO_ADMIN_PASSWORD": "'"$(/usr/local/bin/get_value_from_config.sh MONGO_ADMIN_PASSWORD "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MONGO_REPLICA_SET_KEY": "'"$(/usr/local/bin/get_value_from_config.sh MONGO_REPLICA_SET_KEY "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MINIO_ACCESS_KEY": "'"$(/usr/local/bin/get_value_from_config.sh MINIO_ACCESS_KEY "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MINIO_SECRET_KEY": "'"$(/usr/local/bin/get_value_from_config.sh MINIO_SECRET_KEY "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"DASHBOARD_ADMIN_USERNAME": "'"$(/usr/local/bin/get_value_from_config.sh DASHBOARD_ADMIN_USERNAME "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"DASHBOARD_ADMIN_PASSWORD": "'"$(/usr/local/bin/get_value_from_config.sh DASHBOARD_ADMIN_PASSWORD "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"GRAFANA_ADMIN_USERNAME": "'"$(/usr/local/bin/get_value_from_config.sh GRAFANA_ADMIN_USERNAME "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"GRAFANA_ADMIN_PASSWORD": "'"$(/usr/local/bin/get_value_from_config.sh GRAFANA_ADMIN_PASSWORD "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"LIVEKIT_API_KEY": "'"$(/usr/local/bin/get_value_from_config.sh LIVEKIT_API_KEY "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"LIVEKIT_API_SECRET": "'"$(/usr/local/bin/get_value_from_config.sh LIVEKIT_API_SECRET "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MEET_INITIAL_ADMIN_USER": "'"$(/usr/local/bin/get_value_from_config.sh MEET_INITIAL_ADMIN_USER "${!CLUSTER_CONFIG_DIR}/master_node/meet.env")"'"}')"
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MEET_INITIAL_ADMIN_PASSWORD": "'"$(/usr/local/bin/get_value_from_config.sh MEET_INITIAL_ADMIN_PASSWORD "${!CLUSTER_CONFIG_DIR}/master_node/meet.env")"'"}')"
+                if [[ "${InitialMeetApiKey}" != '' ]]; then
+                  SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"MEET_INITIAL_API_KEY": "'"$(/usr/local/bin/get_value_from_config.sh MEET_INITIAL_API_KEY "${!CLUSTER_CONFIG_DIR}/master_node/meet.env")"'"}')"
+                fi
+                SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"ENABLED_MODULES": "'"$(/usr/local/bin/get_value_from_config.sh ENABLED_MODULES "${!CLUSTER_CONFIG_DIR}/openvidu.env")"'"}')"
+
+                # Update shared secret
+                aws secretsmanager update-secret \
+                  --region ${AWS::Region} \
+                  --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                  --secret-string "$SHARED_SECRET"
+
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/get_value_from_config.sh':
+              content: |
+                #!/bin/bash
+                set -e
+
+                # Function to get the value of a given key from the environment file
+                get_value() {
+                    local key="$1"
+                    local file_path="$2"
+
+                    # Use grep to find the line with the key, ignoring lines starting with #
+                    # Use awk to split on '=' and print the second field, which is the value
+                    local value=$(grep -E "^\s*$key\s*=" "$file_path" | awk -F= '{print $2}' | sed 's/#.*//; s/^\s*//; s/\s*$//')
+
+                    # If the value is empty, return "none"
+                    if [ -z "$value" ]; then
+                        echo "none"
+                    else
+                        echo "$value"
+                    fi
+                }
+
+                # Check if the correct number of arguments are supplied
+                if [ "$#" -ne 2 ]; then
+                    echo "Usage: $0 <key> <file_path>"
+                    exit 1
+                fi
+
+                # Get the key and file path from the arguments
+                key="$1"
+                file_path="$2"
+
+                # Get and print the value
+                get_value "$key" "$file_path"
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/store_secret.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                # Modes: save, generate
+                # save mode: save the secret in the secret manager
+                # generate mode: generate a random password and save it in the secret manager
+                MODE="$1"
+                SHARED_SECRET="$(aws secretsmanager get-secret-value \
+                  --region ${AWS::Region} \
+                  --secret-id ${OpenViduSharedInfo} \
+                  --query SecretString --output text)"
+                if [[ "$MODE" == "generate" ]]; then
+                  SECRET_KEY_NAME="$2"
+                  PREFIX="${!3:-}"
+                  LENGTH="${!4:-44}"
+                  RANDOM_PASSWORD="$(openssl rand -base64 64 | tr -d '+/=\n' | cut -c -${!LENGTH})"
+                  RANDOM_PASSWORD="${!PREFIX}${!RANDOM_PASSWORD}"
+                  SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"'"$SECRET_KEY_NAME"'": "'"$RANDOM_PASSWORD"'"}')"
+                  aws secretsmanager update-secret \
+                    --region ${AWS::Region} \
+                    --secret-id ${OpenViduSharedInfo} \
+                    --secret-string "$SHARED_SECRET" > /dev/null 2>&1
+                  echo "$RANDOM_PASSWORD"
+                elif [[ "$MODE" == "save" ]]; then
+                  SECRET_KEY_NAME="$2"
+                  SECRET_VALUE="$3"
+                  SHARED_SECRET="$(echo "$SHARED_SECRET" | jq '. + {"'"$SECRET_KEY_NAME"'": "'"$SECRET_VALUE"'"}')"
+                  aws secretsmanager update-secret \
+                    --region ${AWS::Region} \
+                    --secret-id ${OpenViduSharedInfo} \
+                    --secret-string "$SHARED_SECRET" > /dev/null 2>&1
+                  echo "$SECRET_VALUE"
+                else
+                  exit 1
+                fi
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/check_app_ready.sh':
+              content: |
+                #!/bin/bash
+                set -e
+                while true; do
+                  HTTP_STATUS=$(curl -Ik http://localhost:7880/health/caddy | head -n1 | awk '{print $2}')
+                  if [ $HTTP_STATUS == 200 ]; then
+                    break
+                  fi
+                  sleep 5
+                done
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/restart.sh':
+              content: |
+                #!/bin/bash
+                set -e
+                # Stop all services
+                systemctl stop openvidu
+
+                # Update config from secret
+                /usr/local/bin/update_config_from_secret.sh
+
+                # Start all services
+                systemctl start openvidu
+              mode: "000755"
+              owner: "root"
+              group: "root"
+    Properties:
+      ImageId: !If
+        - IsMasterGraviton
+        - !If
+          - IsMasterNodeNvidia
+          - '{{resolve:ssm:/aws/service/deeplearning/ami/arm64/base-oss-nvidia-driver-gpu-ubuntu-24.04/latest/ami-id}}'
+          - !FindInMap [ArmImage, !Ref OperatingSystem, ImageId]
+        - !If
+          - IsMasterNodeNvidia
+          - '{{resolve:ssm:/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-24.04/latest/ami-id}}'
+          - !FindInMap [AmdImage, !Ref OperatingSystem, ImageId]
+      LaunchTemplate:
+        # Enable IMDSv2 by default
+        LaunchTemplateId: !Ref IMDSv2LaunchTemplateMasterNode
+        Version: !GetAtt IMDSv2LaunchTemplateMasterNode.DefaultVersionNumber
+      InstanceType: !Ref MasterNodeInstanceType
+      IamInstanceProfile: !Ref OpenViduMasterNodeInstanceProfile
+      SubnetId: !Ref OpenViduMasterNodeSubnet
+      SecurityGroupIds:
+        - !GetAtt OpenViduMasterNodeSG.GroupId
+      KeyName: !Ref KeyName
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} - OpenVidu Elastic - Master Node
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -eu -o pipefail
+
+          echo "DPkg::Lock::Timeout \"-1\";" > /etc/apt/apt.conf.d/99timeout
+
+          apt-get update && apt-get install -y \
+                python3-pip \
+                ec2-instance-connect
+
+          CFN_BOOTSTRAP_VERSION=2.0-38
+          # Detect Ubuntu version and install cfn-bootstrap accordingly
+          UBUNTU_VERSION=$(lsb_release -rs | cut -d. -f1)
+          if [ "$UBUNTU_VERSION" -ge 24 ]; then
+            python3 -m pip install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-${!CFN_BOOTSTRAP_VERSION}.tar.gz
+          else
+            python3 -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-${!CFN_BOOTSTRAP_VERSION}.tar.gz
+          fi
+
+          cfn-init --region ${AWS::Region} --stack ${AWS::StackId} --resource OpenViduMasterNode
+
+          export HOME="/root"
+
+          # Install OpenVidu
+          /usr/local/bin/install.sh || { echo "[OpenVidu] error installing OpenVidu"; exit 1; }
+
+          # Config S3 bucket
+          /usr/local/bin/config_s3.sh || { echo "[OpenVidu] error configuring S3 bucket"; exit 1; }
+
+          # Start OpenVidu
+          systemctl start openvidu || { echo "[OpenVidu] error starting OpenVidu"; exit 1; }
+
+          # Update shared secret
+          /usr/local/bin/after_install.sh || { echo "[OpenVidu] error updating shared secret"; exit 1; }
+
+          # Launch on reboot
+          echo "@reboot /usr/local/bin/restart.sh &> /var/log/openvidu-restart.log" | crontab
+
+          # Wait for the app
+          sleep 20
+          /usr/local/bin/check_app_ready.sh
+
+          # sending the finish call
+          cfn-signal -e $? --stack ${AWS::StackId} --resource WaitCondition --region ${AWS::Region}
+
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp3
+            DeleteOnTermination: true
+            VolumeSize: 200
+
+  OpenViduMediaNodeLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Metadata:
+      Comment: 'Launch template for OpenVidu Elastic Media Node'
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            '/usr/local/bin/install.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                DOMAIN=
+                YQ_VERSION=v4.53.2
+
+                # Install dependencies
+                apt-get update && apt-get install -y \
+                  curl \
+                  unzip \
+                  jq \
+                  wget
+                wget https://github.com/mikefarah/yq/releases/download/${!YQ_VERSION}/yq_linux_$(dpkg --print-architecture).tar.gz -O - |\
+                  tar xz && mv yq_linux_$(dpkg --print-architecture) /usr/bin/yq
+
+                AWS_CLI_VERSION=2.34.41
+                # Install aws-cli if not already installed
+                if ! command -v aws &> /dev/null; then
+                  curl "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m)-${!AWS_CLI_VERSION}.zip" -o "awscliv2.zip"
+                  unzip -qq awscliv2.zip
+                  ./aws/install
+                  rm -rf awscliv2.zip aws
+                fi
+
+                # Token for IMDSv2
+                TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+                # Get own private IP
+                PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+
+                # Unfortunately, EC2 instance role is not immediately available after the instance is launched.
+                # Therefore, we need to retry this operation until the aws-cli command is successful.
+                MAX_RETRIES=10
+                RETRY_COUNT=0
+                while : ; do
+                    SHARED_SECRET=$(aws secretsmanager get-secret-value \
+                      --region ${AWS::Region} \
+                      --secret-id openvidu-elastic-${AWS::Region}-${AWS::StackName} \
+                      --query SecretString --output text || echo 'none')
+
+                    if [[ "$SHARED_SECRET" != "none" ]]; then
+                        break
+                    fi
+                    RETRY_COUNT=$((RETRY_COUNT+1))
+                    if [[ $RETRY_COUNT -ge $MAX_RETRIES ]]; then
+                        exit 1
+                    fi
+                    sleep 6
+                done
+
+                # Get current shared secret
+                DOMAIN=$(echo $SHARED_SECRET | jq -r .DOMAIN_NAME)
+                OPENVIDU_PRO_LICENSE=$(echo $SHARED_SECRET | jq -r .OPENVIDU_PRO_LICENSE)
+                REDIS_PASSWORD=$(echo $SHARED_SECRET | jq -r .REDIS_PASSWORD)
+
+                # Get OpenVidu Media Nodes version to deploy
+                OPENVIDU_VERSION=$(echo "$SHARED_SECRET" | jq -r '.OPENVIDU_VERSION')
+
+                if [[ "$OPENVIDU_VERSION" == "none" ]]; then
+                  echo "OpenVidu version not found"
+                  exit 1
+                fi
+
+                ALL_SECRETS_GENERATED=$(echo $SHARED_SECRET | jq -r .ALL_SECRETS_GENERATED)
+                if [[ "$ALL_SECRETS_GENERATED" == "false" ]]; then
+                  echo "Master node not ready"
+                  /usr/local/bin/set_as_unhealthy.sh
+                  exit 1
+                fi
+
+                # Get Master Node private IP
+                MASTER_NODE_IP=${OpenViduMasterNode.PrivateIp}
+
+                # Base command
+                INSTALL_COMMAND="sh <(curl -fsSL http://get.openvidu.io/pro/elastic/$OPENVIDU_VERSION/install_ov_media_node.sh)"
+
+                # Common arguments
+                COMMON_ARGS=(
+                  "--no-tty"
+                  "--install"
+                  "--environment=aws"
+                  "--deployment-type=elastic"
+                  "--node-role='media-node'"
+                  "--master-node-private-ip=$MASTER_NODE_IP"
+                  "--private-ip=$PRIVATE_IP"
+                  "--redis-password=$REDIS_PASSWORD"
+                )
+
+                # Construct the final command with all arguments
+                FINAL_COMMAND="$INSTALL_COMMAND $(printf "%s " "${!COMMON_ARGS[@]}")"
+
+                # Install OpenVidu
+                exec bash -c "$FINAL_COMMAND"
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/set_as_unhealthy.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                # Token for IMDSv2
+                TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+                # Get own instance ID
+                INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+                # Set instance as unhealthy
+                aws autoscaling set-instance-health \
+                  --region ${AWS::Region} \
+                  --instance-id "$INSTANCE_ID" \
+                  --health-status Unhealthy
+              mode: "000755"
+              owner: "root"
+              group: "root"
+            '/usr/local/bin/stop_media_node.sh':
+              content: !Sub |
+                #!/bin/bash
+                set -e
+                # Token for IMDSv2
+                TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+                # Get own instance ID
+                INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+                ASG_NAME=openvidu-elastic-media-asg-${AWS::Region}-${AWS::StackName}
+
+                # Execute if docker is installed
+                if [ -x "$(command -v docker)" ]; then
+                  echo "Stopping media node services and waiting for termination..."
+                  docker container kill --signal=SIGQUIT openvidu || true
+                  docker container kill --signal=SIGQUIT ingress || true
+                  docker container kill --signal=SIGQUIT egress || true
+                  for agent_container in $(docker ps --filter "label=openvidu-agent=true" --format '{{.Names}}'); do
+                    docker container kill --signal=SIGQUIT "$agent_container"
+                  done
+                  TIME_PASSED=0
+                  HEARTBEAT_MAX=1800
+                  # Wait for running containers to not be openvidu, ingress, egress or an openvidu agent
+                  while [ $(docker ps --filter "label=openvidu-agent=true" -q | wc -l) -gt 0 ] || \
+                        [ $(docker inspect -f '{{.State.Running}}' openvidu 2>/dev/null) == "true" ] || \
+                        [ $(docker inspect -f '{{.State.Running}}' ingress 2>/dev/null) == "true" ] || \
+                        [ $(docker inspect -f '{{.State.Running}}' egress 2>/dev/null) == "true" ]; do
+                    echo "Waiting for containers to stop..."
+                    sleep 5
+                    TIME_PASSED=$((TIME_PASSED+5))
+                    if [ $TIME_PASSED -ge $HEARTBEAT_MAX ]; then
+                      echo "Increase lifecycle hook timeout to continue waiting for termination"
+                      # Increase lifecycle hook timeout
+                      aws autoscaling record-lifecycle-action-heartbeat \
+                        --region ${AWS::Region} \
+                        --lifecycle-hook-name StopMediaNodeLifecycleHook-${AWS::Region}-${AWS::StackName} \
+                        --auto-scaling-group-name "$ASG_NAME" \
+                        --instance-id "$INSTANCE_ID"
+                      TIME_PASSED=0
+                    fi
+                  done
+                fi
+
+                aws autoscaling complete-lifecycle-action \
+                  --region ${AWS::Region} \
+                  --lifecycle-hook-name StopMediaNodeLifecycleHook-${AWS::Region}-${AWS::StackName} \
+                  --auto-scaling-group-name "$ASG_NAME" \
+                  --lifecycle-action-result CONTINUE \
+                  --instance-id "$INSTANCE_ID"
+              mode: "000755"
+              owner: "root"
+              group: "root"
+
+    Properties:
+      LaunchTemplateName: !Sub openvidu-elastic-media-${AWS::Region}-${AWS::StackName}
+      LaunchTemplateData:
+        # Enable IMDSv2 by default
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpPutResponseHopLimit: 1
+          HttpTokens: required
+        IamInstanceProfile:
+          Arn: !GetAtt OpenViduMediaNodeInstanceProfile.Arn
+        SecurityGroupIds:
+          - !GetAtt OpenViduMediaNodeSG.GroupId
+        ImageId: !If
+          - IsMediaGraviton
+          - !If
+            - IsMediaNodeNvidia
+            - '{{resolve:ssm:/aws/service/deeplearning/ami/arm64/base-oss-nvidia-driver-gpu-ubuntu-24.04/latest/ami-id}}'
+            - !FindInMap [ArmImage, !Ref OperatingSystem, ImageId]
+          - !If
+            - IsMediaNodeNvidia
+            - '{{resolve:ssm:/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-24.04/latest/ami-id}}'
+            - !FindInMap [AmdImage, !Ref OperatingSystem, ImageId]
+        KeyName: !Ref KeyName
+        InstanceType: !Ref MediaNodeInstanceType
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -eu -o pipefail
+
+            echo "DPkg::Lock::Timeout \"-1\";" > /etc/apt/apt.conf.d/99timeout
+
+            apt-get update && apt-get install -y \
+                python3-pip \
+                ec2-instance-connect
+
+            CFN_BOOTSTRAP_VERSION=2.0-38
+            # Detect Ubuntu version and install cfn-bootstrap accordingly
+            UBUNTU_VERSION=$(lsb_release -rs | cut -d. -f1)
+            if [ "$UBUNTU_VERSION" -ge 24 ]; then
+              python3 -m pip install --break-system-packages https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-${!CFN_BOOTSTRAP_VERSION}.tar.gz
+            else
+              python3 -m pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-${!CFN_BOOTSTRAP_VERSION}.tar.gz
+            fi
+
+            cfn-init --region ${AWS::Region} --stack ${AWS::StackId} --resource OpenViduMediaNodeLaunchTemplate
+
+            export HOME="/root"
+
+            # Install OpenVidu
+            /usr/local/bin/install.sh || { echo "[OpenVidu] error installing OpenVidu"; /usr/local/bin/set_as_unhealthy.sh; exit 1; }
+
+            # Start OpenVidu
+            systemctl start openvidu || { echo "[OpenVidu] error starting OpenVidu"; /usr/local/bin/set_as_unhealthy.sh; exit 1; }
+
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeType: gp3
+              DeleteOnTermination: true
+              VolumeSize: !If [IsMediaNodeNvidia, 100, 50]
+
+  OpenViduMediaNodeASG:
+    DependsOn:
+      - StopMediaNodeCloudWatchEventRule
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub openvidu-elastic-media-asg-${AWS::Region}-${AWS::StackName}
+      LaunchTemplate:
+        LaunchTemplateId: !Ref OpenViduMediaNodeLaunchTemplate
+        Version: !GetAtt OpenViduMediaNodeLaunchTemplate.DefaultVersionNumber
+      MinSize: !Ref MinNumberOfMediaNodes
+      MaxSize: !Ref MaxNumberOfMediaNodes
+      DesiredCapacity: !Ref InitialNumberOfMediaNodes
+      VPCZoneIdentifier: !Ref OpenViduMediaNodeSubnets
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} - OpenVidu Elastic - Media Node
+          PropagateAtLaunch: true
+
+  StopMediaNodeLifecycleHook:
+    Type: 'AWS::AutoScaling::LifecycleHook'
+    Properties:
+      LifecycleHookName: !Sub StopMediaNodeLifecycleHook-${AWS::Region}-${AWS::StackName}
+      AutoScalingGroupName: !Ref OpenViduMediaNodeASG
+      LifecycleTransition: 'autoscaling:EC2_INSTANCE_TERMINATING'
+      DefaultResult: 'CONTINUE'
+      HeartbeatTimeout: 3600
+
+  StopMediaNodeDocumentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ssm.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+                - ssm:DescribeInstanceInformation
+                - ssm:ListCommands
+                - ssm:ListCommandInvocations
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - ssm:SendCommand
+              Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript
+            - Action:
+                - ssm:SendCommand
+              Resource: !Sub arn:${AWS::Partition}:ec2:*:*:instance/*
+              Condition:
+                StringEquals:
+                  'aws:ResourceTag/aws:cloudformation:stack-name': !Ref 'AWS::StackName'
+              Effect: Allow
+          PolicyName: SSM-Automation-Policy
+
+  StopMediaNodeAutomationDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Name:
+        Fn::Join:
+          # Generate a not too long and unique document name
+          # Getting a unique identifier from the stack id
+          - ''
+          - - 'StopMediaNodeAutomationDocument-'
+            - !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+      DocumentType: Automation
+      Content:
+        schemaVersion: '0.3'
+        assumeRole: "{{automationAssumeRole}}"
+        description: This document stops the OpenVidu services in a Media Node and
+          terminates the instance. It stop the OpenVidu services without interrupting
+          the running sessions, ingress and egress running in the Media Node.
+          Also it sends a CONTINUE signal to the Auto Scaling Group to continue the
+          instance termination when the services are stopped.
+        parameters:
+          InstanceId:
+            type: String
+          automationAssumeRole:
+            type: String
+            default: !GetAtt StopMediaNodeDocumentRole.Arn
+            description: "(Required) The ARN of the role that allows Automation to
+              perform the actions."
+        mainSteps:
+          - name: RunCommand
+            action: aws:runCommand
+            inputs:
+              DocumentName: AWS-RunShellScript
+              InstanceIds:
+                - "{{ InstanceId }}"
+              Parameters:
+                # 24 hours as a timeout to wait for the instance to stop all services
+                executionTimeout: "60"
+                commands:
+                  - nohup /usr/local/bin/stop_media_node.sh > /var/log/stop_media_node.log 2>&1 &
+
+
+  StopMediaNodeCloudWatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - events.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Policies:
+      - PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ssm:StartAutomationExecution
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-execution/*
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/${StopMediaNodeAutomationDocument}
+        PolicyName: !Sub StopMediaNodeCloudWatchEventPolicy-${AWS::Region}-${AWS::StackName}
+      - PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource: !GetAtt StopMediaNodeDocumentRole.Arn
+        PolicyName: Pass-Role-SSM-Automation-Policy
+
+  StopMediaNodeCloudWatchEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Rule to trigger the StopMediaNodeAutomationDocument when an instance is terminated
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-terminate Lifecycle Action
+        detail:
+          AutoScalingGroupName:
+            - !Sub openvidu-elastic-media-asg-${AWS::Region}-${AWS::StackName}
+      Name:
+        Fn::Join:
+          # Generate a not too long and unique rule name
+          # Getting a unique identifier from the stack id
+          - ''
+          - - StopMediaNodeCloudWatchEventRule-
+            - !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+      Targets:
+        - Arn: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/${StopMediaNodeAutomationDocument}:$DEFAULT
+          RoleArn: !GetAtt StopMediaNodeCloudWatchEventRole.Arn
+          Id:
+            Fn::Join:
+              # Generate a not too long and unique target id
+              # Getting a unique identifier from the stack id
+              - ''
+              - - StopMediaNodeCloudWatchEventRule-
+                - !Select [4, !Split ['-', !Select [2, !Split ['/', !Ref AWS::StackId]]]]
+          InputTransformer:
+            InputPathsMap:
+              instanceid: "$.detail.EC2InstanceId"
+            InputTemplate: |
+              {
+                "InstanceId": [ <instanceid> ]
+              }
+
+  OpenViduMediaNodeASGScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref OpenViduMediaNodeASG
+      PolicyType: TargetTrackingScaling
+      EstimatedInstanceWarmup: 120
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: !Ref ScaleTargetCPU
+
+  OpenViduMasterNodeSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for OpenVidu Master Node
+      GroupName: !Sub openvidu-elastic-master-sg-${AWS::Region}-${AWS::StackName}
+      VpcId: !Ref OpenViduVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: 1935
+          ToPort: 1935
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 1935
+          ToPort: 1935
+          CidrIpv6: ::/0
+
+  OpenViduMediaNodeToMasterNodeClusterPortIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 7880
+      ToPort: 7880
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterNodeRedisIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 7000
+      ToPort: 7000
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterNodeMinioIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 9100
+      ToPort: 9100
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterNodeMongoIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 20000
+      ToPort: 20000
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterNodeLokiIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 3100
+      ToPort: 3100
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterNodeMimirIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 9009
+      ToPort: 9009
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterV2CompatibilityWebhookIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 4443
+      ToPort: 4443
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterMeetWebhookIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 9080
+      ToPort: 9080
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeToMasterCustomAppIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 6080
+      ToPort: 6080
+      SourceSecurityGroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+
+  OpenViduMediaNodeSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for OpenVidu Media Node
+      GroupName: !Sub openvidu-elastic-media-sg-${AWS::Region}-${AWS::StackName}
+      VpcId: !Ref OpenViduVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIpv6: ::/0
+        - IpProtocol: udp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 443
+          ToPort: 443
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: 7881
+          ToPort: 7881
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 7881
+          ToPort: 7881
+          CidrIpv6: ::/0
+        - IpProtocol: udp
+          FromPort: 7885
+          ToPort: 7885
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 7885
+          ToPort: 7885
+          CidrIpv6: ::/0
+        - IpProtocol: udp
+          FromPort: 50000
+          ToPort: 60000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 50000
+          ToPort: 60000
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: 50000
+          ToPort: 60000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 50000
+          ToPort: 60000
+          CidrIpv6: ::/0
+
+  OpenViduMasterNodeToMediaNodeRTMPIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 1935
+      ToPort: 1935
+      SourceSecurityGroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+
+  OpenViduMasterNodeTurnTLSToMediaNodeIngressSG:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref OpenViduMediaNodeSG
+      IpProtocol: tcp
+      FromPort: 5349
+      ToPort: 5349
+      SourceSecurityGroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+
+  OpenViduMasterNodeToMediaNodeServerIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 7880
+      ToPort: 7880
+      SourceSecurityGroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+
+  OpenViduMasterToMediaNodeHTTPWHIPIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt OpenViduMediaNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: 8080
+      ToPort: 8080
+      SourceSecurityGroupId: !GetAtt OpenViduMasterNodeSG.GroupId
+
+  ElasticIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Condition: PublicElasticIPPresent
+    Properties:
+      InstanceId: !Ref OpenViduMasterNode
+      EIP: !Ref PublicElasticIP
+
+Outputs:
+  ServicesAndCredentials:
+    Description: Services and credentials
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/secretsmanager/home?region=${AWS::Region}#!/secret?name=openvidu-elastic-${AWS::Region}-${AWS::StackName}
+

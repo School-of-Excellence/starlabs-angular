@@ -291,15 +291,21 @@
         <div class="Participantlist">
           <ul class="profile-list" *ngIf="hierarchyMode && nextModeList[selectedModeIndex]['hierarchyproduct'].length">
             <li *ngFor="let profile of nextModeList[selectedModeIndex]['hierarchyproduct']">
-              <span style="font-weight: bold;">
-                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profile['profileid']" [name]="mapProfile[profile['profileid']]" [size]="28"></app-profile-picture>
+                <span style="font-weight: bold;">
+                  {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+                </span>
               </span> - {{profile['nextmodedate']?.toDate() | date: 'medium'}}
             </li>
           </ul>
           <ul class="profile-list" *ngIf="!hierarchyMode && nextModeList[selectedModeIndex]['participantproduct'].length">
             <li *ngFor="let profile of nextModeList[selectedModeIndex]['participantproduct']">
-              <span style="font-weight: bold;">
-                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profile['profileid']" [name]="mapProfile[profile['profileid']]" [size]="28"></app-profile-picture>
+                <span style="font-weight: bold;">
+                  {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+                </span>
               </span> - {{profile['nextmodedate']?.toDate() | date: 'medium'}}
             </li>
           </ul>
@@ -312,15 +318,21 @@
         <div class="Participantlist">
           <ul class="profile-list" *ngIf="hierarchyMode && priorityModeList[selectedModeIndex]['hierarchyproduct'].length">
             <li *ngFor="let profile of priorityModeList[selectedModeIndex]['hierarchyproduct']">
-              <span style="font-weight: bold;">
-                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profile['profileid']" [name]="mapProfile[profile['profileid']]" [size]="28"></app-profile-picture>
+                <span style="font-weight: bold;">
+                  {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+                </span>
               </span>
             </li>
           </ul>
           <ul class="profile-list" *ngIf="!hierarchyMode && priorityModeList[selectedModeIndex]['participantproduct'].length">
             <li *ngFor="let profile of priorityModeList[selectedModeIndex]['participantproduct']">
-              <span style="font-weight: bold;">
-                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profile['profileid']" [name]="mapProfile[profile['profileid']]" [size]="28"></app-profile-picture>
+                <span style="font-weight: bold;">
+                  {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+                </span>
               </span>
             </li>
           </ul>
@@ -333,15 +345,21 @@
         <div class="Participantlist">
           <ul class="profile-list" *ngIf="hierarchyMode && journeyPlanningModeList[selectedModeIndex]['hierarchyproduct'].length">
             <li *ngFor="let profile of journeyPlanningModeList[selectedModeIndex]['hierarchyproduct']">
-              <span style="font-weight: bold;">
-                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profile['profileid']" [name]="mapProfile[profile['profileid']]" [size]="28"></app-profile-picture>
+                <span style="font-weight: bold;">
+                  {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+                </span>
               </span>
             </li>
           </ul>
           <ul class="profile-list" *ngIf="!hierarchyMode && journeyPlanningModeList[selectedModeIndex]['participantproduct'].length">
             <li *ngFor="let profile of journeyPlanningModeList[selectedModeIndex]['participantproduct']">
-              <span style="font-weight: bold;">
-                {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="profile['profileid']" [name]="mapProfile[profile['profileid']]" [size]="28"></app-profile-picture>
+                <span style="font-weight: bold;">
+                  {{mapProfile[profile['profileid']]}}  <span *ngIf="profile['status']"> ({{profile['status']}})</span>
+                </span>
               </span>
             </li>
           </ul>
@@ -354,9 +372,12 @@
         <div class="Participantlist">
           <ul class="profile-list">
             <li *ngFor="let debugProfile of debugModeList">
-              <span style="font-weight: bold;">
-                {{mapProfile[debugProfile['profileid']]}}
-              </span> 
+              <span style="display:inline-flex;align-items:center;gap:8px;">
+                <app-profile-picture [profileId]="debugProfile['profileid']" [name]="mapProfile[debugProfile['profileid']]" [size]="28"></app-profile-picture>
+                <span style="font-weight: bold;">
+                  {{mapProfile[debugProfile['profileid']]}}
+                </span>
+              </span>
               <!-- - {{debugProfile['nextmodedate']?.toDate() | date: 'medium'}} -->
             </li>
           </ul>

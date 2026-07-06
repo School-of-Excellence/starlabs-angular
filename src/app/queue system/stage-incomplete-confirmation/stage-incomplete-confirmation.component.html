@@ -1,36 +1,47 @@
-<div class="container-fluid p-3">
+<div class="mbq">
 
-  <!-- Message -->
-  <div class="mb-2 mt-1">
-    <p class="text-muted fs-6">
-      The session with <b>{{participantName}}</b> was not fully completed. 
-      When they return to the <b>‘{{currentStage}}’</b> stage, the session can be continued with you. Do you want to assign this participant to yourself?
-    </p>
-  </div>
+  <!-- Header -->
+  <header class="mbq__head">
+    <h2 class="mbq__title">Send {{ participantName }} back to queue</h2>
+    <button type="button" class="mbq__close" (click)="cancel()" aria-label="Close">&#10005;</button>
+  </header>
+
+  <p class="mbq__sub">
+    Session not complete. Returns the participant to the queue — the reason is visible to the Queue Manager.
+  </p>
 
   <!-- Assignment choice -->
-  <div class="mb-4">
-    <mat-radio-group [(ngModel)]="result.preassign" class="d-flex flex-column gap-2">
-      <mat-radio-button [value]="true">Yes, pre-assign to my studio</mat-radio-button>
-      <mat-radio-button [value]="false">No, do not assign</mat-radio-button>
-    </mat-radio-group>
+  <div class="mbq__options">
+    <button type="button" class="mbq__opt" [class.mbq__opt--on]="result.preassign === true"
+            (click)="result.preassign = true">
+      <span class="mbq__radio"></span>
+      <span class="mbq__opt-text">
+        <span class="mbq__opt-title">Yes, pre-assign to my studio</span>
+        <span class="mbq__opt-desc">You will do the {{ currentStage }} yourself next time.</span>
+      </span>
+    </button>
+
+    <button type="button" class="mbq__opt" [class.mbq__opt--on]="result.preassign === false"
+            (click)="result.preassign = false">
+      <span class="mbq__radio"></span>
+      <span class="mbq__opt-text">
+        <span class="mbq__opt-title">No, do not assign</span>
+        <span class="mbq__opt-desc">Any available specialist can handle it.</span>
+      </span>
+    </button>
   </div>
 
   <!-- Reason -->
-  <div class="mb-4">
-    <label class="form-label fw-semibold mb-2">Reason for moving this participant (visible to Queue Manager)</label>
-
-  <mat-form-field appearance="outline" class="w-100">
-    <textarea matInput rows="3" placeholder="Enter reason for moving this participant" [formControl]="reasonControl"></textarea>
-    <mat-error>Reason is required</mat-error>
-  </mat-form-field>
-  </div>
+  <textarea class="mbq__reason" rows="3" placeholder="Reason (required)..."
+            [formControl]="reasonControl" (blur)="reasonControl.markAsTouched()"></textarea>
+  <div class="mbq__err" *ngIf="reasonControl.touched && reasonControl.invalid">Reason is required.</div>
 
   <!-- Actions -->
-  <div class="d-flex justify-content-end gap-2">
-    <button mat-stroked-button (click)="cancel()">Go Back</button>
-
-    <button mat-flat-button color="primary" (click)="onsubmit()">Submit</button>
-  </div>
+  <footer class="mbq__foot">
+    <button type="button" class="mbq__cancel" (click)="cancel()">Cancel</button>
+    <button type="button" class="mbq__submit" [disabled]="reasonControl.invalid" (click)="onsubmit()">
+      Submit move-back
+    </button>
+  </footer>
 
 </div>

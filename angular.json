@@ -35,6 +35,11 @@
                 "glob": "**/*",
                 "input": "node_modules/@ai-coustics/aic-sdk/dist/assets",
                 "output": "/assets/aic/"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/@zoom/meetingsdk/dist",
+                "output": "/zoom/"
               }
             ],
             "styles": [

@@ -39,6 +39,7 @@ import { MatTimepickerModule } from '@angular/material/timepicker';
 import { AuthguardService } from '../../authguard.service';
 import { WorkshopCategoryComponent } from '../workshop-category/workshop-category.component';
 import { UploadEpisodeDialogComponent } from '../../content/episodes-dashboard/upload-episode-dialog/upload-episode-dialog.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface WorkshopConfig {
   detailpage?: {
@@ -159,7 +160,8 @@ interface CurriculumItem {
     NgxEditorModule,
     MatSlideToggleModule,
     MatTimepickerModule,
-    MatChipsModule
+    MatChipsModule,
+    ProfilePictureComponent
 ],
   templateUrl: './workshop-configuration.component.html',
   styleUrls: ['./workshop-configuration.component.css']
@@ -245,6 +247,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
   selectedMenu: 'detailpage' | 'challenges' | 'challengesettings' | 'payment' | null = 'detailpage'; 
   loading = false;
   isSaving = false;
+  private hasInitializedForms = false;
   workshopId: string | null = null;
   documentsize;
   atcTaxonomyData: any[] = [];
@@ -339,7 +342,27 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
   refTitleMap = {};
   mapProfile: any = {};
   mapProfileNew: any = {};
+  // Regular profiles (from profile_data) -> "Select Profile" dropdown.
   names: { id: string, name: string }[] = [];
+  // New-user profiles (from new_user_data) -> "Select New Profile" dropdown.
+  newNames: { id: string, name: string }[] = [];
+  // id -> display name lookups, so chip lists can resolve a name in O(1) instead
+  // of scanning the arrays on every change-detection pass.
+  profileNameMap: Record<string, string> = {};
+  newProfileNameMap: Record<string, string> = {};
+  private newIdSet = new Set<string>();
+  // Each profile area stores ALL selected ids in one array control, but is edited
+  // through two dropdowns. These hold the per-dropdown view of that one array,
+  // keyed by the control path.
+  regularSelections: Record<string, string[]> = {};
+  newSelections: Record<string, string[]> = {};
+  // The array-field control paths that use the two-dropdown profile picker.
+  readonly managedProfilePaths = [
+    'testusers',
+    'facilitatorprofiles',
+    'referallowedusers.referallowedusers',
+    'evergreenaccessto.selected',
+  ];
   selectedNames = new FormControl<string[]>([]);
   selectedTemplatesForFilter: string[] = [];
   allLoadedTestimonials: any[] = [];
@@ -367,23 +390,32 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       this.guard.getProfileMapNewUser()
     ])
     .then(([e, f]) => {
-      const mapProfile = e.map || {};
-      const mapProfileNew = f.map || {};
+      const mapProfile = e.map || {};       // profile_data profiles
+      const mapProfileNew = f.map || {};    // new_user_data profiles
 
-      const namesFromProfile = Object.keys(mapProfile).map(key => ({
-        id: key,
-        name: mapProfile[key]
-      }));
+      // Regular profiles ("Select Profile") and new-user profiles
+      // ("Select New Profile") are kept as separate option lists but write into
+      // the SAME underlying array field per area.
+      this.names = Object.keys(mapProfile)
+        .map(key => ({ id: key, name: mapProfile[key] }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      this.newNames = Object.keys(mapProfileNew)
+        .map(key => ({ id: key, name: mapProfileNew[key] }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-      const namesFromProfileNew = Object.keys(mapProfileNew).map(key => ({
-        id: key,
-        name: mapProfileNew[key]
-      }));
-      this.names = [...namesFromProfile, ...namesFromProfileNew];
-      this.names = this.names.filter(
-        (item, index, self) => index === self.findIndex(t => t.id === item.id)
-      );
-      this.names.sort((a, b) => a.name.localeCompare(b.name));
+      this.profileNameMap = this.names.reduce((acc, n) => {
+        acc[n.id] = n.name;
+        return acc;
+      }, {} as Record<string, string>);
+      this.newProfileNameMap = this.newNames.reduce((acc, n) => {
+        acc[n.id] = n.name;
+        return acc;
+      }, {} as Record<string, string>);
+      this.newIdSet = new Set(this.newNames.map(n => n.id));
+
+      // Now that we know which ids are new users, (re)split any already-loaded
+      // selections into the regular vs new dropdown buckets.
+      this.managedProfilePaths.forEach(p => this.syncSplit(p));
     })
     .catch(err => {
       console.error("Error loading profile maps:", err);
@@ -694,11 +726,13 @@ async ngOnInit() {
       meta.get('workshopDays')?.setValidators([Validators.required, Validators.min(1)]);
       meta.get('lastChallengeMessage')?.enable();
       this.getDailyCommunicationArray().controls.forEach(c => c.enable());
+      this.getDailyCommunication2Array().controls.forEach(c => c.enable());
     } else {
       meta.get('workshopDays')?.disable();
       meta.get('workshopDays')?.clearValidators();
       meta.get('lastChallengeMessage')?.disable();
       this.getDailyCommunicationArray().controls.forEach(c => c.disable());
+      this.getDailyCommunication2Array().controls.forEach(c => c.disable());
     }
     meta.get('workshopDays')?.updateValueAndValidity();
     meta.get('lastChallengeMessage')?.updateValueAndValidity();
@@ -747,28 +781,35 @@ async ngOnInit() {
   }
   
   private dailyCommunicationBuffer: string[] = [];
+  private dailyCommunicationBuffer2: string[] = [];
 
   syncDailyCommunicationArray(days: number): void {
     if (!days || days < 1) return;
-    const arr = this.getDailyCommunicationArray();
     const isEnabled = this.settingsForm.get('evergreenWorkshop')?.value;
+    // Keep both parallel message arrays sized to the number of workshop days.
+    this.syncOneDailyArray(this.getDailyCommunicationArray(), this.dailyCommunicationBuffer, days, isEnabled);
+    this.syncOneDailyArray(this.getDailyCommunication2Array(), this.dailyCommunicationBuffer2, days, isEnabled);
+  }
+  private syncOneDailyArray(arr: FormArray, buffer: string[], days: number, isEnabled: boolean): void {
     arr.controls.forEach((ctrl, i) => {
-      this.dailyCommunicationBuffer[i] = ctrl.value || this.dailyCommunicationBuffer[i] || '';
+      buffer[i] = ctrl.value || buffer[i] || '';
     });
-
     while (arr.length > days) {
       arr.removeAt(arr.length - 1);
     }
     while (arr.length < days) {
       const index = arr.length;
       arr.push(this.fb.control({
-        value: this.dailyCommunicationBuffer[index] || '',
+        value: buffer[index] || '',
         disabled: !isEnabled
       }));
     }
   }
   getDailyCommunicationArray(): FormArray{
     return this.settingsForm.get('evergreenWorkshopMeta.dailyCommunication') as FormArray;
+  }
+  getDailyCommunication2Array(): FormArray{
+    return this.settingsForm.get('evergreenWorkshopMeta.dailyCommunication2') as FormArray;
   }
   addDailyCommunication(): void{
     const isEnabled = this.settingsForm.get('evergreenWorkshop')?.value;
@@ -777,11 +818,20 @@ async ngOnInit() {
         value:'', disabled:!isEnabled
       })
     )
+    this.getDailyCommunication2Array().push(
+      this.fb.control({
+        value:'', disabled:!isEnabled
+      })
+    )
   }
   removeDailyCommunication(index: number):void{
     const arr = this.getDailyCommunicationArray();
+    const arr2 = this.getDailyCommunication2Array();
     if (arr.length > 1) {
       arr.removeAt(index);
+      if (index < arr2.length) {
+        arr2.removeAt(index);
+      }
     }
   }
   async getWorkshopCategories() {
@@ -929,7 +979,34 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         lastChallengeMessage: [{ value: '', disabled: true }],
         dailyCommunication: this.fb.array([
           this.fb.control({value:'',disabled:true})
+        ]),
+        dailyCommunication2: this.fb.array([
+          this.fb.control({value:'',disabled:true})
         ])
+      }),
+      referralworkshop: [false],
+      refercount: [null],
+      referralcodestartswith: ['', [Validators.pattern(/^[A-Z]*$/)]],
+      referralmessage: [''],
+      referraldialogmessage: [''],
+      enrollmentnotallowedmessage: [''],
+      enrollmentnotallowedmessagenew: [''],
+      payment: [false],
+      paymentmap: this.fb.group({
+        amount: [null],
+        amountstriked: [null],
+        api: [''],
+        id: ['']
+      }),
+      referallowedusers: this.fb.group({
+        all: [false],
+        referallowedusers: [[] as string[]],
+        newuserreferallowed: [false]
+      }),
+      evergreenaccessto: this.fb.group({
+        all: [false],
+        new: [false],
+        selected: [[] as string[]]
       }),
       cpwelcomemessage: this.fb.group({
         abovediagnosticsdescription: [''],
@@ -1086,22 +1163,29 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       next: (snapshot: DocumentSnapshot<WorkshopConfig>) => {
         if (snapshot.exists()) {
           this.workshopData = snapshot.data() as WorkshopConfig;
-          this.patchDetailPageData(this.workshopData);
-          this.patchChallengeData(this.workshopData);
-          this.patchSettingsData(this.workshopData);
+
+          // Rebuild the heavy reactive forms (nested challenge FormArrays + rich-text
+          // editors) ONLY on the first real load. Firestore fires this listener again
+          // for every write — including the optimistic local echo of our own saves.
+          // Rebuilding on each of those froze the UI on save and clobbered unsaved
+          // edits in other tabs. `hasPendingWrites` is true for our own in-flight
+          // writes, so we also never re-patch off the back of a save.
+          if (!this.hasInitializedForms && !this.isSaving && !snapshot.metadata.hasPendingWrites) {
+            this.patchDetailPageData(this.workshopData);
+            this.patchChallengeData(this.workshopData);
+            this.patchSettingsData(this.workshopData);
+            this.hasInitializedForms = true;
+          }
+
           const jsonString = JSON.stringify(snapshot.data());
           const bytes = new TextEncoder().encode(jsonString).length;
           const kb = bytes / 1024;
           const mb = kb / 1024;
           this.documentsize = `${kb.toFixed(2)} KB / ${mb.toFixed(2)} MB`;
-          console.log('Document size:', this.documentsize);
-          console.log('workshop docid....',this.workshopData['docid']);
           const workshopCategories: string[] = this.workshopData['categoriesforthisworkshop'] || [];
-          const cohortCategories: string[] = this.workshopData['cohortcategoriesforthisworkshop'] || [];
 
           // this.uniqueWorkshopCategories = Array.from(new Set([...workshopCategories, ...cohortCategories]));
           this.uniqueWorkshopCategories = Array.from(new Set([...workshopCategories]));
-          console.log('Unique categories:', this.uniqueWorkshopCategories);
 
         } else {
           console.error('No such document!');
@@ -2060,6 +2144,30 @@ private rebuildActivityIds(): void {
           workshopDays: data['evergreenWorkshopMeta']?.workshopDays ?? null,
           lastChallengeMessage: data['evergreenWorkshopMeta']?.lastChallengeMessage ?? '',
         },
+        referralworkshop: data['referralworkshop'] || false,
+        refercount: data['refercount'] ?? null,
+        referralcodestartswith: data['referralcodestartswith'] ?? '',
+        referralmessage: data['referralmessage'] ?? '',
+        referraldialogmessage: data['referraldialogmessage'] ?? '',
+        enrollmentnotallowedmessage: data['enrollmentnotallowedmessage'] ?? '',
+        enrollmentnotallowedmessagenew: data['enrollmentnotallowedmessagenew'] ?? '',
+        payment: data['payment'] || false,
+        paymentmap: {
+          amount: data['paymentmap']?.amount ?? null,
+          amountstriked: data['paymentmap']?.amountstriked ?? null,
+          api: data['paymentmap']?.api ?? '',
+          id: data['paymentmap']?.id ?? '',
+        },
+        referallowedusers: {
+          all: data['referallowedusers']?.all || false,
+          referallowedusers: data['referallowedusers']?.referallowedusers || [],
+          newuserreferallowed: data['referallowedusers']?.newuserreferallowed || false,
+        },
+        evergreenaccessto: {
+          all: data['evergreenaccessto']?.all || false,
+          new: data['evergreenaccessto']?.new || false,
+          selected: data['evergreenaccessto']?.selected || [],
+        },
         cpwelcomemessage: {
           abovediagnosticsdescription: data['cpwelcomemessage']?.abovediagnosticsdescription ?? '',
           abovediagnosticsheading: data['cpwelcomemessage']?.abovediagnosticsheading ?? '',
@@ -2099,14 +2207,22 @@ private rebuildActivityIds(): void {
       const isEvergreenEnabled = !!data['evergreenWorkshop'];
       const workshopDays = data['evergreenWorkshopMeta']?.workshopDays || 0;
       const savedComms: string[] = data['evergreenWorkshopMeta']?.dailyCommunication || [];
+      const savedComms2: string[] = data['evergreenWorkshopMeta']?.dailyCommunication2 || [];
       this.dailyCommunicationBuffer = [...savedComms];
-      
+      this.dailyCommunicationBuffer2 = [...savedComms2];
+
       const dailyArray = this.getDailyCommunicationArray();
+      const dailyArray2 = this.getDailyCommunication2Array();
       dailyArray.clear();
+      dailyArray2.clear();
 
       for (let i = 0; i < workshopDays; i++) {
         dailyArray.push(this.fb.control({
           value: savedComms[i] || '',
+          disabled: !isEvergreenEnabled
+        }));
+        dailyArray2.push(this.fb.control({
+          value: savedComms2[i] || '',
           disabled: !isEvergreenEnabled
         }));
       }
@@ -2116,7 +2232,12 @@ private rebuildActivityIds(): void {
         meta.get('workshopDays')?.enable();
         meta.get('lastChallengeMessage')?.enable();
         dailyArray.controls.forEach(c => c.enable());
+        dailyArray2.controls.forEach(c => c.enable());
       }
+
+      // Split loaded selections into the "Select Profile" / "Select New Profile"
+      // dropdown buckets for every profile area.
+      this.managedProfilePaths.forEach(p => this.syncSplit(p));
     }
   }
   // patchSettingsData(data: WorkshopConfig): void {
@@ -2228,8 +2349,9 @@ private rebuildActivityIds(): void {
 
     try {
       this.loading = true;
+      this.isSaving = true;
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
-      await updateDoc(ref, { 
+      await updateDoc(ref, {
         active: this.settingsForm.get('active')?.value || false,
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
@@ -2238,6 +2360,17 @@ private rebuildActivityIds(): void {
         activeparticipants: this.settingsForm.get('activeparticipants')?.value || false,
         evergreenWorkshop: this.settingsForm.get('evergreenWorkshop')?.value || false,
         evergreenWorkshopMeta: this.settingsForm.get('evergreenWorkshopMeta')?.value ?? null,
+        referralworkshop: this.settingsForm.get('referralworkshop')?.value || false,
+        refercount: this.settingsForm.get('refercount')?.value ?? null,
+        referralcodestartswith: this.settingsForm.get('referralcodestartswith')?.value || '',
+        referralmessage: this.settingsForm.get('referralmessage')?.value || '',
+        referraldialogmessage: this.settingsForm.get('referraldialogmessage')?.value || '',
+        enrollmentnotallowedmessage: this.settingsForm.get('enrollmentnotallowedmessage')?.value || '',
+        enrollmentnotallowedmessagenew: this.settingsForm.get('enrollmentnotallowedmessagenew')?.value || '',
+        payment: this.settingsForm.get('payment')?.value || false,
+        paymentmap: this.settingsForm.get('paymentmap')?.value ?? null,
+        referallowedusers: this.settingsForm.get('referallowedusers')?.value ?? null,
+        evergreenaccessto: this.settingsForm.get('evergreenaccessto')?.value ?? null,
         cpwelcomemessage: this.settingsForm.get('cpwelcomemessage')?.value ?? null,
         newusersonly: this.settingsForm.get('newusersonly')?.value || false,
         journeybased: this.settingsForm.get('journeybased')?.value || false,
@@ -2275,6 +2408,7 @@ private rebuildActivityIds(): void {
       this.snackBar.open('Error saving settings. Please try again.', 'Close', { duration: 2000 });
     } finally {
       this.loading = false;
+      this.isSaving = false;
     }
   }
 
@@ -2424,6 +2558,63 @@ removeUser(userId: string): void {
     const currentUsers = this.settingsForm.get('testusers')?.value || [];
     const updatedUsers = currentUsers.filter((id: string) => id !== userId);
     this.settingsForm.get('testusers')?.setValue(updatedUsers);
+}
+// Referral code prefix: allow uppercase letters only. Uppercase what the user
+// types and strip anything that isn't A-Z.
+onReferralCodeInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const cleaned = (input.value || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (input.value !== cleaned) {
+      input.value = cleaned;
+    }
+    this.settingsForm.get('referralcodestartswith')?.setValue(cleaned);
+}
+// Referral message: single line only — strip any newlines (covers paste too).
+onReferralMessageInput(event: Event): void {
+    const input = event.target as HTMLTextAreaElement;
+    const cleaned = (input.value || '').replace(/[\r\n]+/g, ' ');
+    if (input.value !== cleaned) {
+      input.value = cleaned;
+    }
+    this.settingsForm.get('referralmessage')?.setValue(cleaned);
+}
+// Resolve a display name for a selected id from either dropdown's source.
+nameFor(id: string): string {
+    return this.profileNameMap[id] || this.newProfileNameMap[id] || id;
+}
+// Split the one array control at `path` into the regular/new dropdown buckets.
+// New-user ids go to the "new" bucket; everything else (regular + not-yet-loaded)
+// stays in the "regular" bucket, so the union always equals the stored array.
+private syncSplit(path: string): void {
+    const all: string[] = this.settingsForm.get(path)?.value || [];
+    this.newSelections[path] = all.filter(id => this.newIdSet.has(id));
+    this.regularSelections[path] = all.filter(id => !this.newIdSet.has(id));
+}
+// A dropdown changed: store its bucket, then write the union back to the single
+// array control.
+onProfileSelectChange(path: string, isNew: boolean, selected: string[]): void {
+    if (isNew) {
+      this.newSelections[path] = selected || [];
+    } else {
+      this.regularSelections[path] = selected || [];
+    }
+    const combined = [
+      ...(this.regularSelections[path] || []),
+      ...(this.newSelections[path] || []),
+    ];
+    this.settingsForm.get(path)?.setValue(Array.from(new Set(combined)));
+}
+// Remove one id (from a chip) out of the single array control and re-split.
+removeProfileId(path: string, id: string): void {
+    const all: string[] = this.settingsForm.get(path)?.value || [];
+    this.settingsForm.get(path)?.setValue(all.filter((x: string) => x !== id));
+    this.syncSplit(path);
+}
+trackByProfileId(_index: number, profile: { id: string }): string {
+    return profile.id;
+}
+trackById(_index: number, id: string): string {
+    return id;
 }
 removeFacilitator(userId: string): void {
     const currentUsers = this.settingsForm.get('facilitatorprofiles')?.value || [];

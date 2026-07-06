@@ -50,8 +50,16 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   private queuedUuids = new Set<string>()
   private zoomUnsubs: Unsubscribe[] = []
 
-  readonly tableHeaders = ['meetingTopic', 'hostEmail', 'status', 'progress',
+  readonly tableHeaders = ['meetingTopic', 'hostEmail', 'status', 'zoom', 'progress',
     'totalSize', 'totalFiles', 'startTime', 'processingTime', 'file']
+
+  // ── "still in Zoom?" tracking ────────────────────────────────────────────
+  // uuids + meetingIds currently present in Zoom for the loaded date range, so
+  // we can flag whether each migrated recording still exists in Zoom (it may
+  // have been deleted from Zoom after backup). Refreshed with the table query.
+  private zoomPresentUuids = new Set<string>()
+  private zoomPresentMeetingIds = new Set<string>()
+  public zoomPresenceLoaded = false
 
   public files: Array<any> | null = null
   public activeRecord: any = null
@@ -92,6 +100,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   subscribe() {
     this.stopSubscription()
     this.loading = true
+    this.loadZoomPresence()
 
     const start = this.form.value.startDate ? new Date(this.form.value.startDate) : new Date()
     const end = this.form.value.endDate ? new Date(this.form.value.endDate) : new Date()
@@ -121,6 +130,32 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   // date range changed -> re-query server-side
   onDateChange() {
     if (this.form.value.startDate && this.form.value.endDate) this.subscribe()
+  }
+
+  // Fetch the recordings currently in Zoom for the selected range and index them
+  // by uuid + meetingId, so each migrated row can show whether it still exists in
+  // Zoom. Best-effort: on failure we leave presence "unknown" rather than wrong.
+  private async loadZoomPresence() {
+    const start = this.form.value.startDate ? new Date(this.form.value.startDate) : new Date()
+    const end = this.form.value.endDate ? new Date(this.form.value.endDate) : start
+    this.zoomPresenceLoaded = false
+    try {
+      const recs = await this.migrationApi.listRecordings(this.ymd(start), this.ymd(end))
+      this.zoomPresentUuids = new Set(recs.map(r => r.uuid).filter(Boolean))
+      this.zoomPresentMeetingIds = new Set(recs.map(r => String(r.meetingId)).filter(Boolean))
+      this.zoomPresenceLoaded = true
+    } catch {
+      this.zoomPresenceLoaded = false
+    }
+  }
+
+  // 'yes' | 'no' | 'unknown' — whether this migrated recording still exists in
+  // Zoom. Matches on uuid first (unique per recording), then meetingId.
+  existsInZoom(record: any): 'yes' | 'no' | 'unknown' {
+    if (!this.zoomPresenceLoaded) return 'unknown'
+    if (record?.meetinguid && this.zoomPresentUuids.has(record.meetinguid)) return 'yes'
+    if (record?.meetingId != null && this.zoomPresentMeetingIds.has(String(record.meetingId))) return 'yes'
+    return 'no'
   }
 
   // search / status changed -> client-side refine on the already-scoped data
@@ -358,6 +393,20 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     if (Array.isArray(files)) return files
     if (typeof files === 'object') return Object.values(files)
     return []
+  }
+
+  // Web link to the Dropbox folder this recording's files live in. The folder is
+  // derived from any uploaded file's `dropboxPath` (drop the filename), then
+  // resolved to a real shared link by the server (files live in the team space,
+  // so a client-built /home/<path> URL 404s). Null until a file has landed in
+  // Dropbox, or when the API base isn't configured.
+  dropboxFolderUrl(record: any): string | null {
+    const withPath = this.normalizeFiles(record?.files).find(f => f?.dropboxPath)
+    const path: string | undefined = withPath?.dropboxPath
+    if (!path) return null
+    const folder = path.substring(0, path.lastIndexOf('/'))
+    if (!folder) return null
+    return this.migrationApi.folderOpenUrl(folder) || null
   }
 
   // ---- formatting helpers ----
