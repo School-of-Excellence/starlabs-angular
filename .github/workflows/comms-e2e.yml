@@ -21,17 +21,6 @@
 name: comms-e2e (emulator gate)
 
 on:
-  pull_request:
-    branches: [development, production]   # CUTOVER 2026-07-05: real release branches (was [cicd-dev, cicd-prod])
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
-    paths:
-      - 'src/app/Channel Communication/**'
-      - 'src/app/Communication Center/**'
-      - 'src/app/AppEngagement/**'
-      - 'src/app/**.guard.ts'
-      - 'angular.json'
-      - 'package.json'
-      - '.github/workflows/comms-e2e.yml'
   workflow_dispatch:
     inputs:
       only:
