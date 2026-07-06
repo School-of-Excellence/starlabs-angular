@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Firestore, collection, query, where, getDocs } from '@angular/fire/firestore';
 
@@ -10,17 +10,14 @@ const photoCache = new Map<string, string | null>();
   imports: [CommonModule],
   templateUrl: './profile-picture.component.html',
   styleUrl: './profile-picture.component.css',
-  // OnPush: a heavy host (e.g. the Customer Support dashboard with live Firestore
-  // subscriptions) runs change detection on every mouse-move / snapshot. Without
-  // OnPush this leaf re-renders on each pass, which makes the open click-to-enlarge
-  // preview flicker. OnPush limits CD to this component's own state changes.
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProfilePictureComponent implements OnInit, OnDestroy {
+export class ProfilePictureComponent implements OnInit ,OnChanges{
 
   @Input() profileId!: string;
   @Input() name: string = '';
   @Input() size: number = 40;
+  @Input() skipProfileImg: boolean = false;
+
 
   private firestore = inject(Firestore);
   private cdr = inject(ChangeDetectorRef);
@@ -47,36 +44,49 @@ export class ProfilePictureComponent implements OnInit, OnDestroy {
     await this.fetchPhoto();
   }
 
-  private async fetchPhoto(): Promise<void> {
-    try {
-      const snap = await getDocs(
-        query(
-          collection(this.firestore, 'profile_data'),
-          where('profileid', '==', this.profileId)
-        )
-      );
-
-      if (snap.empty) {
-        photoCache.set(this.profileId, null);
-        return;
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['profileId'] && !changes['profileId'].firstChange) {
+      const newId = changes['profileId'].currentValue;
+      if (newId) {
+        photoCache.delete(newId);
+        this.photoUrl = this.defaultAvatar;
+        this.fetchPhoto();
       }
-
-      const data = snap.docs[0].data();
-      const profile = data['profile'] as string | null;
-      const profileImg = data['profileimg'] as string | null;
-      const resolved =
-        profile && !profile.includes('profile-image-png-14')
-          ? profile
-          : profileImg ?? null;
-
-      photoCache.set(this.profileId, resolved);
-      this.photoUrl = resolved ?? this.defaultAvatar;
-      this.cdr.detectChanges();
-
-    } catch (err) {
-      console.error('ProfilePicture fetch error:', err);
     }
   }
+
+private async fetchPhoto(): Promise<void> {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(this.firestore, 'profile_data'),
+        where('profileid', '==', this.profileId)
+      )
+    );
+
+    if (snap.empty) {
+      photoCache.set(this.profileId, null);
+      return;
+    }
+
+    const data = snap.docs[0].data();
+    const profile = data['profile'] as string | null;
+    const profileImg = data['profileimg'] as string | null;
+    let resolved: string | null = null;
+    if (profile && !profile.includes('profile-image-png-14')) {
+      resolved = profile;
+    } else if (!this.skipProfileImg && profileImg) {
+      resolved = profileImg;
+    }
+
+    photoCache.set(this.profileId, resolved);
+    this.photoUrl = resolved ?? this.defaultAvatar;
+    this.cdr.detectChanges();
+
+  } catch (err) {
+    console.error('ProfilePicture fetch error:', err);
+  }
+}
 
   onImgError(): void {
     this.photoUrl = this.defaultAvatar;

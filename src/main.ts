@@ -28,7 +28,12 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);
 } else {
   initializeFirestore(app, {});
-  initializeFirestore(app, {}, 'firestore-atc');
+  // Named DB `firestore-atc`: force long-polling here — this is the canonical,
+  // earliest initializer, so every consumer (getFirestore('firestore-atc') and
+  // AtcFirebaseService) reuses this one instance with a consistent transport.
+  // The network blocks Firestore WebChannel streaming, so long-polling avoids
+  // the "RPC 'Listen' stream transport errored" first-load stall for all ATC screens.
+  initializeFirestore(app, { experimentalForceLongPolling: true }, 'firestore-atc');
 }
 
 (window as any).process = {

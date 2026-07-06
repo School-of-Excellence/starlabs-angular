@@ -968,7 +968,8 @@ export class EngagementDashboardComponent implements OnInit, OnDestroy {
         await this.guard.saveNotificationRecord({
           title: result.title, message: result.message, subtitle: result.subtitle ?? null,
           notificationtype: 'ahupdate', notificationimage: notificationImage, sticky: result.sticky,
-          logged: true, landingpage: result.landingpage, profileid: profileIDs
+          logged: true, landingpage: result.landingpage, profileid: profileIDs,
+          receivingapp: result.receivingapp ?? "breakthroughsapp"
         });
         alert(`A&H Update sent to ${profileIDs.length} users`);
       });
