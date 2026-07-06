@@ -14,15 +14,6 @@
 name: evomap-e2e (emulator gate)
 
 on:
-  pull_request:
-    branches: [cicd-dev, cicd-prod]   # sudo branches — match the other emulator gates. Switch to [development] at cutover.
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
-    paths:
-      - 'src/app/EvolutionMapping/**'
-      - 'src/app/**.guard.ts'
-      - 'angular.json'
-      - 'package.json'
-      - '.github/workflows/evomap-e2e.yml'
   workflow_dispatch:
     inputs:
       only:

@@ -1,6 +1,6 @@
 <div class="main-container" [class.panel-open]="showDetailPanel || showCustomStagePanel">
   <!-- Main Content Area -->
-  <div class="content-area">
+  <div class="content-area" [class.board-active]="activeTab === 'board'">
     <span class="d-flex flex-row justify-content-center mt-2 mb-2">
       <h4 class="text-center" (click)="showQueueSelect = !showQueueSelect">
         Arena Opportunities
