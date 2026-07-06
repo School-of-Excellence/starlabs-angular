@@ -241,15 +241,23 @@ export class DynamicStudioV2Component {
   // persists, instead of being destroyed/recreated — and re-fetching all its ATC
   // getDocs — on every step change.
   prevHistoryMounted: boolean = false
-  // Master switch for the AI-ATC pre-check. While false the whole studio-side feature is held:
-  // no queue_atc_generation query, and the "Use AI-Generated ATC" buttons never render. Flip to
-  // true to release the feature.
-  aiAtcFeatureEnabled: boolean = false
+  // Code-level kill-switch for the AI-ATC pre-check. While false the whole studio-side feature is
+  // held OFF for everyone regardless of config: no queue_atc_generation query, and the "Use
+  // AI-Generated ATC" buttons never render. When true, per-user access is decided by the
+  // admin-editable feature_config/ai_atc allowlist (see loadAiAtcAccess). Set false for an
+  // emergency all-users off without touching the config doc.
+  aiAtcFeatureEnabled: boolean = true
   // Inline "Use AI ATC" button state for the Prescribe ATC step (populated by
   // checkAiAtcAvailability() when a completed queue_atc_generation doc exists for the participant).
   aiAtcAvailable: boolean = false
   aiAtcDocId: string | null = null
   aiAtcCheckedKey: string | null = null
+  // Whether THIS logged-in specialist may use the AI-ATC feature at all. Resolved once at load
+  // from the admin-editable classify/queue-atc-edit-config doc — either global (everyone) or an
+  // allowlist (by profileid / email / role) — on top of the aiAtcFeatureEnabled code-level
+  // kill-switch. Fail-closed: any read error or missing/disabled config leaves it false, so
+  // checkAiAtcAvailability() never queries and no button shows.
+  aiAtcAllowedForUser: boolean = false
   private lastStepSignature: string = ''
   private userNavigated: boolean = false
   private lastAssignmentId: string = ''
@@ -1122,6 +1130,8 @@ export class DynamicStudioV2Component {
           }
         }),
       ]);
+      // Resolve AI-ATC access for this specialist now that profileid/roles/email are known.
+      await this.loadAiAtcAccess();
       // if(roles["eis"] || roles["changeagent"] || roles["ah"] || roles["admin"] || roles["developer"]){
         await getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()))).then(async queue=>{
           var activeQueueList = queue.docs.filter(e => e.data()["queuestartdate"].toDate() <= new Date()) // Find Ongoing Queue
@@ -3625,7 +3635,7 @@ export class DynamicStudioV2Component {
   // Open prescribe-ATC pre-filled from the completed AI-generated ATC (queue_atc_generation).
   // Only callable when checkAiAtcAvailability() found a doc and surfaced the "Use AI ATC" button.
   useAiAtc(validated) {
-    if (!this.aiAtcDocId) return;
+    if (!this.aiAtcAllowedForUser || !this.aiAtcDocId) return;
     const url = this.router.createUrlTree(['/prescribeATC'], {
       queryParams: { aigenerated: true, docid: this.aiAtcDocId, source: 'queueatc', validation: validated }
     }).toString();
@@ -3636,8 +3646,45 @@ export class DynamicStudioV2Component {
   // inline "Use AI ATC" button. Keyed on profileid+token so it queries once per participant; any
   // failure leaves the button hidden (manual prescribe always remains available). Reads only
   // (firestore-atc, queue_atc_generation), never writes.
+  // Resolve whether this logged-in specialist may use the AI-ATC feature, from the admin-editable
+  // config doc classify/queue-atc-edit-config (default DB — same collection the app uses for other
+  // config like wati/queuesystem). Called once from the constructor after getRoles()/currentuserData
+  // are set. Layers on the aiAtcFeatureEnabled code-level kill-switch. Config shape:
+  //   { enabled:boolean,          // master on/off for the whole feature (off => nobody)
+  //     global:boolean,           // true => enabled for EVERYONE (allowlist ignored)
+  //     allowedProfileIds?:string[], allowedEmails?:string[], allowAllForRoles?:string[] }  // used when !global
+  // Fail-closed — missing/disabled config or any error => no access.
+  private async loadAiAtcAccess(): Promise<void> {
+    if (!this.aiAtcFeatureEnabled) { this.aiAtcAllowedForUser = false; return; }  // code-level kill-switch
+    try {
+      const cfgSnap = await getDoc(doc(this.firestore, 'classify', 'queue-atc-edit-config'));
+      const cfg: any = cfgSnap.exists() ? cfgSnap.data() : null;
+      if (!cfg || cfg.enabled !== true) { this.aiAtcAllowedForUser = false; return; }  // feature off
+      if (cfg.global === true) { this.aiAtcAllowedForUser = true; this.maybeRecheckAiAtc(); return; }  // enabled globally for everyone
+      // Not global → restrict to the configured allowed users (by profileid / email / role).
+      const email = this.currentuserData?.['email'] || this.guard?.email || null;
+      const byProfile = Array.isArray(cfg.allowedProfileIds) && cfg.allowedProfileIds.includes(this.profileid);
+      const byEmail   = !!email && Array.isArray(cfg.allowedEmails) && cfg.allowedEmails.includes(email);
+      const byRole    = Array.isArray(cfg.allowAllForRoles) && cfg.allowAllForRoles.some((r: string) => !!this.profileRoles?.[r]);
+      this.aiAtcAllowedForUser = byProfile || byEmail || byRole;
+      this.maybeRecheckAiAtc();
+    } catch (err) {
+      console.error('AI-ATC access config read failed; feature hidden for this user', err);
+      this.aiAtcAllowedForUser = false;  // fail-closed
+    }
+  }
+
+  // If access resolved after the Prescribe-ATC step was already opened, checkAiAtcAvailability()
+  // would have returned early (not allowed yet) and never re-run. Re-trigger it once access is known.
+  private maybeRecheckAiAtc(): void {
+    if (this.aiAtcAllowedForUser && this.activeStepId === 'prescribe-atc') {
+      this.aiAtcCheckedKey = null;  // clear the "already checked this participant" guard so it re-queries
+      this.checkAiAtcAvailability();
+    }
+  }
+
   async checkAiAtcAvailability() {
-    if (!this.aiAtcFeatureEnabled) { this.aiAtcAvailable = false; return; }  // feature held — no query, no buttons
+    if (!this.aiAtcAllowedForUser) { this.aiAtcAvailable = false; return; }  // not configured for this user — no query, no buttons
     const token = this.liveAssignment?.['token'];
     const profileid = this.participantProfileId;
     const queueTokenId = token?.['docid'];
@@ -3666,20 +3713,25 @@ export class DynamicStudioV2Component {
       // (cloud fn: adminATC.doc(queueRef.path)); the studio token's queueref points at the default
       // DB, so rebuild it against firestore-atc for the equality query to match.
       const atcQueueRef = doc(firestoreATC, 'queue generation', tokenQueueRef.id);
+      // Match on participant + token + queue, newest first (stage filter removed, no limit). Take the
+      // latest generation that has actually COMPLETED — an incomplete doc (pending/processing/error)
+      // has no usable `output`, so offering it would open prescribe-ATC with nothing to prefill and
+      // draft creation fails. Status is filtered client-side to reuse the existing composite index.
       const aiSnap = await getDocs(query(
         collection(firestoreATC, 'queue_atc_generation'),
         where('profileid', '==', profileid),
         where('queue_token_id', '==', queueTokenId),
         where('queueref', '==', atcQueueRef),
-        where('stage', '==', 'Scope Enhancement'),
-        where('status', '==', 'completed')
+        orderBy('createdAt', 'desc')
       ));
 
       // Guard against a participant switch that happened while this query was awaiting.
       if (this.aiAtcCheckedKey !== key) return;
 
-      if (!aiSnap.empty) {
-        this.aiAtcDocId = aiSnap.docs[0].id;
+      // docs are newest-first, so the first completed one is the latest completed generation.
+      const completedDoc = aiSnap.docs.find(d => d.data()?.['status'] === 'completed');
+      if (completedDoc) {
+        this.aiAtcDocId = completedDoc.id;
         this.aiAtcAvailable = true;
       }
     } catch (err) {
