@@ -40,6 +40,14 @@
   transition: width var(--dur) var(--ease);
 }
 
+/* Board tab is a dashboard — let its cards use the full screen width.
+   Planning tab + header controls stay centered at the 1180px design width. */
+.content-area.board-active {
+  max-width: none;
+  padding: 0 28px 28px;
+  box-sizing: border-box;   /* keep side padding inside the 100% width — no horizontal scroll */
+}
+
 .main-container.panel-open .content-area {
   width: calc(100% - 500px);
 }
@@ -1649,6 +1657,7 @@
 @media (max-width: 768px) {
   .opportunities-studio-container { flex-direction: column; }
   .panel-summary-cards { grid-template-columns: repeat(3, 1fr); }
+  .content-area.board-active { padding: 0 12px 24px; }
 }
 @media (max-width: 576px) {
   .drag-item { width: 100%; max-width: none; }
