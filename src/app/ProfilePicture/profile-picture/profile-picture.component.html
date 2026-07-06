@@ -1,0 +1,12 @@
+<!-- The enlarge preview is mounted on document.body in openPreview() (see the .ts),
+     NOT here, so the host's render tree (e.g. a churning table) can't move or flicker it. -->
+<img
+  class="profile-img"
+  crossorigin="anonymous"
+  [src]="photoUrl"
+  [alt]="name"
+  [style.width.px]="size"
+  [style.height.px]="size"
+  (error)="onImgError()"
+  (click)="openPreview($event)"
+/>

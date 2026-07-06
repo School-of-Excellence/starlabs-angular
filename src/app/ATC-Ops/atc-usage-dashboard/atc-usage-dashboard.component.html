@@ -1,0 +1,281 @@
+<div class="dashboard-wrapper">
+  <!-- ===== top bar ===== -->
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <h1 class="page-title">ATC Pipeline Monitoring</h1>
+      <span class="page-subtitle">
+        Live health & throughput of the ATC generation pipeline
+        <ng-container *ngIf="lastRefreshed"> · refreshed {{ lastRefreshed | date:'h:mm:ss a' }}</ng-container>
+      </span>
+    </div>
+    <div class="top-bar-right">
+      <button mat-flat-button color="primary" (click)="refreshAll()">
+        <mat-icon>refresh</mat-icon> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== armed banner ===== -->
+  <div class="banner warn" *ngIf="!pod.loading && !armed">
+    <mat-icon>power_settings_new</mat-icon>
+    <span>
+      <strong>Pipeline not armed.</strong> Throughput & turnaround will read zero until
+      <code>pod_worker.enabled === true</code> so jobs drain to a terminal state.
+      Drop-offs and live queue counts still populate.
+    </span>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LIVE TILES (A–F)                                                       -->
+  <!-- ===================================================================== -->
+  <div class="section-header"><h4 class="section-title">Live status</h4></div>
+  <div class="tiles-grid">
+
+    <!-- Panel A — Pod status -->
+    <mat-card class="tile pod-tile"
+      [class.critical]="pod.data?.halted"
+      [class.muted]="!pod.loading && !armed">
+      <div class="tile-head">
+        <span class="tile-label">Pod worker</span>
+        <span class="dot" [class.on]="armed" [class.off]="!armed"></span>
+      </div>
+      <ng-container *ngIf="pod.loading"><mat-spinner diameter="22"></mat-spinner></ng-container>
+      <ng-container *ngIf="!pod.loading && pod.error"><div class="tile-err">{{ pod.error }}</div></ng-container>
+      <ng-container *ngIf="!pod.loading && !pod.error">
+        <ng-container *ngIf="pod.data as p; else noPod">
+          <div class="pod-state">
+            <span class="badge" [ngClass]="{
+              'ok': p.state==='READY',
+              'info': p.state==='LOADING' || p.state==='IDLE',
+              'warn': p.state==='TERMINATING',
+              'danger': p.state==='HALTED' || p.halted }">{{ p.state }}</span>
+            <span class="badge" [class.ok]="p.enabled" [class.danger]="!p.enabled">
+              {{ p.enabled ? 'ARMED' : 'DISARMED' }}
+            </span>
+          </div>
+          <div class="pod-halted" *ngIf="p.halted">
+            <mat-icon>report</mat-icon> Halted — needs manual reset
+            <div class="muted-line" *ngIf="p.haltedReason">{{ p.haltedReason }}</div>
+          </div>
+          <div class="pod-meta">
+            <div><span class="k">GPU</span><span class="v">{{ podGpuLabel(p) }}</span></div>
+            <div><span class="k">Pod</span><span class="v mono">{{ p.podid || '—' }}</span></div>
+            <div *ngIf="p.model"><span class="k">Model</span><span class="v mono">{{ p.model }}</span></div>
+            <div *ngIf="p.workerRunning !== undefined"><span class="k">Worker</span><span class="v">{{ p.workerRunning ? 'running' : 'idle' }}</span></div>
+          </div>
+          <div class="soft-err" *ngIf="p.launchError">{{ p.launchError }}</div>
+        </ng-container>
+        <ng-template #noPod><div class="zero">No pod_worker doc yet.</div></ng-template>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel B — Data-incomplete NOW -->
+    <mat-card class="tile" [class.attention]="dataIncomplete.data > 0">
+      <div class="tile-head">
+        <span class="tile-label">Data-incomplete now</span>
+        <mat-icon class="tile-ico" matTooltip="Created but blocked on missing mandatory / at-least-one-required pairing data">info</mat-icon>
+      </div>
+      <ng-container *ngIf="dataIncomplete.loading"><mat-spinner diameter="22"></mat-spinner></ng-container>
+      <ng-container *ngIf="!dataIncomplete.loading && dataIncomplete.error"><div class="tile-err">{{ dataIncomplete.error }}</div></ng-container>
+      <ng-container *ngIf="!dataIncomplete.loading && !dataIncomplete.error">
+        <div class="tile-number">{{ dataIncomplete.data }}</div>
+        <button mat-stroked-button class="drill-btn" (click)="toggleDrillIn()">
+          {{ drillOpen ? 'Hide' : 'Drill in' }}
+          <mat-icon>{{ drillOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel C — Backlog -->
+    <mat-card class="tile">
+      <div class="tile-head"><span class="tile-label">Backlog</span></div>
+      <ng-container *ngIf="backlog.loading"><mat-spinner diameter="22"></mat-spinner></ng-container>
+      <ng-container *ngIf="!backlog.loading && backlog.error"><div class="tile-err">{{ backlog.error }}</div></ng-container>
+      <ng-container *ngIf="!backlog.loading && !backlog.error">
+        <div class="dual">
+          <div><div class="tile-number">{{ backlog.data.pending }}</div><div class="sub">pending</div></div>
+          <div><div class="tile-number">{{ backlog.data.processing }}</div><div class="sub">processing</div></div>
+        </div>
+        <div class="oldest" *ngIf="!oldestPendingMin.loading">
+          <mat-icon>schedule</mat-icon>
+          Oldest pending:
+          <strong>{{ oldestPendingMin.data === null ? '—' : oldestPendingMin.data + ' min' }}</strong>
+        </div>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel D — Stuck now -->
+    <mat-card class="tile" [class.critical]="stuck.data > 0">
+      <div class="tile-head">
+        <span class="tile-label">Stuck now</span>
+        <mat-icon class="tile-ico" matTooltip="Processing for > 30 min">warning</mat-icon>
+      </div>
+      <ng-container *ngIf="stuck.loading"><mat-spinner diameter="22"></mat-spinner></ng-container>
+      <ng-container *ngIf="!stuck.loading && stuck.error"><div class="tile-err">{{ stuck.error }}</div></ng-container>
+      <ng-container *ngIf="!stuck.loading && !stuck.error">
+        <div class="tile-number" [class.danger-text]="stuck.data > 0">{{ stuck.data }}</div>
+        <div class="sub">processing &gt; 30 min</div>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel E — Done / errors today -->
+    <mat-card class="tile" [class.attention]="today.data.errors > 0">
+      <div class="tile-head"><span class="tile-label">Today (IST)</span></div>
+      <ng-container *ngIf="today.loading"><mat-spinner diameter="22"></mat-spinner></ng-container>
+      <ng-container *ngIf="!today.loading && today.error"><div class="tile-err">{{ today.error }}</div></ng-container>
+      <ng-container *ngIf="!today.loading && !today.error">
+        <div class="dual">
+          <div><div class="tile-number ok-text">{{ today.data.done }}</div><div class="sub">done</div></div>
+          <div><div class="tile-number" [class.danger-text]="today.data.errors > 0">{{ today.data.errors }}</div><div class="sub">errors</div></div>
+        </div>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel F — Breaks / drop-offs -->
+    <mat-card class="tile drop-tile">
+      <div class="tile-head">
+        <span class="tile-label">Breaks today</span>
+        <mat-icon class="tile-ico" matTooltip="Own-stage source unresolvable → no doc created. Distinct from data-incomplete (pairing data).">info</mat-icon>
+      </div>
+      <ng-container *ngIf="dropoffs.loading"><mat-spinner diameter="22"></mat-spinner></ng-container>
+      <ng-container *ngIf="!dropoffs.loading && dropoffs.error"><div class="tile-err">{{ dropoffs.error }}</div></ng-container>
+      <ng-container *ngIf="!dropoffs.loading && !dropoffs.error">
+        <div class="tile-number">{{ dropoffs.data?.total || 0 }}</div>
+        <div class="stage-split" *ngIf="dropoffs.data">
+          <span class="chip s0">S0: {{ dropoffs.data.byStage?.S0 || 0 }}</span>
+          <span class="chip s1">S1: {{ dropoffs.data.byStage?.S1 || 0 }}</span>
+        </div>
+        <div class="reason-list" *ngIf="dropoffReasons().length">
+          <div class="reason-row" *ngFor="let r of dropoffReasons()">
+            <span class="reason-name">{{ r.reason }}</span>
+            <span class="reason-count">{{ r.count }}</span>
+          </div>
+        </div>
+        <div class="last-break" *ngIf="dropoffs.data?.lastReason">
+          <span class="muted-line">Last: <strong>{{ dropoffs.data?.lastReason }}</strong>
+            <ng-container *ngIf="dropoffs.data?.lastExtra as e"> — {{ e.stage }} · {{ e.profileid }}</ng-container>
+          </span>
+        </div>
+        <div class="zero" *ngIf="!dropoffs.data">No breaks recorded today.</div>
+      </ng-container>
+    </mat-card>
+  </div>
+
+  <!-- ===== drill-in (Panel B expand) ===== -->
+  <mat-card class="drawer" *ngIf="drillOpen">
+    <div class="drawer-head">
+      <h4 class="section-title">Blocked docs — missing pairing data</h4>
+      <button mat-icon-button (click)="toggleDrillIn()"><mat-icon>close</mat-icon></button>
+    </div>
+    <ng-container *ngIf="drillIn.loading"><mat-spinner diameter="26"></mat-spinner></ng-container>
+    <ng-container *ngIf="!drillIn.loading && drillIn.error"><div class="tile-err">{{ drillIn.error }}</div></ng-container>
+    <ng-container *ngIf="!drillIn.loading && !drillIn.error">
+      <div class="zero" *ngIf="!drillIn.data.length">No data-incomplete docs 🎉</div>
+      <table class="drill-table" *ngIf="drillIn.data.length">
+        <thead><tr><th>Profile</th><th>Stage</th><th>Created</th><th>Missing stages</th><th></th></tr></thead>
+        <tbody>
+          <tr *ngFor="let d of drillIn.data">
+            <td class="mono">{{ d.profileid || '—' }}</td>
+            <td>{{ d.stage || '—' }}</td>
+            <td [matTooltip]="(tsToDate(d.createdAt) | date:'medium') || ''">{{ (tsToDate(d.createdAt) | date:'short') || '—' }}</td>
+            <td>
+              <span class="chip"
+                *ngFor="let m of missingStages(d)"
+                [ngClass]="{ 'danger': m.entry.category==='mandatory', 'warn': m.entry.category==='atleastonerequired' }">
+                {{ m.stage }} <em>({{ m.entry.category }})</em>
+              </span>
+              <span class="muted-line" *ngIf="!missingStages(d).length">—</span>
+            </td>
+            <td><button mat-stroked-button color="primary" (click)="onRegenerate(d.docid)">Regenerate</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </ng-container>
+  </mat-card>
+
+  <!-- ===================================================================== -->
+  <!-- TRENDS (G, H, J)                                                       -->
+  <!-- ===================================================================== -->
+  <div class="section-header"><h4 class="section-title">Trends</h4></div>
+  <div class="charts-grid">
+
+    <!-- Panel G — Backlog trend -->
+    <mat-card class="chart-card">
+      <div class="chart-head">
+        <span class="chart-title">Backlog trend</span>
+        <span class="as-of" *ngIf="backlogLatest.data?.sampledAt">as of {{ tsToDate(backlogLatest.data?.sampledAt) | date:'short' }}</span>
+      </div>
+      <ng-container *ngIf="backlogTrend.loading"><div class="chart-load"><mat-spinner diameter="28"></mat-spinner></div></ng-container>
+      <ng-container *ngIf="!backlogTrend.loading && backlogTrend.error"><div class="tile-err">{{ backlogTrend.error }}</div></ng-container>
+      <ng-container *ngIf="!backlogTrend.loading && !backlogTrend.error">
+        <apx-chart *ngIf="backlogChart"
+          [series]="backlogChart.series!" [chart]="backlogChart.chart!" [xaxis]="backlogChart.xaxis!"
+          [colors]="backlogChart.colors!" [dataLabels]="backlogChart.dataLabels!" [stroke]="backlogChart.stroke!"
+          [legend]="backlogChart.legend!" [grid]="backlogChart.grid!"></apx-chart>
+        <div class="zero" *ngIf="!backlogChart">No backlog samples yet.</div>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel H — Daily throughput -->
+    <mat-card class="chart-card">
+      <div class="chart-head"><span class="chart-title">Daily throughput</span></div>
+      <ng-container *ngIf="daily.loading"><div class="chart-load"><mat-spinner diameter="28"></mat-spinner></div></ng-container>
+      <ng-container *ngIf="!daily.loading && daily.error"><div class="tile-err">{{ daily.error }}</div></ng-container>
+      <ng-container *ngIf="!daily.loading && !daily.error">
+        <apx-chart *ngIf="throughputChart"
+          [series]="throughputChart.series!" [chart]="throughputChart.chart!" [xaxis]="throughputChart.xaxis!"
+          [colors]="throughputChart.colors!" [plotOptions]="throughputChart.plotOptions!"
+          [dataLabels]="throughputChart.dataLabels!" [legend]="throughputChart.legend!" [grid]="throughputChart.grid!"></apx-chart>
+        <div class="zero" *ngIf="!throughputChart">No throughput yet.</div>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel H (cont) — Avg turnaround -->
+    <mat-card class="chart-card">
+      <div class="chart-head"><span class="chart-title">Avg turnaround (completed)</span></div>
+      <ng-container *ngIf="daily.loading"><div class="chart-load"><mat-spinner diameter="28"></mat-spinner></div></ng-container>
+      <ng-container *ngIf="!daily.loading && !daily.error">
+        <apx-chart *ngIf="turnaroundChart"
+          [series]="turnaroundChart.series!" [chart]="turnaroundChart.chart!" [xaxis]="turnaroundChart.xaxis!"
+          [colors]="turnaroundChart.colors!" [stroke]="turnaroundChart.stroke!"
+          [dataLabels]="turnaroundChart.dataLabels!" [grid]="turnaroundChart.grid!"></apx-chart>
+        <div class="zero" *ngIf="!turnaroundChart">No completed jobs to measure.</div>
+      </ng-container>
+    </mat-card>
+
+    <!-- Panel J — Error breakdown -->
+    <mat-card class="chart-card">
+      <div class="chart-head"><span class="chart-title">Error breakdown by category</span></div>
+      <ng-container *ngIf="errorBreakdown.loading"><div class="chart-load"><mat-spinner diameter="28"></mat-spinner></div></ng-container>
+      <ng-container *ngIf="!errorBreakdown.loading">
+        <apx-chart *ngIf="failureChart"
+          [series]="failureChart.series!" [chart]="failureChart.chart!" [xaxis]="failureChart.xaxis!"
+          [colors]="failureChart.colors!" [plotOptions]="failureChart.plotOptions!"
+          [dataLabels]="failureChart.dataLabels!" [grid]="failureChart.grid!"></apx-chart>
+        <div class="zero" *ngIf="!failureChart">No failures in window 🎉</div>
+      </ng-container>
+    </mat-card>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LIFETIME (I)                                                           -->
+  <!-- ===================================================================== -->
+  <div class="section-header"><h4 class="section-title">Lifetime totals</h4></div>
+  <mat-card class="lifetime-strip">
+    <ng-container *ngIf="lifetime.loading"><mat-spinner diameter="24"></mat-spinner></ng-container>
+    <ng-container *ngIf="!lifetime.loading && lifetime.error"><div class="tile-err">{{ lifetime.error }}</div></ng-container>
+    <ng-container *ngIf="!lifetime.loading && !lifetime.error">
+      <ng-container *ngIf="lifetime.data as lt; else noLifetime">
+        <div class="kpi"><div class="kpi-num">{{ lt.total || 0 }}</div><div class="kpi-lbl">Total</div></div>
+        <div class="kpi"><div class="kpi-num ok-text">{{ lt.completed || 0 }}</div><div class="kpi-lbl">Completed</div></div>
+        <div class="kpi"><div class="kpi-num danger-text">{{ lt.failed || 0 }}</div><div class="kpi-lbl">Failed</div></div>
+        <div class="kpi"><div class="kpi-num">{{ turnaroundLabel(lt) }}</div><div class="kpi-lbl">Avg turnaround</div></div>
+        <div class="kpi wide">
+          <div class="kpi-lbl">Since {{ (tsToDate(lt.firstSeen) | date:'mediumDate') || '—' }}</div>
+          <div class="kpi-lbl">Updated {{ (tsToDate(lt.lastUpdated) | date:'short') || '—' }}</div>
+        </div>
+      </ng-container>
+      <ng-template #noLifetime><div class="zero">No lifetime data yet.</div></ng-template>
+    </ng-container>
+  </mat-card>
+</div>

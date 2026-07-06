@@ -26,6 +26,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { FlagReviewScreenComponent } from "../flag-review-screen/flag-review-screen.component";
 import { CustomerChatScreenComponent } from "../customer-chat-screen/customer-chat-screen.component";
 import { ChatConfigComponent } from '../chat-config/chat-config.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import html2canvas from 'html2canvas';
 
 @Component({
@@ -47,7 +48,8 @@ import html2canvas from 'html2canvas';
     MatDatepickerModule,
     MatMenuModule,
     FlagReviewScreenComponent,
-    CustomerChatScreenComponent
+    CustomerChatScreenComponent,
+    ProfilePictureComponent
   ],
   templateUrl: './customer-support-dashboard.component.html',
   styleUrl: './customer-support-dashboard.component.css'
@@ -464,6 +466,13 @@ export class CustomerSupportDashboardComponent {
 
   trackByCategoryKey(index: number, item: any): any {
     return item.key;
+  }
+
+  // Stable identity for the ticket rows so live collectionSnapshots emits don't
+  // recreate every row (and the embedded <app-profile-picture>). Without this the
+  // open avatar preview blinks out/in on each snapshot = flicker (+ perf churn).
+  trackByTicket(index: number, item: any): any {
+    return item?.id ?? item?.issueno ?? index;
   }
 
   onItemsPerPageChange() {

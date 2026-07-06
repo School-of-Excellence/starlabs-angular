@@ -29,6 +29,7 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { Storage,getDownloadURL, ref, uploadBytes } from '@angular/fire/storage';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 
 interface ImportPreviewParticipant {
@@ -59,6 +60,7 @@ interface ImportPreviewData {
     MatButtonModule,
     MatTooltipModule,
     NgxMatSelectSearchModule,
+    ProfilePictureComponent,
     MatDialogModule
   ],
   templateUrl: './initiate-event-product.component.html',
@@ -189,7 +191,7 @@ export class InitiateEventProductComponent {
 
   ngAfterViewInit() {
     console.log("After View Init")
-    this.participantProductList.sort((a, b) => a["name"].localeCompare(b["name"]))
+    this.participantProductList.sort((a, b) => (a["name"] || '').localeCompare(b["name"] || ''))
     this.participantProductList.sort((a, b) => Number(b["eventrequested"]) - Number(a["eventrequested"]))
     this.tableDatasource.data = this.participantProductList;
     setTimeout(() => {
@@ -749,9 +751,9 @@ export class InitiateEventProductComponent {
     })).filter(p => p.profileid);
 
     this.dialog.open(BulkAddProductsComponent, {
-      data: selectedParticipants,
-      width: '70vw',
-      disableClose: true
+        data: { participants: selectedParticipants, productrefId: this.selectedArena['productref'].id },
+        width: '70vw',
+        disableClose: true
       }).afterClosed().subscribe(async () => {
       if (!this.selectedArena) return;
 
@@ -858,7 +860,7 @@ export class InitiateEventProductComponent {
     if (selectedParticipants.length === 0) return;
 
     this.dialog.open(BulkAddProductsComponent, {
-      data: selectedParticipants,
+      data: { participants: selectedParticipants, productrefId: this.selectedArena['productref'].id },
       width: '70vw',
       disableClose: true
     }).afterClosed().subscribe(async () => {
@@ -1151,6 +1153,7 @@ export class InitiateEventProductComponent {
           logged: true, 
           landingpage: result["landingpage"],
           profileid: selectedParticipants,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
         }).then(()=>{
           console.log( notificationimage)
           alert("A&H Update sent to App user " + selectedParticipants.length.toString())
@@ -1196,6 +1199,7 @@ export class InitiateEventProductComponent {
     const exportData = participants.map(p => ({
       'Name': this.mapProfile[p.profileid]?.name || 'Unknown',
       'Email': this.mapProfile[p.profileid]?.email || 'No email',
+      'PH_NO': this.mapProfile[p.profileid]?.number || 'N/A',
       'Active Journey' : this.mapJourney[this.mapParticipantMetaData[p.profileid]?.activejourney || ''] ?? 'N/A',
       'Total Purchase Value' : this.mapParticipantMetaData[p.profileid]?.pp_totalpurchasevalue ?? 'N/A',
       'Total Paid' : this.mapParticipantMetaData[p.profileid]?.pp_totalpaid ?? 'N/A',
@@ -1204,6 +1208,7 @@ export class InitiateEventProductComponent {
       'Subscription End' : this.formatDate(this.mapParticipantMetaData[p.profileid]?.subscriptionend ),
       'Status': p.status || 'pending',
       'Customer Status': this.mapParticipantMetaData[p.profileid]?.customerstatus || 'N/A',
+      'Eligibilty' : this.getParticipantEligibitly(p.profileid)
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -1226,5 +1231,16 @@ export class InitiateEventProductComponent {
       return date.toISOString()
     }
     return 'N/A';
+  }
+
+  getParticipantEligibitly(pid : string){
+    if(![null , undefined , ''].includes(pid) && this.selectedArena){
+      if(this.eventRequestedNonEligibleProfile.includes(pid)){
+        return 'No';
+      } else if(this.eventRequestedEligibleProfile.includes(pid)){
+        return 'Yes';
+      }
+    } 
+    return 'N/A'
   }
 }

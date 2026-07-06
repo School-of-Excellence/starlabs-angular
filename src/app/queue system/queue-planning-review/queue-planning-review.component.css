@@ -4223,9 +4223,10 @@
 /* Participant Actions */
 .participant-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .revert-btn {
@@ -4370,4 +4371,282 @@
 .oneway-fab {
   background-color: #6366f1 !important;
   color: white !important;
+}
+.slot-title-row {
+  font-weight: 700;
+  font-size: 13px;
+  color: #234C58;
+  border-bottom: 1px solid rgba(35, 76, 88, 0.15);
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.slot-title-text {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-slot-title {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+  color: #234C58;
+  margin-bottom: 2px;
+}
+
+.table-slot-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: #234C58;
+  margin-left: 4px;
+}
+
+.ep-filter-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;  
+}
+
+.ep-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px !important;
+  border-radius: 4px !important;
+  padding: 0 15px !important;
+  height: 48px !important;
+  min-width: 160px !important;
+  line-height: 48px !important;
+}
+
+.ep-filter-active {
+  background: #234C58 !important;
+  color: white !important;
+  border-color: #234C58 !important;
+}
+
+.ep-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  min-width: 280px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ep-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+  font-size: 13px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.ep-search-input {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ep-search-input:focus {
+  border-color: #234C58;
+}
+
+.ep-list {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ep-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  background: #f5f5f5;
+  transition: background 0.15s;
+}
+
+.ep-list-item:hover {
+  background: #e8f4f8;
+}
+
+.ep-list-item-selected {
+  background: #e3f2fd !important;
+}
+
+.ep-type-badge {
+  font-size: 10px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.ep-radio-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #1976d2;
+  flex-shrink: 0;
+}
+
+.ep-empty {
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.ep-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #1976d2;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+  font-weight: 500;
+}
+
+.ep-back-btn mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.ep-apply-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.ep-reset-btn {
+  color: #666;
+}
+.revert-history-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.revert-history-dialog {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.revert-history-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eeeeee;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 1;
+}
+
+.revert-history-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.revert-history-title mat-icon {
+  color: #7b61ff;
+}
+
+.revert-history-dialog-body {
+  padding: 16px 20px;
+}
+
+.revert-history-stage-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7b61ff;
+  margin: 8px 0 8px 0;
+}
+
+.revert-history-stage-label mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #7b61ff;
+}
+
+.revert-history-entry {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border-left: 3px solid #7b61ff;
+  margin-bottom: 8px;
+}
+
+.revert-history-entry-number {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7b61ff;
+  min-width: 24px;
+  padding-top: 2px;
+}
+
+.revert-history-entry-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.revert-history-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #444444;
+}
+
+.revert-history-entry-row mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #888888;
 }

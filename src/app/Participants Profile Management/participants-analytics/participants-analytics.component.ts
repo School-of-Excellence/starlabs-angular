@@ -56,6 +56,7 @@ import { WatiConfigDialogComponent } from './wati-config-dialog/wati-config-dial
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AddPendingActionComponent } from '../../AppEngagement/app-action-pending/add-pending-action/add-pending-action.component';
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../../New-Workshop/whatsapp-progress-dialog.component';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { getApp } from '@angular/fire/app';
 
 export class formelement {
@@ -127,7 +128,8 @@ interface userRoles {
     RouterModule,
     MatSlideToggleModule,
     MatBadgeModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    ProfilePictureComponent
   ],
   templateUrl: './participants-analytics.component.html',
   styleUrl: './participants-analytics.component.css',
@@ -1685,6 +1687,7 @@ export class ParticipantsAnalyticsComponent {
           logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
         }).then(() => {
           console.log(notificationimage)
           alert("A&H Update sent to App user " + profileID.length.toString())

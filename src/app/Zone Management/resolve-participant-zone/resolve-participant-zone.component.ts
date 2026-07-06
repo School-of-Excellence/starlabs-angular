@@ -5,6 +5,7 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 export interface ParticipantIssue {
   participantId: string;
@@ -27,7 +28,8 @@ export interface DialogData {
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    MatRadioModule
+    MatRadioModule,
+    ProfilePictureComponent
   ],
   templateUrl: './resolve-participant-zone.component.html',
   styleUrl: './resolve-participant-zone.component.css'

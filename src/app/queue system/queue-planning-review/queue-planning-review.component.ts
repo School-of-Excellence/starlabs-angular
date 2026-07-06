@@ -1,5 +1,5 @@
 import { Component, ElementRef, inject, OnDestroy, OnInit, TemplateRef, ViewChild, AfterViewInit } from '@angular/core';
-import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query,runTransaction, deleteField, setDoc, Timestamp, updateDoc, where } from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query,runTransaction, deleteField, setDoc, Timestamp, updateDoc, where ,arrayUnion} from '@angular/fire/firestore';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -30,9 +30,10 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 import { environment } from '../../../environments/environment.development';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
-import { OnewayChannelComponent } from '../../OneWayAppCommunication/onewaychannel/oneway-channel/oneway-channel.component';
+import { ChannelCommunicationComponent } from '../../Channel Communication/channel-communication/channel-communication.component';
 import * as XLSX from 'xlsx';
 import { T } from '@angular/cdk/keycodes';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 interface StageConfig {
   stageName: string;
@@ -55,6 +56,7 @@ interface MergedSlot {
         [stageName: string]: {
           maxslot: number;
           usedslot: number;
+          title: string; 
           bigparticipants: any[];
           confirmedParticipants: any[];
           nonConfirmedParticipants: any[];
@@ -87,6 +89,7 @@ interface MergedSlot {
     MatChipsModule,
     MatCheckboxModule,
     MatBadgeModule,
+    ProfilePictureComponent,
   ],
   templateUrl: './queue-planning-review.component.html',
   styleUrl: './queue-planning-review.component.css'
@@ -163,6 +166,17 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
   overallSegmentFilter: string[] = []; // -- surya
 
+  // multi-queue export 
+  liveQueueExportSelection: Set<string> = new Set();
+  liveQueueExportRange = { startDate: null, endDate: null };
+  liveQueueExportBusy: boolean = false;
+  liveQueueExportModeOn: boolean = false;
+  private liveQueueExportCache = new Map<string, {
+    stages: string[];
+    planningData: any;
+    tokens: any[];
+  }>();
+
   // NEW: Track current status view (confirmed/non-confirmed/all/deleted-slots)
   currentStatusView: 'confirmed' | 'non-confirmed' | 'all' | 'deleted-slots' | 'queue-participants' | 'non-queue' = 'all';
   // NEW: Deleted slots participants
@@ -181,7 +195,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   showQueueTabPanel: boolean = false;
   queueTabPanelParticipants: any[] = [];
   queueTabPanelTitle: string = '';
-  queueTabPanelType: 'confirmed' | 'non-confirmed' = 'confirmed';
+  queueTabPanelType: 'confirmed' | 'non-confirmed' | 'all' = 'confirmed';
   queueTabPanelSegmentName: string = '';
   queueTabPanelSlotTime: string = '';
   selectedSegmentIds: Set<string> = new Set();
@@ -210,7 +224,25 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   // Arena event id for selected queue
   selectedQueueArenaEventId: string | null = null;
   selectedQueueProductRef: any = null;
-  
+
+  // Event Participation Filter
+  eventParticipationDataLoaded: boolean = false;
+  eventParticipationLoading: boolean = false;
+  showEventParticipationPicker: boolean = false;
+  eventParticipationList: any[] = [];
+  eventParticipationListLoaded: boolean = false;
+  selectedEventParticipation: any = null;
+  eventParticipationSearchTerm: string = '';
+  arenaEventFilterList: Array<{ docid: string; name: string }> = [];
+  selectedArenaEventId: string | null = null;
+  arenaEventProfileMap: { [arenaeventid: string]: Set<string> } = {};
+  eventParticipationProfileIds: Set<string> = new Set();
+  //slot revert
+  showRevertHistoryDialog: boolean = false;
+  revertHistoryParticipant: any = null;
+  showOverallSlotRevertHistory: boolean = false;
+  overallSlotRevertHistory: { profileId: string; stageName: string; log: any }[] = [];
+
   slotPlannerFilter = {
     startDate: null,
     endDate: null,
@@ -415,6 +447,18 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     this.completedInterimProfileIds = new Set();
     this.notCompletedInterimProfileIds = new Set();
     this.allInterimProfileIds = new Set();
+
+    this.eventParticipationDataLoaded = false;
+    this.eventParticipationLoading = false;
+    this.showEventParticipationPicker = false;
+    this.eventParticipationList = [];
+    this.eventParticipationListLoaded = false;
+    this.selectedEventParticipation = null;
+    this.eventParticipationSearchTerm = '';
+    this.arenaEventFilterList = [];
+    this.selectedArenaEventId = null;
+    this.arenaEventProfileMap = {};
+    this.eventParticipationProfileIds = new Set();
 
     const loading = this.dialog.open(LoadingProgressComponent, {
       data: { msg: "Loading Queue Data..." },
@@ -623,6 +667,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
                   segVariationData.stageData[stageName] = {
                     maxslot: slot.maxslot || 0,
                     usedslot: slot.usedslot || 0,
+                    title: slot.title || '', 
                     startdate: startDate,
                     enddate: endDate
                   };
@@ -692,9 +737,14 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
     this.mergedSlots.sort((a, b) => a.startdate.getTime() - b.startdate.getTime());
   }
+
   recalculateMergedSlotParticipants() {
-    const filterSet = this.activeInterimCard === 'completed' ? this.completedInterimProfileIds
+    const interimSet = this.activeInterimCard === 'completed' ? this.completedInterimProfileIds
       : this.activeInterimCard === 'not-completed' ? this.notCompletedInterimProfileIds
+      : null;
+
+    const eventSet = this.eventParticipationDataLoaded
+      ? this.eventParticipationProfileIds
       : null;
 
     for (const slot of this.mergedSlots) {
@@ -703,21 +753,21 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           for (const stageName of Object.keys(variation.stageData)) {
             const sd: any = variation.stageData[stageName];
 
-            // Store full lists on first call
             if (!sd._allConfirmed) {
               sd._allConfirmed = sd.confirmedParticipants || [];
               sd._allNonConfirmed = sd.nonConfirmedParticipants || [];
             }
 
-            if (filterSet) {
-              sd.confirmedParticipants = sd._allConfirmed.filter((p: any) => {
+            if (interimSet || eventSet) {
+              const pass = (p: any) => {
                 const pid = p.profile_id || p.profileid;
-                return pid && filterSet.has(pid);
-              });
-              sd.nonConfirmedParticipants = sd._allNonConfirmed.filter((p: any) => {
-                const pid = p.profile_id || p.profileid;
-                return pid && filterSet.has(pid);
-              });
+                if (!pid) return false;
+                if (interimSet && !interimSet.has(pid)) return false;
+                if (eventSet && !eventSet.has(pid)) return false;
+                return true;
+              };
+              sd.confirmedParticipants = sd._allConfirmed.filter(pass);
+              sd.nonConfirmedParticipants = sd._allNonConfirmed.filter(pass);
             } else {
               sd.confirmedParticipants = sd._allConfirmed;
               sd.nonConfirmedParticipants = sd._allNonConfirmed;
@@ -764,6 +814,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       result[stageName] = {
         maxslot: slot.maxslot || 0,
         usedslot: confirmedParticipants.length,
+        title: slot.title || '',
         bigparticipants: bigparticipants,
         confirmedParticipants: confirmedParticipants,
         nonConfirmedParticipants: nonConfirmedParticipants
@@ -1931,6 +1982,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     const exportData = allParticipants.map((p, index) => ({
       'No': index + 1,
       'Name': this.getProfileName(p.profileId),
+      'Email': this.getParticipantEmail(p.profileId) ?? 'N/A',
       'Profile ID': p.profileId,
       'Segment': p.segmentName || 'N/A',
       'Segment ID': p.segmentId || 'N/A',
@@ -2057,12 +2109,14 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           if (variation.stageData && variation.stageData[stage]) {
             variation.stageData[stage].confirmedParticipants.forEach((participant) => {
               const participantId = participant.profile_id || participant.profileid;
+              const slotTitle = this.getSlotTitle(slot, stage);
               if (participantId) {
                 allParticipants.push({
                   participantId,
                   segmentName: segmentVar.segmentName,
                   variationName: variation.variationName,
                   stageName: stage,
+                  slotTitle,
                   slotBooked: slotTiming,
                   slotBookedTiming: queueTokenMap.get(participantId)?.selectedstageslot[stage]?.slotconfirmation
                 });
@@ -2074,7 +2128,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     });
 
     if (allParticipants.length === 0) { alert('No participants to export'); return; }
-
+    
     const exportData = allParticipants.map((p) => ({
       'Name': this.getProfileName(p.participantId) || 'N/A',
       'Email': this.getParticipantEmail(p.participantId) ?? 'N/A',
@@ -2082,6 +2136,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       'Segment': p.segmentName || 'N/A',
       'Variation': p.variationName || 'N/A',
       'Current Stage': p.stageName || 'N/A',
+      'Title': p.slotTitle || 'N/A',
       'Slot Booked': p.slotBooked || 'N/A',
       'SlotTiming': p.slotBookedTiming || '',
     }));
@@ -2109,10 +2164,12 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
           if (variation.stageData && variation.stageData[stage]) {
             const confirmed = variation.stageData[stage].confirmedParticipants || [];
             const nonConfirmed = variation.stageData[stage].nonConfirmedParticipants || [];
+            const slotTitle = this.getSlotTitle(slot, stage);
 
             confirmed.forEach((p) => {
               const profileId = p.profile_id || p.profileid;
               exportData.push({
+                'Title': slotTitle || 'N/A',
                 'Slot': slotTiming,
                 'Segment': segmentVar.segmentName,
                 'Name': this.getProfileName(profileId) || 'N/A',
@@ -2125,6 +2182,7 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
             nonConfirmed.forEach((p) => {
               const profileId = p.profile_id || p.profileid;
               exportData.push({
+                'Title': slotTitle || 'N/A',
                 'Slot': slotTiming,
                 'Segment': segmentVar.segmentName,
                 'Name': this.getProfileName(profileId) || 'N/A',
@@ -2156,6 +2214,252 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
     const fileName = `${sheetName.toLowerCase().replace(/ /g, '_')}_${this.selectedQueue?.['queuename'] || 'queue'}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
+  }
+
+  toggleLiveQueueExportMode() {
+    this.liveQueueExportModeOn = !this.liveQueueExportModeOn;
+    if (!this.liveQueueExportModeOn) {
+      this.liveQueueExportSelection.clear();
+      this.liveQueueExportRange = { startDate: null, endDate: null };
+    }
+  }
+
+  onLiveQueueClick(live: any) {
+    if (this.liveQueueExportModeOn) {
+      this.liveQueueExportSelection.has(live['docid'])
+        ? this.liveQueueExportSelection.delete(live['docid'])
+        : this.liveQueueExportSelection.add(live['docid']);
+    } else {
+      this.selectedQueue = live;
+      this.onQueueSelect();
+    }
+  }
+
+  async exportLiveQueuesByDateRange() {
+    if (this.liveQueueExportSelection.size === 0) {
+      alert('Select at least one live queue.');
+      return;
+    }
+    if (!this.liveQueueExportRange.startDate || !this.liveQueueExportRange.endDate) {
+      alert('Select a date range.');
+      return;
+    }
+
+    const rangeStart = new Date(this.liveQueueExportRange.startDate);
+    rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = new Date(this.liveQueueExportRange.endDate);
+    rangeEnd.setHours(23, 59, 59, 999);
+
+    this.liveQueueExportBusy = true;
+    const loading = this.dialog.open(LoadingProgressComponent, {
+      data: { msg: 'Building export...' },
+      disableClose: true
+    });
+
+    const exportData: any[] = [];
+
+    try {
+      const queues = this.liveQueueList.filter(q => this.liveQueueExportSelection.has(q['docid']));
+
+      const queueDataResults = await Promise.all(
+        queues.map(async (q): Promise<{ stages: string[]; slots: MergedSlot[] } | null> => {
+          const docid = q['docid'];
+          if (this.selectedQueue?.['docid'] === docid && this.cachedPlanningData) {
+            return {
+              stages: this.queueStages,
+              slots: this.mergedSlots
+            };
+          }
+
+          const cached = this.liveQueueExportCache.get(docid);
+          if (cached) {
+            return {
+              stages: cached.stages,
+              slots: this.buildSlotsForExport(cached.planningData, cached.stages, cached.tokens)
+            };
+          }
+          const queueRef = doc(this.firestore, 'queue generation', docid);
+          const [queueDoc, planningDocs, tokenDocs] = await Promise.all([getDoc(queueRef),
+            getDocs(query(collection(this.firestore, 'queue planning'), where('queueid', '==', docid))),
+            getDocs(query(collection(this.firestore, 'queue_token'), where('queueref', '==', queueRef)))
+          ]);
+
+          if (!queueDoc.exists() || planningDocs.empty) return null;
+
+          const stages: string[] = queueDoc.data()['stages'] || [];
+          const tokens = tokenDocs.docs.map((d: any) => d.data());
+          const planningData = planningDocs.docs[0].data();
+
+          this.liveQueueExportCache.set(docid, { stages, planningData, tokens });
+
+          return {
+            stages,
+            slots: this.buildSlotsForExport(planningData, stages, tokens)
+          };
+        })
+      );
+      queues.forEach((q, idx) => {
+        const result = queueDataResults[idx];
+        if (!result) return;
+
+        const { stages, slots } = result;
+
+        stages.forEach(stage => {
+          slots
+            .filter(s => s.stages.includes(stage) && s.startdate >= rangeStart && s.startdate <= rangeEnd)
+            .forEach(slot => this.pushSlotRows(exportData, q['queuename'], stage, slot));
+        });
+      });
+
+      loading.close();
+      this.liveQueueExportBusy = false;
+
+      if (exportData.length === 0) {
+        alert('No slots found for the selected queues and date range.');
+        return;
+      }
+
+      this.downloadExcel(exportData, 'Live Queues Export');
+    } catch (err) {
+      console.error('exportLiveQueuesByDateRange', err);
+      loading.close();
+      this.liveQueueExportBusy = false;
+      alert('Export failed. Please try again.');
+    }
+  }
+
+  private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: any) {
+    const slotTiming = `${this.getBookedSlotFormatedString(slot.startdate)} - ${this.getBookedSlotFormatedString(slot.enddate)}`;
+    const slotTitle = this.getSlotTitle(slot, stage);
+    const addRow = (profileId: string, segmentName: string, status: string) => exportData.push({
+      'Queue': queueName,
+      'Title': slotTitle || 'N/A',
+      'Slot': slotTiming,
+      'Stage': stage,
+      'Segment': segmentName,
+      'Name': this.getProfileName(profileId) || 'N/A',
+      'Email': this.getParticipantEmail(profileId) ?? 'N/A',
+      'Phone': this.getParticipantPhoneNumber(profileId) ?? 'N/A',
+      'Status': status,
+    });
+
+    slot.segmentVariations.forEach((segVar: any) => {
+      segVar.variations.forEach((variation: any) => {
+        const stageData = variation.stageData?.[stage];
+        if (!stageData) return;
+        (stageData.confirmedParticipants || []).forEach((p: any) =>
+          addRow(p.profile_id || p.profileid, segVar.segmentName, 'Confirmed'));
+        (stageData.nonConfirmedParticipants || []).forEach((p: any) =>
+          addRow(p.profile_id || p.profileid, segVar.segmentName, 'Non-Confirmed'));
+      });
+    });
+  }
+
+  private buildSlotsForExport(planningData: any, stages: string[], tokens: any[]): MergedSlot[] {
+    const toDate = (d: any): Date | null => {
+      if (!d) return null;
+      if (d.toDate) return d.toDate();
+      if (d.seconds !== undefined) return new Date(d.seconds * 1000);
+      return d instanceof Date ? d : null;
+    };
+
+    const slotsMap = new Map<string, any>();
+    (planningData?.planning || []).forEach((variationPlanning: any) => {
+      const variationId = variationPlanning.variationid;
+      (variationPlanning.segments || []).forEach((segmentData: any) => {
+        const segmentId = segmentData.segmentid;
+        (segmentData.slots || []).forEach((slot: any) => {
+          const startdate = toDate(slot.startdate);
+          const enddate = toDate(slot.enddate);
+          if (!startdate || !enddate) return;
+
+          const key = this.generateSlotKey(startdate, enddate);
+          if (!slotsMap.has(key)) {
+            slotsMap.set(key, {
+              startdate,
+              enddate,
+              starttime: this.formatTimeTo24Hour(startdate),
+              endtime: this.formatTimeTo24Hour(enddate),
+              stages: new Set<string>(),
+              segVar: new Map()
+            });
+          }
+
+          const entry = slotsMap.get(key);
+          entry.stages.add(slot.stagename);
+
+          const svKey = `${segmentId}_${variationId}`;
+          if (!entry.segVar.has(svKey)) {
+            entry.segVar.set(svKey, { segmentId, variationId, stageData: {} });
+          }
+          entry.segVar.get(svKey).stageData[slot.stagename] = { startdate, enddate, title: slot.title || '' };
+        });
+      });
+    });
+
+    return Array.from(slotsMap.values()).map(entry => {
+      const segmentVariations: any[] = [];
+
+      entry.segVar.forEach((sv: any) => {
+        const stageData: any = {};
+
+        Object.keys(sv.stageData).forEach(stageName => {
+          const { startdate, enddate, title } = sv.stageData[stageName];
+
+      const confirmed = tokens.filter(t => {
+        if (!this.isActiveToken(t)) return false;
+        const slot = t.selectedstageslot?.[stageName];
+        if (!slot || slot.segmentid !== sv.segmentId) return false;
+        return toDate(slot.startdate)?.getTime() === startdate.getTime() && 
+              toDate(slot.enddate)?.getTime() === enddate.getTime();
+      });
+
+          const confirmedIds = new Set(confirmed.map(t => t.profile_id || t.profileid));
+          const stageIdx = stages.indexOf(stageName);
+
+          const nonConfirmed = tokens.filter(t => {
+            if (!this.isActiveToken(t)) return false;
+            const pid = t.profile_id || t.profileid;
+            if (confirmedIds.has(pid)) return false;
+            const currentIdx = stages.indexOf(t.currentstage);
+            return currentIdx !== -1 && currentIdx <= stageIdx && t.selectedstageslot?.[stageName] == null;
+          });
+
+          stageData[stageName] = { title, confirmedParticipants: confirmed, nonConfirmedParticipants: nonConfirmed };
+        });
+
+        let segment = segmentVariations.find(s => s.segmentId === sv.segmentId);
+        if (!segment) {
+          segment = { segmentId: sv.segmentId, segmentName: this.getSegmentName(sv.segmentId), variations: [] };
+          segmentVariations.push(segment);
+        }
+        segment.variations.push({ variationId: sv.variationId, stageData });
+      });
+
+      return {
+        startdate: entry.startdate,
+        enddate: entry.enddate,
+        starttime: entry.starttime,
+        endtime: entry.endtime,
+        stages: Array.from(entry.stages),
+        segmentVariations
+      };
+    });
+  }
+
+  private isActiveToken(t: any): boolean {
+    return t.tokenstatus === 'Active' && t.stagestatus === 'Approved' && [null, undefined, false].includes(t.delete);
+  }
+
+  getSlotTitle(slot: any, stage: string): string {
+    if (!slot || !stage) return '';
+    for (const segVar of slot.segmentVariations || []) {
+      for (const variation of segVar.variations || []) {
+        const title = variation.stageData?.[stage]?.title;
+        if (title) return title;
+      }
+    }
+    return '';
   }
 
   // exportParticipantsDetailsForStage() {
@@ -3542,6 +3846,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
           logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
         }).then(() => {
           console.log(notificationimage)
           alert("A&H Update sent to App user " + profileID.length.toString())
@@ -3658,7 +3963,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       }
     })
   }
-  openOneWayWizard(): void {
+  sendChannel(): void {
     const selected = this.getActiveParticipantsList()
       .filter(p => p.selected)
       .map(p => ({
@@ -3669,7 +3974,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
     if (selected.length === 0) return;
 
-    this.dialog.open(OnewayChannelComponent, {
+    this.dialog.open(ChannelCommunicationComponent, {
       data:       selected,
       width:      '860px',
       maxHeight:  '90vh',
@@ -4648,7 +4953,54 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     });
     return count;
   }
-  openQueueTabPanel(slot: MergedSlot, stage: string, segmentId: string, type: 'confirmed' | 'non-confirmed') {
+
+  openTotalPanelForStage(type: 'confirmed' | 'non-confirmed' | 'all') {
+    const slots = this.getSlotsGroupForStage().flatMap(group => group.slots);
+    const virtualSlot = {
+      startdate: new Date(),
+      enddate: new Date(),
+      segmentVariations: [] as any[]
+    };
+    const addedPerSegment = new Map<string, any>();
+
+    slots.forEach(slot => {
+      slot.segmentVariations.forEach(segVar => {
+        if (!addedPerSegment.has(segVar.segmentId)) {
+          addedPerSegment.set(segVar.segmentId, {
+            ...segVar,
+            variations: segVar.variations.map(v => ({
+              ...v,
+              stageData: {
+                [this.selectedStage]: {
+                  confirmedParticipants: [],
+                  nonConfirmedParticipants: []
+                }
+              }
+            }))
+          });
+        }
+        segVar.variations.forEach((variation, vi) => {
+          const target = addedPerSegment.get(segVar.segmentId).variations[vi]?.stageData[this.selectedStage];
+          if (!target || !variation.stageData?.[this.selectedStage]) return;
+          (variation.stageData[this.selectedStage].confirmedParticipants || []).forEach(p => {
+            if (!target.confirmedParticipants.some(x => (x.profile_id || x.profileid) === (p.profile_id || p.profileid)))
+              target.confirmedParticipants.push(p);
+          });
+          (variation.stageData[this.selectedStage].nonConfirmedParticipants || []).forEach(p => {
+            if (!target.nonConfirmedParticipants.some(x => (x.profile_id || x.profileid) === (p.profile_id || p.profileid)))
+              target.nonConfirmedParticipants.push(p);
+          });
+        });
+      });
+    });
+
+    virtualSlot.segmentVariations = Array.from(addedPerSegment.values());
+    this.openQueueTabPanelForSlot(virtualSlot as any, this.selectedStage, type);
+    this.queueTabPanelSlotTime = 'All Slots';
+    this.queueTabPanelSegmentName = 'All Segments';
+  }
+
+  openQueueTabPanel(slot: MergedSlot, stage: string, segmentId: string, type: 'confirmed' | 'non-confirmed' | 'all') {
     const segmentVar = slot.segmentVariations.find(sv => sv.segmentId === segmentId);
     if (!segmentVar) return;
     const participants: any[] = [];
@@ -4656,8 +5008,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
     segmentVar.variations.forEach(variation => {
       if (variation.stageData && variation.stageData[stage]) {
-        const list = type === 'confirmed' ? variation.stageData[stage].confirmedParticipants : variation.stageData[stage].nonConfirmedParticipants;
-        (list || []).forEach(p => {
+      const list = type === 'all' ? [...(variation.stageData[stage].confirmedParticipants || []), ...(variation.stageData[stage].nonConfirmedParticipants || [])] : type === 'confirmed' ? variation.stageData[stage].confirmedParticipants: variation.stageData[stage].nonConfirmedParticipants;
+          (list || []).forEach(p => {
           const profileId = p.profile_id || p.profileid;
           if (profileId && !addedIds.has(profileId)) {
             addedIds.add(profileId);
@@ -4672,19 +5024,21 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     this.showQueueTabPanel = true;
     this.currentPanelSlot = slot;
     this.queueTabPanelType = type;
-    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : type === 'non-confirmed' ? 'Non-Confirmed' : 'All';
     this.queueTabPanelSegmentName = segmentVar.segmentName;
-    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title;
+    this.queueTabPanelSlotTime = (slotTitle ? slotTitle + ' · ' : '') + this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
     this.selectedSegmentIds = new Set([segmentId]);
   }
-  openQueueTabPanelForSlot(slot: MergedSlot, stage: string, type: 'confirmed' | 'non-confirmed') {
+  openQueueTabPanelForSlot(slot: MergedSlot, stage: string, type: 'confirmed' | 'non-confirmed' | 'all') {
     this.currentPanelSlot = slot;
     this.queueTabPanelType = type;
-    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title;
+    this.queueTabPanelSlotTime = (slotTitle ? slotTitle + ' · ' : '') + this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
     this.selectedSegmentIds = new Set((slot.segmentVariations || []).map(sv => sv.segmentId));
     this.refreshQueuePanelParticipants(slot, stage, type);
     this.showQueueTabPanel = true;
-    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : type === 'non-confirmed' ? 'Non-Confirmed' : 'All';
     this.queueTabPanelSegmentName = 'All Segments';
   }
 
@@ -4697,7 +5051,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
     // Set panel context if not already open
     this.currentPanelSlot = slot;
-    this.queueTabPanelSlotTime = this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
+    const slotTitle = slot.segmentVariations[0]?.variations[0]?.stageData[stage]?.title;
+    this.queueTabPanelSlotTime = (slotTitle ? slotTitle + ' · ' : '') + this.getDateAndMonthString(slot.startdate) + ' ' + this.getTimeString(slot.startdate, slot.enddate);
     if (!this.showQueueTabPanel) {
       this.queueTabPanelType = 'confirmed';
       this.queueTabPanelTitle = 'Confirmed';
@@ -4723,7 +5078,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     return this.selectedSegmentIds.has(segmentId);
   }
 
-  refreshQueuePanelParticipants(slot: any, stage: string, type: 'confirmed' | 'non-confirmed') {
+  refreshQueuePanelParticipants(slot: any, stage: string, type: 'confirmed' | 'non-confirmed' | 'all') {
     const participants: any[] = [];
     const addedIds = new Set<string>();
 
@@ -4731,7 +5086,12 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       if (!this.selectedSegmentIds.has(segmentVar.segmentId)) return;
       segmentVar.variations.forEach(variation => {
         if (variation.stageData && variation.stageData[stage]) {
-          const list = type === 'confirmed'
+          const list = type === 'all'
+            ? [
+                ...(variation.stageData[stage].confirmedParticipants || []),
+                ...(variation.stageData[stage].nonConfirmedParticipants || [])
+              ]
+            : type === 'confirmed'
             ? variation.stageData[stage].confirmedParticipants
             : variation.stageData[stage].nonConfirmedParticipants;
           (list || []).forEach(p => {
@@ -4758,10 +5118,11 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     return `${slot.startdate.getTime()}_${slot.enddate.getTime()}`;
   }
 
-  switchPanelType(type: 'confirmed' | 'non-confirmed') {
+  switchPanelType(type: 'confirmed' | 'non-confirmed' | 'all') {
     if (!this.currentPanelSlot) return;
     this.queueTabPanelType = type;
-    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : 'Non-Confirmed';
+    this.queueTabPanelTitle = type === 'confirmed' ? 'Confirmed' : type === 'non-confirmed' ? 'Non-Confirmed' : 'All';
+
     this.refreshQueuePanelParticipants(this.currentPanelSlot, this.selectedStage, type);
   }
 
@@ -5205,12 +5566,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
   // slot revert
   async revertSlot(participant: any, stageName: string) {
     const profileId = participant.profile_id || participant.profileid;
-    const name = this.getProfileName(profileId);
 
-    const confirmed = window.confirm(
-      `Are you sure you want to revert the slot`
-    );
-
+    const confirmed = window.confirm(`Are you sure you want to revert the slot`);
     if (!confirmed) return;
 
     const stageSlots = participant.selectedstageslot || {};
@@ -5250,7 +5607,13 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       const tokenRef = doc(this.firestore, 'queue_token', tokenId);
 
       await updateDoc(tokenRef, {
-        [`selectedstageslot.${stageName}`]: deleteField()
+        [`selectedstageslot.${stageName}`]: deleteField(),
+        [`queue_slot_log.${stageName}`]: arrayUnion({
+          ...selectedSlot,
+          type:       'reverted',
+          revertedby: this.profileid,
+          createdon:  Timestamp.fromDate(new Date())
+        })
       });
 
       const tokenIndex = this.queueTokenList.findIndex(t => t.tokenid === tokenId || t.id === tokenId);
@@ -5261,13 +5624,22 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
         updatedToken.selectedstageslot = updatedStageSlot;
         this.queueTokenList[tokenIndex] = updatedToken;
       }
-
       this.confirmedParticipants = this.confirmedParticipants.filter(p => (p.profile_id || p.profileid) !== profileId);
       this.allParticipantsForStage = this.allParticipantsForStage.filter(p => (p.profile_id || p.profileid) !== profileId);
 
       this.rebuildMergedSlots();
       this.refreshSelectedSlot();
       this.showAllNonConfirmedParticipants();
+
+      // attach log to the participant immediately after rebuild -- surya
+      const updatedToken = this.queueTokenList.find(t => t.tokenid === tokenId || t.id === tokenId);
+      if (updatedToken?.queue_slot_log) {
+        const moved = this.nonConfirmedParticipants.find(
+          p => (p.profile_id || p.profileid) === profileId
+        );
+        if (moved) moved.queue_slot_log = updatedToken.queue_slot_log;
+      }
+
       loading.close();
       alert('Slot reverted successfully!');
 
@@ -5278,4 +5650,135 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     }
   }
 
+  openRevertHistoryDialog(participant: any) {
+    this.revertHistoryParticipant = participant;
+    this.showRevertHistoryDialog = true;
+  }
+
+  openOverallSlotRevertHistory() {
+    const allParticipants = this.getFilteredParticipantsList();
+
+    const entries: { profileId: string; stageName: string; log: any }[] = [];
+
+    allParticipants.forEach(p => {
+      if (!p.queue_slot_log) return;
+      const profileId = p.profile_id || p.profileid;
+      Object.keys(p.queue_slot_log).forEach(stageName => {
+        (p.queue_slot_log[stageName] || []).forEach(log => {
+          entries.push({ profileId, stageName, log });
+        });
+      });
+    });
+    entries.sort((a, b) => {
+      const aTime = a.log.createdon?.toDate ? a.log.createdon.toDate().getTime() : new Date(a.log.createdon).getTime();
+      const bTime = b.log.createdon?.toDate ? b.log.createdon.toDate().getTime() : new Date(b.log.createdon).getTime();
+      return bTime - aTime;
+    });
+
+    this.overallSlotRevertHistory = entries;
+    this.showOverallSlotRevertHistory = true;
+  }
+
+  async loadEventParticipationList() {
+    if (this.eventParticipationListLoaded) return;
+    this.eventParticipationLoading = true;
+
+    const [eventsSnap, queuesSnap] = await Promise.all([
+      getDocs(query(collection(this.firestore, 'event collection'),orderBy('end_date', 'desc'))),
+      getDocs(query(collection(this.firestore, 'queue generation'),orderBy('queueenddate', 'desc')))
+    ]);
+
+    this.eventParticipationList = [
+      ...eventsSnap.docs
+        .filter(d => !d.data()['delete'])
+        .map(d => ({ ...d.data(), docid: d.id, type: 'event', name: d.data()['name'] })),
+      ...queuesSnap.docs
+        .filter(d => !d.data()['delete'])
+        .map(d => ({ ...d.data(), docid: d.id, type: 'queue', name: d.data()['queuename'] }))
+    ];
+
+    this.eventParticipationListLoaded = true;
+    this.eventParticipationLoading = false;
+  }
+
+  async onEventParticipationSelect(item: any) {
+    this.selectedEventParticipation = item;
+    this.selectedArenaEventId = null;
+    this.arenaEventFilterList = [];
+    this.arenaEventProfileMap = {};
+    this.eventParticipationLoading = true;
+
+    const docRef = item.type === 'queue'
+      ? doc(this.firestore, 'queue generation', item.docid)
+      : doc(this.firestore, 'event collection', item.docid);
+
+    const arenaSnap = await getDocs(
+      query(collection(this.firestore, 'arena events'), where('eventref', '==', docRef))
+    );
+
+    if (!arenaSnap.empty) {
+      this.arenaEventFilterList = arenaSnap.docs.map(d => ({
+        docid: d.id,
+        name: d.data()['title']
+          ? `${d.data()['eventname']} - ${d.data()['title']}`
+          : d.data()['eventname'] || d.id
+      }));
+
+      const ids = arenaSnap.docs.map(d => d.id);
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+
+      const results = await Promise.all(chunks.map(chunk =>
+        getDocs(query(
+          collection(this.firestore, 'event participation request'),
+          where('arenaeventid', 'in', chunk),
+          where('status', 'in', ['approved', 'requested', 'attended'])
+        ))
+      ));
+
+      results.forEach(snap => snap.docs.forEach(d => {
+        const data = d.data();
+        const aeid = data['arenaeventid'];
+        const pid = data['profileid'];
+        if (!this.arenaEventProfileMap[aeid]) {
+          this.arenaEventProfileMap[aeid] = new Set<string>();
+        }
+        this.arenaEventProfileMap[aeid].add(pid);
+      }));
+    }
+
+    this.eventParticipationLoading = false;
+  }
+
+  applyEventParticipationFilter() {
+    if (!this.selectedArenaEventId) return;
+    this.eventParticipationProfileIds = this.arenaEventProfileMap[this.selectedArenaEventId] || new Set<string>();
+    this.eventParticipationDataLoaded = true;
+    this.showEventParticipationPicker = false;
+    this.recalculateMergedSlotParticipants();
+  }
+
+  resetEventParticipationFilter() {
+    this.eventParticipationDataLoaded = false;
+    this.showEventParticipationPicker = false;
+    this.selectedEventParticipation = null;
+    this.arenaEventFilterList = [];
+    this.selectedArenaEventId = null;
+    this.arenaEventProfileMap = {};
+    this.eventParticipationProfileIds = new Set();
+    this.recalculateMergedSlotParticipants();
+  }
+
+  get filteredEventParticipationList(): any[] {
+    if (!this.eventParticipationSearchTerm.trim()) return this.eventParticipationList;
+    const term = this.eventParticipationSearchTerm.toLowerCase().trim();
+    return this.eventParticipationList.filter(e =>
+      (e.name || '').toLowerCase().includes(term)
+    );
+  }
+
+  get selectedArenaEventName(): string {
+    if (!this.selectedArenaEventId) return 'Event Filter';
+    return this.arenaEventFilterList.find(e => e.docid === this.selectedArenaEventId)?.name || 'Event Filter';
+  }
 }

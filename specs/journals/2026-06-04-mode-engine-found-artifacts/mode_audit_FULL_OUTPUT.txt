@@ -1,0 +1,329 @@
+Reading participantsproduct…
+  total rows: 38969
+
+Users with >=5 consumed products: picking top 12 by recency. Engine clock = real now (2026-06-04)
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Meena Rastogi  [yrB1WbAYBXLVtbjO6Arn]  consumed 5/9 products  ·  customerstatus=active
+  headline: profile_data=Priority Mode  participant metadata=Priority Mode  expected=Priority Mode  → ROLLUP OK
+  sorted modes (by sequence): [Priority Mode, Performance Mode, Journey Priority Planning Mode, Extended Performance Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  Evolution Prep            completed  Performance Mode            30/60/30    170     MISMATCH(exp After)  [nmd actual 2025-12-18 vs exp 2026-03-16]
+  Critical Support Diagnost ongoing    Priority Mode               30/60/30    —       
+  uP! Diagnostics And Imple completed  Extended Performance Mode   30/60/30    119     MATCH
+  Evolution Prep            completed  Performance Mode            30/60/30    41      MATCH
+  EI Solution               null       Journey Priority Planning M 30/60/30    —       
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    125     MISMATCH(exp Extended)
+  uP! Diagnostics And Imple null       Journey Planning Mode       30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Daizy Makkar  [446C4lLw2gDOHProZE2P]  consumed 10/17 products  ·  customerstatus=active
+  headline: profile_data=Event Mode  participant metadata=Event Mode  expected=Event Mode  → ROLLUP OK
+  sorted modes (by sequence): [Event Mode, Integration Mode, Performance Mode, Extended Performance Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Mapping Activit null       Journey Planning Mode       1/1/1       —       
+  Critical Support Diagnost completed  After Extended Performance  30/60/30    220     MATCH
+  Critical Support Diagnost completed  Performance Mode            30/60/30    -61     MISMATCH(exp Integration)  [nmd actual 2026-07-07 vs exp 2026-11-02]
+  Mini uP!                  completed  After Extended Performance  30/60/30    252     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            completed  After Extended Performance  30/60/30    173     MATCH
+  Evolution Prep            completed  Integration Mode            30/60/30    0       MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    396     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    398     MATCH
+  Evolution Mapping Activit shifted    null                        1/1/1       —       
+  uP! Diagnostics And Imple completed  Extended Performance Mode   30/60/30    119     MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    125     MISMATCH(exp Extended)
+  Evolution Prep            ongoing    Event Mode                  30/60/30    —       
+  CTD Master Class          null       Journey Planning Mode       1/1/1       —       
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Swati Kanodia  [8dS0yAL0EmGWQC80DKld]  consumed 10/22 products  ·  customerstatus=active
+  headline: profile_data=Event Mode  participant metadata=Event Mode  expected=Event Mode  → ROLLUP OK
+  sorted modes (by sequence): [Event Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  Mini uP!                  completed  After Extended Performance  30/60/30    252     MATCH
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    121     MISMATCH(exp Extended)
+  CTD Diagnostics And Imple completed  After Extended Performance  30/60/30    804     MATCH
+  Conversational Programmin completed  After Extended Performance  45/60/30    121     MISMATCH(exp Extended)
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  SMP Live                  null       Journey Planning Mode       30/60/30    —       
+  Evolution Mapping Activit completed  After Extended Performance  1/1/1       398     MATCH
+  SMP Diagnostic & Implemen completed  After Extended Performance  30/60/60    398     MATCH
+  uP! Diagnostics And Imple cancelled  null                        30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            completed  After Extended Performance  30/60/30    173     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    628     MATCH
+  Evolution Prep            ongoing    Event Mode                  30/60/30    —       
+  uP! Diagnostics And Imple null       Journey Planning Mode       30/60/30    —       
+  Conversational Programmin null       Journey Planning Mode       45/60/30    —       
+  CTD Live Event            null       Journey Planning Mode       30/60/30    —       
+  uP! Diagnostics And Imple null       Journey Planning Mode       30/60/30    —       
+  uP! Diagnostics And Imple null       Journey Planning Mode       30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    639     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Jagriti Pande  [NsH8cDOETuIV7SMzZpht]  consumed 12/31 products  ·  customerstatus=active
+  headline: profile_data=Event Mode  participant metadata=Event Mode  expected=Event Mode  → ROLLUP OK
+  sorted modes (by sequence): [Event Mode, Extended Performance Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  A&H Expanding Horizon Con cancelled  null                        30/60/30    —       
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  Conversational Programmin cancelled  null                        45/60/30    —       
+  Complimentary Review with completed  After Extended Performance  1/1/1       1121    MATCH
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    1356    MATCH
+  Evolution Prep            ongoing    Event Mode                  30/60/30    —       
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    125     MISMATCH(exp Extended)
+  uP! Diagnostics And Imple completed  Extended Performance Mode   30/60/30    119     MATCH
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  Conversational Programmin cancelled  null                        45/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    —       
+  CTD Live Event            completed  After Extended Performance  30/60/30    —       
+  A&H Expanding Horizon Con cancelled  null                        30/60/30    —       
+  Super Life Directives     cancelled  null                        30/60/30    —       
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+  CTD Diagnostics And Imple completed  After Extended Performance  30/60/30    398     MATCH
+  uP! Live Event            cancelled  null                        45/60/30    —       
+  WiSH Diagnostics And Impl completed  After Extended Performance  30/60/30    1121    MATCH
+  Evolution Prep            completed  After Extended Performance  30/60/30    152     MATCH
+  A&H Light Diagnostics And completed  After Extended Performance  30/60/30    1121    MATCH
+  uP! Diagnostics And Imple null       Journey Planning Mode       30/60/30    —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    1381    MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Charisma Intensification  cancelled  null                        30/60/30    —       
+  uP! Live Event            cancelled  null                        45/60/30    —       
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Mitali K Lalwani  [DezTWzu6GdgDp7PsTA9J]  consumed 5/22 products  ·  customerstatus=active
+  headline: profile_data=Priority Mode  participant metadata=Priority Mode  expected=Priority Mode  → ROLLUP OK
+  sorted modes (by sequence): [Priority Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  Critical Support Diagnost ongoing    Priority Mode               30/60/30    —       
+  uP! Diagnostics And Imple null       null                        30/60/30    —       
+  uP! Live Event            cancelled  null                        45/60/30    —       
+  A&H Expanding Horizon Con cancelled  null                        30/60/30    —       
+  Conversational Programmin cancelled  null                        45/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            completed  After Extended Performance  30/60/30    138     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  Conversational Programmin cancelled  null                        45/60/30    —       
+  CTD Live Event            cancelled  null                        30/60/30    —       
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  EI Starter Pack           null       null                        30/60/30    —       
+  Evolution Prep            null       null                        30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    134     MATCH
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  Conversational Programmin cancelled  null                        45/60/30    —       
+  uP! Live Event            cancelled  null                        45/60/30    —       
+  Complimentary Review      completed  After Extended Performance  1/1/1       70      MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    125     MISMATCH(exp Extended)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Antano Solar  [J0A39MX1WjCdNk3Z8Isg]  consumed 10/19 products  ·  customerstatus=non active
+  headline: profile_data=Event Mode  participant metadata=Exploration Mode  expected=Exploration Mode  → ROLLUP MISMATCH
+  sorted modes (by sequence): [Event Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  CTD Diagnostics And Imple completed  After Extended Performance  30/60/30    —       
+  B!G Accelerator Arena     completed  After Extended Performance  30/60/30    587     MATCH
+  B!G Accelerator Arena     null       Journey Planning Mode       30/60/30    —       
+  WiSH Diagnostics And Impl completed  After Extended Performance  30/60/30    387     MATCH
+  Conversational Programmin null       Journey Planning Mode       45/60/30    —       
+  B!G Installation Apprenti ongoing    After Extended Performance  30/60/30    —       
+  Super Life Directives     null       Journey Planning Mode       30/60/30    —       
+  A&H Expanding Horizon Con null       Journey Planning Mode       30/60/30    —       
+  Evolution Prep            ongoing    Event Mode                  30/60/30    —       F3-STUCK
+  B!G Accelerator Studio    completed  After Extended Performance  30/60/30    143     MATCH
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    395     MATCH
+  up live test              completed  After Extended Performance  30/60/30    673     MATCH
+  The BiG Vantage (Experien null       Journey Planning Mode       30/60/30    —       
+  B!G Installation Bridge   null       Journey Planning Mode       30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    120     MISMATCH(exp Extended)
+  Conversational Programmin null       Journey Planning Mode       45/60/30    —       
+  Charisma Intensification  null       Journey Planning Mode       30/60/30    —       
+  CTD Live Event            completed  After Extended Performance  30/60/30    —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Arun Dass  [SFrMh3ntKtNOo6MYN7dZ]  consumed 22/34 products  ·  customerstatus=active
+  headline: profile_data=Priority Mode  participant metadata=Priority Mode  expected=Priority Mode  → ROLLUP OK
+  sorted modes (by sequence): [Priority Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  WiSH Diagnostics And Impl completed  After Extended Performance  30/60/30    441     MATCH
+  A&H Light Diagnostics And completed  After Extended Performance  30/60/30    1149    MATCH
+  CTD Diagnostics And Imple completed  After Extended Performance  30/60/30    484     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    398     MATCH
+  Winning Heart             completed  After Extended Performance  30/30/30    115     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    831     MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    391     MATCH
+  B!G Installation Bridge   cancelled  null                        30/60/30    —       
+  up live test              cancelled  null                        30/60/30    —       
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+  Winning Heart             completed  After Extended Performance  30/30/30    144     MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    1356    MATCH
+  uP! Live Event            cancelled  null                        45/60/30    —       
+  Conversational Programmin completed  After Extended Performance  45/60/30    120     MISMATCH(exp Extended)
+  A&H Expanding Horizon Con null       Journey Planning Mode       30/60/30    —       
+  WiSH Diagnostics And Impl null       Priority Mode               30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  uP! Live Event            cancelled  null                        45/60/30    —       
+  Conversational Programmin completed  After Extended Performance  45/60/30    396     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    1373    MATCH
+  WiSH Diagnostics And Impl completed  After Extended Performance  30/60/30    162     MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    832     MATCH
+  CPM Live Readiness        completed  After Extended Performance  45/60/30    832     MATCH
+  uP! Diagnostics And Imple cancelled  null                        30/60/30    —       
+  Conversational Programmin completed  After Extended Performance  45/60/30    832     MATCH
+  WiSH Diagnostics And Impl completed  After Extended Performance  30/60/30    649     MATCH
+  Critical Support Diagnost completed  After Extended Performance  30/60/30    1703    MATCH
+  Evolution Mapping Activit cancelled  null                        1/1/1       —       
+  uP! Diagnostics And Imple shifted    null                        30/60/30    —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    484     MATCH
+  Evolution Mapping Activit completed  After Extended Performance  1/1/1       398     MATCH
+  Legacy Consultation       null       Journey Planning Mode       30/60/30    —       
+  Leadership Training for A completed  After Extended Performance  30/30/60    197     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    398     MATCH
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Yash Melwani  [hExtNzchkmzlwnB7ERaX]  consumed 13/21 products  ·  customerstatus=active
+  headline: profile_data=Journey Planning Mode  participant metadata=Journey Planning Mode  expected=Journey Planning Mode  → ROLLUP OK
+  sorted modes (by sequence): [Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  uP! Live Event            completed  After Extended Performance  45/60/30    1096    MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    391     MATCH
+  uP! Diagnostics And Imple cancelled  null                        30/60/30    —       
+  Evolution Mapping Activit cancelled  null                        1/1/1       —       
+  Evolution Mapping Activit shifted    null                        1/1/1       —       
+  B!G Accelerator Studio    completed  After Extended Performance  30/60/30    616     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            completed  After Extended Performance  30/60/30    173     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    1148    MATCH
+  uP! Live Event            cancelled  null                        45/60/30    —       
+  Conversational Programmin completed  After Extended Performance  45/60/30    391     MATCH
+  EI Solution               completed  After Extended Performance  30/60/30    126     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    406     MATCH
+  EI Solution               completed  After Extended Performance  30/60/30    491     MATCH
+  uP! Live Event            completed  After Extended Performance  45/60/30    1356    MATCH
+  up live test              completed  After Extended Performance  30/60/30    444     MATCH
+  uP! Diagnostics And Imple null       Journey Planning Mode       30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Legacy Consultation       cancelled  null                        30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    120     MISMATCH(exp Extended)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Harini Ramachandran  [jflj8YpGdXy8RtgojT1j]  consumed 9/23 products  ·  customerstatus=active
+  headline: profile_data=Journey Planning Mode  participant metadata=Journey Planning Mode  expected=Journey Planning Mode  → ROLLUP OK
+  sorted modes (by sequence): [Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  A&H Expanding Horizon Con null       Journey Planning Mode       30/60/30    —       
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    640     MATCH
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+  B!G Accelerator Studio    completed  After Extended Performance  30/60/30    143     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    1103    MATCH
+  Super Life Directives     null       Journey Planning Mode       30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    120     MISMATCH(exp Extended)
+  B!G Accelerator Arena     completed  After Extended Performance  30/60/30    731     MATCH
+  Conversational Programmin null       Journey Planning Mode       45/60/30    —       
+  B!G Installation Bridge   completed  After Extended Performance  30/60/30    396     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Legacy Consultation       null       Journey Planning Mode       30/60/30    —       
+  Charisma Intensification  null       Journey Planning Mode       30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    396     MATCH
+  B!G Accelerator Arena     null       Journey Planning Mode       30/60/30    —       
+  Legacy Consultation       null       Journey Planning Mode       30/60/30    —       
+  BiG Designer              completed  After Extended Performance  30/60/30    1096    MATCH
+  A&H Expanding Horizon Con null       Journey Planning Mode       30/60/30    —       
+  Legacy Consultation       null       Journey Planning Mode       30/60/30    —       
+  Legacy Consultation       null       Journey Planning Mode       30/60/30    —       
+  Conversational Programmin null       Journey Planning Mode       45/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    1096    MATCH
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Balbir  [yabfW4C0PgqnfSK1jLNs]  consumed 9/16 products  ·  customerstatus=active
+  headline: profile_data=Event Mode  participant metadata=Event Mode  expected=Event Mode  → ROLLUP OK
+  sorted modes (by sequence): [Event Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  uP! Live Event            completed  After Extended Performance  45/60/30    125     MISMATCH(exp Extended)
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    173     MATCH
+  Evolution Prep            completed  After Extended Performance  30/60/30    210     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    398     MATCH
+  Evolution Prep            ongoing    Event Mode                  30/60/30    —       
+  Evolution Mapping Activit shifted    null                        1/1/1       —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    392     MATCH
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  Evolution Mapping Activit null       Journey Planning Mode       1/1/1       —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    134     MATCH
+  CTD Master Class          null       Journey Planning Mode       1/1/1       —       
+  Mini uP!                  completed  After Extended Performance  30/60/30    252     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  EI Starter Pack           completed  After Extended Performance  30/60/30    398     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Sonali Mudaliar  [qnbnlVy8aEf0WQOGAAfo]  consumed 6/15 products  ·  customerstatus=active
+  headline: profile_data=Journey Priority Planning Mode  participant metadata=Journey Priority Planning Mode  expected=Journey Priority Planning Mode  → ROLLUP OK
+  sorted modes (by sequence): [Journey Priority Planning Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  uP! Live Event            completed  After Extended Performance  45/60/30    125     MISMATCH(exp Extended)
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    412     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    173     MATCH
+  Evolution Prep            shifted    null                        30/60/30    —       
+  Critical Support Diagnost completed  After Extended Performance  30/60/30    160     MATCH
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Mapping Activit shifted    null                        1/1/1       —       
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    132     MATCH
+  EI Starter Pack           null       Journey Priority Planning M 30/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    391     MATCH
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+  Evolution Mapping Activit null       Journey Planning Mode       1/1/1       —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Siddharth Bharati  [biyYZshfOlvJZSsdGn6j]  consumed 7/15 products  ·  customerstatus=active
+  headline: profile_data=Journey Priority Planning Mode  participant metadata=Journey Priority Planning Mode  expected=Journey Priority Planning Mode  → ROLLUP OK
+  sorted modes (by sequence): [Journey Priority Planning Mode, Extended Performance Mode, Journey Planning Mode, After Extended Performance Mode]
+  product                   status     mode                        I/P/E       dSince  verdict
+  uP! Live Event            completed  After Extended Performance  45/60/30    391     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    173     MATCH
+  uP! Diagnostics And Imple completed  Extended Performance Mode   30/60/30    119     MATCH
+  uP! Diagnostics And Imple completed  After Extended Performance  30/60/30    398     MATCH
+  Evolution Prep            completed  After Extended Performance  30/60/30    181     MATCH
+  Critical Support Diagnost completed  After Extended Performance  30/60/30    282     MATCH
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  uP! Live Event            null       Journey Planning Mode       45/60/30    —       
+  uP! Live Event            completed  After Extended Performance  45/60/30    125     MISMATCH(exp Extended)
+  EI Starter Pack           null       Journey Priority Planning M 30/60/30    —       
+  Evolution Prep            null       Journey Planning Mode       30/60/30    —       
+  Evolution Prep            cancelled  null                        30/60/30    —       
+  Evolution Mapping Activit null       Journey Planning Mode       1/1/1       —       
+  Evolution Mapping Activit shifted    null                        1/1/1       —       
+════════════════════════════════════════════════════════════════════════════════════════════════════
+
+=== AUDIT TALLY ===
+{
+  "arcChecked": 105,
+  "MATCH": 90,
+  "LAG": 0,
+  "MISMATCH": 15,
+  "knobsMissing": 0,
+  "f3": 1,
+  "rollupChecked": 12,
+  "rollupMatch": 11,
+  "rollupMismatch": 1
+}
+
+Arc accuracy: 90 exact + 0 within-1-day-of-boundary out of 105 arc rows checked; 15 true mismatches.
+Rollup accuracy: 11/12 users' headline matches the customerstatus rule.
+F3 (stuck event-mode rows, nextmode=Integration & nextmodedate in past): 1.
+
+Wrote mode_audit_output.json

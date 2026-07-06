@@ -1,0 +1,670 @@
+[
+  {
+    "col": "participantjourneyproduct",
+    "count": 5137,
+    "avgFields": 21,
+    "ts": "updated",
+    "last": "2025-03-20T12:26:17.286Z",
+    "first": "2025-03-20T11:23:44.508Z",
+    "l90": 0,
+    "l365": 0,
+    "v": "STALE"
+  },
+  {
+    "col": "journey",
+    "count": 48,
+    "avgFields": 10,
+    "ts": "updatedAt",
+    "last": "2026-04-20T03:06:15.092Z",
+    "first": "2026-04-20T03:06:15.090Z",
+    "l90": 44,
+    "l365": 44,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "products",
+    "count": 104,
+    "avgFields": 18,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "package",
+    "count": 49,
+    "avgFields": 2,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "journey-to-product",
+    "count": 41,
+    "avgFields": 3,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "participantsproduct",
+    "count": 38399,
+    "avgFields": 21,
+    "ts": "subscriptionstart",
+    "last": "2029-07-29T18:30:00.000Z",
+    "err": "Cannot read properties of null (reading 'toDate')",
+    "v": "ERROR"
+  },
+  {
+    "col": "participantJourneySequence",
+    "count": 1495,
+    "avgFields": 11,
+    "ts": "subscriptionstart",
+    "last": "2024-11-27T00:00:00.000Z",
+    "first": "2014-01-01T00:00:00.000Z",
+    "l90": 0,
+    "l365": 0,
+    "v": "STALE"
+  },
+  {
+    "col": "participantdeliverysequence",
+    "count": 3292,
+    "avgFields": 2,
+    "ts": null,
+    "v": "NO-TS (large)"
+  },
+  {
+    "col": "salesleads",
+    "count": 4335,
+    "avgFields": 51,
+    "ts": "date",
+    "last": "2026-06-02T09:42:29.250Z",
+    "first": "2023-03-09T07:55:30.834Z",
+    "l90": 418,
+    "l365": 2028,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "appointments",
+    "count": 10293,
+    "avgFields": 20,
+    "ts": "created",
+    "last": "2026-06-02T07:40:59.424Z",
+    "first": "2021-08-04T10:07:11.620Z",
+    "l90": 1364,
+    "l365": 4226,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "appointmenttype",
+    "count": 108,
+    "avgFields": 4,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "availability",
+    "count": 20767,
+    "avgFields": 18,
+    "ts": "starttime",
+    "last": "2026-06-17T16:00:00.000Z",
+    "first": "2021-07-29T08:30:00.000Z",
+    "l90": 2203,
+    "l365": 7687,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "offtime",
+    "count": 125,
+    "avgFields": 8,
+    "ts": "date",
+    "last": "2026-05-14T18:30:00.000Z",
+    "first": "2022-03-16T20:00:00.000Z",
+    "l90": 1,
+    "l365": 8,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "appointment session",
+    "count": 8,
+    "avgFields": 1,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "deliverables",
+    "count": 30711,
+    "avgFields": 6,
+    "ts": null,
+    "v": "NO-TS (large)"
+  },
+  {
+    "col": "productToDeliverySequence",
+    "count": 85,
+    "avgFields": 2,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "procedures",
+    "count": 34,
+    "avgFields": 3,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "delivery events",
+    "count": 42,
+    "avgFields": 2,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "delivery forms",
+    "count": 84,
+    "avgFields": 6,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "delivery report",
+    "count": 3,
+    "avgFields": 1,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "profile_data",
+    "count": 3246,
+    "avgFields": 14,
+    "ts": "created",
+    "last": "2026-06-02T07:12:47.795Z",
+    "first": "2020-12-02T09:02:15.989Z",
+    "l90": 158,
+    "l365": 677,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "user_data",
+    "count": 2257,
+    "avgFields": 3,
+    "ts": null,
+    "v": "NO-TS (large)"
+  },
+  {
+    "col": "new_user_data",
+    "count": 625,
+    "avgFields": 16,
+    "ts": "created",
+    "last": "2026-06-01T07:29:19.718Z",
+    "first": "2025-11-04T13:05:30.575Z",
+    "l90": 535,
+    "l365": 625,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "eisroles",
+    "count": 166,
+    "avgFields": 3,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "participant metadata",
+    "count": 3310,
+    "avgFields": 37,
+    "ts": "purchasedate",
+    "last": "2026-06-02T06:52:04.163Z",
+    "err": "Cannot read properties of null (reading 'toDate')",
+    "v": "ERROR"
+  },
+  {
+    "col": "queue_token",
+    "count": 7041,
+    "avgFields": 33,
+    "ts": "updatedAt",
+    "last": "2026-05-28T12:12:50.099Z",
+    "first": "2025-04-03T13:49:19.881Z",
+    "l90": 269,
+    "l365": 766,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "queue stage log",
+    "count": 68649,
+    "avgFields": 32,
+    "ts": "logdate",
+    "last": "2026-06-02T08:59:36.027Z",
+    "first": "2022-04-11T13:48:31.517Z",
+    "l90": 3843,
+    "l365": 19082,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "queue generation",
+    "count": 95,
+    "avgFields": 32,
+    "ts": "created",
+    "last": "2025-08-06T08:10:00.682Z",
+    "first": "2022-04-22T15:20:15.125Z",
+    "l90": 0,
+    "l365": 2,
+    "v": "SLOWING"
+  },
+  {
+    "col": "queue activity log",
+    "count": 8283,
+    "avgFields": 9,
+    "ts": "activitydate",
+    "last": "2026-05-30T09:49:02.331Z",
+    "first": "2023-11-24T06:18:10.148Z",
+    "l90": 300,
+    "l365": 1720,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "big assignment",
+    "count": 63,
+    "avgFields": 32,
+    "ts": "createddate",
+    "last": "2026-05-19T11:20:57.801Z",
+    "first": "2025-03-28T12:06:27.708Z",
+    "l90": 25,
+    "l365": 47,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "big cohorts",
+    "count": 345,
+    "avgFields": 15,
+    "ts": "createddate",
+    "last": "2026-05-21T10:42:59.845Z",
+    "first": "2024-10-18T07:09:58.530Z",
+    "l90": 76,
+    "l365": 162,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "big cohorts log",
+    "count": 6107,
+    "avgFields": 14,
+    "ts": "createddate",
+    "last": "2026-05-21T10:44:28.870Z",
+    "first": "2025-12-12T14:25:14.821Z",
+    "l90": 1392,
+    "l365": 6107,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "biglevel",
+    "count": 20,
+    "avgFields": 4,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "big aggregate level",
+    "count": 695,
+    "avgFields": 8,
+    "ts": "lastupdated",
+    "last": "2026-05-30T09:49:07.260Z",
+    "first": "2023-11-24T00:00:00.000Z",
+    "l90": 20,
+    "l365": 506,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "big aggregate level archives",
+    "count": 6,
+    "avgFields": 7,
+    "ts": "lastupdated",
+    "last": "2025-06-19T09:41:00.211Z",
+    "first": "2025-06-19T08:19:46.049Z",
+    "l90": 0,
+    "l365": 6,
+    "v": "SLOWING ⚠churn"
+  },
+  {
+    "col": "big aggregate level archivesv2",
+    "count": 5,
+    "avgFields": 7,
+    "ts": "lastupdated",
+    "last": "2025-04-26T21:20:23.074Z",
+    "first": "2025-04-26T20:28:11.171Z",
+    "l90": 0,
+    "l365": 0,
+    "v": "STALE ⚠churn"
+  },
+  {
+    "col": "big aggregate levelv2",
+    "count": 632,
+    "avgFields": 8,
+    "ts": "lastupdated",
+    "last": "2025-04-26T22:00:08.471Z",
+    "first": "2023-11-24T00:00:00.000Z",
+    "l90": 0,
+    "l365": 0,
+    "v": "STALE ⚠churn"
+  },
+  {
+    "col": "big aggregate event level",
+    "count": 1145,
+    "avgFields": 8,
+    "ts": "lastupdated",
+    "last": "2025-06-13T11:55:53.395Z",
+    "first": "2023-11-26T10:01:09.220Z",
+    "l90": 0,
+    "l365": 3,
+    "v": "SLOWING"
+  },
+  {
+    "col": "big participants assignments",
+    "count": 484,
+    "avgFields": 8,
+    "ts": "createddate",
+    "last": "2026-05-19T11:20:58.732Z",
+    "first": "2025-03-28T12:06:32.803Z",
+    "l90": 63,
+    "l365": 157,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "big marathon",
+    "count": 10,
+    "avgFields": 6,
+    "ts": "enddate",
+    "last": "2026-08-01T18:30:00.000Z",
+    "err": "Cannot read properties of null (reading 'toDate')",
+    "v": "ERROR"
+  },
+  {
+    "col": "bigactivity",
+    "count": 33,
+    "avgFields": 5,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "biginvitation",
+    "count": 1601,
+    "avgFields": 8,
+    "ts": "created",
+    "last": "2026-03-19T20:10:36.257Z",
+    "first": "2023-11-24T02:08:17.642Z",
+    "l90": 5,
+    "l365": 314,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "eiflix workshop",
+    "count": 2,
+    "avgFields": 12,
+    "ts": "lastregistrationdate",
+    "last": "2024-08-05T18:30:00.000Z",
+    "first": "2024-05-24T18:30:00.000Z",
+    "l90": 0,
+    "l365": 0,
+    "v": "STALE"
+  },
+  {
+    "col": "eiflix workshop challenges",
+    "count": 3,
+    "avgFields": 7,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "eiflix participant workshop",
+    "count": 906,
+    "avgFields": 8,
+    "ts": "created",
+    "last": "2025-12-31T09:42:06.001Z",
+    "first": "2024-05-18T10:51:53.722Z",
+    "l90": 0,
+    "l365": 1,
+    "v": "SLOWING"
+  },
+  {
+    "col": "content analytics",
+    "count": 278349,
+    "avgFields": 9,
+    "ts": "logdate",
+    "last": "2026-06-02T09:49:59.492Z",
+    "first": "2023-08-28T14:27:25.065Z",
+    "l90": 47320,
+    "l365": 153634,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "episodes",
+    "count": 502,
+    "avgFields": 21,
+    "ts": "date",
+    "last": "2026-05-27T07:27:39.672Z",
+    "first": "2023-05-24T05:50:37.028Z",
+    "l90": 101,
+    "l365": 217,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "solar voice playlist",
+    "count": 56,
+    "avgFields": 9,
+    "ts": "date",
+    "last": "2026-04-22T14:50:26.664Z",
+    "first": "2023-08-10T09:29:14.352Z",
+    "l90": 9,
+    "l365": 23,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "solar voice audios",
+    "count": 49,
+    "avgFields": 12,
+    "ts": "date",
+    "last": "2026-03-10T12:04:26.004Z",
+    "first": "2023-07-27T12:21:52.719Z",
+    "l90": 1,
+    "l365": 9,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "series",
+    "count": 53,
+    "avgFields": 12,
+    "ts": "date",
+    "last": "2026-04-07T06:16:28.169Z",
+    "first": "2023-05-31T09:01:57.037Z",
+    "l90": 6,
+    "l365": 38,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "participant touchpoint",
+    "count": 89031,
+    "avgFields": 9,
+    "ts": "logdate",
+    "last": "2026-06-02T09:42:23.492Z",
+    "first": "2025-08-26T09:43:35.878Z",
+    "l90": 26707,
+    "l365": 89031,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "recommended mix playlist",
+    "count": 9446,
+    "avgFields": 10,
+    "ts": "date",
+    "last": "2026-05-29T09:05:38.698Z",
+    "first": "2023-08-10T08:40:58.634Z",
+    "l90": 1803,
+    "l365": 3386,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "accelerated evolution level",
+    "count": 11,
+    "avgFields": 4,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "liveevolutionmapping",
+    "count": 538,
+    "avgFields": 6,
+    "ts": "created",
+    "last": "2026-06-01T12:39:22.224Z",
+    "first": "2025-11-05T19:45:18.097Z",
+    "l90": 118,
+    "l365": 538,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "evolutionmappingvideo",
+    "count": 1526,
+    "avgFields": 8,
+    "ts": "created",
+    "last": "2026-06-01T12:45:06.389Z",
+    "first": "2025-11-05T19:41:54.566Z",
+    "l90": 543,
+    "l365": 1526,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "event collection",
+    "count": 97,
+    "avgFields": 14,
+    "ts": "end_date",
+    "last": "2026-08-02T18:29:59.000Z",
+    "first": "2018-08-31T00:00:00.000Z",
+    "l90": 10,
+    "l365": 29,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "event participation request",
+    "count": 14762,
+    "avgFields": 8,
+    "ts": "doccreateddate",
+    "last": "2026-06-02T09:34:24.148Z",
+    "first": "2022-04-12T17:02:18.106Z",
+    "l90": 4361,
+    "l365": 9742,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "event zones",
+    "count": 10,
+    "avgFields": 10,
+    "ts": "created",
+    "last": "2026-04-16T14:03:05.637Z",
+    "first": "2026-01-18T21:06:50.390Z",
+    "l90": 4,
+    "l365": 10,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "arena events",
+    "count": 216,
+    "avgFields": 11,
+    "ts": "enddate",
+    "last": "2026-12-03T18:30:00.000Z",
+    "first": "2020-02-15T18:30:00.000Z",
+    "l90": 33,
+    "l365": 76,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "notificationrecord",
+    "count": 82610,
+    "avgFields": 17,
+    "ts": "date",
+    "last": "2026-06-02T09:44:54.353Z",
+    "first": "2024-12-19T12:59:23.236Z",
+    "l90": 23521,
+    "l365": 82526,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "FCM_token",
+    "count": 8907,
+    "avgFields": 11,
+    "ts": "last_modified",
+    "last": "2026-06-02T09:49:57.094Z",
+    "first": "2020-12-19T11:54:43.688Z",
+    "l90": 4337,
+    "l365": 7006,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "loginlog",
+    "count": 71886,
+    "avgFields": 6,
+    "ts": "date",
+    "last": "2026-06-02T09:42:45.485Z",
+    "first": "2024-11-18T09:50:23.418Z",
+    "l90": 18436,
+    "l365": 62474,
+    "v": "ACTIVE"
+  },
+  {
+    "col": "collectionname",
+    "count": 0,
+    "avgFields": 0,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "userAccessCounts",
+    "count": 56668,
+    "avgFields": 4,
+    "ts": "date",
+    "last": "2024-10-15T09:02:15.791Z",
+    "first": "2024-08-14T10:44:59.174Z",
+    "l90": 0,
+    "l365": 0,
+    "v": "STALE"
+  },
+  {
+    "col": "dashboard",
+    "count": 23,
+    "avgFields": 8,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "classify",
+    "count": 36,
+    "avgFields": 4,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "modes",
+    "count": 15,
+    "avgFields": 4,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "tier",
+    "count": 13,
+    "avgFields": 6,
+    "ts": "date",
+    "last": "2025-12-29T09:33:11.659Z",
+    "first": "2023-05-19T11:48:21.524Z",
+    "l90": 0,
+    "l365": 2,
+    "v": "SLOWING"
+  },
+  {
+    "col": "AppointmentType-To-Roles",
+    "count": 102,
+    "avgFields": 5,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  },
+  {
+    "col": "Roles-To-EIS",
+    "count": 102,
+    "avgFields": 4,
+    "ts": null,
+    "v": "CONFIG/REF (no-ts)"
+  }
+]

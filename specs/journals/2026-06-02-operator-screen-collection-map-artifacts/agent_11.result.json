@@ -1,0 +1,343 @@
+[
+  {
+    "route": "create-workshop",
+    "file": "src/app/New-Workshop/create-workshop/create-workshop.component.ts",
+    "exists": true,
+    "reads": [],
+    "writes": [
+      {"c": "workshopconfiguration", "line": 193},
+      {"c": "workshopconfiguration", "line": 196}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "doc(collection(firestore,'workshopconfiguration')) auto-id then setDoc. Lines 74/77 are commented-out duplicates. No injected data service."
+  },
+  {
+    "route": "workshopconfig/:id",
+    "file": "src/app/New-Workshop/workshop-configuration/workshop-configuration.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "atc taxonomy", "line": 370},
+      {"c": "arenavideoask", "line": 381},
+      {"c": "journey", "line": 400},
+      {"c": "tier", "line": 410},
+      {"c": "episodes", "line": 421},
+      {"c": "solar voice audios", "line": 431},
+      {"c": "participantvideoask", "line": 557},
+      {"c": "supportchat", "line": 609},
+      {"c": "workshopcategory", "line": 744},
+      {"c": "big cohorts", "line": 764},
+      {"c": "delivery forms", "line": 782},
+      {"c": "arenavideoask", "line": 794},
+      {"c": "quiz", "line": 809},
+      {"c": "workshop images", "line": 1061},
+      {"c": "wati archive", "line": 2416}
+    ],
+    "writes": [
+      {"c": "workshopconfiguration", "line": 1445},
+      {"c": "workshopconfiguration", "line": 1878},
+      {"c": "workshopconfiguration", "line": 2132}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc taxonomy"],
+    "notes": "'atc taxonomy' is reference-only/safe per CLAUDE.md. Writes all updateDoc on doc workshopconfiguration/${workshopId} (ref defined lines 1444,1877,2131). 'workshop images' read via collectionSnapshots(1061). episodes/solar voice audios/arenavideoask/journey/tier/quiz/delivery forms loaded via getDocs. No injected data service (only AuthguardService)."
+  },
+  {
+    "route": "workshops",
+    "file": "src/app/New-Workshop/workshops/workshops.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "workshopconfiguration", "line": 49},
+      {"c": "workshopconfiguration", "line": 50},
+      {"c": "workshopconfiguration", "line": 163}
+    ],
+    "writes": [
+      {"c": "workshopconfiguration", "line": 128},
+      {"c": "workshopconfiguration", "line": 145},
+      {"c": "workshopconfiguration", "line": 166},
+      {"c": "workshopconfiguration", "line": 171}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "List via collectionData(49-50). Toggle active/completed via updateDoc(128,145). Duplicate workshop: getDoc(163)+addDoc(166)+updateDoc(171). All on workshopconfiguration."
+  },
+  {
+    "route": "workshop_dashboard/:id",
+    "file": "src/app/New-Workshop/workshop-dashboard/workshop-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 207},
+      {"c": "new_user_data", "line": 228},
+      {"c": "journey", "line": 242},
+      {"c": "tier", "line": 250},
+      {"c": "workshopconfiguration", "line": 380},
+      {"c": "workshop participant enrolled", "line": 718},
+      {"c": "participant workshop", "line": 778},
+      {"c": "workshopcategory", "line": 1043}
+    ],
+    "writes": [
+      {"c": "workshopconfiguration", "line": 1407}
+    ],
+    "services": [],
+    "dynamic": [
+      {"c": "dynamic", "line": 1592},
+      {"c": "dynamic", "line": 1613},
+      {"c": "dynamic", "line": 1656}
+    ],
+    "atc": [],
+    "notes": "onSnapshot(380) on doc workshopconfiguration/{id}; onSnapshot(718) on 'workshop participant enrolled' (workshopRef defined 712). updateDoc(1407) on workshopconfiguration. Dynamic: getDoc(1592,1613) on subChallenge.result/quizResults stored DocumentReferences (VideoAsk/quiz results); updateDoc(1656) on enrolledParticipant.participantworkshopref (stored ref, effectively 'participant workshop'). No injected data service (AuthguardService/SnackbarService only)."
+  },
+  {
+    "route": "formtemplateworkshop",
+    "file": "src/app/New-Workshop/form-assignment/form-assignment.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "delivery forms", "line": 261},
+      {"c": "queue generation", "line": 368},
+      {"c": "queue_token", "line": 384},
+      {"c": "queue variation", "line": 615},
+      {"c": "formsByClient", "line": 720},
+      {"c": "temporary_forms", "line": 860}
+    ],
+    "writes": [
+      {"c": "formsByClient", "line": 637},
+      {"c": "temporary_forms", "line": 642},
+      {"c": "queue_token", "line": 686},
+      {"c": "queue stage log", "line": 692},
+      {"c": "formsByClient log", "line": 725},
+      {"c": "formsByClient", "line": 791},
+      {"c": "temporary_forms", "line": 836}
+    ],
+    "services": [],
+    "dynamic": [
+      {"c": "dynamic", "line": 293},
+      {"c": "dynamic", "line": 649},
+      {"c": "dynamic", "line": 1032}
+    ],
+    "atc": [],
+    "notes": "temporary_forms: id-gen(117), getDocs(860), setDoc(836), deleteDoc(642). formsByClient: getDoc via path(293/720 patchdata), setDoc(637,791). queue_token getDocs(384)/updateDoc(686). Dynamic: getDoc(293) on doc(firestore, formsByClient path-string or queryParams.patchdata); updateDoc(649) on doc(firestore, queryParams['data']) full-path string; getDoc(1032) on doc(firestore, this.workshopRef) from queryParams.workshopref (line 136, likely workshopconfiguration). queue variation getDoc(615). No data service (AuthguardService only)."
+  },
+  {
+    "route": "productpageworkshop",
+    "file": "src/app/New-Workshop/product-page/product-page.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "static meta data", "line": 196}
+    ],
+    "writes": [
+      {"c": "static meta data", "line": 237},
+      {"c": "static meta data", "line": 252}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "All on doc 'static meta data'/'Product Page' (docRef defined 195,234,251). getDoc(196) read; updateDoc(237,252) write products field. Lines 66/112 are commented-out."
+  },
+  {
+    "route": "engagementdashboard",
+    "file": "src/app/New-Workshop/engagement-dashboard/engagement-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "journey", "line": 228},
+      {"c": "participant metadata", "line": 235},
+      {"c": "event collection", "line": 250},
+      {"c": "queue generation", "line": 251},
+      {"c": "workshopconfiguration", "line": 252},
+      {"c": "appointments", "line": 265},
+      {"c": "appointmenttype", "line": 272},
+      {"c": "content analytics", "line": 325},
+      {"c": "event participation request", "line": 413},
+      {"c": "workshop participant enrolled", "line": 414},
+      {"c": "queue_token", "line": 415},
+      {"c": "queue stage log", "line": 416},
+      {"c": "engagement_snapshots", "line": 1264},
+      {"c": "engagement_snapshots", "line": 1265}
+    ],
+    "writes": [
+      {"c": "engagement_snapshots", "line": 1155},
+      {"c": "engagement_snapshots", "line": 1163}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "All getDocs reads. engagement_snapshots written via addDoc(1155,1163) and read via query type==monthKey (1264,1265). No injected data service (AuthguardService/SnackbarService only)."
+  },
+  {
+    "route": "bigengagementdashboard",
+    "file": "src/app/New-Workshop/capacity-dashboard/capacity-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "big aggregate level", "line": 102},
+      {"c": "atcmodel level config", "line": 109},
+      {"c": "biglevel", "line": 115},
+      {"c": "bigactivity", "line": 144},
+      {"c": "biglevel", "line": 147},
+      {"c": "journey", "line": 155},
+      {"c": "participant metadata", "line": 161},
+      {"c": "participant metadata", "line": 162}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atcmodel level config"],
+    "notes": "Read-only dashboard. 'atcmodel level config' is reference-only/safe per CLAUDE.md. collectionData(102,109,147) + getDocs(115,144,155,161,162). journey filtered atcmodel=='B!G'. No injected data service (AuthguardService only)."
+  },
+  {
+    "route": "bigeventmentor",
+    "file": "src/app/New-Workshop/bigeventmentor/bigeventmentor.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 159},
+      {"c": "journey", "line": 160},
+      {"c": "participant metadata", "line": 167},
+      {"c": "participant metadata", "line": 168},
+      {"c": "biglevel", "line": 184},
+      {"c": "bigeventmentor", "line": 201},
+      {"c": "bigeventparticipantsplan", "line": 216},
+      {"c": "bigeventparticipantsplan", "line": 349},
+      {"c": "bigeventparticipantsplan", "line": 382},
+      {"c": "bigeventparticipantsplan", "line": 501}
+    ],
+    "writes": [
+      {"c": "bigeventmentor", "line": 289},
+      {"c": "bigeventmentor", "line": 308},
+      {"c": "bigeventmentor", "line": 322},
+      {"c": "bigeventparticipantsplan", "line": 352},
+      {"c": "bigeventparticipantsplan", "line": 353},
+      {"c": "bigeventparticipantsplan", "line": 385},
+      {"c": "bigeventparticipantsplan", "line": 386},
+      {"c": "bigeventmentor", "line": 451},
+      {"c": "bigeventmentor", "line": 462},
+      {"c": "bigeventparticipantsplan", "line": 504}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "bigeventmentor: getDoc(201), setDoc(289), updateDoc(308,322,451,462). bigeventparticipantsplan (docId=`${profileId}_${eventId}`): getDocs(216), getDoc(349,382,501), updateDoc(352,385,504 arrayUnion/filtered)+setDoc(353,386). journey/event collection filtered atcmodel=='B!G'. No injected data service (AuthguardService only)."
+  },
+  {
+    "route": "createworkshop",
+    "file": "src/app/Workshop/eiflix-workshop/view-workshop/view-workshop.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "eiflix workshop", "line": 48},
+      {"c": "eiflix workshop", "line": 49}
+    ],
+    "writes": [
+      {"c": "dynamic", "line": 89}
+    ],
+    "atc": [],
+    "services": [],
+    "dynamic": [
+      {"c": "dynamic", "line": 89}
+    ],
+    "notes": "onSnapshot(48-49) on 'eiflix workshop' collection. deleteDoc(89) on docRef built from row (eiflix workshop doc, but ref is variable so dynamic)."
+  },
+  {
+    "route": "workshopchallengecreation",
+    "file": "src/app/Workshop/challenge-view/challenge-view.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "eiflix workshop challenges", "line": 49},
+      {"c": "eiflix workshop challenges", "line": 50}
+    ],
+    "writes": [
+      {"c": "eiflix workshop challenges", "line": 93}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionData(49-50) read; deleteDoc(93) on eiflixworkshopchallengesRef. Line 44 commented-out 'eiflix workshop' reference."
+  },
+  {
+    "route": "enrollment_config_view",
+    "file": "src/app/Workshop/enrollment-config-view/enrollment-config-view.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "eiflix enrolment", "line": 46}
+    ],
+    "writes": [
+      {"c": "eiflix enrolment", "line": 96}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "collectionData(46) read; deleteDoc(96) on doc('eiflix enrolment', row.docid)."
+  },
+  {
+    "route": "workshopchallengeparticipantdashboard",
+    "file": "src/app/Workshop/participant-enrollment-dashboard/participant-enrollment-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "eiflix workshop", "line": 77},
+      {"c": "eiflix workshop challenges", "line": 92},
+      {"c": "eiflix participant workshop", "line": 121},
+      {"c": "eiflix participant enrolled", "line": 343}
+    ],
+    "writes": [
+      {"c": "eiflix participant workshop", "line": 251},
+      {"c": "eiflix workshop challenges", "line": 281},
+      {"c": "eiflix participant workshop", "line": 295},
+      {"c": "eiflix participant workshop", "line": 342},
+      {"c": "eiflix participant enrolled", "line": 346},
+      {"c": "eiflix participant workshop", "line": 433}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads: collectionData 'eiflix workshop'(77), getDocs 'eiflix workshop challenges'(92), collectionData 'eiflix participant workshop'(121 by workshopref), getDocs 'eiflix participant enrolled'(343 by participantchallengeref). Writes via writeBatch: batch.update 'eiflix participant workshop'(251,295 ref defined 245,294), batch.delete 'eiflix participant workshop'(342 challengeref defined 341) + 'eiflix participant enrolled'(346 enrolmentdata.docs[0].ref). updateDoc 'eiflix workshop challenges'(281), 'eiflix participant workshop'(433). No injected data service."
+  },
+  {
+    "route": "workshop_image_upload",
+    "file": "src/app/Workshop/workshop-image-upload/workshop-image-upload.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "workshop images", "line": 135},
+      {"c": "atc taxonomy", "line": 141}
+    ],
+    "writes": [
+      {"c": "workshop images", "line": 424}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc taxonomy"],
+    "notes": "'atc taxonomy' is reference-only/safe per CLAUDE.md. collectionData 'workshop images'(135 ordered by date) + 'atc taxonomy'(141). id-gen via doc(collection 'workshop images')(255). setDoc 'workshop images'(424). Uses Firebase Storage for media (not Firestore)."
+  },
+  {
+    "route": "content-upload-v2",
+    "file": "src/app/content-upload-version2/content-upload-version2.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "solar voice audios", "line": 88},
+      {"c": "episodes", "line": 88},
+      {"c": "ads", "line": 88},
+      {"c": "health stories", "line": 88},
+      {"c": "content_urls", "line": 88}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only nav/status screen. Single loadLast() getDocs(88) called 5x from loadAll(73-77) with literal collectionName args: 'solar voice audios','episodes','ads','health stories','content_urls' (each query orderBy field limit 1 for last-updated). collectionName param is dynamic at line 86-88 but all callers pass literals."
+  },
+  {
+    "route": "arenadesigninsights",
+    "file": "src/app/arena-design-insights/arena-design-insights.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 298},
+      {"c": "event collection", "line": 319},
+      {"c": "atc_alpha", "line": 361},
+      {"c": "livechangework", "line": 387},
+      {"c": "arena highlights", "line": 557}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": ["atc_alpha"],
+    "notes": "WARNING: reads 'atc_alpha' (collectionData 366, query defined 361 filtered prescription_date range) — atc_alpha is on the OFF-LIMITS ATC denylist per CLAUDE.md. Read-only dashboard. event collection: docData(298,319 hardcoded doc ids PBTh96.../McC7UQ...) + eventRef used in queries(387,557). livechangework collectionData(391, query 387). arena highlights collectionData(562, query 557). No injected data service."
+  }
+]

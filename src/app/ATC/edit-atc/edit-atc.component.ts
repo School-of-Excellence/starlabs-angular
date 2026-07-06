@@ -10,10 +10,15 @@ import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage
 import { MatDialog } from '@angular/material/dialog';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
 import { NetworkStatusService } from '../../network-status.service';
+import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
+import { ATCDraftService } from '../../shared/atc-draft.service';
+import { DraftConflictDialogComponent } from '../shared/draft-conflict-dialog.component';
 import { PreviewAtcBeforeSubmissionComponent } from '../preview-atc-before-submission/preview-atc-before-submission.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -36,7 +41,8 @@ import { MarkdownModule } from 'ngx-markdown';
     MatIconModule,
     NgxMatSelectSearchModule,
     MatCheckboxModule,
-    MarkdownModule
+    MarkdownModule,
+    MatSnackBarModule
   ],
   templateUrl: './edit-atc.component.html',
   styleUrl: './edit-atc.component.css'
@@ -171,11 +177,18 @@ export class EditAtcComponent {
 
   // Draft
   draftStatus = {
-    message: "No Draft Created!",
+    message: "Draft not saved yet.",
     code: 0
   }
   lastDraftSavedOn = null
   hideDraftBanner = false
+  submitAttempted = false  // true once Submit was pressed — drives the inline "required" hints
+  // shows the inline "Required" message on every required field once Submit was attempted
+  requiredMatcher: ErrorStateMatcher = {
+    isErrorState: (control) => !!(control && control.invalid && (control.touched || this.submitAttempted))
+  };
+  // serialize draft saves so concurrent autosaves cannot overwrite each other
+  private autoSaveInFlight: Promise<void> | null = null;
 
   firebaseDefaultBatch = writeBatch(this.firestoreDefault)
   firebaseATCBatch = writeBatch(this.firestoreATC)
@@ -197,7 +210,10 @@ export class EditAtcComponent {
     public dialog: MatDialog,
     public location: Location,
     public datepipe: DatePipe,
-    private networkStatusService: NetworkStatusService
+    private networkStatusService: NetworkStatusService,
+    private mediaCache: MediaCacheService,
+    public snackbar: MatSnackBar,
+    private draftService: ATCDraftService
   ) {
     this.reportATC = {
       atcData: null,
@@ -374,6 +390,8 @@ export class EditAtcComponent {
   async getATC() {
     var date = new Date()
     var totalProcedureRead = 0
+    // push any edit-draft that never reached the server (e.g. saved offline) before loading
+    await this.draftService.flushDirty(this.firestoreATC)
     await getDoc(doc(this.firestoreATC, this.collectionName, this.atcID)).then(async atcData => {
       var atcDocData = atcData.data()
       getDoc(doc(this.firestoreDefault, "profile_data", atcDocData["profileid"])).then(participant => {
@@ -512,18 +530,22 @@ export class EditAtcComponent {
   async getATCoptions() {
     console.log("ATC Draft")
     this.draftStatus = {
-      message: "No Draft Created!",
+      message: "Draft not saved yet.",
       code: 0
     }
     this.loading = false
     var draftATC = []
-    await getDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"])).then(draft => {
-      if (draft.exists()) {
-        if (draft.data()["delete"] != true) {
-          draftATC = [draft]
-        }
+    const atcid = this.reportATC.atcData["atcid"];
+    // local-first: a BOUNDED server read, then the local cache — show the picker if either holds a live draft
+    const remote = await this.draftService.fetchRemote(this.firestoreATC, "temporary_edit_ATC", atcid);
+    if (remote && remote["delete"] != true) {
+      draftATC = [{ id: atcid, data: () => remote, ref: { path: `temporary_edit_ATC/${atcid}` }, source: 'server' }];
+    } else {
+      const local = await this.draftService.loadLocal('temporary_edit_ATC', atcid);
+      if (local && local["delete"] != true) {
+        draftATC = [{ id: atcid, data: () => local, ref: { path: `temporary_edit_ATC/${atcid}` }, source: 'local' }];
       }
-    })
+    }
     if (draftATC.length != 0) {
       var dialogRef = this.dialog.open(AtcOptionComponent, {
         data: {
@@ -536,36 +558,33 @@ export class EditAtcComponent {
         maxHeight: "90vh",
         disableClose: true
       })
-      dialogRef.afterClosed().toPromise().then(selectedATC => {
+      dialogRef.afterClosed().toPromise().then(async selectedATC => {
         if (selectedATC != null) {
           var atc = selectedATC
           if (atc["type"] == "draft") {
-            var value = atc["doc"].data()
-            this.reportATC.bigactivity = value["bigactivity"] ?? {}
-            this.selectedAdditionalActivity = value["otheractivity"] ?? []
-            this.reportATC.directive = value["directive"] ?? null
-            this.reportATC.transcription = value["transcript"] ?? []
-            this.updatedAdjustment = value["updatedadjustment"] ?? []
-            this.newTranscription = value["newtranscript"] ?? []
-            this.editNotes.consultationsummary = value["consultationsummary"] ?? null
-            this.editNotes.consultationpoint = value["consultationpoint"] ?? null
-            this.editNotes.notes = value["notes"] ?? null
-            this.editNotes.notesedited = value["notesedited"] ?? false
-            // this.editNotes.mentoringnote = value["mentornotes"] ?? null
-            this.draftStatus = {
-              message: "ATC Draft Imported Successfully.",
-              code: 1
-            }
-            if (value["lastupdated"]) {
-              this.lastDraftSavedOn = value["lastupdated"].toDate()
-            }
+            // local-first open: render whatever we have without blocking; reconcile against a bounded server fetch
+            // (clean → adopt; local-ahead → keep local; divergence → user picks, loser archived). Falls back to local.
+            const value = (await this.draftService.openDraft(this.firestoreATC, 'temporary_edit_ATC', atcid, (mine, theirs) => this.openConflictDialog(mine, theirs))) ?? atc["doc"].data()
+            this.applyDraftValue(value)
+            // re-attach any media captured offline during a previous edit session
+            const pendingMedia = await this.mediaCache.listByDraft(this.reportATC.atcData["atcid"]);
+            this.reattachPendingMedia(pendingMedia);
+            this.draftStatus = { message: "ATC Draft Imported Successfully.", code: 1 }
           }
         }
       })
     }
   }
 
-  autoSave() {
+  async autoSave() {
+    // chain each save after the previous one so writes stay in order
+    this.autoSaveInFlight = (this.autoSaveInFlight ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => this.runAutoSave());
+    return this.autoSaveInFlight;
+  }
+
+  async runAutoSave() {
     console.log("Auto Saved")
     try {
       if (this.reportATC.atcData["atcid"] != null) {
@@ -574,7 +593,8 @@ export class EditAtcComponent {
           code: 0
         }
 
-        console.log(this.newTranscription);
+        // keep a durable local copy of any media added during editing (survives offline + app close)
+        await this.mediaCache.replaceDraft(this.reportATC.atcData["atcid"], this.collectLocalMedia());
 
         var data = {
           date: this.datepipe.transform(this.reportATC.atcData["prescription_date"].toDate(), "yyyy-MM-dd"),
@@ -591,30 +611,125 @@ export class EditAtcComponent {
           notes: this.editNotes.notes ?? null,
           notesedited: this.editNotes.notesedited ?? false,
           delete: false,
-          lastupdated: serverTimestamp()
+          lastupdated: new Date()        // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
         }
-        console.log(data)
-        setDoc(doc(this.firestoreATC, "temporary_edit_ATC", this.reportATC.atcData["atcid"]), data).then(() => {
-          this.draftStatus = {
-            message: "ATC Saved to Draft.",
-            code: 1
-          }
-          this.lastDraftSavedOn = new Date()
-        }).catch(err => {
-          console.log(err)
-          this.draftStatus = {
-            message: "Failed to Save Draft. " + JSON.stringify(err),
-            code: -1
-          }
-        })
+
+        // local-first: durable local write (never lost), then push to Firestore inside a rev-checked transaction.
+        // A second device's edit is detected as a 'conflict' and surfaced on reopen — never silently overwritten.
+        await this.draftService.saveLocal('temporary_edit_ATC', this.reportATC.atcData["atcid"], data);
+        const res = await this.draftService.sync(this.firestoreATC, 'temporary_edit_ATC', this.reportATC.atcData["atcid"]);
+        this.draftStatus = this.draftService.statusFor(res.outcome);
+        this.lastDraftSavedOn = new Date()
+
+        // divergence detected (also covers reconnect, which re-runs autosave): surface it now, never clobber
+        if (res.outcome === 'conflict') {
+          await this.reconcileOpenDraft();
+        }
       }
     } catch (error) {
       console.log(error)
-      this.draftStatus = {
-        message: "Failed to Save Draft. " + JSON.stringify(error),
-        code: -1
-      }
+      // honest message: a genuine offline state vs. anything else (incl. the SDK assertion) — never the false "network" claim
+      this.draftStatus = navigator.onLine
+        ? { message: "Could not save the draft just now — your changes are kept on this device and will retry.", code: -1 }
+        : { message: "Saved on this device — will sync when online.", code: 1 }
     }
+  }
+
+  // guards re-entrancy while a conflict dialog is open (so autosave doesn't open a second dialog or loop)
+  private resolvingConflict = false;
+
+  // map an edit-draft document (server, local, or a conflict winner) onto the form. Reused on open AND after a resolve.
+  private applyDraftValue(value: any) {
+    this.reportATC.bigactivity = value["bigactivity"] ?? {}
+    this.selectedAdditionalActivity = value["otheractivity"] ?? []
+    this.reportATC.directive = value["directive"] ?? null
+    this.reportATC.transcription = value["transcript"] ?? []
+    this.updatedAdjustment = value["updatedadjustment"] ?? []
+    this.newTranscription = value["newtranscript"] ?? []
+    this.editNotes.consultationsummary = value["consultationsummary"] ?? null
+    this.editNotes.consultationpoint = value["consultationpoint"] ?? null
+    this.editNotes.notes = value["notes"] ?? null
+    this.editNotes.notesedited = value["notesedited"] ?? false
+    if (value["lastupdated"]) {
+      // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
+      this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
+    }
+  }
+
+  // reconcile the CURRENTLY-OPEN edit-draft against the server (fired when autosave/reconnect detects a 'conflict'):
+  // re-fetch (bounded), let the user pick on a true divergence, then re-hydrate the winner. Re-entrancy-guarded.
+  private async reconcileOpenDraft() {
+    const atcid = this.reportATC.atcData["atcid"];
+    if (atcid == null || this.resolvingConflict) return;
+    this.resolvingConflict = true;
+    try {
+      const value = await this.draftService.openDraft(this.firestoreATC, 'temporary_edit_ATC', atcid, (mine, theirs) => this.openConflictDialog(mine, theirs));
+      if (value) {
+        this.applyDraftValue(value);
+        const pendingMedia = await this.mediaCache.listByDraft(atcid);
+        this.reattachPendingMedia(pendingMedia);
+      }
+    } finally {
+      this.resolvingConflict = false;
+    }
+  }
+
+  // ask the user which version to keep when the same edit-draft diverged across two devices (default to this
+  // device's copy if dismissed — the rejected side is archived by ATCDraftService either way, nothing is lost)
+  private openConflictDialog(mine: any, theirs: any): Promise<'mine' | 'theirs'> {
+    // build the name lookups the dialog needs from the lists the parent already loaded (offline-safe, no reads):
+    // recommended_to → procedure_recommend (recommendlist snapshots), assigned agents → profile paths (author/mentor)
+    const recommendMap: Record<string, string> = {};
+    (this.recommendlist ?? []).forEach((r: any) => { const p = r?.ref?.path; if (p) recommendMap[p] = r.data()?.['name']; });
+    const agentMap: Record<string, string> = {};
+    [...(this.authorList ?? []), ...(this.mentorList ?? [])].forEach((s: any) => { if (s?.authorpath) agentMap[s.authorpath] = s.authorname; });
+    const ref = this.dialog.open(DraftConflictDialogComponent, {
+      data: { mine, theirs, recommendMap, agentMap, procedureMap: this.procedureMap },
+      autoFocus: false, disableClose: true, width: '90vw', maxWidth: '960px'
+    });
+    return ref.afterClosed().toPromise().then(choice => (choice === 'theirs' ? 'theirs' : 'mine'));
+  }
+
+  // lastupdated may arrive as a Firestore Timestamp (server read) or a JS Date (local cache) — normalise to a Date
+  private toJsDate(v: any): Date | null {
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000);
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // collect media blobs added during editing (for durable offline storage)
+  private collectLocalMedia(): PendingMedia[] {
+    const id = this.reportATC.atcData["atcid"];
+    const records: PendingMedia[] = [];
+    (this.audioBlob ?? []).forEach((blob, i) => {
+      if (blob) records.push({ id: `${id}-audio-${i}`, draftId: id, kind: 'audio', blob, name: 'audio-' + i });
+    });
+    (this.selectedNoteImages ?? []).forEach((file, i) => {
+      if (file) records.push({ id: `${id}-note-${i}`, draftId: id, kind: 'note', blob: file, name: file.name });
+    });
+    (this.selectedATCImages ?? []).forEach((file, i) => {
+      if (file) records.push({ id: `${id}-atc-${i}`, draftId: id, kind: 'atc', blob: file, name: file.name });
+    });
+    return records;
+  }
+
+  // re-attach media captured during a previous (offline) session when the draft is reopened
+  private reattachPendingMedia(records: PendingMedia[]) {
+    records.forEach(r => {
+      if (r.kind === 'audio') {
+        this.audioBlob.push(r.blob);
+        this.audioBlobURL.push(URL.createObjectURL(r.blob));
+      } else if (r.kind === 'note') {
+        this.selectedNoteImages.push(new File([r.blob], r.name, { type: r.blob.type }));
+        this.previewNoteImages.push(URL.createObjectURL(r.blob));
+      } else {
+        this.selectedATCImages.push(new File([r.blob], r.name, { type: r.blob.type }));
+        this.previewATCImages.push(URL.createObjectURL(r.blob));
+      }
+    });
   }
 
   addAdditionalActivity() {
@@ -849,6 +964,7 @@ export class EditAtcComponent {
     this.audioBlob = this.audioBlob.concat(blob);
     this.audioBlobURL = this.audioBlobURL
     console.log("blob", blob);
+    this.autoSave();  // draft the new recording (also caches it locally for offline)
   }
 
   // Process Error.
@@ -877,6 +993,7 @@ export class EditAtcComponent {
     if (confirm("Do you want to remove the recording?")) {
       this.audioBlob.splice(index, 1)
       this.audioBlobURL.splice(index, 1)
+      this.autoSave();  // re-snapshot media so the removed item is dropped from the local cache
     }
   }
 
@@ -892,12 +1009,14 @@ export class EditAtcComponent {
       })
     }
     console.log(this.selectedNoteImages, this.previewNoteImages)
+    this.autoSave();  // draft the imported note images (also caches them locally for offline)
   }
 
   removeImage(index) {
     console.log(index)
     this.selectedNoteImages.splice(index, 1)
     this.previewNoteImages.splice(index, 1)
+    this.autoSave();  // re-snapshot media so the removed item is dropped from the local cache
   }
 
   importATCImages(images) {
@@ -912,12 +1031,14 @@ export class EditAtcComponent {
       })
     }
     console.log(this.selectedATCImages, this.previewATCImages)
+    this.autoSave();  // draft the imported ATC images (also caches them locally for offline)
   }
 
   removeATCImage(index) {
     console.log(index)
     this.selectedATCImages.splice(index, 1)
     this.previewATCImages.splice(index, 1)
+    this.autoSave();  // re-snapshot media so the removed item is dropped from the local cache
   }
 
   validateExistingPrescription(): boolean {
@@ -927,7 +1048,7 @@ export class EditAtcComponent {
     console.log("author", authorGiven)
     if (authorGiven.length == 0 && !this.bigActivity()) {
       result = false
-      alert("Author name required!")
+      this.focusMissingField('atcfield-author', 'Author name required')
     }
 
     if (result) {
@@ -935,7 +1056,7 @@ export class EditAtcComponent {
         var existingAdj = this.reportATC.transcription[i]
         if (existingAdj.awareness == null || existingAdj.awarenessdetail == null || existingAdj.potentialyears == null) {
           result = false
-          alert("Avoid empty fields in the Add new Adjustment ex: Awareness Detail & Potential Year")
+          this.focusMissingField('', "Fill the missing Awareness Detail & Potential Years in the existing adjustments")
           break
         }
       }
@@ -945,7 +1066,7 @@ export class EditAtcComponent {
       for (let i = 0; i < this.updatedAdjustment.length; i++) {
         if (this.reportATC.transcription[this.updatedAdjustment[i]].procedure.filter(e => e.name == null).length != 0) {
           result = false
-          alert("Remove empty procedures fields on the existing Adjustments")
+          this.focusMissingField('', "Fill or remove the empty procedure on the existing adjustments")
           break
         }
         if (i + 1 == this.updatedAdjustment.length) {
@@ -966,14 +1087,14 @@ export class EditAtcComponent {
         console.log(this.newTranscription[i]);
 
         if ((this.newTranscription[i]['awareness'] === null || this.newTranscription[i]['awarenessdetail'] === null) || this.newTranscription[i]['potentialyears'] === null) {
-          alert("Avoid empty fields in the Add new Adjustment ex: awareness & potential year")
+          this.focusMissingField('', "Fill the missing Awareness & Potential Years in the new adjustments")
           result = false
           break;
         }
         for (let j = 0; j < this.newTranscription[i].procedure.length; j++) {
           if (this.newTranscription[i].procedure[j].name == null) {
             if (this.newTranscription[i].adjustment.length > 0) {
-              alert("Avoid empty fields in the Add new Adjustment and procedures, Fill Every Adjustment's Procedure row or Remove the Empty Procedure row")
+              this.focusMissingField('', "Fill or remove the empty procedure row in the new adjustments")
               result = false
               i = 1000;
               j = 1000;
@@ -1004,7 +1125,7 @@ export class EditAtcComponent {
     console.log(totalMandatoryProcedure)
     if (totalMandatoryProcedure != 0 && this.audioBlob.length == 0) {
       value = false
-      alert("Changework brief missing!")
+      this.focusMissingField('atcfield-changework', 'Changework brief missing')
     }
     else {
       value = true
@@ -1013,8 +1134,56 @@ export class EditAtcComponent {
   }
 
   adjustmentNewOrder = []
+  /**
+   * Scrolls to the field with the given anchor id (or, if none, the first invalid
+   * Material field in the form), flashes a red highlight, and shows the message in
+   * a top snackbar — so the user is taken to exactly what they missed.
+   */
+  private focusMissingField(anchorId: string, message: string) {
+    try {
+      let el: HTMLElement | null = anchorId ? document.getElementById(anchorId) : null;
+      if (!el) el = this.firstInvalidFieldElement();
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('atc-field-invalid-flash');
+        setTimeout(() => el?.classList.remove('atc-field-invalid-flash'), 2500);
+      }
+    } catch {}
+    this.snackbar.open(message, 'Dismiss', {
+      duration: 4000,
+      horizontalPosition: 'center',
+      verticalPosition: 'top',
+      panelClass: ['atc-validation-snack'],
+    });
+  }
+
+  /** Finds the first visible required-but-empty Material field (Angular marks it .ng-invalid). */
+  private firstInvalidFieldElement(): HTMLElement | null {
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.atc-main .ng-invalid, .atc-main mat-form-field.mat-form-field-invalid, ' +
+        '.atc-main textarea.ng-invalid, .atc-main input.ng-invalid, .atc-main mat-select.ng-invalid'
+      )
+    );
+    for (const c of candidates) {
+      if (c.tagName.toLowerCase() === 'form') continue;
+      const rect = c.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      return c;
+    }
+    return null;
+  }
+
   async submit() {
-    this.autoSave()
+    // mark that a submit was attempted so required fields reveal their inline "required" message
+    this.submitAttempted = true;
+    // block submit while offline — the ATC must reach the server before the draft is removed (changes stay saved)
+    if (!navigator.onLine) {
+      alert("You're offline. Your changes are saved — please reconnect to submit.");
+      return;
+    }
+    // flush any in-flight save so the latest edits are included and the draft can't re-appear after submit
+    await this.autoSave()
     var validation1: boolean = this.validateExistingPrescription()
     var validation2: boolean = this.validateNewPrescription()
     var validation3: boolean = this.collectionName == "atc_alpha" ? this.changeworkBriefValidation() : true
@@ -1448,6 +1617,10 @@ export class EditAtcComponent {
 
       await this.firebaseATCBatch.commit();
       await this.firebaseDefaultBatch.commit();
+
+      // clear locally-cached media AND the local draft copy for the submitted ATC (server soft-delete is in the batch above)
+      await this.mediaCache.deleteByDraft(this.reportATC.atcData["atcid"]);
+      await this.draftService.purgeLocal('temporary_edit_ATC', this.reportATC.atcData["atcid"]);
 
       if (this.roles["mentor"] && !this.bigActivity()) {
         const existingValidator = Array.from(new Set([...(this.reportATC.validator ?? []), this.loggedProfileID]));

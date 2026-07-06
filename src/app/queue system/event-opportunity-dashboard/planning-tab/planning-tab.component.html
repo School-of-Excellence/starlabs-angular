@@ -1,0 +1,340 @@
+<div class="planning-tab" *ngIf="active">
+
+  <!-- Saved filters bar (top) -->
+  <div class="pl-savedbar" *ngIf="selectedQueueList.length > 0 || savedFilters.length > 0">
+    <span class="pl-savedbar-lbl"><mat-icon>bookmarks</mat-icon>Filters</span>
+    <div class="pl-savedchips">
+      <button type="button" class="pl-fchip" *ngFor="let f of savedFilters"
+              [class.on]="isActiveFilter(f)" (click)="applyFilter(f)" [matTooltip]="'Apply ' + f.title">
+        <span class="pl-fchip-txt">{{ f.title }}</span>
+        <mat-icon class="pl-fchip-x" (click)="deleteFilter(f, $event)" matTooltip="Delete filter">close</mat-icon>
+      </button>
+      <button type="button" class="pl-fchip pl-fchip-add" (click)="newFilter()" matTooltip="Start a new filter" aria-label="Add new filter">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="pl-filters">
+    <!-- Event + queue are staged (pending); data only loads on "Get". -->
+    <mat-form-field appearance="outline" class="pl-fil pl-fil-event">
+      <mat-label>Event</mat-label>
+      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="pendingEvents" multiple (ngModelChange)="pendingEvents = $event">
+        <mat-option *ngFor="let e of eventList" [value]="e.id">{{ e.name || e.queuename || e.id }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <!-- Planning's OWN queue selection — fully independent of the Board's top "Select queue". -->
+    <mat-form-field appearance="outline" class="pl-fil pl-fil-queue">
+      <mat-label>Select queue</mat-label>
+      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="pendingQueues" multiple (ngModelChange)="pendingQueues = $event">
+        <mat-option *ngFor="let q of queueList; trackBy: trackByQueueDoc" [value]="q.docid">{{ q.queuename }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Get: the only fetch trigger for the chosen event + queue. -->
+    <button class="ios-btn filled pl-get" type="button" (click)="loadPlanningData()"
+            [disabled]="dataLoading || (!pendingQueues.length && !pendingEvents.length)">
+      <mat-icon>{{ dataLoading ? 'autorenew' : 'download' }}</mat-icon>
+      <span>{{ dataLoading ? 'Loading…' : 'Get' }}</span>
+    </button>
+
+  </div>
+
+  <!-- Bounded "Filters" group: one overall Show-only/Remove mode, then the filters below. Only once data is loaded. -->
+  <div class="pl-filterbox" *ngIf="selectedQueueList.length > 0 || selectedEventIds.length > 0">
+    <span class="pl-filterbox-lbl"><mat-icon>filter_alt</mat-icon>Filters</span>
+
+    <!-- Overall mode -->
+    <div class="pl-mode pl-mode-overall">
+      <button type="button" class="pl-mode-btn" [class.on]="filterMode==='only'" (click)="setFilterMode('only')" matTooltip="Show only participants matching the filters below">Show only</button>
+      <button type="button" class="pl-mode-btn" [class.on]="filterMode==='remove'" (click)="setFilterMode('remove')" matTooltip="Remove participants matching the filters below">Remove</button>
+    </div>
+
+    <!-- Filters (dropdowns + DFU chip, aligned in one row) -->
+    <div class="pl-frow">
+      <mat-form-field appearance="outline" class="pl-fil pl-ffield" *ngIf="journeyList.length > 0">
+        <mat-label>Journey</mat-label>
+        <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedJourneys" multiple (ngModelChange)="onJourneysChange($event)">
+          <mat-option *ngFor="let j of journeyList" [value]="j.id">{{ j.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Cohort filter — the CURRENT marathon's big-cohorts. -->
+      <mat-form-field appearance="outline" class="pl-fil pl-ffield" *ngIf="cohortList.length > 0">
+        <mat-label>{{ currentMarathonTitle ? currentMarathonTitle + ' cohort' : 'Cohort' }}</mat-label>
+        <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedCohorts" multiple (ngModelChange)="onCohortsChange($event)">
+          <mat-option *ngFor="let c of cohortList" [value]="c.id">{{ c.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button type="button" class="pl-toggle-chip" *ngIf="selectedQueueList.length > 0"
+              [class.on]="dfuOn" (click)="toggleDfu()"
+              matTooltip="Include DFU (Priority Mode) participants in the filter">
+        <mat-icon>{{ dfuOn ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+        <span>DFU ongoing</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="pl-countdown" *ngIf="eventDate">
+    <mat-icon>event</mat-icon>
+    <span class="cd-name">{{ eventName }}</span>
+    <span class="cd-dot">·</span>
+    <span class="cd-date">{{ eventDate | date:'EEE, MMM d, y' }}</span>
+    <span class="cd-badge" [class.soon]="daysToEvent!=null && daysToEvent>=0 && daysToEvent<=7" [class.today]="daysToEvent===0" [class.past]="daysToEvent!=null && daysToEvent<0">{{ countdownLabel }}</span>
+  </div>
+
+  <div *ngIf="selectedEventIds.length === 0 && selectedQueueList.length === 0" class="planning-empty">
+    <mat-icon>event_available</mat-icon>
+    <p>Select an event and a queue to begin.</p>
+  </div>
+
+  <div *ngIf="dataLoading" class="pl-note"><mat-icon>autorenew</mat-icon><span>Loading from Starlabs…</span></div>
+
+  <!-- Clickable summary cards -->
+  <div class="pl-cards" *ngIf="selectedEventIds.length > 0 || selectedQueueList.length > 0">
+    <div class="pl-card" *ngFor="let c of cards" [class.sel]="selectedCardKey === c.key" (click)="selectCard(c.key)"
+         role="button" tabindex="0" [attr.aria-pressed]="selectedCardKey === c.key"
+         (keydown.enter)="selectCard(c.key)" (keydown.space)="selectCard(c.key); $event.preventDefault()">
+      <div class="pl-card-val">{{ c.value }}</div>
+      <div class="pl-card-lbl">{{ c.label }}</div>
+      <div class="pl-card-desc" *ngIf="c.desc">{{ c.desc }}</div>
+    </div>
+  </div>
+
+  <!-- Drill-down list for the clicked card -->
+  <div class="dd" *ngIf="selectedCardKey">
+    <div class="dd-head">
+      <div class="dd-title">{{ cardLabel(selectedCardKey) }} — {{ drillList.length }}</div>
+      <button class="ios-icon" (click)="selectCard(selectedCardKey)" matTooltip="Close"><mat-icon>close</mat-icon></button>
+    </div>
+    <div class="dd-tools">
+      <div class="dd-search">
+        <mat-icon>search</mat-icon>
+        <input type="text" [(ngModel)]="drillSearch" (ngModelChange)="onDrillSearch()" placeholder="Search name…" aria-label="Search participants">
+        <button *ngIf="drillSearch" type="button" class="dd-clear" (click)="drillSearch=''; onDrillSearch()" aria-label="Clear search"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="dd-chips">
+        <button type="button" class="fchip" [class.on]="isDrillFilter('conf:yes')" (click)="toggleDrillFilter('conf:yes')">Confirmed</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('conf:no')" (click)="toggleDrillFilter('conf:no')">Not confirmed</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('st:a')" (click)="toggleDrillFilter('st:a')">Active</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('st:na')" (click)="toggleDrillFilter('st:na')">Non-Active</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('st:d')" (click)="toggleDrillFilter('st:d')">Discont</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('inq:in')" (click)="toggleDrillFilter('inq:in')">In queue</button>
+        <button type="button" class="fchip" [class.on]="isDrillFilter('inq:out')" (click)="toggleDrillFilter('inq:out')">Not in queue</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="t">
+        <thead><tr><th class="col-idx">#</th><th>Participant</th><th>Status</th><th>uP!</th><th>In queue</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let r of pagedDrill; let i = index">
+            <td class="meta col-idx">{{ drillPage * pageSize + i + 1 }}</td>
+            <td><div class="nm">{{ r.name }}</div><div class="meta">{{ r.phone }}</div></td>
+            <td>{{ r.status }}</td>
+            <td><span class="pill" [class.ok]="r.confirmed" [class.mut]="!r.confirmed"><span class="dot"></span>{{ r.confirmed ? 'Confirmed' : 'Not' }}</span></td>
+            <td><span class="pill" [class.tint]="r.inQueue" [class.mut]="!r.inQueue"><span class="dot"></span>{{ r.inQueue ? 'In queue' : 'Not' }}</span></td>
+          </tr>
+          <tr *ngIf="filteredDrill.length === 0"><td colspan="5" class="empty-cell">No participants.</td></tr>
+        </tbody>
+      </table>
+      <div class="dd-pager" *ngIf="drillPageCount > 1">
+        <button type="button" class="pg-btn" [disabled]="drillPage === 0" (click)="prevDrillPage()" matTooltip="Previous" aria-label="Previous page"><mat-icon>chevron_left</mat-icon></button>
+        <span class="pg-range">{{ drillRangeStart }}–{{ drillRangeEnd }} of {{ drillList.length }}</span>
+        <button type="button" class="pg-btn" [disabled]="drillPage >= drillPageCount - 1" (click)="nextDrillPage()" matTooltip="Next" aria-label="Next page"><mat-icon>chevron_right</mat-icon></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase / readiness -->
+  <div class="pl-phase-head" *ngIf="selectedQueueList.length > 0">
+    <span class="pl-section-title">Phase / readiness</span>
+    <button class="ios-btn filled" (click)="openAddPhase()" *ngIf="!showPhaseForm"><mat-icon>add</mat-icon><span>Add phase</span></button>
+  </div>
+
+  <div class="pl-note" *ngIf="selectedEventIds.length > 0 && selectedQueueList.length === 0 && !dataLoading">
+    <mat-icon>info</mat-icon><span>Select a queue to see phase readiness for this cohort.</span>
+  </div>
+
+  <ng-container *ngIf="selectedQueueList.length > 0">
+
+    <!-- Create / edit phase form -->
+    <div class="phase-form ios-card" *ngIf="showPhaseForm">
+      <form [formGroup]="phaseForm">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Phase name</mat-label>
+          <input matInput type="text" formControlName="phasename" placeholder="e.g. Phase 1 · Orientation">
+          <mat-error *ngIf="phaseForm.get('phasename')?.touched && phaseForm.get('phasename')?.invalid">Name is required</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Target readiness % (optional)</mat-label>
+          <input matInput type="number" min="0" max="100" formControlName="targetPct" placeholder="e.g. 80">
+          <mat-error *ngIf="phaseForm.get('targetPct')?.hasError('max') || phaseForm.get('targetPct')?.hasError('min')">Enter a value between 0 and 100</mat-error>
+        </mat-form-field>
+        <div class="phase-form-hint">Name the phase. Configure the queue stage(s) and slot(s) per row in the table below.</div>
+        <div class="phase-form-actions">
+          <button mat-button type="button" (click)="closePhaseForm()">Cancel</button>
+          <button class="ios-btn filled" type="button" [disabled]="!phaseForm.valid" (click)="submitPhase()">{{ isEditMode ? 'Update' : 'Create' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="pl-note" *ngIf="planningPhases.length === 0 && !showPhaseForm">
+      <mat-icon>layers</mat-icon><span>No phases yet. Add a phase (a group of queue stages) and the readiness table fills in.</span>
+    </div>
+
+    <!-- Per-phase readiness matrix -->
+    <div class="matrix-wrap" *ngFor="let row of matrixRows; trackBy: trackByPhaseRow">
+      <div class="pmx-phase-head">
+        <span class="grp-ring">
+          <svg viewBox="0 0 60 60" aria-hidden="true">
+            <circle cx="30" cy="30" r="26" class="rt"></circle>
+            <circle cx="30" cy="30" r="26" class="rv" [attr.stroke-dasharray]="ringDash(row.pct)" transform="rotate(-90 30 30)"></circle>
+          </svg>
+          <span class="grp-pct">{{ row.pct }}%</span>
+        </span>
+        <span class="grp-name">
+          <span class="grp-title">{{ row.phase.phasename }}</span>
+          <span class="grp-pending">Pending (Potential) - {{ potentialTotal }}</span>
+          <span class="grp-stages" *ngIf="row.target == null">configure each row below</span>
+          <span class="grp-target" *ngIf="row.target != null" [class.ontrack]="row.status==='ontrack'" [class.risk]="row.status==='risk'" [class.behind]="row.status==='behind'">Target {{ row.target }}% · {{ phaseStatusLabel(row.status) }}</span>
+        </span>
+        <span class="grp-actions">
+          <button class="ios-icon" (click)="editPhase(row.phase)" matTooltip="Rename phase"><mat-icon>edit</mat-icon></button>
+          <button class="ios-icon danger" (click)="deletePhase(row.phase)" matTooltip="Delete"><mat-icon>delete_outline</mat-icon></button>
+        </span>
+      </div>
+      <div class="pmx-core">
+      <table class="pmx">
+        <thead>
+          <tr>
+            <th class="lbl grp-h">Event confirmation</th>
+            <th colspan="3" class="grp-h grp-conf">Confirmed</th>
+            <th colspan="3" class="grp-h grp-nconf">Not Confirmed</th>
+          </tr>
+          <tr>
+            <th class="lbl">Categories</th>
+            <th *ngFor="let c of confirmedCols">{{ c.label }}</th>
+            <th *ngFor="let c of notConfirmedCols">{{ c.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="line" [class.rate-line]="ln.kind === 'rate'" *ngFor="let ln of row.lines; trackBy: trackByLineKey">
+            <td class="lbl">
+              <div class="row-lbl">{{ ln.label }}</div>
+              <mat-form-field appearance="outline" class="row-cfg" *ngIf="ln.kind !== 'rate'">
+                <mat-select panelClass="eod-ios-pane" disableOptionCentering [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)"
+                  [placeholder]="ln.kind === 'slot' ? 'Add slot stage' : 'Add queue stage'"
+                  [attr.aria-label]="ln.kind === 'slot' ? 'Slot stage' : 'Queue stage'">
+                  <mat-select-trigger>
+                    {{ ln.stages?.[0]?.stagename }}<span class="cfg-more" *ngIf="(ln.stages?.length || 0) > 1">+{{ ln.stages.length - 1 }}</span>
+                  </mat-select-trigger>
+                  <mat-option *ngFor="let opt of stageOptions" [value]="opt">{{ opt.stagename }} <span class="opt-queue-hint">({{ queueName(opt.queueid) }})</span></mat-option>
+                </mat-select>
+              </mat-form-field>
+            </td>
+            <ng-container *ngFor="let c of allCols">
+              <!-- Rate rows show a derived percentage: not zero-dimmed, not clickable. -->
+              <td *ngIf="ln.kind === 'rate'; else countCell" class="num rate">{{ ln.cells[c.k] }}%</td>
+              <ng-template #countCell>
+                <td class="num"
+                    [class.zero]="ln.cells[c.k] === 0"
+                    [class.clickable]="ln.cells[c.k] > 0"
+                    [class.sel]="isCellSel(row.phase, ln, c.k)"
+                    [attr.role]="ln.cells[c.k] > 0 ? 'button' : null"
+                    [attr.tabindex]="ln.cells[c.k] > 0 ? 0 : null"
+                    [attr.aria-pressed]="ln.cells[c.k] > 0 ? isCellSel(row.phase, ln, c.k) : null"
+                    (keydown.enter)="selectCell(row.phase, ln, c.k)"
+                    (keydown.space)="selectCell(row.phase, ln, c.k); $event.preventDefault()"
+                    (click)="selectCell(row.phase, ln, c.k)">{{ ln.cells[c.k] }}</td>
+              </ng-template>
+            </ng-container>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+
+      <!-- Drill-down for a clicked matrix cell -->
+      <div class="dd cell-dd" *ngIf="selectedCell && selectedCell.phaseDocid === row.phase.docid">
+        <div class="dd-head">
+          <div class="dd-title">{{ selectedCell.label }} — {{ cellDrillRows.length }}</div>
+          <button class="ios-icon" (click)="closeCell()" matTooltip="Close"><mat-icon>close</mat-icon></button>
+        </div>
+        <div class="dd-tools">
+          <div class="dd-search">
+            <mat-icon>search</mat-icon>
+            <input type="text" [(ngModel)]="cellSearch" (ngModelChange)="onCellSearch()" placeholder="Search name…" aria-label="Search participants">
+            <button *ngIf="cellSearch" type="button" class="dd-clear" (click)="cellSearch=''; onCellSearch()" aria-label="Clear search"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="dd-chips">
+            <button type="button" class="fchip" [class.on]="isCellFilter('conf:yes')" (click)="toggleCellFilter('conf:yes')">Confirmed</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('conf:no')" (click)="toggleCellFilter('conf:no')">Not confirmed</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('st:a')" (click)="toggleCellFilter('st:a')">Active</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('st:na')" (click)="toggleCellFilter('st:na')">Non-Active</button>
+            <button type="button" class="fchip" [class.on]="isCellFilter('st:d')" (click)="toggleCellFilter('st:d')">Discont</button>
+            <button *ngIf="cellIsSlot" type="button" class="fchip" [class.on]="isCellFilter('slot:has')" (click)="toggleCellFilter('slot:has')">Has slot</button>
+            <button *ngIf="cellIsSlot" type="button" class="fchip" [class.on]="isCellFilter('slot:none')" (click)="toggleCellFilter('slot:none')">No slot</button>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="t" [class.t--slot]="cellIsSlot">
+            <thead><tr><th class="col-idx">#</th><th>Participant</th><th>Current queue</th><th>Current stage</th><th *ngIf="cellIsSlot" class="col-slot">Selected slot</th><th>Status</th><th class="col-up">uP!</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let r of pagedCellDrill; let i = index">
+                <td class="meta col-idx">{{ cellPage * pageSize + i + 1 }}</td>
+                <td><div class="nm">{{ r.name }}</div><div class="meta">{{ r.phone }}</div></td>
+                <td>{{ r.queueName }}</td>
+                <td>{{ r.stage }}</td>
+                <td *ngIf="cellIsSlot" class="col-slot"><span class="slot-chip" [class.mut]="r.slot === '—'">{{ r.slot }}</span></td>
+                <td>{{ r.status }}</td>
+                <td class="col-up"><span class="pill" [class.ok]="r.confirmed" [class.mut]="!r.confirmed"><span class="dot"></span>{{ r.confirmed ? 'Confirmed' : 'Not' }}</span></td>
+              </tr>
+              <tr *ngIf="filteredCellDrill.length === 0"><td [attr.colspan]="cellIsSlot ? 7 : 6" class="empty-cell">No participants.</td></tr>
+            </tbody>
+          </table>
+          <div class="dd-pager" *ngIf="cellPageCount > 1">
+            <button type="button" class="pg-btn" [disabled]="cellPage === 0" (click)="prevCellPage()" matTooltip="Previous" aria-label="Previous page"><mat-icon>chevron_left</mat-icon></button>
+            <span class="pg-range">{{ cellRangeStart }}–{{ cellRangeEnd }} of {{ cellDrillRows.length }}</span>
+            <button type="button" class="pg-btn" [disabled]="cellPage >= cellPageCount - 1" (click)="nextCellPage()" matTooltip="Next" aria-label="Next page"><mat-icon>chevron_right</mat-icon></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </ng-container>
+
+  <!-- Floating "save as filter" widget — appears whenever the working state is unsaved/changed -->
+  <div class="pl-savefab" *ngIf="isDirty && selectedQueueList.length > 0">
+    <!-- Compact pill -->
+    <button type="button" class="pl-savepill" *ngIf="!showSaveWidget" (click)="openSaveWidget()">
+      <span class="pl-savedot"></span>
+      <span>{{ activeFilterId ? 'Unsaved changes' : 'Save as filter' }}</span>
+      <mat-icon>bookmark_add</mat-icon>
+    </button>
+
+    <!-- Expanded save panel -->
+    <div class="pl-savecard" *ngIf="showSaveWidget">
+      <div class="pl-savecard-head">
+        <span class="pl-savecard-title">{{ saveMode === 'update' ? 'Save changes' : 'Save as filter' }}</span>
+        <button type="button" class="ios-icon" (click)="closeSaveWidget()" matTooltip="Close"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="pl-savecard-changes">
+        <div class="pl-savecard-sub">What changed</div>
+        <ul>
+          <li *ngFor="let c of pendingChanges">{{ c }}</li>
+        </ul>
+      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Filter title</mat-label>
+        <input matInput type="text" [(ngModel)]="saveTitle" placeholder="e.g. Evolution Prep — Cohort A" (keydown.enter)="saveFilter()">
+      </mat-form-field>
+      <div class="pl-savecard-actions">
+        <button mat-button type="button" (click)="closeSaveWidget()">Cancel</button>
+        <button class="ios-btn filled" type="button" [disabled]="!saveTitle.trim()" (click)="saveFilter()">
+          {{ saveMode === 'update' ? 'Save' : 'Create filter' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

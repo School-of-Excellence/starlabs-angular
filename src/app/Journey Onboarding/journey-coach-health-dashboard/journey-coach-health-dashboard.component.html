@@ -1,0 +1,787 @@
+<div class="jchd-wrap" [ngClass]="'jchd-view-' + view">
+
+  <header class="jchd-header">
+    <div class="header-left">
+      <div class="jchd-eyebrow">Coach overview</div>
+      <h1>Journey Coach</h1>
+      <p class="subtitle" *ngIf="view === 'summary'">Health Dashboard<span *ngIf="selectedCoachName"> · {{ selectedCoachName }}</span></p>
+      <p class="subtitle" *ngIf="view === 'base' && selectedCoachName">{{ selectedCoachName }}'s base</p>
+      <p class="subtitle" *ngIf="view === 'scoreboard'">Coach caseloads</p>
+    </div>
+    <div class="jchd-header-controls" *ngIf="!loading && !loadError">
+      <mat-button-toggle-group class="view-toggle" [value]="view" (change)="setView($event.value)"
+        aria-label="Dashboard view">
+        <mat-button-toggle value="summary">Summary</mat-button-toggle>
+        <mat-button-toggle value="base">Participants</mat-button-toggle>
+        <mat-button-toggle value="scoreboard">Coaches</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
+        <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
+        <select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
+          <option [value]="ALL">All participants</option>
+          <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
+          <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
+        </select>
+        <svg class="jchd-pill-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </label>
+    </div>
+  </header>
+
+  <div class="jchd-skeleton" *ngIf="loading" aria-busy="true" aria-label="Loading the base">
+    <div class="jchd-progress" role="progressbar" [attr.aria-valuenow]="loadProgress" aria-valuemin="0" aria-valuemax="100">
+      <div class="jchd-progress-head"><span>{{ loadProgressLabel }}</span><strong>{{ loadProgress }}%</strong></div>
+      <div class="jchd-progress-track"><div class="jchd-progress-fill" [style.width.%]="loadProgress"></div></div>
+    </div>
+    <div class="sk-band">
+      <div class="sk-stat" *ngFor="let s of [1,2,3,4,5,6]">
+        <div class="sk-line sk-line-sm"></div>
+        <div class="sk-line sk-line-lg"></div>
+      </div>
+    </div>
+    <div class="sk-table">
+      <div class="sk-row" *ngFor="let r of [1,2,3,4,5,6,7,8]">
+        <div class="sk-line sk-cell-a"></div>
+        <div class="sk-line sk-cell-b"></div>
+        <div class="sk-line sk-cell-c"></div>
+        <div class="sk-line sk-cell-d"></div>
+      </div>
+    </div>
+  </div>
+  <div class="jchd-state error" *ngIf="!loading && loadError">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ loadError }}</span>
+  </div>
+
+  <ng-container *ngIf="!loading && !loadError">
+
+    <!-- background finalize bar: first page is on screen; full base + activity still loading -->
+    <div class="jchd-progress slim" *ngIf="loadProgress < 100" role="progressbar"
+         [attr.aria-valuenow]="loadProgress" aria-valuemin="0" aria-valuemax="100">
+      <div class="jchd-progress-track"><div class="jchd-progress-fill" [style.width.%]="loadProgress"></div></div>
+      <div class="jchd-progress-head"><span>{{ loadProgressLabel }}</span><strong>{{ loadProgress }}%</strong></div>
+    </div>
+
+    <!-- ===== Summary view (iOS cards) ===== -->
+    <ng-container *ngIf="view === 'summary'">
+    <div class="jchd-anim">
+      <section class="ios-grid">
+
+        <!-- HERO: Needs Attention — click navigates to the filtered Participants tab -->
+        <section class="ios-card ios-hero span-2 is-tappable" role="button" tabindex="0"
+                 (click)="goToParticipantsWithLever('needsAttention')"
+                 (keydown.enter)="goToParticipantsWithLever('needsAttention')">
+          <div class="ios-card-head">
+            <span class="ios-card-title tint-red">Needs Attention</span>
+          </div>
+          <div class="ios-bignum">{{ needsAttentionCount }}<span class="unit">people</span></div>
+          <div class="ios-subline" *ngIf="needsAttentionCount > 0">
+            Highest-priority first. Tap to open the full list.
+          </div>
+          <div class="ios-subline" *ngIf="needsAttentionCount === 0">
+            Nothing needs you right now — the loaded base is calm.
+          </div>
+
+          <div class="ios-hero-people" *ngIf="needsAttentionRows().length">
+            <span class="ios-hero-chip" *ngFor="let r of needsAttentionRows() | slice:0:2">
+              <span class="ios-avatar" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
+              <span class="meta">
+                <span class="name">{{ r.name }}</span>
+                <span class="reason">{{ r.reason }}</span>
+              </span>
+              <span class="ios-pill" [ngClass]="bandClass(r.priorityBand)">{{ r.priorityBand }}</span>
+            </span>
+          </div>
+        </section>
+
+        <!-- Going quiet -->
+        <section class="ios-card is-tappable" role="button" tabindex="0"
+                 (click)="goToParticipantsWithLever('goingQuiet')" (keydown.enter)="goToParticipantsWithLever('goingQuiet')">
+          <div class="ios-card-head"><span class="ios-card-title tint-orange">Going quiet</span></div>
+          <div class="ios-bignum sm">{{ summary.goingQuiet }}<span class="unit">no contact {{ QUIET_DAYS }}d+</span></div>
+          <div class="ios-cluster" *ngIf="goingQuietRows().length; else quietEmpty">
+            <span class="ios-row" *ngFor="let r of goingQuietRows() | slice:0:3">
+              <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
+              <span class="nm">{{ r.name }} <span class="tag" *ngIf="r.daysSinceCoach != null">{{ r.daysSinceCoach }}d</span></span>
+            </span>
+          </div>
+          <ng-template #quietEmpty>
+            <p class="ios-empty" *ngIf="summary.goingQuiet === 0">No one is going quiet.</p>
+            <p class="ios-empty" *ngIf="summary.goingQuiet > 0">Open to see all.</p>
+          </ng-template>
+        </section>
+
+        <!-- Payments locked — uses the existing finance filter (no payments-locked lever) -->
+        <section class="ios-card is-tappable" role="button" tabindex="0"
+                 (click)="goToPaymentsLocked()" (keydown.enter)="goToPaymentsLocked()">
+          <div class="ios-card-head"><span class="ios-card-title tint-red">Payments locked</span></div>
+          <div class="ios-bignum sm">{{ summary.paymentsLocked }}<span class="unit">finance follow-up</span></div>
+          <div class="ios-cluster" *ngIf="paymentsLockedRows().length; else lockedEmpty">
+            <span class="ios-row" *ngFor="let r of paymentsLockedRows() | slice:0:3">
+              <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
+              <span class="nm">{{ r.name }}</span>
+            </span>
+          </div>
+          <ng-template #lockedEmpty>
+            <p class="ios-empty" *ngIf="summary.paymentsLocked === 0">No locked payments.</p>
+            <p class="ios-empty" *ngIf="summary.paymentsLocked > 0">Open to see all.</p>
+          </ng-template>
+        </section>
+
+        <!-- Renewing in 90 days -->
+        <section class="ios-card is-tappable" role="button" tabindex="0"
+                 (click)="goToParticipantsWithLever('renewalWindow')" (keydown.enter)="goToParticipantsWithLever('renewalWindow')">
+          <div class="ios-card-head"><span class="ios-card-title tint-blue">Renewing in 90 days</span></div>
+          <div class="ios-bignum sm">{{ summary.renewalsSoon }}<span class="unit">continuity calls</span></div>
+          <div class="ios-cluster" *ngIf="renewalRows().length; else renewEmpty">
+            <span class="ios-row" *ngFor="let r of renewalRows() | slice:0:3">
+              <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
+              <span class="nm">{{ r.name }} <span class="tag">{{ fmtDate(r.subscriptionend) }}</span></span>
+            </span>
+          </div>
+          <!-- when the count is >0 but no preview rows are loaded, never contradict the count -->
+          <ng-template #renewEmpty>
+            <p class="ios-empty" *ngIf="summary.renewalsSoon === 0">No renewals in the next 90 days.</p>
+            <p class="ios-empty" *ngIf="summary.renewalsSoon > 0">Open to see all.</p>
+          </ng-template>
+        </section>
+
+        <!-- Open tickets -->
+        <section class="ios-card is-tappable" role="button" tabindex="0"
+                 (click)="goToParticipantsWithLever('tickets')" (keydown.enter)="goToParticipantsWithLever('tickets')">
+          <div class="ios-card-head"><span class="ios-card-title tint-teal">Open tickets</span></div>
+          <div class="ios-bignum sm">{{ summary.withOpenTickets }}<span class="unit">open tickets</span></div>
+          <div class="ios-cluster" *ngIf="openTicketRows().length; else ticketEmpty">
+            <span class="ios-row" *ngFor="let r of openTicketRows() | slice:0:3">
+              <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
+              <span class="nm">{{ r.name }} <span class="tag">{{ r.openTickets }} open</span></span>
+            </span>
+          </div>
+          <ng-template #ticketEmpty>
+            <p class="ios-empty" *ngIf="summary.withOpenTickets === 0">No open tickets.</p>
+            <p class="ios-empty" *ngIf="summary.withOpenTickets > 0">Open to see all.</p>
+          </ng-template>
+        </section>
+
+        <!-- Flagged -->
+        <section class="ios-card is-tappable" role="button" tabindex="0"
+                 (click)="goToParticipantsWithLever('flagged')" (keydown.enter)="goToParticipantsWithLever('flagged')">
+          <div class="ios-card-head"><span class="ios-card-title tint-pink">Flagged</span></div>
+          <div class="ios-bignum sm">{{ flaggedCount() }}<span class="unit">pinned</span></div>
+          <div class="ios-cluster" *ngIf="flaggedRows().length; else flagEmpty">
+            <span class="ios-row" *ngFor="let r of flaggedRows() | slice:0:3">
+              <span class="ios-avatar av-sm" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
+              <span class="nm">{{ r.name }}</span>
+            </span>
+          </div>
+          <ng-template #flagEmpty>
+            <p class="ios-empty" *ngIf="flaggedCount() === 0">Nothing flagged.</p>
+            <p class="ios-empty" *ngIf="flaggedCount() > 0">Open to see all.</p>
+          </ng-template>
+        </section>
+
+        <!-- Unassigned — no coach; tap to open the assign-coach view -->
+        <section class="ios-card is-tappable" role="button" tabindex="0"
+                 (click)="goToUnassigned()" (keydown.enter)="goToUnassigned()">
+          <div class="ios-card-head"><span class="ios-card-title tint-slate">Unassigned</span></div>
+          <div class="ios-bignum sm">{{ unassignedCount }}<span class="unit">no coach</span></div>
+          <p class="ios-empty" *ngIf="unassignedCount === 0">Everyone has a coach.</p>
+          <p class="ios-empty" *ngIf="unassignedCount > 0">Tap to assign a coach.</p>
+        </section>
+
+        <!-- Coach-set health distribution (across the current scope's loaded rows) -->
+        <section class="ios-card span-2 health-card" *ngIf="healthDistribution() as hd">
+          <div class="ios-card-head"><span class="ios-card-title tint-indigo">Coach-set health</span></div>
+          <div class="health-bar" *ngIf="hd.total > 0" aria-hidden="true">
+            <span class="hb-segment state-happy" [style.width.%]="healthPct(hd.happy, hd.total)" matTooltip="Happy: {{ hd.happy }}"></span>
+            <span class="hb-segment state-neutral" [style.width.%]="healthPct(hd.neutral, hd.total)" matTooltip="Neutral: {{ hd.neutral }}"></span>
+            <span class="hb-segment state-unhappy" [style.width.%]="healthPct(hd.unhappy, hd.total)" matTooltip="Unhappy: {{ hd.unhappy }}"></span>
+            <span class="hb-segment state-at-risk" [style.width.%]="healthPct(hd.atRisk, hd.total)" matTooltip="At-risk: {{ hd.atRisk }}"></span>
+            <span class="hb-segment state-critical" [style.width.%]="healthPct(hd.critical, hd.total)" matTooltip="Critical: {{ hd.critical }}"></span>
+            <span class="hb-segment state-not-assessed" [style.width.%]="healthPct(hd.notAssessed, hd.total)" matTooltip="Not assessed: {{ hd.notAssessed }}"></span>
+          </div>
+          <div class="health-legend">
+            <span class="hl-item"><i class="hl-dot state-happy"></i>Happy <b>{{ hd.happy }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-neutral"></i>Neutral <b>{{ hd.neutral }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-unhappy"></i>Unhappy <b>{{ hd.unhappy }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-at-risk"></i>At-risk <b>{{ hd.atRisk }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-critical"></i>Critical <b>{{ hd.critical }}</b></span>
+            <span class="hl-item"><i class="hl-dot state-not-assessed"></i>Not assessed <b>{{ hd.notAssessed }}</b></span>
+          </div>
+          <p class="health-caption">From logged assessments only — most participants start as Not assessed.</p>
+        </section>
+
+      </section>
+    </div>
+    </ng-container>
+    <!-- ===== /Summary view ===== -->
+
+    <!-- ===== Base view (existing dashboard) ===== -->
+    <ng-container *ngIf="view === 'base'">
+    <div class="jchd-anim">
+
+    <!-- Fallback notice: logged-in coach couldn't be matched, so we're showing everyone. -->
+    <div class="jchd-fallback-banner" *ngIf="coachFallback && selectedCoachId === ALL && !coachFallbackDismissed">
+      <mat-icon>info</mat-icon>
+      <span>Showing all participants — we couldn't match your coach profile. Pick your name above to see just your base.</span>
+      <button mat-icon-button class="jchd-fallback-dismiss" matTooltip="Dismiss"
+        aria-label="Dismiss notice" (click)="coachFallbackDismissed = true">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Persistent selection tray (Unassigned view) — survives search/filter/paging because selection
+         is now persistent. Chips read from selectedMeta so off-page picks still show; ✕ deselects. -->
+    <section class="jchd-tray" *ngIf="(selectedCoachId === UNASSIGNED || selectedCoachId === ALL) && selectedCount > 0">
+      <div class="jchd-tray-head">
+        <strong>{{ selectedCount }}</strong> selected
+        <button type="button" class="jchd-tray-clear" (click)="clearSelection()">Clear all</button>
+      </div>
+      <div class="jchd-tray-chips">
+        <span class="jchd-chip" *ngFor="let s of selectedTray">
+          <span class="jchd-chip-name">{{ s.name }}</span>
+          <button type="button" class="jchd-chip-x" aria-label="Remove from selection"
+                  (click)="deselect(s.id)">✕</button>
+        </span>
+      </div>
+    </section>
+
+    <!-- Assignment bar: Unassigned view (always), or All view once something is selected (bulk assign/reassign) -->
+    <section class="jchd-assign" *ngIf="selectedCoachId === UNASSIGNED || (selectedCoachId === ALL && selectedCount > 0)">
+      <mat-icon>person_add</mat-icon>
+      <span class="assign-text" *ngIf="selectedCoachId === UNASSIGNED"><strong>{{ selectedCount }}</strong> of {{ dataSource.data.length }} selected · these participants have no journey coach</span>
+      <span class="assign-text" *ngIf="selectedCoachId === ALL"><strong>{{ selectedCount }}</strong> selected · assign or reassign to a coach</span>
+      <span class="jchd-assign-spacer"></span>
+      <label class="jchd-assign-pick">
+        <select class="jchd-assign-select" [(ngModel)]="assignTargetCoachId" aria-label="Assign to coach">
+          <option value="">Assign to coach</option>
+          <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
+        </select>
+        <svg class="jchd-assign-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </label>
+      <button type="button" class="jchd-btn-primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
+        (click)="assignSelected()">
+        <mat-icon>how_to_reg</mat-icon> Assign {{ selectedCount }}
+      </button>
+      <mat-spinner *ngIf="assigning" diameter="20"></mat-spinner>
+    </section>
+
+    <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
+    <section class="ios-mini-summary" *ngIf="selectedCoachId !== UNASSIGNED">
+      <button type="button" class="ios-mini-card" [class.is-on]="activeLever==='needsAttention'"
+        (click)="setLever(activeLever==='needsAttention' ? 'all' : 'needsAttention')"
+        matTooltip="Going quiet · lapsed · not started · renewing · open tickets">
+        <span class="mc-label"><span class="mc-dot dot-red"></span>Needs Attention</span>
+        <span class="mc-num">{{ needsAttentionCount }}</span>
+      </button>
+      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
+        matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
+        <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded()"
+          matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
+        <span class="mc-num">{{ summary.goingQuiet }}</span>
+      </button>
+      <button type="button" class="ios-mini-card" [class.is-on]="financeFilters.includes('locked')"
+        (click)="financeFilters.includes('locked') ? clearFilters() : goToPaymentsLocked()"
+        matTooltip="Participants with locked payments">
+        <span class="mc-label"><span class="mc-dot dot-red"></span>Payments locked</span>
+        <span class="mc-num">{{ summary.paymentsLocked }}</span>
+      </button>
+      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
+        matTooltip="Active subscription ending within the next 90 days">
+        <span class="mc-label"><span class="mc-dot dot-blue"></span>Renewing 90d</span>
+        <span class="mc-num">{{ summary.renewalsSoon }}</span>
+      </button>
+      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')" matTooltip="Only open tickets">
+        <span class="mc-label"><span class="mc-dot dot-teal"></span>Open tickets</span>
+        <span class="mc-num">{{ summary.withOpenTickets }}</span>
+      </button>
+      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
+        matTooltip="Flagged participants (visible to all coaches)">
+        <span class="mc-label"><span class="mc-dot dot-pink"></span>Flagged</span>
+        <span class="mc-num">{{ flaggedCount() }}</span>
+      </button>
+    </section>
+
+    <section class="jchd-filters">
+      <label class="jchd-search">
+        <svg class="jchd-search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>
+        </svg>
+        <input #searchInput type="text" [(ngModel)]="search" (ngModelChange)="applyFilters()"
+          placeholder="Search name or number" aria-label="Search name or number" />
+      </label>
+
+      <div class="jchd-filter-pills">
+        <label class="jchd-pill jchd-pill-select">
+          <span class="jchd-pill-label">Journey</span>
+          <select [(ngModel)]="journeyFilter" (ngModelChange)="applyFilters()" aria-label="Journey">
+            <option value="">All</option>
+            <option *ngFor="let j of journeyOptions" [value]="j">{{ j }}</option>
+          </select>
+          <svg class="jchd-pill-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+        </label>
+
+        <label class="jchd-pill jchd-pill-select">
+          <span class="jchd-pill-label">Status</span>
+          <select [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()" aria-label="Status">
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="late">Late</option>
+            <option value="discontinued">Discontinued</option>
+          </select>
+          <svg class="jchd-pill-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+        </label>
+
+        <button type="button" class="jchd-pill" [class.is-on]="filtersExpanded || hasActiveFilters"
+          (click)="filtersExpanded = !filtersExpanded"
+          matTooltip="Product type, tier, priority, health, finance, renewal & quiet filters">
+          <mat-icon class="jchd-pill-ic">tune</mat-icon> Filters
+        </button>
+
+        <button type="button" class="jchd-pill" (click)="exportCsv()" matTooltip="Export the current list as CSV">
+          <mat-icon class="jchd-pill-ic">download</mat-icon> Export
+        </button>
+
+        <button type="button" class="jchd-pill jchd-pill-clear" *ngIf="hasActiveFilters" (click)="clearFilters()"
+          matTooltip="Clear active filters">Clear</button>
+      </div>
+    </section>
+
+    <!-- Intelligent filter panel (collapsible). Product type defaults to Ecosystem. -->
+    <section class="jchd-filter-panel" *ngIf="selectedCoachId !== UNASSIGNED && filtersExpanded">
+      <div class="fp-grid">
+        <label class="fp-field"
+          matTooltip="Ecosystem = B!G/LYL/uP!/CPM journeys · DFU = Done-For-You · Gifts = FTO">
+          <span class="fp-field-label">Product type</span>
+          <mat-form-field appearance="outline" class="fp-mat">
+            <mat-select [(ngModel)]="productTypeFilters" (ngModelChange)="applyFilters()" multiple
+              panelClass="jchd-fp-panel" placeholder="Any">
+              <mat-option value="ecosystem">Ecosystem</mat-option>
+              <mat-option value="dfu">DFU</mat-option>
+              <mat-option value="gifts">Gifts</mat-option>
+              <mat-option value="other">Other</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </label>
+
+        <label class="fp-field">
+          <span class="fp-field-label">Tier</span>
+          <mat-form-field appearance="outline" class="fp-mat">
+            <mat-select [(ngModel)]="tierFilters" (ngModelChange)="applyFilters()" multiple
+              panelClass="jchd-fp-panel" placeholder="Any">
+              <mat-option *ngFor="let t of tierOptions" [value]="t">{{ t }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </label>
+
+        <label class="fp-field">
+          <span class="fp-field-label">Priority band</span>
+          <mat-form-field appearance="outline" class="fp-mat">
+            <mat-select [(ngModel)]="bandFilters" (ngModelChange)="applyFilters()" multiple
+              panelClass="jchd-fp-panel" placeholder="Any">
+              <mat-option value="High">High</mat-option>
+              <mat-option value="Medium">Medium</mat-option>
+              <mat-option value="Low">Low</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </label>
+
+        <label class="fp-field">
+          <span class="fp-field-label">Coach health</span>
+          <mat-form-field appearance="outline" class="fp-mat">
+            <mat-select [(ngModel)]="healthFilters" (ngModelChange)="applyFilters()" multiple
+              panelClass="jchd-fp-panel" placeholder="Any">
+              <mat-option *ngFor="let h of healthOptions" [value]="h">{{ healthLabel(h) }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </label>
+
+        <label class="fp-field" *ngIf="financeOptions.length">
+          <span class="fp-field-label">Financial status</span>
+          <mat-form-field appearance="outline" class="fp-mat">
+            <mat-select [(ngModel)]="financeFilters" (ngModelChange)="applyFilters()" multiple
+              panelClass="jchd-fp-panel" placeholder="Any">
+              <mat-option *ngFor="let f of financeOptions" [value]="f">{{ f }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </label>
+      </div>
+
+      <div class="fp-toggles">
+        <label class="fp-check" matTooltip="Subscription ends within {{ RENEWAL_DAYS }} days">
+          <input type="checkbox" [(ngModel)]="renewalWindowOnly" (ngModelChange)="applyFilters()" />
+          <span class="fp-check-box" aria-hidden="true">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+          </span>
+          <span class="fp-check-label">Renewal window</span>
+        </label>
+        <label class="fp-check" matTooltip="No coach contact in {{ QUIET_DAYS }}+ days">
+          <input type="checkbox" [(ngModel)]="goingQuietOnly" (ngModelChange)="applyFilters()" />
+          <span class="fp-check-box" aria-hidden="true">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+          </span>
+          <span class="fp-check-label">Going quiet</span>
+        </label>
+        <label class="fp-check">
+          <input type="checkbox" [(ngModel)]="noEventRequestOnly" (ngModelChange)="applyFilters()" />
+          <span class="fp-check-box" aria-hidden="true">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+          </span>
+          <span class="fp-check-label">No recent event request</span>
+        </label>
+        <span class="fp-spacer"></span>
+        <button type="button" class="jchd-pill jchd-pill-clear fp-clear"
+          [disabled]="!hasActiveFilters" (click)="clearFilters()">
+          <mat-icon class="jchd-pill-ic">filter_alt_off</mat-icon> Clear filters
+        </button>
+      </div>
+
+      <div class="fp-note" *ngIf="pagedMode">
+        <mat-icon>info</mat-icon>
+        <span>Search, product type, tier, status, finance &amp; renewal-window filters cover the
+          <strong>full base</strong> via a lightweight index. Priority band, coach-health &amp;
+          going-quiet refine within loaded pages — page through to apply them across everyone.</span>
+      </div>
+    </section>
+
+    <div class="jchd-diag" *ngIf="!pagedMode && selectedCoachId !== UNASSIGNED">
+      {{ summary.total }} participant(s) for <strong>{{ selectedCoachName || 'selected coach' }}</strong>
+      · matched {{ matchedCount }} of {{ scannedCount }} journey-product records · ranked by priority
+      <span *ngIf="matchedCount === 0"> — this coach has no participants assigned via <code>coachedby</code>. Pick another coach above, or assignment data may be sparse here.</span>
+    </div>
+    <!-- paged views (ALL / UNASSIGNED) — matched-set pagination; total = all matches across pages -->
+    <div class="jchd-diag" *ngIf="pagedMode && selectedCoachId !== UNASSIGNED">
+      Showing {{ dataSource.data.length }} of {{ pageLength }} matching · ranked by priority within the page.
+    </div>
+    <!-- per-card explainer: only the ACTIVE card's note, shown next to the table (not all at once) -->
+    <div class="jchd-filter-note" *ngIf="pagedMode && activeFilterNote">
+      <mat-icon>info</mat-icon><span>{{ activeFilterNote }}</span>
+    </div>
+    <div class="jchd-diag" *ngIf="pagedMode && selectedCoachId === UNASSIGNED">
+      Page {{ currentPage + 1 }} · {{ dataSource.data.length }} unassigned on this page · {{ loadedRowCount }} loaded so far<span *ngIf="reachedEnd"> · end of list</span>.
+      Select rows and assign a coach above — this writes <code>coachedby</code>. Some pages may show fewer rows as participants get assigned.
+    </div>
+    <!-- Honest, always-visible caveat: page-local filters (band / health / going-quiet) only
+         refine the loaded pages in paged mode. Renewal-window + open-tickets are now base-wide.
+         Shown above the table, not buried in the filter panel. -->
+    <div class="jchd-page-caveat" *ngIf="pagedMode && pageLocalFilterActive">
+      <mat-icon>info</mat-icon>
+      <span>Filtering loaded pages only — page through, or pick your own name for the whole base.</span>
+    </div>
+
+    <div class="jchd-state" *ngIf="pageLoading">
+      <mat-spinner diameter="24"></mat-spinner><span>Loading page…</span>
+    </div>
+
+    <!-- Visually-hidden live region: announces the keyboard-focused participant to screen readers. -->
+    <div class="sr-only" aria-live="polite">{{ focusedRowName }}</div>
+
+    <div class="jchd-table-wrap ios-table-card">
+      <table mat-table [dataSource]="dataSource" [trackBy]="trackByProfileId" matSort matSortActive="priority" matSortDirection="desc"
+             class="jchd-table ios-grid-t">
+
+        <!-- Participant: initials avatar + bold name (+ flag glyph when flagged) + masked mono id -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+          <td mat-cell *matCellDef="let r" class="col-person">
+            <span class="cell-person">
+              <app-profile-picture [profileId]="r.profileid" [name]="r.name" [size]="32"></app-profile-picture>
+              <span class="cp-id-wrap">
+                <span class="cp-name">{{ r.name }}
+                  <span class="flag-icon" *ngIf="r.flagged" matTooltip="Flagged">
+                    <mat-icon>flag</mat-icon>
+                  </span>
+                </span>
+                <span class="cp-email" *ngIf="r.email">{{ r.email }}</span>
+                <span class="cp-id">{{ r.number || '—' }}</span>
+              </span>
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Coach -->
+        <ng-container matColumnDef="coach">
+          <th mat-header-cell *matHeaderCellDef>Coach</th>
+          <td mat-cell *matCellDef="let r"><span class="coach-cell">{{ r.coachname }}</span></td>
+        </ng-container>
+
+        <!-- Priority: coloured dot + label (Urgent/Watch/Calm) + "· score" -->
+        <ng-container matColumnDef="priority">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Priority</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="prio" [ngClass]="prioClass(r.priorityBand)">
+              <span class="dot" [ngClass]="prioClass(r.priorityBand)"></span>
+              <span class="plabel">{{ prioLabel(r.priorityBand) }}</span>
+              <span class="pscore">· {{ r.priority }}</span>
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Journey: name · status -->
+        <ng-container matColumnDef="journey">
+          <th mat-header-cell *matHeaderCellDef>Journey</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="journey-cell">{{ r.journeyname }} <span class="muted">·</span> {{ r.journeystatus }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Status: soft capsule (Active green / Non-Active red) -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="capsule" [ngClass]="statusCapsuleClass(r)">{{ statusCapsuleLabel(r) }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Finance: soft capsule (Locked orange / Fully paid green / Regular gray) -->
+        <ng-container matColumnDef="finance">
+          <th mat-header-cell *matHeaderCellDef>Finance</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="capsule" [ngClass]="financeCapsuleClass(r)">{{ financeCapsuleLabel(r) }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Renewal: mono date + muted day-sub -->
+        <ng-container matColumnDef="renewal">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Renewal</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="renewal" [class.muted]="!r.subscriptionend">{{ renewalDate(r) }}<span
+              class="sub tnum" *ngIf="renewalSub(r) as sub">{{ sub }}</span></span>
+          </td>
+        </ng-container>
+
+        <!-- Tickets: count, amber when >0, muted 0 -->
+        <ng-container matColumnDef="tickets">
+          <th mat-header-cell *matHeaderCellDef>Tickets</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="tick-count tnum" [ngClass]="r.openTickets > 0 ? 'amber' : 'zero'">{{ r.openTickets }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Last touch: "68d ago" -->
+        <ng-container matColumnDef="lastcoach">
+          <th mat-header-cell *matHeaderCellDef>Last touch</th>
+          <td mat-cell *matCellDef="let r"><span class="lasttouch tnum">{{ lastTouchLabel(r) }}</span></td>
+        </ng-container>
+
+        <!-- Unassigned (assignment) view only: selection checkbox + per-row assign action. -->
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-checkbox [checked]="allVisibleSelected" (change)="toggleSelectAll()"></mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let r">
+            <mat-checkbox [checked]="isSelected(r.profileid)"
+              (click)="$event.stopPropagation()" (change)="toggleSelect(r.profileid, r.name)"></mat-checkbox>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r">
+            <span class="row-actions" (click)="$event.stopPropagation()">
+              <button mat-icon-button (click)="markAddressed(r, !isAddressed(r))"
+                      *ngIf="r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0 || isAddressed(r)"
+                      [class.is-addressed]="isAddressed(r)"
+                      [matTooltip]="isAddressed(r) ? 'Addressed — click to re-open' : 'Mark addressed (clears Needs Attention until a new issue)'">
+                <mat-icon>{{ isAddressed(r) ? 'task_alt' : 'radio_button_unchecked' }}</mat-icon>
+              </button>
+              <button mat-icon-button [matMenuTriggerFor]="assignMenu" matTooltip="Assign coach">
+                <mat-icon>person_add</mat-icon>
+              </button>
+              <button mat-icon-button [routerLink]="['/userprofile', r.profileid]" matTooltip="Open profile">
+                <mat-icon>open_in_new</mat-icon>
+              </button>
+            </span>
+            <mat-menu #assignMenu="matMenu">
+              <button mat-menu-item *ngFor="let c of coaches" (click)="assignCoachToRow(r, c.id)">
+                <mat-icon *ngIf="r.coachname === c.name">check</mat-icon>
+                <span [class.assign-current]="r.coachname === c.name">{{ c.name }}</span>
+              </button>
+              <button mat-menu-item class="assign-unassign" *ngIf="r.coachname && r.coachname !== '—'"
+                      (click)="unassignCoach(r)">
+                <mat-icon>person_remove</mat-icon>
+                <span>Unassign (remove coach)</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <!-- row tap opens the slide-over (where the dropped intel now lives); the UNASSIGNED
+             assignment view uses checkboxes instead, so its rows don't open the panel. -->
+        <tr mat-row *matRowDef="let row; columns: displayedColumns; let i = index"
+            class="jchd-data-row ios-row-t" [ngClass]="bandClass(row.priorityBand)"
+            [style.--i]="i"
+            [class.no-tap]="selectedCoachId === UNASSIGNED"
+            (click)="selectedCoachId !== UNASSIGNED && openSlideover(row)"
+            [class.jchd-row-focused]="i === focusedRowIndex"
+            [attr.aria-current]="i === focusedRowIndex ? 'true' : null"></tr>
+      </table>
+
+      <div class="jchd-empty" *ngIf="dataSource.data.length === 0 && !pageLoading">
+        <span *ngIf="!pagedMode">No participants match the current filters.</span>
+        <span *ngIf="pagedMode && !reachedEnd">No matching participants on this page — use the paginator to load more.</span>
+        <span *ngIf="pagedMode && reachedEnd">No more participants.</span>
+      </div>
+
+      <mat-paginator pageSize="50" [pageSizeOptions]="[25, 50, 100]"
+        [length]="pagedMode ? pageLength : dataSource.data.length"
+        (page)="onPageEvent($event)" showFirstLastButtons></mat-paginator>
+    </div>
+
+    </div>
+    </ng-container>
+    <!-- ===== /Base view ===== -->
+
+    <!-- ===== Phase C: Coach Scoreboard ===== -->
+    <ng-container *ngIf="view === 'scoreboard'">
+    <div class="jchd-anim">
+
+      <div class="jchd-scoreboard-blocked" *ngIf="scoreboardDataBlocked">
+        <mat-icon>report_problem</mat-icon>
+        <span>Touchpoint/appointment data unavailable (permissions) — coverage &amp; quality may be understated.</span>
+      </div>
+
+      <!-- Mockup #panel-coaches: one .coach-card per coach, all stats from real loaded data. -->
+      <div class="coach-list">
+        <div class="coach-card" *ngFor="let card of coachCards(); trackBy: trackByCoachId"
+             [class.open]="expandedCoachIds.has(card.coachId)"
+             (click)="toggleCoachCard(card.coachId)">
+          <div class="coach-top">
+            <span class="ios-avatar" [ngClass]="avatarClass(card.coachId)">{{ initials(card.coachName) }}</span>
+            <div class="coach-id">
+              <div class="coach-name">{{ card.coachName }}</div>
+              <div class="coach-sub">Caseload {{ card.caseload }} · {{ card.needToday }} need action today</div>
+            </div>
+            <span class="coach-chev"><mat-icon>chevron_right</mat-icon></span>
+          </div>
+
+          <div class="stat-row">
+            <div class="stat"><div class="v">{{ card.caseload }}</div><div class="k">Caseload</div></div>
+            <div class="stat"><div class="v red">{{ card.needToday }}</div><div class="k">Need today</div></div>
+            <div class="stat"><div class="v orange">{{ card.goingQuiet }}</div><div class="k">Going quiet</div></div>
+            <div class="stat"><div class="v pink">{{ card.flagged }}</div><div class="k">Flagged</div></div>
+            <div class="stat"><div class="v green">{{ card.handled }}</div><div class="k">Handled</div></div>
+          </div>
+
+          <div class="progress-wrap">
+            <div class="progress-label">
+              <span>Handled today</span>
+              <span class="strong tnum">{{ card.handled }} / {{ card.needToday }}</span>
+            </div>
+            <div class="bar"><i [style.width.%]="handledPct(card)"></i></div>
+          </div>
+
+          <div class="coach-expand">
+            <div class="expand-inner">
+              <div class="eh">Needs action — top of queue</div>
+              <div class="mini-person" *ngFor="let p of card.queue"
+                   (click)="$event.stopPropagation(); openSlideover(p)" [matTooltip]="p.reason">
+                <span class="ios-avatar av-sm" [ngClass]="avatarClass(p.profileid)">{{ initials(p.name) }}</span>
+                <span class="mp-name">{{ p.name }}</span>
+                <span class="mp-reason">{{ p.reason }}</span>
+              </div>
+              <div class="mini-person-empty" *ngIf="card.queue.length === 0">
+                No one in this coach's loaded queue needs action.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="jchd-empty" *ngIf="coachCards().length === 0">
+          No coaches have an assigned base yet.
+        </div>
+      </div>
+
+    </div>
+    </ng-container>
+    <!-- ===== /Coach Scoreboard ===== -->
+
+    <!-- ===== Today's Worklist (triage queue) ===== -->
+    <ng-container *ngIf="view === 'worklist'">
+    <div class="jchd-anim">
+
+      <div class="wl-head" *ngIf="worklistTotal() > 0">
+        <div class="wl-head-main">
+          <h2>Today's focus</h2>
+          <p>Top {{ worklistRows().length }} of {{ worklistTotal() }} to act on, highest priority first.</p>
+        </div>
+        <div class="wl-diag" *ngIf="pagedMode">Showing loaded pages only — most precise in single-coach view.</div>
+      </div>
+
+      <div class="wl-list" *ngIf="worklistTotal() > 0">
+        <article class="wl-card" *ngFor="let r of worklistRows(); let i = index; trackBy: trackByProfileId" [ngClass]="bandClass(r.priorityBand)" [style.--i]="i">
+          <div class="wl-rail"></div>
+
+          <div class="wl-body">
+            <div class="wl-row-top">
+              <span class="pri wl-pri" [ngClass]="bandClass(r.priorityBand)">{{ r.priorityBand }} · {{ r.priority }}</span>
+              <div class="wl-id">
+                <a class="wl-name name-link" role="button" tabindex="0"
+                   (click)="openSlideover(r)" (keydown.enter)="openSlideover(r)" (keydown.space)="openSlideover(r)"
+                   matTooltip="Open participant panel">{{ r.name }}</a>
+                <span class="wl-meta">
+                  <span>{{ r.number || '—' }}</span>
+                  <span *ngIf="r.atcmodel" class="wl-dot">·</span>
+                  <span *ngIf="r.atcmodel">{{ r.atcmodel }}</span>
+                  <span *ngIf="r.journeyname" class="wl-dot">·</span>
+                  <span *ngIf="r.journeyname">{{ r.journeyname }}<span *ngIf="r.journeystatus"> ({{ r.journeystatus }})</span></span>
+                </span>
+              </div>
+            </div>
+
+            <p class="wl-reason">{{ r.reason }}</p>
+
+            <div class="wl-signals">
+              <span class="chip chip-warn" *ngIf="r.renewalWindow">Renews in {{ r.daysToRenewal }}d</span>
+              <span class="chip chip-bad" *ngIf="r.lapsed">Lapsed</span>
+              <span class="chip chip-warn" *ngIf="r.goingQuiet">Quiet {{ r.daysSinceCoach }}d</span>
+              <span class="chip chip-warn" *ngIf="r.openTickets > 0">{{ r.openTickets }} open ticket<span *ngIf="r.openTickets > 1">s</span></span>
+              <span class="chip" *ngIf="r.recentEventRequest" [ngClass]="eventStatusClass(r.recentEventRequest.status)"
+                    [matTooltip]="r.recentEventRequest.eventName + (r.recentEventRequest.date ? ' · ' + fmtDate(r.recentEventRequest.date) : '')">{{ r.recentEventRequest.eventName }}: {{ r.recentEventRequest.status }}</span>
+              <span class="chip" *ngIf="r.coachHealthState" [ngClass]="stateClass(r.coachHealthState.state)"
+                    [matTooltip]="(r.coachHealthState.note || 'No note') + ' · ' + fmtDate(r.coachHealthState.date)">{{ healthLabel(r.coachHealthState.state) }}</span>
+              <span class="chip" *ngIf="r.customerstatus" [ngClass]="statusClass(r.customerstatus)">{{ r.customerstatus }}</span>
+              <span class="chip chip-bad" *ngIf="r.financialstatus === 'locked' || r.financialstatus === 'defaulted'">{{ r.financialstatus }}</span>
+            </div>
+          </div>
+
+          <div class="wl-actions">
+            <button mat-icon-button class="wl-flag" [class.is-flagged]="r.flagged"
+              (click)="toggleFlag(r)" [attr.aria-pressed]="r.flagged"
+              [matTooltip]="r.flagged ? 'Unflag' : 'Flag'">
+              <mat-icon>{{ r.flagged ? 'flag' : 'outlined_flag' }}</mat-icon>
+            </button>
+            <button mat-stroked-button class="wl-act" (click)="openSlideover(r)" matTooltip="Open participant panel">Details</button>
+            <button mat-stroked-button class="wl-act" (click)="logCall(r)">Log call</button>
+            <button mat-stroked-button class="wl-act" (click)="setHealthState(r)">Set health</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="wl-more" *ngIf="worklistTotal() > 0 && worklistRows().length < worklistTotal()">
+        <button mat-stroked-button (click)="showMoreWorklist()">
+          Show more ({{ worklistTotal() - worklistRows().length }} remaining)
+        </button>
+      </div>
+
+      <div class="jchd-empty wl-empty" *ngIf="worklistTotal() === 0">
+        <mat-icon>task_alt</mat-icon>
+        <div class="wl-empty-title">Nothing in the queue</div>
+        <div class="wl-empty-sub">No participants match the current filters — clear a filter or switch coach to see your worklist.</div>
+      </div>
+
+    </div>
+    </ng-container>
+    <!-- ===== /Today's Worklist ===== -->
+
+  </ng-container>
+</div>

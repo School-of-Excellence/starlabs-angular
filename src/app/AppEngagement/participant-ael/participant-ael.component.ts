@@ -25,6 +25,7 @@ import { doc, where, getDocs, Timestamp ,writeBatch,updateDoc} from '@angular/fi
 import { ActivatedRoute } from '@angular/router';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { ChangeDetectorRef } from '@angular/core';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-participant-ael',
@@ -41,7 +42,8 @@ import { ChangeDetectorRef } from '@angular/core';
     MatTableModule,
     MatPaginatorModule,
     MatSortModule,
-    MatButtonModule],
+    MatButtonModule,
+    ProfilePictureComponent],
   templateUrl: './participant-ael.component.html',
   styleUrls: ['./participant-ael.component.css']
 })

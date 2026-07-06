@@ -1,0 +1,410 @@
+[
+  {
+    "route": "event_participation_approve",
+    "file": "src/app/Events/event-participation-approve/event-participation-approve.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 118},
+      {"c": "event participation request", "line": 195},
+      {"c": "deliverables", "line": 265},
+      {"c": "events_profiles", "line": 316},
+      {"c": "deliverables", "line": 326},
+      {"c": "deliverables", "line": 402}
+    ],
+    "writes": [
+      {"c": "event participation request", "line": 252},
+      {"c": "events_profiles", "line": 255},
+      {"c": "deliverables", "line": 278},
+      {"c": "event participation request", "line": 313},
+      {"c": "participantsproduct", "line": 351},
+      {"c": "deliverables", "line": 355},
+      {"c": "event participation request", "line": 389},
+      {"c": "events_profiles", "line": 392},
+      {"c": "deliverables", "line": 415}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Modular API (collection/collectionData/writeBatch). Three write methods: markAsAttended (244-291), markAsUnattendedAndCancelProduct (304-377), and a third approve method (381-419), each commits a writeBatch updating 'event participation request' status, creating 'events_profiles' docs, and updating 'deliverables'/'participantsproduct' status. 'profile_data' is only referenced as doc() refs stored inside events_profiles docs (lines 257,319,394,448) - not read/written directly. Lines 434-474 (legacy compat-API this.firestore.collection writes to 'event participation request'/'events_profiles'/'profile_data') are inside a /* */ comment block = dead code. authguard.updateDeliveryStatus() service call referenced in commented code only."
+  },
+  {
+    "route": "create_event",
+    "file": "src/app/Events/event-list/event-list.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 63}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads 'event collection' via collectionData (line 65). Line 90 only generates a new doc id (doc(collection(...,'event collection')).id) for eventDocId, no write here. Actual event create/save likely dispatched to a dialog/service not in this file."
+  },
+  {
+    "route": "arena_e_ticket_approve",
+    "file": "src/app/Events/arena-e-ticket-approve/arena-e-ticket-approve.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 61},
+      {"c": "profile_data", "line": 73},
+      {"c": "products", "line": 82},
+      {"c": "event participation request", "line": 129},
+      {"c": "arena e-ticket", "line": 136}
+    ],
+    "writes": [
+      {"c": "arena e-ticket", "line": 157},
+      {"c": "arena e-ticket", "line": 170},
+      {"c": "arena e-ticket", "line": 184},
+      {"c": "arena e-ticket", "line": 193}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads via getDocs (event collection, profile_data, products) and collectionData (event participation request filtered by eventref doc(event collection,selectedEvent); arena e-ticket). Writes updateDoc/setDoc to 'arena e-ticket' (approve/revoke e-ticket). Line 169 builds doc ref to 'event participation request' as a value (eventParticipationRef), not a read/write of that collection."
+  },
+  {
+    "route": "qr-scanner",
+    "file": "src/app/Events/qr-scanner/qr-scanner.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "products", "line": 67},
+      {"c": "event collection", "line": 76},
+      {"c": "profile_data", "line": 89},
+      {"c": "arena e-ticket log", "line": 97},
+      {"c": "arena e-ticket", "line": 139}
+    ],
+    "writes": [
+      {"c": "arena e-ticket log", "line": 219}
+    ],
+    "services": [],
+    "dynamic": ["selectedeventpath (doc(this.firestore,selectedeventpath) line 138 - event doc ref built from a path string)"],
+    "atc": [],
+    "notes": "Reads getDocs (products, event collection, profile_data) and collectionData (arena e-ticket log line 97; arena e-ticket filtered by eventref line 139). Write setDoc to 'arena e-ticket log' (line 219) when scanning/checking in. Lines 209/210 build doc refs to 'products' and 'arena e-ticket' as values for the log doc."
+  },
+  {
+    "route": "event_attendance_log",
+    "file": "src/app/Events/event-attendance-log/event-attendance-log.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 87},
+      {"c": "products", "line": 95},
+      {"c": "event collection", "line": 103},
+      {"c": "arena e-ticket log", "line": 131}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Read-only screen. getDocs (profile_data, products, event collection); collectionData query on 'arena e-ticket log' filtered by eventref==doc('event collection',selectedevent) (line 131-132). valueChanges at line 116 is an Angular FormControl, not Firestore."
+  },
+  {
+    "route": "videoask-display",
+    "file": "src/app/Events/videoask-display/videoask-display.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 138},
+      {"c": "participant tags", "line": 154},
+      {"c": "eiflix workshop", "line": 165},
+      {"c": "queue generation", "line": 177},
+      {"c": "arenavideoask", "line": 189},
+      {"c": "participantvideoask", "line": 202}
+    ],
+    "writes": [
+      {"c": "arena highlights", "line": 329},
+      {"c": "participantvideoask", "line": 363},
+      {"c": "participant metadata", "line": 368},
+      {"c": "participant tag logs", "line": 373}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads getDocs (event collection, eiflix workshop, queue generation, arenavideoask) and collectionData ('participant tags' line 152-154; 'participantvideoask' orderBy uploaded line 202). Writes: setDoc merge to 'arena highlights' (329); updateDoc 'participantvideoask' (363) and 'participant metadata' (368) plus setDoc to 'participant tag logs' (373) when tagging. Lines 384-385 reference 'participant tag versions' setDoc but are commented out. valueChanges line 213 is a FormControl."
+  },
+  {
+    "route": "overall_event_dashboard",
+    "file": "src/app/Events/live-event-dashboard/live-event-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "products", "line": 243},
+      {"c": "temporary function access", "line": 254},
+      {"c": "procedures", "line": 265},
+      {"c": "event collection", "line": 273},
+      {"c": "event participation request", "line": 479},
+      {"c": "arena events", "line": 499},
+      {"c": "participant metadata", "line": 506},
+      {"c": "atc_to_validate", "line": 537},
+      {"c": "arena e-ticket log", "line": 554},
+      {"c": "arenavideoask", "line": 576},
+      {"c": "Achievements/posts/postcollection", "line": 593},
+      {"c": "participant AEL", "line": 643},
+      {"c": "atc_alpha", "line": 676},
+      {"c": "temporary function access", "line": 1563}
+    ],
+    "writes": [
+      {"c": "atc_alpha", "line": 1567}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [
+      {"c": "atc_to_validate", "line": 537},
+      {"c": "atc_alpha", "line": 676},
+      {"c": "atc_alpha", "line": 1567}
+    ],
+    "notes": "ATC SENSITIVE: reads 'atc_to_validate' (537) and 'atc_alpha' (676) via collectionData; onDeleteATC writes updateDoc {isdelete:true} to 'atc_alpha' (1567) gated by getDoc('temporary function access','atcaccess'). getDoc 'temporary function access' doc 'atcaccess' at 254 & 1563. 'Achievements/posts/postcollection' is a literal subcollection path (backtick template but constant). Line 1414 'updashboard_logs' add is commented out."
+  },
+  {
+    "route": "live_event_dashboard",
+    "file": "src/app/Events/live-event-dashboard-v2/live-event-dashboard-v2.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "journey", "line": 607},
+      {"c": "participant tags", "line": 615},
+      {"c": "event collection", "line": 628},
+      {"c": "big cohorts", "line": 776},
+      {"c": "new_user_data", "line": 858},
+      {"c": "queue generation", "line": 972},
+      {"c": "queue generation", "line": 1030},
+      {"c": "event participation request", "line": 1398},
+      {"c": "participant metadata", "line": 1452},
+      {"c": "chat config", "line": 1478},
+      {"c": "clientissue", "line": 1487},
+      {"c": "arena e-ticket log", "line": 1755},
+      {"c": "arena e-ticket", "line": 1823},
+      {"c": "queue variation", "line": 2208},
+      {"c": "atc_alpha", "line": 2250},
+      {"c": "atc_to_validate", "line": 2282},
+      {"c": "arenavideoask", "line": 2329},
+      {"c": "participantvideoask", "line": 2335},
+      {"c": "livechangework", "line": 2926},
+      {"c": "arena events", "line": 3203},
+      {"c": "classify", "line": 3316},
+      {"c": "classify", "line": 4115},
+      {"c": "event participant zones", "line": 4349},
+      {"c": "temporary_ATC", "line": 4484}
+    ],
+    "writes": [
+      {"c": "wati archive", "line": 2757},
+      {"c": "email archive", "line": 2798}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [
+      {"c": "atc_alpha", "line": 2250},
+      {"c": "atc_to_validate", "line": 2282},
+      {"c": "temporary_ATC", "line": 4484}
+    ],
+    "notes": "Largest screen (4612 lines). ATC: reads 'atc_alpha' (2250), 'atc_to_validate' (2282), and draft 'temporary_ATC' where delete==false (4484) all via collectionData. classify (3316,4115) = getDoc(doc(collection('classify'),'eventtags')). Writes only updateDoc to 'wati archive' (2757) and setDoc merge to 'email archive' (2798) from Wati/Email dialog results. Commented-out reads at 3388-3398 (arenavideoask/participantvideoask action queue). valueChanges hits are FormControls."
+  },
+  {
+    "route": "first_timers_dashboard",
+    "file": "src/app/Events/first-timers-dashboard/first-timers-dashboard.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "journey", "line": 158},
+      {"c": "participant tags", "line": 165},
+      {"c": "procedures", "line": 181},
+      {"c": "event collection", "line": 194},
+      {"c": "participant metadata", "line": 221},
+      {"c": "arena e-ticket", "line": 308},
+      {"c": "queue generation", "line": 334},
+      {"c": "queue variation", "line": 375},
+      {"c": "atc_alpha", "line": 400},
+      {"c": "livechangework", "line": 437},
+      {"c": "livechangework", "line": 466},
+      {"c": "livechangework", "line": 890}
+    ],
+    "writes": [],
+    "services": [],
+    "dynamic": [],
+    "atc": [
+      {"c": "atc_alpha", "line": 400}
+    ],
+    "notes": "Read-only screen. ATC SENSITIVE: reads 'atc_alpha' (400) via collectionData filtered by product in atcModels, isdelete==false, prescription_date range. Reads getDocs (journey, procedures, event collection, queue generation, queue variation, livechangework@896) and collectionData (participant tags, participant metadata, arena e-ticket, atc_alpha, livechangework@444/473). Line 174 getDoc('classify','eventtags') is commented out."
+  },
+  {
+    "route": "layers-screen",
+    "file": "src/app/Events/layers-screen/layers-screen.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 78},
+      {"c": "arenalayers", "line": 100}
+    ],
+    "writes": [
+      {"c": "arenalayers", "line": 154},
+      {"c": "arenalayers", "line": 182}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads 'event collection' via getDocs (78) and 'arenalayers' via onSnapshot (100, query filtered by eventref==doc('event collection',selectedevent)). Writes: batch.update 'arenalayers' (154) and updateDoc 'arenalayers' (182)."
+  },
+  {
+    "route": "group-chat",
+    "file": "src/app/Events/Chat/chat-screen/chat-screen.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "profile_data", "line": 152},
+      {"c": "profile_data", "line": 160},
+      {"c": "users_roles", "line": 175},
+      {"c": "supportchat", "line": 210},
+      {"c": "supportchat/{docid}/messages", "line": 311}
+    ],
+    "writes": [
+      {"c": "supportchat/{docid}/messages", "line": 468},
+      {"c": "supportchat/{docid}/messages", "line": 485},
+      {"c": "supportchat/{docid}/messages", "line": 496},
+      {"c": "supportchat", "line": 778},
+      {"c": "supportchat", "line": 791},
+      {"c": "supportchat/{docid}/messages", "line": 841},
+      {"c": "supportchat", "line": 844},
+      {"c": "supportchat", "line": 885},
+      {"c": "supportchat", "line": 1185}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "supportchatCollection=collection('supportchat') (143); profiledataCollection=collection('profile_data') (144). Reads: getDocs 'profile_data' by user_ref (152); collectionSnapshots 'profile_data' (160), 'users_roles' (175 via collectionData), 'supportchat' (210), and messages subcollection 'supportchat/{docid}/messages' (311). Writes to messages subcollection: batch.delete (468), deleteDoc (485), updateDoc (496), setDoc new message (841). Writes to parent 'supportchat' doc via docref: updateDoc (778,791,844 last_message, 1185) and setDoc new chat (885 buildGroup). 'user_data' (151) only a doc ref for where-clause; 'temp' (816,921) only doc().id generation - neither read/written."
+  },
+  {
+    "route": "evolutionmapping",
+    "file": "src/app/EvolutionMapping/evolution-mapping/evolution-mapping.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "evolutionmappingvideo", "line": 163},
+      {"c": "liveevolutionmapping", "line": 260}
+    ],
+    "writes": [
+      {"c": "evolutionmappingvideo", "line": 492}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads getDocs 'evolutionmappingvideo' (163, query) and 'liveevolutionmapping' (260, query line 266). Write updateDoc {deleted:true} to 'evolutionmappingvideo' (492, doc ref built at 489). Commented-out legacy compat reads at 201/229 (evolutionmappingvideo/liveevolutionmapping .get().toPromise()) and 475 (evolutionmappingvideo update)."
+  },
+  {
+    "route": "evolutionmappingnew",
+    "file": "src/app/EvolutionMapping/evolution-mapping-new/evolution-mapping-new.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participant metadata", "line": 227},
+      {"c": "journey", "line": 248},
+      {"c": "event participation request", "line": 324},
+      {"c": "participant videos", "line": 346},
+      {"c": "participant videos", "line": 423},
+      {"c": "profile_data", "line": 458},
+      {"c": "participant videos", "line": 576},
+      {"c": "participant metadata", "line": 640},
+      {"c": "event participation request", "line": 655},
+      {"c": "event participation request", "line": 852},
+      {"c": "participant videos", "line": 857},
+      {"c": "event collection", "line": 1253},
+      {"c": "event collection", "line": 1264},
+      {"c": "participant metadata", "line": 1646},
+      {"c": "event collection", "line": 1663}
+    ],
+    "writes": [
+      {"c": "participant videos", "line": 1321},
+      {"c": "participant videos", "line": 1416},
+      {"c": "participant videos", "line": 1428},
+      {"c": "participant videos", "line": 1689}
+    ],
+    "services": [],
+    "dynamic": [
+      "getDoc(latest['eventref']) line 403 - event doc ref from stored field",
+      "getDoc(eventref) line 893 - event doc ref from stored field",
+      "getDoc(doc(this.firestore, path)) line 959 - path variable"
+    ],
+    "atc": [],
+    "notes": "Reads getDocs across 'participant metadata' (227,640,1646), 'journey' (248 getDoc per id), 'event participation request' (324,655,852, status==attended/profileid in chunk), 'participant videos' (346,423,576,857), 'profile_data' (458), 'event collection' (1253,1264,1663). Writes addDoc 'participant videos' (1321 bulk import, 1428 create, 1689 bulk add) and updateDoc 'participant videos' (1416). buildBaseQuery (line ~739/760 getDocs) queries a collection built earlier. Dynamic getDoc on stored eventref/path refs (403,893,959). valueChanges hits are FormControls."
+  },
+  {
+    "route": "participantevolution",
+    "file": "src/app/EvolutionMapping/evolution-mapping/participant-evolution-mapping/participant-evolution-mapping.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "queue_token", "line": 110},
+      {"c": "queue generation", "line": 128},
+      {"c": "evolutionmappingvideo", "line": 140},
+      {"c": "liveevolutionmapping", "line": 157},
+      {"c": "queue variation", "line": 212}
+    ],
+    "writes": [
+      {"c": "queue_token", "line": 247},
+      {"c": "queue stage log", "line": 259}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Reads getDocs 'queue_token' (110 query, 116) and 'evolutionmappingvideo' (140 query, 143); getDoc 'queue generation' (128 via queueRef), 'liveevolutionmapping' (157, doc by profileid), 'queue variation' (212, doc by variationid). Writes updateDoc 'queue_token' (247) and setDoc 'queue stage log' (259). Commented: line 80 profile_data get; 275-276 liveevolutionmapping update."
+  },
+  {
+    "route": "evolutionmappingv2",
+    "file": "src/app/EvolutionMapping/evolution-mapping-v2/evolution-mapping-v2.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "evolutionmappingvideo", "line": 160},
+      {"c": "liveevolutionmapping", "line": 250}
+    ],
+    "writes": [
+      {"c": "evolutionmappingvideo", "line": 486}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Near-identical to v1 evolutionmapping. Reads getDocs 'evolutionmappingvideo' (160, query line 162) and 'liveevolutionmapping' (250, query line 256). Write updateDoc {deleted:true} to 'evolutionmappingvideo' (486, doc ref at 483). Commented legacy compat reads at 192/220 and update at 469."
+  },
+  {
+    "route": "queueeventhealth",
+    "file": "src/app/Diagnostics Tool/queue-event-health/queue-event-health.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "participantsproduct", "line": 479},
+      {"c": "queue generation", "line": 599},
+      {"c": "profile_data", "line": 633},
+      {"c": "products", "line": 649},
+      {"c": "event participation request", "line": 666},
+      {"c": "participantsproduct", "line": 766},
+      {"c": "arena events", "line": 781},
+      {"c": "atc_alpha", "line": 811},
+      {"c": "atc_to_validate", "line": 831},
+      {"c": "queue_token", "line": 848},
+      {"c": "participantsproduct", "line": 864},
+      {"c": "event participation request", "line": 880}
+    ],
+    "writes": [
+      {"c": "event participation request", "line": 460},
+      {"c": "participantsproduct", "line": 482},
+      {"c": "queue_token", "line": 1158},
+      {"c": "participantsproduct", "line": 1169},
+      {"c": "event participation request", "line": 1188}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [
+      {"c": "atc_alpha", "line": 811},
+      {"c": "atc_to_validate", "line": 831}
+    ],
+    "notes": "Diagnostics screen. ATC SENSITIVE: onSnapshot listeners on 'atc_alpha' isdelete==false (811) and 'atc_to_validate' (831). Reads via getDocs (participantsproduct@479, queue generation@599), getDoc (profile_data@633, products@649, event participation request@666), and onSnapshot (participantsproduct@766/864, arena events@781, queue_token@848, event participation request@880). Writes: setDoc new 'event participation request' (460) + updateDoc 'participantsproduct' (482); batch.update 'queue_token' inactive (1158), 'participantsproduct' cancelled (1169/1174), 'event participation request' unattended (1188). Commented-out: arena events/event participation request queries (409-455 partial), writeBatch block (726-764)."
+  },
+  {
+    "route": "liveeventhealth",
+    "file": "src/app/Diagnostics Tool/live-event-health/live-event-health.component.ts",
+    "exists": true,
+    "reads": [
+      {"c": "event collection", "line": 253},
+      {"c": "event participation request", "line": 291},
+      {"c": "participant metadata", "line": 321},
+      {"c": "products", "line": 335},
+      {"c": "participantsproduct", "line": 378},
+      {"c": "participantsproduct", "line": 397}
+    ],
+    "writes": [
+      {"c": "participantsproduct", "line": 199},
+      {"c": "event participation request", "line": 215}
+    ],
+    "services": [],
+    "dynamic": [],
+    "atc": [],
+    "notes": "Diagnostics screen, no ATC. Reads all via onSnapshot: 'event collection' (253), 'event participation request' filtered by eventref (291/295), 'participant metadata' (321), 'products' (335), 'participantsproduct' (378/383, 397/402). Writes via addCancelToBatch (cancelProduct@148/cancelSelected@163): batch.update 'participantsproduct' status cancelled (199) and 'event participation request' status unattended (215). valueChanges lines 244-247,259 are FormControls."
+  }
+]

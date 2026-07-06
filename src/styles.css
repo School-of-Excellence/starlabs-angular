@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
 /* You can add global styles to this file, and also import other style files */
 @import '@angular/material/prebuilt-themes/indigo-pink.css';
 body{
@@ -157,6 +158,50 @@ body {
   }
 }
 
+/* Journey Coach Health Dashboard — participant Logs hub (right-side sheet) */
+.jchd-slideover-panel {
+  max-width: 100vw !important;
+  height: 100vh;
+}
+.jchd-slideover-panel .mat-mdc-dialog-surface {
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  height: 100vh;
+  background: #ffffff !important;
+  box-shadow: -18px 0 48px -24px rgba(0, 0, 0, 0.22);
+  padding: 0;
+  animation: jchd-slideover-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.jchd-slideover-panel .mat-mdc-dialog-container .mdc-dialog__surface {
+  padding: 0;
+}
+.jchd-slideover-panel .mat-mdc-dialog-container,
+.jchd-slideover-panel .mdc-dialog__content {
+  padding: 0 !important;
+}
+@keyframes jchd-slideover-in {
+  from { transform: translateX(36px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@media (max-width: 640px) {
+  .jchd-slideover-panel { width: 100vw !important; }
+}
+
+/* Journey Coach Health Dashboard — Log composer (centered modal popup) */
+.jchd-logcomposer-panel .mat-mdc-dialog-surface {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.18), 0 30px 60px -20px rgba(0, 0, 0, 0.28);
+  padding: 0;
+}
+.jchd-logcomposer-panel .mat-mdc-dialog-container .mdc-dialog__surface {
+  padding: 0;
+}
+.jchd-logcomposer-panel .mat-mdc-dialog-container,
+.jchd-logcomposer-panel .mdc-dialog__content {
+  padding: 0 !important;
+}
+
 .fullscreen-dialog .mat-mdc-dialog-surface {
   border-radius: 10px !important;
   overflow: auto !important;
@@ -165,3 +210,118 @@ body {
   width: 80vw;
   flex-direction: column;
 }
+/* Enter-studio "Participant accepted" popup — rounded white card */
+.enter-studio-dialog .mat-mdc-dialog-surface {
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, .18) !important;
+}
+.enter-studio-dialog .mat-mdc-dialog-container {
+  --mdc-dialog-container-color: #fff;
+}
+/* =============================================================
+   Dynamic Studio V2 — body scroll lock
+   When the studio takes over the viewport with position:fixed,
+   we lock the host page so the user can't accidentally scroll
+   the underlying content (or the Material drawer container,
+   which creates a transform-containing block that the studio's
+   fixed positioning would otherwise inherit).
+   ============================================================= */
+body:has(.dyn-studio-v2-app),
+html:has(.dyn-studio-v2-app) {
+  overflow: hidden !important;
+}
+.mat-drawer-content:has(.dyn-studio-v2-app),
+.mat-drawer-container:has(.dyn-studio-v2-app) {
+  overflow: hidden !important;
+  height: 100vh !important;
+}
+/* When the studio un-pins on short/narrow viewports (tablet, mobile, high
+   browser zoom) it re-enters normal document flow, so the host page must be
+   allowed to scroll again — otherwise the overflowing content is stuck with
+   no scrollbar. Keep these breakpoints in sync with the .ds-app un-pin rule
+   in dynamic-studio-v2.component.css (max-width:459px / max-height:380px). */
+@media (max-width: 459px), (max-height: 380px) {
+  body:has(.dyn-studio-v2-app),
+  html:has(.dyn-studio-v2-app) {
+    overflow: auto !important;
+  }
+  .mat-drawer-content:has(.dyn-studio-v2-app),
+  .mat-drawer-container:has(.dyn-studio-v2-app) {
+    overflow: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+}
+
+/* =============================================================
+   Zoom meeting view — blend the Safari bottom gap to black.
+   Safari sizes the Zoom gallery a hair under the window height, leaving a strip
+   of page background at the bottom. Paint the page black so it blends into the
+   meeting instead of flashing white. COLOUR ONLY — no layout change. Targets
+   `html` AND `body` (the template renders a nested <body> shorter than the
+   viewport). Harmless in Chrome.
+   Bisect (2026-07-06) confirmed the Safari control-bar being hidden is INHERENT
+   to Zoom SDK 6.1.0 (present even on 3-days-ago code), NOT a recent regression —
+   so we do NOT try to reposition #zmmtg-root (that only displaced the bar). The
+   real fix for visible Safari controls is the custom control bar rendered by the
+   component (see .sx-zoom-controls + isSafariBrowser). */
+html:has(#zmmtg-root),
+body:has(#zmmtg-root) { background: #000; }
+
+/* =============================================================
+   Event Participation Confirmations — CDK overlay theming.
+   :host ::ng-deep cannot reach overlays (they mount at <body>), so
+   these are scoped to THIS feature's overlays via panelClass /
+   overlayPanelClass: 'sx-select-pane' (every select incl. the
+   paginator's page-size, via MAT_SELECT_CONFIG), 'sx-dialog' /
+   'sx-dialog-surface' (dialogs), 'sx-menu-panel' (menu), 'sx-snack'
+   (snackbars), 'sx-tip' (tooltips). No effect on other screens.
+   ============================================================= */
+.sx-select-pane .mat-mdc-select-panel,
+.sx-select-pane .mat-mdc-option,
+.sx-dialog .mat-mdc-dialog-surface,
+.sx-menu-panel,
+.sx-menu-panel .mat-mdc-menu-item,
+.sx-snack .mdc-snackbar__surface,
+.sx-tip {
+  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Select dropdown panels — named selects AND the paginator page-size select */
+.sx-select-pane .mat-mdc-select-panel { border-radius: 12px; padding: 5px; background: #fff;
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, .18); }
+.sx-select-pane .mat-mdc-option { --mat-option-selected-state-layer-color: rgba(0, 122, 255, .08); }
+.sx-select-pane .mat-mdc-option .mdc-list-item__primary-text { color: #1c1c1e; }
+.sx-select-pane .mat-mdc-option.mdc-list-item--selected .mdc-list-item__primary-text { color: #0060df; }
+.sx-select-pane .mat-mdc-option:hover:not(.mdc-list-item--disabled),
+.sx-select-pane .mat-mdc-option.mat-mdc-option-active { background: rgba(0, 122, 255, .06); }
+
+/* Dialogs (confirm / progress / failures via sx-dialog) */
+.sx-dialog .mat-mdc-dialog-surface { border-radius: 16px; }
+.sx-dialog .mdc-button { font-family: inherit; letter-spacing: 0; border-radius: 10px; height: 40px; }
+.sx-dialog .mat-mdc-button { --mdc-text-button-label-text-color: #007aff; }
+.sx-dialog .mat-mdc-unelevated-button {
+  --mdc-filled-button-container-color: #007aff;
+  --mdc-filled-button-label-text-color: #fff;
+}
+.sx-dialog .mat-mdc-unelevated-button:hover { --mdc-filled-button-container-color: #0060df; }
+.sx-dialog .mdc-linear-progress { --mdc-linear-progress-active-indicator-color: #007aff; }
+.sx-dialog .mdc-linear-progress__buffer-bar { background: rgba(0, 122, 255, .16); }
+
+/* Surface-only class for foreign dialogs (assign-product, comms) — rounds the
+   surface WITHOUT recolouring their internal buttons */
+.sx-dialog-surface .mat-mdc-dialog-surface { border-radius: 16px;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .18), 0 30px 60px -20px rgba(0, 0, 0, .28); }
+
+/* Send menu panel */
+.sx-menu-panel.mat-mdc-menu-panel { border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 32px -12px rgba(0, 0, 0, .22); }
+.sx-menu-panel .mat-mdc-menu-item { min-height: 40px; --mat-menu-item-label-text-color: #1c1c1e; }
+.sx-menu-panel .mat-mdc-menu-item .mat-icon { color: #6c6c70; font-size: 20px; width: 20px; height: 20px; }
+.sx-menu-panel .mat-mdc-menu-item:hover,
+.sx-menu-panel .mat-mdc-menu-item.cdk-focused { background: rgba(0, 122, 255, .08); }
+
+/* Snackbars (sx-snack via MAT_SNACK_BAR_DEFAULT_OPTIONS) */
+.sx-snack { --mdc-snackbar-container-shape: 12px; --mat-snack-bar-button-color: #4da3ff; }

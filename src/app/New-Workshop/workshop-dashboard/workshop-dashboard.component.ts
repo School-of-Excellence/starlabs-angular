@@ -34,6 +34,7 @@ import { HttpClient } from '@angular/common/http';
 import { SnackbarService } from '../../shared/snackbar.service';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsapp-progress-dialog.component';
 
 @Component({
   selector: 'app-workshop-dashboard',
@@ -472,8 +473,161 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     ref.afterClosed().subscribe(async (result) => {
-      await this.handleDialogResult(result);
+      await this.handleWhatsappChunked(result);
     });
+  }
+
+  private readonly WHATSAPP_CHUNK_SIZE = 200;
+  private readonly CHUNK_DELAY_MS = 1000;
+
+  private async handleWhatsappChunked(result: any) {
+    if (result?.action !== 'sent' || result.type !== 'whatsapp') {
+      return;
+    }
+
+    const { templateName, customParams } = result;
+    const participants = this.filteredParticipants
+      .filter(participant => {
+        const metadata = participant['metadata'];
+        return metadata && metadata['phonenumber'] && metadata['name'];
+      })
+      .map(participant => {
+        const metadata = participant['metadata'];
+        const name = metadata['name'];
+        let cc = metadata['countryCode'] || metadata['countrycode'] || '';
+        cc = cc.trim();
+        if (cc && !cc.startsWith('+')) cc = '+' + cc;
+        let phone = metadata['phonenumber']?.toString().trim() || '';
+        phone = phone.replace(/^\+/, '');
+        const phonenumber = cc ? `${cc}${phone}` : phone;
+        const processedParams = customParams.map((param: any) => ({
+          name: param.name,
+          value: param.value.replace(/\{\{name\}\}/g, name)
+        }));
+        return { phonenumber, name, customParams: processedParams };
+      });
+
+    if (participants.length === 0) {
+      this.snackbarService.show('No valid participants found');
+      return;
+    }
+
+    const progressDialog = this.dialog.open(WhatsappProgressDialogComponent, {
+      width: '500px',
+      maxWidth: '95vw',
+      disableClose: true,
+      data: {
+        totalParticipants: participants.length,
+        templateName: templateName
+      } as WhatsAppProgressData
+    });
+    const progressComponent = progressDialog.componentInstance;
+    const chunks = this.chunkArray(participants, this.WHATSAPP_CHUNK_SIZE);
+    const totalChunks = chunks.length;
+    progressComponent.updateProgress({ totalChunks });
+
+    let totalSuccess = 0;
+    let totalFailed = 0;
+    let allErrors: string[] = [];
+    let isCancelled = false;
+    const cancelSubscription = progressComponent.cancel$.subscribe(() => {
+      isCancelled = true;
+    });
+
+    const url = this.getCloudFunctionUrl('workshopprogressmessage');
+    for (let i = 0; i < chunks.length; i++) {
+      if (isCancelled) {
+        console.log('Sending cancelled by user');
+        break;
+      }
+
+      const chunk = chunks[i];
+      const chunkIndex = i + 1;
+
+      progressComponent.updateProgress({
+        currentChunk: chunkIndex,
+        isProcessingChunk: true
+      });
+
+      try {
+        const chunkPayload = {
+          type: 'whatsapp',
+          templateName,
+          participants: chunk,
+          chunkInfo: {
+            chunkIndex,
+            totalChunks,
+            chunkSize: chunk.length
+          }
+        };
+
+        const response = await firstValueFrom(
+          this.http.post<any>(url, chunkPayload, { responseType: 'json' })
+        );
+
+        console.log(`Chunk ${chunkIndex}/${totalChunks} response:`, response);
+        const chunkSuccess = response.successCount || chunk.length;
+        const chunkFailed = response.failureCount || 0;
+        totalSuccess += chunkSuccess;
+        totalFailed += chunkFailed;
+        if (response.errors && Array.isArray(response.errors)) {
+          allErrors = [...allErrors, ...response.errors];
+        }
+
+        progressComponent.updateProgress({
+          processedCount: totalSuccess + totalFailed,
+          successCount: totalSuccess,
+          failedCount: totalFailed,
+          isProcessingChunk: false,
+          errors: response.errors || [],
+          watiErrors: response.watiErrors || []
+        });
+
+      } catch (error: any) {
+        console.error(`Failed to send chunk ${chunkIndex}:`, error);
+        totalFailed += chunk.length;
+        const errorMessage = `Chunk ${chunkIndex} failed: ${error.message || 'Unknown error'}`;
+        allErrors.push(errorMessage);
+
+        progressComponent.updateProgress({
+          processedCount: totalSuccess + totalFailed,
+          successCount: totalSuccess,
+          failedCount: totalFailed,
+          isProcessingChunk: false,
+          errors: [errorMessage]
+        });
+      }
+      if (i < chunks.length - 1 && !isCancelled) {
+        await this.delay(this.CHUNK_DELAY_MS);
+      }
+    }
+    cancelSubscription.unsubscribe();
+
+    let finalStatus: 'success' | 'partial' | 'error';
+    if (isCancelled) {
+      finalStatus = totalSuccess > 0 ? 'partial' : 'error';
+    } else if (totalFailed === 0) {
+      finalStatus = 'success';
+    } else if (totalSuccess > 0) {
+      finalStatus = 'partial';
+    } else {
+      finalStatus = 'error';
+    }
+    progressComponent.complete(finalStatus);
+    const dialogResult = await firstValueFrom(progressDialog.afterClosed());
+    console.log('Final sending result:', dialogResult);
+  }
+
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private getCloudFunctionUrl(functionName: string): string {
@@ -627,6 +781,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
         }).then(() => {
           alert("A&H Update sent to App user " + profileID.length.toString());
         });
@@ -2489,11 +2644,19 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.downloadCSV(csvContent, fileName);
   }
 
+  // async manualenroll() {
+  //   const { EnrollComponent } = await import('./enroll/enroll.component');
+  //   const dialogRef = this.dialog.open(EnrollComponent, {
+  //     width: '400px',
+  //     data: { workshopId: this.workshopId, profiledata: this.mapProfile }
+  //   });
+  //   dialogRef.afterClosed().subscribe(result => { });
+  // }
   async manualenroll() {
     const { EnrollComponent } = await import('./enroll/enroll.component');
     const dialogRef = this.dialog.open(EnrollComponent, {
       width: '400px',
-      data: { workshopId: this.workshopId, profiledata: this.mapProfile }
+      data: { workshopId: this.workshopId }
     });
     dialogRef.afterClosed().subscribe(result => { });
   }

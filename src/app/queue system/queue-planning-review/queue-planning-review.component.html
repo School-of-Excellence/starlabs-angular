@@ -36,14 +36,53 @@
       <div class="row w-100">
         <div class="col-sm">
           <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1">
-            <div class="fw-bold mb-2 h5">Live Queue</div>
-            <span *ngFor="let live of liveQueueList">
-              <button mat-stroked-button class="me-2 mb-2"
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="fw-bold h5 mb-0">Live Queue</div>
+              <button mat-stroked-button
+                [color]="liveQueueExportModeOn ? 'primary' : ''"
+                (click)="toggleLiveQueueExportMode()">
+                <mat-icon>{{ liveQueueExportModeOn ? 'checklist' : 'checklist_rtl' }}</mat-icon>
+                {{ liveQueueExportModeOn ? 'Exit Export Mode' : 'Select for Export' }}
+              </button>
+            </div>
+
+            <span *ngFor="let live of liveQueueList" class="d-inline-flex align-items-center me-2 mb-2">
+              <span *ngIf="liveQueueExportModeOn" class="me-1">
+                <mat-icon>
+                  {{ liveQueueExportSelection.has(live['docid']) ? 'check_box' : 'check_box_outline_blank' }}
+                </mat-icon>
+              </span>
+              <button mat-stroked-button
                 [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
-                (click)="selectedQueue = live; onQueueSelect()">
+                (click)="onLiveQueueClick(live)">
                 {{live["queuename"]}}
               </button>
             </span>
+
+            <div class="d-flex align-items-center gap-2 mt-2" *ngIf="liveQueueExportModeOn && liveQueueExportSelection.size > 0">
+              <span class="text-muted small">{{ liveQueueExportSelection.size }} selected</span>
+
+              <mat-form-field appearance="outline" style="width:260px">
+                <mat-label>Date range</mat-label>
+                <mat-date-range-input [rangePicker]="exportRangePicker">
+                  <input matStartDate placeholder="Start" [(ngModel)]="liveQueueExportRange.startDate">
+                  <input matEndDate placeholder="End" [(ngModel)]="liveQueueExportRange.endDate">
+                </mat-date-range-input>
+                <mat-datepicker-toggle matIconSuffix [for]="exportRangePicker"></mat-datepicker-toggle>
+                <mat-date-range-picker #exportRangePicker></mat-date-range-picker>
+              </mat-form-field>
+
+              <button mat-raised-button color="primary"
+                [disabled]="!liveQueueExportRange.startDate || !liveQueueExportRange.endDate || liveQueueExportBusy"
+                (click)="exportLiveQueuesByDateRange()">
+                <mat-spinner *ngIf="liveQueueExportBusy" diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+                Export
+              </button>
+
+              <button mat-icon-button matTooltip="Clear" (click)="toggleLiveQueueExportMode()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -102,6 +141,80 @@
 
       </ng-container>
 
+
+      <!-- Event Participation Filter -->
+      <div class="ep-filter-wrapper" *ngIf="selectedQueue != null">
+
+        <button mat-stroked-button class="ep-filter-btn"
+          [class.ep-filter-active]="eventParticipationDataLoaded"
+          [disabled]="eventParticipationLoading"
+          (click)="showEventParticipationPicker = !showEventParticipationPicker; loadEventParticipationList()">
+          <mat-icon>event</mat-icon>
+          <span *ngIf="!eventParticipationDataLoaded">Event Filter</span>
+          <span *ngIf="eventParticipationDataLoaded">{{ selectedArenaEventName }}</span>
+          <mat-spinner *ngIf="eventParticipationLoading" diameter="14"
+            style="display:inline-block; margin-left:4px;">
+          </mat-spinner>
+        </button>
+
+        <div class="ep-dropdown" *ngIf="showEventParticipationPicker">
+
+          <div *ngIf="eventParticipationLoading" class="ep-loading">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Loading...</span>
+          </div>
+
+          <ng-container *ngIf="!eventParticipationLoading && arenaEventFilterList.length === 0">
+            <input class="ep-search-input" type="text"
+              [(ngModel)]="eventParticipationSearchTerm"
+              placeholder="Search events or queues...">
+            <div class="ep-list">
+              <div *ngFor="let item of filteredEventParticipationList"
+                class="ep-list-item"
+                (click)="onEventParticipationSelect(item)">
+                <span>{{ item.name }}</span>
+                <span class="ep-type-badge">{{ item.type }}</span>
+              </div>
+              <div *ngIf="filteredEventParticipationList.length === 0" class="ep-empty">
+                No results found
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="!eventParticipationLoading && arenaEventFilterList.length > 0">
+            <div class="ep-back-btn"
+              (click)="selectedEventParticipation = null; arenaEventFilterList = []; arenaEventProfileMap = {}; selectedArenaEventId = null;">
+              <mat-icon>arrow_back</mat-icon>
+              <span>{{ selectedEventParticipation?.name }}</span>
+            </div>
+            <div class="ep-list">
+              <div *ngFor="let event of arenaEventFilterList"
+                class="ep-list-item"
+                [class.ep-list-item-selected]="selectedArenaEventId === event.docid"
+                (click)="selectedArenaEventId = event.docid">
+                <mat-icon class="ep-radio-icon">
+                  {{ selectedArenaEventId === event.docid ? 'radio_button_checked' : 'radio_button_unchecked' }}
+                </mat-icon>
+                <span>{{ event.name }}</span>
+              </div>
+            </div>
+            <button mat-raised-button color="primary" class="ep-apply-btn"
+              [disabled]="!selectedArenaEventId"
+              (click)="applyEventParticipationFilter()">
+              Apply
+            </button>
+          </ng-container>
+
+        </div>
+
+        <button mat-icon-button class="ep-reset-btn"
+          *ngIf="eventParticipationDataLoaded"
+          matTooltip="Reset Event Filter"
+          (click)="resetEventParticipationFilter()">
+          <mat-icon>close</mat-icon>
+        </button>
+
+      </div>
 
     <!-- NEW: Overall Counts Section -->
     <div class="overall-counts-section" [class.with-interim-cards]="interimDataLoaded" *ngIf="selectedQueue && !loading">
@@ -201,8 +314,16 @@
                   <!-- Slot Cards for this Stage -->
                   <div *ngFor="let slot of getSlotsForStage(stage)" class="slot-card-wrapper">
                     <div class="slot-card" (click)="openSlotPanel(slot, stage)">
-                      <!-- Show Dates with Time in Single Box -->
                       <div class="slot-datetime-box">
+                        <div class="datetime-row slot-title-row" 
+                          *ngIf="getSlotTitle(slot, stage)">
+                          <mat-icon>label</mat-icon>
+                          <span class="datetime-label" style="color: black;">Title:</span>
+                          <span class="slot-title-text">
+                            {{ getSlotTitle(slot, stage) }}
+                          </span>
+                        </div>
+
                         <div class="datetime-row">
                           <mat-icon>event</mat-icon>
                           <span class="datetime-label">Start:</span>
@@ -216,6 +337,7 @@
                           <span class="datetime-value">{{ slot.enddate | date:'dd MMM yyyy' }} {{
                             formatTimeTo12Hour(slot.endtime) }}</span>
                         </div>
+
                       </div>
 
                       <!-- Counts Display -->
@@ -309,6 +431,11 @@
 
         <h4 *ngIf="panelViewType === 'slot'">
           <span class="info-value">
+            <span class="panel-slot-title" style="color: white;" 
+              *ngIf="getSlotTitle(selectedSlot, selectedStageForPanel)">
+              <span style="color: white;">Title:</span>   
+              {{ getSlotTitle(selectedSlot, selectedStageForPanel) }}
+            </span>
             {{ selectedSlot?.startdate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.starttime) }}
             <span class="separator">—</span>
             {{ selectedSlot?.enddate | date:'dd MMM yyyy' }} {{ formatTimeTo12Hour(selectedSlot?.endtime) }}
@@ -604,6 +731,10 @@
               (click)="exportParticipantsToExcel()">
               <mat-icon>file_download</mat-icon>
             </button>
+            <button mat-icon-button matTooltip="Overall Slot Revert History"
+              (click)="openOverallSlotRevertHistory()">
+              <mat-icon>manage_history</mat-icon>
+            </button>
             <mat-checkbox [checked]="areAllParticipantsSelected(activePanelSection || 'all')"
               [indeterminate]="areSomeParticipantsSelected(activePanelSection || 'all')"
               (change)="toggleAllParticipants($event.checked, activePanelSection || 'all')">
@@ -639,9 +770,9 @@
             </button>
             <button mat-raised-button class="action-btn-compact oneway-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
-              (click)="openOneWayWizard()">
+              (click)="sendChannel()">
               <mat-icon>campaign</mat-icon>
-              <span>One Way -</span>
+              <span>Channel -</span>
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
             </button>
           </div>
@@ -680,7 +811,10 @@
                     <mat-icon *ngIf="participant.isDuplicate" class="duplicate-icon">content_copy</mat-icon>
                     <mat-icon *ngIf="participant.isNonSegmentParticipant" class="non-segment-icon">person_off</mat-icon>
                   </div>
-                  <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                  <span style="display:inline-flex;align-items:center;gap:6px;">
+                    <app-profile-picture [profileId]="participant.profile_id || participant.profileid" [name]="getProfileName(participant.profile_id || participant.profileid)" [size]="28"></app-profile-picture>
+                    <span>{{ getProfileName(participant.profile_id || participant.profileid) }}</span>
+                  </span>
                   <span class="participant-phone"
                     *ngIf="getParticipantPhoneNumber(participant.profile_id || participant.profileid)">
                     📞 {{ getParticipantPhoneNumber(participant.profile_id || participant.profileid) }}
@@ -811,6 +945,14 @@
                 class="book-btn"
                 (click)="openBookSlotDialog(participant, selectedStageForPanel); $event.stopPropagation()">
                 <mat-icon>event_available</mat-icon>
+              </button>
+
+              <button mat-icon-button
+                *ngIf="participant.queue_slot_log"
+                class="history-btn"
+                matTooltip="Revert History"
+                (click)="openRevertHistoryDialog(participant); $event.stopPropagation()">
+                <mat-icon>history</mat-icon>
               </button>
 
               <mat-checkbox [(ngModel)]="participant.selected" class="participant-checkbox">
@@ -983,7 +1125,14 @@
               <td>
                 <span class="expand-arrow" [class.expanded]="slot.expanded" *ngIf="slot.showExpand">▶</span>
               </td>
-              <td><strong>{{ getDateAndMonthString(slot?.startdate) }}</strong></td>
+              <td>
+                <div *ngIf="getSlotTitle(slot, selectedStage)"
+                  class="table-slot-title">
+                  <span class="datetime-label" style="color: black;">Title:</span>  
+                  {{ getSlotTitle(slot, selectedStage) }}
+                </div>
+                <strong>{{ getDateAndMonthString(slot?.startdate) }}</strong>
+              </td>
               <td>{{ getTimeString(slot?.startdate , slot?.enddate) }}</td>
               <td style="text-align:center">
                 <span class="badge badge-none">{{ getMaxSlotsCount(slot, selectedStage) }}</span>
@@ -1076,6 +1225,11 @@
                     [class.expanded]="isQueueRowExpanded(slot)">▶</span>
                 </td>
                 <td (click)="toggleQueueRow(slot)">
+                  <div *ngIf="getSlotTitle(slot, selectedStage)"
+                    class="table-slot-title">
+                    <span class="datetime-label" style="color: black;">Title:</span>  
+                    {{ getSlotTitle(slot, selectedStage) }}
+                  </div>
                   <strong>{{ getDateAndMonthString(slot.startdate) }}</strong>
                   {{ getTimeString(slot.startdate, slot.enddate) }}
                 </td>
@@ -1094,7 +1248,9 @@
                   </span>
                 </td>
                 <td style="text-align:center">
-                  <span class="badge badge-none">
+                  <span class="badge badge-none clickable-badge"
+                    (click)="openQueueTabPanelForSlot(slot, selectedStage, 'all')">
+                    <mat-icon class="badge-click-icon">people</mat-icon>
                     {{ getConfirmedCountForSlot(slot, selectedStage) + getNonConfirmedCountForSlot(slot, selectedStage) }}
                   </span>
                 </td>
@@ -1142,7 +1298,9 @@
                               </span>
                             </td>
                             <td style="text-align:center">
-                              <span class="badge badge-none">
+                              <span class="badge badge-none clickable-badge"
+                                (click)="openQueueTabPanel(slot, selectedStage, segmentVar.segmentId, 'all')">
+                                <mat-icon class="badge-click-icon">people</mat-icon>
                                 {{ getConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) + getNonConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
                               </span>
                             </td>
@@ -1153,30 +1311,34 @@
                   </div>
                 </td>
               </tr>
-
             </ng-container>
           </ng-container>
 
-          <!-- Total Row -->
           <tr class="total-row">
-            <td></td>
-            <td><strong>TOTAL</strong></td>
-            <td style="text-align:center">
-              <span class="badge badge-booked">
-                {{ getTotalConfirmedParticipantInTable() }}
-              </span>
-            </td>
-            <td style="text-align:center">
-              <span class="badge badge-nonconf">
-                {{ getTotalQueueNonConfirmedInTable() }}
-              </span>
-            </td>
-            <td style="text-align:center">
-              <span class="badge badge-none">
-                {{ getTotalConfirmedParticipantInTable() + getTotalQueueNonConfirmedInTable() }}
-              </span>
-            </td>
-          </tr>
+          <td></td>
+          <td><strong>TOTAL</strong></td>
+          <td style="text-align:center">
+            <span class="badge badge-booked clickable-badge"
+              (click)="openTotalPanelForStage('confirmed')">
+              <mat-icon class="badge-click-icon">how_to_reg</mat-icon>
+              {{ getTotalConfirmedParticipantInTable() }}
+            </span>
+          </td>
+          <td style="text-align:center">
+            <span class="badge badge-nonconf clickable-badge"
+              (click)="openTotalPanelForStage('non-confirmed')">
+              <mat-icon class="badge-click-icon">schedule</mat-icon>
+              {{ getTotalQueueNonConfirmedInTable() }}
+            </span>
+          </td>
+          <td style="text-align:center">
+            <span class="badge badge-none clickable-badge"
+              (click)="openTotalPanelForStage('all')">
+              <mat-icon class="badge-click-icon">people</mat-icon>
+              {{ getTotalConfirmedParticipantInTable() + getTotalQueueNonConfirmedInTable() }}
+            </span>
+          </td>
+        </tr>
         </tbody>
       </table>
     </div>
@@ -1246,7 +1408,7 @@
             <mat-icon>email</mat-icon>
           </button>
           <button mat-mini-fab class="comm-fab oneway-fab" matTooltip="One Way Broadcast"
-            (click)="openOneWayWizard()">
+            (click)="sendChannel()">
             <mat-icon>campaign</mat-icon>
           </button>
           <span class="comm-count-label">{{ getSelectedParticipantsCount('all') }} selected</span>
@@ -1343,6 +1505,109 @@
         <mat-spinner *ngIf="bookSlotLoading" diameter="18" style="display:inline-block; margin-right:6px;"></mat-spinner>
         Confirm Booking
       </button>
+    </div>
+
+  </div>
+</div>
+<!-- Revert History Dialog -->
+<div class="revert-history-overlay" *ngIf="showRevertHistoryDialog" (click)="showRevertHistoryDialog = false">
+  <div class="revert-history-dialog" (click)="$event.stopPropagation()">
+
+    <div class="revert-history-dialog-header">
+      <div class="revert-history-title">
+        <mat-icon>history</mat-icon>
+        <span>Revert History</span>
+      </div>
+      <button mat-icon-button (click)="showRevertHistoryDialog = false">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="revert-history-dialog-body">
+      <ng-container *ngFor="let stageEntry of revertHistoryParticipant?.queue_slot_log | keyvalue">
+        <div class="revert-history-stage-label">
+          <mat-icon>flag</mat-icon>
+          {{ stageEntry.key }}
+        </div>
+        <div class="revert-history-entry" *ngFor="let entry of stageEntry.value; let i = index">
+          <div class="revert-history-entry-number">#{{ i + 1 }}</div>
+          <div class="revert-history-entry-details">
+            <div class="revert-history-entry-row">
+              <mat-icon>schedule</mat-icon>
+              <span><b>Slot:</b>
+                {{ (entry.startdate?.toDate ? entry.startdate.toDate() : entry.startdate) | date:'dd MMM yyyy, HH:mm' }}
+                -
+                {{ (entry.enddate?.toDate ? entry.enddate.toDate() : entry.enddate) | date:'HH:mm' }}
+              </span>
+            </div>
+            <div class="revert-history-entry-row">
+              <mat-icon>event</mat-icon>
+              <span><b>Reverted On:</b>
+                {{ (entry.createdon?.toDate ? entry.createdon.toDate() : entry.createdon) | date:'dd MMM yyyy, HH:mm' }}
+              </span>
+            </div>
+            <div class="revert-history-entry-row">
+              <mat-icon>admin_panel_settings</mat-icon>
+              <span><b>Reverted By:</b> {{ getProfileName(entry.revertedby) }}</span>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+</div>
+<!-- Overall Slot Revert History Dialog -->
+<div class="revert-history-overlay" *ngIf="showOverallSlotRevertHistory"
+  (click)="showOverallSlotRevertHistory = false">
+  <div class="revert-history-dialog" (click)="$event.stopPropagation()">
+
+    <div class="revert-history-dialog-header">
+      <div class="revert-history-title">
+        <mat-icon>manage_history</mat-icon>
+        <span>Overall Slot Revert History ({{ overallSlotRevertHistory.length }})</span>
+      </div>
+      <button mat-icon-button (click)="showOverallSlotRevertHistory = false">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="revert-history-dialog-body">
+      <div *ngIf="overallSlotRevertHistory.length === 0" style="padding: 16px; color: #888;">
+        No revert history found for this slot.
+      </div>
+
+      <div class="revert-history-entry"
+        *ngFor="let entry of overallSlotRevertHistory; let i = index">
+        <div class="revert-history-entry-number">#{{ i + 1 }}</div>
+        <div class="revert-history-entry-details">
+          <div class="revert-history-entry-row">
+            <mat-icon>person</mat-icon>
+            <span><b>Participant:</b> {{ getProfileName(entry.profileId) }}</span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>flag</mat-icon>
+            <span><b>Stage:</b> {{ entry.stageName }}</span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>schedule</mat-icon>
+            <span><b>Slot:</b>
+              {{ (entry.log.startdate?.toDate ? entry.log.startdate.toDate() : entry.log.startdate) | date:'dd MMM yyyy, HH:mm' }}
+              —
+              {{ (entry.log.enddate?.toDate ? entry.log.enddate.toDate() : entry.log.enddate) | date:'HH:mm' }}
+            </span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>event</mat-icon>
+            <span><b>Reverted On:</b>
+              {{ (entry.log.createdon?.toDate ? entry.log.createdon.toDate() : entry.log.createdon) | date:'dd MMM yyyy, HH:mm' }}
+            </span>
+          </div>
+          <div class="revert-history-entry-row">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <span><b>Reverted By:</b> {{ getProfileName(entry.log.revertedby) }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>

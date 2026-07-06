@@ -1,4 +1,6 @@
-import { Component, OnInit, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { Observable, interval, map, takeWhile, startWith, tap } from 'rxjs';
+import { AsyncPipe } from '@angular/common';
 import { Firestore, collection, collectionData,query, where,getDoc,setDoc, getDocs,doc, updateDoc, deleteDoc } from '@angular/fire/firestore';
 import { Storage, ref as afRef, uploadBytes as afUploadBytes, getDownloadURL as afGetDownloadURL } from '@angular/fire/storage';
 import { v4 as uuidv4 } from 'uuid'; // for createId replacement
@@ -15,7 +17,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-participant-evolution-mapping',
-  imports: [VideoPlayerComponent,CommonModule,MatProgressBarModule,MatCheckboxModule,FormsModule, ReactiveFormsModule],
+  imports: [VideoPlayerComponent,CommonModule,MatProgressBarModule,MatCheckboxModule,FormsModule, ReactiveFormsModule, AsyncPipe],
   templateUrl: './participant-evolution-mapping.component.html',
   styleUrl: './participant-evolution-mapping.component.css'
 })
@@ -44,7 +46,10 @@ export class ParticipantEvolutionMappingComponent {
   submitted:boolean = false
   enableCheck: boolean = false;
   showCongrats: boolean = false;
-  alreadyCompleted: boolean = false;  constructor(
+  alreadyCompleted: boolean = false; 
+  expiredLive: boolean = false;
+  timeRemaining$: Observable<string> | null = null;
+  constructor(
     private firestore: Firestore,
     private storage: Storage,
     private authguard: AuthguardService,
@@ -90,6 +95,50 @@ export class ParticipantEvolutionMappingComponent {
   ngOnInit() {
 
   }
+
+  startCountdownTimer(lastupdated: Date) {
+    const expiryTime = new Date(
+      lastupdated.getTime() + 48 * 60 * 60 * 1000
+    );
+
+    this.timeRemaining$ = interval(1000).pipe(
+      startWith(0),
+      map(() => {
+        const diff = expiryTime.getTime() - new Date().getTime();
+
+        if (diff <= 0) return '00:00:00';
+
+        const hours   = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }),
+      takeWhile(val => val !== '00:00:00', true),
+      tap(async val => {
+        if (val === '00:00:00' && !this.expiredLive) {
+          this.expiredLive = true;
+          try {
+            const liveDocRef = doc(
+              this.firestore,
+              'liveevolutionmapping',
+              this.currentProfile['profileid']
+            );
+            await updateDoc(liveDocRef, { live: false });
+          } catch (err) {
+            console.error('Error updating live status on expiry', err);
+          }
+          if (this.liveEvolutionMapping.length > 0) {
+            this.liveEvolutionMapping = [
+              { ...this.liveEvolutionMapping[0], live: false }
+            ];
+          }
+        }
+      })
+    );
+  }
+
+
 
   async fetchOngoingLiveEvolutionMapping() {
   this.profileJourneyProduct['group'] = {};
@@ -153,24 +202,45 @@ export class ParticipantEvolutionMappingComponent {
 
   // liveevolutionmapping
   try {
-    const liveDocRef = doc(this.firestore, "liveevolutionmapping", this.currentProfile['profileid']);
-    const livedata = await getDoc(liveDocRef);
+      const liveDocRef = doc(this.firestore, "liveevolutionmapping", this.currentProfile['profileid']);
+      const livedata = await getDoc(liveDocRef);
 
-    this.liveEvolutionMapping = [];
-    const element = livedata.data();
-    if (element) {
-      this.liveEvolutionMapping.push(element);
-      console.log("live", this.liveEvolutionMapping);
-    } else {
-      console.log("No data");
+      this.liveEvolutionMapping = [];
+      const element = livedata.data();
+      if (element) {
+
+        const lastupdated = element['lastupdated']?.toDate();
+
+        if (!lastupdated) {
+          this.expiredLive = true;
+          await updateDoc(liveDocRef, { live: false });
+          element['live'] = false;
+
+        } else {
+          const now = new Date();
+          const diffHrs = (now.getTime() - lastupdated.getTime()) / (1000 * 60 * 60);
+
+          if (diffHrs > 48) {
+            this.expiredLive = true;
+            await updateDoc(liveDocRef, { live: false });
+            element['live'] = false;
+          } else {
+            this.startCountdownTimer(lastupdated);
+          }
+        }
+
+        this.liveEvolutionMapping.push(element);
+        console.log("live", this.liveEvolutionMapping);
+      } else {
+        console.log("No data");
+      }
+      this.queryCount += 1;
+      if (this.queryCount >= 2) {
+        this.loading = false;
+      }
+    } catch (error) {
+      console.error("Error", error);
     }
-    this.queryCount += 1;
-    if (this.queryCount >= 2) {
-      this.loading = false;
-    }
-  } catch (error) {
-    console.error("Error", error);
-  }
 }
   isVideoEnabled(index: number): boolean {
     return this.enabledVideos.has(index);

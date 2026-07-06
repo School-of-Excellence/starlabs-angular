@@ -21,7 +21,12 @@
     "e2e:T7": "npx playwright test --config=e2e/playwright.config.ts T7-screen-share",
     "e2e:T8": "npx playwright test --config=e2e/playwright.config.ts T8-blur",
     "e2e:T9": "npx playwright test --config=e2e/playwright.config.ts T9-sustained",
-    "e2e:T10": "npx playwright test --config=e2e/playwright.config.ts T10-rejoin"
+    "e2e:T10": "npx playwright test --config=e2e/playwright.config.ts T10-rejoin",
+    "start:emulator": "ng serve --configuration emulator",
+    "build:emulator": "ng build --configuration emulator",
+    "perf:auth": "npx tsx e2e/perf/capture-auth.ts",
+    "perf:trace": "npx playwright test --config=e2e/perf/playwright.perf.config.ts",
+    "perf:trace:report": "npx playwright show-report e2e/perf/report"
   },
   "private": true,
   "dependencies": {
@@ -48,7 +53,7 @@
     "@picovoice/koala-web": "^3.0.0",
     "@picovoice/web-voice-processor": "^4.0.9",
     "@types/file-saver": "^2.0.7",
-    "@zoom/meetingsdk": "^3.13.2",
+    "@zoom/meetingsdk": "^6.1.0",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "@zxing/ngx-scanner": "^19.0.0",
@@ -63,7 +68,7 @@
     "firebase": "^11.10.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
-    "livekit-client": "^1.15.13",
+    "livekit-client": "2.19.1",
     "marked": "^15.0.12",
     "ng-apexcharts": "1.15.0",
     "ngx-editor": "^19.0.0-beta.1",

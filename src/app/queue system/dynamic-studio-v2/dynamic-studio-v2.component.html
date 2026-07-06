@@ -1,0 +1,1552 @@
+<div class="mainscreen mb-2">
+
+  <!-- ============ LOBBY: studios directly (mockup) — no studio selected ============ -->
+  <ng-container *ngIf="liveAssignment == null && !selectedStudio['docid']">
+    <div class="ds-lobby-head">
+      <h1 class="ds-lobby-title" data-testid="studio-arena-title">{{ mapProfile[profileid] ? (mapProfile[profileid] + "'s Studio") : 'My Studio' }}</h1>
+      <div class="ds-lobby-sub">Run your 1-on-1 sessions with participants from your queues</div>
+    </div>
+
+    <div *ngIf="noStudioInAnyQueue" class="no-studio-alert mb-3" data-testid="studio-no-studio-alert">
+      <mat-icon>info</mat-icon>
+      <span>No studios available in any of your ongoing queues.</span>
+    </div>
+
+    <!-- Other studios you've been invited to join -->
+    <div *ngIf="outsideLiveAssignment.length != 0" class="otherstudio">
+      <h6 class="secondtitle fs-6 mb-2">Other Studio that you are invited to Join</h6>
+      <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index; trackBy: trackByDocId" class="mr-3" (click)="visitOtherStudio(studio)">
+        <span>Studio {{i+1}}:</span>&nbsp;
+        <span *ngFor="let participant of studio['pairing']; let j = index; trackBy: trackByDocId">
+          <span *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{activity}}&nbsp;</span>
+          <span>({{mapProfile[participant]}})</span>
+          <span *ngIf="j+1 != studio['pairing'].length">,&nbsp;</span>
+        </span>
+      </button>
+      <div class="mt-2">
+        <span class="label font-italic">Click on the studio to join the call</span>
+      </div>
+    </div>
+
+    <!-- All studios across every queue, shown directly as cards -->
+    <div class="studio-grid" *ngIf="allStudios.length">
+      <div class="studio-card" *ngFor="let s of allStudios; trackBy: trackByStudioId"
+           [class.studio-card--in]="s.checkin"
+           (click)="openStudioCard(s)" data-testid="studio-select-btn" [attr.data-studioid]="s.studioId">
+        <div class="studio-top">
+          <span class="studio-icon"><mat-icon>sensors</mat-icon></span>
+          <div style="flex:1;min-width:0">
+            <div class="studio-name">{{ s.activity }}</div>
+            <div class="studio-queue">{{ s.queueName }}</div>
+            <!-- Specialist(s) working this studio — helps identify who's
+                 collaborating when several specialists share one studio. -->
+            <div class="studio-specialists" *ngIf="s.specialists" data-testid="studio-specialists">
+              <mat-icon>group</mat-icon>{{ s.specialists }}
+            </div>
+          </div>
+          <span class="studio-badge studio-badge--in" *ngIf="s.checkin" data-testid="studio-checkedin-badge">
+            <span class="studio-badge__dot"></span>Checked in
+          </span>
+          <mat-icon class="studio-live" *ngIf="s.isLive" data-testid="studio-live-tv-icon">live_tv</mat-icon>
+        </div>
+        <div class="studio-foot">
+          <span class="studio-open">Open <mat-icon>chevron_right</mat-icon></span>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ============ LIST: a studio is selected — check-in + waiting ============ -->
+  <ng-container *ngIf="liveAssignment == null && selectedStudio['docid']">
+    <button class="ds-back-link" (click)="backToStudios()" data-testid="studio-back-link">
+      <mat-icon>arrow_back</mat-icon> Back to all studios
+    </button>
+    <div class="ds-list-head">
+      <span class="studio-icon"><mat-icon>sensors</mat-icon></span>
+      <div style="min-width:0">
+        <h1 class="ds-list-title">
+          <ng-container *ngFor="let participant of selectedStudio['participants']; let j = index; trackBy: trackByDocId">{{ mapActivity[selectedStudio['participantsactivity'][participant]] }}<span *ngIf="participant == profileid && selectedStudio['participants'].length != 1"> (You)</span><span *ngIf="participant != profileid"> ({{ mapProfile[participant] }})</span>{{ j+1 != selectedStudio['participants'].length ? ', ' : '' }}</ng-container>
+        </h1>
+        <div class="ds-list-sub">{{ ongoingQueue['queuename'] }}</div>
+      </div>
+    </div>
+
+    <!-- Studio Check-in card -->
+    <div class="checkin-card">
+      <div style="min-width:0">
+        <div class="checkin-card__title">Studio Check-in</div>
+        <div class="checkin-card__sub">Toggle on to go online. Waiting participants appear only when your studio is enabled.</div>
+      </div>
+      <mat-slide-toggle data-testid="studio-checkin-toggle" [checked]="selectedStudio['checkin']" [disabled]="onhold == true" (change)="onhold ? ($event.source.checked = selectedStudio['checkin']) : checkinStudio($event)"></mat-slide-toggle>
+    </div>
+
+    <!-- Offline empty state -->
+    <div class="empty-card" *ngIf="!selectedStudio['checkin']">
+      <span class="empty-card__ic"><mat-icon>sensors_off</mat-icon></span>
+      <div class="empty-card__t">Studio is offline</div>
+      <div class="empty-card__b">Toggle Studio Check-in ON to see participants waiting in this studio.</div>
+    </div>
+  </ng-container>
+
+  <!-- Participant Conversation -->
+  <div class="chat-container" *ngIf="studiochatList.length != 0" (click)="toggleChatContainer()">
+    <button mat-icon-button (click)="toggleChatContainer()">
+      <mat-icon (click)="toggleChatContainer()">chat</mat-icon>
+    </button>
+  </div>
+
+  <div class="example-container" *ngIf="isChatContainerOpen && studiochatList.length != 0">
+    <div *ngFor="let participant of studiochatList; let i = index; trackBy: trackByDocId" class="participant-item">
+      {{ participant.participantname }}
+      <span *ngIf="pendingMessagesCount[participant.docid] && pendingMessagesCount[participant.docid] > 0">
+        ({{ pendingMessagesCount[participant.docid] }} unread)
+      </span>
+      <button mat-icon-button (click)="getstudiochat(participant)">
+        <mat-icon>chat</mat-icon>
+      </button>
+      <div *ngIf="selectedParticipant === true && selectedChat && selectedChat.docid === participant.docid">
+        <div *ngIf="messages.length != 0" style="height:300px" class="w-100 overflow-auto">
+          <span *ngFor="let list of messages; trackBy: trackByDocId">
+            <span *ngIf="list['sender_uid'] === currentuseruid">
+              <div class="talk-bubble round" style="float:right;">
+                <div class="talktext d-flex justify-content-end flex-column" style="text-align:end;">
+                  <span class="d-flex justify-content-between">
+                    <span class="d-flex justify-content-between">
+                      <p [innerHTML]="processMessage(list['message'])"></p>
+                    </span>
+                  </span>
+                  <span style="font-size: 14px;color: deepskyblue;" [ngClass]="list['sender_uid'] == currentuseruid ? 'right' : 'bluetickleft'">
+                    <p>{{list['time']?.toDate() | date:'short'}}</p>
+                  </span>
+                </div>
+              </div>
+            </span>
+            <span *ngIf="list['sender_uid'] !== currentuseruid">
+              <div class="talk-bubble1 round">
+                <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
+                  <span class="d-flex justify-content-between" style="font-style: italic;color: rgb(1, 121, 161);">
+                    <p>{{mapProfileuid[list['sender_uid']]['name']}}</p>
+                  </span>
+                  <span>
+                    <span class="d-flex justify-content-between">
+                      <p [innerHTML]="processMessage(list['message'])"></p>
+                    </span>
+                  </span>
+                  <span style="font-size: 14px;color: rgb(1, 121, 161);">
+                    <p>{{list['time']?.toDate() | date:'short'}}</p>
+                  </span>
+                </div>
+              </div>
+            </span>
+          </span>
+        </div>
+        <section>
+          <br>
+          <form [formGroup]="messageform" (ngSubmit)="sendMessage(messageform.value)">
+            <textarea
+              name="sms"
+              autofocus
+              id="message"
+              placeholder="Type your message..."
+              class="form-control messageinput"
+              (keydown.enter)="sendMsg($event)"
+              formControlName="sms" >
+            </textarea>
+          </form>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage Waiting list -->
+  <div *ngIf="liveAssignment == null && selectedStudio['checkin']">
+    <div class="row">
+      <div *ngFor="let stage of stageTokenList; let stageindex = index; trackBy: trackByStageName" class="col-sm" data-testid="studio-stage-col" [attr.data-stage]="stage.stagename">
+        <div class="mat-elevation-z2">
+          <div class="stagename">{{stage.stagename}}</div>
+          <div class="stagequeue">
+            <div *ngFor="let token of stage.tokenlist; trackBy: trackByTokenDocId">
+              <div class="wait-token" data-testid="studio-token-card" [attr.data-token]="token.docid">
+                <!-- Avatar + name (left) -->
+                <div class="wait-token__id">
+                  <div class="wait-token__avatar"
+                       [class.wait-token__avatar--clickable]="mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile"
+                       (click)="(mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile) && (expandedImage = (mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile))">
+                    <img *ngIf="mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile"
+                         [src]="mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile"
+                         [alt]="mapProfile[token.profile_id]">
+                    <span *ngIf="!(mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile)">
+                      {{ (mapProfile[token.profile_id] || '?').charAt(0) | uppercase }}
+                    </span>
+                  </div>
+                  <div class="wait-token__name-wrap">
+                    <div class="wait-token__name">{{ mapProfile[token.profile_id] }}</div>
+                    <div class="wait-token__preassigned"
+                         *ngIf="token.preassigned != null && token.preassigned[stage.stagename] != null && token.preassigned[stage.stagename]?.includes(selectedStudio['docid'])">
+                      <mat-icon class="ic">push_pin</mat-icon>
+                      Preassigned to you
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CTA (right) -->
+                <div class="wait-token__cta">
+                  <span *ngIf="tokenInvitedByOther[token.docid] as inv"
+                        class="wait-token__chip"
+                        [title]="(inv.studioName ? 'by ' + inv.studioName : 'Already being invited by another studio') + (inv.specialistNames?.length ? ' · ' + inv.specialistNames.join(', ') : '')">
+                    <mat-icon class="ic">record_voice_over</mat-icon>
+                    <span class="wait-token__chip-text">
+                      Already being invited
+                      <small class="wait-token__chip-by" *ngIf="inv.studioName || inv.specialistNames?.length">
+                        <ng-container *ngIf="inv.specialistNames?.length; else byStudioOnly">
+                          by {{ inv.specialistNames.join(', ') }}<ng-container *ngIf="inv.studioName"> ({{ inv.studioName }})</ng-container>
+                        </ng-container>
+                        <ng-template #byStudioOnly>by {{ inv.studioName }}</ng-template>
+                      </small>
+                    </span>
+                  </span>
+                  <ng-container *ngIf="tokenInvitedBySelf[token.docid] as self">
+                    <!-- Pending: awaiting the participant's response -->
+                    <span *ngIf="!self.approved"
+                          class="wait-token__chip wait-token__chip--self"
+                          title="You invited this participant — waiting for their response">
+                      <mat-icon class="ic">hourglass_top</mat-icon>
+                      <span class="wait-token__chip-text">Invitation sent · awaiting response</span>
+                      <button type="button"
+                              class="wait-token__chip-cancel"
+                              (click)="cancelOwnInvitation(token)"
+                              title="Cancel invitation"
+                              data-testid="studio-cancel-invite-btn">
+                        <mat-icon class="ic">close</mat-icon>
+                      </button>
+                    </span>
+                    <!-- Approved: reopen the assign-studio dialog (recoverable if dismissed) -->
+                    <button *ngIf="self.approved"
+                            type="button"
+                            class="wait-token__btn wait-token__btn--approved"
+                            (click)="assignStudio(self.invitation)"
+                            title="Participant approved — assign them to the studio"
+                            data-testid="studio-assign-approved-btn">
+                      Approved · Assign studio
+                      <mat-icon class="ic">arrow_forward</mat-icon>
+                    </button>
+                  </ng-container>
+                  <button *ngIf="!tokenInvitedByOther[token.docid] && !tokenInvitedBySelf[token.docid]"
+                          type="button"
+                          class="wait-token__btn"
+                          (click)="sendStudioInvitation(token)" data-testid="studio-bring-btn">
+                    Bring To Studio
+                    <mat-icon class="ic">arrow_forward</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <!-- This stage has no one waiting. -->
+            <div *ngIf="!stage.tokenlist?.length" class="wait-empty">
+              <mat-icon class="ic">group_off</mat-icon> No participants
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Checked in, but NO stages exist / nobody is waiting anywhere. -->
+    <div *ngIf="!stageTokenList?.length" class="wait-empty wait-empty--all">
+      <mat-icon class="ic">group_off</mat-icon> No participants waiting
+    </div>
+  </div>
+
+  <!-- Expanded profile image overlay — rendered at top level so it works
+       both pre-live (waiting list) and inside the live studio. -->
+  <div class="preview-backdrop" *ngIf="expandedImage" (click)="expandedImage = null">
+    <div class="preview-panel" (click)="$event.stopPropagation()">
+      <button class="preview-close-btn" (click)="expandedImage = null">✕</button>
+      <img class="preview-image" [src]="expandedImage" alt="Preview">
+    </div>
+  </div>
+
+  <!-- =================== LIVE ASSIGNMENT (STEPPER V2 — NEW DESIGN) =================== -->
+  <div *ngIf="liveAssignment != null" class="ds-app dyn-studio-v2-app">
+
+    <!-- ============================ SIDEBAR (identity + vertical stepper) ============================ -->
+    <aside class="ds-side">
+      <div class="ds-side-id">
+        <div class="ds-avatar"
+          (click)="(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile) && (expandedImage = (mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile))">
+          <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+            [src]="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
+            [alt]="mapProfile[participantProfileId]">
+          <span *ngIf="!(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile)">
+            {{ (mapProfile[participantProfileId] || '?').charAt(0) | uppercase }}
+          </span>
+          <span class="ds-online" *ngIf="participantReady"></span>
+        </div>
+        <div class="ds-side-idbody">
+          <div class="ds-side-name" data-testid="studio-live-participant-name">{{ mapProfile[participantProfileId] || '—' }}</div>
+          <div class="ds-side-sub">
+            <span *ngIf="participantUPVisitLabel">{{ participantUPVisitLabel }} at uP!</span><span *ngIf="participantUPVisitLabel && participantJourneyName"> &middot; </span><span *ngIf="participantJourneyName" [title]="participantJourneyName"><span class="ds-side-journey-label">Journey:</span> {{ participantJourneyName }}</span>
+          </div>
+          <div class="ds-side-specialists" *ngIf="additionalSpecialists.length"
+               [class.ds-side-specialists--multi]="additionalSpecialists.length > 1"
+               [class.ds-side-specialists--collapsible]="additionalSpecialists.length > 3">
+            <div class="ds-side-specialists__head">
+              <mat-icon class="ic">groups</mat-icon>
+              <span class="ds-side-specialists__label">With<span *ngIf="additionalSpecialists.length > 1"> · {{ additionalSpecialists.length }}</span></span>
+              <!-- Compact "View all" chip: only shown (via CSS) when the roster is
+                   collapsible AND the window is short (zoomed in), so a long roster
+                   can't push the Session Steps off-screen. Opens the overlay below. -->
+              <button type="button" class="ds-side-specialists__more"
+                      (click)="specialistsOverlayOpen = true" data-testid="studio-specialists-viewall">
+                View all
+              </button>
+            </div>
+            <ul class="ds-side-specialists__list">
+              <li class="ds-side-specialists__item" *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
+                <span class="ds-side-specialists__name">{{ sp.name }}</span><span *ngIf="sp.activity" class="ds-side-specialists__role"> ({{ sp.activity }})</span>
+              </li>
+            </ul>
+
+            <!-- Full-roster overlay (opened from the "View all" chip). -->
+            <ng-container *ngIf="specialistsOverlayOpen">
+              <div class="ds-spec-overlay-backdrop" (click)="specialistsOverlayOpen = false"></div>
+              <div class="ds-spec-overlay" role="dialog">
+                <div class="ds-spec-overlay__head">
+                  <mat-icon class="ic">groups</mat-icon>
+                  <span>With · {{ additionalSpecialists.length }}</span>
+                  <button type="button" class="ds-spec-overlay__close" (click)="specialistsOverlayOpen = false" aria-label="Close">&#10005;</button>
+                </div>
+                <ul class="ds-spec-overlay__list">
+                  <li *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
+                    <span class="ds-spec-overlay__name">{{ sp.name }}</span><span *ngIf="sp.activity" class="ds-spec-overlay__role"> ({{ sp.activity }})</span>
+                  </li>
+                </ul>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-side-steps">
+        <div class="ds-side-steps__label">Session Steps</div>
+        <nav class="ds-vsteplist">
+          <button *ngFor="let step of visibleSteps; let i = index; trackBy: trackByDocId"
+                  type="button" class="ds-vstep"
+                  [class.active]="step.id === activeStepId"
+                  [class.done]="isStepCompleted(step.id)"
+                  (click)="setActiveStep(step.id)">
+            <span class="ds-vstep-node">
+              <mat-icon class="ic" *ngIf="isStepCompleted(step.id)">check</mat-icon>
+              <span *ngIf="!isStepCompleted(step.id)">{{ i + 1 }}</span>
+            </span>
+            <span class="ds-vstep-text">
+              <span class="ds-vstep-label">{{ step.label }}</span>
+              <span class="ds-vstep-sub" *ngIf="step.sub">{{ step.sub }}</span>
+            </span>
+          </button>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- ============================ TOPBAR (status + actions) ============================ -->
+    <header class="ds-topbar2">
+      <div class="ds-topbar2__left">
+        <div class="ds-waiting ds-waiting--compact"
+             [ngClass]="'tone-' + topBarStatus.tone"
+             [class.is-joined]="participantHasJoinedCall">
+          <div class="ds-waiting-icon"><mat-icon class="ic">{{ topBarStatus.icon }}</mat-icon></div>
+          <div class="ds-waiting-body">
+            <div class="ds-waiting-title">{{ topBarStatus.title }}</div>
+            <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" *ngIf="participantInWaitingRoom" (click)="setActiveStep('getstarted')">
+          <mat-icon class="ic">videocam</mat-icon>
+          Join Call
+        </button>
+      </div>
+      <div class="ds-topbar2__right">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="inviteMore(false)" data-testid="studio-invite-more-btn">
+          <mat-icon class="ic">person_add</mat-icon>
+          Invite More
+        </button>
+        <button type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()">
+          <mat-icon class="ic">undo</mat-icon>
+          Send back to Waiting Again
+        </button>
+        <div class="ds-menu-anchor" *ngIf="hasNextStageOptions">
+          <button type="button" class="btn btn-green btn-sm"
+                  (click)="toggleNextStageMenu('header')"
+                  [class.is-open]="nextStageMenuOpen === 'header'"
+                  matTooltip="Complete the session and choose where this participant goes next"
+                  matTooltipShowDelay="150"
+                  data-testid="studio-move-next-stage-btn">
+            Move Next Stage
+            <mat-icon class="ic">arrow_forward</mat-icon>
+          </button>
+          <ng-container *ngIf="nextStageMenuOpen === 'header'">
+            <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
+            <div class="ds-nextmenu ds-nextmenu--center">
+              <div class="ds-nextmenu__head">Choose next stage</div>
+              <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </header>
+
+
+    <!-- ============================ MAIN ============================ -->
+    <main class="ds-main">
+
+      <!-- In-studio navigator (legacy parity): keep every queue you belong to
+           and the studios in the active queue reachable WITHOUT leaving the
+           live session. Switching while live is confirm-guarded. Only shown
+           when there is something to switch between. -->
+      <!-- COMMENTED OUT: in-studio queue/studio switcher rows (ngIf false for easy restore). -->
+      <div class="ds-qnav"
+           *ngIf="false && (queuesWithStudios.length > 1 || studioList.length > 1 || outsideLiveAssignment.length)">
+        <div class="ds-qnav__group" *ngIf="queuesWithStudios.length > 1">
+          <span class="ds-qnav__label"><mat-icon class="ic">layers</mat-icon>Queues</span>
+          <div class="ds-qnav__chips">
+            <button type="button" class="ds-qchip"
+              *ngFor="let queue of queuesWithStudios; trackBy: trackByDocId"
+              [class.is-active]="queue['docid'] === ongoingQueue['docid']"
+              (click)="confirmSwitchQueue(queue)"
+              [attr.data-queueid]="queue['docid']" data-testid="studio-qnav-queue">
+              <span class="ds-qchip__name">{{ queue['queuename'] }}</span>
+              <span class="ds-qchip__count">{{ queueStudioCounts[queue['docid']] || 0 }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="ds-qnav__group" *ngIf="studioList.length > 1">
+          <span class="ds-qnav__label"><mat-icon class="ic">meeting_room</mat-icon>Studios</span>
+          <div class="ds-qnav__chips">
+            <button type="button" class="ds-qchip"
+              *ngFor="let studio of studioList; let i = index; trackBy: trackByDocId"
+              [class.is-active]="selectedStudio['docid'] === studio['docid']"
+              (click)="confirmSwitchStudio(studio)"
+              [attr.data-studioid]="studio['docid']" data-testid="studio-qnav-studio">
+              <span class="ds-qchip__name">
+                <ng-container *ngFor="let participant of studio['participants']; let j = index; trackBy: trackByDocId">{{ mapActivity[studio['participantsactivity']?.[participant]] }}<ng-container *ngIf="participant == profileid && studio['participants'].length != 1"> (You)</ng-container><ng-container *ngIf="participant != profileid"> ({{ mapProfile[participant] }})</ng-container>{{ j + 1 != studio['participants'].length ? ', ' : '' }}</ng-container>
+              </span>
+              <mat-icon class="ic ds-qchip__live" *ngIf="mapStudioLiveAssignment[studio['docid']]">live_tv</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <!-- Studios in OTHER queues you've been invited to join (outsideLiveAssignment).
+             Joining one leaves your current session, so it's confirm-guarded too. -->
+        <div class="ds-qnav__group" *ngIf="outsideLiveAssignment.length">
+          <span class="ds-qnav__label"><mat-icon class="ic">group_add</mat-icon>Invited</span>
+          <div class="ds-qnav__chips">
+            <button type="button" class="ds-qchip ds-qchip--invited"
+              *ngFor="let studio of outsideLiveAssignment; let i = index; trackBy: trackByDocId"
+              (click)="confirmVisitOtherStudio(studio)"
+              data-testid="studio-qnav-invited">
+              <span class="ds-qchip__name">
+                <ng-container *ngFor="let participant of studio['pairing']; let j = index; trackBy: trackByDocId"><ng-container *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{ activity }} </ng-container>({{ mapProfile[participant] }}){{ j + 1 != studio['pairing'].length ? ', ' : '' }}</ng-container>
+              </span>
+              <mat-icon class="ic ds-qchip__live">login</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage notes — full-width banner directly below the topbar (so the
+           complete text is visible and never overlaps). Each note targets a
+           selected stage and only shows when the participant's variation
+           includes that stage. -->
+      <div class="ds-stagenote-bar" *ngIf="currentStageNotes.length">
+        <div class="ds-stagenote" *ngFor="let sn of currentStageNotes; trackBy: trackByDocId">
+          <mat-icon class="ic">sticky_note_2</mat-icon>
+          <div class="ds-stagenote__main">
+            <span class="ds-stagenote__text"
+                  [class.is-clamped]="!isStageNoteExpanded(sn.stage)">{{ sn.note }}</span>
+            <button type="button" class="ds-stagenote__more"
+                    *ngIf="(sn.note?.length || 0) > 140"
+                    (click)="toggleStageNote(sn.stage)">
+              {{ isStageNoteExpanded(sn.stage) ? 'Show less' : 'Show more' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-main-scroll" #dsMainScroll>
+        <div class="ds-main-inner">
+
+          <!-- Eyebrow / step header -->
+          <div class="ds-step-header">
+            <div class="ds-eyebrow">
+              <span class="num">{{ activeStepIndex + 1 }}</span>
+              <span *ngIf="activeStepId === 'current-forms'">Submitted Forms · Current Cycle</span>
+              <span *ngIf="activeStepId === 'prev-history'">Previous ATC & Love Letters · Previous Cycle(s)</span>
+              <span *ngIf="activeStepId === 'view-atc'">View Submitted ATC · Current Cycle</span>
+              <span *ngIf="activeStepId === 'getstarted'">Zoom Session · Connect with participant</span>
+              <span *ngIf="activeStepId === 'prescribe-atc'">Prescribe ATC · Current Cycle</span>
+              <span *ngIf="activeStepId === 'ael-validation'">AEL Validation</span>
+            </div>
+          </div>
+
+          <!-- (ATC prescribed banner + Submitted Forms info banner moved into
+               the topbar status pill as compact chips — saves vertical space.) -->
+
+          <!-- ========================= STEP 1: Review Forms + Love Letters ========================= -->
+          <ng-container *ngIf="activeStepId === 'current-forms'">
+            <div class="card" *ngIf="participantForm && participantForm.length">
+              <div class="form-row form-row--compact" *ngFor="let form of participantForm; let i = index; trackBy: trackByDocId">
+                <div class="form-row__main">
+                  <span class="form-row__num">{{ i + 1 }}.</span>
+                  <div class="form-row__icon"><mat-icon class="ic">description</mat-icon></div>
+                  <span class="form-row__name">{{ form['formname'] }}</span>
+                </div>
+                <button type="button" class="btn btn-primary" (click)="viewform(form)">
+                  Open Form
+                  <mat-icon class="ic">arrow_forward</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- Love Letters now live in Step 2 (Previous ATC & Love Letters). -->
+          </ng-container>
+
+          <!-- ========================= STEP 2: ATC & Love Letters =========================
+               Mounted ONCE (prevHistoryMounted) then toggled with [hidden] instead of
+               *ngIf, so the heavy <app-view-participant-atc> child loads a single time and
+               persists rather than re-fetching all its ATC getDocs on every step change. -->
+          <ng-container *ngIf="prevHistoryMounted">
+            <div class="step-compact" [hidden]="activeStepId !== 'prev-history'">
+            <!-- Previous ATC History -->
+            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')">
+              <div class="card-pad">
+                <h3 class="section-title">Previous ATC History</h3>
+                @defer (on viewport) {
+                  <app-view-participant-atc
+                    [profileid]="liveAssignment['participantid']"
+                    [excludeQueueId]="ongoingQueue['docid']">
+                  </app-view-participant-atc>
+                } @placeholder {
+                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
+                } @loading {
+                  <div class="ds-atc-defer-placeholder">Loading previous ATC…</div>
+                }
+              </div>
+            </div>
+
+            <!-- Love Letters (Step 2, per mockup) — rounded on all sides -->
+            <div class="card ds-ll-card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('loveletters')">
+              <div class="card-head tint-slate">
+                <div class="card-head-title">
+                  <mat-icon class="ic">favorite_border</mat-icon>
+                  Love Letters
+                </div>
+                <button *ngIf="!showLoveLetter" type="button" class="btn btn-ghost btn-sm" (click)="toggleLoveLetter()">
+                  <mat-icon class="ic">favorite_border</mat-icon>
+                  Load Love Letters
+                </button>
+              </div>
+              <div class="card-pad" *ngIf="showLoveLetter">
+                <div class="ll-loading" *ngIf="loveLetterLoading">
+                  <mat-icon class="ic">hourglass_top</mat-icon>
+                  Loading love letters...
+                </div>
+                <div class="empty" *ngIf="!loveLetterLoading && loveLetterList.length === 0">
+                  <div class="empty-ic"><mat-icon class="ic">inbox</mat-icon></div>
+                  <div class="empty-text">No love letters found for this participant.</div>
+                </div>
+                <div class="ll-list" *ngIf="!loveLetterLoading && loveLetterList.length > 0">
+                  <div class="ll-item" *ngFor="let letter of loveLetterList; let i = index; trackBy: trackByDocId">
+                    <div class="ll-item__head">
+                      <span>{{ i + 1 }}.</span>
+                      <span class="ll-item__name">{{ mapProfile[letter.profileid] || mapProfile[participantProfileId] }}</span>
+                      <span class="ll-item__date">
+                        {{ (letter.created?.toDate ? letter.created.toDate() : letter.created) | date:'medium' }}
+                      </span>
+                    </div>
+                    <div class="ll-item__label">Love Letter</div>
+                    <div class="ll-item__content" [innerHTML]="letter.loveletter || '-'"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <!-- Evolution Wishlist -->
+            <div class="card"
+                 [class.card--empty]="evolutionWishlist.length === 0"
+                 *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('evolutionwishlist')">
+              <div class="card-head tint-slate">
+                <div class="card-head-title">
+                  <mat-icon class="ic">auto_awesome</mat-icon>
+                  Evolution Wishlist
+                  <span class="count-badge" *ngIf="evolutionWishlist.length > 0">{{ evolutionWishlist.length }}</span>
+                  <span class="card-head-empty" *ngIf="evolutionWishlist.length === 0 && !evolutionWishlistLoading">— No data available</span>
+                  <span class="card-head-empty" *ngIf="evolutionWishlist.length === 0 && evolutionWishlistLoading">— Loading…</span>
+                </div>
+              </div>
+              <div class="card-pad" *ngIf="evolutionWishlist.length > 0">
+                <div class="ewl-list">
+                  <div class="ewl-item" *ngFor="let entry of evolutionWishlist; let i = index; trackBy: trackByDocId">
+                    <div class="ewl-item__head">
+                      <span class="ewl-item__num">{{ i + 1 }}.</span>
+                      <span class="ewl-item__type">{{ formatEvolutionWishlistType(entry.type) }}</span>
+                      <span class="ewl-item__status">{{ formatEvolutionWishlistStatus(entry) }}</span>
+                      <span class="ewl-item__date">
+                        {{ (entry.created?.toDate ? entry.created.toDate() : entry.created) | date:'mediumDate' }}
+                      </span>
+                    </div>
+                    <div class="ewl-item__contacts" *ngIf="evolutionWishlistContactsLabel(entry) as contactsLabel">
+                      <mat-icon class="ic">group</mat-icon>
+                      {{ contactsLabel }} contacts
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </ng-container>
+
+          <!-- ========================= STEP 3: View Submitted ATC ========================= -->
+          <ng-container *ngIf="activeStepId === 'view-atc'">
+            <div class="step-compact">
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedvalidatedatc')" [ngTemplateOutlet]="tplValidatedATC"></ng-container>
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('prescribedunvalidatedatc')" [ngTemplateOutlet]="tplUnvalidatedATC"></ng-container>
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('assignedatc')" [ngTemplateOutlet]="tplAssignedATC"></ng-container>
+              <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('viewtripleatc')" [ngTemplateOutlet]="tplTripleATC"></ng-container>
+            </div>
+          </ng-container>
+
+          <!-- ========================= STEP 4: Zoom Session ========================= -->
+          <ng-container *ngIf="activeStepId === 'getstarted'">
+            <div class="zoom-stack">
+              <!-- In-house Meeting (primary, full width) -->
+              <div class="choice choice--primary" *ngIf="selectedStudio['openvidu']">
+                <div class="choice-head">
+                  <div class="choice-ic blue"><mat-icon class="ic">videocam</mat-icon></div>
+                  <div class="choice-headtext">
+                    <div class="choice-title">
+                      In-house Meeting
+                      <span class="pill pill-primary" style="margin-left:8px;">Recommended</span>
+                    </div>
+                    <div class="choice-desc">
+                      Start a secure video call right here in the app. No external link to share, no app switching — fastest way to begin the session.
+                    </div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
+                        (click)="joinOpenViduRoom()" data-testid="studio-openvidu-start-btn">
+                  <mat-icon class="ic">{{ specialistInMeeting ? 'videocam' : 'play_arrow' }}</mat-icon>
+                  <span class="start-meeting-btn__label">{{ specialistInMeeting ? 'In Meeting' : 'Start Meeting' }}</span>
+                </button>
+              </div>
+
+              <!-- Zoom Meeting (URL hidden — only the in-house Start Meeting button is used) -->
+              <div class="choice choice--primary"
+                   *ngIf="ongoingQueue['zoomlinkrequired'] != false && [false,undefined].includes(ongoingQueue['enablezoommeetingsdk']) && selectedStudio['openvidu'] != true">
+                <div class="choice-head">
+                  <div class="choice-ic blue"><mat-icon class="ic">videocam</mat-icon></div>
+                  <div class="choice-headtext">
+                    <div class="choice-title">Zoom Meeting</div>
+                    <div class="choice-desc">
+                      Start the call when you're ready. The participant has already been invited.
+                    </div>
+                  </div>
+                </div>
+                <!-- Inline status: ready / pending / broken -->
+                <div class="zoom-status" *ngIf="liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
+                  <mat-icon class="ic">check_circle</mat-icon>
+                  Zoom link ready
+                </div>
+                <div class="zoom-status zoom-status--pending" *ngIf="!liveAssignment['zoomdata']?.start_url">
+                  <mat-icon class="ic">hourglass_top</mat-icon>
+                  Generating Zoom link...
+                </div>
+                <div class="zoom-status zoom-status--broken" *ngIf="callEnded && liveAssignment['zoomdata']">
+                  <mat-icon class="ic">event_busy</mat-icon>
+                  This meeting has ended — generate a new link below to start a new one.
+                </div>
+                <div class="zoom-status zoom-status--broken" *ngIf="isZoomLinkBroken && !callEnded && liveAssignment['zoomdata']">
+                  <mat-icon class="ic">warning</mat-icon>
+                  This Zoom link is broken — please generate a new one below.
+                </div>
+                <button type="button" class="btn btn-primary btn-block btn-lg start-meeting-btn"
+                        (click)="navigateMeeting(liveAssignment)" data-testid="studio-zoom-start-btn"
+                        [disabled]="liveAssignment['zoomdata'] === undefined || isZoomLinkBroken || callEnded">
+                  <mat-icon class="ic">{{ specialistInMeeting ? 'videocam' : 'play_arrow' }}</mat-icon>
+                  <span class="start-meeting-btn__label">{{ specialistInMeeting ? 'In Meeting' : 'Start Meeting' }}</span>
+                </button>
+
+                <!-- Recording reminder — placed right under Start Meeting so it's
+                     seen before joining (moved up from the bottom of the step). -->
+                <div class="zoom-record-note zoom-record-note--inline">
+                  <mat-icon class="ic">fiber_manual_record</mat-icon>
+                  Once the call starts, make sure Zoom recording is enabled.
+                </div>
+
+                <!-- Generate a fresh link — MOVED inside this meeting card so it's
+                     part of the Start Meeting section, not a separate block. -->
+                <div class="zoom-regen"
+                     *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
+                  <div class="zoom-regen__text">
+                    <div class="choice-title">{{ callEnded ? 'Meeting ended — start a new one' : isZoomLinkBroken ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
+                    <div class="choice-desc">Generate a new link — it's resent to the participant automatically.</div>
+                  </div>
+                  <button type="button" class="btn btn-sm"
+                          [class.btn-ghost]="!isZoomLinkBroken && !callEnded"
+                          [class.btn-primary]="isZoomLinkBroken || callEnded"
+                          [disabled]="!isZoomLinkBroken && !callEnded && !zoomlinkGenerator"
+                          (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">
+                    <mat-icon class="ic">refresh</mat-icon>
+                    Generate new link &amp; resend
+                  </button>
+                </div>
+
+                <!-- Backup-link UX: the in-app Start Meeting button is the
+                     primary path; the raw start_url is the fallback if it
+                     doesn't launch. Hint + link are grouped so it reads as one
+                     "if that didn't work, use this" block. -->
+                <!-- COMMENTED OUT: raw Zoom start_url shown openly (ngIf false for easy restore). -->
+                <div class="zoom-fallback" *ngIf="false && liveAssignment['zoomdata']?.start_url && !isZoomLinkBroken">
+                  <div class="zoom-link-hint">
+                    <mat-icon class="ic">info</mat-icon>
+                    <span>Use <strong>Start Meeting</strong> above. If it doesn’t open, join with this backup link:</span>
+                  </div>
+                  <div class="zoom-link-row">
+                    <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
+                    <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
+                       [title]="liveAssignment['zoomdata']?.start_url">
+                      {{ liveAssignment['zoomdata']?.start_url }}
+                    </a>
+                    <button type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
+                            matTooltip="Copy link">
+                      <mat-icon class="ic">content_copy</mat-icon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </ng-container>
+
+          <!-- ========================= STEP 5: Prescribe ATC ========================= -->
+          <ng-container *ngIf="activeStepId === 'prescribe-atc'">
+            <div class="step-compact">
+            <!-- Prescribe new ATC — kept FIRST so the button is always in the
+                 same place regardless of how many ATCs are already listed
+                 below (Scope Enhancement / Diagnostics / Consultation). -->
+            <div class="card"
+              *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc') || ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')">
+              <div class="card-head tint-slate">
+                <div class="card-head-title">
+                  <mat-icon class="ic">send</mat-icon>
+                  Prescribe New ATC
+                </div>
+              </div>
+              <div class="card-pad">
+                <div style="font-size:14px;color:var(--ink-2);font-weight:600;margin-bottom:16px;">
+                  Create a new Accelerated Time Compression directive for this participant. The prescribing form opens in a new tab.
+                </div>
+                <!-- An AI-generated ATC was found for this participant (queue_atc_generation,
+                     Scope Enhancement). The "Use AI-Generated ATC" buttons open the prescribe form
+                     pre-filled from it; the plain buttons start a blank ATC. -->
+                <div *ngIf="aiAtcAvailable"
+                  style="display:flex;align-items:center;gap:8px;font-size:13px;color:#9A258F;font-weight:700;margin-bottom:12px;">
+                  <mat-icon class="ic">auto_awesome</mat-icon>
+                  An AI-generated ATC is available for this participant.
+                </div>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-primary btn-lg"
+                    *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc')"
+                    (click)="addATC(true, participantProfileId)">
+                    <mat-icon class="ic">check</mat-icon>
+                    Prescribe ATC — No Validation
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-lg"
+                    *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')"
+                    (click)="addATC(false, participantProfileId)">
+                    <mat-icon class="ic">verified</mat-icon>
+                    Prescribe ATC — Requires Validation
+                  </button>
+                  <button type="button" class="btn btn-primary btn-lg"
+                    *ngIf="aiAtcAvailable && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc')"
+                    style="background:#9A258F;border-color:#9A258F;"
+                    (click)="useAiAtc(true)">
+                    <mat-icon class="ic">auto_awesome</mat-icon>
+                    Use AI-Generated ATC — No Validation
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-lg"
+                    *ngIf="aiAtcAvailable && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')"
+                    style="color:#9A258F;border-color:#9A258F;"
+                    (click)="useAiAtc(false)">
+                    <mat-icon class="ic">auto_awesome</mat-icon>
+                    Use AI-Generated ATC — Requires Validation
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Highlight: ATC already submitted for THIS queue/activity -->
+            <div class="card" *ngIf="atcInThisQueueCount > 0">
+              <div class="card-head tint-green">
+                <div class="card-head-title">
+                  <mat-icon class="ic">task_alt</mat-icon>
+                  ATC has been submitted for this activity
+                  <span class="count-badge count-green">{{ atcInThisQueueCount }}</span>
+                </div>
+              </div>
+              <div class="card-pad">
+                <ng-container *ngFor="let atc of currentQueueValidatedATCList; let i = index; trackBy: trackByDocId">
+                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'validated', editColl: 'alpha' }"></ng-container>
+                </ng-container>
+                <ng-container *ngFor="let atc of currentQueueUnvalidatedATCList; let i = index; trackBy: trackByDocId">
+                  <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: currentQueueValidatedATCList.length + i, kind: 'pending', editColl: 'validation' }"></ng-container>
+                </ng-container>
+              </div>
+            </div>
+
+            <!-- Assign Changeagent to Procedure -->
+            <div class="card" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('assignprocedure')">
+              <div class="card-head tint-slate">
+                <div class="card-head-title">
+                  <mat-icon class="ic">assignment</mat-icon>
+                  Assign Changeagent to Procedure
+                </div>
+              </div>
+              <div class="card-pad">
+                <button type="button" class="btn btn-ghost" (click)="assignChangeagent(true)">
+                  <mat-icon class="ic">open_in_new</mat-icon>
+                  Open ATC
+                </button>
+              </div>
+            </div>
+
+            <!-- Shared widgets. NOTE: the Validated / Unvalidated ATC lists are
+                 intentionally NOT shown in this step — the Prescribe ATC step
+                 only surfaces "ATC submitted for this activity" (above). The
+                 full validated/unvalidated breakdown lives on the View ATC step. -->
+            <ng-container *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('viewtripleatc')" [ngTemplateOutlet]="tplTripleATC"></ng-container>
+            </div>
+          </ng-container>
+
+          <!-- ========================= STEP 6: AEL Validation ========================= -->
+          <ng-container *ngIf="activeStepId === 'ael-validation'">
+            <div class="card">
+              <div class="card-head" [ngClass]="participantAEL['aelStatus'] === 'validated' ? 'tint-green' : 'tint-slate'">
+                <div class="card-head-title">
+                  <mat-icon class="ic">verified</mat-icon>
+                  Accelerated Evolution Level
+                </div>
+              </div>
+              <div class="card-pad">
+                <p class="ael-intro">
+                  Review the participant&rsquo;s current Accelerated Evolution Level across all five areas.
+                  Adjust any value, then mark the AEL as validated.
+                </p>
+
+                <div *ngIf="participantAEL['crossovermetric'] == null" class="empty">
+                  <div class="empty-ic"><mat-icon class="ic">inbox</mat-icon></div>
+                  <div class="empty-text">No AEL Found</div>
+                </div>
+
+                <!-- Read-only display of the participant's AEL across all areas
+                     (legacy dynamic-studio parity). Shown whenever an AEL exists,
+                     even after it's validated, so the specialist can always see
+                     the current level per area — the modal is only for editing. -->
+                <div class="ael-areas" *ngIf="participantAEL['crossovermetric'] != null">
+                  <div class="ael-area" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; let i = index">
+                    <span class="ael-area__num">{{ i + 1 }}.</span>
+                    <span class="ael-area__name" [title]="crossover.key">{{ crossover.key }}</span>
+                    <span class="ael-area__level">{{ aelBandLabel(crossover.value['value']) }}</span>
+                  </div>
+                </div>
+
+                <div class="ael-actions" *ngIf="participantAEL['crossovermetric'] != null">
+                  <button type="button" class="btn btn-lg"
+                          [class.btn-green]="participantAEL['aelStatus'] === 'validated'"
+                          [class.btn-primary]="participantAEL['aelStatus'] !== 'validated'"
+                          (click)="openAelModal()"
+                          data-testid="studio-ael-validate-btn">
+                    <mat-icon class="ic">{{ participantAEL['aelStatus'] === 'validated' ? 'check' : 'tune' }}</mat-icon>
+                    {{ participantAEL['aelStatus'] == "validated" ? "AEL Validated" : participantAEL['aelStatus'] == "edited" ? "Review &amp; Validate AEL" : "Validate AEL" }}
+                  </button>
+                  <span class="ael-validated-note" *ngIf="participantAEL['aelStatus'] === 'validated'">
+                    <mat-icon class="ic">check</mat-icon>
+                    All five areas validated for this cycle.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- ========================= STEP 7: Mark as Completed ========================= -->
+          <!-- (Mark as Completed step removed — its actions moved to the
+               "Move to Next Stage" dropdown, see #nextStageItems below.) -->
+
+        </div>
+      </div>
+
+  </main>
+
+    <!-- ============================ FOOTER (Back / Step / Next) ============================ -->
+    <footer class="ds-footer">
+      <button type="button" class="btn btn-ghost" (click)="goToStep(-1)" [disabled]="activeStepIndex === 0">
+        <mat-icon class="ic">arrow_back</mat-icon>
+        Back
+      </button>
+      <div class="ds-footer-center">
+        Step <b>{{ activeStepIndex + 1 }}</b> of <b>{{ visibleSteps.length }}</b>
+      </div>
+      <button type="button" class="btn btn-primary" *ngIf="activeStepIndex !== visibleSteps.length - 1" (click)="goToStep(1)">
+        Next
+        <mat-icon class="ic">arrow_forward</mat-icon>
+      </button>
+      <!-- On the last step, the "Next" arrow becomes the Move-Next-Stage action
+           (opens the same centered "Choose next stage" menu as the header). -->
+      <div class="ds-footer-next" *ngIf="activeStepIndex === visibleSteps.length - 1">
+        <button type="button" class="btn btn-primary"
+                (click)="toggleNextStageMenu('footer')"
+                [class.is-open]="nextStageMenuOpen === 'footer'"
+                matTooltip="Complete the session and choose where this participant goes next"
+                matTooltipShowDelay="150"
+                data-testid="studio-move-next-stage-footer-btn">
+          Move Next Stage
+          <mat-icon class="ic">arrow_forward</mat-icon>
+        </button>
+        <ng-container *ngIf="nextStageMenuOpen === 'footer'">
+          <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
+          <div class="ds-nextmenu ds-nextmenu--center">
+            <div class="ds-nextmenu__head">Choose next stage</div>
+            <ng-container *ngTemplateOutlet="nextStageItems"></ng-container>
+          </div>
+        </ng-container>
+      </div>
+    </footer>
+
+    <!-- ===================== MOVE-TO-NEXT-STAGE MENU ITEMS (mockup) =====================
+         Shared by the header + footer "Move to Next Stage" dropdowns. Same
+         actions as the old Mark-as-Completed step (movetoNextMonthReview /
+         moveStage) — relocated into a popup. No backend change. -->
+    <ng-template #nextStageItems>
+      <!-- Mark for next month review -->
+      <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('movetonextqueue')"
+              type="button" class="ds-nextmenu__item"
+              [disabled]="nextMonthReviewSaving || nextMonthReviewMarked"
+              (click)="movetoNextMonthReview()">
+        <mat-icon class="ic">{{ nextMonthReviewMarked ? 'check_circle' : 'calendar_today' }}</mat-icon>
+        <span>{{ nextMonthReviewSaving ? 'Marking…' : nextMonthReviewMarked ? 'Marked for next month review' : 'Mark for next month review' }}</span>
+      </button>
+      <!-- Next-stage routes -->
+      <ng-container *ngFor="let config of ongoingQueue['stageproperty'][liveAssignment['stagename']]?.nextstage; trackBy: trackByDocId">
+        <button
+          *ngIf="(liveAssignment['token']?.variationid == null || liveAssignment['token']?.variationid == undefined) && (!config.variations || config.variations.length === 0)"
+          type="button" class="ds-nextmenu__item ds-nextmenu__item--go"
+          (click)="moveStage(config.stage, config.markascompleted); closeNextStageMenu()"
+          data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
+          <mat-icon class="ic">check_circle</mat-icon>
+          <span>{{ config.calltoaction }}</span>
+        </button>
+        <button
+          *ngIf="liveAssignment['token']?.variationid != null && liveAssignment['token']?.variationid != undefined && queueVariation[liveAssignment['token']?.variationid] && queueVariation[liveAssignment['token']?.variationid].includes(liveAssignment['stagename']) && config.variations && config.variations.includes(liveAssignment['token']?.variationid)"
+          type="button" class="ds-nextmenu__item ds-nextmenu__item--go"
+          (click)="moveStage(config.stage, config.markascompleted); closeNextStageMenu()"
+          data-testid="studio-move-next-btn" [attr.data-stage]="config.stage">
+          <mat-icon class="ic">check_circle</mat-icon>
+          <span>{{ config.calltoaction }}</span>
+        </button>
+      </ng-container>
+    </ng-template>
+
+    <!-- ===================== AEL SLIDER MODAL (mockup) =====================
+         Slider-per-area over the existing band list (aelLevelList). UI only:
+         each slider notch maps to a stored "start---end" band — no model change. -->
+    <div class="ael-modal-backdrop" *ngIf="aelModalOpen" (click)="closeAelModal()">
+      <div class="ael-modal" (click)="$event.stopPropagation()">
+        <div class="ael-modal__head">
+          <span class="ael-modal__title"><mat-icon class="ic">verified</mat-icon> Validate AEL</span>
+          <button type="button" class="ael-modal__x" (click)="closeAelModal()" aria-label="Close">
+            <mat-icon class="ic">close</mat-icon>
+          </button>
+        </div>
+        <div class="ael-modal__body">
+          <p class="ael-modal__sub">
+            Review the participant&rsquo;s Accelerated Evolution Level across all areas.
+            Drag any slider to adjust, then validate.
+          </p>
+          <div class="ael-slider-row" *ngFor="let crossover of participantAEL['crossovermetric'] | keyvalue; trackBy: trackById">
+            <span class="ael-slider-row__area" [title]="crossover.key">{{ crossover.key }}</span>
+            <input type="range" class="ael-slider-row__range"
+                   min="0" [max]="aelLevelList.length - 1" step="1"
+                   [value]="aelBandIndex(crossover.value['value'])"
+                   (input)="setAelBand(crossover, $any($event.target).value)">
+            <span class="ael-slider-row__val">{{ aelBandLabel(crossover.value['value']) }}</span>
+          </div>
+        </div>
+        <div class="ael-modal__foot">
+          <button type="button" class="btn btn-ghost" (click)="closeAelModal()">Cancel</button>
+          <button type="button" class="btn btn-green" (click)="validateAelFromModal()"
+                  data-testid="studio-ael-modal-validate-btn"
+                  [disabled]="participantAEL['aelStatus'] === 'validated'">
+            <mat-icon class="ic">check</mat-icon>
+            {{ participantAEL['aelStatus'] == "validated" ? "AEL Validated" : "Mark AEL validated" }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form-in-dialog template (used by viewform()).
+         Renders the submitted form INLINE — markup mirrors the overlay in
+         view-participants-form.component.html (individual mode). Bound to
+         the component's `formViewerState` writable holder. -->
+    <ng-template #formDialogTpl>
+      <div class="form-dlg">
+        <header class="form-dlg__head">
+          <span class="form-dlg__title">
+            <mat-icon class="ic">description</mat-icon>
+            {{ formViewerState.title }}
+          </span>
+          <button type="button" class="form-dlg__close" mat-dialog-close>
+            <mat-icon class="ic">close</mat-icon>
+          </button>
+        </header>
+        <div class="overlay-content">
+          <div *ngIf="formViewerState.loading" class="loading-spinner">
+            <div class="ds-form-spinner" aria-label="Loading"></div>
+          </div>
+
+          <ng-container *ngIf="!formViewerState.loading && formViewerState.data">
+            <div class="form-view">
+              <div class="form-banner"></div>
+              <div class="form-participant">{{ formViewerState.data.participantName }}</div>
+              <div class="form-title">{{ formViewerState.data.formTitle }}</div>
+              <div class="form-description" *ngIf="formViewerState.data.formDescription">{{ formViewerState.data.formDescription }}</div>
+              <div class="form-meta">
+                Queue: {{ formViewerState.data.queue }} | Workshop: {{ formViewerState.data.workshop }} | Submitted: {{ formViewerState.data.date }}
+              </div>
+              <hr class="form-divider">
+              <div *ngFor="let field of formViewerState.data.fields; trackBy: trackByDocId" class="form-field-item">
+                <div *ngIf="field.type === 'label'" class="form-section-label">
+                  <div class="section-title">{{ field.fieldname }}</div>
+                  <div class="section-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+                </div>
+                <div *ngIf="field.type === 'field'" class="form-question">
+                  <div class="question-title">
+                    {{ field.number }}. {{ field.fieldname }}
+                    <span class="required-star" *ngIf="field.required">*</span>
+                  </div>
+                  <div class="question-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+                  <div class="question-value" [class.empty-value]="field.isEmpty">
+                    <ng-container *ngIf="field.fieldType === 'array'; else plainValue">
+                      <div *ngFor="let line of field.value.split('\n'); trackBy: trackByDocId" class="array-sub-item">
+                        <ng-container *ngIf="line.includes(':'); else noColon">
+                          <span class="sub-item-label">{{ line.split(':')[0] }}:</span>
+                          <div class="sub-item-answer">{{ line.split(':').slice(1).join(':') }}</div>
+                        </ng-container>
+                        <ng-template #noColon>{{ line }}</ng-template>
+                      </div>
+                    </ng-container>
+                    <ng-template #plainValue>{{ field.value }}</ng-template>
+                  </div>
+                  <div class="question-notes" *ngIf="field.fieldnotes">Note: {{ field.fieldnotes }}</div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- =====================================================================
+         Reusable widget templates (shared between Steps 3 & 5)
+         ===================================================================== -->
+    <ng-template #tplValidatedATC>
+      <div class="card" [class.card--empty]="alphaATCList.length == 0">
+        <div class="card-head tint-green">
+          <div class="card-head-title">
+            <mat-icon class="ic">verified</mat-icon>
+            Validated ATC
+            <span class="count-badge count-green" *ngIf="alphaATCList.length > 0">{{ alphaATCList.length }}</span>
+            <span class="card-head-empty" *ngIf="alphaATCList.length == 0">— No data available</span>
+          </div>
+        </div>
+        <div class="card-pad" *ngIf="alphaATCList.length > 0">
+          <ng-container *ngFor="let atc of alphaATCList; let i = index; trackBy: trackByDocId">
+            <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'validated', editColl: 'alpha' }"></ng-container>
+          </ng-container>
+        </div>
+      </div>
+    </ng-template>
+
+    <ng-template #tplUnvalidatedATC>
+      <div class="card" [class.card--empty]="unvalidatedATCList.length == 0">
+        <div class="card-head tint-amber">
+          <div class="card-head-title">
+            <mat-icon class="ic">assignment</mat-icon>
+            Unvalidated ATC
+            <span class="count-badge count-amber" *ngIf="unvalidatedATCList.length > 0">{{ unvalidatedATCList.length }}</span>
+            <span class="card-head-empty" *ngIf="unvalidatedATCList.length == 0">— No data available</span>
+          </div>
+        </div>
+        <div class="card-pad" *ngIf="unvalidatedATCList.length > 0">
+          <ng-container *ngFor="let atc of unvalidatedATCList; let i = index; trackBy: trackByDocId">
+            <ng-container *ngTemplateOutlet="atcCardTpl; context: { $implicit: atc, index: i, kind: 'pending', editColl: 'validation' }"></ng-container>
+          </ng-container>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- Shared ATC Card template -->
+    <ng-template #atcCardTpl let-atc let-i="index" let-kind="kind" let-editColl="editColl">
+      <div class="atc-card">
+        <div class="atc-card__head">
+          <span class="atc-card__num">{{ i + 1 }}.</span>
+          <span class="atc-card__date">{{ atc["atcdata"]["prescription_date"].toDate() | date:'medium' }}</span>
+          <span class="pill pill-green" *ngIf="kind === 'validated'">
+            <mat-icon class="ic">verified</mat-icon>
+            Validated
+          </span>
+          <span class="pill pill-amber" *ngIf="kind === 'pending'">
+            <mat-icon class="ic">schedule</mat-icon>
+            Awaiting Validation
+          </span>
+        </div>
+
+        <div class="field-grid">
+          <span class="field-label">Participant Name</span>
+          <span class="field-val">{{ mapProfile[participantProfileId] }}</span>
+          <ng-container *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
+            <span class="field-label">{{ mapActivity[$any(activity.key)] }}</span>
+            <span class="field-val">
+              <span *ngFor="let specialist of $any(activity.value); let isLast = last; trackBy: trackByDocId">{{ mapProfile[specialist] }}{{ isLast ? '' : ', ' }}</span>
+            </span>
+          </ng-container>
+          <ng-container *ngIf="atc['atcdata']['queueid']">
+            <span class="field-label">Queue</span>
+            <span class="field-val">{{ mapQueue[atc["atcdata"]["queueid"]] }}</span>
+          </ng-container>
+          <ng-container *ngIf="atc['atcdata']['directive']">
+            <span class="field-label">ATC Directive</span>
+            <span class="field-val">{{ atc["atcdata"]["directive"] }}</span>
+          </ng-container>
+        </div>
+
+        <div class="atc-card__note" *ngIf="kind === 'validated'">
+          <mat-icon class="ic">visibility</mat-icon>
+          This ATC is directly visible to the Participant.
+        </div>
+
+        <div class="atc-card__actions">
+          <button type="button" class="btn btn-soft btn-sm" (click)="viewATCInDialog(atc, kind)">
+            <mat-icon class="ic">visibility</mat-icon>
+            View Full ATC
+          </button>
+          <button type="button" class="btn btn-soft btn-sm" *ngIf="isMentor"
+                  (click)="updateATC(atc.atcid, editColl, '')">
+            <mat-icon class="ic">edit</mat-icon>
+            Edit ATC
+          </button>
+          <!-- Non-mentors can't edit a submitted ATC — explain why. -->
+          <span class="atc-card__mentor-note" *ngIf="!isMentor">
+            <mat-icon class="ic">lock</mat-icon>
+            Only the Mentor can edit this ATC.
+          </span>
+        </div>
+
+        <!-- Inline expanded details (kept available via toggleATC for compatibility;
+             "View Full ATC" now opens the overlay instead) -->
+        <div class="atc-card__details" *ngIf="isATCExpanded(atc.atcid)">
+          <ng-container *ngTemplateOutlet="atcDetailTpl; context: { $implicit: atc }"></ng-container>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- =====================================================================
+         Shared ATC detail body — Adjustments & Procedures + Notes.
+         Rendered both inline (atcCardTpl) and inside the overlay (atcDialogTpl)
+         so the two stay visually identical. Mirrors the expanded card in
+         view-participant-atc (adjustment header + procedure rows with status).
+         ===================================================================== -->
+    <ng-template #atcDetailTpl let-atc>
+      <div *ngIf="atc['transcription']?.length" class="transcription-section">
+        <div class="section-title">Adjustments &amp; Procedures</div>
+        <div class="atc-adj-list">
+          <ng-container *ngFor="let adjustment of atc['transcription']; let aIdx = index; trackBy: trackByDocId">
+            <div class="adjustment-block" *ngIf="adjustment?.procedure.length != 0">
+              <div class="adjustment-header">
+                <span class="adj-number">{{ aIdx + 1 }}.</span>
+                <span class="adj-name">Adjustment: {{ adjustment?.adjustment }}</span>
+              </div>
+              <div class="procedures-container">
+                <div class="procedures-title">Procedures:</div>
+                <div class="procedure-block" *ngFor="let procedure of adjustment?.procedure; let pIdx = index; trackBy: trackByDocId">
+                  <div class="procedure-row">
+                    <span class="proc-number">{{ pIdx + 1 }}.</span>
+                    <span class="proc-name">{{ mapProcedure[procedure?.procedureid] }}</span>
+                    <mat-icon class="status-icon" [class.completed]="procedure?.status === 'completed'" [class.pending]="procedure?.status !== 'completed'">
+                      {{ procedure?.status === 'completed' ? 'check_circle' : 'radio_button_unchecked' }}
+                    </mat-icon>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+      <div *ngIf="!atc['transcription']?.length" class="no-transcription">
+        No adjustments recorded
+      </div>
+
+      <div *ngIf="mapATCnotes[atc.atcdata['notesid']] || mapATCnotes[atc.atcdata['mentoringid']]" style="margin-top:16px;">
+        <h6 class="atc-card__detail-label">Notes</h6>
+        <div class="atc-note-grid">
+          <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['notesid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['consultationsummary'])">
+            <span class="atc-note__title"><mat-icon class="ic">summarize</mat-icon> Summary</span>
+            <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['notesid']]['consultationsummary'] }}</p>
+          </div>
+          <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['notesid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['notesid']]['notes'])">
+            <span class="atc-note__title"><mat-icon class="ic">sticky_note_2</mat-icon> Notes</span>
+            <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['notesid']]['notes'] }}</p>
+          </div>
+          <div class="atc-note" *ngIf="mapATCnotes[atc.atcdata['mentoringid']] && !['',null,undefined].includes(mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'])">
+            <span class="atc-note__title"><mat-icon class="ic">school</mat-icon> Mentoring Note</span>
+            <p class="atc-note__body">{{ mapATCnotes[atc.atcdata['mentoringid']]['mentoringnote'] }}</p>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+
+    <!-- =====================================================================
+         Full ATC overlay (MatDialog) — mirrors formDialogTpl. Opened by
+         viewATCInDialog(); bound to the component's `atcViewerState` holder.
+         ===================================================================== -->
+    <ng-template #atcDialogTpl>
+      <div class="form-dlg">
+        <header class="form-dlg__head">
+          <span class="form-dlg__title">
+            <mat-icon class="ic">fact_check</mat-icon>
+            {{ atcViewerState.title }}
+          </span>
+          <button type="button" class="form-dlg__close" mat-dialog-close>
+            <mat-icon class="ic">close</mat-icon>
+          </button>
+        </header>
+        <div class="overlay-content">
+          <ng-container *ngIf="atcViewerState.data as atc">
+            <div class="atc-card atc-card--dialog">
+              <div class="atc-card__head">
+                <span class="atc-card__date">{{ atc["atcdata"]["prescription_date"].toDate() | date:'medium' }}</span>
+                <span class="pill pill-green" *ngIf="atcViewerState.kind === 'validated'">
+                  <mat-icon class="ic">verified</mat-icon>
+                  Validated
+                </span>
+                <span class="pill pill-amber" *ngIf="atcViewerState.kind === 'pending'">
+                  <mat-icon class="ic">schedule</mat-icon>
+                  Awaiting Validation
+                </span>
+              </div>
+
+              <div class="field-grid">
+                <span class="field-label">Participant Name</span>
+                <span class="field-val">{{ mapProfile[participantProfileId] }}</span>
+                <ng-container *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
+                  <span class="field-label">{{ mapActivity[$any(activity.key)] }}</span>
+                  <span class="field-val">
+                    <span *ngFor="let specialist of $any(activity.value); let isLast = last; trackBy: trackByDocId">{{ mapProfile[specialist] }}{{ isLast ? '' : ', ' }}</span>
+                  </span>
+                </ng-container>
+                <ng-container *ngIf="atc['atcdata']['queueid']">
+                  <span class="field-label">Queue</span>
+                  <span class="field-val">{{ mapQueue[atc["atcdata"]["queueid"]] }}</span>
+                </ng-container>
+                <ng-container *ngIf="atc['atcdata']['directive']">
+                  <span class="field-label">ATC Directive</span>
+                  <span class="field-val">{{ atc["atcdata"]["directive"] }}</span>
+                </ng-container>
+              </div>
+
+              <div class="atc-card__note" *ngIf="atcViewerState.kind === 'validated'">
+                <mat-icon class="ic">visibility</mat-icon>
+                This ATC is directly visible to the Participant.
+              </div>
+
+              <div class="atc-card__details atc-card__details--dialog">
+                <ng-container *ngTemplateOutlet="atcDetailTpl; context: { $implicit: atc }"></ng-container>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </ng-template>
+
+    <ng-template #tplAssignedATC>
+      <div class="card" [class.card--empty]="cwATClist.length == 0">
+        <div class="card-head tint-slate">
+          <div class="card-head-title">
+            <mat-icon class="ic">assignment_turned_in</mat-icon>
+            ATC Assigned to Them
+            <span class="count-badge count-slate" *ngIf="cwATClist.length > 0">{{ cwATClist.length }}</span>
+            <span class="card-head-empty" *ngIf="cwATClist.length == 0">— No data available</span>
+          </div>
+        </div>
+        <div class="card-pad" *ngIf="cwATClist.length > 0">
+          <div class="atc-assigned" *ngIf="cwATClist.length > 0">
+            <div class="atc-assigned__card" *ngFor="let atc of cwATClist; let a = index; trackBy: trackByDocId">
+              <div class="atc-assigned__head" (click)="toggleATC('cw-' + a)">
+                <span class="atc-assigned__index">{{ (a + 1) < 10 ? '0' + (a + 1) : (a + 1) }}</span>
+                <span class="atc-assigned__date">{{ atc["atcdata"]?.prescription_date?.toDate() | date:'mediumDate' }}</span>
+                <span class="atc-assigned__queue">
+                  <mat-icon class="ic">people</mat-icon>
+                  {{ mapQueue[atc["queueid"]] }}
+                </span>
+                <mat-icon class="ic atc-assigned__chev">{{ isATCExpanded('cw-' + a) ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </div>
+              <div class="atc-assigned__body" *ngIf="isATCExpanded('cw-' + a)">
+                <div class="empty" *ngIf="atc['adjustments'].length == 0" style="padding:16px 0;">
+                  <div class="empty-text">No mandatory procedure assigned for this ATC</div>
+                </div>
+                <div *ngIf="atc['adjustments'].length > 0">
+                  <h6 class="atc-card__detail-label">Procedures to Complete</h6>
+                  <div class="atc-adj-list">
+                    <ng-container *ngFor="let adjustment of atc['adjustments']; let i = index; trackBy: trackByDocId">
+                      <div class="atc-adj" *ngIf="adjustment?.procedure.length != 0">
+                        <div class="atc-adj__head">
+                          <span class="atc-adj__index">A{{ i + 1 }}</span>
+                          <span class="atc-adj__text">{{ adjustment?.adjustments }}</span>
+                        </div>
+                        <ul class="atc-proc-list">
+                          <li *ngFor="let procedure of adjustment?.procedure; let j = index; trackBy: trackByDocId">
+                            <mat-icon class="ic">chevron_right</mat-icon>
+                            <span class="proc-actionable__name">{{ mapProcedure[procedure?.procedureid] }}</span>
+                            <button
+                              type="button"
+                              class="proc-actionable__btn"
+                              [class.proc-actionable__btn--done]="procedure.status == 'completed'"
+                              (click)="markProcedure(a, i, j); $event.stopPropagation()" data-testid="studio-mark-procedure-btn">
+                              <mat-icon class="ic">{{ procedure.status == 'completed' ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+                              {{ procedure.status == 'completed' ? 'Completed' : 'Mark as Completed' }}
+                            </button>
+                          </li>
+                        </ul>
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+
+                <div *ngIf="atc['cwbrief'].length != 0" style="margin-top:14px;">
+                  <h6 class="atc-card__detail-label">Changework Brief</h6>
+                  <div class="atc-audio-list">
+                    <div class="atc-audio" *ngFor="let audio of atc['cwbrief']; let i = index; trackBy: trackByDocId">
+                      <span class="atc-audio__index">{{ i + 1 }}</span>
+                      <audio controls>
+                        <source [src]="audio" type="audio/wav">
+                      </audio>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+
+    <ng-template #tplTripleATC>
+      <div class="card" [class.card--empty]="tripleATCList.length == 0">
+        <div class="card-head tint-slate">
+          <div class="card-head-title">
+            <mat-icon class="ic">show_chart</mat-icon>
+            Triple ATC
+            <span class="count-badge count-slate" *ngIf="tripleATCList.length > 0">{{ tripleATCList.length }}</span>
+            <span class="card-head-empty" *ngIf="tripleATCList.length == 0">— No data available</span>
+          </div>
+        </div>
+        <div class="card-pad" *ngIf="tripleATCList.length > 0">
+          <div class="triple-atc-grid" *ngIf="tripleATCList.length > 0">
+            <button
+              *ngFor="let atc of tripleATCList; let i = index; trackBy: trackByDocId"
+              type="button"
+              class="triple-atc-card"
+              (click)="viewTripleATC(atc['atcid'])">
+              <span class="triple-atc-card__index">{{ (i + 1) < 10 ? '0' + (i + 1) : (i + 1) }}</span>
+              <div class="triple-atc-card__body">
+                <span class="triple-atc-card__label">Triple ATC</span>
+                <span class="triple-atc-card__date">{{ atc["prescription_date"].toDate() | date:'mediumDate' }}</span>
+                <span class="triple-atc-card__queue">{{ mapQueue[atc["queueid"]] }}</span>
+              </div>
+              <mat-icon class="ic">open_in_new</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+
+  </div>
+  <!-- =================== END LIVE ASSIGNMENT (STEPPER V2) =================== -->
+
+  <!-- Single-studio check-in conflict template (must live outside the
+       *ngIf="liveAssignment != null" block since the toggle that triggers
+       it is rendered when liveAssignment is null). -->
+  <ng-template #checkinConflictTpl let-data>
+    <div class="checkin-conflict">
+      <header class="checkin-conflict__head">
+        <mat-icon class="ic">error_outline</mat-icon>
+        <h3 class="checkin-conflict__title">You're already checked into another studio</h3>
+      </header>
+      <div class="checkin-conflict__body">
+        <p class="checkin-conflict__copy">
+          You can only be checked into one studio at a time. Checking in here will
+          check you out of:
+        </p>
+        <ul class="checkin-conflict__studios">
+          <li *ngFor="let s of data.studios; trackBy: trackByDocId">
+            <mat-icon class="ic">meeting_room</mat-icon>
+            <div class="checkin-conflict__studio-info">
+              <div class="checkin-conflict__queue">
+                {{ s.queueName || 'Unknown queue' }}
+                <span class="checkin-conflict__live-dot" *ngIf="s.isLive" title="Live session in progress"></span>
+              </div>
+              <div class="checkin-conflict__stage" *ngIf="s.stageName">
+                <mat-icon class="ic ic-sm">arrow_forward</mat-icon>
+                <span>{{ s.stageName }}</span>
+                <span class="checkin-conflict__live-tag" *ngIf="s.isLive">LIVE</span>
+              </div>
+              <div class="checkin-conflict__stage checkin-conflict__stage--muted" *ngIf="!s.stageName">
+                <span>Idle · no active stage</span>
+              </div>
+              <div class="checkin-conflict__studio-name">{{ s.name }}</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <footer class="checkin-conflict__foot">
+        <button type="button" class="checkin-conflict__btn checkin-conflict__btn--ghost" [mat-dialog-close]="false">
+          Cancel
+        </button>
+        <button type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
+          <mat-icon class="ic">logout</mat-icon>
+          Check out &amp; continue
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+
+  <!-- Hard-block alert: a co-specialist on this studio is already live in
+       another studio, so check-in is refused (they can't be in two at once). -->
+  <ng-template #collaboratorBusyTpl let-data>
+    <div class="checkin-conflict">
+      <header class="checkin-conflict__head">
+        <mat-icon class="ic">block</mat-icon>
+        <h3 class="checkin-conflict__title">Can't check in — a collaborator is busy</h3>
+      </header>
+      <div class="checkin-conflict__body">
+        <p class="checkin-conflict__copy">
+          The following specialist on this studio is already in an activity in
+          another studio. You can check in once they finish there:
+        </p>
+        <ul class="checkin-conflict__studios">
+          <li *ngFor="let c of data.collaborators; trackBy: trackByDocId">
+            <mat-icon class="ic">person</mat-icon>
+            <div class="checkin-conflict__studio-info">
+              <div class="checkin-conflict__queue">{{ c.collaboratorName }}</div>
+              <div class="checkin-conflict__stage" *ngIf="c.stageName">
+                <mat-icon class="ic ic-sm">arrow_forward</mat-icon>
+                <span>{{ c.stageName }}</span>
+                <span class="checkin-conflict__live-tag">LIVE</span>
+              </div>
+              <div class="checkin-conflict__stage checkin-conflict__stage--muted" *ngIf="!c.stageName">
+                <span>In a live activity elsewhere</span>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <footer class="checkin-conflict__foot">
+        <button type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
+          Got it
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+
+  <button *ngIf="selectedStudio['docid']" type="button" class="std-chat-fab"
+      matTooltip="Chat" matTooltipPosition="above"
+      (click)="isChatOpen ? closeChat() : openChat()">
+    <mat-icon>chat</mat-icon>
+    <span *ngIf="unreadChatCount > 0" class="std-chat-fab__badge">
+      {{ unreadChatCount > 99 ? '99+' : unreadChatCount }}
+    </span>
+  </button>
+
+  <div *ngIf="isChatOpen" class="std-chat-popup">
+    <div class="std-chat-popup__head">
+      <div class="std-chat-popup__head-info">
+        <mat-icon>support_agent</mat-icon>
+        <div>
+          <div class="std-chat-popup__title">CHAT</div>
+        </div>
+      </div>
+      <button type="button" (click)="closeChat()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <div class="std-chat-popup__messages" #chatScroll>
+      <div *ngIf="chatHasMore" class="std-chat-showmore">
+        <button type="button" (click)="loadMoreChatMessages()">
+          Show more
+        </button>
+      </div>
+
+      <ng-container *ngFor="let msg of chatMessages; let i = index">
+        <div *ngIf="i === 0 || msg['liveassignmentid'] !== chatMessages[i-1]['liveassignmentid']"
+            class="std-chat-divider">
+          <span>{{ msg['liveassignmentid'] === liveAssignment?.['docid'] ? 'Current session' : 'Previous session' }}</span>
+        </div>
+        <div class="std-chat-msg" [class.std-chat-msg--mine]="msg['sent_by'] === profileid">
+          <div class="std-chat-msg__sender">
+            {{ msg['sent_by'] === profileid ? 'You' : 'A&H Team' }}
+          </div>
+          <div class="std-chat-msg__bubble">
+            <p *ngIf="msg['message']" [innerHTML]="processMessage(msg['message'], msg['sent_by'] === profileid ? '#ffffff' : '#1a56db')"></p>
+            <div *ngFor="let f of msg['files']">
+              <img *ngIf="isImageFile(f.filename)" [src]="f.fileurl"
+                  class="std-chat-img" (click)="expandedImage = f.fileurl">
+              <div *ngIf="!isImageFile(f.filename)" class="std-chat-file__card">
+                <mat-icon>attach_file</mat-icon>
+                <span>{{ f.filename }}</span>
+                <a [href]="f.fileurl" target="_blank" (click)="$event.stopPropagation()">
+                  <mat-icon>download</mat-icon>
+                </a>
+              </div>
+            </div>
+          </div>
+          <div class="std-chat-msg__time">
+            {{ msg['sentat']?.toDate ? (msg['sentat'].toDate() | date:'shortTime') : (msg['sentat'] | date:'shortTime') }}
+          </div>
+        </div>
+      </ng-container>
+      <div *ngIf="!chatMessages.length" class="std-chat-empty">No messages yet</div>
+    </div>
+
+    <div *ngIf="chatAttachedFiles.length" class="std-chat-previews">
+      <div *ngFor="let f of chatAttachedFiles; let i = index" class="std-chat-preview">
+        <img *ngIf="f.fileurl" [src]="f.fileurl">
+        <mat-icon *ngIf="!f.fileurl">attach_file</mat-icon>
+        <button type="button" (click)="removeChatFile(i)">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="std-chat-popup__input">
+      <input #chatFileInput type="file" multiple style="display:none"
+        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+        (change)="onChatFileSelected($event)">
+      <textarea [(ngModel)]="chatText" placeholder="Type a message..." rows="1"(keydown)="onChatKeydown($event)"class="std-chat-input-textarea"></textarea>
+      <button type="button" (click)="chatFileInput.click()">
+        <mat-icon>attach_file</mat-icon>
+      </button>
+      <button type="button" (click)="sendChatMessage()"
+        [disabled]="chatUploading || (!chatText.trim() && !chatAttachedFiles.length)">
+        <mat-icon>{{ chatUploading ? 'hourglass_top' : 'send' }}</mat-icon>
+      </button>
+    </div>
+  </div>
+</div>

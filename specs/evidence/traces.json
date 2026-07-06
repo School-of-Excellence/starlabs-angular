@@ -1,0 +1,1952 @@
+{
+  "recencyNuance": {
+    "queue generation/created/90d": 0,
+    "queue generation/created/365d": 2,
+    "queue generation/created/last": "2025-08-06 08:10:00",
+    "queue generation/modified/90d": 7,
+    "queue generation/modified/365d": 21,
+    "queue generation/modified/last": "2026-06-02 15:49:01",
+    "queue stage log/createdon/90d": 3552,
+    "queue stage log/updatedAt/90d": 1060,
+    "participantjourneyproduct/subscriptionstart/90d": 336,
+    "participantjourneyproduct/purchasedate/90d": 265,
+    "participantjourneyproduct/updated/90d": 0
+  },
+  "queueTrace": {
+    "queueGeneration": {
+      "id": "vuvS7eBgTxLKufnesLQT",
+      "queuename": "A&H Evolution Preparation Event - April 2026",
+      "stages": [
+        "Evolution Prep Orientation",
+        "uP! Preparation Hold",
+        "Accelerated Evolution Level Form",
+        "uP! Life Aspiration Report",
+        "ATC Orientation Form",
+        "Prodigies Preparation Form",
+        "uP! Life Report",
+        "Scope Enhancement",
+        "Evolution Mapping Activity",
+        "In Evolution Mapping Activity",
+        "Self Evaluation Form",
+        "Scope Enhancement Changework",
+        "Transfered",
+        "Completed"
+      ],
+      "stageCount": 14,
+      "stagepropertyKeys": [
+        "Transfer queue",
+        "Transfer Queue",
+        "uP! Readiness Changework",
+        "Diagnostics",
+        "In-person Completed",
+        "Guided Self ATC",
+        "Ready for Diagnostics",
+        "ATC Orientation Group Call",
+        "Triple ATC Validation",
+        "Guided Self ATC Orientation",
+        "Triple ATC",
+        "In ATC Orientation Group Call",
+        "Consultation",
+        "Diagnostics In-person",
+        "Consultation In-person",
+        "Wellness Scaling Form",
+        "Review",
+        "Guided Pre ATC Orientation",
+        "uP! Prep Process - Hold",
+        "Self ATC Next Cycle",
+        "ATC Orientation",
+        "My Pocket ATC",
+        "Implementation",
+        "Diagnostics Readiness Changework",
+        "Expanding Horizon Consultation",
+        "Queue Transferred",
+        "Evolution Prep Completed",
+        "Self ATC",
+        "Self Evolution Report",
+        "My Evolution Wishlist"
+      ],
+      "sampleStageProperty": {
+        "Transfer queue": [
+          "calltoaction",
+          "transferactivityproperty",
+          "stagegroup",
+          "participantform",
+          "optionalstagegrouping",
+          "transferactivity",
+          "minwatingminutes",
+          "actiontype",
+          "messageheader",
+          "nextstage",
+          "studiowidgets",
+          "mandatorystagegrouping",
+          "selfmovable",
+          "stageexplanation",
+          "maxwatingminutes",
+          "compulsoryactivity",
+          "stagemessage",
+          "implementationstages"
+        ]
+      },
+      "queuevariationCount": 10,
+      "queueadmin": 19,
+      "modified": "2026-06-02 15:49:01",
+      "created": "2023-11-07 06:16:09",
+      "hasBooleanToggles": []
+    },
+    "tokenTrace": {
+      "tokenId": "0B1inpSgA668vdsLMOJu",
+      "profile_id": "9na6zpzgaEQAoklCUnpC",
+      "queuename": "uP!/Legacy Diagnostics & Consultation - ONLINE",
+      "queueref": "queue generation/UfglSsK3GurM3KiRJrdS",
+      "currentstage": "Completed",
+      "previousstage": "Self Evolution Report",
+      "tokenstatus": "Active",
+      "variationid": "RNOFi3yRZeRGSuRQZQJm",
+      "studioid": null,
+      "liveassignmentid": null,
+      "productname": "Legacy Consultation",
+      "resolvedVariation": {
+        "variationname": "Old Participant",
+        "stages": [
+          "Yet to Start",
+          "Wellness Scaling Form",
+          "uP! Life Report",
+          "Video Log",
+          "Evolution Mapping Activity",
+          "In Evolution Mapping Activity",
+          "Self Evaluation Form",
+          "Self ATC Next Cycle",
+          "Diagnostics",
+          "Diagnostics Readiness Changework",
+          "Consultation",
+          "uP! Readiness Changework",
+          "Review",
+          "Self Evolution Report",
+          "Completed"
+        ],
+        "atcmodel": null
+      },
+      "stageHistoryCount": 17,
+      "stageHistory": [
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Evolution Mapping Activity",
+          "to": "In Evolution Mapping Activity",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 8
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Video Log",
+          "to": "Video Log",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 7
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "In Evolution Mapping Activity",
+          "to": "Self Evaluation Form",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 1
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "uP! Life Report",
+          "to": "Video Log",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 5
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Consultation",
+          "to": "Consultation",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 31
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Diagnostics",
+          "to": "Diagnostics",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 15
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Wellness Scaling Form",
+          "to": "uP! Life Report",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 23
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Video Log",
+          "to": "Evolution Mapping Activity",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 7
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Consultation",
+          "to": "Consultation",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 2
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Self Evolution Report",
+          "to": "Completed",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 10
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Self ATC Next Cycle",
+          "to": "Diagnostics",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 9
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Self Evaluation Form",
+          "to": "Self ATC Next Cycle",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 15
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Diagnostics",
+          "to": "Diagnostics",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 1
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Diagnostics",
+          "to": "Diagnostics",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 15
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Yet to Start",
+          "to": "Wellness Scaling Form",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": null
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Diagnostics",
+          "to": "Consultation",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 1
+        },
+        {
+          "at": "2023-11-30 07:54:44",
+          "from": "Consultation",
+          "to": "Self Evolution Report",
+          "status": "Approved",
+          "manuallymoved": null,
+          "pos": 2
+        }
+      ]
+    }
+  },
+  "studioTrace": {
+    "liveAssignment": {
+      "id": "nB91BRzO3kxQFYZvg1LV",
+      "participantid": "biGk1k7F8FZKr3sGFe5n",
+      "queueid": "bk2Fx9B41cGUv4DhrDi0",
+      "stagename": "Diagnostics",
+      "stagetype": null,
+      "studioid": "WU0KYrffrWcbDW6U3GnL",
+      "status": "completed",
+      "created": "2026-05-27 10:33:50",
+      "updated": "2026-06-02 08:08:46",
+      "zoomdataKeys": [
+        "type",
+        "encrypted_password",
+        "settings",
+        "h323_password",
+        "uuid",
+        "status",
+        "pstn_password",
+        "created_at",
+        "topic",
+        "start_url",
+        "host_email",
+        "pre_schedule",
+        "id",
+        "host_id",
+        "creation_source",
+        "password",
+        "join_url",
+        "timezone",
+        "chat_join_url"
+      ],
+      "hasJoinUrl": true,
+      "hasStartUrl": true,
+      "signatureLen": 0,
+      "pairingCount": 1,
+      "changeworkbriefCount": 0
+    },
+    "linkedToken": "no token currently points here (binding may be completed/cleared)",
+    "openviduroomByLiveAssignmentId": "no openviduroom with id==liveassignmentid (Zoom-path studios have none)",
+    "openviduroomSample": {
+      "id": "IV72tcdHPBno7BTz9o00",
+      "sessiontype": "appointment",
+      "roomstatus": "finished",
+      "recordingstatus": "ended",
+      "hasEgress": true
+    },
+    "arenaspaceSample": {
+      "id": "0DQMrBO9bwnGmECMefeU",
+      "spaceid": "0Y4CGoY5oQHXgHfbXxJl",
+      "pivottype": "k7fiQxHgCfA1v6VzdKEC",
+      "mentors": 1,
+      "validated": false,
+      "participants": 1
+    }
+  },
+  "journeyTrace": {
+    "profileid": "mA072qKbzrAthut6CdFV",
+    "journeyCount": 1,
+    "journeys": [
+      {
+        "id": "00Aiq4OUe3IJGK7rD0qq",
+        "journeystatus": "completed",
+        "journeyref": "journey/YYsg9Lux3oaNjEC8jqex",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "onboarded": true,
+        "purchasedate": "2025-03-04 13:56:12",
+        "journeytype": "new"
+      }
+    ],
+    "products": [
+      {
+        "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+        "deliverymode": "Installation Event Mode",
+        "mode": "After Extended Performance Mode",
+        "status": "completed",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": null
+      },
+      {
+        "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+        "deliverymode": "Event Mode",
+        "mode": null,
+        "status": "cancelled",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": "ppDajRs7K5hG51P1bbE6"
+      },
+      {
+        "productref": "products/cpzUxE5I2FRqs3hkgHO2",
+        "deliverymode": "Event Mode",
+        "mode": "After Extended Performance Mode",
+        "status": "completed",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": "8sLSCm6bNBa4QL47Ats5"
+      },
+      {
+        "productref": "products/IWnYE1whSGrjT7duRSv4",
+        "deliverymode": "Event Mode",
+        "mode": "After Extended Performance Mode",
+        "status": "completed",
+        "subscriptionstart": "2018-01-01 00:00:00",
+        "subscriptionend": "2022-07-30 00:00:00",
+        "queuevariationid": null
+      },
+      {
+        "productref": "products/IWnYE1whSGrjT7duRSv4",
+        "deliverymode": "Event Mode",
+        "mode": "After Extended Performance Mode",
+        "status": "completed",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": "5vwCfehSsxNcENmkEM7x"
+      },
+      {
+        "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+        "deliverymode": "Installation Event Mode",
+        "mode": null,
+        "status": "cancelled",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": null
+      },
+      {
+        "productref": "products/IWnYE1whSGrjT7duRSv4",
+        "deliverymode": "Event Mode",
+        "mode": "Event Mode",
+        "status": "ongoing",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": null
+      },
+      {
+        "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+        "deliverymode": "Event Mode",
+        "mode": "After Extended Performance Mode",
+        "status": "completed",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": "rkx1mx2bkzpjHjSKF860"
+      },
+      {
+        "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+        "deliverymode": "Event Mode",
+        "mode": null,
+        "status": "cancelled",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": "gaxV11w9xDmYBhcmSCsc"
+      },
+      {
+        "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+        "deliverymode": "Event Mode",
+        "mode": null,
+        "status": "cancelled",
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": "gaxV11w9xDmYBhcmSCsc"
+      },
+      {
+        "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+        "deliverymode": "Installation Event Mode",
+        "mode": "Journey Planning Mode",
+        "status": null,
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": null
+      },
+      {
+        "productref": "products/0ayiNALL1HDVvCXDHcZ4",
+        "deliverymode": "Installation Event Mode",
+        "mode": "After Extended Performance Mode",
+        "status": "completed",
+        "subscriptionstart": "2018-01-01 00:00:00",
+        "subscriptionend": "2022-07-30 00:00:00",
+        "queuevariationid": null
+      },
+      {
+        "productref": "products/IWnYE1whSGrjT7duRSv4",
+        "deliverymode": "Event Mode",
+        "mode": "Journey Planning Mode",
+        "status": null,
+        "subscriptionstart": "2025-03-04 13:56:12",
+        "subscriptionend": "2027-03-03 18:30:00",
+        "queuevariationid": null
+      },
+      {
+        "productref": "products/WKyHUzbJMjZZtMg6uUq9",
+        "deliverymode": "Event Mode",
+        "mode": "Journey Planning Mode",
+        "status": null,
+        "subscriptionstart": null,
+        "subscriptionend": null,
+        "queuevariationid": null
+      }
+    ],
+    "productCount": 14,
+    "appointmentCount": 0,
+    "appointments": [],
+    "deliverableCount": 9,
+    "deliverableStatuses": {
+      "(blank)": 4,
+      "completed": 4,
+      "ongoing": 1
+    }
+  },
+  "contentTrace": {
+    "totalContentAnalytics": 278756,
+    "byType": {
+      "solarvoice": 119959,
+      "eiflixcontent": 39717,
+      "eiflix": 14928,
+      "video": 0,
+      "audio": 0,
+      "ads": 0,
+      "series": 0,
+      "healthstories": 0
+    },
+    "sample": {
+      "type": "eiflix",
+      "videoname": "DAY 01 - Part 08 - S2 - State changed",
+      "totaltimespend": 1170,
+      "from": "eiflixworkshop",
+      "logdate": "2026-06-02 16:07:54"
+    },
+    "touchpointSample": {
+      "touchpoint": "Form Submitted",
+      "label": "Form Submitted - ATC Understanding Validation",
+      "profileid": "27MaTyYg9qFNGRWQW1Ih",
+      "at": "2026-06-02 16:07:10"
+    },
+    "touchpointTotal": 89245
+  },
+  "authTrace": {
+    "dashboard": [
+      {
+        "id": "gWzSE8DjALql9acU5rDi",
+        "label": "Dashboard",
+        "route": "/EISDashboard",
+        "showInSidenav": true,
+        "order": 1,
+        "roles": [],
+        "profileidCount": 0,
+        "children": []
+      },
+      {
+        "id": "O9d7l9TOSgxLF1wsieeI",
+        "label": "Product Designer",
+        "route": null,
+        "showInSidenav": true,
+        "order": 2,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Add Package",
+            "route": "/addpackage",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Add Journey",
+            "route": "/addjourney",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Add Product",
+            "route": "/addproduct",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "ATC Model",
+            "route": "/atcmodel",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Package Design",
+            "route": "/packagedesign",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Delivery Activities",
+            "route": "/deliveryactivities",
+            "roles": 3,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Product Mode Config",
+            "route": "/productmodeconfig",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Journey Product Map",
+            "route": "/journeyproductmap",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Products & Delivery Activities Map",
+            "route": "/productdelivery",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "deliverysequence",
+            "route": "/deliverysequence",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Appointment Roles",
+            "route": "/appointmentrole",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "EIS & Appointment Role Map",
+            "route": "/eisappointmentrole",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Map Appointment Type & Roles",
+            "route": "/mapappointmentrole",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Create Accelerator Evolution Level",
+            "route": "/createaelnames",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "ticEn0412bPh2K03IdmN",
+        "label": "Developer Settings",
+        "route": "/routeconfiguration",
+        "showInSidenav": false,
+        "order": 3,
+        "roles": [
+          "admin"
+        ],
+        "profileidCount": 0,
+        "children": []
+      },
+      {
+        "id": "vR6m6bDQybRTyHdwMN7e",
+        "label": "Participant Profiles Management",
+        "route": null,
+        "showInSidenav": true,
+        "order": 4,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "View Participants Form",
+            "route": "/view-participants-form",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant Profiles",
+            "route": "/profilelist",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participants Analytics",
+            "route": "/participants-analytics",
+            "roles": 9,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "userprofile",
+            "route": "/userprofile",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Participant Purchase",
+            "route": "/participantpurchase",
+            "roles": 9,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Journey Support",
+            "route": "/journeysupport",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Participant Delivery Sequence",
+            "route": "/participantdeliverysequence",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "participant-evolution-summary",
+            "route": "/participant-evolution-summary",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Profile Summary",
+            "route": "/profilesummary",
+            "roles": 11,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Participant Product",
+            "route": "/participantproduct",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Profile Screen",
+            "route": "/ProfileScreen",
+            "roles": 8,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "User Profile",
+            "route": "/user%20profile",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Participant Form Tracker",
+            "route": "/participant-form-tracker",
+            "roles": 0,
+            "profileid": 2,
+            "showInSidenav": false
+          },
+          {
+            "label": "User Profile Old",
+            "route": "/userprofile_old",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "O7rc91Bb0t3Ce4p2MPqi",
+        "label": "Workshop",
+        "route": null,
+        "showInSidenav": true,
+        "order": 5,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Workshop Dashboard",
+            "route": "/workshop_dashboard",
+            "roles": 17,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "EiFlix Workshops",
+            "route": "/workshops",
+            "roles": 5,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Workshop Image Upload",
+            "route": "/workshop_image_upload",
+            "roles": 2,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Engagement Dashboard",
+            "route": "/engagementdashboard",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "B!G Event Mentor",
+            "route": "/bigeventmentor",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "B!G Engagement Dashboard",
+            "route": "/bigengagementdashboard",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Success Multiplier",
+            "route": "/hpc",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Quiz",
+            "route": "/quiz",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "qtGF5KgvW5TOQiRVCYhA",
+        "label": "Content",
+        "route": null,
+        "showInSidenav": true,
+        "order": 6,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Content Home",
+            "route": "/content-upload-v2",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Solar Voice Upload",
+            "route": "/audiodashboard",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Solar Voice Playlist",
+            "route": "/playlistdashboard",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "EiFlix Video Upload",
+            "route": "/videodashboard",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "EiFlix Category Assign",
+            "route": "/assigncategory",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "EiFlix Series Configuration",
+            "route": "/seriesdashboard",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "EiFlix Tier Configuration",
+            "route": "/viewparticipantstieraccess",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "General Content Upload",
+            "route": "/contentupload",
+            "roles": 4,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Ads",
+            "route": "/ads",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Playlist Ads",
+            "route": "/playlistads",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Health Stories",
+            "route": "/healthstories",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Community Manager",
+            "route": "/communitymanager",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Content Analytics",
+            "route": "/contentanalytics",
+            "roles": 9,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Create Arena Video Ask Template",
+            "route": "/createarenavideoasktemplate",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Resources",
+            "route": "/learningmaterial",
+            "roles": 1,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Manage Recommended Playlist",
+            "route": "/recommendedplaylist",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Content Analytics Dashboard",
+            "route": "/content-analytics-dashboard",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "ytoEaZKRgvHBYZbKQ5h3",
+        "label": "Journey Dashboard",
+        "route": null,
+        "showInSidenav": true,
+        "order": 7,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Sales Approval",
+            "route": "/salesleads",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Journey Experience Dashboard",
+            "route": "/JourneycoachDashboard-new",
+            "roles": 11,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "ProductInitiated Dashboard",
+            "route": "/productinitiated-dashboard",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Delivery Dashboard",
+            "route": "/delivery-dashboard",
+            "roles": 4,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Business Dashboard",
+            "route": "/overall-dashboard",
+            "roles": 2,
+            "profileid": 9,
+            "showInSidenav": false
+          },
+          {
+            "label": "Sales Report",
+            "route": "/sales-report",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Ecosystem",
+            "route": "/ecosystem",
+            "roles": 8,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Onboarding Pipeline",
+            "route": "/onboarding-pipeline",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "rkisciZC9SRaZRSJBKmc",
+        "label": "EiFlix",
+        "route": null,
+        "showInSidenav": false,
+        "order": 9,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Tier Access Config",
+            "route": "/tieraccessconfig",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "QG4otvdZUDV1BERR4yIv",
+        "label": "Form Template",
+        "route": "/formtemplate",
+        "showInSidenav": false,
+        "order": 10,
+        "roles": [
+          "admin",
+          "ah",
+          "ahmember",
+          "capacityplanner",
+          "developer",
+          "eis",
+          "participant"
+        ],
+        "profileidCount": 0,
+        "children": []
+      },
+      {
+        "id": "KcCogoTrhqGj1EFxzNSv",
+        "label": "Events",
+        "route": null,
+        "showInSidenav": true,
+        "order": 11,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Create Event",
+            "route": "/create_event",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Initiate Event Product",
+            "route": "/initiateeventproduct",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Arena E-Ticket Approve",
+            "route": "/arena_e_ticket_approve",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Event Participation Approve",
+            "route": "/event_participation_approve",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "QR Scanner",
+            "route": "/qr-scanner",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Layers screen",
+            "route": "/layers-screen",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "B!G Wall",
+            "route": "/bigwall",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Video Ask",
+            "route": "/videoask-display",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Live Event Dashboard",
+            "route": "/live_event_dashboard",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Event Attendence Log",
+            "route": "/event_attendance_log",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Event Group Chat",
+            "route": "/group-chat",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant  Evolution Mapping",
+            "route": "/participantevolution",
+            "roles": 16,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Evolution Mapping",
+            "route": "/evolutionmapping",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "First Timers Dashboard",
+            "route": "/first_timers_dashboard",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Event Zone Management",
+            "route": "/eventzonemanagement",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Overall Event Dashboard",
+            "route": "/overall_event_dashboard",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant Videos Mapping",
+            "route": "/participant_videos_mapping",
+            "roles": 3,
+            "profileid": 4,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "bWRM3C6tvYBQr4z7MvQQ",
+        "label": "Scheduling",
+        "route": null,
+        "showInSidenav": true,
+        "order": 12,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "EIS Zoom Account",
+            "route": "/EISzoom",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Appointment Availability",
+            "route": "/appointmentavailability",
+            "roles": 8,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Book Appointment",
+            "route": "/bookappointment",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "My Calendar",
+            "route": "/mycalendar",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Appointment Calendar",
+            "route": "/appointmentcalendar",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Daily Roster",
+            "route": "/roster",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Appointment Status Pending",
+            "route": "/appointmentstatuspending",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Team Delivery Hours",
+            "route": "/teamdeliveryhours",
+            "roles": 9,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Team Offtime",
+            "route": "/offtime",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Approve Offtime",
+            "route": "/approveofftime",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Capacity Utilization",
+            "route": "/capacityutilization",
+            "roles": 8,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Personalize Delivery Teams",
+            "route": "/mapclienteis",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Appointment Studio",
+            "route": "/appointmentstudio",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Open Appointment Studio",
+            "route": "/openappointmentzoom",
+            "roles": 2,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Appointment-Dashboard",
+            "route": "/appointment-dashboard",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "FwJ0g5qxzBfNUUJHSKUR",
+        "label": "Queue System",
+        "route": null,
+        "showInSidenav": true,
+        "order": 13,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Queue List",
+            "route": "/queuelist",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "BiG Planner",
+            "route": "/queuebigplanner",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Dynamic Studio",
+            "route": "/dynamicstudio",
+            "roles": 8,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Queue Zoom Account",
+            "route": "/zoomaccount",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Arena Activities by Studio",
+            "route": "/arenastudioactivity",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Queue Participant Transfer",
+            "route": "/queuetransfer",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Event Opportunity Dashboard",
+            "route": "/eventopportunitydashboard",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Queue Broadcast for Arena",
+            "route": "/queuevenue",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Zoom Studio",
+            "route": "/openmeeting",
+            "roles": 8,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Queue Planner",
+            "route": "/queue-planner",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Queue Planner Review",
+            "route": "/queue-planner-review",
+            "roles": 9,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Queue Manager",
+            "route": "/dynamicqueuemanager",
+            "roles": 11,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Queue Web",
+            "route": "/queue-web",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Scope Enhancement Rubrics Scoring",
+            "route": "/viewrubrics_scoring_atc",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "epAIBqboQwdDJSKSWFPa",
+        "label": "B!G",
+        "route": null,
+        "showInSidenav": true,
+        "order": 14,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Taxonomy",
+            "route": "/atctaxonomy",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Big Activity",
+            "route": "/bigactivity",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Big Dashboard",
+            "route": "/big-dashboard",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "B!G Level",
+            "route": "/biglevel",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Big Accelerator - Arena Activities",
+            "route": "/particiant_assignment_board",
+            "roles": 2,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "B!G Aggregate",
+            "route": "/big_aggregate",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "ATC Model Level Config",
+            "route": "/modellevelconfig",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Big Activity Log",
+            "route": "/bigactivitylog",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "A&H Space",
+            "route": "/arena_space",
+            "roles": 2,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Big Activity Monitor",
+            "route": "/bigactivitymonitor",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Big Cohorts",
+            "route": "/bigcohorts",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "B!G Chat Screen",
+            "route": "/bigchatscreen",
+            "roles": 8,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Form Based Submission",
+            "route": "/formbasedsubmission",
+            "roles": 8,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Zoom Meeting",
+            "route": "/zoommeeting_bigparticipants",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Validate B!G Activity",
+            "route": "/validateParticipantAssignments",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "BiG Profile",
+            "route": "/bigProfile",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "finUNEFnplEK8MSGsyrV",
+        "label": "ATC",
+        "route": null,
+        "showInSidenav": true,
+        "order": 15,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Prescribe ATC",
+            "route": "/prescribeATC",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "View Prescribed ATC",
+            "route": "/viewprescribedATC",
+            "roles": 7,
+            "profileid": 2,
+            "showInSidenav": true
+          },
+          {
+            "label": "View Assigned ATC",
+            "route": "/viewassignedATC",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "ATC - Review/Flag",
+            "route": "/reviewflagATC",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Pick ATC for Mentoring",
+            "route": "/pickformentoring",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Edit ATC",
+            "route": "/editATC",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Add Triple ATC",
+            "route": "/addtripleATC",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "View Triple ATC",
+            "route": "/viewtripleATC",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Edit Triple ATC",
+            "route": "/edittripleATC",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "ATC Education",
+            "route": "/atctrajectory",
+            "roles": 2,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Preview ATC",
+            "route": "/previewATC",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Preview Triple ATC",
+            "route": "/previewtripleATC",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Live Prescription",
+            "route": "/liveprescription",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Upgraded ATC",
+            "route": "/viewUpgradedATC",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "mB2bSe8d8N6pOFry1LTi",
+        "label": "App Engagement",
+        "route": null,
+        "showInSidenav": true,
+        "order": 16,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "App Action Pending",
+            "route": "/appactionpending",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Interim Report Log",
+            "route": "/interimreportlog",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Evolution Wishlist Log",
+            "route": "/evolutionwishlistlog",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Mode Dashboard",
+            "route": "/modedashboard",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant AEL",
+            "route": "/participantAEL",
+            "roles": 5,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant ATC Taxonomy Update",
+            "route": "/updateprofiletaxonomy",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Notification Record",
+            "route": "/notificationrecord",
+            "roles": 5,
+            "profileid": 1,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant Notification Log",
+            "route": "/notificationlog",
+            "roles": 6,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant Touch Point",
+            "route": "/participanttouchpoint",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Mode Dashboard New",
+            "route": "/mode-dashboard-new",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "App Flow Breaks",
+            "route": "/app-flow-breaks",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Evolution Wishlist Form",
+            "route": "/evolutionwishlist",
+            "roles": 1,
+            "profileid": 0,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "Jfe1vJkSH58EJ1D6Kui1",
+        "label": "Customer Support",
+        "route": null,
+        "showInSidenav": true,
+        "order": 17,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Customer Support Dashboard",
+            "route": "/customersupportdashboard",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Customer Support Tickets",
+            "route": "/customer-support-tickets",
+            "roles": 7,
+            "profileid": 0,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "JW36x6hDtZ19NULmxxc1",
+        "label": "Communication",
+        "route": null,
+        "showInSidenav": true,
+        "order": 18,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Email Template",
+            "route": "/email-templates",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "aPvcAnJK3yHLZAc21o7g",
+        "label": "Business Dashboard",
+        "route": null,
+        "showInSidenav": false,
+        "order": 20,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Ads Entry",
+            "route": "/ads-entry",
+            "roles": 0,
+            "profileid": 4,
+            "showInSidenav": false
+          },
+          {
+            "label": "Expense Planner",
+            "route": "/expense-planner",
+            "roles": 0,
+            "profileid": 5,
+            "showInSidenav": false
+          },
+          {
+            "label": "Profile Based Access",
+            "route": "/profile-role-access",
+            "roles": 0,
+            "profileid": 4,
+            "showInSidenav": false
+          }
+        ]
+      },
+      {
+        "id": "iskRMxeivnY9tCMknkmE",
+        "label": "OpenVidu",
+        "route": null,
+        "showInSidenav": true,
+        "order": 21,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Join Room",
+            "route": "/joinroom",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": false
+          },
+          {
+            "label": "Monitor Live Assignment",
+            "route": "/monitorliveassignment",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Participant Studio",
+            "route": "/participantstudio",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "OpenVidu Recordings",
+            "route": "/openvidurecordings",
+            "roles": 3,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "xB7h0ivhbz7eRkmYsnvT",
+        "label": "EI AI",
+        "route": "/viewaigeneratedatc",
+        "showInSidenav": true,
+        "order": 22,
+        "roles": [
+          "ah",
+          "developer",
+          "eis"
+        ],
+        "profileidCount": 0,
+        "children": []
+      },
+      {
+        "id": "oSdsJ4VtVRCZ6NW0ELJ5",
+        "label": "Diagnostics System",
+        "route": null,
+        "showInSidenav": true,
+        "order": 23,
+        "roles": [],
+        "profileidCount": 0,
+        "children": [
+          {
+            "label": "Queue Event Health",
+            "route": "/queueeventhealth",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          },
+          {
+            "label": "Live Event Health",
+            "route": "/liveeventhealth",
+            "roles": 4,
+            "profileid": 0,
+            "showInSidenav": true
+          }
+        ]
+      },
+      {
+        "id": "JszoEkhMyzxyFSZlVcEL",
+        "label": "Journey Onboarding Detail",
+        "route": "/journeyonboardingdetail",
+        "showInSidenav": true,
+        "order": 24,
+        "roles": [
+          "admin",
+          "developer"
+        ],
+        "profileidCount": 0,
+        "children": []
+      },
+      {
+        "id": "pgsQV7vXEMP47Q2M5xkf",
+        "label": "Development Mic Test",
+        "route": "/devtestmic",
+        "showInSidenav": true,
+        "order": 25,
+        "roles": [
+          "developer"
+        ],
+        "profileidCount": 0,
+        "children": []
+      }
+    ],
+    "eisrolesSample": [
+      {
+        "id": "0VDWDUDz6A6d9wyqn88g",
+        "role": "Breakthrough Mid Review Collaborator"
+      },
+      {
+        "id": "0X0xTZHfFY9WH9hU0Jcr",
+        "role": "Critical Support Orientation Facilitator"
+      },
+      {
+        "id": "1KunlbALzQ6inQilT4Ie",
+        "role": "Breakthrough Review Collaborator"
+      },
+      {
+        "id": "1nx4kcY11DOeXOkIN9hs",
+        "role": "WiSH Testimonial Call Facilitator"
+      },
+      {
+        "id": "31NmzRzHmnAH9YfV3Qsn",
+        "role": "A&H Motherhood Diagnostics"
+      },
+      {
+        "id": "3U7nWgtBvH3p3LRYvpsd",
+        "role": "Health Diagnostics Collaborator"
+      },
+      {
+        "id": "3iBTsNr3EzwHmOCoijzN",
+        "role": "Fertility Implementation Specialist"
+      },
+      {
+        "id": "3iNrNlLqGeJjOV59gNYL",
+        "role": "Critical Support Implementation Validation Specialist"
+      }
+    ],
+    "eisrolesCount": 166,
+    "ahcrmAccess": {
+      "business dashboard": "6 profileids"
+    },
+    "profileRoleRefExample": {
+      "profileid": "Od2wVistwa7znbTSRylR",
+      "role_ref": "users_roles/00uKMRyllw0kmwkQXgGv"
+    }
+  }
+}

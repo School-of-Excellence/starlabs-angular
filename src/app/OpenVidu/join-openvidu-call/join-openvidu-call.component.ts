@@ -416,7 +416,7 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
       const publishOptions    = this.adaptiveQuality.getPublishOptions(initialTier);
       await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
 
-      const videoTrack = room.localParticipant.videoTracks.values().next().value?.track;
+      const videoTrack = room.localParticipant.videoTrackPublications.values().next().value?.track;
       this.localParticipant.set(videoTrack);
 
       // Start adaptive quality monitoring BEFORE blur so the baseline CPU reading
@@ -538,9 +538,9 @@ export class JoinOpenviduCallComponent implements AfterViewInit, OnDestroy {
     if (!room) return undefined;
 
     if (source === Track.Source.Microphone) {
-      return Array.from(room.localParticipant.audioTracks.values()).find(pub => pub.source === source);
+      return Array.from(room.localParticipant.audioTrackPublications.values()).find(pub => pub.source === source);
     } else {
-      return Array.from(room.localParticipant.videoTracks.values()).find(pub => pub.source === source);
+      return Array.from(room.localParticipant.videoTrackPublications.values()).find(pub => pub.source === source);
     }
   }
 

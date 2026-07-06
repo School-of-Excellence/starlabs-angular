@@ -1,0 +1,4460 @@
+/* =========================================================================
+   Dynamic Studio V2 — rebuilt styles
+   Design system extracted from the React prototype (Manrope + navy/primary).
+   Scoped to .ds-app so it does not leak into the rest of the host page.
+   ========================================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+/* ------------------------------------------------------------------ TOKENS */
+.ds-app {
+  --navy: #16323B;
+  --navy-2: #204550;
+  --canvas: #EEF1F6;
+  --surface: #FFFFFF;
+  --surface-2: #F8FAFC;
+  --border: #E2E7EF;
+  --border-strong: #CFD6E1;
+  --ink: #1A2332;
+  --ink-2: #566072;
+  --ink-3: #8A93A3;
+  /* Accent retheme → mockup purple (dynamic-studio-full.html). Token-driven so
+     the whole .ds-app workspace picks it up automatically. */
+  --primary: #9A258F;
+  --primary-ink: #7C1D73;
+  --primary-soft: #F8EAF6;
+  --primary-line: #E9C9E4;
+  --green: #1B8E50;
+  --green-bright: #1FA15B;
+  --green-soft: #E4F4EA;
+  --green-line: #BFE3CC;
+  --amber: #B45309;
+  --amber-bright: #D97706;
+  --amber-soft: #FCF3E0;
+  --amber-line: #F1DDA8;
+  --red: #DC2626;
+  --shadow-sm: 0 1px 2px rgba(26,35,50,.04), 0 1px 3px rgba(26,35,50,.05);
+  --shadow-md: 0 6px 18px rgba(26,35,50,.06), 0 2px 6px rgba(26,35,50,.04);
+  --shadow-lg: 0 18px 48px rgba(26,35,50,.12), 0 6px 14px rgba(26,35,50,.06);
+  --r-sm: 9px;
+  --r-md: 13px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --ease: cubic-bezier(.32,.72,0,1);
+  --hair: rgba(26,35,50,.10);
+  /* Fluid sizing — sidebar and topbar scale with the viewport so the design
+     works on 13" laptops and 27" monitors without footer clipping. */
+  --sidebar-w: clamp(240px, 22vw, 328px);
+  --topbar-h: clamp(72px, 8vh, 96px);
+  --footer-h: clamp(62px, 7vh, 78px);
+  --base-fs: clamp(14px, 0.9vw + 6px, 16px);
+  /* The host STARLABS mat-toolbar sits at the top of the page (sticky). Reserve
+     that space so the studio's own topbar / status pill is never hidden behind
+     it. MUST stay IN SYNC with the .toolbar height in app.component.css — that
+     bar is now zoom-stable (viewport-unit height), so this offset tracks the
+     same clamp expression exactly (otherwise a gap/overlap appears under it). */
+  --host-toolbar-h: clamp(40px, 7.4vh, 64px);
+}
+
+/* ---------------------------------------------------------------- ROOT APP */
+.ds-app {
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-size: var(--base-fs);
+  line-height: 1.45;
+  display: grid;
+  /* Zoom-stable chrome — sidebar/topbar/footer are sized in VIEWPORT units so
+     they keep a constant PHYSICAL size when the browser is zoomed (vw shrinks in
+     CSS-px as you zoom, cancelling it). Only main (1fr, px-based) scales with
+     zoom. Wide clamp bounds keep it adaptive across screen sizes. */
+  grid-template-columns: clamp(150px, 16vw, 300px) 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "sidebar topbar"
+    "sidebar main"
+    "sidebar footer";
+  /* The component lives inside the STARLABS shell's .mainscreen wrapper.
+     We take over the visible area BELOW the host toolbar so:
+       1. The toolbar (hamburger, logo, bell, settings) stays visible.
+       2. Our own .ds-topbar (status pill + Jump to Meeting) isn't hidden
+          underneath the host toolbar.
+       3. The footer (Back / Step X of Y / Next) is always above the fold. */
+  position: fixed;
+  top: var(--host-toolbar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: calc(100vh - var(--host-toolbar-h));
+  /* dvh: iOS Safari/Chrome mobile exclude the URL bar from 100vh, which clips
+     the footer. Browsers without dvh support ignore this and keep the vh line. */
+  height: calc(100dvh - var(--host-toolbar-h));
+  z-index: 30;
+  overflow: hidden;
+}
+.ds-app *,
+.ds-app *::before,
+.ds-app *::after { box-sizing: border-box; }
+.ds-app button { font-family: inherit; cursor: pointer; border: none; background: none; }
+.ds-app ::selection { background: var(--primary-soft); }
+.ds-app :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5.5px var(--primary);
+  border-radius: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-app *,
+  .ds-app *::before,
+  .ds-app *::after { transition: none !important; animation: none !important; }
+}
+
+/* mat-icon inline used as "ic" */
+.ds-app .ic {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  flex-shrink: 0;
+}
+.ds-app .ic.ic-sm { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ic.ic-lg { font-size: 22px; width: 22px; height: 22px; line-height: 22px; }
+.ds-app .ic.ic-xl { font-size: 40px; width: 40px; height: 40px; line-height: 40px; }
+
+/* ============================================================== TOP BAR */
+.ds-app .ds-topbar {
+  grid-area: topbar;
+  background: rgba(255,255,255,.72);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--hair);
+  border-left: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(16px, 1.6vw + 8px, 32px);
+  gap: clamp(12px, 1vw + 4px, 24px);
+  min-width: 0;
+}
+.ds-app .ds-topbar > * { min-width: 0; }
+.ds-app .ds-waiting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-line);
+}
+.ds-app .ds-waiting--full {
+  flex: 1;
+  width: 100%;
+  padding: 11px 14px 11px 16px;
+  border-radius: var(--r-md);
+}
+/* Compact topbar variant — tighter padding, smaller icon, less side gap */
+.ds-app .ds-waiting--compact {
+  padding: clamp(6px, 0.4vw + 3px, 8px) clamp(10px, 0.6vw + 4px, 14px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--r-sm);
+}
+.ds-app .ds-waiting--compact .ds-waiting-icon {
+  width: clamp(28px, 1.6vw + 12px, 36px);
+  height: clamp(28px, 1.6vw + 12px, 36px);
+}
+.ds-app .ds-waiting--compact .ds-waiting-icon .ic {
+  font-size: clamp(14px, 0.4vw + 9px, 18px);
+  width: clamp(14px, 0.4vw + 9px, 18px);
+  height: clamp(14px, 0.4vw + 9px, 18px);
+  line-height: clamp(14px, 0.4vw + 9px, 18px);
+}
+.ds-app .ds-waiting--compact .ds-waiting-title {
+  font-size: clamp(13px, 0.5vw + 8px, 15px);
+  line-height: 1.2;
+}
+.ds-app .ds-waiting--compact .ds-waiting-sub {
+  font-size: clamp(11px, 0.3vw + 8px, 12.5px);
+  line-height: 1.3;
+}
+/* Tighten the topbar's outer container too — the gap on the sides comes
+   from the host topbar padding + waiting pill width:100%. */
+.ds-app .ds-topbar {
+  padding-left: clamp(12px, 1vw + 4px, 22px);
+  padding-right: clamp(12px, 1vw + 4px, 22px);
+  gap: 10px;
+}
+.ds-app .ds-waiting-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.ds-app .ds-waiting-cta {
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Joined-state highlight: animated glow + brighter border around the
+   topbar pill so the specialist immediately notices the participant has
+   come into the call. */
+.ds-app .ds-waiting.is-joined {
+  border-width: 1.5px;
+  box-shadow:
+    0 0 0 4px rgba(30, 86, 99, 0.10),
+    0 6px 18px rgba(30, 86, 99, 0.18);
+  animation: dsJoinedPulse 2.4s var(--ease) infinite;
+}
+@keyframes dsJoinedPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(30, 86, 99, 0.10), 0 6px 18px rgba(30, 86, 99, 0.18); }
+  50%      { box-shadow: 0 0 0 8px rgba(30, 86, 99, 0.04), 0 6px 24px rgba(30, 86, 99, 0.24); }
+}
+.ds-app .ds-waiting.is-joined .ds-waiting-icon {
+  animation: dsJoinedIcon 1.6s var(--ease) infinite;
+}
+@keyframes dsJoinedIcon {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+.ds-app .ds-waiting-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--green-bright);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ds-app .ds-waiting-icon .ic { font-size: 22px; width: 22px; height: 22px; line-height: 22px; }
+.ds-app .ds-waiting-title {
+  font-size: clamp(14px, 0.7vw + 9px, 18px);
+  font-weight: 800;
+  color: var(--green);
+  line-height: 1.15;
+  letter-spacing: -.01em;
+}
+.ds-app .ds-waiting-sub {
+  font-size: clamp(11.5px, 0.4vw + 8px, 13.5px);
+  color: #3E7A55;
+  font-weight: 600;
+}
+.ds-app .ds-waiting-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 10px;
+}
+.ds-app .ds-waiting.tone-primary { background: var(--primary-soft); border-color: var(--primary-line); }
+.ds-app .ds-waiting.tone-primary .ds-waiting-icon { background: var(--primary); }
+.ds-app .ds-waiting.tone-primary .ds-waiting-title { color: var(--primary-ink); }
+.ds-app .ds-waiting.tone-primary .ds-waiting-sub { color: #3a5e66; }
+.ds-app .ds-waiting.tone-amber { background: var(--amber-soft); border-color: var(--amber-line); }
+.ds-app .ds-waiting.tone-amber .ds-waiting-icon { background: var(--amber-bright); }
+.ds-app .ds-waiting.tone-amber .ds-waiting-title { color: var(--amber); }
+.ds-app .ds-waiting.tone-amber .ds-waiting-sub { color: #8a5a1a; }
+.ds-app .ds-waiting.tone-slate { background: var(--surface-2); border-color: var(--border-strong); }
+.ds-app .ds-waiting.tone-slate .ds-waiting-icon { background: var(--ink-3); }
+.ds-app .ds-waiting.tone-slate .ds-waiting-title { color: var(--ink); }
+.ds-app .ds-waiting.tone-slate .ds-waiting-sub { color: var(--ink-2); }
+.ds-app .ds-status-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: inherit;
+  opacity: .62;
+  margin-top: 3px;
+}
+.ds-app .ds-status-hint .live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: dsLivePulse 1.8s var(--ease) infinite;
+}
+@keyframes dsLivePulse {
+  0% { box-shadow: 0 0 0 0 rgba(0,0,0,.25); }
+  70% { box-shadow: 0 0 0 6px rgba(0,0,0,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+
+/* ============================================================== SIDEBAR */
+.ds-app .ds-sidebar {
+  grid-area: sidebar;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ds-app .ds-side-profile {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ds-app .ds-side-id { display: flex; align-items: center; gap: 13px; }
+/* Collapse toggle for the meta rows below */
+.ds-app .ds-collapse {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.ds-app .ds-collapse:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .ds-collapse .ic { transition: transform .3s var(--ease); }
+.ds-app .ds-collapse.open .ic { transform: rotate(180deg); }
+.ds-app .ds-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #C04FB5, #9A258F);
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  cursor: pointer;
+}
+.ds-app .ds-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.ds-app .ds-avatar .ds-online {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--green-bright);
+  border: 2.5px solid var(--surface);
+}
+.ds-app .ds-side-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  line-height: 1.2;
+  /* Long participant names wrap to multiple lines instead of being clipped. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ds-app .ds-side-meta {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+.ds-app .ds-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 13px;
+}
+.ds-app .ds-meta-row + .ds-meta-row { border-top: 1px solid var(--border); }
+.ds-app .ds-meta-ic {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ds-app .ds-meta-ic .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+.ds-app .ds-chip-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+/* Milestone value with no label — left-aligned, fills the row. */
+.ds-app .ds-chip-val--lead {
+  margin-left: 0 !important;
+  text-align: left !important;
+}
+.ds-app .ds-chip-val {
+  margin-left: auto;
+  text-align: right;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+  /* Allow long values (product names, journey names, etc.) to wrap to
+     multiple lines instead of being clipped with an ellipsis. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Extra invited specialists roster (sidebar, under participant profile) */
+.ds-app .ds-extra-specialists {
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ds-app .ds-extra-specialists__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--ink-3, #6B7686);
+  font-family: inherit;
+}
+.ds-app .ds-extra-specialists.is-open .ds-extra-specialists__head { margin-bottom: 8px; }
+.ds-app .ds-extra-specialists__head:hover { color: var(--primary-ink); }
+.ds-app .ds-extra-specialists__head .ic {
+  font-size: 16px; width: 16px; height: 16px; line-height: 16px;
+}
+.ds-app .ds-extra-specialists__title { text-align: left; }
+.ds-app .ds-extra-specialists__chevron {
+  margin-left: auto;
+  transition: transform .18s ease;
+}
+.ds-app .ds-extra-specialists.is-open .ds-extra-specialists__chevron { transform: rotate(180deg); }
+.ds-app .ds-extra-specialists__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ds-app .ds-extra-specialist {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+.ds-app .ds-extra-specialist__avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ds-app .ds-extra-specialist__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ds-app .ds-extra-specialist__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink, #1E2733);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ds-app .ds-extra-specialist__activity {
+  font-size: 11.5px;
+  color: var(--primary-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-app .ds-side-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-app .ds-stepscroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 22px;
+}
+.ds-app .ds-steps-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0 8px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ds-app .ds-progress-count {
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ds-app .ds-steplist {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+.ds-app .ds-step {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 14px 12px;
+  border-radius: 0;
+  transition: background .3s var(--ease);
+  background: transparent;
+}
+.ds-app .ds-step:hover { background: var(--surface-2); }
+.ds-app .ds-step.active { background: var(--primary-soft); }
+.ds-app .ds-step.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 11px;
+  bottom: 11px;
+  width: 3.5px;
+  border-radius: 3px;
+  background: var(--primary);
+}
+.ds-app .ds-node {
+  position: relative;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink-3);
+  transition: transform .4s var(--ease), background .3s var(--ease),
+    border-color .3s var(--ease), box-shadow .3s var(--ease), color .3s var(--ease);
+}
+.ds-app .ds-node .ic { font-size: 17px; width: 17px; height: 17px; line-height: 17px; }
+.ds-app .ds-step.active .ds-node {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--primary-soft);
+  transform: scale(1.06);
+}
+.ds-app .ds-step.done .ds-node {
+  background: var(--green-bright);
+  border-color: var(--green-bright);
+  color: #fff;
+}
+.ds-app .ds-connector {
+  position: absolute;
+  left: 28.5px;
+  top: 46px;
+  width: 2px;
+  height: calc(100% - 46px);
+  background: var(--border);
+  z-index: 1;
+}
+.ds-app .ds-step.done .ds-connector { background: var(--green-line); }
+.ds-app .ds-step-body {
+  padding-top: 1px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ds-app .ds-step-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -.01em;
+  line-height: 1.25;
+}
+.ds-app .ds-step.active .ds-step-title { color: var(--primary-ink); }
+.ds-app .ds-step-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-3);
+  font-weight: 600;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* ============================================================== HEADER (mockup)
+   Replaces the old left sidebar + topbar. Participant identity + status pill +
+   session actions in one horizontal bar, with a details popover. */
+.ds-app .ds-header {
+  grid-area: header;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  padding: 18px 16px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+}
+/* Identity block: avatar + name stacked in the left column. */
+.ds-app .ds-header .ds-hdr-id { flex-wrap: wrap; }
+.ds-app .ds-hdr-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  position: relative;
+}
+.ds-app .ds-hdr-idbody { min-width: 0; }
+.ds-app .ds-hdr-name {
+  font-size: clamp(16px, 0.8vw + 10px, 21px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-metaline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-2);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-uplabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  color: var(--primary-ink);
+}
+.ds-app .ds-hdr-uplabel .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--amber-bright); }
+.ds-app .ds-hdr-dot { color: var(--ink-3); }
+.ds-app .ds-hdr-detailsbtn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.ds-app .ds-hdr-detailsbtn:hover { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-hdr-detailsbtn .ic { transition: transform .3s var(--ease); }
+.ds-app .ds-hdr-detailsbtn.open .ic { transform: rotate(180deg); }
+.ds-app .ds-hdr-details {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  width: min(340px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px 14px;
+}
+.ds-app .ds-hdr-details__specialists { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.ds-app .ds-hdr-details__specialists-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.ds-app .ds-hdr-details__specialists-head .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-hdr-details__count {
+  margin-left: auto;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+/* Left-column layout: status pill + actions stack full-width under the identity. */
+.ds-app .ds-hdr-status {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+.ds-app .ds-hdr-status .ds-waiting { width: 100%; }
+.ds-app .ds-hdr-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.ds-app .ds-hdr-actions .btn,
+.ds-app .ds-hdr-actions .ds-menu-anchor,
+.ds-app .ds-hdr-actions .ds-menu-anchor > .btn { width: 100%; justify-content: center; }
+
+/* Specialists included — inline row under the participant name in the header */
+.ds-app .ds-hdr-specialists {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  max-width: 34vw;
+}
+.ds-app .ds-hdr-specialists .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--primary); }
+.ds-app .ds-hdr-specialists__label { color: var(--ink-3); font-weight: 700; }
+.ds-app .ds-hdr-specialists__names {
+  color: var(--primary-ink);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ds-app .ds-hdr-specialists__role { color: var(--ink-3); font-weight: 600; }
+
+/* ---------------------------------------------- HORIZONTAL STEPPER (mockup pane)
+   A single rounded white pane carrying numbered steps with chevrons between
+   them. Active = purple-soft chip; done = green node. Matches the mockup
+   (dynamic-studio-full.html .stepper). */
+.ds-app .ds-stepbar {
+  grid-area: stepper;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px clamp(16px, 1.8vw + 8px, 32px);
+  overflow: hidden;
+}
+.ds-app .ds-stepbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  /* the pane */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow-md);
+}
+.ds-app .ds-hstep {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 8px 13px;
+  border-radius: 11px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.ds-app .ds-hstep:hover { background: var(--surface-2); }
+.ds-app .ds-hstep-node {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  background: #F0F0F3;
+  color: var(--ink-3);
+}
+.ds-app .ds-hstep-node .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-hstep-label { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ds-app .ds-hstep-chev { color: var(--ink-3); font-size: 17px; width: 17px; height: 17px; line-height: 17px; flex-shrink: 0; }
+.ds-app .ds-hstep.done .ds-hstep-label { color: var(--ink); }
+.ds-app .ds-hstep.done .ds-hstep-node { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-hstep.active { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-hstep.active .ds-hstep-node { background: var(--primary); color: #fff; }
+.ds-app .ds-hstep.active .ds-hstep-label { font-weight: 800; }
+
+/* ============================================================== SIDEBAR (identity + vertical stepper) */
+.ds-app .ds-side {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 14px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  min-width: 0;
+  /* Grid items default to min-height:auto, so when the profile/specialists grow
+     tall (e.g. at 175% zoom) the sidebar expands past its track and the app's
+     overflow:hidden clips the Session Steps off the bottom. min-height:0 lets it
+     respect the track height so overflow-y:auto actually scrolls the steps into
+     reach instead of hiding them. */
+  min-height: 0;
+}
+.ds-app .ds-side-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  /* Keep the identity at its NATURAL height and never let it shrink to a sliver
+     that hides the participant's visit/journey/specialists. When the sidebar as a
+     whole is too short for identity + steps (high zoom / small screens), the
+     sidebar itself scrolls (.ds-side is overflow-y:auto) so BOTH the identity and
+     the Session Steps stay fully reachable — nothing is clipped off-screen. */
+  flex: 0 0 auto;
+}
+.ds-app .ds-side-idbody { min-width: 0; }
+.ds-app .ds-side-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+}
+.ds-app .ds-side-sub {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.ds-app .ds-side-journey-label { color: var(--ink-3); font-weight: 700; }
+/* Love Letters widget (Step 2) — rounded on all sides. */
+.ds-app .ds-ll-card { border-radius: 14px; overflow: hidden; }
+/* Specialist roster: a "With · N" header over a one-per-line list, so any number
+   of bonus specialists (each with its activity) reads cleanly instead of a long
+   comma-wrapped blob. Left-aligned by default (stacked band); the two-column
+   profile-card override below centres it. */
+.ds-app .ds-side-specialists {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 6px; font-size: 12px; color: var(--ink-2); font-weight: 600; min-width: 0;
+}
+.ds-app .ds-side-specialists__head { display: inline-flex; align-items: center; gap: 5px; }
+.ds-app .ds-side-specialists .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--primary); }
+.ds-app .ds-side-specialists__label {
+  color: var(--ink-3); font-weight: 800; flex-shrink: 0;
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+}
+.ds-app .ds-side-specialists__list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; width: 100%;
+}
+.ds-app .ds-side-specialists__item { line-height: 1.3; min-width: 0; }
+.ds-app .ds-side-specialists__name { color: var(--primary-ink); font-weight: 700; }
+/* Bonus-activity role/activity name shown after each specialist — secondary weight/colour. */
+.ds-app .ds-side-specialists__role { color: var(--ink-3); font-weight: 600; }
+
+/* Compact "View all" chip — hidden by default; the short-height media query
+   below reveals it when a long roster + zoomed-in window would otherwise bury
+   the Session Steps. */
+.ds-app .ds-side-specialists__more {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin-left: 6px;
+  cursor: pointer;
+}
+.ds-app .ds-side-specialists__more:hover { background: var(--primary-line); }
+
+/* Full-roster overlay (opened from the chip) — fixed/centered so it escapes the
+   sidebar's scroll clipping. */
+.ds-app .ds-spec-overlay-backdrop { position: fixed; inset: 0; z-index: 65; background: rgba(15,18,22,.38); }
+.ds-app .ds-spec-overlay {
+  position: fixed;
+  z-index: 66;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(340px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 14px 16px;
+  animation: dsNextmenuIn .16s var(--ease);
+}
+.ds-app .ds-spec-overlay__head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 800; color: var(--ink);
+  margin-bottom: 10px;
+}
+.ds-app .ds-spec-overlay__head .ic { color: var(--primary); font-size: 18px; width: 18px; height: 18px; }
+.ds-app .ds-spec-overlay__close {
+  margin-left: auto;
+  width: 26px; height: 26px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; color: var(--ink-3); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.ds-app .ds-spec-overlay__close:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .ds-spec-overlay__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ds-app .ds-spec-overlay__list li { font-size: 13px; line-height: 1.35; }
+.ds-app .ds-spec-overlay__name { color: var(--primary-ink); font-weight: 700; }
+.ds-app .ds-spec-overlay__role { color: var(--ink-3); font-weight: 600; }
+
+/* Zoomed-in / short window: don't hide the whole roster — TRUNCATE it to as many
+   names as fit in a viewport-relative height (so shorter windows show fewer), fade
+   the cut edge, and surface the rest via the "View all" chip. */
+@media (max-height: 760px) {
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__list {
+    max-height: 20vh;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent);
+    mask-image: linear-gradient(to bottom, #000 68%, transparent);
+  }
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__more { display: inline-flex; }
+}
+/* Even shorter (more zoom) → collapse the inline roster entirely to just the
+   "With · N — View all" header, so the identity block stays short and the Session
+   Steps fit in the sidebar without scrolling. The full roster is one click away
+   via the "View all" overlay, so no information is lost. */
+@media (max-height: 560px) {
+  .ds-app .ds-side-specialists--collapsible .ds-side-specialists__list { display: none; }
+}
+
+.ds-app .ds-side-steps { display: flex; flex-direction: column; gap: 4px; }
+.ds-app .ds-side-steps__label {
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); padding: 0 8px 6px;
+}
+.ds-app .ds-vsteplist { display: flex; flex-direction: column; gap: 2px; }
+.ds-app .ds-vstep {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: 11px;
+  background: transparent; color: var(--ink-2);
+  transition: background .18s var(--ease), color .18s var(--ease);
+}
+.ds-app .ds-vstep:hover { background: var(--surface-2); }
+.ds-app .ds-vstep-node {
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800;
+  background: #F0F0F3; color: var(--ink-3);
+}
+.ds-app .ds-vstep-node .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .ds-vstep-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.ds-app .ds-vstep-label { font-size: 14px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.ds-app .ds-vstep-sub { font-size: 11.5px; font-weight: 500; color: var(--ink-3); white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.ds-app .ds-vstep.active .ds-vstep-sub { color: var(--primary-ink); }
+.ds-app .ds-vstep.done .ds-vstep-label { color: var(--ink); }
+.ds-app .ds-vstep.done .ds-vstep-node { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-vstep.active { background: var(--primary-soft); }
+.ds-app .ds-vstep.active .ds-vstep-node { background: var(--primary); color: #fff; }
+.ds-app .ds-vstep.active .ds-vstep-label { color: var(--primary-ink); font-weight: 800; }
+
+/* ============================================================== TOPBAR (status + actions) */
+.ds-app .ds-topbar2 {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+  position: relative;
+  z-index: 20;
+}
+.ds-app .ds-topbar2__left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ds-app .ds-topbar2__right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Footer is a grid child on the right (was inside main before). */
+.ds-app .ds-footer { grid-area: footer; }
+
+/* ============================================================== ZOOM-STABLE CHROME
+   Size the sidebar / topbar / footer (dimensions, fonts, icons, buttons) in
+   viewport units so they hold a constant PHYSICAL size as the browser zooms —
+   only the px-based main content scales. Wide clamp bounds keep them adaptive
+   across screen sizes. */
+.ds-app .ds-topbar2 { padding: clamp(7px, 0.7vh + 2px, 14px) clamp(14px, 1.4vw, 28px); }
+.ds-app .ds-side { padding: clamp(12px, 1.2vw, 20px) clamp(10px, 0.9vw, 16px); gap: clamp(12px, 1.2vh, 20px); }
+.ds-app .ds-side-id {
+  gap: clamp(10px, 1vw, 14px);
+  /* Taller identity block: breathing room above + below the avatar/name. */
+  padding: clamp(10px, 1.6vh, 20px) 4px clamp(16px, 2vh, 24px);
+}
+.ds-app .ds-side .ds-avatar {
+  width: clamp(54px, 4.4vw, 70px);
+  height: clamp(54px, 4.4vw, 70px);
+  font-size: clamp(18px, 1.5vw, 24px);
+}
+.ds-app .ds-side-name { font-size: clamp(13px, 1.05vw, 17px); }
+.ds-app .ds-side-sub { font-size: clamp(10px, 0.82vw, 13px); }
+.ds-app .ds-side-specialists { font-size: clamp(10px, 0.8vw, 12.5px); }
+.ds-app .ds-side-steps__label { font-size: clamp(9px, 0.72vw, 11px); }
+.ds-app .ds-vstep { padding: clamp(7px, 0.7vh, 11px) clamp(8px, 0.8vw, 12px); gap: clamp(8px, 0.8vw, 12px); }
+.ds-app .ds-vstep-node { width: clamp(20px, 1.7vw, 26px); height: clamp(20px, 1.7vw, 26px); font-size: clamp(10px, 0.85vw, 13px); }
+.ds-app .ds-vstep-label { font-size: clamp(11px, 0.92vw, 14px); }
+.ds-app .ds-footer { height: clamp(38px, 4.5vh, 52px); min-height: clamp(38px, 4.5vh, 52px); padding: 0 clamp(14px, 1.4vw, 28px); }
+.ds-app .ds-footer-center { font-size: clamp(10px, 0.8vw, 13px); }
+/* Chrome buttons + icons in viewport units too, so their box doesn't grow the bar. */
+.ds-app .ds-side .btn,
+.ds-app .ds-topbar2 .btn,
+.ds-app .ds-footer .btn {
+  font-size: clamp(11px, 0.85vw, 14px);
+  padding: clamp(6px, 0.7vh, 10px) clamp(10px, 1vw, 16px);
+  gap: clamp(5px, 0.5vw, 8px);
+}
+.ds-app .ds-side .ic,
+.ds-app .ds-topbar2 .ic,
+.ds-app .ds-footer .ic {
+  font-size: clamp(14px, 1.1vw, 18px);
+  width: clamp(14px, 1.1vw, 18px);
+  height: clamp(14px, 1.1vw, 18px);
+  line-height: clamp(14px, 1.1vw, 18px);
+}
+/* Topbar status pill scales with the viewport too. */
+.ds-app .ds-topbar2 .ds-waiting-title { font-size: clamp(11px, 0.85vw, 14px); }
+.ds-app .ds-topbar2 .ds-waiting-sub { font-size: clamp(9px, 0.72vw, 12px); }
+.ds-app .ds-topbar2 .ds-waiting-icon { width: clamp(26px, 2.1vw, 34px); height: clamp(26px, 2.1vw, 34px); }
+
+/* ---- Responsive header + stepper ------------------------------------------
+   Goal: never horizontally scroll. The header wraps its three groups; the
+   stepper wraps rows, then progressively sheds chrome as width shrinks. */
+
+/* Tablet / small laptop: drop the chevrons (they dangle once steps wrap). */
+@media (max-width: 1080px) {
+  .ds-app .ds-hstep-chev { display: none; }
+}
+
+/* Tablet & down — a 240px left column gets cramped, so stack vertically:
+   stepper on top, the top-bar as a horizontal row, then main. */
+@media (max-width: 1024px) {
+  /* Tablet & down — stack: topbar, sidebar (identity + steps), main, footer. */
+  .ds-app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      "topbar"
+      "sidebar"
+      "main"
+      "footer";
+  }
+  /* Lay the sidebar band HORIZONTALLY: participant identity on the left, the
+     session steps on the SAME row to its right — instead of two stacked rows
+     that waste the wide horizontal space and steal content height. Wraps to two
+     rows only when there isn't room (narrow tablets / phones). */
+  .ds-app .ds-side {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: clamp(16px, 2.4vw, 36px);
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+  .ds-app .ds-side-id {
+    flex: 0 1 auto;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  /* Steps take the remaining width and flow as a horizontal wrap. */
+  .ds-app .ds-side-steps { flex: 1 1 340px; min-width: 0; }
+  .ds-app .ds-vsteplist { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .ds-app .ds-vstep { width: auto; }
+}
+
+/* Wide-but-SHORT viewport (the classic "zoomed desktop" case — e.g. a 1512px
+   screen at 150% zoom is ~1008×540 CSS px). The ≤1024 vertical stack above
+   pushes identity + steps + note above the content, crushing the scroll area to
+   ~150px. When there's still enough WIDTH for two columns, restore the
+   sidebar-on-the-left layout so identity/steps live in the left column and the
+   content gets the full viewport height back. Genuine tablets/phones (narrower)
+   and tall windows (which have height to spare) keep stacking. */
+/* Wide-enough-but-SHORT (zoomed desktop AND tablet-at-175% ≈ 585×440): go
+   two-column so the content gets a full-height column instead of being crushed
+   under a tall stacked identity+steps band. Threshold lowered to 460px so tablet
+   zoom lands here; phones (<460) stay stacked. Narrower sidebar → more content
+   room. Steps pinned + identity scrolls (see the >1024 block). */
+@media (min-width: 460px) and (max-width: 1024px) and (max-height: 720px) {
+  .ds-app {
+    /* Wider than before so the specialist names wrap less (shorter identity),
+       leaving room to show the name + bonus-activity roster in full. */
+    grid-template-columns: clamp(168px, 22vw, 280px) 1fr;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "sidebar topbar"
+      "sidebar main"
+      "sidebar footer";
+  }
+  .ds-app .ds-side {
+    /* Reset the stacked-band's row direction + centered alignment — this is a
+       real vertical sidebar, so children stretch full-width and align left
+       (otherwise the steps block gets centered/indented vs the identity). */
+    flex-direction: column;
+    /* CRITICAL: reset flex-wrap. The wider ≤1024 tablet band sets flex-wrap:wrap
+       for the horizontal identity+steps layout. Here we're a vertical column with
+       a FIXED height, so an inherited `wrap` makes the steps overflow into a
+       hidden SECOND column beside the identity (the actual "steps got hidden at
+       175% zoom" bug). nowrap keeps identity + steps in one stacked column that
+       the sidebar scrolls (overflow-y:auto) when it's taller than the viewport. */
+    flex-wrap: nowrap;
+    align-items: stretch;
+    border-right: 1px solid var(--border);
+    border-bottom: none;
+    /* Scroll the whole sidebar as a fallback so the Session Steps are always
+       reachable at high zoom even if the identity block doesn't shrink enough. */
+    overflow-y: auto;
+    min-height: 0;
+    justify-content: flex-start;
+    gap: clamp(8px, 1.2vh, 14px);
+  }
+  /* Smaller avatar → shorter identity block, more room for name + roster. */
+  .ds-app .ds-side .ds-avatar {
+    width: clamp(40px, 3.4vw, 52px); height: clamp(40px, 3.4vw, 52px);
+    font-size: clamp(15px, 1.2vw, 20px);
+  }
+  /* COMPACT the stepper so all 6 steps take little height, leaving the identity
+     enough leftover to show its full content (name + "…at uP!" + specialists)
+     without scrolling. */
+  .ds-app .ds-side-steps { flex: 0 0 auto; min-width: 0; }
+  .ds-app .ds-side-steps__label { padding: 0 8px 3px; font-size: 9.5px; }
+  .ds-app .ds-vsteplist { flex-direction: column; flex-wrap: nowrap; gap: 1px; }
+  .ds-app .ds-vstep { width: 100%; padding: clamp(3px, 0.4vh, 6px) clamp(8px, 0.8vw, 11px); gap: clamp(7px, 0.7vw, 10px); }
+  .ds-app .ds-vstep-node { width: clamp(17px, 1.4vw, 20px); height: clamp(17px, 1.4vw, 20px); font-size: clamp(10px, 0.85vw, 12px); }
+  .ds-app .ds-vstep-label { font-size: clamp(11.5px, 0.9vw, 13px); }
+  /* Tighten the identity's internal spacing so name + "…at uP!" + the full
+     specialist roster fit in the leftover height without scrolling. */
+  .ds-app .ds-side-id { padding-bottom: clamp(6px, 0.8vh, 10px); }
+  .ds-app .ds-side-sub { margin-top: 1px; }
+  .ds-app .ds-side-specialists { margin-top: 4px; gap: 2px; }
+  .ds-app .ds-side-specialists__list { gap: 1px; }
+  .ds-app .ds-side-specialists__item { line-height: 1.22; }
+  .ds-app .ds-side-name {
+    white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25;
+  }
+  /* LEFT-aligned identity at its NATURAL height. The compacted stepper below +
+     dropped step sub-labels (see the short-height blocks) mean identity + steps
+     fit without scrolling for typical rosters; if the roster is very long the
+     WHOLE sidebar scrolls (.ds-side overflow-y:auto) so identity info is never
+     shrunk away and the steps are never clipped. */
+  .ds-app .ds-side-id {
+    flex-direction: column; align-items: flex-start; text-align: left;
+    flex: 0 0 auto; min-height: 0;
+  }
+  .ds-app .ds-side-idbody { text-align: left; width: 100%; }
+  .ds-app .ds-side-specialists { align-items: flex-start; text-align: left; }
+  .ds-app .ds-side-specialists__list { align-items: flex-start; }
+}
+
+/* Desktop two-column (>1024): on a TALL window the sidebar is much taller than
+   its content (identity + 6 steps), leaving a big void at the bottom. Vertically
+   center the identity+steps as one group so the whitespace is balanced and the
+   sidebar reads as intentional rather than top-heavy-with-a-gap. The stepper also
+   gets more breathing room so it fills more of the column. `safe center` falls
+   back to top-alignment if the content ever exceeds the sidebar height (short
+   window) so nothing gets clipped above the scroll origin. */
+@media (min-width: 1025px) {
+  /* Steps ALWAYS reachable: identity keeps its NATURAL height (never shrunk to a
+     sliver that hides the participant's visit/journey/specialists), steps sit
+     directly below it, and the WHOLE sidebar scrolls (overflow-y:auto) when the
+     two together exceed the column height. So on tall windows everything shows
+     at once; on short/zoomed windows the sidebar scrolls and nothing is clipped.
+     Top-aligned, LEFT-aligned profile (avatar on top, name / uP · product /
+     specialists all flush-left). */
+  .ds-app .ds-side { justify-content: flex-start; overflow-y: auto; min-height: 0; gap: clamp(12px, 1.6vh, 20px); }
+  .ds-app .ds-side-id {
+    flex-direction: column; align-items: flex-start; text-align: left;
+    flex: 0 0 auto; min-height: 0;
+  }
+  .ds-app .ds-side-idbody { text-align: left; width: 100%; }
+  .ds-app .ds-side-name { white-space: normal; overflow: visible; text-overflow: clip; }
+  .ds-app .ds-side-specialists { align-items: flex-start; text-align: left; }
+  .ds-app .ds-side-specialists__list { align-items: flex-start; }
+  .ds-app .ds-side-steps { flex: 0 0 auto; gap: clamp(4px, 0.5vh, 9px); }
+  .ds-app .ds-vstep { padding: clamp(8px, 0.9vh, 14px) clamp(8px, 0.8vw, 12px); }
+  /* Cleaner, tighter identity card (the loose spacing + big avatar read clumsy):
+     smaller avatar, consistent vertical rhythm, roster grouped snug under "With". */
+  .ds-app .ds-side .ds-avatar {
+    width: clamp(46px, 3.6vw, 58px); height: clamp(46px, 3.6vw, 58px);
+    font-size: clamp(16px, 1.3vw, 21px);
+  }
+  .ds-app .ds-side-id { gap: 10px; padding-bottom: 14px; }
+  .ds-app .ds-side-name { font-size: clamp(15px, 1.15vw, 18px); line-height: 1.2; }
+  .ds-app .ds-side-sub { margin-top: 3px; line-height: 1.35; }
+  .ds-app .ds-side-specialists { margin-top: 8px; gap: 3px; }
+  .ds-app .ds-side-specialists__item { line-height: 1.3; }
+}
+/* Wide-but-SHORT desktop (zoomed): identity + steps can't both fit at once, so
+   the whole sidebar scrolls (handled by .ds-side overflow-y:auto). Identity stays
+   at natural height (flex:0 0 auto from the block above) so its info is never
+   shrunk away; the dropped step sub-labels below keep the steps compact enough to
+   usually still fit without a scroll. */
+
+/* Phone: compact stepper — show only the ACTIVE step's label, others are
+   node-only chips, so all steps fit without scrolling. Buttons shrink. */
+@media (max-width: 680px) {
+  .ds-app .ds-stepbar { padding: 8px 12px 10px; }
+  .ds-app .ds-hstep { padding: 6px 8px; gap: 6px; }
+  .ds-app .ds-hstep:not(.active) .ds-hstep-label { display: none; }
+  .ds-app .ds-hstep-node { width: 24px; height: 24px; }
+  .ds-app .ds-hstep.active .ds-hstep-label { max-width: 48vw; }
+  .ds-app .ds-header { gap: 10px; padding: 10px 12px; }
+  .ds-app .ds-hdr-name { max-width: 60vw; }
+  .ds-app .ds-hdr-actions .btn { padding: 8px 10px; font-size: 12.5px; }
+  .ds-app .ds-main-scroll { padding: 14px 12px 20px; }
+  .ds-app .card-pad { padding: 16px 16px; }
+}
+
+/* ---- Short viewport (laptop zoom / tablet) — keep the pinned app optimized ---
+   A 14" laptop at 150% zoom is ~1008×552 CSS px. We KEEP the fixed app layout
+   (sticky header/stepper/footer, content scrolls inside) and just shrink the
+   chrome so the content keeps most of the height — applied at any width, not
+   only >1024, so zoomed laptops and tablets stay pinned instead of un-pinning. */
+@media (max-height: 900px) {
+  .ds-app .ds-header { padding-top: 9px; padding-bottom: 9px; }
+  .ds-app .ds-stepbar { padding-top: 8px; padding-bottom: 8px; }
+  .ds-app .ds-hstep { padding-top: 5px; padding-bottom: 5px; }
+  .ds-app .ds-footer { min-height: 0; }
+  .ds-app .ds-main-scroll {
+    padding-top: clamp(12px, 1.4vw, 20px);
+    padding-bottom: clamp(12px, 1.2vw, 18px);
+  }
+  .ds-app .ds-step-header { margin-bottom: 12px; }
+  .ds-app .card-pad { padding: 18px 20px; }
+  .ds-app .ds-stagenote-bar { padding-top: 8px; padding-bottom: 8px; }
+}
+/* Heavier zoom / shorter height: smaller step nodes + tighter header. */
+@media (max-height: 760px) {
+  .ds-app .ds-hstep-node { width: 24px; height: 24px; }
+  .ds-app .ds-step-header { margin-bottom: 8px; }
+  /* Vertical Session Steps (live sidebar): drop the per-step SUB caption and
+     tighten padding so all six steps stack in far less height. This is what keeps
+     the steps fully visible (no sidebar scroll needed) once the window is short
+     from zoom — the identity above keeps its natural height, and the compacted
+     steps fit in what's left. */
+  .ds-app .ds-vstep-sub { display: none; }
+  .ds-app .ds-vstep { padding-top: clamp(5px, 0.6vh, 9px); padding-bottom: clamp(5px, 0.6vh, 9px); }
+  .ds-app .ds-side-steps { gap: 2px; }
+}
+/* When ALSO width-limited, collapse the stepper to one row (only the active step
+   keeps its label) so 7 pills never wrap and steal content height. On a wide but
+   short screen the labels stay — the pills fit one row anyway. */
+@media (max-height: 760px) and (max-width: 1180px) {
+  .ds-app .ds-hstep:not(.active) .ds-hstep-label { display: none; }
+}
+/* ---- Very short viewport (high zoom, ~150%+ ≈ ≤560px tall) --------------------
+   Aggressively trim the fixed chrome (topbar, stage-note, step header, footer,
+   scroll padding) so the CONTENT column keeps as much height as possible while
+   the app stays pinned. The stage-note clamps to a single line here. */
+@media (max-height: 560px) {
+  /* Compact the status/actions top bar to a SINGLE row: drop the pill's
+     second line, shrink its icon, and tighten the buttons + bar padding so the
+     whole bar is as short as possible and the content column keeps the height. */
+  .ds-app .ds-topbar2 { padding-top: clamp(3px, 0.5vh, 7px); padding-bottom: clamp(3px, 0.5vh, 7px); gap: 8px 12px; }
+  .ds-app .ds-topbar2 .ds-waiting-sub { display: none; }
+  .ds-app .ds-topbar2 .ds-waiting--compact { padding: 4px 10px; gap: 7px; }
+  .ds-app .ds-topbar2 .ds-waiting-icon { width: 24px; height: 24px; }
+  .ds-app .ds-topbar2 .ds-waiting-icon .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+  .ds-app .ds-topbar2 .ds-waiting-title { font-size: 13px; line-height: 1.15; }
+  .ds-app .ds-topbar2 .btn { padding-top: 5px; padding-bottom: 5px; }
+
+  .ds-app .ds-stagenote { padding: 5px 12px; }
+  /* Higher specificity so this beats the base 2-line clamp defined later in the file. */
+  .ds-app.dyn-studio-v2-app .ds-stagenote__text.is-clamped { -webkit-line-clamp: 1; }
+  .ds-app .ds-step-header { margin-bottom: 4px; }
+  .ds-app .ds-eyebrow { font-size: 12px; }
+  .ds-app .ds-main-scroll { padding-top: 10px; padding-bottom: 12px; }
+  .ds-app .ds-footer { height: clamp(34px, 4vh, 44px); min-height: 0; }
+}
+
+/* ---- Phone / extreme fallback ---------------------------------------------
+   Only for genuinely small viewports (phones, or an extremely short window) do
+   we UN-PIN the shell into normal document flow so the host page scrolls. Above
+   this — tablets and zoomed laptops (incl. ~175% zoom ≈ 460px tall) — we stay
+   pinned + compact/two-column (above) so the content keeps the height. Only very
+   short windows (≤380px) un-pin. Keep in sync with the scroll-lock override in
+   src/styles.css.
+   NOTE: width cutoff is 459px (NOT 640) so it doesn't overlap the ≥460px
+   two-column block above — a tablet at 175% (~585×440) must stay PINNED
+   two-column, not un-pin (which would let the sidebar grow and clip the steps). */
+@media (max-width: 459px), (max-height: 380px) {
+  .ds-app.dyn-studio-v2-app {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    z-index: auto;
+    /* Let every row size to its content instead of forcing main into 1fr
+       (stacked order: topbar, sidebar, main, footer). */
+    grid-template-rows: auto auto auto auto;
+  }
+  .ds-app.dyn-studio-v2-app .ds-main { overflow: visible; }
+  .ds-app.dyn-studio-v2-app .ds-main-scroll { overflow: visible; flex: 0 0 auto; }
+  /* Footer flows at the end of the content rather than being pinned. */
+  .ds-app.dyn-studio-v2-app .ds-footer { position: static; }
+}
+
+/* Phone: the topbar's status pill + action buttons ("Invite More", "Send back
+   to Waiting Again", "Move Next Stage") need room. Stack the two groups and let
+   each button grow to a comfortable tap target instead of squeezing onto one
+   cramped row. Width-only (not height) so short landscape keeps the compact row. */
+@media (max-width: 640px) {
+  .ds-app .ds-topbar2 { padding: 10px 14px; gap: 10px; }
+  .ds-app .ds-topbar2__left,
+  .ds-app .ds-topbar2__right { flex: 1 1 100%; }
+  .ds-app .ds-topbar2__right { justify-content: flex-start; }
+  .ds-app .ds-topbar2__right .btn,
+  .ds-app .ds-topbar2 .ds-menu-anchor,
+  .ds-app .ds-topbar2 .ds-menu-anchor .btn { flex: 1 1 auto; justify-content: center; }
+  /* Footer: auto-height + tight padding so it hugs the Back/Step/Next row with
+     no leftover vertical whitespace (the fixed 46px + 12px vpad looked padded on
+     phones, esp. once un-pinned where the footer flows in normal document order). */
+  .ds-app .ds-footer { height: auto; min-height: 0; padding: 8px 16px; }
+}
+
+/* ============================================================== MAIN */
+.ds-app .ds-main {
+  grid-area: main;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+/* -------------------------------------------- IN-STUDIO QUEUE/STUDIO NAV
+   Top strip inside the live-studio view (legacy parity). Non-shrinking row
+   directly under the status pill; the scroll area below flexes as before. */
+.ds-app .ds-qnav {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  padding: 10px clamp(20px, 2.2vw + 8px, 40px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.ds-app .ds-qnav__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ds-app .ds-qnav__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.ds-app .ds-qnav__label .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+.ds-app .ds-qnav__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.ds-app .ds-qchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
+}
+.ds-app .ds-qchip:hover {
+  border-color: var(--primary-line);
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+}
+.ds-app .ds-qchip.is-active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.ds-app .ds-qchip__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-app .ds-qchip__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(26, 35, 50, .10);
+  font-size: 11px;
+  font-weight: 800;
+}
+.ds-app .ds-qchip.is-active .ds-qchip__count { background: rgba(255, 255, 255, .22); }
+.ds-app .ds-qchip__live { font-size: 16px; width: 16px; height: 16px; line-height: 16px; color: var(--green-bright); }
+.ds-app .ds-qchip.is-active .ds-qchip__live { color: #fff; }
+/* Invited studios (from other queues) — dashed outline + primary "login" icon
+   so they read as "jump in" rather than one of your own studios. */
+.ds-app .ds-qchip--invited { border-style: dashed; border-color: var(--primary-line); }
+.ds-app .ds-qchip--invited:hover { border-style: solid; }
+.ds-app .ds-qchip--invited .ds-qchip__live { color: var(--primary); }
+.ds-app .ds-main-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(18px, 2vw + 6px, 30px) clamp(20px, 2.2vw + 8px, 40px) clamp(16px, 1.4vw + 6px, 24px);
+}
+.ds-app .ds-main-inner { max-width: 1320px; margin: 0 auto; }
+.ds-app .ds-step-header { margin-bottom: 20px; }
+.ds-app .ds-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--primary-ink);
+  margin-bottom: 0;
+}
+.ds-app .ds-eyebrow .num {
+  background: var(--primary);
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+.ds-app .ds-h1 {
+  font-size: clamp(22px, 1.8vw + 8px, 30px);
+  font-weight: 800;
+  letter-spacing: -.025em;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.1;
+}
+.ds-app .ds-lead {
+  font-size: clamp(14px, 0.6vw + 9px, 16px);
+  color: var(--ink-2);
+  margin: 8px 0 0;
+  font-weight: 500;
+  max-width: 680px;
+}
+
+/* ============================================================== FOOTER */
+.ds-app .ds-footer {
+  grid-area: footer;
+  flex-shrink: 0;
+  /* Fixed, shorter footer. */
+  min-height: 46px;
+  height: 46px;
+  background: rgba(255,255,255,.72);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  gap: 12px;
+}
+.ds-app .ds-footer .btn { padding-top: 6px; padding-bottom: 6px; }
+.ds-app .ds-footer-center {
+  font-size: clamp(12px, 0.4vw + 8px, 14px);
+  font-weight: 700;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.ds-app .ds-footer-center b { color: var(--ink); }
+
+/* ============================================================== BUTTONS */
+.ds-app .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: clamp(13px, 0.4vw + 9px, 15px);
+  border-radius: var(--r-md);
+  padding: clamp(10px, 0.8vw + 4px, 13px) clamp(16px, 1.4vw + 8px, 22px);
+  transition: transform .4s var(--ease), background .25s var(--ease),
+    box-shadow .3s var(--ease), border-color .25s var(--ease);
+  white-space: nowrap;
+  line-height: 1;
+  border: 1.5px solid transparent;
+}
+.ds-app .btn:hover { transform: translateY(-1px); }
+.ds-app .btn:active { transform: translateY(0) scale(.985); transition-duration: .08s; }
+.ds-app .btn-lg {
+  padding: clamp(12px, 1vw + 6px, 16px) clamp(18px, 1.5vw + 10px, 26px);
+  font-size: clamp(14px, 0.4vw + 10px, 16px);
+}
+.ds-app .btn-block { width: 100%; }
+/* Bootstrap also defines .btn-primary globally and may load AFTER our styles;
+   the !important keeps the design's navy-teal background and white text from
+   being overridden by Bootstrap's blue. */
+.ds-app .btn-primary {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 2px 6px rgba(30,86,99,.30);
+}
+.ds-app .btn-primary:hover {
+  background: var(--primary-ink) !important;
+  border-color: var(--primary-ink) !important;
+  box-shadow: 0 4px 12px rgba(30,86,99,.38);
+}
+.ds-app .btn-primary:disabled,
+.ds-app .btn-primary[disabled] {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  opacity: .45;
+}
+.ds-app .btn-dark { background: var(--navy); color: #fff; }
+.ds-app .btn-dark:hover { background: var(--navy-2); }
+.ds-app .btn-green {
+  background: var(--green-bright);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(22,163,74,.30);
+}
+.ds-app .btn-green:hover { background: var(--green); }
+.ds-app .btn-ghost {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+.ds-app .btn-ghost:hover {
+  background: var(--surface-2);
+  border-color: var(--ink-3);
+}
+.ds-app .btn-soft { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .btn-soft:hover { background: #D6E5E7; }
+.ds-app .btn-amber {
+  background: var(--surface);
+  color: var(--amber);
+  border-color: var(--amber-line);
+}
+.ds-app .btn-amber:hover { background: var(--amber-soft); }
+.ds-app .btn-icon {
+  padding: 11px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-app .btn-icon:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .btn-sm { padding: 9px 16px; font-size: 13.5px; border-radius: var(--r-sm); }
+.ds-app .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ============================================================== CARDS */
+.ds-app .card {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .35s var(--ease), transform .35s var(--ease);
+}
+.ds-app .card + .card { margin-top: 20px; }
+.ds-app .card-pad { padding: 24px 26px; }
+.ds-app .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.ds-app .card-head.tint-amber {
+  background: var(--amber-soft);
+  border-bottom-color: var(--amber-line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.ds-app .card-head.tint-slate { background: var(--surface-2); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.ds-app .card-head.tint-green {
+  background: var(--green-soft);
+  border-bottom-color: var(--green-line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.ds-app .card-head-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -.01em;
+}
+.ds-app .count-badge {
+  font-size: 13px;
+  font-weight: 800;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-app .count-amber { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-line); }
+.ds-app .count-green { background: var(--green-soft); color: var(--green); border: 1px solid var(--green-line); }
+.ds-app .count-slate { background: #EAEEF4; color: var(--ink-2); }
+
+.ds-app .section-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  color: var(--primary-ink);
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+
+/* ============================================================== PILL */
+.ds-app .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.ds-app .pill .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
+.ds-app .pill-green { background: var(--green-soft); color: var(--green); border: 1px solid var(--green-line); }
+.ds-app .pill-amber { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-line); }
+.ds-app .pill-slate { background: #EFF2F7; color: var(--ink-2); border: 1px solid var(--border); }
+.ds-app .pill-primary { background: var(--primary-soft); color: var(--primary-ink); border: 1px solid var(--primary-line); }
+
+/* ============================================================== EMPTY */
+.ds-app .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--ink-3);
+}
+.ds-app .empty-ic {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+}
+.ds-app .empty-ic .ic { font-size: 26px; width: 26px; height: 26px; line-height: 26px; }
+.ds-app .empty-text { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+
+/* ============================================================== INFO BANNER */
+.ds-app .info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: var(--r-md);
+  padding: 15px 18px;
+  margin-bottom: 20px;
+}
+.ds-app .info-banner .ic { color: var(--primary-ink); flex-shrink: 0; margin-top: 1px; font-size: 20px; width: 20px; height: 20px; line-height: 20px; }
+.ds-app .info-banner p { margin: 0; font-size: 14.5px; color: #3A6770; font-weight: 600; line-height: 1.45; }
+.ds-app .info-banner b { color: var(--primary-ink); }
+
+/* ============================================================== ATC FIELDS */
+.ds-app .field-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 13px 28px;
+}
+.ds-app .field-label { font-size: 14px; font-weight: 800; font-style: italic; color: var(--ink); }
+.ds-app .field-val { font-size: 15px; color: var(--primary-ink); font-weight: 600; }
+
+/* ATC card */
+.ds-app .atc-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 22px 24px;
+  background: var(--surface);
+}
+.ds-app .atc-card + .atc-card { margin-top: 14px; }
+.ds-app .atc-card__head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.ds-app .atc-card__num { font-size: 16px; font-weight: 800; color: var(--ink-3); }
+.ds-app .atc-card__date {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 2px;
+}
+.ds-app .atc-card__note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0;
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.ds-app .atc-card__note .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .atc-card__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ds-app .atc-card__details {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.ds-app .atc-card__detail-label {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 10px;
+}
+.ds-app .atc-adj-list { display: flex; flex-direction: column; gap: 12px; }
+.ds-app .atc-adj {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+}
+.ds-app .atc-adj__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.ds-app .atc-adj__index {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-weight: 800;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.ds-app .atc-adj__text { font-weight: 700; color: var(--ink); font-size: 14px; }
+.ds-app .atc-proc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ds-app .atc-proc-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.ds-app .atc-proc-list .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
+
+/* Adjustments & Procedures detail — mirrors view-participant-atc's expanded
+   card (adjustment header + procedure rows with status). */
+.ds-app .transcription-section { margin: 0; }
+.ds-app .adjustment-block {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: var(--surface-2);
+}
+.ds-app .adjustment-block:last-child { margin-bottom: 0; }
+.ds-app .adjustment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.ds-app .adj-number { color: var(--ink-3); }
+.ds-app .adj-name { flex: 1; }
+.ds-app .procedures-container {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.ds-app .procedures-title {
+  font-weight: 800;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.ds-app .procedure-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.ds-app .procedure-block:last-child { margin-bottom: 0; }
+.ds-app .procedure-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.ds-app .proc-number { color: var(--ink-3); font-size: 12.5px; font-weight: 800; }
+.ds-app .proc-name { flex: 1; }
+.ds-app .status-icon { font-size: 18px; width: 18px; height: 18px; }
+.ds-app .status-icon.completed { color: var(--green); }
+.ds-app .status-icon.pending { color: var(--ink-3); }
+.ds-app .no-transcription {
+  padding: 12px 0 0;
+  font-size: 13px;
+  color: var(--ink-3);
+  font-style: italic;
+}
+.ds-app .atc-note-grid { display: grid; gap: 12px; }
+.ds-app .atc-note {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+}
+.ds-app .atc-note__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 12.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--primary-ink);
+  margin-bottom: 6px;
+}
+.ds-app .atc-note__title .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+.ds-app .atc-note__body { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+
+/* ============================================================== CHOICE */
+.ds-app .choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.ds-app .choice {
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  background: var(--surface);
+  transition: all .15s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.ds-app .choice:hover {
+  border-color: var(--primary-line);
+  box-shadow: var(--shadow-md);
+}
+.ds-app .choice-ic {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.ds-app .choice-ic.blue { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .choice-ic.slate { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border); }
+.ds-app .choice-ic .ic { font-size: 24px; width: 24px; height: 24px; line-height: 24px; }
+.ds-app .choice-title { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+.ds-app .choice-desc {
+  font-size: 14px;
+  color: var(--ink-2);
+  margin: 7px 0 18px;
+  line-height: 1.5;
+  flex: 1;
+}
+/* Icon sits NEXT TO the title + description (horizontal header) instead of on
+   its own line above them. */
+.ds-app .choice-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+.ds-app .choice-head .choice-ic { margin-bottom: 0; flex-shrink: 0; }
+.ds-app .choice-headtext { min-width: 0; flex: 1; }
+.ds-app .choice-head .choice-desc { margin: 6px 0 0; flex: initial; }
+/* "Need a fresh link?" regenerate row — now lives INSIDE the meeting card,
+   separated from the Start Meeting button by a divider. */
+.ds-app .zoom-regen {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.ds-app .zoom-regen__text { min-width: 0; }
+.ds-app .zoom-regen .choice-title { font-size: 14px; }
+.ds-app .zoom-regen .choice-desc { margin: 3px 0 0; flex: initial; font-size: 12.5px; }
+.ds-app .choice-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: var(--r-sm);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber);
+}
+.ds-app .choice-divider {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hair);
+}
+.ds-app .choice-divider__text { flex: 1; min-width: 0; }
+.ds-app .choice-divider__title { font-size: 15px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+.ds-app .choice-divider__sub { font-size: 13.5px; color: var(--ink-2); font-weight: 600; margin-top: 3px; line-height: 1.45; }
+
+/* ============================================================== AEL FORM */
+.ds-app .ael-intro {
+  font-size: 15px;
+  color: var(--ink-2);
+  font-weight: 600;
+  margin: 0 0 22px;
+  line-height: 1.5;
+}
+/* Read-only per-area AEL display on the AEL Validation step (legacy parity). */
+.ds-app .ael-areas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ds-app .ael-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.ds-app .ael-area__num {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.ds-app .ael-area__name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ds-app .ael-area__level {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.ds-app .ael-form { display: flex; flex-direction: column; gap: 22px; }
+.ds-app .ael-field { display: flex; flex-direction: column; gap: 10px; }
+.ds-app .ael-label {
+  display: block;
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -.01em;
+}
+.ds-app .ael-label .req { color: var(--red); font-weight: 800; margin-left: 3px; font-size: 16px; }
+.ds-app .ael-actions {
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ds-app .ael-validated-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+/* ============================================================== ZOOM SESSION INTRO STRIP */
+.ds-app .zoom-intro {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-sm);
+}
+.ds-app .zoom-intro__avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #2E7180, #1E5663);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ds-app .zoom-intro__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ds-app .zoom-intro__title { font-size: 18px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+.ds-app .zoom-intro__sub { font-size: 14px; color: var(--ink-2); font-weight: 600; margin-top: 2px; }
+.ds-app .zoom-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.ds-app .zoom-link a {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ds-app .zoom-link--pending { color: var(--amber); }
+
+/* Raw Zoom start URL row shown under the Start Meeting button (getstarted step) */
+/* Backup-link block: the "if Start Meeting didn't work, use this" group.
+   Hint caption + link row are visually tied together below the button. */
+.ds-app .zoom-fallback {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+/* Recording reminder (mockup .record-note) — amber inline note. */
+.ds-app .zoom-record-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: var(--r-md);
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ds-app .zoom-record-note .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; color: var(--red); }
+.ds-app .zoom-link-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.ds-app .zoom-link-hint strong { color: var(--ink); font-weight: 800; }
+.ds-app .zoom-link-hint .ic {
+  font-size: 16px; width: 16px; height: 16px; line-height: 16px;
+  color: var(--primary); flex: 0 0 auto;
+}
+.ds-app .zoom-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+}
+.ds-app .zoom-link-row__ic {
+  font-size: 17px; width: 17px; height: 17px; line-height: 17px;
+  color: var(--ink-3); flex: 0 0 auto;
+}
+.ds-app .zoom-link-row__url {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ds-app .zoom-link-row__url:hover { text-decoration: underline; }
+.ds-app .zoom-link-row__copy {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.ds-app .zoom-link-row__copy:hover { background: var(--surface-2); color: var(--primary); }
+.ds-app .zoom-link-row__copy .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+
+/* ============================================================== ATC BANNER */
+.ds-app .atc-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-line);
+  border-radius: var(--r-md);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.ds-app .atc-banner__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--green-bright);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ds-app .atc-banner__title { font-weight: 800; color: var(--green); font-size: 14.5px; }
+.ds-app .atc-banner__sub { font-size: 13px; color: #3E7A55; font-weight: 600; margin-top: 2px; }
+.ds-app .atc-banner__cta { margin-left: auto; }
+
+/* ============================================================== FORMS CARD */
+.ds-app .form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  gap: 16px;
+}
+.ds-app .form-row + .form-row { border-top: 1px solid var(--border); }
+.ds-app .form-row__main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.ds-app .form-row__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ds-app .form-row__icon .ic { font-size: 22px; width: 22px; height: 22px; line-height: 22px; }
+.ds-app .form-row__kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ds-app .form-row__name {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -.01em;
+  margin: 2px 0 8px;
+}
+.ds-app .form-row__chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Compact single-row variant — number + small icon + form name + CTA,
+   no kicker / no chips / no extra rows. Saves vertical space. */
+.ds-app .form-row--compact {
+  padding: clamp(10px, 0.6vw + 4px, 14px) clamp(14px, 0.8vw + 6px, 18px);
+}
+.ds-app .form-row--compact .form-row__main { gap: 10px; }
+.ds-app .form-row--compact .form-row__num {
+  font-size: clamp(14px, 0.4vw + 9px, 16px);
+  font-weight: 800;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+}
+.ds-app .form-row--compact .form-row__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.ds-app .form-row--compact .form-row__icon .ic {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+.ds-app .form-row--compact .form-row__name {
+  font-size: clamp(14px, 0.4vw + 9px, 16px);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================== LOVE LETTERS */
+.ds-app .ll-list { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+.ds-app .ll-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+.ds-app .ll-item__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.ds-app .ll-item__name { font-weight: 800; color: var(--ink); }
+.ds-app .ll-item__date { margin-left: auto; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.ds-app .ll-item__label {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--primary-ink);
+  margin-bottom: 4px;
+}
+.ds-app .ll-item__content { font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+
+/* ============================================================== EVOLUTION WISHLIST
+   Compact rows of the participant's evolution wishlist log entries. */
+.ds-app .ewl-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.ds-app .ewl-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 11px 14px;
+}
+.ds-app .ewl-item__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.ds-app .ewl-item__num { color: var(--ink-3); font-weight: 700; }
+.ds-app .ewl-item__type { font-weight: 800; color: var(--ink); }
+.ds-app .ewl-item__status {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--primary-ink);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.ds-app .ewl-item__date { margin-left: auto; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.ds-app .ewl-item__contacts {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ds-app .ewl-item__contacts .ic {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  line-height: 15px;
+  color: var(--ink-3);
+}
+.ds-app .ll-empty,
+.ds-app .ll-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink-2);
+  padding: 14px 0;
+}
+
+/* ============================================================== TRIPLE ATC */
+.ds-app .triple-atc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.ds-app .triple-atc-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+  text-align: left;
+  transition: all .2s var(--ease);
+  cursor: pointer;
+}
+.ds-app .triple-atc-card:hover {
+  border-color: var(--primary-line);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+.ds-app .triple-atc-card__index {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-app .triple-atc-card__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ds-app .triple-atc-card__label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.ds-app .triple-atc-card__date { font-size: 14px; font-weight: 700; color: var(--ink); }
+.ds-app .triple-atc-card__queue { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+
+/* ============================================================== ASSIGNED ATC */
+.ds-app .atc-assigned { display: flex; flex-direction: column; gap: 12px; }
+.ds-app .atc-assigned__card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.ds-app .atc-assigned__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.ds-app .atc-assigned__index {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #E0F2F1;
+  color: #0891b2;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-app .atc-assigned__date { font-weight: 800; color: var(--ink); font-size: 14px; }
+.ds-app .atc-assigned__queue {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-weight: 600;
+  margin-left: 10px;
+}
+.ds-app .atc-assigned__queue .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
+.ds-app .atc-assigned__chev { margin-left: auto; color: var(--ink-3); }
+.ds-app .atc-assigned__body { padding: 0 16px 16px; }
+
+.ds-app .proc-actionable { display: flex; align-items: center; gap: 8px; }
+.ds-app .proc-actionable__name { flex: 1; }
+.ds-app .proc-actionable__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.ds-app .proc-actionable__btn--done {
+  background: var(--green-soft);
+  color: var(--green);
+  border-color: var(--green-line);
+}
+.ds-app .atc-audio-list { display: flex; flex-direction: column; gap: 8px; }
+.ds-app .atc-audio { display: flex; align-items: center; gap: 10px; }
+.ds-app .atc-audio__index {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-weight: 800;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ds-app .atc-audio audio { flex: 1; min-width: 0; }
+
+/* ============================================================== FORM DIALOG
+   MatDialog renders the template into the CDK overlay (at the document body
+   level), so the dialog content is OUTSIDE .ds-app — these selectors MUST
+   NOT be scoped to .ds-app or they won't match the rendered dialog. We use
+   ::ng-deep so the rules survive Angular's view encapsulation, and the
+   `form-dialog-panel` panelClass set in viewform() lets us size the dialog
+   pane itself. */
+::ng-deep .form-dialog-panel .mat-mdc-dialog-surface,
+::ng-deep .form-dialog-panel .mdc-dialog__surface {
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 14px !important;
+}
+::ng-deep .form-dialog-panel .mat-mdc-dialog-container,
+::ng-deep .form-dialog-panel .mdc-dialog__container {
+  padding: 0 !important;
+}
+::ng-deep .form-dlg {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: #fff;
+}
+::ng-deep .form-dlg__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #E2E7EF;
+  flex-shrink: 0;
+}
+::ng-deep .form-dlg__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: #1A2332;
+  font-size: 16px;
+}
+::ng-deep .form-dlg__title .ic {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+}
+::ng-deep .form-dlg__close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #F8FAFC;
+  color: #566072;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+}
+::ng-deep .form-dlg__close:hover { background: #EEF1F6; color: #1A2332; }
+::ng-deep .form-dlg__frame {
+  display: block;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 0;
+  background: #fff;
+}
+
+/* ============================================================== INLINE FORM VIEWER
+   Ported from view-participants-form.component.css. The MatDialog template
+   renders OUTSIDE .ds-app via the CDK overlay, so we scope under the dialog's
+   panelClass with ::ng-deep instead of .ds-app. */
+::ng-deep .form-dialog-panel .overlay-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+::ng-deep .form-dialog-panel .loading-spinner {
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+}
+::ng-deep .form-dialog-panel .ds-form-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: ds-form-spinner-rot 0.9s linear infinite;
+}
+@keyframes ds-form-spinner-rot {
+  to { transform: rotate(360deg); }
+}
+::ng-deep .form-dialog-panel .form-view {
+  padding-bottom: 24px;
+}
+::ng-deep .form-dialog-panel .form-banner {
+  height: 6px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  margin-bottom: 16px;
+}
+::ng-deep .form-dialog-panel .form-participant {
+  font-size: 14px;
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 4px;
+}
+::ng-deep .form-dialog-panel .form-title {
+  font-size: 22px;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 8px;
+}
+::ng-deep .form-dialog-panel .form-description {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+::ng-deep .form-dialog-panel .form-meta {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 12px;
+}
+::ng-deep .form-dialog-panel .form-divider {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 12px 0 20px;
+}
+::ng-deep .form-dialog-panel .form-field-item {
+  margin-bottom: 20px;
+}
+::ng-deep .form-dialog-panel .form-section-label {
+  margin: 24px 0 12px;
+}
+::ng-deep .form-dialog-panel .section-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #000;
+}
+::ng-deep .form-dialog-panel .section-description {
+  font-size: 12px;
+  color: #777;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+::ng-deep .form-dialog-panel .form-question {
+  padding-left: 4px;
+}
+::ng-deep .form-dialog-panel .question-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 4px;
+}
+::ng-deep .form-dialog-panel .required-star {
+  color: #e53935;
+}
+::ng-deep .form-dialog-panel .question-description {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+::ng-deep .form-dialog-panel .question-value {
+  font-size: 13px;
+  color: #000;
+  background: #f5f5f5;
+  padding: 10px 12px;
+  border-radius: 6px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+::ng-deep .form-dialog-panel .question-value.empty-value {
+  color: #aaa;
+  font-style: italic;
+}
+::ng-deep .form-dialog-panel .question-notes {
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
+  margin-top: 6px;
+  padding-left: 4px;
+}
+::ng-deep .form-dialog-panel .array-sub-item {
+  padding: 6px 10px;
+  margin: 4px 0;
+  background-color: #f5f5f5;
+  border-left: 3px solid #667eea;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+::ng-deep .form-dialog-panel .sub-item-label {
+  font-weight: 600;
+  color: #000;
+  font-size: 13px;
+}
+::ng-deep .form-dialog-panel .sub-item-answer {
+  color: #444;
+  font-size: 13px;
+  margin-top: 2px;
+  padding-left: 8px;
+  line-height: 1.5;
+}
+
+/* ============================================================== FULL ATC OVERLAY
+   The atcDialogTpl renders OUTSIDE .ds-app via the CDK overlay, so the
+   .ds-app-scoped ATC card rules don't apply. Replicate the navy/teal ATC
+   card look here under the dialog panelClass (mirrors view-participant-atc /
+   atcCardTpl). Values inlined since CSS vars aren't in scope outside :host. */
+::ng-deep .form-dialog-panel .atc-card--dialog {
+  border: 1px solid #E2E7EF;
+  border-radius: 13px;
+  padding: 22px 24px;
+  background: #FFFFFF;
+}
+::ng-deep .form-dialog-panel .atc-card__head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+::ng-deep .form-dialog-panel .atc-card__date {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1A2332;
+  border-bottom: 2px solid #1A2332;
+  padding-bottom: 2px;
+}
+::ng-deep .form-dialog-panel .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+::ng-deep .form-dialog-panel .pill .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
+::ng-deep .form-dialog-panel .pill-green { background: #E4F4EA; color: #1B8E50; border: 1px solid #BFE3CC; }
+::ng-deep .form-dialog-panel .pill-amber { background: #FCF3E0; color: #B45309; border: 1px solid #F1DDA8; }
+
+::ng-deep .form-dialog-panel .field-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 13px 28px;
+  margin-bottom: 16px;
+}
+::ng-deep .form-dialog-panel .field-label { font-size: 14px; font-weight: 800; font-style: italic; color: #1A2332; }
+::ng-deep .form-dialog-panel .field-val { font-size: 15px; color: #143F49; font-weight: 600; }
+
+::ng-deep .form-dialog-panel .atc-card__note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0;
+  font-size: 13.5px;
+  font-style: italic;
+  color: #8A93A3;
+  font-weight: 600;
+}
+::ng-deep .form-dialog-panel .atc-card__note .ic { font-size: 15px; width: 15px; height: 15px; line-height: 15px; }
+
+::ng-deep .form-dialog-panel .atc-card__details--dialog {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #E2E7EF;
+}
+::ng-deep .form-dialog-panel .atc-card__detail-label {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #8A93A3;
+  margin: 0 0 10px;
+}
+::ng-deep .form-dialog-panel .section-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  color: #143F49;
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+::ng-deep .form-dialog-panel .atc-adj-list { display: flex; flex-direction: column; gap: 12px; }
+::ng-deep .form-dialog-panel .adjustment-block {
+  border: 1px solid #E2E7EF;
+  border-radius: 9px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: #F8FAFC;
+}
+::ng-deep .form-dialog-panel .adjustment-block:last-child { margin-bottom: 0; }
+::ng-deep .form-dialog-panel .adjustment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A2332;
+  margin-bottom: 8px;
+}
+::ng-deep .form-dialog-panel .adj-number { color: #8A93A3; }
+::ng-deep .form-dialog-panel .adj-name { flex: 1; }
+::ng-deep .form-dialog-panel .procedures-container {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #E2E7EF;
+}
+::ng-deep .form-dialog-panel .procedures-title {
+  font-weight: 800;
+  color: #566072;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+::ng-deep .form-dialog-panel .procedure-block {
+  background: #FFFFFF;
+  border: 1px solid #E2E7EF;
+  border-radius: 9px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+::ng-deep .form-dialog-panel .procedure-block:last-child { margin-bottom: 0; }
+::ng-deep .form-dialog-panel .procedure-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #1A2332;
+}
+::ng-deep .form-dialog-panel .proc-number { color: #8A93A3; font-size: 12.5px; font-weight: 800; }
+::ng-deep .form-dialog-panel .proc-name { flex: 1; }
+::ng-deep .form-dialog-panel .status-icon { font-size: 18px; width: 18px; height: 18px; }
+::ng-deep .form-dialog-panel .status-icon.completed { color: #1B8E50; }
+::ng-deep .form-dialog-panel .status-icon.pending { color: #8A93A3; }
+::ng-deep .form-dialog-panel .no-transcription {
+  padding: 12px 0 0;
+  font-size: 13px;
+  color: #8A93A3;
+  font-style: italic;
+}
+::ng-deep .form-dialog-panel .atc-note-grid { display: grid; gap: 12px; }
+::ng-deep .form-dialog-panel .atc-note {
+  background: #F8FAFC;
+  border: 1px solid #E2E7EF;
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+::ng-deep .form-dialog-panel .atc-note__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  color: #143F49;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+::ng-deep .form-dialog-panel .atc-note__title .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+::ng-deep .form-dialog-panel .atc-note__body { margin: 0; font-size: 13.5px; color: #1A2332; line-height: 1.5; }
+
+/* ============================================================== LIGHTBOX
+   Unscoped — the lightbox lives at the component's top level so it works
+   pre-live (waiting list) and inside the studio. */
+.preview-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.preview-image {
+  max-width: 60vw;
+  max-height: 70vh;
+  border-radius: 16px;
+  object-fit: contain;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.preview-close-btn {
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  background: rgba(255, 255, 255, 0.4);
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.preview-close-btn:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+.wait-token__avatar--clickable { cursor: pointer; }
+
+.std-chat-fab {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #1E5663;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid #5DCAA5;
+  cursor: pointer;
+  z-index: 9050;
+  box-shadow: 0 4px 14px rgba(30,86,99,.35);
+  transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+.std-chat-fab:hover { background: #143F49; transform: scale(1.06); }
+.std-chat-fab .mat-icon { font-size: 23px; width: 23px; height: 23px; line-height: 23px; color: #fff; }
+
+.std-chat-fab__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Draws attention only when there's something unread — calm otherwise */
+.std-chat-fab--unread {
+  animation: stdChatPulse 2.2s ease-in-out infinite;
+}
+@keyframes stdChatPulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(30,86,99,.35), 0 0 0 0 rgba(93,202,165,.45); }
+  50%      { box-shadow: 0 4px 14px rgba(30,86,99,.35), 0 0 0 8px rgba(93,202,165,0); }
+}
+
+.std-chat-popup {
+  position: fixed;
+  bottom: 160px;
+  right: 20px;
+  width: 300px;
+  max-height: 420px;
+  background: #FFFFFF;
+  border: 1px solid #E2E7EF;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  z-index: 9050;
+  overflow: hidden;
+  box-shadow: 0 18px 48px rgba(26,35,50,.18), 0 6px 14px rgba(26,35,50,.10);
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+.std-chat-popup__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #1E5663;
+  color: #fff;
+  flex-shrink: 0;
+}
+.std-chat-popup__head-info { display: flex; align-items: center; gap: 8px; }
+.std-chat-popup__head-info .mat-icon { color: #fff; font-size: 18px; width: 18px; height: 18px; line-height: 18px; }
+.std-chat-popup__head button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+.std-chat-popup__title { font-size: 14px; font-weight: 700; color: #fff; }
+
+.std-chat-popup__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.std-chat-showmore { display: flex; justify-content: center; margin-bottom: 4px; }
+.std-chat-showmore button {
+  background: #F8FAFC;
+  border: 1px solid #E2E7EF;
+  border-radius: 14px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #566072;
+  cursor: pointer;
+  font-family: inherit;
+}
+.std-chat-showmore button:hover { background: #E2E7EF; }
+
+.std-chat-divider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.std-chat-divider::before,
+.std-chat-divider::after {
+  content: '';
+  flex: 1;
+  height: 0.5px;
+  background: #E2E7EF;
+}
+.std-chat-divider span {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #8A93A3;
+  white-space: nowrap;
+}
+
+.std-chat-msg { display: flex; flex-direction: column; }
+.std-chat-msg--mine { align-items: flex-end; }
+.std-chat-msg:not(.std-chat-msg--mine) { align-items: flex-start; }
+.std-chat-msg__bubble {
+  max-width: 85%;
+  padding: 7px 10px;
+  border-radius: 10px 10px 10px 2px;
+  background: #F8FAFC;
+  border: 1px solid #E2E7EF;
+  font-size: 12.5px;
+  color: #1A2332;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.std-chat-msg__bubble a {
+  color: inherit;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.std-chat-msg__bubble p { margin: 0; }
+.std-chat-msg--mine .std-chat-msg__bubble {
+  background: #1E5663;
+  border-color: #1E5663;
+  color: #fff;
+  border-radius: 10px 10px 2px 10px;
+}
+.std-chat-msg__time {
+  font-size: 10px;
+  color: #8A93A3;
+  margin-top: 2px;
+  padding: 0 2px;
+}
+.std-chat-img {
+  max-width: 160px;
+  max-height: 120px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: block;
+  margin-top: 4px;
+  object-fit: cover;
+}
+.std-chat-file__card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 5px 8px;
+  background: rgba(0,0,0,.06);
+  border-radius: 6px;
+  font-size: 11.5px;
+}
+.std-chat-msg--mine .std-chat-file__card { background: rgba(255,255,255,.18); color: #fff; }
+.std-chat-file__card a { color: inherit; display: flex; }
+.std-chat-empty {
+  text-align: center;
+  font-size: 12.5px;
+  color: #8A93A3;
+  padding: 20px 0;
+}
+
+.std-chat-previews {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid #E2E7EF;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.std-chat-preview {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: #F8FAFC;
+  border: 1px solid #E2E7EF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.std-chat-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
+.std-chat-preview button {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #DC2626;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.std-chat-preview button .mat-icon { font-size: 11px; width: 11px; height: 11px; line-height: 11px; }
+
+.std-chat-popup__input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid #E2E7EF;
+  background: #F8FAFC;
+  flex-shrink: 0;
+}
+
+.std-chat-popup__input button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #1E5663;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+.std-chat-popup__input button:disabled { opacity: .45; cursor: not-allowed; }
+.std-chat-popup__input button:first-of-type {
+  background: #fff;
+  color: #566072;
+  border: 1px solid #E2E7EF;
+}
+.std-chat-popup__input button:first-of-type:hover { background: #F8FAFC; }
+.std-chat-msg__sender {
+  font-size: 10px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 3px;
+  padding: 0 4px;
+}
+
+.std-chat-msg--mine .std-chat-msg__sender {
+  text-align: right;
+  color: #334155;
+}
+.std-chat-input-textarea {
+  flex: 1;
+  resize: none;
+  overflow-y: auto;
+  max-height: 120px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.4;
+  background: transparent;
+  font-family: inherit;
+}
+
+/* ============================================================== LEGACY PRE-LIVE STYLES */
+/* These keep the surrounding "select studio / queue card / waiting list" UI
+   readable on the same screen since the new design only covers what's inside
+   the live assignment. */
+.mainscreen { padding: 16px 20px; font-family: 'Manrope', system-ui, sans-serif; }
+.mainscreen .title { font-size: 20px; font-weight: 800; color: #1A2332; }
+.no-studio-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FCF3E0;
+  color: #B45309;
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 1px solid #F1DDA8;
+  font-weight: 600;
+}
+.queue-card-list { display: flex; flex-direction: column; gap: 8px; }
+.queue-card-list__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #8A93A3;
+}
+.queue-card-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.queue-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #E2E7EF;
+  border-radius: 11px;
+  cursor: pointer;
+  min-width: 200px;
+  transition: all .2s ease;
+}
+.queue-card:hover { border-color: #9A258F; }
+.queue-card--active { border-color: #9A258F; background: #F8EAF6; }
+.queue-card__name { font-weight: 800; color: #1A2332; }
+.queue-card__meta { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #566072; }
+.queue-card__icon, .queue-card__chevron { color: #8A93A3; }
+
+.otherstudio { padding: 12px 0; }
+.secondtitle { font-weight: 800; color: #1A2332; }
+
+.sec--studios { margin-top: 18px; }
+.sec__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: #1A2332;
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+.sec__head-count {
+  background: #F8EAF6;
+  color: #7C1D73;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.primarystudio { background: #F8EAF6 !important; color: #7C1D73 !important; font-weight: 700; }
+.secondarystudio { background: #FCF3E0 !important; color: #B45309 !important; font-weight: 700; }
+
+/* Stage group → mockup .group-card (rounded, soft shadow) + .group-head. */
+.mainscreen [data-testid="studio-stage-col"] > .mat-elevation-z2 {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06) !important;
+}
+.stagename {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #6B7280;
+  background: #fff;
+  padding: 14px 18px;
+  border-bottom: 1px solid #E5E7EB;
+}
+.stagequeue { padding: 12px; }
+
+/* Empty state — shown when a stage (or the whole waiting list) has no one waiting. */
+.wait-empty {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 22px 16px; color: #9CA3AF; font-weight: 600; font-size: 13.5px;
+  font-family: 'Manrope', system-ui, sans-serif; text-align: center;
+}
+.wait-empty .ic, .wait-empty mat-icon { font-size: 18px; width: 18px; height: 18px; color: #C4C9D4; }
+.wait-empty--all {
+  background: #fff; border-radius: 16px; margin-top: 6px; padding: 44px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+}
+
+/* Waiting-list stage columns — the only `.row` inside .mainscreen (line ~159 of
+   the template). Bootstrap's `.col-sm` keeps every stage on ONE row until 576px.
+   Use `auto-fit` with a 1/3-width floor so the stages FILL the row: 1 stage →
+   full width, 2 → half each, 3 → thirds, MAX 3 per row (4+ wrap). Wider cards
+   also give each waiting participant's name room to show instead of clipping.
+   `max(300px, …)` drops to fewer columns on narrow screens. */
+.mainscreen > div > .row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(300px, calc((100% - 32px) / 3)), 1fr));
+  gap: 16px;
+  margin: 0;
+}
+.mainscreen [data-testid="studio-stage-col"].col-sm {
+  flex: initial;
+  max-width: none;
+  padding: 0;
+  /* Make each stage column a query container so the waiting-participant cards
+     can respond to the COLUMN's width (not the viewport). This is what fixes the
+     overlap when zoomed in / on narrow columns: the viewport can still be wide
+     while a 1/3-width column is narrow. */
+  container-type: inline-size;
+}
+.token {
+  background: #fff;
+  border: 1px solid #E2E7EF;
+  border-radius: 9px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.token .label {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #8A93A3;
+}
+.btnarea { margin-top: 8px; }
+.stagebtn { border-radius: 9px !important; font-weight: 700 !important; }
+
+/* ============================================================== WAIT-LIST TOKEN ROW
+   Single-row layout matching the navy/teal studio aesthetic. Uses local
+   colours (not --ds tokens) because this row is rendered OUTSIDE the
+   .ds-app shell (the waiting list shows when liveAssignment is null). */
+.wait-token {
+  display: flex;
+  flex-wrap: wrap;            /* wrap instead of overflowing/overlapping when narrow */
+  align-items: center;
+  gap: 14px;
+  background: #FFFFFF;
+  border: 1px solid #E2E7EF;
+  border-radius: 11px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  box-shadow: 0 1px 2px rgba(26,35,50,.04);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.wait-token:hover { box-shadow: 0 4px 12px rgba(26,35,50,.06); }
+.wait-token__id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.wait-token__avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #F3DEEF;
+  color: #7C1D73;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid #E9C9E4;
+}
+.wait-token__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wait-token__name-wrap { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wait-token__name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1A2332;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Mockup .badge-pre — amber "Preassigned" pill. */
+.wait-token__preassigned {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #B45309;
+  background: #FEF3C7;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: fit-content;
+}
+.wait-token__preassigned .ic { font-size: 13px; width: 13px; height: 13px; line-height: 13px; }
+.wait-token__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.wait-token__token {
+  font-size: 13px;
+  font-weight: 800;
+  color: #7C1D73;
+  background: #F8EAF6;
+  border: 1px solid #E9C9E4;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.wait-token__status {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #8A93A3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #F1F4F8;
+  border: 1px solid #E2E7EF;
+}
+.wait-token__status.is-ready {
+  color: #1B8E50;
+  background: #E4F4EA;
+  border-color: #BFE3CC;
+}
+.wait-token__cta { flex-shrink: 0; }
+.wait-token__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #9A258F;
+  color: #FFFFFF;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background .2s ease, transform .2s ease;
+  font-family: inherit;
+}
+.wait-token__btn:hover { background: #7C1D73; }
+.wait-token__btn .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+/* Approved invite — green so it reads as "ready to assign", not a fresh invite. */
+.wait-token__btn--approved { background: #15803D; }
+.wait-token__btn--approved:hover { background: #166534; }
+.wait-token__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FCF3E0;
+  color: #B45309;
+  border: 1px solid #F1DDA8;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+.wait-token__chip .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
+.wait-token__chip-text {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+.wait-token__chip-by {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: .85;
+}
+/* This studio's own pending invite — blue "awaiting response" with a Cancel. */
+.wait-token__chip--self {
+  background: #F8EAF6;
+  color: #7C1D73;
+  border-color: #E9C9E4;
+}
+.wait-token__chip-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: .7;
+}
+.wait-token__chip-cancel:hover { opacity: 1; background: rgba(124,58,237,.14); }
+.wait-token__chip-cancel .ic { font-size: 14px; width: 14px; height: 14px; line-height: 14px; }
+
+/* Narrow COLUMN (zoomed in, or 3 columns on a smaller screen): stack the token's
+   sections so the name, status and CTA never overlap. Container-based so it
+   responds to the column width, not the viewport (the viewport can be wide while
+   a 1/3-width column is narrow). Graceful fallback: `.wait-token` already has
+   `flex-wrap: wrap`, so browsers without @container support still wrap. */
+@container (max-width: 420px) {
+  .wait-token { gap: 10px; }
+  .wait-token__id { flex: 1 1 100%; }        /* avatar + name on their own row */
+  .wait-token__cta { order: 3; margin-left: auto; } /* CTA pushed to the right */
+}
+@container (max-width: 300px) {
+  /* Very tight: give the CTA its own full-width row so the button can't collide
+     with the status pill. */
+  .wait-token__cta { flex: 1 1 100%; margin-left: 0; }
+  .wait-token__cta .wait-token__btn,
+  .wait-token__cta .wait-token__chip {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+}
+
+.chat-container {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100;
+  background: #1E5663;
+  color: #fff;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.chat-container .mat-icon { color: #fff; }
+.example-container {
+  position: fixed;
+  right: 20px;
+  bottom: 72px;
+  width: 320px;
+  background: #fff;
+  border: 1px solid #E2E7EF;
+  border-radius: 13px;
+  box-shadow: 0 12px 32px rgba(26,35,50,.18);
+  padding: 12px;
+  z-index: 100;
+}
+.talk-bubble {
+  background: #E2EEEF;
+  color: #143F49;
+  padding: 8px 12px;
+  border-radius: 11px 11px 2px 11px;
+  margin: 4px 0;
+  max-width: 90%;
+  display: inline-block;
+}
+.talk-bubble1 {
+  background: #F8FAFC;
+  color: #1A2332;
+  padding: 8px 12px;
+  border-radius: 2px 11px 11px 11px;
+  margin: 4px 0;
+  max-width: 90%;
+  display: inline-block;
+  border: 1px solid #E2E7EF;
+}
+.messageinput {
+  font-family: 'Manrope', sans-serif;
+  border-radius: 9px;
+  resize: vertical;
+}
+
+/* ============================================================== RESPONSIVE */
+/* The --sidebar-w / --topbar-h tokens at the top already use clamp() so most
+   sizing flows naturally. These breakpoints fine-tune density. */
+@media (max-width: 1440px) {
+  .ds-app .ds-main-scroll { padding: 24px 28px 20px; }
+  .ds-app .ds-h1 { font-size: clamp(22px, 1.6vw + 8px, 28px); }
+  .ds-app .card-pad { padding: 20px 22px; }
+}
+@media (max-width: 1180px) {
+  .ds-app .ds-main-scroll { padding: 20px 22px 16px; }
+  .ds-app .choice-grid { grid-template-columns: 1fr; }
+  .ds-app .ds-footer { padding: 12px 22px; }
+  .ds-app .ds-topbar { padding: 0 22px; }
+}
+@media (max-width: 1024px) {
+  .ds-app .ds-eyebrow { font-size: 13px; }
+  .ds-app .ds-side-name { font-size: 16px; }
+  .ds-app .ds-step-title { font-size: 14px; }
+  .ds-app .ds-step-sub { font-size: 11.5px; }
+  .ds-app .ds-stepscroll { padding: 14px 12px 22px; }
+  .ds-app .ds-side-profile { padding: 12px 14px 10px; }
+}
+
+/* (Old ≤900px stacking removed — the new `@media (max-width: 1024px)` above
+   governs stacking for the sidebar/topbar/main/footer layout; un-pinning is
+   handled by the ≤640px / ≤460h fallback.) */
+
+/* ============================================================== ZOOM STACK (Step 4) */
+/* Vertical stack so In-house / Zoom card sits at the top and "Generate New
+   Link" lives as a separate full-width row at the BOTTOM (no side-by-side
+   grid that was clipping button labels on narrow viewports). */
+.ds-app .zoom-stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 1.4vw + 6px, 22px);
+}
+.ds-app .zoom-stack > * { width: 100%; }
+.ds-app .choice--primary { padding: clamp(18px, 1.6vw + 8px, 26px); }
+
+/* "Zoom link ready" / "Generating link..." status pill (replaces the raw
+   start_url that was leaking the meeting URL into the UI). */
+.ds-app .zoom-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-line);
+  color: var(--green);
+  border-radius: 999px;
+  font-size: clamp(12px, 0.35vw + 9px, 13.5px);
+  font-weight: 700;
+  margin-bottom: 14px;
+  align-self: flex-start;
+}
+.ds-app .zoom-status .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; color: var(--green-bright); }
+.ds-app .zoom-status--pending {
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+  color: var(--amber);
+}
+.ds-app .zoom-status--pending .ic { color: var(--amber-bright); }
+.ds-app .zoom-status--broken {
+  background: #FDE8E8;
+  border-color: #F5C2C2;
+  color: var(--red);
+  align-self: stretch;
+  padding: 9px 14px;
+  border-radius: var(--r-sm);
+}
+.ds-app .zoom-status--broken .ic { color: var(--red); }
+
+/* Generate New Link — compact helper strip sitting just under the Zoom card.
+   Slimmer padding + muted surface so it reads as a secondary "fix it" action,
+   not a co-equal card. Negative margin pulls it tight against the Zoom card. */
+.ds-app .choice--secondary {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 12px 16px;
+  display: block;
+  height: auto;
+  border-radius: var(--r-sm);
+  margin-top: -8px;
+}
+.ds-app .choice--secondary .choice-title { font-size: 14px; }
+.ds-app .choice--secondary .choice-desc { font-size: 12.5px; }
+.ds-app .choice-secondary__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ds-app .choice-secondary__head .choice-ic {
+  margin-bottom: 0;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.ds-app .choice-secondary__text { flex: 1; min-width: 220px; }
+.ds-app .choice-secondary__head .choice-desc { margin: 4px 0 0; }
+.ds-app .choice-secondary__head .btn {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Start Meeting button — ensure the label is always readable even if a
+   global stylesheet (Bootstrap) tries to override .btn-primary's color. */
+.ds-app .start-meeting-btn {
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
+  gap: 10px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+.ds-app .start-meeting-btn:hover {
+  background: var(--primary-ink) !important;
+  border-color: var(--primary-ink) !important;
+}
+.ds-app .start-meeting-btn:disabled,
+.ds-app .start-meeting-btn[disabled] {
+  background: var(--primary) !important;
+  color: #fff !important;
+  opacity: .55;
+}
+.ds-app .start-meeting-btn__label {
+  color: #fff;
+  font-size: inherit;
+  font-weight: inherit;
+  white-space: nowrap;
+}
+.ds-app .start-meeting-btn .ic {
+  color: #fff;
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+}
+
+@media (max-width: 720px) {
+  .ds-app .choice-secondary__head { flex-direction: column; align-items: flex-start; }
+  .ds-app .choice-secondary__head .btn { margin-left: 0; width: 100%; }
+}
+
+/* ============================================================== PREVIOUS ATC SLOT
+   The previous-cycle step embeds <app-view-participant-atc>. The child now
+   ships its own navy/teal styling (matches atcCardTpl natively), so we only
+   need minor host-side padding tweaks here. */
+.ds-app app-view-participant-atc {
+  display: block;
+  margin: 0;
+}
+
+/* ============================================================== STEP-COMPACT
+   Tighter spacing for the Prescribe ATC + Previous ATC step containers so
+   they use vertical space better on shorter screens. Only applies inside
+   the `.step-compact` wrapper. */
+.ds-app .step-compact .card { margin-top: clamp(10px, 0.5vw + 4px, 13px); }
+.ds-app .step-compact .card:first-child { margin-top: 0; }
+.ds-app .step-compact .card + .card { margin-top: clamp(10px, 0.5vw + 4px, 13px); }
+.ds-app .step-compact .card-head { padding: clamp(8px, 0.4vw + 4px, 11px) clamp(12px, 0.6vw + 6px, 16px); }
+.ds-app .step-compact .card-pad { padding: clamp(10px, 0.5vw + 4px, 14px) clamp(13px, 0.7vw + 6px, 17px); }
+.ds-app .step-compact .atc-card { padding: clamp(10px, 0.5vw + 6px, 14px) clamp(13px, 0.7vw + 6px, 17px) !important; }
+.ds-app .step-compact .atc-card .atc-card__head { margin-bottom: clamp(8px, 0.4vw + 4px, 12px) !important; }
+.ds-app .step-compact .field-grid { gap: clamp(5px, 0.3vw + 3px, 8px) clamp(14px, 1vw + 8px, 20px); }
+.ds-app .step-compact .field-label, .ds-app .step-compact .field-val {
+  font-size: clamp(12.5px, 0.3vw + 9px, 13.5px);
+  line-height: 1.35;
+}
+.ds-app .step-compact .section-title { margin-bottom: 8px; font-size: 12px; }
+.ds-app .step-compact .empty { padding: 18px 12px; }
+.ds-app .step-compact .empty-ic { width: 40px; height: 40px; margin-bottom: 8px; }
+.ds-app .step-compact .empty-text { font-size: 13px; }
+.ds-app .step-compact .count-badge { font-size: 11.5px; min-width: 20px; height: 20px; }
+
+/* Compact pass for the previous-cycle ATC component when rendered inside
+   .step-compact. Uses ::ng-deep to pierce View Encapsulation since
+   app-view-participant-atc is a standalone component with its own styles. */
+.ds-app .step-compact ::ng-deep app-view-participant-atc .atc-card {
+  padding: clamp(10px, 0.5vw + 6px, 14px) clamp(13px, 0.7vw + 6px, 17px) !important;
+  margin-bottom: clamp(8px, 0.4vw + 4px, 11px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .atc-card__head {
+  margin-bottom: clamp(8px, 0.4vw + 4px, 11px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .field-grid {
+  gap: clamp(5px, 0.3vw + 3px, 8px) clamp(14px, 1vw + 8px, 20px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .product-group {
+  margin-bottom: clamp(10px, 0.5vw + 4px, 14px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .product-header {
+  padding: clamp(7px, 0.4vw + 4px, 10px) clamp(11px, 0.5vw + 6px, 14px) !important;
+  margin-bottom: clamp(7px, 0.4vw + 4px, 10px) !important;
+}
+.ds-app .step-compact ::ng-deep app-view-participant-atc .product-header h2 {
+  font-size: 13.5px !important;
+}
+
+/* ============================================================== CHECKIN CONFLICT DIALOG
+   Rendered by MatDialog OUTSIDE .ds-app, so no ds-app scoping. */
+.checkin-conflict {
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: 22px 24px;
+  background: #FFFFFF;
+  color: #1A2332;
+}
+.checkin-conflict__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.checkin-conflict__head .ic {
+  color: #B45309;
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+}
+.checkin-conflict__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #1A2332;
+  letter-spacing: -.01em;
+}
+.checkin-conflict__body { margin-bottom: 18px; }
+.checkin-conflict__copy {
+  margin: 0 0 12px;
+  color: #566072;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.checkin-conflict__studios {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.checkin-conflict__studios li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #FCF3E0;
+  border: 1px solid #F1DDA8;
+  color: #B45309;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.checkin-conflict__studios li > .ic {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  color: #B45309;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.checkin-conflict__studio-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.checkin-conflict__queue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #1A2332;
+  letter-spacing: -.01em;
+}
+.checkin-conflict__live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #DC2626;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  animation: conflictDot 1.4s ease-out infinite;
+}
+@keyframes conflictDot {
+  0%   { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0); }
+}
+.checkin-conflict__stage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #92400E;
+}
+.checkin-conflict__stage .ic {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  line-height: 13px;
+  color: #B45309;
+}
+.checkin-conflict__stage--muted { color: #8A93A3; font-weight: 600; }
+.checkin-conflict__live-tag {
+  margin-left: 4px;
+  padding: 1px 7px;
+  background: #DC2626;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+.checkin-conflict__studio-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #8A93A3;
+  letter-spacing: .02em;
+  margin-top: 1px;
+}
+.checkin-conflict__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.checkin-conflict__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #E2E7EF;
+  background: #FFFFFF;
+  color: #1A2332;
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .2s ease, color .2s ease;
+}
+.checkin-conflict__btn .ic { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
+.checkin-conflict__btn--ghost:hover { background: #F8FAFC; }
+.checkin-conflict__btn--primary {
+  background: #1E5663;
+  color: #FFFFFF;
+  border-color: #143F49;
+}
+.checkin-conflict__btn--primary:hover { background: #143F49; }
+
+/* ============================================================== TOPBAR SUMMARY CHIPS
+   Forms count + ATC prescribed count, shown inline inside the Awaiting-
+   participant status pill. Replaces the old info-banner + atc-banner that
+   were taking a full row each in the main panel. */
+.ds-app .ds-waiting-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.ds-app .ds-waiting-cta { margin-left: 8px; }
+/* When the CTA is present, push it after the chips */
+.ds-app .ds-waiting-chips + .ds-waiting-cta { margin-left: 0; }
+
+.ds-app .ds-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: clamp(11.5px, 0.3vw + 9px, 13px);
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: background .2s var(--ease), border-color .2s var(--ease), transform .2s var(--ease);
+}
+.ds-app .ds-chip:hover {
+  background: var(--surface-2);
+  border-color: var(--ink-3);
+  transform: translateY(-1px);
+}
+.ds-app .ds-chip b {
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ds-app .ds-chip .ic {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+}
+.ds-app .ds-chip--forms {
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
+  color: var(--primary-ink);
+}
+.ds-app .ds-chip--forms b { color: var(--primary-ink); }
+.ds-app .ds-chip--forms .ic { color: var(--primary); }
+.ds-app .ds-chip--forms:hover {
+  background: #D6E6E8;
+  border-color: var(--primary);
+}
+.ds-app .ds-chip--atc {
+  background: var(--green-soft);
+  border-color: var(--green-line);
+  color: var(--green);
+}
+.ds-app .ds-chip--atc b { color: var(--green); }
+.ds-app .ds-chip--atc .ic { color: var(--green-bright); }
+.ds-app .ds-chip--atc:hover {
+  background: #D2EBD9;
+  border-color: var(--green-bright);
+}
+
+/* Tighten on narrow viewports — hide the trailing label, keep just the
+   icon + count so the topbar doesn't wrap. */
+@media (max-width: 1180px) {
+  .ds-app .ds-chip { padding: 4px 9px; }
+}
+@media (max-width: 900px) {
+  .ds-app .ds-waiting-chips { display: none; }
+}
+
+/* ============================================================== STAGE NOTE
+   Per-stage note configured in queue-creation, shown next to the topbar
+   status pill. Amber info chip, single-line with ellipsis so it never breaks
+   the topbar layout; hidden under 1024px on narrow screens. */
+/* Stage notes — full-width banner directly below the topbar, in the main
+   content flow (NOT inside the fixed-height topbar). Shows the complete note
+   text with wrapping, never overlapping the content below. */
+.ds-app .ds-stagenote-bar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Flush to the edges — no outer box and no side margin. */
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.ds-app .ds-stagenote {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 13px;
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  border-radius: 8px;
+  color: var(--amber);
+  font-family: inherit;
+  font-size: clamp(11.5px, 0.3vw + 9px, 13px);
+  font-weight: 600;
+  width: 100%;
+}
+.ds-app .ds-stagenote .ic {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 1.35;
+  color: var(--amber-bright);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.ds-app .ds-stagenote__main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.ds-app .ds-stagenote__text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+/* Clamp to 2 lines until expanded. */
+.ds-app .ds-stagenote__text.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ds-app .ds-stagenote__more {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--amber-bright);
+  text-decoration: underline;
+}
+.ds-app .ds-stagenote__more:hover { color: var(--amber); }
+
+/* ============================================================== EMPTY SECTION (compact)
+   When an ATC section has no data we collapse the card to just its head and
+   show "— No data available" inline next to the title instead of a tall
+   empty-state card. */
+.ds-app .card-head-empty {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  font-style: italic;
+  margin-left: 4px;
+}
+.ds-app .card--empty {
+  box-shadow: none;
+}
+.ds-app .card--empty .card-head {
+  border-bottom: none;
+  border-radius: var(--r-lg);
+}
+
+/* Mentor-only edit note on ATC cards (shown to non-mentors). */
+.ds-app .atc-card__mentor-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--ink-3);
+}
+.ds-app .atc-card__mentor-note .ic {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  line-height: 15px;
+  color: var(--ink-4);
+}
+
+/* ============================================================== AEL SLIDER MODAL (mockup) */
+.ds-app .ael-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 17, 21, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  padding: 16px;
+}
+.ds-app .ael-modal {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.ds-app .ael-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ds-app .ael-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.ds-app .ael-modal__title .ic { color: var(--primary); }
+.ds-app .ael-modal__x {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-app .ael-modal__x:hover { background: var(--surface-2); color: var(--ink); }
+.ds-app .ael-modal__body { padding: 20px; overflow-y: auto; }
+.ds-app .ael-modal__sub {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.ds-app .ael-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.ds-app .ael-slider-row__area {
+  width: 92px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-app .ael-slider-row__range {
+  flex: 1;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.ds-app .ael-slider-row__val {
+  width: 62px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-ink);
+}
+.ds-app .ael-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================== MOVE-TO-NEXT-STAGE DROPDOWN (mockup) */
+.ds-app .ds-menu-anchor { position: relative; display: inline-flex; }
+.ds-app .ds-menu-anchor .btn.is-open { box-shadow: 0 6px 16px -6px rgba(124, 58, 237, .55); }
+.ds-app .ds-nextmenu-backdrop { position: fixed; inset: 0; z-index: 55; background: rgba(15, 18, 22, .38); }
+.ds-app .ds-nextmenu {
+  position: absolute;
+  right: 0;
+  min-width: 288px;
+  max-width: min(360px, 86vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  z-index: 60;
+}
+.ds-app .ds-nextmenu--down { top: 100%; margin-top: 8px; }
+.ds-app .ds-nextmenu--up { bottom: 100%; margin-bottom: 8px; }
+/* Centered-on-screen variant (modal-like) — used by the Move Next Stage menu so
+   the dropdown appears in the middle of the viewport, not cramped by the button. */
+.ds-app .ds-nextmenu--center {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  width: min(400px, 92vw);
+  max-width: 92vw;
+  padding: 12px;
+  border-radius: var(--r-lg);
+  animation: dsNextmenuIn .16s var(--ease);
+}
+@keyframes dsNextmenuIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+/* The footer has a backdrop-filter, which makes it a *containing block* for
+   position:fixed descendants — that anchored the centered "Choose next stage"
+   overlay to the footer (bottom of screen) instead of the viewport. While the
+   overlay is open, drop the footer's filter so the .ds-nextmenu--center child
+   resolves against the viewport and truly centers. The full-screen dark
+   .ds-nextmenu-backdrop covers the footer meanwhile, so losing the frost for
+   that moment is invisible. (The header's Move Next Stage already centers — its
+   .ds-topbar2 has no backdrop-filter.) */
+.ds-app .ds-footer:has(.ds-nextmenu--center) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.ds-app .ds-nextmenu__head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 6px 10px 8px;
+}
+.ds-app .ds-nextmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: background .15s var(--ease);
+}
+.ds-app .ds-nextmenu__item + .ds-nextmenu__item { margin-top: 2px; }
+.ds-app .ds-nextmenu__item:hover:not(:disabled) { background: var(--primary-soft); color: var(--primary-ink); }
+.ds-app .ds-nextmenu__item:disabled { opacity: .55; cursor: default; }
+.ds-app .ds-nextmenu__item .ic { color: var(--primary); flex-shrink: 0; }
+.ds-app .ds-nextmenu__item--go .ic { color: var(--green-bright); }
+.ds-app .ds-nextmenu__item--go:hover:not(:disabled) { background: var(--green-soft); color: var(--green); }
+.ds-app .ds-nextmenu__item--go:hover:not(:disabled) .ic { color: var(--green); }
+
+/* ============================================================== LOBBY: STUDIO GRID (mockup) */
+.ds-lobby-head { margin-bottom: 24px; }
+.ds-lobby-title { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; color: #0D0F12; margin: 0; }
+.ds-lobby-sub { font-size: 13px; color: #6B7280; margin-top: 4px; }
+
+/* min(100%, 300px) so a single card never exceeds the viewport on a narrow
+   phone (a fixed 320px min would force horizontal scroll under ~360px). */
+/* MAX 3 cards per row: auto-fit + a 1/3-width floor. 1 card → full width,
+   2 → half each, 3 → thirds, 4+ wrap. `max(300px, …)` drops to fewer columns on
+   narrow screens so a single card never forces horizontal scroll on a phone. */
+.studio-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(max(300px, calc((100% - 28px) / 3)), 1fr)); }
+.studio-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 18px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.studio-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
+.studio-top { display: flex; align-items: center; gap: 11px; }
+.studio-icon {
+  width: 40px; height: 40px; border-radius: 11px;
+  background: #F3DEEF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.studio-icon mat-icon { font-size: 20px; width: 20px; height: 20px; color: #7C1D73; }
+.studio-name { font-size: 14.5px; font-weight: 800; color: #0D0F12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-queue { font-size: 12px; color: #6B7280; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-specialists { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #4B5563; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studio-specialists mat-icon { font-size: 14px; width: 14px; height: 14px; line-height: 14px; color: #9CA3AF; flex-shrink: 0; }
+.studio-live { color: #16A34A; font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+.studio-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; border-top: 1px solid #F3F4F6; padding-top: 11px; }
+.studio-spec { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; min-width: 0; }
+.studio-spec mat-icon { font-size: 15px; width: 15px; height: 15px; flex-shrink: 0; }
+.studio-spec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-open { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700; color: #9A258F; flex-shrink: 0; }
+.studio-open mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+/* ---- LIST screen (after picking a studio) ---- */
+/* Clear, tappable pill button (was a tiny grey text link that was easy to miss).
+   Pre-live view isn't inside .ds-app, so colours are hard-coded (no CSS vars). */
+.ds-back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #7C1D73; font-size: 14px; font-weight: 700;
+  background: #F8EAF6; border: 1px solid #E9C9E4;
+  border-radius: 999px; padding: 9px 18px 9px 13px; margin-bottom: 18px;
+  cursor: pointer; transition: background .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.ds-back-link:hover { background: #E9E0FF; box-shadow: 0 4px 12px -4px rgba(124, 58, 237, .35); }
+.ds-back-link:active { transform: translateY(1px); }
+.ds-back-link mat-icon { font-size: 20px; width: 20px; height: 20px; }
+.ds-list-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.ds-list-title { font-size: 20px; font-weight: 800; color: #0D0F12; margin: 0; }
+.ds-list-sub { font-size: 13px; color: #6B7280; margin-top: 2px; }
+
+.checkin-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 18px 20px; margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.checkin-card__title { font-size: 14px; font-weight: 700; color: #0D0F12; }
+.checkin-card__sub { font-size: 12.5px; color: #6B7280; margin-top: 3px; }
+
+.empty-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  padding: 48px 32px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+}
+.empty-card__ic {
+  width: 60px; height: 60px; border-radius: 18px; background: #F3F4F6;
+  display: flex; align-items: center; justify-content: center;
+}
+.empty-card__ic mat-icon { font-size: 26px; width: 26px; height: 26px; color: #9CA3AF; }
+.empty-card__t { font-size: 15px; font-weight: 700; color: #0D0F12; }
+.empty-card__b { font-size: 12.5px; color: #6B7280; max-width: 400px; line-height: 1.6; }
+
+/* Lobby studio card — "checked in" indicator (so you can see, from outside,
+   which studio you're currently checked into). */
+.studio-card--in { border: 1.5px solid #BBF7D0; box-shadow: 0 1px 3px rgba(22,163,74,0.12), 0 4px 16px rgba(22,163,74,0.10); }
+.studio-badge {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  font-size: 11px; font-weight: 800; letter-spacing: .01em;
+  padding: 4px 10px; border-radius: 999px;
+}
+.studio-badge--in { color: #15803D; background: #DCFCE7; }
+.studio-badge__dot { width: 7px; height: 7px; border-radius: 999px; background: #16A34A; }
+
+/* ============================================================== PRE-LIVE RESPONSIVE
+   The lobby / studio-list / waiting-list screens (rendered OUTSIDE the fixed
+   .ds-app grid) had no dedicated breakpoints. Tighten padding and collapse to a
+   single column on phones so nothing overflows or gets cramped. */
+
+/* Tablet & down: cap at 2 per row (1 → full, 2 → half) so cards keep enough
+   width for names; 3-up gets too cramped below ~900px. */
+@media (max-width: 900px) {
+  .mainscreen > div > .row {
+    grid-template-columns: repeat(auto-fit, minmax(max(260px, calc((100% - 12px) / 2)), 1fr));
+    gap: 12px;
+  }
+}
+
+/* Phone: single column everywhere, tighter chrome, wrap the check-in row so the
+   toggle never gets pushed off-screen. */
+@media (max-width: 640px) {
+  .mainscreen { padding: 12px 14px; }
+  .ds-lobby-head { margin-bottom: 18px; }
+  .ds-lobby-title { font-size: 19px; }
+  .studio-grid { gap: 12px; }
+  .mainscreen > div > .row { grid-template-columns: 1fr; }
+  .checkin-card {
+    flex-wrap: wrap;
+    padding: 16px;
+    gap: 12px;
+  }
+  .empty-card { padding: 32px 20px; }
+  .ds-list-head { gap: 10px; margin-bottom: 16px; }
+  .ds-list-title { font-size: 18px; }
+  /* Invited-studio buttons: let them stack full width instead of dangling. */
+  .otherstudio .mat-mdc-outlined-button { width: 100%; margin-right: 0 !important; margin-bottom: 8px; }
+}

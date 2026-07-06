@@ -269,6 +269,7 @@
                 <td>{{ (currentPage - 1) * itemsPerPage + i + 1 }}.</td>
                 <td *ngFor="let column of currentTableConfig?.columns" [class.highlight-cell]="shouldHighlightCell(column.key)">
             
+                  <app-profile-picture *ngIf="column.key === 'profileid' && column.mapValue === 'name'" [profileId]="row.profileid" [name]="formatCellValue(row, column)" [size]="28" style="vertical-align:middle;margin-right:6px;"></app-profile-picture>
                   <span [class.badge-cell]="isBadgeColumn(column.key)"
                     *ngIf="!['action', 'notes', 'journeyplan', 'addnotes', 'generalnotes', 'waitingperiod', 'menubutton', 'salenotes','products','prioritystatus'].includes(column.key)">
                     {{ formatCellValue(row, column) }}

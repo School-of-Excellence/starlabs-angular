@@ -18,6 +18,7 @@ import { ResolveParticipantZoneComponent } from '../resolve-participant-zone/res
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { Clipboard } from '@angular/cdk/clipboard';
 import * as XLSX from 'xlsx';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 @Component({
   selector: 'app-event-zone-management',
@@ -31,7 +32,8 @@ import * as XLSX from 'xlsx';
     MatCheckboxModule,
     MatIconModule,
     MatButtonModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    ProfilePictureComponent
   ],
   templateUrl: './event-zone-management.component.html',
   styleUrl: './event-zone-management.component.css'

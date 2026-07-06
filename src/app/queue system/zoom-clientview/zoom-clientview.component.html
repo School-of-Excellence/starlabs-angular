@@ -16,10 +16,98 @@
   <title>Zoom ClientView Component</title>
 </head>
 <body>
-  <div class="d-flex flex-row justify-content-center">
-    <h1>Zoom ClientView Component</h1>
+  <!-- (Removed leftover "Zoom ClientView Component" <h1> — it rendered a
+       dark-grey-on-black strip at the top until the Zoom SDK covered it.) -->
+
+  <!-- Meeting ended / link invalid screen -->
+  <div class="wait-screen" *ngIf="meetingEnded">
+    <div class="wait-card wait-card--ended">
+      <div class="wait-card__pulse wait-card__pulse--static">
+        <span class="wait-pulse__core wait-pulse__core--ended">
+          <mat-icon>
+            {{ endedReason === 'completed' ? 'check_circle' :
+               endedReason === 'cancelled' ? 'cancel' :
+               endedReason === 'notfound' ? 'link_off' : 'event_busy' }}
+          </mat-icon>
+        </span>
+      </div>
+
+      <span class="wait-card__eyebrow wait-card__eyebrow--ended">
+        {{ endedReason === 'completed' ? 'Session Completed' :
+           endedReason === 'cancelled' ? 'Session Cancelled' :
+           endedReason === 'notfound' ? 'Invalid Link' : 'Session Expired' }}
+      </span>
+
+      <h2 class="wait-card__title">
+        <ng-container *ngIf="endedReason === 'completed'">This consultation has wrapped up</ng-container>
+        <ng-container *ngIf="endedReason === 'cancelled'">This session was cancelled</ng-container>
+        <ng-container *ngIf="endedReason === 'notfound'">This meeting link is no longer valid</ng-container>
+        <ng-container *ngIf="endedReason === 'expired' || !endedReason">This meeting has ended</ng-container>
+      </h2>
+
+      <p class="wait-card__body">
+        <ng-container *ngIf="endedReason === 'completed'">
+          Thank you for joining the session. Your specialist has marked the consultation as complete.
+          You can now close this window.
+        </ng-container>
+        <ng-container *ngIf="endedReason === 'cancelled'">
+          Your specialist had to cancel this session. Please reach out to support to reschedule.
+        </ng-container>
+        <ng-container *ngIf="endedReason === 'notfound'">
+          The meeting you're trying to join doesn't exist anymore. It may have been removed,
+          or the link you used is incorrect. Please contact your specialist for a fresh link.
+        </ng-container>
+        <ng-container *ngIf="endedReason === 'expired' || !endedReason">
+          This meeting link has expired. If you believe this is a mistake,
+          please contact your specialist for assistance.
+        </ng-container>
+      </p>
+
+      <div class="wait-card__hint">
+        <mat-icon>support_agent</mat-icon>
+        Need help? Reach out to your specialist for next steps.
+      </div>
+    </div>
   </div>
-  
+
+  <!-- Specialist-wait screen (shown to participants until specialist joins) -->
+  <div class="wait-screen" *ngIf="waitingForSpecialist && !meetingEnded">
+    <div class="wait-card">
+      <div class="wait-card__pulse">
+        <span class="wait-pulse__ring wait-pulse__ring--a"></span>
+        <span class="wait-pulse__ring wait-pulse__ring--b"></span>
+        <span class="wait-pulse__core">
+          <mat-icon>medical_information</mat-icon>
+        </span>
+      </div>
+
+      <span class="wait-card__eyebrow">
+        <span class="wait-card__eyebrow-dot"></span>
+        Preparing your session
+      </span>
+
+      <h2 class="wait-card__title">
+        Hello{{ participantName ? ', ' + participantName : '' }} —
+        your specialist is reviewing your records
+      </h2>
+
+      <p class="wait-card__body">
+        They are going through your <strong>submitted forms</strong> and
+        <strong>ATC</strong> before the consultation starts.
+        The call will begin automatically the moment they're ready.
+      </p>
+
+      <div class="wait-card__dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+
+      <div class="wait-card__hint">
+        <mat-icon>info</mat-icon>
+        Please stay on this page — no action needed from you.
+      </div>
+    </div>
+  </div>
+
   <div id="zmmtg-root"></div>
   <div *ngIf="profileHost">
     <div class="slider-container">
@@ -28,7 +116,136 @@
       </div>
     </div>
   </div>
-  <button *ngIf="profileHost && isJoined" class="float" (click)="onClick()">capture</button>
+  <button *ngIf="profileHost && isJoined" class="float" (click)="onClick()" title="Capture">
+    <mat-icon>photo_camera</mat-icon>
+    <span>Capture</span>
+  </button>
+
+  <!-- Host-only quick jump to the Prescribe ATC step of Dynamic Studio -->
+  <button *ngIf="profileHost && isJoined" class="prescribe-bubble" (click)="goToPrescribeAtc()"
+          title="Prescribe ATC">
+    <mat-icon>add_circle</mat-icon>
+    <span>Prescribe ATC</span>
+  </button>
+
+  <!-- Big center overlay shown to the HOST when recording is paused/stopped
+       while another person is in the call. Replaces the older top snackbar
+       so it's impossible to miss. -->
+  <div class="rec-prompt-overlay" *ngIf="recordingPromptVisible" role="alertdialog" aria-live="assertive">
+    <div class="rec-prompt-card">
+      <div class="rec-prompt-card__icon">
+        <mat-icon>fiber_manual_record</mat-icon>
+      </div>
+      <h2 class="rec-prompt-card__title">
+        {{ recordingPromptKind === 'paused' ? 'Recording is paused' : 'Recording is not running' }}
+      </h2>
+      <p class="rec-prompt-card__body">
+        {{ recordingPromptKind === 'paused'
+            ? 'Please resume the recording now — the session is in progress.'
+            : 'Please start the recording now — the session is in progress.' }}
+      </p>
+      <div class="rec-prompt-card__hint">
+        <mat-icon>info</mat-icon>
+        <span>Use the <strong>Record</strong> control at the <strong>top-right</strong> of the
+        Zoom window to {{ recordingPromptKind === 'paused' ? 'resume' : 'start' }} recording.</span>
+      </div>
+      <div class="rec-prompt-card__actions">
+        <button class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="resumeRecordingNow()">
+          {{ recordingPromptKind === 'paused' ? 'Resume recording' : 'Start recording' }}
+        </button>
+        <button class="rec-prompt-card__btn" (click)="dismissRecordingPrompt()">Dismiss for 30s</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- In-call popup: shown after Prescribe ATC switched an already-open Studio
+       tab to the step (the browser can't foreground that tab for us). -->
+  <div class="rec-prompt-overlay" *ngIf="prescribeHintVisible" role="alertdialog" aria-live="assertive">
+    <div class="rec-prompt-card">
+      <div class="rec-prompt-card__icon rec-prompt-card__icon--atc">
+        <mat-icon>fact_check</mat-icon>
+      </div>
+      <h2 class="rec-prompt-card__title">Prescribe ATC is ready</h2>
+      <p class="rec-prompt-card__body">
+        It's open on the <strong>Prescribe ATC</strong> step in your
+        <strong>Dynamic Studio</strong> tab. Click the <strong>notification</strong> that
+        just appeared to jump straight there, or switch to that browser tab yourself —
+        this Zoom call keeps running here.
+      </p>
+      <div class="rec-prompt-card__actions">
+        <button class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="dismissPrescribeHint()">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Safari-only custom control bar. The Zoom SDK 6.1.0 control bar renders
+       invisibly in Safari (bisect-confirmed inherent bug), so on Safari we show
+       our own bar wired to the real Zoom actions. Chrome uses the native bar. -->
+  <!-- Device menu, anchored above the pill (opens upward) -->
+  <div class="sx-zc-menu" *ngIf="menuKind && isSafariBrowser" (click)="$event.stopPropagation()"
+       [style.left.px]="menuLeft" [style.bottom.px]="menuBottom">
+    <div class="sx-zc-menu-title">{{ menuKind === 'audio' ? 'Audio' : menuKind === 'video' ? 'Camera' : 'More' }} options</div>
+    <ng-container *ngFor="let it of menuItems; let i = index">
+      <div *ngIf="it.header" class="sx-zc-menu-item sx-zc-menu-item--header">{{ it.label }}</div>
+      <button *ngIf="!it.header" type="button" class="sx-zc-menu-item"
+              [class.sx-zc-menu-item--checked]="it.checked" (click)="clickDeviceItem(i, it)">
+        <mat-icon>{{ it.checked ? 'check' : '' }}</mat-icon>
+        <span>{{ it.label }}</span>
+      </button>
+    </ng-container>
+    <div class="sx-zc-menu-item sx-zc-menu-item--header" *ngIf="!menuItems.length">No devices found</div>
+  </div>
+
+  <div class="sx-zoom-controls" *ngIf="isJoined && isSafariBrowser" (click)="$event.stopPropagation()">
+    <div class="sx-zc-group">
+      <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customMuted"
+              (click)="toggleCustomMute()" [title]="customMuted ? 'Unmute' : 'Mute'">
+        <mat-icon>{{ customMuted ? 'mic_off' : 'mic' }}</mat-icon>
+        <span>{{ customMuted ? 'Unmute' : 'Mute' }}</span>
+      </button>
+      <button type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'audio'"
+              (click)="toggleDeviceMenu('audio', $event)" title="Audio device options">
+        <mat-icon>expand_less</mat-icon>
+      </button>
+    </div>
+    <div class="sx-zc-group">
+      <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="!customVideoOn"
+              (click)="toggleVideo()" [title]="customVideoOn ? 'Stop Video' : 'Start Video'">
+        <mat-icon>{{ customVideoOn ? 'videocam' : 'videocam_off' }}</mat-icon>
+        <span>{{ customVideoOn ? 'Stop Video' : 'Start Video' }}</span>
+      </button>
+      <button type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'video'"
+              (click)="toggleDeviceMenu('video', $event)" title="Camera device options">
+        <mat-icon>expand_less</mat-icon>
+      </button>
+    </div>
+    <button type="button" class="sx-zc-btn" (click)="toggleParticipants()" title="Participants">
+      <mat-icon>groups</mat-icon><span>Participants</span>
+    </button>
+    <button type="button" class="sx-zc-btn" (click)="toggleChat()" title="Chat">
+      <mat-icon>chat</mat-icon><span>Chat</span>
+    </button>
+    <button type="button" class="sx-zc-btn" (click)="shareScreen()" title="Share Screen">
+      <mat-icon>screen_share</mat-icon><span>Share</span>
+    </button>
+    <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customHandRaised"
+            (click)="toggleHand()" [title]="customHandRaised ? 'Lower Hand' : 'Raise Hand'">
+      <mat-icon>front_hand</mat-icon><span>{{ customHandRaised ? 'Lower' : 'Raise' }}</span>
+    </button>
+    <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="menuKind === 'more'"
+            (click)="toggleDeviceMenu('more', $event)" title="More">
+      <mat-icon>more_horiz</mat-icon><span>More</span>
+    </button>
+    <span class="sx-zc-sep"></span>
+    <button type="button" class="sx-zc-btn sx-zc-btn--leave" (click)="leaveCall()" title="Leave meeting">
+      <mat-icon>call_end</mat-icon><span>Leave</span>
+    </button>
+    <button type="button" class="sx-zc-btn sx-zc-btn--leave" *ngIf="profileHost"
+            (click)="endForAll()" title="End meeting for all">
+      <mat-icon>cancel</mat-icon><span>End all</span>
+    </button>
+  </div>
+
   <div id="aria-notify-area"></div>
 </body>
 </html>

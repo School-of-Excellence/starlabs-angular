@@ -9,7 +9,10 @@
                       ngDefaultControl></ngx-mat-select-search>
                 </mat-option>
                 <mat-option *ngFor="let participant of returnFilterProflie()" [value]="participant.profileid">
-                    {{participant.name}}
+                    <span style="display:inline-flex;align-items:center;gap:8px;">
+                      <app-profile-picture [profileId]="participant.profileid" [name]="participant.name || participant.participantname" [size]="24"></app-profile-picture>
+                      <span>{{participant.name || participant.participantname}}</span>
+                    </span>
                 </mat-option>
             </mat-select>
         </mat-form-field>

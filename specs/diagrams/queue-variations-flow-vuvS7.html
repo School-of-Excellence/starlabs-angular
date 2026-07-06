@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Queue Variation Flow — Evolution Mapping (599)</title>
+<style>
+  :root{--bg:#0f1216;--panel:#171b21;--line:#2a323d;--ink:#e8edf3;--dim:#9aa7b6;
+        --self:#3b82f6;--spec:#f97316;--gate:#64748b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;padding:26px 30px 60px}
+  h1{font-size:20px;margin:0 0 2px}
+  .sub{color:var(--dim);margin:0 0 14px}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;color:var(--dim);font-size:12.5px;margin:8px 0 14px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  svg{display:block}
+  .note{color:var(--dim);font-size:12.5px;margin-top:14px;max-width:1000px}
+  text{font-family:inherit}
+</style>
+</head>
+<body>
+  <h1>Evolution Mapping — variation flow across stages</h1>
+  <p class="sub">Queue <code>vuvS7eBgTxLKufnesLQT</code> · 599 participants · 14 stages · 10 variations · each row = one variation's path through the stages (left → right). Skipped stages = the line jumps the gap.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--gate)"></i> gate / hold / terminal</span>
+    <span><i class="sw" style="background:var(--self)"></i> self-guided (form / report)</span>
+    <span><i class="sw" style="background:var(--spec)"></i> specialist studio</span>
+    <span>● node = stage included &nbsp;·&nbsp; ── flow &nbsp;·&nbsp; ★ = delivery (studios)</span>
+  </div>
+  <div class="wrap"><svg id="chart"></svg></div>
+  <p class="note">All paths run strictly left→right (no back-steps). The big split: <b>"Next Cycle"</b> variations (uP!/B!G/LYL, returning) take the full mapping arc <b>6→7→8→9→10</b>; <b>"First Cycle"</b> variations (first-timers) take the short orientation arc <b>2→3→4→7</b> straight to Scope Enhancement and out. <b>Scope Enhancement (7)</b> is the one stage almost every path crosses — and the only heavy studio stage.</p>
+
+<script>
+const base=["Evo Prep Orientation","uP! Prep Hold","AEL Form","Life Aspiration","ATC Orientation","Prodigies Prep","uP! Life Report","Scope Enhancement ★","Evo Mapping Activity","In Evo Mapping","Self Evaluation","SE Changework ★","Transferred","Completed"];
+const kind=["gate","gate","self","self","self","self","self","spec","self","self","self","spec","gate","gate"];
+const KC={self:"#3b82f6",spec:"#f97316",gate:"#64748b"};
+const vars=[
+ {name:"uP! Next Cycle",n:421,p:[0,2,6,7,8,9,10,13]},
+ {name:"uP! First Cycle",n:83,p:[0,2,3,4,7,13]},
+ {name:"B!G Next Cycle",n:32,p:[0,2,6,7,8,9,10,13]},
+ {name:"Prodigies Next Cycle",n:21,p:[0,5,7,8,9,10,13]},
+ {name:"SE Changework",n:20,p:[0,2,3,4,5,6,7,8,9,10,11,13]},
+ {name:"LYL Next Cycle",n:13,p:[0,2,6,7,8,9,10,13]},
+ {name:"LYL First Cycle",n:8,p:[0,2,3,4,7,13]},
+ {name:"Transfer",n:1,p:[12]},
+ {name:"Prodigies First Cycle",n:0,p:[0,2,4,7,13]},
+ {name:"uP! Prep Hold",n:0,p:[1]},
+];
+const VC=["#22d3ee","#34d399","#a78bfa","#f472b6","#fbbf24","#60a5fa","#4ade80","#f87171","#94a3b8","#cbd5e1"];
+const mL=190,mT=120,colW=92,rowH=46,r=6;
+const W=mL+base.length*colW+30, H=mT+vars.length*rowH+30;
+const X=i=>mL+i*colW+colW/2, Y=row=>mT+row*rowH+rowH/2;
+let s=`<svg id="chart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+s+=`<defs>${VC.map((c,i)=>`<marker id="a${i}" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="${c}"/></marker>`).join("")}</defs>`;
+// vertical gridlines + stage headers
+base.forEach((nm,i)=>{
+  const x=X(i);
+  s+=`<line x1="${x}" y1="${mT-10}" x2="${x}" y2="${H-18}" stroke="#222a33" stroke-width="1"/>`;
+  s+=`<g transform="translate(${x},${mT-16}) rotate(-32)"><text x="0" y="0" fill="#cbd5e1" font-size="11.5" text-anchor="start">${nm}</text></g>`;
+  s+=`<circle cx="${x}" cy="${mT-2}" r="4" fill="${KC[kind[i]]}"/>`;
+  s+=`<text x="${x}" y="${mT-32}" fill="#64748b" font-size="10" text-anchor="middle">${i}</text>`;
+});
+// variation rows
+vars.forEach((v,row)=>{
+  const y=Y(row), c=VC[row%VC.length];
+  s+=`<text x="${mL-14}" y="${y-3}" fill="#e8edf3" font-size="12.5" text-anchor="end" font-weight="600">${v.name}</text>`;
+  s+=`<text x="${mL-14}" y="${y+11}" fill="#9aa7b6" font-size="10.5" text-anchor="end">${v.n} ppl</text>`;
+  // path line
+  if(v.p.length>1){
+    let d=`M ${X(v.p[0])} ${y}`;
+    for(let k=1;k<v.p.length;k++) d+=` L ${X(v.p[k])} ${y}`;
+    s+=`<path d="${d}" fill="none" stroke="${c}" stroke-width="${Math.max(1.5,Math.min(5,Math.log2(v.n+1)))}" stroke-opacity="0.85" marker-end="url(#a${row%VC.length})"/>`;
+  }
+  // nodes
+  v.p.forEach(i=>{ s+=`<circle cx="${X(i)}" cy="${y}" r="${r}" fill="${c}" stroke="#0f1216" stroke-width="1.5"/>`; });
+});
+s+=`</svg>`;
+document.getElementById('chart').outerHTML=s;
+</script>
+</body>
+</html>

@@ -55,11 +55,17 @@ export class ListOpenviduRoomComponent {
     var assignmentCollection = collection(this.firestore, "live assignment")
     var liveQuery = query(assignmentCollection, where("status", "==", "live"), where("participantid", "==", this.loggedinProfileID))
 
-    collectionData(liveQuery).pipe(
+    collectionData(liveQuery, { idField: 'docid' }).pipe(
       takeUntil(this.subscription)
     ).subscribe(data =>{
       var studioID = Array.from(new Set(data.map(e => e["studioid"])))
       console.log("Studio", studioID)
+
+      // NOTE: We intentionally do NOT write participantReadyAt /
+      // participantLastSeenAt from this page. /participantstudio is only the
+      // invitation list — the participant hasn't actually entered the studio
+      // yet. Presence is written by zoom-clientview the moment they click
+      // "Join Meeting Now" and land on the wait screen.
 
       if(studioID.length != 0){
         var studioCollection = collection(this.firestore, "queue studio pairing")
@@ -275,6 +281,18 @@ export class ListOpenviduRoomComponent {
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
     return [hours, minutes, seconds];
+  }
+
+  ngOnDestroy() {
+    // The 1s countdown interval (this.timerSub, set at loadAppointments) is NOT
+    // piped through takeUntil(this.subscription), so completing the subject does
+    // not stop it. Without this, leaving the page mid-countdown leaves a 1s
+    // interval calling checkLiveAppointment() (and re-running loadAppointments)
+    // on a destroyed component forever.
+    this.timerSub?.unsubscribe()
+    this.timerSub = null
+    this.subscription?.next()
+    this.subscription?.complete()
   }
 
 }

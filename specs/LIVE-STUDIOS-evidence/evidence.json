@@ -1,0 +1,796 @@
+{
+  "doc": "LIVE-STUDIOS",
+  "provenance": "READ-ONLY production probes (fir-sample-aae4a), 2026-06-02. Regenerate: specs/evidence/probe_*.js then split_evidence.js. ATC denylist enforced.",
+  "now": "2026-06-02",
+  "schema": {
+    "arenaspace": {
+      "collection": "arenaspace",
+      "count": 93,
+      "sampled": 93,
+      "sampleDocIds": [
+        "0DQMrBO9bwnGmECMefeU",
+        "0PjiIQv9sGPQoMa9mnak",
+        "0qXFHF40PTPYrGx4DP47"
+      ],
+      "tsField": "date",
+      "fields": {
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 93
+          }
+        },
+        "createddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 93
+          }
+        },
+        "date": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 93
+          }
+        },
+        "spaceid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 93
+          }
+        },
+        "mentor": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 93
+          }
+        },
+        "pivottype": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 93
+          }
+        },
+        "summary": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 93
+          }
+        },
+        "eventref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 93
+          }
+        },
+        "validated": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 93
+          }
+        },
+        "delete": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 93
+          }
+        },
+        "cohortsid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 93
+          }
+        },
+        "participantslist": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 93
+          }
+        },
+        "updateddate": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "ts",
+          "types": {
+            "ts": 2
+          }
+        },
+        "assignmentref": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 93
+          }
+        },
+        "marathonref": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 93
+          }
+        }
+      },
+      "fieldCount": 15,
+      "lastWrite": "2025-09-15",
+      "writes90d": 0,
+      "writes365d": 1
+    },
+    "arena participant": {
+      "collection": "arena participant",
+      "count": 1239,
+      "sampled": 100,
+      "sampleDocIds": [
+        "05V9HQCUEvi3thgc6r1t",
+        "0AOpv2gyQHAjg2LeNu2I",
+        "0DzyBfGVnhunxBXDvJ3x"
+      ],
+      "tsField": null,
+      "fields": {
+        "pairingmode": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "queueid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "profileid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "stagerole": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "liveassignmentstatus": {
+          "fillPct": 21,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "string": 21,
+            "null": 79
+          }
+        },
+        "tentativenextready": {
+          "fillPct": 0,
+          "presentPct": 100,
+          "type": "null",
+          "types": {
+            "null": 100
+          }
+        }
+      },
+      "fieldCount": 8
+    },
+    "live assignment": {
+      "collection": "live assignment",
+      "count": 12787,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00N0C291k0Z9pTPKn4yi",
+        "00eH9urdXggWILK12w56",
+        "00rnDIFNO8kzJR7P0O7P"
+      ],
+      "tsField": "updated",
+      "fields": {
+        "participantid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "queueid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "stagename": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "pairing": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "status": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "created": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "ts",
+          "types": {
+            "ts": 99
+          }
+        },
+        "updated": {
+          "fillPct": 98,
+          "presentPct": 98,
+          "type": "ts",
+          "types": {
+            "ts": 98
+          }
+        },
+        "zoomdata": {
+          "fillPct": 87,
+          "presentPct": 87,
+          "type": "map",
+          "types": {
+            "map": 87
+          }
+        },
+        "zoomlinkrequired": {
+          "fillPct": 83,
+          "presentPct": 83,
+          "type": "boolean",
+          "types": {
+            "boolean": 83
+          }
+        },
+        "studioid": {
+          "fillPct": 71,
+          "presentPct": 71,
+          "type": "string",
+          "types": {
+            "string": 71
+          }
+        },
+        "participantsactivity": {
+          "fillPct": 71,
+          "presentPct": 71,
+          "type": "map",
+          "types": {
+            "map": 71
+          }
+        },
+        "signature": {
+          "fillPct": 55,
+          "presentPct": 55,
+          "type": "string",
+          "types": {
+            "string": 55
+          }
+        },
+        "changeworkbrief": {
+          "fillPct": 30,
+          "presentPct": 30,
+          "type": "array",
+          "types": {
+            "array": 30
+          }
+        },
+        "stagetype": {
+          "fillPct": 29,
+          "presentPct": 29,
+          "type": "string",
+          "types": {
+            "string": 29
+          }
+        },
+        "shadowperson": {
+          "fillPct": 26,
+          "presentPct": 26,
+          "type": "array",
+          "types": {
+            "array": 26
+          }
+        },
+        "isactivitydone": {
+          "fillPct": 25,
+          "presentPct": 25,
+          "type": "boolean",
+          "types": {
+            "boolean": 25
+          }
+        },
+        "atcmodel": {
+          "fillPct": 23,
+          "presentPct": 23,
+          "type": "string",
+          "types": {
+            "string": 23
+          }
+        },
+        "bonusactivity": {
+          "fillPct": 10,
+          "presentPct": 71,
+          "type": "null",
+          "types": {
+            "null": 61,
+            "map": 10
+          }
+        },
+        "bonusactivityparticipant": {
+          "fillPct": 10,
+          "presentPct": 71,
+          "type": "null",
+          "types": {
+            "null": 61,
+            "array": 10
+          }
+        },
+        "hostsignature": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        },
+        "participantsignature": {
+          "fillPct": 9,
+          "presentPct": 9,
+          "type": "string",
+          "types": {
+            "string": 9
+          }
+        },
+        "implementationagent": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "cliptimings": {
+          "fillPct": 2,
+          "presentPct": 2,
+          "type": "array",
+          "types": {
+            "array": 2
+          }
+        },
+        "groupid": {
+          "fillPct": 1,
+          "presentPct": 1,
+          "type": "string",
+          "types": {
+            "string": 1
+          }
+        }
+      },
+      "fieldCount": 25,
+      "lastWrite": "2026-06-02",
+      "writes90d": 595,
+      "writes365d": 2952
+    },
+    "openviduroom": {
+      "collection": "openviduroom",
+      "count": 102,
+      "sampled": 100,
+      "sampleDocIds": [
+        "1BZMBayABmr8jwu6zZzZ",
+        "1X69fnI18RfJjLHFS3RG",
+        "4FqauTxFRuq80Kdlux12"
+      ],
+      "tsField": "createddate",
+      "fields": {
+        "sessiontype": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "sessionid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "hosts": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "title": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "roomid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "createddate": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "active": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "metadata": {
+          "fillPct": 99,
+          "presentPct": 99,
+          "type": "map",
+          "types": {
+            "map": 99
+          }
+        },
+        "participantid": {
+          "fillPct": 96,
+          "presentPct": 99,
+          "type": "string",
+          "types": {
+            "string": 96,
+            "null": 3
+          }
+        },
+        "participantlive": {
+          "fillPct": 92,
+          "presentPct": 92,
+          "type": "array",
+          "types": {
+            "array": 92
+          }
+        },
+        "roomstatus": {
+          "fillPct": 92,
+          "presentPct": 92,
+          "type": "string",
+          "types": {
+            "string": 92
+          }
+        },
+        "participantjoined": {
+          "fillPct": 79,
+          "presentPct": 79,
+          "type": "array",
+          "types": {
+            "array": 79
+          }
+        },
+        "recordingstatus": {
+          "fillPct": 79,
+          "presentPct": 79,
+          "type": "string",
+          "types": {
+            "string": 79
+          }
+        },
+        "egressInfo": {
+          "fillPct": 78,
+          "presentPct": 78,
+          "type": "map",
+          "types": {
+            "map": 78
+          }
+        },
+        "participantghost": {
+          "fillPct": 20,
+          "presentPct": 20,
+          "type": "array",
+          "types": {
+            "array": 20
+          }
+        }
+      },
+      "fieldCount": 15,
+      "lastWrite": "2026-06-02",
+      "writes90d": 98,
+      "writes365d": 102
+    },
+    "queue studio pairing": {
+      "collection": "queue studio pairing",
+      "count": 2335,
+      "sampled": 100,
+      "sampleDocIds": [
+        "00Brn3Tg7lYRmwGEE1bE",
+        "00gQ1xpBSRhDbBKJil2r",
+        "01tUOIVjtuiiLJtelCuv"
+      ],
+      "tsField": "created",
+      "fields": {
+        "participantsactivity": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "map",
+          "types": {
+            "map": 100
+          }
+        },
+        "queueref": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ref",
+          "types": {
+            "ref": 100
+          }
+        },
+        "docid": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "string",
+          "types": {
+            "string": 100
+          }
+        },
+        "participants": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "array",
+          "types": {
+            "array": 100
+          }
+        },
+        "created": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "ts",
+          "types": {
+            "ts": 100
+          }
+        },
+        "studioin": {
+          "fillPct": 100,
+          "presentPct": 100,
+          "type": "boolean",
+          "types": {
+            "boolean": 100
+          }
+        },
+        "checkin": {
+          "fillPct": 87,
+          "presentPct": 87,
+          "type": "boolean",
+          "types": {
+            "boolean": 87
+          }
+        },
+        "atcmodel": {
+          "fillPct": 50,
+          "presentPct": 50,
+          "type": "array",
+          "types": {
+            "array": 50
+          }
+        },
+        "openvidu": {
+          "fillPct": 28,
+          "presentPct": 28,
+          "type": "boolean",
+          "types": {
+            "boolean": 28
+          }
+        },
+        "mandatoryactivities": {
+          "fillPct": 12,
+          "presentPct": 12,
+          "type": "array",
+          "types": {
+            "array": 12
+          }
+        },
+        "status": {
+          "fillPct": 0,
+          "presentPct": 76,
+          "type": "null",
+          "types": {
+            "null": 76
+          }
+        }
+      },
+      "fieldCount": 11,
+      "lastWrite": "2026-05-21",
+      "writes90d": 180,
+      "writes365d": 790
+    }
+  },
+  "config": {
+    "arenaspace": {
+      "collection": "arenaspace",
+      "count": 93,
+      "sampled": 93,
+      "variantCount": 2,
+      "variants": [
+        {
+          "count": 91,
+          "exampleId": "0DQMrBO9bwnGmECMefeU",
+          "keys": [
+            "assignmentref",
+            "cohortsid",
+            "createddate",
+            "date",
+            "delete",
+            "docid",
+            "eventref",
+            "marathonref",
+            "mentor",
+            "participantslist",
+            "pivottype",
+            "spaceid",
+            "summary",
+            "validated"
+          ],
+          "shape": "{docid:str(20), createddate:ts, date:ts, spaceid:str(20), mentor:array[1]<str(20)>, pivottype:str(20), summary:str(86), eventref:ref, assignmentref:null, marathonref:null, validated:boolean, delete:boolean, cohortsid:array[0], participantslist:array[1]<str(20)>}"
+        },
+        {
+          "count": 2,
+          "exampleId": "uo4LvFk7xBo4PTjHqVwO",
+          "keys": [
+            "assignmentref",
+            "cohortsid",
+            "createddate",
+            "date",
+            "delete",
+            "docid",
+            "eventref",
+            "marathonref",
+            "mentor",
+            "participantslist",
+            "pivottype",
+            "spaceid",
+            "summary",
+            "updateddate",
+            "validated"
+          ],
+          "shape": "{date:ts, createddate:ts, docid:str(20), marathonref:null, delete:boolean, eventref:ref, spaceid:str(20), cohortsid:array[1]<str(20)>, pivottype:str(20), validated:boolean, assignmentref:null, summary:str(0), mentor:array[1]<str(20)>, participantslist:array[1]<str(20)>, updateddate:ts}"
+        }
+      ]
+    }
+  },
+  "traces": {
+    "studioTrace": {
+      "liveAssignment": {
+        "id": "nB91BRzO3kxQFYZvg1LV",
+        "participantid": "biGk1k7F8FZKr3sGFe5n",
+        "queueid": "bk2Fx9B41cGUv4DhrDi0",
+        "stagename": "Diagnostics",
+        "stagetype": null,
+        "studioid": "WU0KYrffrWcbDW6U3GnL",
+        "status": "completed",
+        "created": "2026-05-27 10:33:50",
+        "updated": "2026-06-02 08:08:46",
+        "zoomdataKeys": [
+          "type",
+          "encrypted_password",
+          "settings",
+          "h323_password",
+          "uuid",
+          "status",
+          "pstn_password",
+          "created_at",
+          "topic",
+          "start_url",
+          "host_email",
+          "pre_schedule",
+          "id",
+          "host_id",
+          "creation_source",
+          "password",
+          "join_url",
+          "timezone",
+          "chat_join_url"
+        ],
+        "hasJoinUrl": true,
+        "hasStartUrl": true,
+        "signatureLen": 0,
+        "pairingCount": 1,
+        "changeworkbriefCount": 0
+      },
+      "linkedToken": "no token currently points here (binding may be completed/cleared)",
+      "openviduroomByLiveAssignmentId": "no openviduroom with id==liveassignmentid (Zoom-path studios have none)",
+      "openviduroomSample": {
+        "id": "IV72tcdHPBno7BTz9o00",
+        "sessiontype": "appointment",
+        "roomstatus": "finished",
+        "recordingstatus": "ended",
+        "hasEgress": true
+      },
+      "arenaspaceSample": {
+        "id": "0DQMrBO9bwnGmECMefeU",
+        "spaceid": "0Y4CGoY5oQHXgHfbXxJl",
+        "pivottype": "k7fiQxHgCfA1v6VzdKEC",
+        "mentors": 1,
+        "validated": false,
+        "participants": 1
+      }
+    }
+  }
+}

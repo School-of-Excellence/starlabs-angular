@@ -35,7 +35,12 @@
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">{{client.name}}</mat-option>
+              <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="client.profileid" [name]="client.name" [size]="24"></app-profile-picture>
+                  <span>{{client.name}}</span>
+                </span>
+              </mat-option>
             </mat-select>
             <span *ngIf="checkIssue === true">
                <mat-icon matSuffix><i class="fa fa-exclamation-circle" style="color: red;" aria-hidden="true"></i></mat-icon>
@@ -89,7 +94,12 @@
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">{{client.name}}</mat-option>
+              <mat-option *ngFor="let client of returnFilterClient()" [value]="client.profileid">
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="client.profileid" [name]="client.name" [size]="24"></app-profile-picture>
+                  <span>{{client.name}}</span>
+                </span>
+              </mat-option>
             </mat-select>
             <span *ngIf="checkIssue === true">
                <mat-icon matSuffix><i class="fa fa-exclamation-circle" style="color: red;" aria-hidden="true"></i></mat-icon>
@@ -105,7 +115,12 @@
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let user of returnFilterMember()" [value]="user.profileid" >{{user.name}}</mat-option>
+              <mat-option *ngFor="let user of returnFilterMember()" [value]="user.profileid" >
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="user.profileid" [name]="user.name" [size]="24"></app-profile-picture>
+                  <span>{{user.name}}</span>
+                </span>
+              </mat-option>
             </mat-select>
             <mat-error *ngIf="!addissue.controls['reportedBy'].valid">Reported by is required </mat-error>
           </mat-form-field>
@@ -127,7 +142,12 @@
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let user of returnFilterMember()" [value]="user.profileid" >{{user.name}}</mat-option>
+              <mat-option *ngFor="let user of returnFilterMember()" [value]="user.profileid" >
+                <span style="display:inline-flex;align-items:center;gap:8px;">
+                  <app-profile-picture [profileId]="user.profileid" [name]="user.name" [size]="24"></app-profile-picture>
+                  <span>{{user.name}}</span>
+                </span>
+              </mat-option>
             </mat-select>
             <mat-error *ngIf="!addissue.controls['assign'].valid">Assign To is required </mat-error>
           </mat-form-field>
