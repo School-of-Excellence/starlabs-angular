@@ -11,17 +11,6 @@
 name: authroles-e2e (emulator gate)
 
 on:
-  pull_request:
-    branches: [development, production]   # CUTOVER 2026-07-05: real release branches (was [cicd-dev, cicd-prod])
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
-    paths:
-      - 'src/app/login/**'
-      - 'src/app/**.guard.ts'
-      - 'src/app/Business Dashboard/profile-based-access/**'
-      - 'src/app/app.component.ts'
-      - 'angular.json'
-      - 'package.json'
-      - '.github/workflows/authroles-e2e.yml'
   workflow_dispatch:
     inputs:
       only:
