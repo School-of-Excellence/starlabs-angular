@@ -27,7 +27,15 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   if (e.storage) connectStorageEmulator(getStorage(app), e.storage.host, e.storage.port);
   console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);
 } else {
-  initializeFirestore(app, {});
+  // Default DB: auto-detect long-polling. This network interferes with
+  // Firestore's WebChannel streaming transport (see the `firestore-atc` note
+  // below — that DB force-long-polls for the same reason). Plain streaming can
+  // stall on first load, and the failure is much more likely with a SECOND
+  // concurrent tab open on the same origin (e.g. two Arena boards) — one tab's
+  // Listen stream never establishes and that board shows no data. Auto-detect
+  // keeps fast streaming where it works and transparently falls back to
+  // long-polling when the stream can't be established, so every tab loads.
+  initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
   // Named DB `firestore-atc`: force long-polling here — this is the canonical,
   // earliest initializer, so every consumer (getFirestore('firestore-atc') and
   // AtcFirebaseService) reuses this one instance with a consistent transport.

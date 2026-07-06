@@ -296,12 +296,41 @@ export class ArenaBoardComponent implements OnDestroy {
     return this.tokens.filter(t => t.status == null || t.status === 'queued' || t.status === 'invited');
   }
 
+  // Studios that actually serve THIS stage. `this.studios` holds every
+  // checked-in studio in the queue (a studio isn't bound to one stage — it can
+  // be eligible for several), so without this filter the IDLE column, the
+  // Specialists tab count and the right-panel studio list bleed in studios from
+  // OTHER stages of the same queue — i.e. data unrelated to the card that was
+  // clicked, and identical across two different-stage boards of one queue.
+  // Eligibility is derived the same way dynamic-studio-v2 + the dashboard do it:
+  // the studio's sorted participant-activity signature must match one of the
+  // stage's `compulsoryactivity` combinations. If the stage has no activity
+  // config we deliberately DON'T filter (fall back to all checked-in studios)
+  // so a missing/edge config can never blank the board.
+  get stageStudios(): ArenaStudio[] {
+    const combos = this.stageActivityCombos();
+    if (combos.length === 0) return this.studios;
+    return this.studios.filter(s => combos.includes(this.studioActivitySignature(s)));
+  }
+
+  private stageActivityCombos(): string[] {
+    const sp = this.queueData?.['stageproperty']?.[this.stage];
+    return Object.values(sp?.['compulsoryactivity'] ?? {}).map((c: any) =>
+      (Array.isArray(c) ? c : [c]).map(String).sort((a, b) => a.localeCompare(b)).join(',')
+    );
+  }
+
+  private studioActivitySignature(s: ArenaStudio): string {
+    return Object.values(s.participantsactivity ?? {})
+      .map(String).sort((a, b) => a.localeCompare(b)).join(',');
+  }
+
   // Studios in each column
   get idleStudios(): ArenaStudio[] {
     // A studio is "idle" if it is checked in but has no live assignment AND no active invitation
     const liveStudioIds = new Set(this.liveAssignments.map(a => a.studioid));
     const invitingStudioIds = new Set(this.invitations.map(i => i.studioid));
-    return this.studios.filter(s => !liveStudioIds.has(s.docid) && !invitingStudioIds.has(s.docid));
+    return this.stageStudios.filter(s => !liveStudioIds.has(s.docid) && !invitingStudioIds.has(s.docid));
   }
 
   // Studios with an active live session (joined or active)
