@@ -1,5 +1,5 @@
 import { Component, ElementRef, inject, OnDestroy, OnInit, TemplateRef, ViewChild, AfterViewInit } from '@angular/core';
-import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query,runTransaction, deleteField, setDoc, Timestamp, updateDoc, where ,arrayUnion} from '@angular/fire/firestore';
+import { collection, collectionData, doc, DocumentData, Firestore, getDoc, getDocs, orderBy, Query, query,runTransaction, deleteField, setDoc, Timestamp, updateDoc, where } from '@angular/fire/firestore';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -238,10 +238,11 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   arenaEventProfileMap: { [arenaeventid: string]: Set<string> } = {};
   eventParticipationProfileIds: Set<string> = new Set();
   //slot revert
-  showRevertHistoryDialog: boolean = false;
-  revertHistoryParticipant: any = null;
   showOverallSlotRevertHistory: boolean = false;
   overallSlotRevertHistory: { profileId: string; stageName: string; log: any }[] = [];
+  revertHistoryLoading: boolean = false;
+  revertHistorySearchTerm: string = '';
+  revertHistoryAllEntries: { profileId: string; stageName: string; log: any }[] = [];
 
   slotPlannerFilter = {
     startDate: null,
@@ -2262,20 +2263,22 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
       const queues = this.liveQueueList.filter(q => this.liveQueueExportSelection.has(q['docid']));
 
       const queueDataResults = await Promise.all(
-        queues.map(async (q): Promise<{ stages: string[]; slots: MergedSlot[] } | null> => {
+        queues.map(async (q): Promise<{ stages: string[]; slots: MergedSlot[]; tokens: any[] } | null> => {
           const docid = q['docid'];
           if (this.selectedQueue?.['docid'] === docid && this.cachedPlanningData) {
             return {
               stages: this.queueStages,
-              slots: this.mergedSlots
+              slots: this.mergedSlots,
+              tokens: this.queueTokenList
             };
           }
 
-          const cached = this.liveQueueExportCache.get(docid);
+         const cached = this.liveQueueExportCache.get(docid);
           if (cached) {
             return {
               stages: cached.stages,
-              slots: this.buildSlotsForExport(cached.planningData, cached.stages, cached.tokens)
+              slots: this.buildSlotsForExport(cached.planningData, cached.stages, cached.tokens),
+              tokens: cached.tokens
             };
           }
           const queueRef = doc(this.firestore, 'queue generation', docid);
@@ -2294,22 +2297,81 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
 
           return {
             stages,
-            slots: this.buildSlotsForExport(planningData, stages, tokens)
+            slots: this.buildSlotsForExport(planningData, stages, tokens),
+            tokens
           };
         })
       );
       queues.forEach((q, idx) => {
-        const result = queueDataResults[idx];
-        if (!result) return;
-
-        const { stages, slots } = result;
-
-        stages.forEach(stage => {
-          slots
-            .filter(s => s.stages.includes(stage) && s.startdate >= rangeStart && s.startdate <= rangeEnd)
-            .forEach(slot => this.pushSlotRows(exportData, q['queuename'], stage, slot));
+      const result = queueDataResults[idx];
+      if (!result) return;
+      const { stages, slots, tokens } = result;
+      const segmentIdToName = new Map<string, string>();
+      slots.forEach(slot => {
+        slot.segmentVariations.forEach((segVar: any) => {
+          if (!segmentIdToName.has(segVar.segmentId)) {
+            segmentIdToName.set(segVar.segmentId, segVar.segmentName);
+          }
         });
       });
+      const pidToSegmentName = new Map<string, string>();
+      tokens.forEach(t => {
+        const pid = t.profile_id || t.profileid;
+        if (!pid) return;
+        const otherSlots = Object.values(t.selectedstageslot || {});
+        if (otherSlots.length > 0) {
+          const segmentId = (otherSlots[0] as any).segmentid;
+          const name = segmentIdToName.get(segmentId) || this.getSegmentName(segmentId);
+          if (name) pidToSegmentName.set(pid, name);
+        }
+      });
+      stages.forEach(stage => {
+        const stageIdx = stages.indexOf(stage);
+
+        const filteredSlots = slots.filter(s => {
+          if (!s.stages.includes(stage)) return false;
+          const slotTime = s.startdate.getTime();
+          return slotTime >= rangeStart.getTime() && slotTime <= rangeEnd.getTime();
+        });
+
+        if (filteredSlots.length === 0) return;
+        const confirmedIds = new Set<string>();
+        filteredSlots.forEach(slot => {
+          this.pushSlotRows(exportData, q['queuename'], stage, slot);
+          slot.segmentVariations.forEach((segVar: any) => {
+            segVar.variations.forEach((variation: any) => {
+              (variation.stageData?.[stage]?.confirmedParticipants || []).forEach((p: any) => {
+                const pid = p.profile_id || p.profileid;
+                if (pid) confirmedIds.add(pid);
+              });
+            });
+          });
+        });
+        const addedNonConfirmed = new Set<string>();
+        (tokens || []).filter(t => {
+          if (!this.isActiveToken(t)) return false;
+          const currentIdx = stages.indexOf(t.currentstage);
+          return currentIdx !== -1 &&
+                currentIdx <= stageIdx &&
+                t.selectedstageslot?.[stage] == null;
+        }).forEach(t => {
+          const pid = t.profile_id || t.profileid;
+          if (!pid || addedNonConfirmed.has(pid) || confirmedIds.has(pid)) return;
+          addedNonConfirmed.add(pid);
+          exportData.push({
+            'Queue': q['queuename'],
+            'Title': 'N/A',
+            'Slot': 'Not Booked',
+            'Stage': stage,
+            'Segment': pidToSegmentName.get(pid) || 'N/A',
+            'Name': this.getProfileName(pid) || 'N/A',
+            'Email': this.getParticipantEmail(pid) ?? 'N/A',
+            'Phone': this.getParticipantPhoneNumber(pid) ?? 'N/A',
+            'Status': 'Non-Confirmed',
+          });
+        });
+      });
+    });
 
       loading.close();
       this.liveQueueExportBusy = false;
@@ -2328,32 +2390,35 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
     }
   }
 
-  private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: any) {
-    const slotTiming = `${this.getBookedSlotFormatedString(slot.startdate)} - ${this.getBookedSlotFormatedString(slot.enddate)}`;
-    const slotTitle = this.getSlotTitle(slot, stage);
-    const addRow = (profileId: string, segmentName: string, status: string) => exportData.push({
-      'Queue': queueName,
-      'Title': slotTitle || 'N/A',
-      'Slot': slotTiming,
-      'Stage': stage,
-      'Segment': segmentName,
-      'Name': this.getProfileName(profileId) || 'N/A',
-      'Email': this.getParticipantEmail(profileId) ?? 'N/A',
-      'Phone': this.getParticipantPhoneNumber(profileId) ?? 'N/A',
-      'Status': status,
-    });
+private pushSlotRows(exportData: any[], queueName: string, stage: string, slot: any) {
+  const slotTiming = `${this.getBookedSlotFormatedString(slot.startdate)} - ${this.getBookedSlotFormatedString(slot.enddate)}`;
+  const slotTitle = this.getSlotTitle(slot, stage);
+  const addedInSlot = new Set<string>();
 
-    slot.segmentVariations.forEach((segVar: any) => {
-      segVar.variations.forEach((variation: any) => {
-        const stageData = variation.stageData?.[stage];
-        if (!stageData) return;
-        (stageData.confirmedParticipants || []).forEach((p: any) =>
-          addRow(p.profile_id || p.profileid, segVar.segmentName, 'Confirmed'));
-        (stageData.nonConfirmedParticipants || []).forEach((p: any) =>
-          addRow(p.profile_id || p.profileid, segVar.segmentName, 'Non-Confirmed'));
+  slot.segmentVariations.forEach((segVar: any) => {
+    segVar.variations.forEach((variation: any) => {
+      const stageData = variation.stageData?.[stage];
+      if (!stageData) return;
+
+      (stageData.confirmedParticipants || []).forEach((p: any) => {
+        const pid = p.profile_id || p.profileid;
+        if (!pid || addedInSlot.has(pid)) return;
+        addedInSlot.add(pid);
+        exportData.push({
+          'Queue': queueName,
+          'Title': slotTitle || 'N/A',
+          'Slot': slotTiming,
+          'Stage': stage,
+          'Segment': segVar.segmentName,
+          'Name': this.getProfileName(pid) || 'N/A',
+          'Email': this.getParticipantEmail(pid) ?? 'N/A',
+          'Phone': this.getParticipantPhoneNumber(pid) ?? 'N/A',
+          'Status': 'Confirmed',
+        });
       });
     });
-  }
+  });
+}
 
   private buildSlotsForExport(planningData: any, stages: string[], tokens: any[]): MergedSlot[] {
     const toDate = (d: any): Date | null => {
@@ -2406,13 +2471,13 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
         Object.keys(sv.stageData).forEach(stageName => {
           const { startdate, enddate, title } = sv.stageData[stageName];
 
-      const confirmed = tokens.filter(t => {
-        if (!this.isActiveToken(t)) return false;
-        const slot = t.selectedstageslot?.[stageName];
-        if (!slot || slot.segmentid !== sv.segmentId) return false;
-        return toDate(slot.startdate)?.getTime() === startdate.getTime() && 
-              toDate(slot.enddate)?.getTime() === enddate.getTime();
-      });
+          const confirmed = tokens.filter(t => {
+            if (!this.isActiveToken(t)) return false;
+            const slot = t.selectedstageslot?.[stageName];
+            if (!slot || slot.segmentid !== sv.segmentId) return false;
+            return toDate(slot.startdate)?.getTime() === startdate.getTime() && 
+                  toDate(slot.enddate)?.getTime() === enddate.getTime();
+          });
 
           const confirmedIds = new Set(confirmed.map(t => t.profile_id || t.profileid));
           const stageIdx = stages.indexOf(stageName);
@@ -5604,16 +5669,22 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
 
       const tokenId = participant.tokenid || participant.id;
       const tokenRef = doc(this.firestore, 'queue_token', tokenId);
-
-      await updateDoc(tokenRef, {
-        [`selectedstageslot.${stageName}`]: deleteField(),
-        [`queue_slot_log.${stageName}`]: arrayUnion({
+      const logRef = doc(collection(this.firestore, 'queue_slot_log'));
+      await Promise.all([
+        updateDoc(tokenRef, {
+          [`selectedstageslot.${stageName}`]: deleteField()
+        }),
+        setDoc(logRef, {
+          docid:      logRef.id,
           ...selectedSlot,
+          profileid:  profileId,
+          tokenid:    tokenId,
+          queueid:    this.selectedQueue['docid'],
           type:       'reverted',
           revertedby: this.profileid,
           createdon:  Timestamp.fromDate(new Date())
         })
-      });
+      ]);
 
       const tokenIndex = this.queueTokenList.findIndex(t => t.tokenid === tokenId || t.id === tokenId);
       if (tokenIndex !== -1) {
@@ -5630,15 +5701,6 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       this.refreshSelectedSlot();
       this.showAllNonConfirmedParticipants();
 
-      // attach log to the participant immediately after rebuild -- surya
-      const updatedToken = this.queueTokenList.find(t => t.tokenid === tokenId || t.id === tokenId);
-      if (updatedToken?.queue_slot_log) {
-        const moved = this.nonConfirmedParticipants.find(
-          p => (p.profile_id || p.profileid) === profileId
-        );
-        if (moved) moved.queue_slot_log = updatedToken.queue_slot_log;
-      }
-
       loading.close();
       alert('Slot reverted successfully!');
 
@@ -5649,33 +5711,38 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     }
   }
 
-  openRevertHistoryDialog(participant: any) {
-    this.revertHistoryParticipant = participant;
-    this.showRevertHistoryDialog = true;
-  }
-
-  openOverallSlotRevertHistory() {
-    const allParticipants = this.getFilteredParticipantsList();
-
-    const entries: { profileId: string; stageName: string; log: any }[] = [];
-
-    allParticipants.forEach(p => {
-      if (!p.queue_slot_log) return;
-      const profileId = p.profile_id || p.profileid;
-      Object.keys(p.queue_slot_log).forEach(stageName => {
-        (p.queue_slot_log[stageName] || []).forEach(log => {
-          entries.push({ profileId, stageName, log });
-        });
-      });
-    });
-    entries.sort((a, b) => {
-      const aTime = a.log.createdon?.toDate ? a.log.createdon.toDate().getTime() : new Date(a.log.createdon).getTime();
-      const bTime = b.log.createdon?.toDate ? b.log.createdon.toDate().getTime() : new Date(b.log.createdon).getTime();
-      return bTime - aTime;
-    });
-
-    this.overallSlotRevertHistory = entries;
+  async openOverallSlotRevertHistory() {
+    this.overallSlotRevertHistory = [];
+    this.revertHistoryAllEntries = [];
+    this.revertHistorySearchTerm = '';
+    this.revertHistoryLoading = true;
     this.showOverallSlotRevertHistory = true;
+
+    const snap = await getDocs(query(
+      collection(this.firestore, 'queue_slot_log'),
+      where('queueid', '==', this.selectedQueue['docid']),
+      orderBy('createdon', 'desc')
+    ));
+
+    this.revertHistoryAllEntries = snap.docs.map(d => ({
+      profileId: d.data()['profileid'],
+      stageName: d.data()['stagename'],
+      log:       d.data()
+    }));
+
+    this.overallSlotRevertHistory = [...this.revertHistoryAllEntries];
+    this.revertHistoryLoading = false;
+  }
+  filterRevertHistory() {
+    if (!this.revertHistorySearchTerm.trim()) {
+      this.overallSlotRevertHistory = [...this.revertHistoryAllEntries];
+      return;
+    }
+    const term = this.revertHistorySearchTerm.toLowerCase().trim();
+    this.overallSlotRevertHistory = this.revertHistoryAllEntries.filter(entry =>
+      this.getProfileName(entry.profileId).toLowerCase().includes(term) ||
+      entry.stageName.toLowerCase().includes(term)
+    );
   }
 
   async loadEventParticipationList() {

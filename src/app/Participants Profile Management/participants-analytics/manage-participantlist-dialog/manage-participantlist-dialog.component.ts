@@ -1485,6 +1485,51 @@ toggleAllMergeConflicts(event: Event): void {
     return this.externalProfileIds.filter(id => !list.profileids.includes(id)).length;
   }
 
+  exportLiveLists(): void {
+  const liveLists = this.participantLists.filter(list => list.live === true);
+
+  if (liveLists.length === 0) {
+    this.snackBar.open('No live lists available to export', 'Close', { duration: 3000 });
+    return;
+  }
+
+  console.log('Exporting live lists:', liveLists.length);
+
+  const csvRows = ['Participant Name,Email,List Name'];
+  let totalRows = 0;
+
+  for (const list of liveLists) {
+    const profiles = (list.profiles && list.profiles.length > 0)
+      ? list.profiles
+      : list.profileids.map(id => this.allProfiles.find(p => p.id === id) || { id, name: this.getProfileName(id) } as Profile);
+
+    if (profiles.length === 0) {
+      csvRows.push(`(no participants),,"${list.name}"`);
+      continue;
+    }
+
+    profiles.forEach(profile => {
+      const name = (profile.name || '').replace(/"/g, '""');
+      const email = (profile.email || '').replace(/"/g, '""');
+      const listName = list.name.replace(/"/g, '""');
+      csvRows.push(`"${name}","${email}","${listName}"`);
+      totalRows++;
+    });
+  }
+
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `live_participant_lists_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  this.snackBar.open(`Exported ${totalRows} participant(s) from ${liveLists.length} live list(s)`, 'Close', { duration: 3000 });
+}
+
   getFilterTypeLabel(type: string): string {
     const labels: { [key: string]: string } = {
       'all': 'All Fields',

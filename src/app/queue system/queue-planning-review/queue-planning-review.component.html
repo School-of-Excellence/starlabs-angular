@@ -46,15 +46,22 @@
               </button>
             </div>
 
-            <span *ngFor="let live of liveQueueList" class="d-inline-flex align-items-center me-2 mb-2">
-              <span *ngIf="liveQueueExportModeOn" class="me-1">
+            <span *ngFor="let live of liveQueueList" 
+              class="d-inline-flex align-items-center me-2 mb-2"
+              [style.cursor]="liveQueueExportModeOn ? 'pointer' : 'default'"
+              (click)="liveQueueExportModeOn ? onLiveQueueClick(live) : null">
+              <span *ngIf="liveQueueExportModeOn" class="me-1"
+                [style.color]="liveQueueExportSelection.has(live['docid']) ? '#1976d2' : '#aaa'">
                 <mat-icon>
                   {{ liveQueueExportSelection.has(live['docid']) ? 'check_box' : 'check_box_outline_blank' }}
                 </mat-icon>
               </span>
               <button mat-stroked-button
-                [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
-                (click)="onLiveQueueClick(live)">
+                [ngClass]="{
+                  'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid'],
+                  'export-selected': liveQueueExportModeOn && liveQueueExportSelection.has(live['docid'])
+                }"
+                (click)="!liveQueueExportModeOn ? onLiveQueueClick(live) : null">
                 {{live["queuename"]}}
               </button>
             </span>
@@ -141,6 +148,19 @@
 
       </ng-container>
 
+
+      <!-- Revert History Log -->
+      <div class="ep-filter-wrapper" *ngIf="selectedQueue != null">
+        <button mat-stroked-button class="ep-filter-btn"
+          [disabled]="revertHistoryLoading"
+          (click)="openOverallSlotRevertHistory()">
+          <mat-icon>manage_history</mat-icon>
+          <span>Revert History</span>
+          <mat-spinner *ngIf="revertHistoryLoading" diameter="14"
+            style="display:inline-block; margin-left:4px;">
+          </mat-spinner>
+        </button>
+      </div>
 
       <!-- Event Participation Filter -->
       <div class="ep-filter-wrapper" *ngIf="selectedQueue != null">
@@ -731,10 +751,6 @@
               (click)="exportParticipantsToExcel()">
               <mat-icon>file_download</mat-icon>
             </button>
-            <button mat-icon-button matTooltip="Overall Slot Revert History"
-              (click)="openOverallSlotRevertHistory()">
-              <mat-icon>manage_history</mat-icon>
-            </button>
             <mat-checkbox [checked]="areAllParticipantsSelected(activePanelSection || 'all')"
               [indeterminate]="areSomeParticipantsSelected(activePanelSection || 'all')"
               (change)="toggleAllParticipants($event.checked, activePanelSection || 'all')">
@@ -945,14 +961,6 @@
                 class="book-btn"
                 (click)="openBookSlotDialog(participant, selectedStageForPanel); $event.stopPropagation()">
                 <mat-icon>event_available</mat-icon>
-              </button>
-
-              <button mat-icon-button
-                *ngIf="participant.queue_slot_log"
-                class="history-btn"
-                matTooltip="Revert History"
-                (click)="openRevertHistoryDialog(participant); $event.stopPropagation()">
-                <mat-icon>history</mat-icon>
               </button>
 
               <mat-checkbox [(ngModel)]="participant.selected" class="participant-checkbox">
@@ -1509,53 +1517,6 @@
 
   </div>
 </div>
-<!-- Revert History Dialog -->
-<div class="revert-history-overlay" *ngIf="showRevertHistoryDialog" (click)="showRevertHistoryDialog = false">
-  <div class="revert-history-dialog" (click)="$event.stopPropagation()">
-
-    <div class="revert-history-dialog-header">
-      <div class="revert-history-title">
-        <mat-icon>history</mat-icon>
-        <span>Revert History</span>
-      </div>
-      <button mat-icon-button (click)="showRevertHistoryDialog = false">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
-
-    <div class="revert-history-dialog-body">
-      <ng-container *ngFor="let stageEntry of revertHistoryParticipant?.queue_slot_log | keyvalue">
-        <div class="revert-history-stage-label">
-          <mat-icon>flag</mat-icon>
-          {{ stageEntry.key }}
-        </div>
-        <div class="revert-history-entry" *ngFor="let entry of stageEntry.value; let i = index">
-          <div class="revert-history-entry-number">#{{ i + 1 }}</div>
-          <div class="revert-history-entry-details">
-            <div class="revert-history-entry-row">
-              <mat-icon>schedule</mat-icon>
-              <span><b>Slot:</b>
-                {{ (entry.startdate?.toDate ? entry.startdate.toDate() : entry.startdate) | date:'dd MMM yyyy, HH:mm' }}
-                -
-                {{ (entry.enddate?.toDate ? entry.enddate.toDate() : entry.enddate) | date:'HH:mm' }}
-              </span>
-            </div>
-            <div class="revert-history-entry-row">
-              <mat-icon>event</mat-icon>
-              <span><b>Reverted On:</b>
-                {{ (entry.createdon?.toDate ? entry.createdon.toDate() : entry.createdon) | date:'dd MMM yyyy, HH:mm' }}
-              </span>
-            </div>
-            <div class="revert-history-entry-row">
-              <mat-icon>admin_panel_settings</mat-icon>
-              <span><b>Reverted By:</b> {{ getProfileName(entry.revertedby) }}</span>
-            </div>
-          </div>
-        </div>
-      </ng-container>
-    </div>
-  </div>
-</div>
 <!-- Overall Slot Revert History Dialog -->
 <div class="revert-history-overlay" *ngIf="showOverallSlotRevertHistory"
   (click)="showOverallSlotRevertHistory = false">
@@ -1564,16 +1525,35 @@
     <div class="revert-history-dialog-header">
       <div class="revert-history-title">
         <mat-icon>manage_history</mat-icon>
-        <span>Overall Slot Revert History ({{ overallSlotRevertHistory.length }})</span>
+        <span>Revert History ({{ overallSlotRevertHistory.length }})</span>
       </div>
       <button mat-icon-button (click)="showOverallSlotRevertHistory = false">
         <mat-icon>close</mat-icon>
       </button>
     </div>
 
+    <!-- Search -->
+    <div style="padding: 8px 16px;">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Search by participant or stage</mat-label>
+        <input matInput [(ngModel)]="revertHistorySearchTerm" 
+          (ngModelChange)="filterRevertHistory()"
+          placeholder="Search...">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+    </div>
+
     <div class="revert-history-dialog-body">
-      <div *ngIf="overallSlotRevertHistory.length === 0" style="padding: 16px; color: #888;">
-        No revert history found for this slot.
+
+      <div *ngIf="revertHistoryLoading"
+        style="padding: 16px; display: flex; align-items: center; gap: 8px;">
+        <mat-spinner diameter="20"></mat-spinner>
+        <span>Loading...</span>
+      </div>
+
+      <div *ngIf="!revertHistoryLoading && overallSlotRevertHistory.length === 0"
+        style="padding: 16px; color: #888;">
+        No revert history found.
       </div>
 
       <div class="revert-history-entry"
@@ -1591,24 +1571,24 @@
           <div class="revert-history-entry-row">
             <mat-icon>schedule</mat-icon>
             <span><b>Slot:</b>
-              {{ (entry.log.startdate?.toDate ? entry.log.startdate.toDate() : entry.log.startdate) | date:'dd MMM yyyy, HH:mm' }}
+              {{ (entry.log['startdate']?.toDate ? entry.log['startdate'].toDate() : entry.log['startdate']) | date:'dd MMM yyyy, HH:mm' }}
               —
-              {{ (entry.log.enddate?.toDate ? entry.log.enddate.toDate() : entry.log.enddate) | date:'HH:mm' }}
+              {{ (entry.log['enddate']?.toDate ? entry.log['enddate'].toDate() : entry.log['enddate']) | date:'HH:mm' }}
             </span>
           </div>
           <div class="revert-history-entry-row">
             <mat-icon>event</mat-icon>
             <span><b>Reverted On:</b>
-              {{ (entry.log.createdon?.toDate ? entry.log.createdon.toDate() : entry.log.createdon) | date:'dd MMM yyyy, HH:mm' }}
+              {{ (entry.log['createdon']?.toDate ? entry.log['createdon'].toDate() : entry.log['createdon']) | date:'dd MMM yyyy, HH:mm' }}
             </span>
           </div>
           <div class="revert-history-entry-row">
             <mat-icon>admin_panel_settings</mat-icon>
-            <span><b>Reverted By:</b> {{ getProfileName(entry.log.revertedby) }}</span>
+            <span><b>Reverted By:</b> {{ getProfileName(entry.log['revertedby']) }}</span>
           </div>
         </div>
       </div>
-    </div>
 
+    </div>
   </div>
 </div>
