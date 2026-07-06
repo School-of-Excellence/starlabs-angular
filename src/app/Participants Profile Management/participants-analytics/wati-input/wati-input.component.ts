@@ -318,13 +318,6 @@ export class WatiInputComponent {
     this.templateParamNames = allParams;
     this.templateParams = allParams.map(name => {
       const existing = this.templateParams.find(p => p.name === name);
-      // Auto-fill Title from workshopTitle silently
-      if (name === 'Title' && this.workshopTitle) {
-        return { name, fillType: 'static', staticValue: this.workshopTitle, metadataField: '', excelColumn: '' };
-      }
-      if (!existing && name === 'workshoptitle') {
-        return { name, fillType: 'static', staticValue: this.workshopTitle, metadataField: '', excelColumn: '' };
-      }
       return existing ?? { name, fillType: 'static', staticValue: '', metadataField: '', excelColumn: '' };
     });
     this.updatePreview();
