@@ -612,12 +612,13 @@ export class DynamicStudioComponent {
                         const docid = this.studioInvitation["docid"]
                         const url = `https://cutstudiocall-kakybqnyrq-uc.a.run.app?docid=${encodeURIComponent(docid)}`
                         await this.http.get(url).toPromise()
+                      //                deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
+                      //   console.log(err)
+                      // })
                       } catch(err) {
                         console.error("Error cutting call", err)
                       }
-                      deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
-                        console.log(err)
-                      })
+         
                     }
                     this.studioInvitation = null
                     this.invitationCountdown = null
