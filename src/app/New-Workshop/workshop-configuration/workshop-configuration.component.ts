@@ -317,7 +317,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'inputfield',
       iconLabel: 'Enter FAQ Question',
       descriptionLabel: 'Enter FAQ Answer',
-      maxLength: 500
+      maxLength: 600
     }
   ];
   //challenge type
