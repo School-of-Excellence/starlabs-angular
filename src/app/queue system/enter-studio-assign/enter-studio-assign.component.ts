@@ -48,6 +48,10 @@ export class EnterStudioAssignComponent {
   mapActivity: { [id: string]: string } = {}
   mapProfile: { [id: string]: string } = {}
   activitySpecialists: { [activityId: string]: string[] } = {}
+  // Profile ids already present in this studio's live assignment (pairing +
+  // already-invited bonus specialists). Hidden from every activity's specialist
+  // list so you can't re-invite someone who's already in the session.
+  excludeProfileIds = new Set<string>()
 
   currentProfileId: string | null = null
 
@@ -87,6 +91,7 @@ export class EnterStudioAssignComponent {
       this.mapActivity = data['mapactivity'] ?? {}
       this.mapProfile = data['mapprofile'] ?? {}
       this.activitySpecialists = data['activityspecialists'] ?? {}
+      this.excludeProfileIds = new Set<string>(data['excludeprofileids'] ?? [])
 
       // Mode + overridable copy (defaults reproduce the original 'enter' popup).
       this.mode = data['mode'] === 'invite' ? 'invite' : 'enter'
@@ -185,6 +190,8 @@ export class EnterStudioAssignComponent {
     if (!activityId) return []
     const ids = this.activitySpecialists[activityId] ?? []
     return ids
+      // Drop anyone already in the live assignment — they've been called already.
+      .filter(id => !this.excludeProfileIds.has(id))
       .map(id => ({ profileid: id, name: this.mapProfile[id] ?? id }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }

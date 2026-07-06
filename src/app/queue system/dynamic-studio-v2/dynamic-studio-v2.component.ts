@@ -888,6 +888,14 @@ export class DynamicStudioV2Component {
       this.syncStepUrl(this.activeStepId)
     }
 
+    // Default-step URL guarantee: if they arrived WITHOUT a `?step=` (or the step
+    // list didn't change so the block above was skipped on re-entry), still put
+    // the resolved active step — the first step by default — into the URL.
+    // Idempotent: syncStepUrl no-ops when the URL already matches.
+    if (this.activeStepId && this.route.snapshot.queryParamMap.get('step') !== this.activeStepId) {
+      this.syncStepUrl(this.activeStepId)
+    }
+
     return steps
   }
 
@@ -3345,6 +3353,14 @@ export class DynamicStudioV2Component {
     // below already consumes. The "Confirm who attended" flow (reviewSpecialist
     // == true, from moveStage) keeps the AssignQueueStudio dialog since it also
     // needs studio selection + attendance semantics.
+    // Everyone already in this live assignment (main pairing + already-invited
+    // bonus specialists) — hidden from the activity specialist lists so you can't
+    // re-invite someone who's already been called into the session.
+    const alreadyInAssignment = Array.from(new Set<string>([
+      ...(this.liveAssignment['pairing'] ?? []),
+      ...(this.liveAssignment['bonusactivityparticipant'] ?? []),
+      ...Object.keys(this.liveAssignment['bonusactivity'] ?? {}),
+    ]))
     let inviteParticipant: any
     if (!reviewSpecialist) {
       inviteParticipant = await this.openEnterStudioAssign({
@@ -3356,7 +3372,8 @@ export class DynamicStudioV2Component {
           currentprofileid: this.profileid,
           mapprofile: this.mapProfile,
           mapactivity: this.mapActivity,
-          activityspecialists: this.activitySpecialistMap
+          activityspecialists: this.activitySpecialistMap,
+          excludeprofileids: alreadyInAssignment
         },
         autoFocus: false,
         panelClass: "enter-studio-dialog",
