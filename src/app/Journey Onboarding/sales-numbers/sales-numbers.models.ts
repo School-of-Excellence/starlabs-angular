@@ -1,47 +1,55 @@
 // Data contracts for the Sales Numbers dashboard.
-// Backed by the Firestore `salesleads` collection (+ the new `source`/`originalsource`
-// fields) and the new `sales_teams` collection. See benchmark/seed-sales.mjs.
+// Reads the real `salesleads` collection; product category + name are derived from the
+// `journey` collection (see SalesNumbersService.ensureJourneys). GSV/ASV follow the
+// journey-coach dashboard rules.
 
-export type Timeframe = 'last7' | 'last30' | 'month';
+export type Timeframe = 'last7' | 'last30' | 'last90' | 'month';
 
-// Raw shape we read from `salesleads` (only the fields this dashboard needs).
+// Raw shape we read from `salesleads` (only the fields this dashboard needs),
+// enriched with `category` / `productName` resolved from the journey collection.
 export interface SaleLead {
   docid: string;
   salespersonname: string;
   presalespersonname: string;
-  source: string;
-  originalsource: string;
-  product: string;              // category: Ecosystem | DFU | FTO | Gift
-  productName: string;          // specific product within the category (uP!, LYL, B!G, W!SH, ...)
-  saleType: string;             // underlying sale type: new | upgrade | addons (set on cancellations too)
-  journeytype: string;          // 'new' | 'upgrade' | 'addons' | 'cancelled' | downgrade types
+  journey: string;              // journey doc id
+  journeytype: string;          // new | upgrade | addons | cancelled | downgrade
+  status: string;               // '', 'Approved', 'Rejected', ...
+  email: string;
+  paymentplan: string;          // non-empty => assured
+  source: string;               // lead source (may be empty; set via the Assign Source view)
+  category: string;             // derived: Ecosystem | DFU | FTO + Gift | Other
+  productName: string;          // derived: the journey name
   totalpurchasevalue: number;
+  installmentamount: number;
   purchasedate: Date | null;    // sale date
-  date: Date | null;            // cancellation / event date
-  paymentplanassureddate: Date | null; // present => assured (ASV)
-  canceldocid?: string;
+  date: Date | null;            // cancellation / downgrade event date
+  paymentplanassureddate: Date | null;
 }
 
 // One team document from `sales_teams`.
 export interface SalesTeam {
   id: string;
   team: string;
-  members: string[];            // salespersonname values
+  members: string[];            // profileids of salespeople
 }
 
-// Aggregated metrics for one group (a salesperson or a team).
-// Cancellations are split gross vs assured so the global GSV/ASV filter drives them too.
+// A flagged salesperson (users_roles where salesperson == true).
+export interface SalespersonRef {
+  roleDocId: string;            // the users_roles doc id
+  profileid: string;            // profile_ref.id
+  name: string;                 // users_roles.name (firstname + ' ' + lastname)
+}
+
+// Aggregated metrics for one group (salesperson / team / product-segment).
 export interface SalesGroupMetric {
-  group: string;                // salesperson / team / product-segment name
-  grossCount: number;
-  gsv: number;                  // gross sales value
-  assuredCount: number;
-  asv: number;                  // assured sales value
-  cancelledCount: number;       // all (gross) cancellations in range (by cancel date)
+  group: string;
+  grossCount: number;           // journey-coach gross: purchasedate in window, not rejected/excluded
+  gsv: number;                  // sum totalpurchasevalue of gross
+  assuredCount: number;         // gross AND paymentplan non-empty
+  asv: number;                  // sum totalpurchasevalue of assured
+  cancelledCount: number;       // journeytype cancelled, date in window, status approved
   cancelledValue: number;
-  assuredCancelledCount: number;   // cancellations whose sale was assured
-  assuredCancelledValue: number;
-  // sale-type split (gross + assured counts), for the inline New/Upgrade/Add-on figures on the cards
+  // sale-type split (approved-only gross counts, plus their assured subset) for the card
   newGrossCount: number;
   newAssuredCount: number;
   upgradeGrossCount: number;
@@ -50,9 +58,9 @@ export interface SalesGroupMetric {
   addonsAssuredCount: number;
 }
 
-// One month bucket for the sales-vs-cancellations comparison chart.
+// One month bucket for the sales-vs-cancellations chart.
 export interface MonthlyPoint {
-  month: string;                // 'Jan 2026'
+  month: string;
   salesCount: number;
   salesValue: number;
   cancelledCount: number;
@@ -60,14 +68,13 @@ export interface MonthlyPoint {
 }
 
 export interface DashboardData {
-  segments: SalesGroupMetric[]; // the product-segment cards: Ecosystem, DFU, FTO + Gift (fixed order)
-  allSegment: SalesGroupMetric; // the "All" rollup card (also used as table totals)
-  groups: SalesGroupMetric[];   // by salesperson or by team, per current view
-  bySource: SalesGroupMetric[]; // breakdown by lead source
-  totals: SalesGroupMetric;     // roll-up across all groups (== allSegment)
+  segments: SalesGroupMetric[]; // Ecosystem, DFU, FTO + Gift (fixed order)
+  allSegment: SalesGroupMetric; // "All" rollup (also table totals)
+  groups: SalesGroupMetric[];   // by salesperson or team, per current view
+  bySource: SalesGroupMetric[]; // by lead source
+  totals: SalesGroupMetric;     // == allSegment
   monthly: MonthlyPoint[];
   sources: string[];            // distinct source values present (for the filter)
-  originalSources: string[];    // distinct originalsource values
   salespeople: string[];        // distinct salespeople present
   teams: string[];              // team names
 }
