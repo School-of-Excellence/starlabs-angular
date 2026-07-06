@@ -605,12 +605,17 @@ export class DynamicStudioComponent {
                     })
                   }
                   // Denied by B!G Participant
-                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
+                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result=>{
                     console.log(result)
                     if(result == "invitation cancelled"){
+                      try {
+                        const docid = this.studioInvitation["docid"]
+                        const url = `https://cutstudiocall-kakybqnyrq-uc.a.run.app?docid=${encodeURIComponent(docid)}`
+                        await this.http.get(url).toPromise()
+                      } catch(err) {
+                        console.error("Error cutting call", err)
+                      }
                       deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
-                        console.log(err)
-                      }).catch(err =>{
                         console.log(err)
                       })
                     }

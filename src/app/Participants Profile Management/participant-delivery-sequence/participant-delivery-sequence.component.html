@@ -6,7 +6,7 @@
     <div class="profilebox">
       <mat-form-field appearance="outline">
         <mat-label>Select Profile</mat-label>
-        <mat-select [(ngModel)]="selectedProfileid" (selectionChange)="changeProfile()" [disabled]="!developer">
+        <mat-select [(ngModel)]="selectedProfileid" (selectionChange)="changeProfile()" [disabled]="true">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="profileFilterCtrl" name="name" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
           </mat-option>

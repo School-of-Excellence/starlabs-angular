@@ -4546,6 +4546,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           logged: true,
           landingpage: result["landingpage"],
           profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
           metadata: {
             'queueref': doc(this.firestore, "queue generation", this.selectedQueue["docid"])
           }
@@ -4754,6 +4755,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
             createddate: serverTimestamp(),
             docid: id,
             expirydate: new Date(Date.now() + duration * 60000),
+            // Intended countdown window (seconds) — the participant's timer counts
+            // down from this plain number locally (skew/timezone-immune). `duration`
+            // is in MINUTES here.
+            durationSeconds: duration * 60,
             participantname: token.profile_name,
             profileid: token.profile_id,
             stage: this.selectedChatStage,

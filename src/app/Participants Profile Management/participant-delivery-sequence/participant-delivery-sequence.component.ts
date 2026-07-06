@@ -82,6 +82,12 @@ export class ParticipantDeliverySequenceComponent {
     guard.getAppointmentMap().then(data => this.mapAppointment = data)
     guard.getRoles().then(async roles => {
       this.developer = roles["developer"] ?? false
+      // Do NOT load the full profile roster on this screen. The participant is
+      // fixed by the :pid route param and the "Select Profile" switcher is
+      // disabled, so there is nothing to switch to. Reading all ~3,300
+      // profile_data docs used to saturate the Firestore channel and block the
+      // main thread, starving this participant's own tiny reads for ~70s
+      // (measured: 72s -> ~3s once the roster read was removed).
       // if (roles["admin"] || roles["ah"] || roles["integrator"] || roles["scheduler"] || this.developer) {
       await this.mapData().then(() => {
         route.params.subscribe(data => {
@@ -128,23 +134,13 @@ export class ParticipantDeliverySequenceComponent {
     this.selectedAppointments = []
   }
 
+  // NOTE: the full profile roster is intentionally NOT loaded on this screen.
+  // The participant is already identified by the :pid route param, and the
+  // "Select Profile" switcher is disabled — so there is nothing to switch to and
+  // no reason to read ~3,300 profile_data docs. Only the current profile is
+  // fetched (single getDoc in patchProfileStatus) to show its name/status.
+
   async mapData() {
-    // Profile
-    await getDocs(query(collection(this.firestore, "profile_data"), orderBy("name"))).then(profile => {
-      var data = []
-      for (let i = 0; i < profile.docs.length; i++) {
-        const doc = profile.docs[i];
-        var profiledata = doc.data()
-        data.push({
-          name: profiledata["name"],
-          id: doc.id,
-          status: profiledata["datastatus"] ?? "Not entered",
-          sequencechanged: profiledata["sequencechanged"] ?? false,
-          migrationrequired: profiledata["migrationrequired"] ?? false
-        })
-      }
-      this.profileList = data
-    })
     // Journey
     getDocs(collection(this.firestore, "journey")).then(journey => {
       for (let i = 0; i < journey.docs.length; i++) {
@@ -168,8 +164,8 @@ export class ParticipantDeliverySequenceComponent {
           path: apptDoc.ref.path,
           type: "appointment"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Form
     getDocs(query(collection(this.firestore, "delivery forms"), orderBy("formname"))).then(form => {
@@ -180,8 +176,8 @@ export class ParticipantDeliverySequenceComponent {
           path: formDoc.ref.path,
           type: "form"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Report
     getDocs(query(collection(this.firestore, "delivery report"), orderBy("reportname"))).then(report => {
@@ -192,8 +188,8 @@ export class ParticipantDeliverySequenceComponent {
           path: reportDoc.ref.path,
           type: "report"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Event
     getDocs(query(collection(this.firestore, "delivery events"), orderBy("eventname"))).then(event => {
@@ -204,8 +200,8 @@ export class ParticipantDeliverySequenceComponent {
           path: eventDoc.ref.path,
           type: "event"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Queue
     getDocs(query(collection(this.firestore, "delivery queue"), orderBy("queuename"))).then(queue => {
@@ -216,8 +212,8 @@ export class ParticipantDeliverySequenceComponent {
           path: queueDoc.ref.path,
           type: "queue"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
     // Fieldwork
     getDocs(query(collection(this.firestore, "delivery fieldwork"), orderBy("fieldworkname"))).then(fieldwork => {
@@ -228,8 +224,8 @@ export class ParticipantDeliverySequenceComponent {
           path: fieldworkDoc.ref.path,
           type: "fieldwork"
         })
-        this.sortDelivery()
       }
+      this.sortDelivery()
     })
   }
 
@@ -248,12 +244,40 @@ export class ParticipantDeliverySequenceComponent {
   onProfileSelect() {
     console.log("Pro-", this.selectedProfileid)
     this.getParticipantAppointment()
-    var selectedProfile = this.profileList[this.profileList.findIndex(e => e.id == this.selectedProfileid)]
-    this.profileDataStatus = selectedProfile.status
-    this.sequencechanged = selectedProfile.sequencechanged
-    this.migrationrequired = selectedProfile.migrationrequired
     this.clearProductData()
+    // Load the participant's delivery data immediately — this is the main content.
     this.getParticipantDeliverySequence()
+    // Fetch only THIS profile's status/flags (single doc read) instead of
+    // scanning the whole profile list. Runs in parallel, doesn't block render.
+    this.patchProfileStatus()
+  }
+
+  patchProfileStatus() {
+    // Prefer the already-loaded list (developers) to avoid a redundant read.
+    var cached = this.profileList.find(e => e.id == this.selectedProfileid)
+    if (cached != null) {
+      this.profileDataStatus = cached.status
+      this.sequencechanged = cached.sequencechanged
+      this.migrationrequired = cached.migrationrequired
+      return
+    }
+    getDoc(doc(this.firestore, "profile_data", this.selectedProfileid)).then(snap => {
+      var profiledata = snap.data() ?? {}
+      this.profileDataStatus = profiledata["datastatus"] ?? "Not entered"
+      this.sequencechanged = profiledata["sequencechanged"] ?? false
+      this.migrationrequired = profiledata["migrationrequired"] ?? false
+      // Seed the (disabled) switcher with just this one profile so its label
+      // shows the participant's name, without loading the whole roster.
+      if (!this.profileList.some(e => e.id == this.selectedProfileid)) {
+        this.profileList = [{
+          name: profiledata["name"] ?? "",
+          id: this.selectedProfileid,
+          status: this.profileDataStatus,
+          sequencechanged: this.sequencechanged,
+          migrationrequired: this.migrationrequired
+        }]
+      }
+    })
   }
 
   async getParticipantDeliverySequence() {
@@ -313,12 +337,10 @@ export class ParticipantDeliverySequenceComponent {
     */
     // Deliverable
     await getDocs(query(collection(this.firestore, "deliverables"), where("profileid", "==", this.selectedProfileid))).then(delivery => {
-      console.log(delivery.size)
       for (let i = 0; i < delivery.docs.length; i++) {
         const deliverable = delivery.docs[i];
         this.mapDeliveryDoc[deliverable.ref.path] = deliverable.data()
       }
-      console.log(this.mapDeliveryDoc)
     })
     this.loading = false
   }
