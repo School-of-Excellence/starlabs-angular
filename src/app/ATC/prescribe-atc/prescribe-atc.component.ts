@@ -458,13 +458,18 @@ export class PrescribeATCComponent {
     this.route.queryParams.subscribe(async params => {
       if (!params['aigenerated'] || !params['docid']) return;
       const docid = params['docid'];
-      const draftRef = doc(this.firestoreATC, 'temporary_ATC', docid);
-      const draftSnap = await getDoc(draftRef);
+      // Load through the offline-capable draft service (local-first): openDraft returns the cached
+      // copy when the server is unreachable, so an already-opened AI draft still loads offline —
+      // matching the normal prescribe flow. Only when NO draft exists anywhere do we parse the AI
+      // source below. (Was a raw getDoc, which failed offline since firestore-atc has no persistence.)
+      const existing = await this.draftService.openDraft(
+        this.firestoreATC, 'temporary_ATC', docid,
+        (mine, theirs) => this.openConflictDialog(mine, theirs));
 
-      if (draftSnap.exists()) {
-        console.log('Draft exists → loading from temporary_ATC');
+      if (existing) {
+        console.log('Draft exists → loading from temporary_ATC (local-first)');
 
-        const value = draftSnap.data();
+        const value = existing;
 
         this.autoSaveID = docid;
         this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
@@ -580,7 +585,11 @@ export class PrescribeATCComponent {
       this.aigeneratedsource = aiSourceCollection;
       this.aigeneratedid = docid;
 
-      await setDoc(draftRef, {
+      // Create the draft through the offline-capable draft service: saveLocal writes to IndexedDB
+      // first (durable across refresh/offline), then sync pushes to the server when online — the same
+      // path the normal flow uses, so the AI draft gets the offline safety net. (Was a raw setDoc,
+      // which wrote only to the server and skipped the local cache.)
+      await this.draftService.saveLocal('temporary_ATC', docid, {
         profileid: this.participantProfileid,
         transcript: [],
         aiatcsummary: this.summarystring,
@@ -590,9 +599,9 @@ export class PrescribeATCComponent {
         aiedited: true,
         aigeneratedsource: aiSourceCollection,
         aigeneratedid: docid,
-        created: serverTimestamp(),
-        lastupdated: serverTimestamp()
+        lastupdated: new Date(),
       });
+      await this.draftService.sync(this.firestoreATC, 'temporary_ATC', docid);
 
       if (this.proceduresLoaded) {
         this.patchAIAdjustments(this.pendingAIJson);
