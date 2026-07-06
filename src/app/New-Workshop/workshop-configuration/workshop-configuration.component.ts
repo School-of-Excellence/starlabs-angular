@@ -1032,6 +1032,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       facilitatorprofiles:[[],],
       selectedgroup: [''],
       enrollwattimessage: [''],
+      enrolledcongrats: [''],
       loginlogchannel:['workshop-logs'],
       workshopactivitychannel:['workshop-logs'],
       selectedjourneys: [[],],
@@ -2184,6 +2185,7 @@ private rebuildActivityIds(): void {
         facilitatorprofiles: data['facilitatorprofiles'] || [],
         selectedgroup: data['selectedgroup'] || null,
         enrollwattimessage: data['enrollwattimessage'] || null,
+        enrolledcongrats: data['enrolledcongrats'] ?? '',
         loginlogchannel: data['loginlogchannel'] || 'workshop-logs',
         workshopactivitychannel: data['workshopactivitychannel'] || 'workshop-logs',
         mailTemplate: data['mailTemplate'] || null,
@@ -2382,6 +2384,7 @@ private rebuildActivityIds(): void {
         selectedgroup: this.settingsForm.get('selectedgroup')?.value || null,
         loginlogchannel: this.settingsForm.get('loginlogchannel')?.value || null,
         enrollwattimessage: this.settingsForm.get('enrollwattimessage')?.value || null,
+        enrolledcongrats: this.settingsForm.get('enrolledcongrats')?.value || '',
         workshopactivitychannel: this.settingsForm.get('workshopactivitychannel')?.value || null,
         mailTemplate: this.settingsForm.get('mailTemplate')?.value || null,
         testusers: this.settingsForm.get('testusers')?.value || [],
@@ -2461,6 +2464,14 @@ private rebuildActivityIds(): void {
     } catch (error) {
       console.error('Video upload failed:', error);
       this.snackBar.open('Video upload failed', 'Close', { duration: 2000 });
+    }
+  }
+  // Clear a selected hero asset (web image / mobile image / video). Only removes
+  // it from the config; the actual file in Storage is left untouched.
+  removeHeroAsset(field: 'heroImage' | 'heroImageMobile' | 'heroVideo', input?: HTMLInputElement): void {
+    this.settingsForm.get(field)?.setValue('');
+    if (input) {
+      input.value = '';
     }
   }
   onToggleChange(field: 'active' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
