@@ -120,7 +120,7 @@
 .sn-filter-grid {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 .sn-filter { width: 100%; }
@@ -435,3 +435,70 @@
   .sn-segs { grid-template-columns: 1fr; }
   .sn-control-group.sn-right { margin-left: 0; }
 }
+
+/* ============================================================================
+   MERGED VIEWS — Teams + Assign Source (screen toggle)
+   ============================================================================ */
+.sn-screen-toggle { flex: 0 0 auto; }
+
+/* create team */
+.sn-create { display: flex; align-items: flex-end; gap: 16px; }
+.sn-newname { width: 280px; }
+:host ::ng-deep .sn-wrap .st-btn-primary.mat-mdc-button-base {
+  height: 44px; border-radius: var(--ios-r-control); background: var(--ios-blue);
+  color: #fff; font-weight: 600; letter-spacing: -0.01em; padding: 0 20px;
+  box-shadow: var(--ios-shadow-sm); transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .st-btn-primary .mat-mdc-button-touch-target { height: 44px; }
+:host ::ng-deep .sn-wrap .st-btn-primary:hover { box-shadow: var(--ios-shadow-md); }
+:host ::ng-deep .sn-wrap .st-btn-primary:active { transform: scale(0.98); }
+:host ::ng-deep .sn-wrap .st-btn-primary[disabled] { opacity: .45; box-shadow: none; }
+
+/* team cards */
+.st-teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-bottom: 24px; }
+:host ::ng-deep .st-team.mat-mdc-card,
+.st-team {
+  padding: 20px !important; background: var(--ios-surface); border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card) !important; box-shadow: var(--ios-shadow-md);
+  transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .st-team.mat-mdc-card:hover,
+.st-team:hover { transform: translateY(-2px); box-shadow: var(--ios-shadow-lift); }
+.st-team-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.st-team-head h2 { margin: 0; flex: 0 0 auto; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--ios-label); }
+.st-count { font-size: 13px; color: var(--ios-secondary); flex: 1; font-variant-numeric: tabular-nums; }
+:host ::ng-deep .st-team-head button[mat-icon-button] { color: var(--ios-secondary); }
+:host ::ng-deep .st-team-head button[mat-icon-button]:hover { color: var(--ios-red); }
+.st-empty { color: var(--ios-secondary); font-size: 13px; margin: 8px 0 0; }
+
+/* chips */
+:host ::ng-deep .st-team .mat-mdc-standard-chip,
+:host ::ng-deep .st-team .mat-mdc-chip {
+  background: var(--ios-fill) !important; border-radius: var(--ios-r-pill) !important; border: none !important; box-shadow: none !important;
+}
+:host ::ng-deep .st-team .mdc-evolution-chip__text-label { color: var(--ios-label); font-weight: 500; font-size: 13px; }
+
+/* roster */
+.st-roster { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.st-roster-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--ios-separator-soft);
+}
+.st-roster-row:last-child { border-bottom: none; }
+.st-person { font-size: 15px; font-weight: 500; color: var(--ios-label); }
+.st-assign { width: 220px; }
+
+/* assign source */
+.sn-src-hint { color: var(--ios-secondary); font-size: 13px; margin: 0 0 12px; }
+.sn-src-select { width: 180px; }
+
+/* salespeople flag toggle */
+:host ::ng-deep .sn-wrap .sn-flag-btn.mat-mdc-button-base {
+  height: 38px; border-radius: var(--ios-r-pill); border: 1px solid var(--ios-separator);
+  color: var(--ios-secondary); font-weight: 600; letter-spacing: -0.01em;
+  transition: background-color .2s var(--ios-ease), color .2s var(--ios-ease), border-color .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .sn-flag-btn.on.mat-mdc-button-base {
+  color: var(--ios-green); border-color: rgba(52,199,89,.35); background: rgba(52,199,89,.09);
+}
+:host ::ng-deep .sn-wrap .sn-flag-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
