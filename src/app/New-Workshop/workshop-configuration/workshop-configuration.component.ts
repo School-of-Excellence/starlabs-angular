@@ -287,7 +287,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 70
+      maxLength: 300
     },
     {
       key: 'workshopoverview',
@@ -297,7 +297,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 70
+      maxLength: 300
     },
     {
       key: 'knowinfo',
@@ -307,7 +307,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 150
+      maxLength: 300
     },
     {
       key: 'faq',
