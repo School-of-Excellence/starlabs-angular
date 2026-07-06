@@ -3191,16 +3191,26 @@ export class DynamicStudioV2Component {
       const cfgSnap = await getDoc(doc(this.firestore, 'classify', 'queue-atc-edit-config'));
       const cfg: any = cfgSnap.exists() ? cfgSnap.data() : null;
       if (!cfg || cfg.enabled !== true) { this.aiAtcAllowedForUser = false; return; }  // feature off
-      if (cfg.global === true) { this.aiAtcAllowedForUser = true; return; }             // enabled globally for everyone
+      if (cfg.global === true) { this.aiAtcAllowedForUser = true; this.maybeRecheckAiAtc(); return; }  // enabled globally for everyone
       // Not global → restrict to the configured allowed users (by profileid / email / role).
       const email = this.currentuserData?.['email'] || this.guard?.email || null;
       const byProfile = Array.isArray(cfg.allowedProfileIds) && cfg.allowedProfileIds.includes(this.profileid);
       const byEmail   = !!email && Array.isArray(cfg.allowedEmails) && cfg.allowedEmails.includes(email);
       const byRole    = Array.isArray(cfg.allowAllForRoles) && cfg.allowAllForRoles.some((r: string) => !!this.profileRoles?.[r]);
       this.aiAtcAllowedForUser = byProfile || byEmail || byRole;
+      this.maybeRecheckAiAtc();
     } catch (err) {
       console.error('AI-ATC access config read failed; feature hidden for this user', err);
       this.aiAtcAllowedForUser = false;  // fail-closed
+    }
+  }
+
+  // If access resolved after the Prescribe-ATC step was already opened, checkAiAtcAvailability()
+  // would have returned early (not allowed yet) and never re-run. Re-trigger it once access is known.
+  private maybeRecheckAiAtc(): void {
+    if (this.aiAtcAllowedForUser && this.activeStepId === 'prescribe-atc') {
+      this.aiAtcCheckedKey = null;  // clear the "already checked this participant" guard so it re-queries
+      this.checkAiAtcAvailability();
     }
   }
 
@@ -3234,20 +3244,25 @@ export class DynamicStudioV2Component {
       // (cloud fn: adminATC.doc(queueRef.path)); the studio token's queueref points at the default
       // DB, so rebuild it against firestore-atc for the equality query to match.
       const atcQueueRef = doc(firestoreATC, 'queue generation', tokenQueueRef.id);
+      // Match on participant + token + queue, newest first (stage filter removed, no limit). Take the
+      // latest generation that has actually COMPLETED — an incomplete doc (pending/processing/error)
+      // has no usable `output`, so offering it would open prescribe-ATC with nothing to prefill and
+      // draft creation fails. Status is filtered client-side to reuse the existing composite index.
       const aiSnap = await getDocs(query(
         collection(firestoreATC, 'queue_atc_generation'),
         where('profileid', '==', profileid),
         where('queue_token_id', '==', queueTokenId),
         where('queueref', '==', atcQueueRef),
-        where('stage', '==', 'Scope Enhancement'),
-        where('status', '==', 'completed')
+        orderBy('createdAt', 'desc')
       ));
 
       // Guard against a participant switch that happened while this query was awaiting.
       if (this.aiAtcCheckedKey !== key) return;
 
-      if (!aiSnap.empty) {
-        this.aiAtcDocId = aiSnap.docs[0].id;
+      // docs are newest-first, so the first completed one is the latest completed generation.
+      const completedDoc = aiSnap.docs.find(d => d.data()?.['status'] === 'completed');
+      if (completedDoc) {
+        this.aiAtcDocId = completedDoc.id;
         this.aiAtcAvailable = true;
       }
     } catch (err) {

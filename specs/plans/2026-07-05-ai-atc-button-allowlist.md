@@ -39,7 +39,40 @@ Two modes: **global** (`global:true` → everyone) and **allowed-users** (`globa
 5. `useAiAtc()` defensive `aiAtcAllowedForUser` check.
 Template unchanged — `*ngIf="aiAtcAvailable"` already sits downstream of the access check.
 
+## Session update (2026-07-06) — end-to-end wiring of the AI-ATC flow
+
+Beyond gating, the full studio→prescribe flow was debugged and made to work. Final state:
+
+**Availability query (`checkAiAtcAvailability`).** Removed BOTH the `stage=='Scope Enhancement'`
+and the `status=='completed'` server filters (they excluded valid docs). Now queries
+`profileid + queue_token_id + queueref`, `orderBy('createdAt','desc')`, **no limit**, and picks the
+**latest `status=='completed'`** doc client-side (reuses the composite index; ordering by `createdAt`
+means docs missing that field are excluded — backend sets it). Added `maybeRecheckAiAtc()` to
+re-run availability if access resolved after the Prescribe-ATC step was already open (load-order race).
+
+**prescribe-atc — schema normalization.** `queue_atc_generation.output` uses a different schema than
+legacy `ai_generated_atc_summary`: Part-1 text + `---JSON---` + `{ adjustments:[{adjustment,outcome,
+procedures}], areas_needing_more_data }` (no `ATC_Report`). For `source=queueatc` we parse with
+`parseAtcOutput()` and remap into the `{ ATC_Report:{ Adjustments, Areas_that_need_to_be_explored_more }}`
+shape the existing patch/areas logic expects. Legacy path untouched.
+
+**prescribe-atc — procedure pseudonym mapping.** AI emits procedure pseudo-codes ("A&H Procedure24" /
+"procedure24" / "A&H_procedure24") where the NUMBER is the key. New `src/app/ATC-Ops/procedure-pseudonyms.ts`
+(frozen mirror of `atc-finetunning/procedures-cf/src/seed.js`) maps number→realName; `patchAIAdjustments`
+resolves the code, then matches `realName` against `procedures.name`. Verified with an offline harness
+(all code formats resolve+match). `extractProcedureKey` (which stripped the number) is now fallback-only.
+
+**prescribe-atc — duplicate-draft fix.** `getATCoptions()` unconditionally minted a random `autoSaveID`
+via `generateId`, clobbering the AI entry's deterministic `temporary_ATC/<docid>` and spawning a new
+draft on every open/refresh. Guarded: `getATCoptions()` returns early when `?aigenerated` is present,
+so the AI flow keeps the single deterministic docid — create-once, refresh/re-navigate reloads it,
+all autosaves target the same id.
+
 ## Not in scope / follow-ups
 - **Security rules:** this is UI gating + read-skip, not hard access control. True enforcement
   needs a Firestore security rule on `queue_atc_generation`. Separate task if required.
 - In-app admin UI to edit the allowlist (console-only for now).
+- **Procedure glossary drift:** `procedure-pseudonyms.ts` is a frozen mirror of the sibling repo's
+  `seed.js`; regenerate both if procedures change. The `[AI-ATC]` warn flags unmatched names at runtime.
+- **One-time cleanup:** duplicate drafts created before the fix need manual removal in the console.
+- If the AI ever emits procedures as objects (not strings), harden `resolveProcedurePseudonym`.
