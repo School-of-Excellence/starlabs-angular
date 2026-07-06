@@ -207,6 +207,24 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     'Testimonial': 'Testimonial',
   };
   videoTypeKeys = Object.keys(this.videoTypeMap);
+  showArenaEventPicker = false;
+  arenaEventParentSearchCtrl = new FormControl('');
+  arenaEventParentList: { docid: string; name: string; type: 'event' | 'queue' }[] = [];
+  filteredArenaParentList: { docid: string; name: string; type: 'event' | 'queue' }[] = [];
+  arenaEventParentListLoaded = false;
+  arenaEventParentLoading = false;
+  selectedArenaParent: { docid: string; name: string; type: 'event' | 'queue' } | null = null;
+  arenaSubEventList: { docid: string; name: string }[] = [];
+  arenaSubEventLoading = false;
+  selectedArenaSubEventId: string | null = null;
+  arenaEventFilterActive: {
+    parentName: string;
+    subEventName: string;
+    subEventId: string;
+    metadataIds: string[];
+    videoCounts: { [type: string]: number };
+  } | null = null;
+  private arenaEventSearchSub: Subscription | null = null;
 
   // separate remarks
   separateRemarks: { [entryIndex: number]: { text: string; profileid: string; updatedon: any }[] } = {};
@@ -236,8 +254,123 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.participantSearchSub?.unsubscribe();
     this.addVideoSearchSub?.unsubscribe();
-    this.eventFilterSearchSub?.unsubscribe();  
+    this.eventFilterSearchSub?.unsubscribe();
     this.logEventFilterSub?.unsubscribe();
+    this.arenaEventSearchSub?.unsubscribe();
+  }
+  async loadArenaEventParentList() {
+    if (this.arenaEventParentListLoaded) return;
+    this.arenaEventParentLoading = true;
+
+    const queuesSnap = await getDocs(
+      query(collection(this.firestore, 'queue generation'), orderBy('queuename', 'asc'))
+    );
+
+    this.arenaEventParentList = [
+      ...this.liveevent.map(e => ({
+        docid: e.id,
+        name: e.name,
+        type: 'event' as const
+      })),
+      ...queuesSnap.docs
+        .filter(d => !d.data()['delete'])
+        .map(d => ({
+          docid: d.id,
+          name: d.data()['queuename'] || '',
+          type: 'queue' as const
+        }))
+    ].sort((a, b) => a.name.localeCompare(b.name));
+
+    this.filteredArenaParentList = [...this.arenaEventParentList];
+
+    this.arenaEventSearchSub?.unsubscribe();
+    this.arenaEventSearchSub = this.arenaEventParentSearchCtrl.valueChanges.pipe(
+      debounceTime(200),
+      distinctUntilChanged()
+    ).subscribe(search => {
+      const lower = (search || '').toLowerCase();
+      this.filteredArenaParentList = !lower? [...this.arenaEventParentList]: this.arenaEventParentList.filter(e => e.name.toLowerCase().includes(lower));
+    });
+
+    this.arenaEventParentListLoaded = true;
+    this.arenaEventParentLoading = false;
+  }
+
+  async onArenaParentSelect(
+    parent: { docid: string; name: string; type: 'event' | 'queue' }
+  ) {
+    this.selectedArenaParent = parent;
+    this.selectedArenaSubEventId = null;
+    this.arenaSubEventList = [];
+    this.arenaSubEventLoading = true;
+
+    const docRef = parent.type === 'queue'? doc(this.firestore, 'queue generation', parent.docid): doc(this.firestore, 'event collection', parent.docid);
+
+    const arenaSnap = await getDocs(
+      query(collection(this.firestore, 'arena events'), where('eventref', '==', docRef))
+    );
+
+    this.arenaSubEventList = arenaSnap.docs.map(d => ({
+      docid: d.id,
+      name: d.data()['title']? `${d.data()['eventname']} – ${d.data()['title']}`: d.data()['eventname'] || d.id
+    }));
+
+    this.arenaSubEventLoading = false;
+  }
+
+  async applyArenaEventFilter() {
+    if (!this.selectedArenaSubEventId || !this.selectedArenaParent) return;
+    const subEvent = this.arenaSubEventList.find(
+      e => e.docid === this.selectedArenaSubEventId
+    );
+    const arenaSnap = await getDocs(query( collection(this.firestore, 'event participation request'), where('arenaeventid', '==', this.selectedArenaSubEventId), where('status', 'in', ['approved', 'requested', 'attended'])));
+    const profileIds = new Set<string>(
+      arenaSnap.docs.map(d => d.data()['profileid']).filter(Boolean)
+    );
+    const metadataIds = Object.entries(this.mapProfiles)
+      .filter(([, profile]: [string, any]) =>
+        profileIds.has(profile['profileid'])
+      )
+      .map(([id]) => id);
+    // Fetch video counts once for all filtered participants
+    const videoCountChunks = this.chunkArray(Array.from(profileIds), 30);
+    const videoSnaps = await Promise.all(
+      videoCountChunks.map(chunk => getDocs(query( collection(this.firestore, 'participant videos'), where('delete', '==', false), where('profileid', 'in', chunk))))
+    );
+
+    const videoCounts: { [type: string]: number } = {};
+    this.videoTypeKeys.forEach(type => videoCounts[type] = 0);
+    videoSnaps.forEach(snap =>
+      snap.docs.forEach(d => {
+        const type = d.data()['type'];
+        if (type && videoCounts[type] !== undefined) {
+          videoCounts[type]++;
+        }
+      })
+    );
+
+    this.arenaEventFilterActive = {
+      parentName: this.selectedArenaParent.name,
+      subEventName: subEvent?.name || '',
+      subEventId: this.selectedArenaSubEventId,
+      metadataIds,
+      videoCounts
+    };
+
+    this.showArenaEventPicker = false;
+    this.resetPagination();
+    this.fetchRecords();
+  }
+
+  resetArenaEventFilter() {
+    this.arenaEventFilterActive = null;
+    this.showArenaEventPicker = false;
+    this.selectedArenaParent = null;
+    this.arenaSubEventList = [];
+    this.selectedArenaSubEventId = null;
+    this.fetchSummaryStats();
+    this.resetPagination();
+    this.fetchRecords();
   }
 
   // Fetch participants for filter dropdown
@@ -734,6 +867,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.videoFilterSearchCtrl.setValue('');   
     this.showEventFilterDropdown = false;
     this.showVideoFilterDropdown = false;
+    if (this.arenaEventFilterActive) this.fetchSummaryStats();
+    this.arenaEventFilterActive = null;
+    this.selectedArenaParent = null;
+    this.arenaSubEventList = [];
+    this.selectedArenaSubEventId = null;
+    this.showArenaEventPicker = false;
     this.resetPagination();
     this.fetchRecords();
   }
@@ -804,12 +943,19 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         ? this.currentPage * this.pageSize + snap.docs.length
         : (this.currentPage + 2) * this.pageSize
     );
-    this.summaryStats = {
-      ...this.summaryStats,
-      totalParticipants: this.showOnlyWithVideos
-        ? this.totalRecords
-        : this.participantOptions.length,
-    };
+    if (this.arenaEventFilterActive) {
+      this.summaryStats = {
+        totalParticipants: this.arenaEventFilterActive.metadataIds.length,
+        videoCounts: this.arenaEventFilterActive.videoCounts
+      };
+    } else {
+      this.summaryStats = {
+        ...this.summaryStats,
+        totalParticipants: this.showOnlyWithVideos
+          ? this.totalRecords
+          : this.participantOptions.length,
+      };
+    }
     this.loading = false;
     this.initialLoading = false;
   }
@@ -842,8 +988,14 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       selectedIds = selectedIds.length > 0? selectedIds.filter(id => withoutPhotoIds.includes(id)): withoutPhotoIds;
     }
 
-    const noFilters = !this.selectedParticipants.length &&!this.selectedJourneyFilters.length &&!this.selectedEventFilters.length &&!this.selectedVideoFilters.length&&this.journeyTypeFilter === 'all' && !this.showOnlyWithVideos && !this.showOnlyWithoutPhoto;
-    if (noFilters) {
+    if (this.arenaEventFilterActive) {
+      const arenaIds = this.arenaEventFilterActive.metadataIds;
+      selectedIds = selectedIds.length > 0
+        ? selectedIds.filter(id => arenaIds.includes(id))
+        : arenaIds;
+    }
+    const noFilters = !this.selectedParticipants.length && !this.selectedJourneyFilters.length && !this.selectedEventFilters.length && !this.selectedVideoFilters.length && this.journeyTypeFilter === 'all' && !this.showOnlyWithVideos && !this.showOnlyWithoutPhoto && !this.arenaEventFilterActive;
+     if (noFilters) {
         const snap = await getDocs(this.buildBaseQuery(undefined, startAfterDoc));
         await this.executeQuery(snap);
         return;

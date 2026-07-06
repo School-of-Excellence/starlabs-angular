@@ -2129,3 +2129,128 @@ mat-paginator {
   opacity: 0.4;
   cursor: not-allowed;
 }
+.ep-filter-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ep-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.ep-filter-active {
+  background-color: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+}
+
+.ep-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  width: 300px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ep-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  color: #6b7280;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.ep-search-input {
+  margin: 8px;
+  padding: 7px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  width: calc(100% - 16px);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.ep-search-input:focus { border-color: #0284c7; }
+
+.ep-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+
+.ep-list-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.ep-list-item:hover { background: #f3f4f6; }
+.ep-list-item-selected { background: #eff6ff; }
+
+.ep-type-badge {
+  margin-left: auto;
+  font-size: 11px;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 2px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+
+.ep-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+.ep-back-btn:hover { background: #f9fafb; }
+
+.ep-empty {
+  padding: 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.ep-apply-btn {
+  margin: 8px;
+  width: calc(100% - 16px);
+  flex-shrink: 0;
+}
+
+.ep-reset-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}

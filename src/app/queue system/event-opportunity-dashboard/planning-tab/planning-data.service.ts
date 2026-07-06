@@ -366,11 +366,31 @@ export class PlanningDataService {
   }
 
   /** profileId -> raw customerstatus (lowercased) for the given profiles. */
+  /** Load FULL participant-metadata docs for just these ids (chunked, parallel). profileid → doc. */
+  async loadParticipantMeta(profileIds: string[]): Promise<{ [id: string]: any }> {
+    const out: { [id: string]: any } = {};
+    const ids = [...new Set(profileIds.filter(Boolean))];
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    await Promise.all(chunks.map(async chunk => {
+      try {
+        const snap = await getDocs(query(
+          collection(this.firestore, 'participant metadata'),
+          where('profileid', 'in', chunk)
+        ));
+        snap.docs.forEach(d => { const x: any = d.data(); if (x['profileid']) out[x['profileid']] = x; });
+      } catch (e) { /* tolerate a failed chunk */ }
+    }));
+    return out;
+  }
+
   async loadCustomerStatus(profileIds: string[]): Promise<Map<string, string>> {
     const out = new Map<string, string>();
     const ids = [...new Set(profileIds.filter(Boolean))];
-    for (let i = 0; i < ids.length; i += 30) {
-      const chunk = ids.slice(i, i + 30);
+    // Fire all chunk queries in parallel (was sequential → one round-trip per 30 ids).
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    await Promise.all(chunks.map(async chunk => {
       try {
         const snap = await getDocs(query(
           collection(this.firestore, 'participant metadata'),
@@ -378,7 +398,7 @@ export class PlanningDataService {
         ));
         snap.docs.forEach(d => { const x: any = d.data(); if (x['profileid']) out.set(x['profileid'], String(x['customerstatus'] || '').toLowerCase()); });
       } catch (e) { /* tolerate a failed chunk */ }
-    }
+    }));
     return out;
   }
 }
