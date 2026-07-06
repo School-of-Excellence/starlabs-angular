@@ -12,6 +12,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
 import { ATCDraftService } from '../../shared/atc-draft.service';
+import { parseAtcOutput } from '../../ATC-Ops/atc-ops.types';
+import { resolveProcedurePseudonym } from '../../ATC-Ops/procedure-pseudonyms';
 import { DraftConflictDialogComponent } from '../shared/draft-conflict-dialog.component';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -350,11 +352,22 @@ export class PrescribeATCComponent {
       const procedures = [];
 
       (adj.Procedures || []).forEach(rawProc => {
-        const aiKey = this.extractProcedureKey(rawProc).toLowerCase();
-
-        const matchedProcedure = this.procedurelist.find(p =>
-          p.procedurename.toLowerCase().includes(aiKey)
-        );
+        // AI procedures come as pseudo-codes ("A&H Procedure24" / "procedure24" / "A&H_procedure24").
+        // Resolve the number → real procedure name via the frozen glossary, then match by name.
+        const realName = resolveProcedurePseudonym(rawProc);
+        let matchedProcedure;
+        if (realName) {
+          const target = realName.toLowerCase().trim();
+          matchedProcedure =
+            this.procedurelist.find(p => p.procedurename?.toLowerCase().trim() === target) ??
+            this.procedurelist.find(p => p.procedurename?.toLowerCase().includes(target));
+          if (!matchedProcedure) console.warn('[AI-ATC] procedure pseudo-code resolved to', realName, 'but no procedures.name matched for', rawProc);
+        } else {
+          // Fallback: AI emitted a real name (legacy ai_generated_atc_summary) — name substring match.
+          const aiKey = this.extractProcedureKey(rawProc).toLowerCase();
+          matchedProcedure = this.procedurelist.find(p => p.procedurename.toLowerCase().includes(aiKey));
+          if (!matchedProcedure) console.warn('[AI-ATC] could not resolve/match procedure', rawProc);
+        }
 
         if (matchedProcedure) {
           procedures.push({
@@ -509,13 +522,39 @@ export class PrescribeATCComponent {
       //   return;
       // }
 
-        const firstBrace = output.indexOf('{');
-        this.summarystring = firstBrace > 0 ? output.substring(0, firstBrace).trim() : null;
-        const parsedJson = this.extractATCJson(output);
-
-        if (!parsedJson) {
-          console.warn('No ATC_Report JSON found in AI output');
-          return;
+        // queue_atc_generation and ai_generated_atc_summary use DIFFERENT output schemas.
+        // Normalize BOTH into the { ATC_Report: { Adjustments, Areas_that_need_to_be_explored_more } }
+        // shape that patchAIAdjustments() + the areasstring logic below expect.
+        let parsedJson: any;
+        if (params['source'] === 'queueatc') {
+          // Queue schema: Part-1 text + "---JSON---" + { adjustments:[{adjustment,outcome,procedures}],
+          // areas_needing_more_data:[] }. Use the delimiter-aware parser and remap the field names.
+          const parsed = parseAtcOutput(output);
+          this.summarystring = parsed.analysis || null;
+          const qj: any = parsed.json;
+          if (!qj || !Array.isArray(qj.adjustments)) {
+            console.warn('queue_atc_generation output has no parseable adjustments JSON', { keys: qj ? Object.keys(qj) : null });
+            return;
+          }
+          parsedJson = {
+            ATC_Report: {
+              Adjustments: qj.adjustments.map((a: any) => ({
+                Adjustment: a?.adjustment ?? '',
+                Outcome: a?.outcome ?? '',
+                Procedures: a?.procedures ?? [],
+              })),
+              Areas_that_need_to_be_explored_more: qj.areas_needing_more_data ?? [],
+            },
+          };
+        } else {
+          // Legacy ai_generated_atc_summary schema: already { ATC_Report: {...} }.
+          const firstBrace = output.indexOf('{');
+          this.summarystring = firstBrace > 0 ? output.substring(0, firstBrace).trim() : null;
+          parsedJson = this.extractATCJson(output);
+          if (!parsedJson) {
+            console.warn('No ATC_Report JSON found in AI output');
+            return;
+          }
         }
 
       // const beforeJsonMatch = output.match(/^[\s\S]*?(?=\{)/);
@@ -1003,6 +1042,12 @@ export class PrescribeATCComponent {
 
 
   async getATCoptions(){
+    // An AI-generated entry (opened from queue_atc_generation via ?aigenerated) owns a DETERMINISTIC
+    // draft id — temporary_ATC/<docid> — established in ngOnInit. Do NOT run the draft picker or mint
+    // a new random autoSaveID here: that would make autoSave persist to a second id and create a
+    // duplicate draft on every open/refresh. The ngOnInit handler already loads-or-creates that docid,
+    // so refresh / re-navigation reuses the same draft instead of spawning new ones.
+    if (this.route.snapshot.queryParamMap.get('aigenerated')) return;
     console.log("ATC Draft")
     this.draftStatus = {
       message: "Draft not saved yet.",
