@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {collection, collectionData, doc, docData, Firestore,query, where, orderBy, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, writeBatch, limit, startAfter, collectionGroup} from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
-import { Subject, Subscription, takeUntil } from 'rxjs';
+import { Subject, Subscription, takeUntil, catchError, of } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 
 type ArenaTab = 'participants' | 'specialists';
@@ -82,6 +82,19 @@ export class ArenaBoardComponent implements OnDestroy {
   stage = '';
   queueName = '';
   queueData: any = null;
+
+  // Set when any board-data Firestore stream errors out (e.g. the WebChannel
+  // Listen stream stalls on a hostile network, a missing composite index, or a
+  // rules denial). Without this the stream dies silently and the board just
+  // shows nothing with no explanation — the exact "board not showing data"
+  // symptom. Surfaced as a retryable banner instead.
+  loadError: string | null = null;
+  private flagLoadError = (e: any) => {
+    console.error('[arena-board] data load error', e);
+    this.loadError = 'Some board data failed to load (connection or permissions). Tap Retry.';
+    return of([] as any[]);
+  };
+  retryLoad(): void { this.loadError = null; window.location.reload(); }
 
   // Tabs
   leftTab: ArenaTab = 'participants';
@@ -183,7 +196,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('tokenstatus', '==', 'Active')
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       // Sort by `queueposition` (same field the dynamic queue manager uses to
       // order the queue) so Waiting / Queued show the same canonical order.
       // Fall back to `tokennumber` if `queueposition` is missing.
@@ -216,7 +229,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('queueref', '==', queueRef)
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       this.studios = (rows as ArenaStudio[]).filter((s: any) =>
         s['studioin'] === true && s['checkin'] === true
       );
@@ -232,7 +245,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('queueref', '==', doc(this.firestore, 'queue generation', this.queueid))
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       // Keep only pending (still alive)
       const now = new Date();
       this.invitations = (rows as ArenaInvitation[]).filter(inv => {
@@ -251,7 +264,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('status', '==', 'live')
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       this.liveAssignments = rows as ArenaAssignment[];
       this.sortStudiosAndAssignments();
       // Lazy-load profiles for participants and pairing specialists so cards
@@ -275,7 +288,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('status', '==', 'completed')
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       const list = (rows as ArenaAssignment[]).filter((a: any) => a['isactivitydone'] === true);
       list.sort((a: any, b: any) => {
         const tb = b?.['created']?.toMillis ? b['created'].toMillis() : 0;

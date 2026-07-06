@@ -16,6 +16,16 @@
     </div>
   </header>
 
+  <!-- Board-data load failure (silent-blank guard). Surfaces a stalled Listen
+       stream / index / rules error instead of an empty board, with recovery. -->
+  <div class="arena__load-error" *ngIf="loadError" role="alert">
+    <mat-icon>cloud_off</mat-icon>
+    <span>{{ loadError }}</span>
+    <button type="button" class="arena__load-retry" (click)="retryLoad()">
+      <mat-icon>refresh</mat-icon> Retry
+    </button>
+  </div>
+
   <!-- ============================== BODY ============================== -->
   <main class="arena__body" [class.is-left-closed]="!leftOpen" [class.is-right-closed]="!rightOpen">
 

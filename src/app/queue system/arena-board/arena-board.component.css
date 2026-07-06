@@ -1044,3 +1044,32 @@
   background: transparent;
   font-family: inherit;
 }
+/* Board-data load-failure banner (see loadError in the component). */
+.arena__load-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #FDECEA;
+  border: 1px solid #F5C6C0;
+  color: #B23A2E;
+  font-size: 13px;
+}
+.arena__load-error mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.arena__load-retry {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.arena__load-retry:hover { background: rgba(178, 58, 46, 0.08); }
