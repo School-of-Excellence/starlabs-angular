@@ -257,6 +257,65 @@
 
   <div class="queued-notice-bar" *ngIf="isQueuedTemplate"><mat-icon>schedule</mat-icon><div><strong>Queued template</strong><p>Ready to send to {{getRecipientCount()}} recipient(s).</p></div></div>
 
+  <!-- ═══════ WATI CATEGORY TAG ═══════ -->
+  <div class="step-card category-tag-card" *ngIf="isTemplatePresent() && !isQueuedTemplate">
+    <div class="step-header">
+      <div class="step-badge"><mat-icon style="font-size:16px;line-height:1">category</mat-icon></div>
+      <span>Tag Broadcast Category</span>
+      <span class="step-hint required-hint"><mat-icon style="font-size:14px;vertical-align:middle">error_outline</mat-icon> Required</span>
+    </div>
+    <div class="category-tag-row">
+      <mat-form-field appearance="outline" class="category-tag-field">
+        <mat-label>Category <span style="color:red">*</span></mat-label>
+        <mat-icon matPrefix>category</mat-icon>
+        <mat-select [(ngModel)]="selectedWatiCategory" required>
+          <mat-option value="">None</mat-option>
+          <mat-option *ngFor="let c of watiCategories" [value]="c.id">{{ c.name }}</mat-option>
+        </mat-select>
+        <mat-hint *ngIf="!selectedWatiCategory" style="color: #e53935;">Select a category to enable sending</mat-hint>
+      </mat-form-field>
+      <button mat-icon-button color="primary" (click)="manageCategoryDialogOpen = true"
+        matTooltip="Manage categories" class="add-cat-btn">
+        <mat-icon>add_circle_outline</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════ MANAGE WATI CATEGORIES ═══════ -->
+  <div class="manage-overlay" *ngIf="manageCategoryDialogOpen" (click)="manageCategoryDialogOpen = false">
+    <div class="manage-dialog" (click)="$event.stopPropagation()">
+      <div class="manage-header">
+        <h3>Manage Categories</h3>
+        <button mat-icon-button (click)="manageCategoryDialogOpen = false">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="manage-add-row">
+        <mat-form-field appearance="outline" class="manage-input">
+          <mat-label>New Category</mat-label>
+          <input matInput [(ngModel)]="newWatiCategoryName" (keyup.enter)="addWatiCategory()"
+            placeholder="Enter name…">
+        </mat-form-field>
+        <button mat-raised-button color="primary" [disabled]="!newWatiCategoryName.trim() || isAddingCategory"
+          (click)="addWatiCategory()">
+          <mat-progress-spinner *ngIf="isAddingCategory" diameter="16" mode="indeterminate"
+            style="display:inline-flex;margin-right:6px;"></mat-progress-spinner>
+          <mat-icon *ngIf="!isAddingCategory">add</mat-icon> Add
+        </button>
+      </div>
+
+      <div class="manage-list">
+        <div class="manage-item" *ngFor="let c of watiCategories">
+          <mat-chip color="primary" selected>{{ c.name }}</mat-chip>
+        </div>
+        <div *ngIf="watiCategories.length === 0" class="manage-empty-state">
+          No categories yet.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════ SCHEDULE ═══════ -->
   <div class="step-card schedule-card" *ngIf="isTemplatePresent() && !isQueuedTemplate">
     <div class="schedule-header" [class.schedule-header-active]="isScheduled" (click)="isScheduled = !isScheduled; onScheduleToggle()">
@@ -319,9 +378,9 @@
   <div class="footer-actions" *ngIf="isTemplatePresent()">
     <button mat-stroked-button (click)="dialogRef.close()" class="cancel-btn">Cancel</button>
     <div class="footer-right">
-      <button mat-stroked-button color="primary" *ngIf="!isScheduled" [disabled]="isQueuedTemplate || isUploadingFile" (click)="addtoQueueFunction()" class="queue-btn"><mat-icon>playlist_add</mat-icon> Add to Queue</button>
-      <button mat-raised-button class="schedule-send-btn" *ngIf="isScheduled && !isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || !isScheduleValid() || !isParamConfigValid()" (click)="onScheduleSubmit()"><mat-icon>schedule_send</mat-icon> Schedule for {{scheduleHour}}:{{scheduleMinute}} {{schedulePeriod}}</button>
-      <button mat-raised-button color="primary" *ngIf="!isScheduled || isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || (!isQueuedTemplate && !isParamConfigValid()) || isSendingQueued" (click)="onSubmit()" class="send-btn">
+      <button mat-stroked-button color="primary" *ngIf="!isScheduled" [disabled]="isQueuedTemplate || isUploadingFile || (!isQueuedTemplate && !selectedWatiCategory)" (click)="addtoQueueFunction()" class="queue-btn"><mat-icon>playlist_add</mat-icon> Add to Queue</button>
+      <button mat-raised-button class="schedule-send-btn" *ngIf="isScheduled && !isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || !isScheduleValid() || !isParamConfigValid() || !selectedWatiCategory" (click)="onScheduleSubmit()"><mat-icon>schedule_send</mat-icon> Schedule for {{scheduleHour}}:{{scheduleMinute}} {{schedulePeriod}}</button>
+      <button mat-raised-button color="primary" *ngIf="!isScheduled || isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || (!isQueuedTemplate && !isParamConfigValid()) || isSendingQueued || (!isQueuedTemplate && !selectedWatiCategory)" (click)="onSubmit()" class="send-btn">
         <mat-progress-spinner *ngIf="isSendingQueued" diameter="18" mode="indeterminate" color="accent" style="display:inline-flex;margin-right:8px;"></mat-progress-spinner>
         <mat-icon *ngIf="!isSendingQueued">send</mat-icon> {{isQueuedTemplate ? (isSendingQueued ? 'Sending…' : 'Send to Recipients') : 'Send Now'}}
       </button>
