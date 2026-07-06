@@ -1483,6 +1483,17 @@
                   </div>
 
                   <div class="form-section">
+                    <h3 class="section-title">Congratulations Message</h3>
+                    <div class="comm-section-body">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Congratulations Message</mat-label>
+                        <textarea matInput formControlName="enrolledcongrats" rows="3"
+                          placeholder="Enter the congratulations message..."></textarea>
+                      </mat-form-field>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
                     <h3 class="section-title">Workshop Chat</h3>
                     <div class="comm-section-body">
                       <mat-form-field appearance="outline" class="w-100">
@@ -1532,23 +1543,35 @@
                       </mat-form-field>
                       <div class="upload-block">
                         <p class="upload-label">Choose Web Hero Image — Recommended Size: 3840 × 1350</p>
-                        <input type="file" (change)="onHeroImageUpload($event)" />
+                        <input #webHeroInput type="file" (change)="onHeroImageUpload($event)" />
                         <div *ngIf="settingsForm.get('heroImage')?.value" class="upload-preview">
                           <img [src]="settingsForm.get('heroImage')?.value" alt="Hero Image">
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroImage', webHeroInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                       <div class="upload-block">
                         <p class="upload-label">Choose Mobile Hero Image — Recommended Size: EiFlix Series Image Size</p>
-                        <input type="file" (change)="onHeroMobileImageUpload($event)" />
+                        <input #mobileHeroInput type="file" (change)="onHeroMobileImageUpload($event)" />
                         <div *ngIf="settingsForm.get('heroImageMobile')?.value" class="upload-preview">
                           <img [src]="settingsForm.get('heroImageMobile')?.value" alt="Hero Image">
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroImageMobile', mobileHeroInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                       <div class="upload-block">
                         <p class="upload-label">Choose Video</p>
-                        <input type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
+                        <input #heroVideoInput type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
                         <div *ngIf="settingsForm.get('heroVideo')?.value" class="upload-preview">
                           <video [src]="settingsForm.get('heroVideo')?.value" controls></video>
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroVideo', heroVideoInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                     </div>
