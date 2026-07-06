@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getDocsFromCache, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, Location } from '@angular/common';
@@ -11,7 +11,10 @@ import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialog } from '@angular/material/dialog';
 import { ConnectivityGuardService } from '../../shared/connectivity-guard.service';
 import { MediaCacheService, PendingMedia } from '../../shared/media-cache.service';
-import { FirestoreRecoveryService } from '../../shared/firestore-recovery.service';
+import { ATCDraftService } from '../../shared/atc-draft.service';
+import { parseAtcOutput } from '../../ATC-Ops/atc-ops.types';
+import { resolveProcedurePseudonym } from '../../ATC-Ops/procedure-pseudonyms';
+import { DraftConflictDialogComponent } from '../shared/draft-conflict-dialog.component';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { AtcOptionComponent } from '../../ATC/atc-option/atc-option.component';
@@ -65,7 +68,6 @@ const generateId = (firestore: Firestore, collectionName: string) => doc(collect
 })
 export class PrescribeATCComponent {
   autoSaveID = null;
-  draftUrls = []
   // Progess
   settingup:boolean = true
   loading = false;
@@ -279,7 +281,7 @@ export class PrescribeATCComponent {
     private networkStatusService : NetworkStatusService,
     private connectivity: ConnectivityGuardService,
     private mediaCache: MediaCacheService,
-    private recovery: FirestoreRecoveryService
+    private draftService: ATCDraftService
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -350,11 +352,22 @@ export class PrescribeATCComponent {
       const procedures = [];
 
       (adj.Procedures || []).forEach(rawProc => {
-        const aiKey = this.extractProcedureKey(rawProc).toLowerCase();
-
-        const matchedProcedure = this.procedurelist.find(p =>
-          p.procedurename.toLowerCase().includes(aiKey)
-        );
+        // AI procedures come as pseudo-codes ("A&H Procedure24" / "procedure24" / "A&H_procedure24").
+        // Resolve the number → real procedure name via the frozen glossary, then match by name.
+        const realName = resolveProcedurePseudonym(rawProc);
+        let matchedProcedure;
+        if (realName) {
+          const target = realName.toLowerCase().trim();
+          matchedProcedure =
+            this.procedurelist.find(p => p.procedurename?.toLowerCase().trim() === target) ??
+            this.procedurelist.find(p => p.procedurename?.toLowerCase().includes(target));
+          if (!matchedProcedure) console.warn('[AI-ATC] procedure pseudo-code resolved to', realName, 'but no procedures.name matched for', rawProc);
+        } else {
+          // Fallback: AI emitted a real name (legacy ai_generated_atc_summary) — name substring match.
+          const aiKey = this.extractProcedureKey(rawProc).toLowerCase();
+          matchedProcedure = this.procedurelist.find(p => p.procedurename.toLowerCase().includes(aiKey));
+          if (!matchedProcedure) console.warn('[AI-ATC] could not resolve/match procedure', rawProc);
+        }
 
         if (matchedProcedure) {
           procedures.push({
@@ -509,13 +522,39 @@ export class PrescribeATCComponent {
       //   return;
       // }
 
-        const firstBrace = output.indexOf('{');
-        this.summarystring = firstBrace > 0 ? output.substring(0, firstBrace).trim() : null;
-        const parsedJson = this.extractATCJson(output);
-
-        if (!parsedJson) {
-          console.warn('No ATC_Report JSON found in AI output');
-          return;
+        // queue_atc_generation and ai_generated_atc_summary use DIFFERENT output schemas.
+        // Normalize BOTH into the { ATC_Report: { Adjustments, Areas_that_need_to_be_explored_more } }
+        // shape that patchAIAdjustments() + the areasstring logic below expect.
+        let parsedJson: any;
+        if (params['source'] === 'queueatc') {
+          // Queue schema: Part-1 text + "---JSON---" + { adjustments:[{adjustment,outcome,procedures}],
+          // areas_needing_more_data:[] }. Use the delimiter-aware parser and remap the field names.
+          const parsed = parseAtcOutput(output);
+          this.summarystring = parsed.analysis || null;
+          const qj: any = parsed.json;
+          if (!qj || !Array.isArray(qj.adjustments)) {
+            console.warn('queue_atc_generation output has no parseable adjustments JSON', { keys: qj ? Object.keys(qj) : null });
+            return;
+          }
+          parsedJson = {
+            ATC_Report: {
+              Adjustments: qj.adjustments.map((a: any) => ({
+                Adjustment: a?.adjustment ?? '',
+                Outcome: a?.outcome ?? '',
+                Procedures: a?.procedures ?? [],
+              })),
+              Areas_that_need_to_be_explored_more: qj.areas_needing_more_data ?? [],
+            },
+          };
+        } else {
+          // Legacy ai_generated_atc_summary schema: already { ATC_Report: {...} }.
+          const firstBrace = output.indexOf('{');
+          this.summarystring = firstBrace > 0 ? output.substring(0, firstBrace).trim() : null;
+          parsedJson = this.extractATCJson(output);
+          if (!parsedJson) {
+            console.warn('No ATC_Report JSON found in AI output');
+            return;
+          }
         }
 
       // const beforeJsonMatch = output.match(/^[\s\S]*?(?=\{)/);
@@ -1003,6 +1042,12 @@ export class PrescribeATCComponent {
 
 
   async getATCoptions(){
+    // An AI-generated entry (opened from queue_atc_generation via ?aigenerated) owns a DETERMINISTIC
+    // draft id — temporary_ATC/<docid> — established in ngOnInit. Do NOT run the draft picker or mint
+    // a new random autoSaveID here: that would make autoSave persist to a second id and create a
+    // duplicate draft on every open/refresh. The ngOnInit handler already loads-or-creates that docid,
+    // so refresh / re-navigation reuses the same draft instead of spawning new ones.
+    if (this.route.snapshot.queryParamMap.get('aigenerated')) return;
     console.log("ATC Draft")
     this.draftStatus = {
       message: "Draft not saved yet.",
@@ -1010,16 +1055,18 @@ export class PrescribeATCComponent {
     }
     this.lastDraftSavedOn = null
     var draftATC = []
-    // push any drafts that never reached the server (e.g. saved during a bricked session) before reading the list
-    await this.recovery.flushPending(this.firestoreATC)
+    // push any drafts that never reached the server (e.g. saved offline) before reading the list
+    await this.draftService.flushDirty(this.firestoreATC)
     if (this.developer || this.admin) {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
         where('profileid', '==', this.participantProfileid),
         where('delete', '==', false)
       );
-      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
-      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
+      // local-first list: bounded server query merged with any unsynced local drafts; local-only if unreachable
+      draftATC = await this.draftService.listDrafts('temporary_ATC', q, 
+        d => d['profileid'] === this.participantProfileid && d['delete'] !== true
+      );
     } else {
       const q = query(
         collection(this.firestoreATC, 'temporary_ATC'),
@@ -1027,8 +1074,10 @@ export class PrescribeATCComponent {
         where('delete', '==', false),
         where('authorprofileid', 'array-contains', this.loggedinProfileid)
       );
-      // online: read from server (refreshes cache); offline: read from cache so pending/offline drafts are returned
-      draftATC = (await (navigator.onLine ? getDocs(q) : getDocsFromCache(q))).docs;
+      // local-first list: bounded server query merged with any unsynced local drafts; local-only if unreachable
+      draftATC = await this.draftService.listDrafts('temporary_ATC', q,
+        d => d['profileid'] === this.participantProfileid && d['delete'] !== true && (d['authorprofileid'] || []).includes(this.loggedinProfileid)
+      );
     }
     console.log(draftATC.map(e => e.ref.path))
     this.existingDraftIds = draftATC.map(e => e.id)  // remember this participant's existing draft ids
@@ -1050,62 +1099,13 @@ export class PrescribeATCComponent {
           var atc = selectedATC
           if(atc["type"] == "draft"){
             this.autoSaveID = atc["doc"].id
-            // re-read the doc so the latest offline edits (pending writes) are loaded, not the stale query snapshot
-            const freshSnap = await getDoc(doc(this.firestoreATC, 'temporary_ATC', this.autoSaveID))
-            var value = freshSnap.exists() ? freshSnap.data() : atc["doc"].data()
-            console.log(value);
-            this.date = value['date']
-            this.product = value['product']
-            this.atcdirective = value['atcdirective'] ?? null
-            this.participantProfileid = value['profileid']
-            this.authorMap = value['author'] ?? {}
-            this.additionalActivityMap = value["additionalactivity"] ?? []
-            this.observerMap = value['observer'] ?? {}
-            this.mentorMap = value['mentor'] ?? {}
-            this.transcript = value['transcript'] ?? []
-            this.atcAssignment = value['atcassignment'] ?? []
-            // Notes
-            this.consultationSummary = value['consultationsummary'] ?? null
-            this.consultationpoint = value['consultationpoint'] ?? null
-            this.casenotes = value['notes'] ?? null
-            this.mentornotes = value['mentornotes'] ?? null
-            // Carry the "edited from AI generation" provenance through to submit.
-            this.aiedited = value['aiedited'] ?? false
-            this.aigeneratedsource = value['aigeneratedsource'] ?? null
-            this.aigeneratedid = value['aigeneratedid'] ?? null
-            console.log(atc)
-            for (let i = 0; i < this.transcript.length; i++) {
-              this.transcript[i]['awareness'] = this.transcript[i]['awareness'] ?? null
-              this.transcript[i]['potentialyears'] = this.transcript[i]['potentialyears'] ?? null
-            }
-
-            // Load any uploaded media that exists (images can exist without audio); never abort the import on failure
-            this.existingAudioURLs = value['audioRecordings'] || [];
-            this.existingNoteImageURLs = value['noteImageURLs'] || [];
-            this.existingATCImageURLs = value['atcImageURLs'] || [];
-            this.imagelist = [...this.existingNoteImageURLs];
-            this.atcImageURL = [...this.existingATCImageURLs];
-            try {
-              this.draftStatus = { message: "Loading media...", code: 0 };
-              await this.loadAudioFromURLs(this.existingAudioURLs);
-              await this.loadNoteImagesFromURLs(this.existingNoteImageURLs);
-              await this.loadATCImagesFromURLs(this.existingATCImageURLs);
-            } catch (error) {
-              console.warn("Some media could not be loaded (kept by URL):", error);
-            }
-
-            // re-attach any media captured offline that hasn't uploaded yet, and upload it if back online
-            const pendingMedia = await this.mediaCache.listByDraft(this.autoSaveID);
-            this.reattachPendingMedia(pendingMedia);
-            if (pendingMedia.length && navigator.onLine) this.autoSave();
-
-            this.draftStatus = {
-              message: "ATC Draft Imported Successfully.",
-              code: 1
-            }
-            if(value["lastupdated"]){
-              this.lastDraftSavedOn = value["lastupdated"].toDate()
-            }
+            // local-first open: render whatever we have without blocking; reconcile against a bounded server fetch
+            // (clean → adopt; local-ahead → keep local; divergence → user picks, loser archived). Falls back to local.
+            const value = (await this.draftService.openDraft(this.firestoreATC, 'temporary_ATC', this.autoSaveID, (mine, theirs) => this.openConflictDialog(mine, theirs))) ?? atc["doc"].data()
+            this.applyDraftValue(value)
+            this.draftStatus = { message: "Loading media...", code: 0 }
+            await this.reloadDraftMedia()
+            this.draftStatus = { message: "ATC Draft Imported Successfully.", code: 1 }
           }
         }
       })
@@ -1502,20 +1502,27 @@ export class PrescribeATCComponent {
           lastupdated: new Date(),       // client time (was serverTimestamp) so the draft is durable in the local outbox + REST fallback
           aiatcsummary:this.summarystring ?? '',
           areastoexplore:this.areasstring ?? '',
-          // preserve "edited from AI generation" provenance across autosaves (writeDraft overwrites the doc)
+          // preserve "edited from AI generation" provenance across autosaves (each sync overwrites the doc)
           aiedited: this.aiedited ?? false,
           aigeneratedsource: this.aigeneratedsource ?? null,
           aigeneratedid: this.aigeneratedid ?? null,
         };
 
-        // durable local outbox first (never lost), then Firestore — falling back to a direct REST write if the
-        // SDK client has been bricked by its internal assertion (b815). Never hangs, never loses the draft.
-        const outcome = await this.recovery.writeDraft(this.firestoreATC, 'temporary_ATC', this.autoSaveID, data);
-        this.draftStatus = this.recovery.draftStatusFor(outcome);
+        // local-first: durable local write (never lost), then push to Firestore inside a rev-checked transaction.
+        // A second device's edit is detected as a 'conflict' and surfaced on reopen — never silently overwritten.
+        await this.draftService.saveLocal('temporary_ATC', this.autoSaveID, data);
+        const res = await this.draftService.sync(this.firestoreATC, 'temporary_ATC', this.autoSaveID);
+        this.draftStatus = this.draftService.statusFor(res.outcome);
         this.lastDraftSavedOn = new Date();
 
-        // upload media only when online AND the Firestore client is healthy; otherwise it stays cached and retries
-        if (navigator.onLine && !this.recovery.isDegraded()) {
+        // a divergence was detected (this device AND another both changed since the last sync) — surface it NOW
+        // (this also covers reconnect, which re-runs autosave): re-fetch, let the user pick, re-hydrate. Never clobbers.
+        if (res.outcome === 'conflict') {
+          await this.reconcileOpenDraft();
+        }
+
+        // upload media only when we actually reached the server with a clean result; otherwise it stays cached
+        if (navigator.onLine && (res.outcome === 'created' || res.outcome === 'updated' || res.outcome === 'unchanged' || res.outcome === 'took-remote')) {
           try {
             const [audioURLs, noteImageURLs, atcImageURLs] = await Promise.all([
               this.uploadAudioToStorage(),
@@ -1523,7 +1530,6 @@ export class PrescribeATCComponent {
               this.uploadATCImageToStorage()
             ]);
 
-            this.draftUrls = audioURLs;
             this.audiolist = audioURLs;
             this.imagelist = noteImageURLs;
             this.atcImageURL = atcImageURLs;
@@ -1574,6 +1580,100 @@ export class PrescribeATCComponent {
   // true when the participant has at least one draft other than the one currently open
   get hasOtherDrafts(): boolean {
     return this.existingDraftIds.some(id => id !== this.autoSaveID);
+  }
+
+  // guards re-entrancy while a conflict dialog is open (so autosave doesn't open a second dialog or loop)
+  private resolvingConflict = false;
+
+  // map a draft document (server, local, or a conflict winner) onto the form fields. Reused on open AND after a resolve.
+  private applyDraftValue(value: any) {
+    this.date = value['date']
+    this.product = value['product']
+    this.atcdirective = value['atcdirective'] ?? null
+    this.participantProfileid = value['profileid']
+    this.authorMap = value['author'] ?? {}
+    this.additionalActivityMap = value["additionalactivity"] ?? []
+    this.observerMap = value['observer'] ?? {}
+    this.mentorMap = value['mentor'] ?? {}
+    this.transcript = value['transcript'] ?? []
+    this.atcAssignment = value['atcassignment'] ?? []
+    // Notes
+    this.consultationSummary = value['consultationsummary'] ?? null
+    this.consultationpoint = value['consultationpoint'] ?? null
+    this.casenotes = value['notes'] ?? null
+    this.mentornotes = value['mentornotes'] ?? null
+    // Carry the "edited from AI generation" provenance through to submit.
+    this.aiedited = value['aiedited'] ?? false
+    this.aigeneratedsource = value['aigeneratedsource'] ?? null
+    this.aigeneratedid = value['aigeneratedid'] ?? null
+    for (let i = 0; i < this.transcript.length; i++) {
+      this.transcript[i]['awareness'] = this.transcript[i]['awareness'] ?? null
+      this.transcript[i]['potentialyears'] = this.transcript[i]['potentialyears'] ?? null
+    }
+    // media URL arrays the draft already has (uploaded earlier)
+    this.existingAudioURLs = value['audioRecordings'] || [];
+    this.existingNoteImageURLs = value['noteImageURLs'] || [];
+    this.existingATCImageURLs = value['atcImageURLs'] || [];
+    this.imagelist = [...this.existingNoteImageURLs];
+    this.atcImageURL = [...this.existingATCImageURLs];
+    if (value["lastupdated"]) {
+      // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
+      this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
+    }
+  }
+
+  // (re)load uploaded media from URLs and re-attach offline-captured media for the current draft. Used on open + resolve.
+  private async reloadDraftMedia() {
+    try {
+      await this.loadAudioFromURLs(this.existingAudioURLs);
+      await this.loadNoteImagesFromURLs(this.existingNoteImageURLs);
+      await this.loadATCImagesFromURLs(this.existingATCImageURLs);
+    } catch (error) {
+      console.warn("Some media could not be loaded (kept by URL):", error);
+    }
+    const pendingMedia = await this.mediaCache.listByDraft(this.autoSaveID);
+    this.reattachPendingMedia(pendingMedia);
+    // upload offline-captured media now if we're back online (but not mid conflict-resolve, to avoid a loop)
+    if (pendingMedia.length && navigator.onLine && !this.resolvingConflict) this.autoSave();
+  }
+
+  // reconcile the CURRENTLY-OPEN draft against the server (fired when autosave/reconnect detects a 'conflict'):
+  // re-fetch (bounded), let the user pick on a true divergence, then re-hydrate the winner. Re-entrancy-guarded.
+  private async reconcileOpenDraft() {
+    if (this.autoSaveID == null || this.resolvingConflict) return;
+    this.resolvingConflict = true;
+    try {
+      const value = await this.draftService.openDraft(this.firestoreATC, 'temporary_ATC', this.autoSaveID, (mine, theirs) => this.openConflictDialog(mine, theirs));
+      if (value) { this.applyDraftValue(value); await this.reloadDraftMedia(); }
+    } finally {
+      this.resolvingConflict = false;
+    }
+  }
+
+  // ask the user which version to keep when the same draft diverged across two devices (default to this device's
+  // copy if dismissed — the rejected side is archived by ATCDraftService either way, so nothing is ever lost)
+  private openConflictDialog(mine: any, theirs: any): Promise<'mine' | 'theirs'> {
+    // build the name lookups the dialog needs from the lists the parent already loaded (offline-safe, no reads):
+    // recommended_to → procedure_recommend (recommendlist), assigned agents → profile paths (specialist/mentor lists)
+    const recommendMap: Record<string, string> = {};
+    (this.recommendlist ?? []).forEach((r: any) => { if (r?.path) recommendMap[r.path] = r.name; });
+    const agentMap: Record<string, string> = {};
+    [...(this.specialistList ?? []), ...(this.mentorNameList ?? [])].forEach((s: any) => { if (s?.authorpath) agentMap[s.authorpath] = s.authorname; });
+    const ref = this.matDialog.open(DraftConflictDialogComponent, {
+      data: { mine, theirs, recommendMap, agentMap, procedureMap: this.procedureMap },
+      autoFocus: false, disableClose: true, width: '90vw', maxWidth: '960px'
+    });
+    return ref.afterClosed().toPromise().then(choice => (choice === 'theirs' ? 'theirs' : 'mine'));
+  }
+
+  // lastupdated may arrive as a Firestore Timestamp (server read) or a JS Date (local cache) — normalise to a Date
+  private toJsDate(v: any): Date | null {
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000);
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
   }
 
   // collect media blobs that haven't been uploaded yet (for durable offline storage)
@@ -2434,9 +2534,8 @@ async removeATCImage(index: number) {
     this.loading = false
     // await this.cleanTemporaryaudio()
     // wait for the soft-delete to complete so the submitted draft does not reappear
-    await updateDoc(doc(this.firestoreATC, "temporary_ATC", this.autoSaveID), {delete: true}).catch(err=>{
-      console.log(err)
-    })
+    // soft-delete the server draft AND purge the local cache copy (idempotent; self-heals if it can't complete now)
+    await this.draftService.finalizeSubmit(this.firestoreATC, "temporary_ATC", this.autoSaveID)
     // clear locally-cached media for the submitted draft
     await this.mediaCache.deleteByDraft(this.autoSaveID)
 

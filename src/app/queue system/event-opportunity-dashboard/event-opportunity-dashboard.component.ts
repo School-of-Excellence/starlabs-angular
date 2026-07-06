@@ -82,6 +82,10 @@ export class EventOpportunityDashboardComponent {
   customStageSearchText: string = '';
 
   selectedQueueList: string[] = []
+  /** Planning tab's OWN, independent queue selection (separate from the Board's). */
+  planningQueues: string[] = []
+  /** Union of Board + Planning selections — the set data is actually loaded for. */
+  get loadedQueues(): string[] { return [...new Set([...this.selectedQueueList, ...this.planningQueues])]; }
   queueList: any[]
   mapQueue = {}
   showQueueSelect: boolean = true
@@ -105,6 +109,7 @@ export class EventOpportunityDashboardComponent {
 
   queueTokens: any[] = [];
   developerRole:boolean = false;
+  currentProfileId: string = '';
   queueTokenMap: Map<string, any> = new Map();
   selectedProductFilter: string | null = null;
   expandedStages: Set<string> = new Set();
@@ -113,6 +118,22 @@ export class EventOpportunityDashboardComponent {
   eventList:any[]=[]
   arenaeticket:any[]=[]
   mapEvent = {}
+
+  // ===== Studio Watch =====================================================
+  // A right-side panel that surfaces studios which have been occupied too long
+  // and are holding up the queue. Two sources feed it (matching the Arena's
+  // JOINED / ACTIVE columns):
+  //   • JOINED  — participant pulled into the studio (no Zoom start yet) more
+  //               than 4h ago  → measure from the live-assignment `created`.
+  //   • ACTIVE  — the call has started; measure from `specialistJoinedAt`. We
+  //               still flag it even when the call itself has ended (the
+  //               assignment is `live` so the studio is not yet freed).
+  // Only `status === 'live'` assignments count — a completed assignment has
+  // already freed its studio.
+  private readonly STUDIO_WATCH_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 hours
+  studioWatchOpen = false;         // collapsed pill by default; user expands
+  private studioWatchTick = 0;     // bumped by a timer so elapsed labels refresh
+  private studioWatchTimer: any = null;
 
   filteredProfileIds: Set<string> = new Set();
   selectedEventName: string = '';
@@ -186,21 +207,27 @@ export class EventOpportunityDashboardComponent {
         if (roleData["developer"]) {
           this.developerRole = true;
         }
+        this.currentProfileId = roleData?.['profile_ref']?.id || '';
         this.getQueueData()
       // } else {
       //   this.router.navigateByUrl("/")
       // }
     })
+
+    // Refresh Studio Watch elapsed labels every 30s (Xh Ym granularity).
+    this.studioWatchTimer = setInterval(() => { this.studioWatchTick++; }, 30000);
   }
 
   ngOnDestroy() {
+    if (this.studioWatchTimer) clearInterval(this.studioWatchTimer);
     this.subscription.complete();
     this.subscription.next();
   }
 
   setActiveTab(tab: 'board' | 'planning'): void {
+    // Both tabs stay alive (toggled via [hidden]) so switching never reloads/refetches.
+    // Data stays fresh through queue-selection changes, not tab switches.
     this.activeTab = tab;
-    if (tab === 'planning') this.planningRefreshKey++;
   }
 
   /** Queue selection coming from the Planning tab's own queue filter. */
@@ -382,6 +409,21 @@ export class EventOpportunityDashboardComponent {
     } else {
       console.log('No queues selected, skipping stage fetch');
     }
+  }
+
+  /** Top "Select queue" picker changed (ngModel gives the full new selection). */
+  onQueueSelectionChange(ids: string[]): void {
+    this.selectedQueueList = [...(ids || [])];
+    this.getselectedStages();
+    this.fetchQueueTokens();
+    this.planningRefreshKey++;
+  }
+
+  /** Planning tab picked its OWN queues (independent of the Board). Loads data for the union. */
+  onPlanningQueuesChange(ids: string[]): void {
+    this.planningQueues = [...(ids || [])];
+    this.fetchQueueTokens();
+    this.planningRefreshKey++;
   }
 
   updateSelectedQueues(docid: any, event: any) {
@@ -1296,6 +1338,103 @@ export class EventOpportunityDashboardComponent {
     return names.join(', ') || studioId;
   }
 
+  // ===== Studio Watch =====================================================
+
+  private tsToMillis(ts: any): number | null {
+    if (!ts) return null;
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+    const d = new Date(ts);
+    const t = d.getTime();
+    return isNaN(t) ? null : t;
+  }
+
+  /**
+   * Studios flagged by the 4-hour rule across the currently selected board
+   * queues. JOINED assignments are measured from `created` (studio entry);
+   * ACTIVE assignments (call started) from `specialistJoinedAt`. Sorted
+   * longest-waiting first.
+   */
+  get studioWatchItems(): Array<{
+    key: string;
+    queueid: string;
+    queuename: string;
+    stage: string;
+    type: 'joined' | 'active';
+    participant: string;
+    coach: string;
+    studioLabel: string;
+    elapsedMs: number;
+  }> {
+    void this.studioWatchTick; // re-evaluate on each tick so timers advance
+    const now = Date.now();
+    const out: Array<any> = [];
+
+    for (const queueid of this.selectedQueueList) {
+      const list: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+      const queuename = this.mapQueue[queueid]?.['queuename'] ?? queueid;
+
+      for (const a of list) {
+        if (a?.['status'] !== 'live') continue;
+        const stage = a?.['stagename'];
+        if (!stage) continue;
+        if (!this.isStageSelected(queueid, stage)) continue;
+
+        const joinedMs = this.tsToMillis(a?.['specialistJoinedAt']);
+        const type: 'joined' | 'active' = joinedMs != null ? 'active' : 'joined';
+        const startMs = joinedMs != null ? joinedMs : this.tsToMillis(a?.['created']);
+        if (startMs == null) continue;
+
+        const elapsedMs = now - startMs;
+        if (elapsedMs < this.STUDIO_WATCH_THRESHOLD_MS) continue;
+
+        // Respect the active event filter when one is applied.
+        const participantId = a?.['participantid'];
+        if (this.filteredProfileIds.size > 0 && !this.filteredProfileIds.has(participantId)) continue;
+
+        const pairing: string[] = a?.['pairing'] || [];
+        const coach = pairing.map(pid => this.mapProfile[pid] || pid).filter(Boolean).join(', ');
+
+        out.push({
+          key: a?.['id'] || a?.['docid'] || `${queueid}-${a?.['studioid']}`,
+          queueid,
+          queuename,
+          stage,
+          type,
+          participant: this.mapProfile[participantId] || participantId || '—',
+          coach: coach || '—',
+          studioLabel: this.getStudioWatchStudioLabel(queueid, a?.['studioid']) || queuename,
+          elapsedMs,
+        });
+      }
+    }
+
+    return out.sort((x, y) => y.elapsedMs - x.elapsedMs);
+  }
+
+  get studioWatchCount(): number {
+    return this.studioWatchItems.length;
+  }
+
+  private getStudioWatchStudioLabel(queueid: string, studioid: string): string {
+    const studio = this.mapData[queueid]?.['studioMap']?.[studioid];
+    if (!studio) return '';
+    const named = studio['studioname'] || studio['name'];
+    if (named && named !== 'Studio') return named;
+    const participants: string[] = studio['participants'] || [];
+    return participants.map(id => this.mapProfile[id] || id).filter(Boolean).join(', ');
+  }
+
+  /** "5h 12m" style elapsed label. */
+  formatWatchElapsed(ms: number): string {
+    if (ms == null || ms < 0) ms = 0;
+    const totalMin = Math.floor(ms / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h <= 0) return `${m}m`;
+    return `${h}h ${m.toString().padStart(2, '0')}m`;
+  }
+
   formatActivityDate(timestamp: any): string {
     if (!timestamp) return '';
 
@@ -1424,12 +1563,13 @@ export class EventOpportunityDashboardComponent {
   }
 
   fetchQueueTokens() {
-    if (this.selectedQueueList.length === 0) {
+    const queues = this.loadedQueues;
+    if (queues.length === 0) {
       this.queueTokens = [];
       this.queueTokenMap.clear();
       return;
     }
-    const selectedQueueRef = this.selectedQueueList.map((e) => this.mapQueue[e]['docref'])
+    const selectedQueueRef = queues.map((e) => this.mapQueue[e]['docref'])
     collectionData(query(
       collection(this.firestore, 'queue_token'),
       where('queueref', 'in', selectedQueueRef)

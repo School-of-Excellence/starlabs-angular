@@ -61,7 +61,7 @@
 </div>
 
 <!-- Success Modal -->
-<div class="inv-success-backdrop" *ngIf="invitationAccepted">
+<div class="inv-success-backdrop" *ngIf="invitationAccepted && !waitingForStudio && !busyElsewhere">
   <div class="inv-success-dialog">
 
     <div class="inv-success-icon">
@@ -86,7 +86,31 @@
       </ul>
     </div>
 
-    <button class="inv-success-btn" data-testid="web-inv-success-btn" (click)="_closeInvitation()">Got it, Thanks!</button>
+    <button class="inv-success-btn" data-testid="web-inv-success-btn" (click)="acknowledgeAccepted()">Got it, Thanks!</button>
+
+  </div>
+</div>
+
+<!-- Waiting-for-specialist status — persists after "Got it" until the
+     specialist assigns the participant to the studio (inStudio → dismissed,
+     Join Meeting screen shows through). -->
+<div class="inv-success-backdrop" *ngIf="waitingForStudio && !busyElsewhere" data-testid="web-inv-waiting-backdrop">
+  <div class="inv-success-dialog">
+
+    <div class="inv-success-icon inv-success-icon--waiting">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" width="36" height="36">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+
+    <h2 class="inv-success-title">Invitation Accepted</h2>
+
+    <p class="inv-success-sub">
+      Waiting for the specialist to bring you into the studio.
+      This screen will open your session automatically once they’re ready.
+    </p>
+
+    <div class="inv-waiting-dots" aria-hidden="true"><span></span><span></span><span></span></div>
 
   </div>
 </div>

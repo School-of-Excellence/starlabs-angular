@@ -11,7 +11,7 @@
 export type CoachHealthState = 'HAPPY' | 'NEUTRAL' | 'UNHAPPY' | 'AT_RISK' | 'CRITICAL';
 
 /** Event types written to the unified append-only healthtracker_activity log. */
-export type ActivityType = 'call' | 'health' | 'schedule' | 'note' | 'flag' | 'coach_change';
+export type ActivityType = 'call' | 'health' | 'schedule' | 'note' | 'flag' | 'coach_change' | 'addressed';
 
 /** Ordered list of the coach-set states for option pickers / distribution iteration. */
 export const COACH_HEALTH_OPTIONS: CoachHealthState[] = ['HAPPY', 'NEUTRAL', 'UNHAPPY', 'AT_RISK', 'CRITICAL'];

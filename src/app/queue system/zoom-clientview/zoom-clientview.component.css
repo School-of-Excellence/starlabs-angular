@@ -1,20 +1,23 @@
 .slider-container {
   position: absolute;
-  bottom: 50px; /* Adjust as needed */
-  left: 10px; /* Adjust as needed */
+  top: 60px;  /* top-left corner, just below Zoom's header */
+  left: 10px;
   z-index: 9999; /* Ensure it appears on top of other elements */
   background-color: transparent;
   color: white; /* Text color */
-  padding: 5px 10px;
+  padding: 5px;
   border-radius: 5px;
   border: none;
   cursor: pointer;
-  overflow-x: auto;
+  overflow: visible; /* no scrollbar — chips auto-remove after 10s so they don't pile up */
   display: flex;
   flex-direction: column;
   align-items: start; /* Center align items */
   justify-content: start;
-  width: 900px;
+  /* Was 900px — a transparent 900px overlay intercepted clicks over the
+     Zoom UI underneath. Size to the thumbnails so only the chips are
+     interactive. */
+  width: 116px;
 }
 
 .slider-item {
@@ -36,22 +39,182 @@
   position: relative;
 }
 
-.float {
-position: fixed;
-  bottom: 12px;
-  right: 90px;
-  /* sits just left of Zoom's End button */
-  z-index: 99999;
-  background-color: #f12155;
-  color: white;
-  padding: 8px 16px;
+/* ============================================================
+   Safari-only custom Zoom control bar (Mute/Unmute + Leave).
+   Rendered instead of the SDK's control bar, which Safari refuses to paint.
+   Plain DOM → paints reliably. Pinned to the viewport bottom, on the black strip. */
+.sx-zoom-controls {
+  /* Centered floating pill. NOT bottom:0 — in Safari the viewport bottom is
+     off the visible screen edge (a persistent gap the viewport APIs don't
+     expose), so a bottom:0 bar is off-screen. Anchor at bottom:88px, the same
+     level as the host Capture button which is reliably visible. Centered so it
+     never covers the left-side host buttons. */
+  position: fixed;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483000;      /* above the Zoom SDK chrome */
+  max-width: 96vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 10px;
+  background: rgba(22, 24, 28, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.sx-zc-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 62px;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: #f1f5f9;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+  transition: background-color 120ms ease;
+}
+.sx-zc-btn mat-icon {
+  font-size: 21px;
+  width: 21px;
+  height: 21px;
+}
+.sx-zc-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.sx-zc-btn--muted { color: #fca5a5; }
+.sx-zc-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.sx-zc-btn--leave { color: #fff; }
+.sx-zc-btn--leave mat-icon { color: #f87171; }
+.sx-zc-btn--leave:hover { background: rgba(239, 68, 68, 0.18); }
+
+/* Mic/Camera button + caret grouping */
+.sx-zc-group { display: inline-flex; align-items: stretch; }
+.sx-zc-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  padding: 0;
+  margin-left: -2px;
+  background: transparent;
+  border: none;
   border-radius: 8px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.sx-zc-caret mat-icon { font-size: 16px; width: 16px; height: 16px; }
+.sx-zc-caret:hover { background: rgba(255, 255, 255, 0.1); }
+.sx-zc-caret--open { background: rgba(255, 255, 255, 0.16); color: #fff; }
+
+/* Device dropdown (opens above the pill) */
+.sx-zc-menu {
+  position: fixed;      /* left/bottom set inline, anchored to the caret */
+  z-index: 2147483001;
+  min-width: 260px;
+  max-width: 92vw;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: rgba(28, 30, 35, 0.99);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.sx-zc-menu-title {
+  padding: 6px 10px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.sx-zc-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #f1f5f9;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+.sx-zc-menu-item mat-icon { font-size: 18px; width: 18px; height: 18px; color: #34d399; flex-shrink: 0; }
+.sx-zc-menu-item span { flex: 1; white-space: normal; word-break: break-word; }
+.sx-zc-menu-item:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.sx-zc-menu-item--checked { color: #fff; font-weight: 600; }
+.sx-zc-menu-item--header {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: default;
+}
+
+/* Capture + Prescribe ATC — IDENTICAL host-only pill buttons, stacked bottom-left
+   above the Zoom control bar (clear of the End / "End meeting for all" controls).
+   Same shape/size/typography; the ONLY difference is the accent colour below. */
+.float,
+.prescribe-bubble {
+  position: fixed;
+  left: 16px;
+  z-index: 99999;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
   border: none;
   cursor: pointer;
   font-weight: 600;
   font-size: 13px;
+  line-height: 1;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: background-color 120ms ease, transform 120ms ease;
 }
+.float mat-icon,
+.prescribe-bubble mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+.float:hover,
+.prescribe-bubble:hover {
+  transform: translateY(-1px);
+}
+
+/* Positions — stacked bottom-left */
+.float { bottom: 88px; }
+.prescribe-bubble { bottom: 132px; }
+
+/* Colours — the only visual difference between the two */
+.prescribe-bubble { background-color: #ef4444; }   /* red — matches the Prescribe ATC step */
+.prescribe-bubble:hover { background-color: #dc2626; }
+.float { background-color: #0ea5e9; }              /* sky blue — capture */
+.float:hover { background-color: #0284c7; }
 
 /* ============================================================
    Specialist-wait screen (participant side, queue/studio flow)
@@ -313,6 +476,12 @@ position: fixed;
   height: 38px;
   line-height: 38px;
 }
+/* Prescribe-ATC "ready" popup icon — indigo, no pulsing (not a recording alert). */
+.rec-prompt-card__icon--atc {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: none;
+  animation: none;
+}
 @keyframes rec-pulse {
   0%   { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0.55); }
   70%  { box-shadow: 0 0 0 22px rgba(220, 38, 38, 0);   }
@@ -333,26 +502,32 @@ position: fixed;
   color: #334155;
 }
 .rec-prompt-card__hint {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;    /* keep icon aligned to the first line when text wraps */
   gap: 8px;
-  padding: 9px 16px;          /* unchanged */
+  padding: 9px 16px;
   margin-bottom: 22px;
   background: #fef3c7;
   border: 1px solid #fcd34d;
-  border-radius: 10px;        /* was 999px */
+  border-radius: 10px;
   font-size: 12.5px;
   font-weight: 600;
   color: #92400e;
-  width: 100%;                /* add this */
-  box-sizing: border-box;     /* add this */
-  text-align: left;           /* add this */
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+.rec-prompt-card__hint > span {
+  flex: 1;                    /* the whole message is a single flowing block */
+  line-height: 1.5;
 }
 .rec-prompt-card__hint mat-icon {
+  flex-shrink: 0;            /* icon stays 16px, never squeezed by the text */
   font-size: 16px;
   width: 16px;
   height: 16px;
   line-height: 16px;
+  margin-top: 1px;
   color: #b45309;
 }
 .rec-prompt-card__actions {

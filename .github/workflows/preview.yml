@@ -99,31 +99,30 @@ jobs:
           echo "Preview URL: $URL"
 
       # Write the REAL preview URL into the release console (release-candidates doc on
-      # starlabs-cicd). The console can't compute it (hashed), so the workflow — the only
-      # place that knows it — records it. Reuses the same SA as the history recorder.
+      # starlabs-cicd). The console can't compute it (hashed), so the workflow POSTs it to a
+      # token-authenticated Cloud Function (recordPreviewUrl) that validates the payload and
+      # updates the record. No service account in this repo — auth is a low-privilege shared
+      # token CONSOLE_INGEST_TOKEN scoped to that one endpoint (Option A, 2026-06-28).
       - name: Record preview URL in the release console
         if: success() && steps.deploy.outputs.url != ''
+        continue-on-error: true            # a console-write hiccup must never fail the preview
         env:
-          STARLABS_CICD_SA_JSON: ${{ secrets.STARLABS_CICD_SA }}
+          INGEST_URL: https://us-central1-starlabs-cicd.cloudfunctions.net/recordPreviewUrl
+          INGEST_TOKEN: ${{ secrets.CONSOLE_INGEST_TOKEN }}
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
-          PREVIEW_SHA: ${{ github.sha }}
           REPO_NAME: ${{ github.event.repository.name }}
           BRANCH: ${{ github.event.inputs.ref || github.ref_name }}
+          PREVIEW_SHA: ${{ github.sha }}
         run: |
-          if [ -z "$STARLABS_CICD_SA_JSON" ]; then echo "STARLABS_CICD_SA not set — skipping console update."; exit 0; fi
-          echo "$STARLABS_CICD_SA_JSON" > "$RUNNER_TEMP/cicd-sa.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/cicd-sa.json"
-          npm i firebase-admin@12 --no-save --no-audit --no-fund --silent
-          node -e '
-            const admin = require("firebase-admin");
-            admin.initializeApp({ credential: admin.credential.cert(require(process.env.RUNNER_TEMP + "/cicd-sa.json")), projectId: "starlabs-cicd" });
-            const id = process.env.REPO_NAME + "__" + process.env.BRANCH.replace(/\//g, "-");
-            admin.firestore().collection("release-candidates").doc(id).set({
-              repo: process.env.REPO_NAME,
-              branch: process.env.BRANCH,
-              preview: { url: process.env.PREVIEW_URL, buildState: "LIVE", sha: process.env.PREVIEW_SHA },
-              updatedAt: Date.now(),
-            }, { merge: true })
-            .then(() => { console.log("Recorded preview URL on", id, "→", process.env.PREVIEW_URL); process.exit(0); })
-            .catch((e) => { console.error("console update failed (non-fatal):", e.message); process.exit(0); });
-          '
+          if [ -z "$INGEST_TOKEN" ]; then echo "CONSOLE_INGEST_TOKEN not set — skipping console update."; exit 0; fi
+          curl -fsS -X POST "$INGEST_URL" \
+            -H "Authorization: Bearer $INGEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -nc \
+                  --arg repo "$REPO_NAME" \
+                  --arg branch "$BRANCH" \
+                  --arg url "$PREVIEW_URL" \
+                  --arg sha "$PREVIEW_SHA" \
+                  '{repo:$repo, branch:$branch, url:$url, sha:$sha}')" \
+            && echo "Recorded preview URL: $PREVIEW_URL" \
+            || echo "console update failed (non-fatal)"

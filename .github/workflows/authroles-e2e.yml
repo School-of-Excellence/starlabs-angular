@@ -1,0 +1,41 @@
+# authroles-e2e — THIN CALLER for the Stage-2 hermetic Playwright gate (AUTHROLES system).
+#
+# Mirrors journey-e2e.yml / queue-e2e.yml: the gate logic lives in the hub
+# (starlabs-e2e-tests/.github/workflows/web-e2e.yml); this file just wires the app's PR triggers + path
+# filters and selects the AUTHROLES suite via `config` + `suite`. Requires repo/org secret with read on the
+# private e2e + cloud-function repos, passed via `secrets: inherit`.
+#
+# ✅ POST-MERGE: the authroles ENGINE + shared lib are merged to hub `main` (systems-emulator -> main),
+#    so `uses:` + `e2e_ref:` point at `@main`. REPORT-ONLY (non-required) until proven green N times, then
+#    promote per-system.
+name: authroles-e2e (emulator gate)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Spec subset (space-separated). Empty = all authroles specs.'
+        type: string
+        default: ''
+      evidence:
+        description: '1 = capture screenshots + traces (to debug a CI-only failure)'
+        type: string
+        default: '0'
+
+jobs:
+  gate:
+    # Cost control: skip the heavy gate on DRAFT PRs unless explicitly labeled `run-e2e`.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.draft == false ||
+      contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      cf_branch: development
+      e2e_ref: main                                # engine merged to hub main
+      firebase_project: starlabs-cicd                # MUST match the app's projectId or auth silently fails
+      config: playwright.authroles.emulator.evidence.config.ts  # EVIDENCE variant: screenshot+trace per test → browsable report
+      suite: authroles                               # spec root (authroles/) + history audit tag
+      only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || '' }}
+      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}
+    secrets: inherit

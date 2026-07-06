@@ -1,0 +1,10 @@
+{
+  "name": "deepfilternet3-noise-filter-mezon",
+  "version": "1.2.1-mezon",
+  "private": true,
+  "type": "module",
+  "main": "index.esm.js",
+  "module": "index.esm.js",
+  "types": "index.d.ts",
+  "comment": "Vendored patched build from videoconference/fresh-livekit-dfn/mezon-noise-suppression (adds makeupGain + post-DFN gate). The npm deepfilternet3-noise-filter@1.2.1 lacks these. Used by the LiveKit call flow only; the legacy DeepFilter3Service/lab still use the npm build."
+}
