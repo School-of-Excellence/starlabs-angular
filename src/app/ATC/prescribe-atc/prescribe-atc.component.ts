@@ -2724,7 +2724,10 @@ async removeATCImage(index: number) {
   */
 
   moveToStudio(){
-    this.router.navigateByUrl("/dynamicstudio")
+    // Return to the studio ON the prescribe-atc step (mirrors the zoom-clientview
+    // return URL). The studio reads ?step= into pendingDeepLinkStep and reopens
+    // that stage instead of snapping to the first step.
+    this.router.navigateByUrl("/dynamicstudio?step=prescribe-atc")
   }
 
   //Big Assignment

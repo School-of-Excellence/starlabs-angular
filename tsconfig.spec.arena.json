@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "./out-tsc/spec-arena", "types": ["jasmine"] },
+  "include": [
+    "src/app/queue system/arena-board/arena-board.component.spec.ts",
+    "src/**/*.d.ts"
+  ]
+}
