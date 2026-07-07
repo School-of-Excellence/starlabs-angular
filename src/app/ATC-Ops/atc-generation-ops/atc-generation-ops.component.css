@@ -102,12 +102,22 @@
 
 /* ===== workspace ===== */
 .workspace { flex: 1 1 auto; display: flex; min-height: 0; overflow: hidden; }
+.workspace.resizing { user-select: none; cursor: col-resize; }
 .table-area {
   flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
   background: #fff;
 }
-.table-area.shrink { flex: 1 1 58%; }
 .table-scroll { flex: 1 1 auto; overflow: auto; min-height: 0; }
+
+/* ===== resize handle (between table and detail column) ===== */
+.resize-handle {
+  flex: 0 0 auto; width: 12px; cursor: col-resize; touch-action: none; user-select: none;
+  display: flex; align-items: center; justify-content: center;
+  background: #f1f5f9; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;
+  color: #94a3b8;
+}
+.resize-handle:hover, .workspace.resizing .resize-handle { background: #e2e8f0; color: #2563eb; }
+.resize-handle mat-icon { font-size: 18px; height: 18px; width: 18px; pointer-events: none; }
 
 .atc-table { width: 100%; border-collapse: collapse; table-layout: auto; }
 /* Force native table layout — a global/theme rule flips mat rows to flex, which
@@ -178,12 +188,37 @@ mat-paginator { flex: 0 0 auto; border-top: 1px solid #e2e8f0; }
 .pill-blue { background: #eff6ff; color: #1d4ed8; }
 .pill-purple { background: #f5f3ff; color: #6d28d9; }
 
-/* ===== detail drawer ===== */
+/* ===== detail drawer (resizable; width set inline via [style.width.px]) ===== */
 .detail {
-  flex: 0 0 42%; max-width: 560px; min-width: 380px;
+  flex: 0 0 auto; min-width: 340px;
   display: flex; flex-direction: column; overflow: hidden;
   background: #fff; border-left: 1px solid #e2e8f0; box-shadow: -4px 0 16px rgba(0,0,0,0.05);
 }
+
+/* ===== notes column (append-only log) ===== */
+.notes {
+  flex: 0 0 auto; width: 320px; min-width: 260px;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: #fff; border-left: 1px solid #e2e8f0;
+}
+.notes .n-ic { color: #d97706; font-size: 20px; height: 20px; width: 20px; }
+.n-count {
+  background: #f1f5f9; color: #475569; border-radius: 10px;
+  padding: 0 7px; font-size: 11px; font-weight: 700;
+}
+.n-add { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; }
+.n-input { width: 100%; box-sizing: border-box; }
+.n-add-act { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.n-list { flex: 1 1 auto; overflow: auto; min-height: 0; padding: 10px 14px 14px; }
+.n-empty { padding: 14px 0; }
+.n-item {
+  border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px;
+  margin-bottom: 8px; background: #fcfdff;
+}
+.n-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.n-author { font-weight: 700; color: #0f172a; font-size: 11.5px; word-break: break-all; }
+.n-when { color: #94a3b8; font-size: 11px; margin-left: auto; white-space: nowrap; }
+.n-text { color: #334155; font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
 .d-head {
   flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
   padding: 8px 8px 8px 14px; border-bottom: 1px solid #e2e8f0;
@@ -263,8 +298,10 @@ ul.plain li, .er-l li { margin-bottom: 3px; }
 /* ===== responsive ===== */
 @media (max-width: 1080px) {
   .workspace { flex-direction: column; }
-  .table-area.shrink { flex: 1 1 50%; }
-  .detail { flex: 1 1 50%; max-width: none; min-width: 0; border-left: none; border-top: 1px solid #e2e8f0; }
+  .resize-handle { display: none; }
+  /* inline [style.width.px] must be overridden when stacked */
+  .detail { width: auto !important; flex: 1 1 auto; min-width: 0; border-left: none; border-top: 1px solid #e2e8f0; }
+  .notes { width: auto; flex: 1 1 auto; min-width: 0; border-left: none; border-top: 1px solid #e2e8f0; }
 }
 
 /* ===== snackbar colors (component-scoped) ===== */

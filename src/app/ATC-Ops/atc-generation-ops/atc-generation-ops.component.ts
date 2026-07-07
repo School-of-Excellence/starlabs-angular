@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -27,6 +27,7 @@ import { mapAtcError } from '../atc-reason-map';
 import {
   AtcGenDoc,
   AtcStatus,
+  OpsNote,
   parseAtcOutput,
   ParsedAtcOutput,
   PodWorker,
@@ -159,6 +160,18 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   promptDraft = '';
   savingPrompt = false;
 
+  // ---- notes (append-only log on the selected doc) ----
+  noteDraft = '';
+  addingNote = false;
+
+  // ---- resizable detail column ----
+  detailWidth = 440; // px; the notes column is fixed, the table absorbs the rest
+  readonly DETAIL_MIN = 340;
+  readonly DETAIL_MAX = 820;
+  resizing = false;
+  private resizeStartX = 0;
+  private resizeStartWidth = 0;
+
   authExpired = false;
 
   private mapProfileData: Record<string, string> = {};
@@ -175,6 +188,8 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    const savedWidth = this.readStoredWidth();
+    if (savedWidth != null) this.detailWidth = savedWidth;
     this.configureDataSource();
     this.data.getProfileMap().then((m) => {
       this.mapProfileData = m;
@@ -509,6 +524,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     this.detailNotFound = false;
     this.detailLoading = true;
     this.editingPrompt = false;
+    this.noteDraft = '';
     this.detailUnsub?.();
     this.detailUnsub = this.data.listenDoc(
       docid,
@@ -614,6 +630,90 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
       );
     } finally {
       this.savingPrompt = false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Notes (append-only log on the selected doc)
+  // -------------------------------------------------------------------------
+  /** Notes on the selected doc, newest first. */
+  get notes(): OpsNote[] {
+    const list = this.selectedDoc?.opsNotes ?? [];
+    return [...list].sort((a, b) => (toMillis(b.at) ?? 0) - (toMillis(a.at) ?? 0));
+  }
+
+  async addNote(): Promise<void> {
+    const docid = this.selectedDoc?.docid;
+    const text = this.noteDraft.trim();
+    if (!docid || !text || this.addingNote) return;
+    this.addingNote = true;
+    try {
+      await this.data.addNote(docid, text);
+      this.noteDraft = '';
+      this.toast('Note added', 'success');
+    } catch (e: any) {
+      this.toast(
+        e?.code === 'permission-denied'
+          ? 'No permission to add notes.'
+          : 'Could not add note. Try again.',
+        'error',
+      );
+    } finally {
+      this.addingNote = false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Resizable detail column (drag handle on its left edge)
+  // -------------------------------------------------------------------------
+  startResize(ev: PointerEvent): void {
+    ev.preventDefault();
+    this.resizing = true;
+    this.resizeStartX = ev.clientX;
+    this.resizeStartWidth = this.detailWidth;
+    (ev.target as Element)?.setPointerCapture?.(ev.pointerId);
+  }
+
+  @HostListener('document:pointermove', ['$event'])
+  onResizeMove(ev: PointerEvent): void {
+    if (!this.resizing) return;
+    // handle sits on the detail column's LEFT edge → dragging left widens it
+    const dx = this.resizeStartX - ev.clientX;
+    this.detailWidth = this.clampWidth(this.resizeStartWidth + dx);
+  }
+
+  @HostListener('document:pointerup')
+  onResizeEnd(): void {
+    if (!this.resizing) return;
+    this.resizing = false;
+    this.storeWidth(this.detailWidth);
+  }
+
+  /** Double-click the handle to snap between min and max width. */
+  toggleDetailWidth(): void {
+    const mid = (this.DETAIL_MIN + this.DETAIL_MAX) / 2;
+    this.detailWidth = this.detailWidth > mid ? this.DETAIL_MIN : this.DETAIL_MAX;
+    this.storeWidth(this.detailWidth);
+  }
+
+  private clampWidth(w: number): number {
+    return Math.max(this.DETAIL_MIN, Math.min(this.DETAIL_MAX, Math.round(w)));
+  }
+  private readStoredWidth(): number | null {
+    try {
+      if (typeof localStorage === 'undefined') return null;
+      const v = parseInt(localStorage.getItem('atcOps.detailWidth') || '', 10);
+      return isNaN(v) ? null : this.clampWidth(v);
+    } catch {
+      return null;
+    }
+  }
+  private storeWidth(w: number): void {
+    try {
+      if (typeof localStorage !== 'undefined')
+        localStorage.setItem('atcOps.detailWidth', String(w));
+    } catch {
+      /* ignore storage failures */
     }
   }
 

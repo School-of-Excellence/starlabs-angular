@@ -94,9 +94,9 @@
     </div>
 
     <!-- ===== workspace ===== -->
-    <div class="workspace">
+    <div class="workspace" [class.resizing]="resizing">
       <!-- table -->
-      <section class="table-area" [class.shrink]="selectedDocid">
+      <section class="table-area">
         <div class="center-state small" *ngIf="listLoading">
           <mat-spinner diameter="30"></mat-spinner><p>Loading docs…</p>
         </div>
@@ -214,8 +214,15 @@
                        [hidden]="filteredCount === 0" showFirstLastButtons></mat-paginator>
       </section>
 
-      <!-- ===== detail drawer ===== -->
-      <aside class="detail" *ngIf="selectedDocid">
+      <!-- ===== resize handle — drag to resize the detail column ===== -->
+      <div class="resize-handle" *ngIf="selectedDocid"
+           (pointerdown)="startResize($event)" (dblclick)="toggleDetailWidth()"
+           matTooltip="Drag to resize · double-click for max / min">
+        <mat-icon>drag_indicator</mat-icon>
+      </div>
+
+      <!-- ===== detail column (metadata + tabs) — resizable ===== -->
+      <aside class="detail" *ngIf="selectedDocid" [style.width.px]="detailWidth">
         <div class="d-head">
           <span class="badge" *ngIf="selectedDoc" [ngClass]="statusClass(selectedDoc.status)">{{ selectedDoc.status }}</span>
           <span class="d-title" *ngIf="selectedDoc">{{ resolveTitle() }}</span>
@@ -413,6 +420,44 @@
             </mat-tab-group>
           </ng-container>
         </div>
+      </aside>
+
+      <!-- ===== notes column (append-only log) ===== -->
+      <aside class="notes" *ngIf="selectedDocid">
+        <div class="d-head">
+          <mat-icon class="n-ic">sticky_note_2</mat-icon>
+          <span class="d-title">Notes</span>
+          <span class="n-count" *ngIf="notes.length">{{ notes.length }}</span>
+        </div>
+
+        <div class="center-state small" *ngIf="detailLoading"><mat-spinner diameter="24"></mat-spinner></div>
+
+        <ng-container *ngIf="!detailLoading">
+          <div class="n-add">
+            <textarea class="edit n-input" rows="3" [(ngModel)]="noteDraft"
+                      [disabled]="addingNote || detailNotFound"
+                      placeholder="Add a note…" (keydown.control.enter)="addNote()"></textarea>
+            <div class="n-add-act">
+              <button mat-flat-button color="primary"
+                      [disabled]="addingNote || detailNotFound || !noteDraft.trim()" (click)="addNote()">
+                <mat-icon>add</mat-icon> Add note
+              </button>
+              <mat-spinner diameter="18" *ngIf="addingNote"></mat-spinner>
+              <span class="muted small">Ctrl + Enter</span>
+            </div>
+          </div>
+
+          <div class="n-list">
+            <div class="n-empty muted" *ngIf="!notes.length">No notes yet. Add the first one.</div>
+            <div class="n-item" *ngFor="let n of notes">
+              <div class="n-meta">
+                <span class="n-author">{{ n.author || 'unknown' }}</span>
+                <span class="n-when" *ngIf="n.at" [matTooltip]="(asDate(n.at) | date:'medium') || ''">{{ relativeTime(n.at) }} ago</span>
+              </div>
+              <div class="n-text">{{ n.text }}</div>
+            </div>
+          </div>
+        </ng-container>
       </aside>
     </div>
   </ng-container>
