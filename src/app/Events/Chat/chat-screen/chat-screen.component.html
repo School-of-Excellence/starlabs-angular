@@ -315,7 +315,7 @@
             <mat-icon>push_pin</mat-icon>
             <span *ngIf="pinnedMessagesCount > 0" class="pin-count-badge">{{ pinnedMessagesCount }}</span>
           </button>
-          <button mat-icon-button matTooltip="Chat Info">
+          <button mat-icon-button (click)="editGroup(selectedChat)" matTooltip="Chat Info">
             <mat-icon>info</mat-icon>
           </button>
           <button mat-icon-button [matMenuTriggerFor]="chatMenu" matTooltip="More options"
