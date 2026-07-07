@@ -116,6 +116,9 @@ export class AdaptiveQualityService {
           return delays[context.retryCount];
         },
       },
+      // Audio capture: match the videoconference reference (deviceId only; Chrome NS/EC/AGC
+      // defaults stay on — DFN later flips voiceIsolation off on the DFN-ON path).
+      audioCaptureDefaults: {},
       publishDefaults: {
         videoCodec: 'vp8' as const,
         simulcast: true,
@@ -124,6 +127,16 @@ export class AdaptiveQualityService {
           maxBitrate: cfg.maxBitrate,
           maxFramerate: cfg.frameRate,
         },
+        // ── AUDIO publish defaults — EXACT videoconference baseline (PageClientImpl.tsx) ──
+        // red:  RED redundant Opus encoding — recovers lost audio packets, the single most
+        //       important breakup-resistance knob on lossy/jittery links. (livekit default true,
+        //       set explicit to match + document intent.)
+        // dtx:  Discontinuous Transmission OFF. With DTX ON (livekit default) the encoder stops
+        //       sending during silence; combined with the DFN −45 dBFS gate (which forces gated
+        //       silences truly silent) the stream keeps cutting out and speech onsets clip —
+        //       audible as "breaking up". The reference deliberately disables it.
+        red: true,
+        dtx: false,
       },
     };
   }
@@ -229,7 +242,7 @@ export class AdaptiveQualityService {
 
     if (this.room) {
       // Apply constraints to the local camera track (controls outgoing bitrate)
-      const cameraPub = Array.from(this.room.localParticipant.videoTracks.values())
+      const cameraPub = Array.from(this.room.localParticipant.videoTrackPublications.values())
         .find(pub => pub.source === 'camera');
       const rawTrack = cameraPub?.track?.mediaStreamTrack;
       if (rawTrack) {
@@ -332,7 +345,7 @@ export class AdaptiveQualityService {
     const net = this.networkQuality();
 
     // Get camera publication
-    const cameraPub = Array.from(this.room.localParticipant.videoTracks.values())
+    const cameraPub = Array.from(this.room.localParticipant.videoTrackPublications.values())
       .find(pub => pub.source === 'camera');
 
     // M3: Read actual encoded fps from WebRTC outbound-rtp stats instead of getSettings().frameRate

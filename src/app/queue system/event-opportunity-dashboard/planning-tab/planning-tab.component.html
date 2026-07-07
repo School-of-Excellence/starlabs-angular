@@ -1,14 +1,80 @@
-<div class="planning-tab">
+<div class="planning-tab" *ngIf="active">
+
+  <!-- Saved filters bar (top) -->
+  <div class="pl-savedbar" *ngIf="selectedQueueList.length > 0 || savedFilters.length > 0">
+    <span class="pl-savedbar-lbl"><mat-icon>bookmarks</mat-icon>Filters</span>
+    <div class="pl-savedchips">
+      <button type="button" class="pl-fchip" *ngFor="let f of savedFilters"
+              [class.on]="isActiveFilter(f)" (click)="applyFilter(f)" [matTooltip]="'Apply ' + f.title">
+        <span class="pl-fchip-txt">{{ f.title }}</span>
+        <mat-icon class="pl-fchip-x" (click)="deleteFilter(f, $event)" matTooltip="Delete filter">close</mat-icon>
+      </button>
+      <button type="button" class="pl-fchip pl-fchip-add" (click)="newFilter()" matTooltip="Start a new filter" aria-label="Add new filter">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </div>
 
   <!-- Filters -->
   <div class="pl-filters">
+    <!-- Event + queue are staged (pending); data only loads on "Get". -->
     <mat-form-field appearance="outline" class="pl-fil pl-fil-event">
       <mat-label>Event</mat-label>
-      <mat-select panelClass="eod-ios-pane" [ngModel]="selectedEventIds" multiple (ngModelChange)="onEventChange($event)">
+      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="pendingEvents" multiple (ngModelChange)="pendingEvents = $event">
         <mat-option *ngFor="let e of eventList" [value]="e.id">{{ e.name || e.queuename || e.id }}</mat-option>
       </mat-select>
     </mat-form-field>
-    <!-- Queue selection is driven by the single global "Select queue" picker above the tabs. -->
+    <!-- Planning's OWN queue selection — fully independent of the Board's top "Select queue". -->
+    <mat-form-field appearance="outline" class="pl-fil pl-fil-queue">
+      <mat-label>Select queue</mat-label>
+      <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="pendingQueues" multiple (ngModelChange)="pendingQueues = $event">
+        <mat-option *ngFor="let q of queueList; trackBy: trackByQueueDoc" [value]="q.docid">{{ q.queuename }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Get: the only fetch trigger for the chosen event + queue. -->
+    <button class="ios-btn filled pl-get" type="button" (click)="loadPlanningData()"
+            [disabled]="dataLoading || (!pendingQueues.length && !pendingEvents.length)">
+      <mat-icon>{{ dataLoading ? 'autorenew' : 'download' }}</mat-icon>
+      <span>{{ dataLoading ? 'Loading…' : 'Get' }}</span>
+    </button>
+
+  </div>
+
+  <!-- Bounded "Filters" group: one overall Show-only/Remove mode, then the filters below. Only once data is loaded. -->
+  <div class="pl-filterbox" *ngIf="selectedQueueList.length > 0 || selectedEventIds.length > 0">
+    <span class="pl-filterbox-lbl"><mat-icon>filter_alt</mat-icon>Filters</span>
+
+    <!-- Overall mode -->
+    <div class="pl-mode pl-mode-overall">
+      <button type="button" class="pl-mode-btn" [class.on]="filterMode==='only'" (click)="setFilterMode('only')" matTooltip="Show only participants matching the filters below">Show only</button>
+      <button type="button" class="pl-mode-btn" [class.on]="filterMode==='remove'" (click)="setFilterMode('remove')" matTooltip="Remove participants matching the filters below">Remove</button>
+    </div>
+
+    <!-- Filters (dropdowns + DFU chip, aligned in one row) -->
+    <div class="pl-frow">
+      <mat-form-field appearance="outline" class="pl-fil pl-ffield" *ngIf="journeyList.length > 0">
+        <mat-label>Journey</mat-label>
+        <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedJourneys" multiple (ngModelChange)="onJourneysChange($event)">
+          <mat-option *ngFor="let j of journeyList" [value]="j.id">{{ j.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Cohort filter — the CURRENT marathon's big-cohorts. -->
+      <mat-form-field appearance="outline" class="pl-fil pl-ffield" *ngIf="cohortList.length > 0">
+        <mat-label>{{ currentMarathonTitle ? currentMarathonTitle + ' cohort' : 'Cohort' }}</mat-label>
+        <mat-select panelClass="eod-ios-pane" disableOptionCentering [ngModel]="selectedCohorts" multiple (ngModelChange)="onCohortsChange($event)">
+          <mat-option *ngFor="let c of cohortList" [value]="c.id">{{ c.name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button type="button" class="pl-toggle-chip" *ngIf="selectedQueueList.length > 0"
+              [class.on]="dfuOn" (click)="toggleDfu()"
+              matTooltip="Include DFU (Priority Mode) participants in the filter">
+        <mat-icon>{{ dfuOn ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+        <span>DFU ongoing</span>
+      </button>
+    </div>
   </div>
 
   <div class="pl-countdown" *ngIf="eventDate">
@@ -33,6 +99,7 @@
          (keydown.enter)="selectCard(c.key)" (keydown.space)="selectCard(c.key); $event.preventDefault()">
       <div class="pl-card-val">{{ c.value }}</div>
       <div class="pl-card-lbl">{{ c.label }}</div>
+      <div class="pl-card-desc" *ngIf="c.desc">{{ c.desc }}</div>
     </div>
   </div>
 
@@ -103,6 +170,7 @@
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Target readiness % (optional)</mat-label>
           <input matInput type="number" min="0" max="100" formControlName="targetPct" placeholder="e.g. 80">
+          <mat-error *ngIf="phaseForm.get('targetPct')?.hasError('max') || phaseForm.get('targetPct')?.hasError('min')">Enter a value between 0 and 100</mat-error>
         </mat-form-field>
         <div class="phase-form-hint">Name the phase. Configure the queue stage(s) and slot(s) per row in the table below.</div>
         <div class="phase-form-actions">
@@ -117,7 +185,7 @@
     </div>
 
     <!-- Per-phase readiness matrix -->
-    <div class="matrix-wrap" *ngFor="let row of matrixRows">
+    <div class="matrix-wrap" *ngFor="let row of matrixRows; trackBy: trackByPhaseRow">
       <div class="pmx-phase-head">
         <span class="grp-ring">
           <svg viewBox="0 0 60 60" aria-hidden="true">
@@ -128,6 +196,7 @@
         </span>
         <span class="grp-name">
           <span class="grp-title">{{ row.phase.phasename }}</span>
+          <span class="grp-pending">Pending (Potential) - {{ potentialTotal }}</span>
           <span class="grp-stages" *ngIf="row.target == null">configure each row below</span>
           <span class="grp-target" *ngIf="row.target != null" [class.ontrack]="row.status==='ontrack'" [class.risk]="row.status==='risk'" [class.behind]="row.status==='behind'">Target {{ row.target }}% · {{ phaseStatusLabel(row.status) }}</span>
         </span>
@@ -140,22 +209,22 @@
       <table class="pmx">
         <thead>
           <tr>
-            <th class="lbl" rowspan="2"></th>
+            <th class="lbl grp-h">Event confirmation</th>
             <th colspan="3" class="grp-h grp-conf">Confirmed</th>
-            <th colspan="3" class="grp-h grp-nconf">Not confirmed</th>
-            <th rowspan="2" class="tot-h">Total</th>
+            <th colspan="3" class="grp-h grp-nconf">Not Confirmed</th>
           </tr>
           <tr>
+            <th class="lbl">Categories</th>
             <th *ngFor="let c of confirmedCols">{{ c.label }}</th>
             <th *ngFor="let c of notConfirmedCols">{{ c.label }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr class="line" *ngFor="let ln of row.lines">
+          <tr class="line" [class.rate-line]="ln.kind === 'rate'" *ngFor="let ln of row.lines; trackBy: trackByLineKey">
             <td class="lbl">
               <div class="row-lbl">{{ ln.label }}</div>
-              <mat-form-field appearance="outline" class="row-cfg">
-                <mat-select panelClass="eod-ios-pane" [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)"
+              <mat-form-field appearance="outline" class="row-cfg" *ngIf="ln.kind !== 'rate'">
+                <mat-select panelClass="eod-ios-pane" disableOptionCentering [compareWith]="comparePhaseStage" [value]="ln.stages" multiple (selectionChange)="setRowStages(row.phase, ln.key, $event.value)"
                   [placeholder]="ln.kind === 'slot' ? 'Add slot stage' : 'Add queue stage'"
                   [attr.aria-label]="ln.kind === 'slot' ? 'Slot stage' : 'Queue stage'">
                   <mat-select-trigger>
@@ -165,26 +234,22 @@
                 </mat-select>
               </mat-form-field>
             </td>
-            <td *ngFor="let c of allCols" class="num"
-                [class.zero]="ln.cells[c.k] === 0"
-                [class.clickable]="ln.cells[c.k] > 0"
-                [class.sel]="isCellSel(row.phase, ln, c.k)"
-                [attr.role]="ln.cells[c.k] > 0 ? 'button' : null"
-                [attr.tabindex]="ln.cells[c.k] > 0 ? 0 : null"
-                [attr.aria-pressed]="ln.cells[c.k] > 0 ? isCellSel(row.phase, ln, c.k) : null"
-                (keydown.enter)="selectCell(row.phase, ln, c.k)"
-                (keydown.space)="selectCell(row.phase, ln, c.k); $event.preventDefault()"
-                (click)="selectCell(row.phase, ln, c.k)">{{ ln.cells[c.k] }}</td>
-            <td class="tot num"
-                [class.zero]="ln.cells.total === 0"
-                [class.clickable]="ln.cells.total > 0"
-                [class.sel]="isCellSel(row.phase, ln, 'total')"
-                [attr.role]="ln.cells.total > 0 ? 'button' : null"
-                [attr.tabindex]="ln.cells.total > 0 ? 0 : null"
-                [attr.aria-pressed]="ln.cells.total > 0 ? isCellSel(row.phase, ln, 'total') : null"
-                (keydown.enter)="selectCell(row.phase, ln, 'total')"
-                (keydown.space)="selectCell(row.phase, ln, 'total'); $event.preventDefault()"
-                (click)="selectCell(row.phase, ln, 'total')">{{ ln.cells.total }}</td>
+            <ng-container *ngFor="let c of allCols">
+              <!-- Rate rows show a derived percentage: not zero-dimmed, not clickable. -->
+              <td *ngIf="ln.kind === 'rate'; else countCell" class="num rate">{{ ln.cells[c.k] }}%</td>
+              <ng-template #countCell>
+                <td class="num"
+                    [class.zero]="ln.cells[c.k] === 0"
+                    [class.clickable]="ln.cells[c.k] > 0"
+                    [class.sel]="isCellSel(row.phase, ln, c.k)"
+                    [attr.role]="ln.cells[c.k] > 0 ? 'button' : null"
+                    [attr.tabindex]="ln.cells[c.k] > 0 ? 0 : null"
+                    [attr.aria-pressed]="ln.cells[c.k] > 0 ? isCellSel(row.phase, ln, c.k) : null"
+                    (keydown.enter)="selectCell(row.phase, ln, c.k)"
+                    (keydown.space)="selectCell(row.phase, ln, c.k); $event.preventDefault()"
+                    (click)="selectCell(row.phase, ln, c.k)">{{ ln.cells[c.k] }}</td>
+              </ng-template>
+            </ng-container>
           </tr>
         </tbody>
       </table>
@@ -238,4 +303,38 @@
     </div>
 
   </ng-container>
+
+  <!-- Floating "save as filter" widget — appears whenever the working state is unsaved/changed -->
+  <div class="pl-savefab" *ngIf="isDirty && selectedQueueList.length > 0">
+    <!-- Compact pill -->
+    <button type="button" class="pl-savepill" *ngIf="!showSaveWidget" (click)="openSaveWidget()">
+      <span class="pl-savedot"></span>
+      <span>{{ activeFilterId ? 'Unsaved changes' : 'Save as filter' }}</span>
+      <mat-icon>bookmark_add</mat-icon>
+    </button>
+
+    <!-- Expanded save panel -->
+    <div class="pl-savecard" *ngIf="showSaveWidget">
+      <div class="pl-savecard-head">
+        <span class="pl-savecard-title">{{ saveMode === 'update' ? 'Save changes' : 'Save as filter' }}</span>
+        <button type="button" class="ios-icon" (click)="closeSaveWidget()" matTooltip="Close"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="pl-savecard-changes">
+        <div class="pl-savecard-sub">What changed</div>
+        <ul>
+          <li *ngFor="let c of pendingChanges">{{ c }}</li>
+        </ul>
+      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Filter title</mat-label>
+        <input matInput type="text" [(ngModel)]="saveTitle" placeholder="e.g. Evolution Prep — Cohort A" (keydown.enter)="saveFilter()">
+      </mat-form-field>
+      <div class="pl-savecard-actions">
+        <button mat-button type="button" (click)="closeSaveWidget()">Cancel</button>
+        <button class="ios-btn filled" type="button" [disabled]="!saveTitle.trim()" (click)="saveFilter()">
+          {{ saveMode === 'update' ? 'Save' : 'Create filter' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

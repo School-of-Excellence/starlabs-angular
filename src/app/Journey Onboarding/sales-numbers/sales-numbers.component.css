@@ -1,0 +1,504 @@
+/* ===========================================================================
+   iOS-MINIMALIST DESIGN SYSTEM — Sales Numbers
+   Visual-only restyle. Tokens defined on :host, reused throughout.
+   =========================================================================== */
+:host {
+  /* surfaces */
+  --ios-bg: #F2F2F7;            /* grouped background */
+  --ios-surface: #FFFFFF;       /* cards / panels */
+  --ios-fill: #EFEFF4;          /* input fill */
+  --ios-fill-segment: rgba(118,118,128,.12); /* segmented track */
+  --ios-chip: rgba(118,118,128,.12);         /* chip fill (shared token) */
+  --ios-tile: #F7F7FA;          /* inner tiles */
+
+  /* text */
+  --ios-label: #1C1C1E;         /* primary label (never pure black) */
+  --ios-secondary: #8A8A8E;     /* secondary text */
+
+  /* accents */
+  --ios-blue: #0A84FF;          /* single accent */
+  --ios-green: #34C759;         /* positive */
+  --ios-red: #FF3B30;           /* negative */
+  --ios-indigo: #5E5CE6;        /* net */
+
+  /* hairlines & shadows */
+  --ios-separator: rgba(60,60,67,.10);
+  --ios-separator-soft: rgba(60,60,67,.08);
+  --ios-shadow-sm: 0 1px 2px rgba(17,24,39,.04);
+  --ios-shadow-md: 0 1px 2px rgba(17,24,39,.04), 0 6px 20px rgba(17,24,39,.05);
+  --ios-shadow-lift: 0 2px 4px rgba(17,24,39,.05), 0 12px 30px rgba(17,24,39,.08);
+
+  /* radii */
+  --ios-r-card: 20px;
+  --ios-r-control: 12px;
+  --ios-r-pill: 980px;
+
+  /* motion */
+  --ios-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --ios-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+
+  display: block;
+  background: var(--ios-bg);
+  font-family: var(--ios-font);
+}
+
+.sn-wrap {
+  padding: 32px 24px 48px;
+  max-width: 1280px;
+  margin: 0 auto;
+  font-family: var(--ios-font);
+  color: var(--ios-label);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------------- header */
+.sn-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.sn-header h1 {
+  font-size: 25px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.02em;
+  color: var(--ios-label);
+}
+.sn-sub {
+  margin: 6px 0 0;
+  color: var(--ios-secondary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* header CTA styled via the unified .sn-btn-secondary system below */
+.sn-header { align-items: center; }
+
+/* ------------------------------------------------ toolbar (controls + filters) */
+.sn-toolbar {
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 1px 2px rgba(28,28,30,.05), 0 10px 30px rgba(28,28,30,.05);
+  padding: 18px 20px;
+  margin-bottom: 24px;
+}
+
+/* ---------------------------------------------------------------- controls */
+.sn-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 30px;
+}
+.sn-control-group { display: flex; align-items: center; gap: 11px; min-height: 36px; }
+.sn-control-group.sn-right { margin-left: auto; }
+.sn-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ios-secondary);
+}
+/* date pickers share the filter field rhythm */
+.sn-date { width: 160px; }
+
+/* ---------------------------------------------------------------- filters */
+.sn-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ios-separator);
+}
+/* uniform grid rhythm — every filter field equal width, equal height */
+.sn-filter-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.sn-filter { width: 100%; }
+@media (max-width: 1100px) {
+  .sn-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .sn-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.sn-loading { display: flex; justify-content: center; padding: 60px 0; }
+
+/* ============================================================================
+   UNIFIED BUTTON SYSTEM — one radius/height/weight/hover/active across both screens
+   primary = flat iOS blue · secondary = quiet pill · destructive = red
+   ============================================================================ */
+/* secondary (quiet pill): header CTA + Clear */
+:host ::ng-deep .sn-wrap .sn-btn-secondary.mat-mdc-button-base,
+:host ::ng-deep .sn-wrap a.sn-btn-secondary {
+  height: 44px;
+  border-radius: var(--ios-r-pill);
+  border: 1px solid var(--ios-separator);
+  background: var(--ios-surface);
+  color: var(--ios-blue);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 0 18px;
+  box-shadow: var(--ios-shadow-sm);
+  transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease), background-color .2s var(--ios-ease), color .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .sn-btn-secondary .mat-mdc-button-touch-target { height: 44px; }
+:host ::ng-deep .sn-wrap .sn-btn-secondary:hover { box-shadow: var(--ios-shadow-md); transform: translateY(-1px); }
+:host ::ng-deep .sn-wrap .sn-btn-secondary:active { transform: scale(0.98); box-shadow: var(--ios-shadow-sm); }
+/* Clear sits at the end of the filter row, aligned to field height */
+:host ::ng-deep .sn-filters .sn-btn-secondary { flex: 0 0 auto; align-self: flex-end; }
+
+/* ============================================================================
+   iOS SEGMENTED CONTROLS — restyle mat-button-toggle-group as UISegmentedControl
+   ============================================================================ */
+:host ::ng-deep .sn-wrap .mat-button-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  background: var(--ios-fill-segment);
+  border-radius: 10px;
+  border: none;
+  padding: 3px;
+  gap: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-group .mat-button-toggle {
+  border: none;
+  background: transparent;
+  color: var(--ios-secondary);
+  border-radius: 7px;
+  transition: background-color .25s var(--ios-ease), color .25s var(--ios-ease), box-shadow .25s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-group .mat-button-toggle + .mat-button-toggle {
+  border-left: none;
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle .mat-button-toggle-label-content {
+  line-height: 30px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: inherit;
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-appearance-standard {
+  background: transparent;
+  color: var(--ios-secondary);
+}
+/* selected pill */
+:host ::ng-deep .sn-wrap .mat-button-toggle-checked {
+  background: var(--ios-surface);
+  color: var(--ios-label);
+  border-radius: 7px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+:host ::ng-deep .sn-wrap .mat-button-toggle-checked .mat-button-toggle-label-content { color: var(--ios-label); }
+/* remove Material ink / ripple / focus overlay */
+:host ::ng-deep .sn-wrap .mat-button-toggle .mat-button-toggle-focus-overlay { opacity: 0 !important; }
+:host ::ng-deep .sn-wrap .mat-button-toggle-ripple { display: none; }
+:host ::ng-deep .sn-wrap .mat-button-toggle-button:active { transform: scale(0.98); }
+
+/* ============================================================================
+   iOS FILLED INPUTS / SELECTS — restyle mat-form-field (outline -> filled)
+   ============================================================================ */
+:host ::ng-deep .sn-wrap .mat-mdc-form-field {
+  font-family: var(--ios-font);
+}
+:host ::ng-deep .sn-wrap .mat-mdc-text-field-wrapper {
+  background: var(--ios-fill);
+  border-radius: var(--ios-r-control);
+}
+/* hide Material's outline notch entirely */
+:host ::ng-deep .sn-wrap .mdc-notched-outline__leading,
+:host ::ng-deep .sn-wrap .mdc-notched-outline__notch,
+:host ::ng-deep .sn-wrap .mdc-notched-outline__trailing {
+  border: none !important;
+}
+:host ::ng-deep .sn-wrap .mat-mdc-text-field-wrapper {
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
+  box-shadow: inset 0 0 0 2px rgba(10,132,255,.35);
+}
+/* consistent field height; room for the always-floating label */
+:host ::ng-deep .sn-wrap .mat-mdc-form-field-infix {
+  min-height: 44px;
+  padding-top: 20px;
+  padding-bottom: 8px;
+}
+:host ::ng-deep .sn-wrap .mat-mdc-text-field-wrapper {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+:host ::ng-deep .sn-wrap .mat-mdc-select-value-text,
+:host ::ng-deep .sn-wrap .mat-mdc-input-element { color: var(--ios-label); }
+/* always-floating label: small, fixed at top, secondary tone */
+:host ::ng-deep .sn-wrap .mat-mdc-floating-label,
+:host ::ng-deep .sn-wrap .mdc-floating-label--float-above {
+  color: var(--ios-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+/* placeholder / empty-select value reads as quiet secondary text */
+:host ::ng-deep .sn-wrap .mat-mdc-select-placeholder,
+:host ::ng-deep .sn-wrap input.mat-mdc-input-element::placeholder {
+  color: var(--ios-secondary);
+  opacity: 1;
+}
+/* kill the subscript/hint gap so every field is the same height */
+:host ::ng-deep .sn-wrap .mat-mdc-form-field-subscript-wrapper { display: none; }
+:host ::ng-deep .sn-wrap .mat-mdc-form-field-bottom-align::before { display: none; }
+
+/* ============================================================================
+   PRODUCT-SEGMENT CARDS — Ecosystem / DFU / FTO+Gift / All
+   ============================================================================ */
+.sn-active-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  margin-bottom: 16px;
+  background: var(--ios-fill);
+  border-radius: var(--ios-r-pill);
+  font-size: 13px;
+  color: var(--ios-label);
+}
+.sn-active-team mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--ios-secondary); }
+.sn-active-team strong { font-weight: 600; }
+:host ::ng-deep .sn-active-team button.mat-mdc-icon-button {
+  width: 28px; height: 28px; padding: 0; line-height: 28px;
+}
+:host ::ng-deep .sn-active-team button.mat-mdc-icon-button mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--ios-secondary); }
+
+.sn-segs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+:host ::ng-deep .sn-seg.mat-mdc-card,
+.sn-seg {
+  display: flex;
+  flex-direction: column;
+  padding: 22px 22px !important;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: 20px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 1px 2px rgba(28,28,30,.05), 0 10px 30px rgba(28,28,30,.06);
+  transition: transform .22s var(--ios-ease), box-shadow .22s var(--ios-ease);
+}
+:host ::ng-deep .sn-seg.mat-mdc-card:hover,
+.sn-seg:hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px rgba(28,28,30,.06), 0 18px 44px rgba(28,28,30,.10);
+}
+/* All = the rollup; emphasised by elevation + a slightly stronger hairline, not colour */
+:host ::ng-deep .sn-seg-all.mat-mdc-card,
+.sn-seg-all {
+  border-color: rgba(60,60,67,.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px rgba(28,28,30,.06), 0 16px 40px rgba(28,28,30,.10);
+}
+
+.sn-seg-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.sn-seg-icon {
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.14);
+}
+:host ::ng-deep .sn-seg-icon mat-icon { font-size: 20px; width: 20px; height: 20px; line-height: 20px; color: #fff; }
+.sn-seg-name { font-size: 15px; font-weight: 600; color: var(--ios-label); flex: 1; letter-spacing: -0.01em; }
+.sn-seg-badge {
+  font-size: 11px; font-weight: 600; color: var(--ios-secondary);
+  background: var(--ios-fill); border-radius: var(--ios-r-pill);
+  padding: 3px 9px;
+}
+.sn-seg-total {
+  font-size: 46px; font-weight: 700; line-height: 1; letter-spacing: -0.035em;
+  color: var(--ios-label);
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+.sn-seg-value { font-size: 14px; font-weight: 500; color: var(--ios-secondary); margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+.sn-seg-split { border-top: 0.5px solid var(--ios-separator); margin-top: 14px; padding-top: 12px; }
+.sn-seg-foot { border-top: 0.5px solid var(--ios-separator); margin-top: 12px; padding-top: 12px; }
+.sn-seg-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 14px; padding: 4px 0;
+}
+.sn-seg-row span:first-child { color: var(--ios-secondary); }
+.sn-seg-row span:last-child {
+  color: var(--ios-label); font-weight: 700; font-size: 16px;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+.sn-seg-row span.neg { color: var(--ios-red); }
+.sn-seg-row span.pos { color: var(--ios-green); }
+
+/* ============================================================================
+   PANELS
+   ============================================================================ */
+:host ::ng-deep .sn-panel.mat-mdc-card,
+.sn-panel {
+  padding: 24px 24px !important;
+  background: var(--ios-surface);
+  border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card) !important;
+  box-shadow: var(--ios-shadow-md);
+  margin-bottom: 24px;
+}
+.sn-panel h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+  color: var(--ios-label);
+}
+
+
+/* ============================================================================
+   TABLE — airy, hairline separators, tabular nums
+   ============================================================================ */
+.sn-table { width: 100%; background: transparent; }
+:host ::ng-deep .sn-table.mat-mdc-table { background: transparent; }
+.sn-table th {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ios-secondary);
+}
+:host ::ng-deep .sn-table .mat-mdc-header-row { background: transparent; }
+:host ::ng-deep .sn-table .mat-mdc-header-cell {
+  border-bottom: 1px solid var(--ios-separator);
+  padding: 10px 14px;
+}
+:host ::ng-deep .sn-table .mat-mdc-row,
+:host ::ng-deep .sn-table .mat-mdc-footer-row { background: transparent; }
+:host ::ng-deep .sn-table .mat-mdc-cell {
+  border-bottom: 1px solid var(--ios-separator-soft);
+  padding: 16px 14px;
+  height: 52px;
+  color: var(--ios-label);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+:host ::ng-deep .sn-table .mat-mdc-row:hover .mat-mdc-cell {
+  background: rgba(118,118,128,.05);
+}
+.sn-table td.pos { color: var(--ios-green); font-weight: 600; }
+.sn-table td.neg { color: var(--ios-red); font-weight: 600; }
+/* numeric columns right-aligned, tabular figures (group/name column stays left) */
+:host ::ng-deep .sn-table th.sn-num,
+:host ::ng-deep .sn-table td.sn-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.sn-cell-sub {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--ios-secondary);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+/* total / footer row — stronger top separator */
+:host ::ng-deep .sn-table .sn-total-row .mat-mdc-footer-cell {
+  font-weight: 700;
+  border-top: 1.5px solid var(--ios-separator);
+  border-bottom: none;
+  color: var(--ios-label);
+  padding: 18px 14px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.sn-empty { color: var(--ios-secondary); font-size: 14px; padding: 14px 0; }
+
+/* ---------------------------------------------------------------- responsive */
+@media (max-width: 1000px) {
+  .sn-segs { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .sn-segs { grid-template-columns: 1fr; }
+  .sn-control-group.sn-right { margin-left: 0; }
+}
+
+/* ============================================================================
+   MERGED VIEWS — Teams + Assign Source (screen toggle)
+   ============================================================================ */
+.sn-screen-toggle { flex: 0 0 auto; }
+
+/* create team */
+.sn-create { display: flex; align-items: flex-end; gap: 16px; }
+.sn-newname { width: 280px; }
+:host ::ng-deep .sn-wrap .st-btn-primary.mat-mdc-button-base {
+  height: 44px; border-radius: var(--ios-r-control); background: var(--ios-blue);
+  color: #fff; font-weight: 600; letter-spacing: -0.01em; padding: 0 20px;
+  box-shadow: var(--ios-shadow-sm); transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .st-btn-primary .mat-mdc-button-touch-target { height: 44px; }
+:host ::ng-deep .sn-wrap .st-btn-primary:hover { box-shadow: var(--ios-shadow-md); }
+:host ::ng-deep .sn-wrap .st-btn-primary:active { transform: scale(0.98); }
+:host ::ng-deep .sn-wrap .st-btn-primary[disabled] { opacity: .45; box-shadow: none; }
+
+/* team cards */
+.st-teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-bottom: 24px; }
+:host ::ng-deep .st-team.mat-mdc-card,
+.st-team {
+  padding: 20px !important; background: var(--ios-surface); border: 1px solid var(--ios-separator);
+  border-radius: var(--ios-r-card) !important; box-shadow: var(--ios-shadow-md);
+  transition: transform .2s var(--ios-ease), box-shadow .2s var(--ios-ease);
+}
+:host ::ng-deep .st-team.mat-mdc-card:hover,
+.st-team:hover { transform: translateY(-2px); box-shadow: var(--ios-shadow-lift); }
+.st-team-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.st-team-head h2 { margin: 0; flex: 0 0 auto; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--ios-label); }
+.st-count { font-size: 13px; color: var(--ios-secondary); flex: 1; font-variant-numeric: tabular-nums; }
+:host ::ng-deep .st-team-head button[mat-icon-button] { color: var(--ios-secondary); }
+:host ::ng-deep .st-team-head button[mat-icon-button]:hover { color: var(--ios-red); }
+.st-empty { color: var(--ios-secondary); font-size: 13px; margin: 8px 0 0; }
+
+/* chips */
+:host ::ng-deep .st-team .mat-mdc-standard-chip,
+:host ::ng-deep .st-team .mat-mdc-chip {
+  background: var(--ios-fill) !important; border-radius: var(--ios-r-pill) !important; border: none !important; box-shadow: none !important;
+}
+:host ::ng-deep .st-team .mdc-evolution-chip__text-label { color: var(--ios-label); font-weight: 500; font-size: 13px; }
+
+/* roster */
+.st-roster { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.st-roster-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--ios-separator-soft);
+}
+.st-roster-row:last-child { border-bottom: none; }
+.st-person { font-size: 15px; font-weight: 500; color: var(--ios-label); }
+.st-assign { width: 220px; }
+
+/* assign source */
+.sn-src-hint { color: var(--ios-secondary); font-size: 13px; margin: 0 0 12px; }
+.sn-src-select { width: 180px; }
+
+/* salespeople flag toggle */
+:host ::ng-deep .sn-wrap .sn-flag-btn.mat-mdc-button-base {
+  height: 38px; border-radius: var(--ios-r-pill); border: 1px solid var(--ios-separator);
+  color: var(--ios-secondary); font-weight: 600; letter-spacing: -0.01em;
+  transition: background-color .2s var(--ios-ease), color .2s var(--ios-ease), border-color .2s var(--ios-ease);
+}
+:host ::ng-deep .sn-wrap .sn-flag-btn.on.mat-mdc-button-base {
+  color: var(--ios-green); border-color: rgba(52,199,89,.35); background: rgba(52,199,89,.09);
+}
+:host ::ng-deep .sn-wrap .sn-flag-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }

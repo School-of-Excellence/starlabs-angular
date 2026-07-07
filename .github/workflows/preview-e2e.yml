@@ -1,0 +1,231 @@
+# preview-e2e — PREVIEW-TIME hermetic Playwright gate (thin caller).
+#
+# EVOLVED 2026-07-03 (master plan: hub specs/plans/2026-07-02-test-orchestration-cf-rollout-architecture.md).
+# Two ways in:
+#
+#  1. CONSOLE-DISPATCHED (the normal path): the console's deployPreview/runTests callables pass
+#     `suites` (a JSON array, e.g. '["queue","journey"]') + `cf_repo`/`cf_branch` (the CF source the
+#     emulator loads — chosen in the Test Run dialog, default development). A RESOLVE job maps each
+#     suite name to its Playwright config via the hub's suites-manifest.json (git = truth), then a
+#     MATRIX runs one parallel job per suite (fail-fast: false — every suite reports). Report mode is
+#     ALWAYS on (evidence '1'); the per-suite config decides capture (failure-only vs all, plan L7/L11).
+#
+#  2. FALLBACK SELF-ROUTING (no `suites` input — e.g. a manual dispatch): the original
+#     dorny/paths-filter area routing below runs unchanged, diffing the WHOLE branch against
+#     `development` (merge-base). Narrow map, broad fallback: cross-cutting changes or unmapped
+#     queue sub-areas run the FULL suite; the cheap self-tests ride with every area.
+#     NOTE: the area→spec map is being migrated INTO suites-manifest.json (`suites.queue.areas`) —
+#     keep the two in sync until the fallback reads the manifest too.
+#
+# TRIGGER = workflow_dispatch only (2026-06-29 decision: the test is tied to the deliberate deploy /
+# explicit Run tests click — never bare pushes).
+#
+# Requires repo secret REPO_PAT via `secrets: inherit`; the hub must allow org-wide workflow reuse.
+name: preview-e2e (preview-time gate)
+
+on:
+  workflow_dispatch:
+    inputs:
+      suites:
+        description: 'JSON array of suite names from the console dialog (e.g. ["queue","journey"]). Empty = fallback path-routing.'
+        type: string
+        default: ''
+      cf_repo:
+        description: 'Cloud Functions repo the emulator loads (room for future CF repos, plan L21)'
+        type: string
+        default: starlabs-cloud-function
+      cf_branch:
+        description: 'Cloud Functions branch the emulator loads (Test Run dialog choice, default development)'
+        type: string
+        default: development
+      only:
+        description: 'Spec subset (space-separated). Empty = suites/routing. Non-empty = run exactly this subset (manual debug).'
+        type: string
+        default: ''
+      evidence:
+        description: 'Capture mode override for the manual path (matrix legs always run report mode)'
+        type: string
+        default: '0'
+
+jobs:
+  # ── 0. RESOLVE (console path): suite names → {suite, config} matrix via the hub manifest ─────────
+  resolve:
+    if: ${{ inputs.suites != '' && inputs.only == '' }}
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.map.outputs.matrix }}
+    steps:
+      - name: Checkout the hub (suites-manifest.json — git is the routing truth)
+        uses: actions/checkout@v4
+        with:
+          repository: School-of-Excellence/starlabs-e2e-tests
+          ref: main
+          token: ${{ secrets.REPO_PAT }}
+
+      - name: Map suites → configs
+        id: map
+        env:
+          SUITES: ${{ inputs.suites }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const manifest = JSON.parse(fs.readFileSync("suites-manifest.json", "utf8"));
+            const names = JSON.parse(process.env.SUITES);
+            if (!Array.isArray(names) || names.length === 0) { console.error("suites must be a non-empty JSON array"); process.exit(1); }
+            const legs = names.map((n) => {
+              const def = manifest.suites[n];
+              if (!def) { console.error(`Unknown suite: ${n}`); process.exit(1); }
+              if (!def.ciReady) { console.error(`Suite not CI-ready: ${n}`); process.exit(1); }
+              return { suite: n, config: def.config };
+            });
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(legs)}\n`);
+            console.log("matrix:", JSON.stringify(legs, null, 2));
+          '
+
+  # ── 0b. MATRIX (console path): one parallel gate job per suite (plan L3/F6→D1) ───────────────────
+  suite:
+    needs: resolve
+    if: ${{ inputs.suites != '' && inputs.only == '' }}
+    strategy:
+      fail-fast: false          # every suite reports — one failure must not cancel the others
+      matrix:
+        include: ${{ fromJson(needs.resolve.outputs.matrix) }}
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      suite: ${{ matrix.suite }}
+      config: ${{ matrix.config }}
+      cf_repo: ${{ inputs.cf_repo }}
+      cf_branch: ${{ inputs.cf_branch }}
+      e2e_ref: main
+      firebase_project: starlabs-cicd
+      stage: preview-gate
+      evidence: '1'             # report mode ALWAYS on (L7); the config decides capture level
+    secrets: inherit
+
+  # ── 1. FALLBACK: classify what the WHOLE branch changed vs development (routing path) ────────────
+  changes:
+    if: ${{ inputs.only == '' && inputs.suites == '' }}
+    runs-on: ubuntu-latest
+    outputs:
+      studio: ${{ steps.filter.outputs.studio }}
+      operator: ${{ steps.filter.outputs.operator }}
+      big: ${{ steps.filter.outputs.big }}
+      shared: ${{ steps.filter.outputs.shared }}
+      queue: ${{ steps.filter.outputs.queue }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Diff the full feature branch against the integration branch (merge-base), NOT just the last
+          # push — a preview deploy ships the cumulative branch, so routing must see the whole diff.
+          base: development
+          filters: |
+            studio:
+              - 'src/app/queue system/dynamic-studio/**'
+              - 'src/app/queue system/dynamic-studio-v2/**'
+              - 'src/app/queue system/assign-procedure-studio/**'
+              - 'src/app/queue system/assign-queue-studio/**'
+              - 'src/app/queue system/preassign-studio/**'
+              - 'src/app/queue system/studio-preassign-dialog/**'
+              - 'src/app/queue system/accept-other-studio/**'
+              - 'src/app/queue system/invite-other-studio/**'
+              - 'src/app/queue system/arenastudioactivity/**'
+            operator:
+              - 'src/app/queue system/dynamic-queue-manager/**'
+              - 'src/app/queue system/dynamic-queue-manager-clone/**'
+              - 'src/app/queue system/queue-list/**'
+              - 'src/app/queue system/queue-planning/**'
+              - 'src/app/queue system/queue-planning-clone/**'
+              - 'src/app/queue system/queue-planning-review/**'
+              - 'src/app/queue system/draft-queue-planning-dialog/**'
+              - 'src/app/queue system/queue-creation-v3/**'
+              - 'src/app/queue system/arena-board/**'
+              - 'src/app/queue system/queue-flow-visualizer/**'
+            big:
+              - 'src/app/queue system/big-planner/**'
+              - 'src/app/queue system/event-opportunity-dashboard/**'
+              - 'src/app/queue system/initiate-event-product/**'
+            # Cross-cutting → force the FULL suite (these can affect everything).
+            shared:
+              - 'src/app/**.guard.ts'
+              - 'angular.json'
+              - 'package.json'
+              - 'src/app/queue system/*.ts'
+              - '.github/workflows/preview-e2e.yml'
+            # The whole queue dir — used to detect a change in an UNMAPPED sub-area (→ full fallback).
+            queue:
+              - 'src/app/queue system/**'
+
+  # ── 2. Per-area suites (run every area that changed) ────────────────────────────────────────────
+  studio:
+    needs: changes
+    if: ${{ needs.changes.outputs.shared == 'false' && needs.changes.outputs.studio == 'true' }}
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      cf_branch: ${{ inputs.cf_branch }}
+      cf_repo: ${{ inputs.cf_repo }}
+      e2e_ref: main
+      firebase_project: starlabs-cicd
+      stage: preview-gate
+      only: 'queue/studio-core.spec.ts queue/studio-session.spec.ts queue/invariants-selftest.spec.ts queue/loop-bound-selftest.spec.ts queue/oracle-selftest.spec.ts'
+    secrets: inherit
+
+  operator:
+    needs: changes
+    if: ${{ needs.changes.outputs.shared == 'false' && needs.changes.outputs.operator == 'true' }}
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      cf_branch: ${{ inputs.cf_branch }}
+      cf_repo: ${{ inputs.cf_repo }}
+      e2e_ref: main
+      firebase_project: starlabs-cicd
+      stage: preview-gate
+      only: 'queue/operator.spec.ts queue/selfmovable-gate.spec.ts queue/watch-videos.spec.ts queue/actors-health.spec.ts queue/authoring.spec.ts queue/cf-sideeffects.spec.ts queue/invariants-selftest.spec.ts queue/loop-bound-selftest.spec.ts queue/oracle-selftest.spec.ts'
+    secrets: inherit
+
+  big:
+    needs: changes
+    if: ${{ needs.changes.outputs.shared == 'false' && needs.changes.outputs.big == 'true' }}
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      cf_branch: ${{ inputs.cf_branch }}
+      cf_repo: ${{ inputs.cf_repo }}
+      e2e_ref: main
+      firebase_project: starlabs-cicd
+      stage: preview-gate
+      only: 'queue/big-analytics.spec.ts queue/cross-db-lowerbound.spec.ts queue/invariants-selftest.spec.ts queue/loop-bound-selftest.spec.ts queue/oracle-selftest.spec.ts'
+    secrets: inherit
+
+  # ── 3. Full suite — cross-cutting change, OR a queue change in an unmapped sub-area ──────────────
+  full:
+    needs: changes
+    if: >-
+      ${{ needs.changes.outputs.shared == 'true' ||
+          (needs.changes.outputs.queue == 'true' &&
+           needs.changes.outputs.studio == 'false' &&
+           needs.changes.outputs.operator == 'false' &&
+           needs.changes.outputs.big == 'false') }}
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      cf_branch: ${{ inputs.cf_branch }}
+      cf_repo: ${{ inputs.cf_repo }}
+      e2e_ref: main
+      firebase_project: starlabs-cicd
+      stage: preview-gate
+      only: ''   # full suite
+    secrets: inherit
+
+  # ── 4. Manual debug — an explicit `only` subset skips routing (deliberate single-suite run) ──────
+  manual:
+    if: ${{ inputs.only != '' }}
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      cf_branch: ${{ inputs.cf_branch }}
+      cf_repo: ${{ inputs.cf_repo }}
+      e2e_ref: main
+      firebase_project: starlabs-cicd
+      stage: preview-gate
+      only: ${{ inputs.only }}
+      evidence: ${{ inputs.evidence }}
+    secrets: inherit

@@ -894,26 +894,27 @@
                       </div>
                       <div *ngIf="settingsForm.get('testmode')?.value" class="setting-row-expand">
                         <mat-form-field appearance="outline" class="w-100">
-                          <mat-label>Select Profiles</mat-label>
-                          <mat-select formControlName="testusers" multiple>
-                            <mat-option *ngFor="let profile of names" [value]="profile.id">
-                              <span style="display:inline-flex;align-items:center;gap:8px;">
-                                <app-profile-picture [profileId]="profile.id" [name]="profile.name" [size]="24"></app-profile-picture>
-                                <span>{{ profile.name }}</span>
-                              </span>
-                            </mat-option>
+                          <mat-label>Select Profile</mat-label>
+                          <mat-select multiple [value]="regularSelections['testusers'] || []"
+                            (selectionChange)="onProfileSelectChange('testusers', false, $event.value)">
+                            <mat-option *ngFor="let profile of names; trackBy: trackByProfileId" [value]="profile.id">{{ profile.name }}</mat-option>
                           </mat-select>
-                          <mat-hint>Selected {{ settingsForm.get('testusers')?.value?.length || 0 }} users</mat-hint>
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Select New Profile</mat-label>
+                          <mat-select multiple [value]="newSelections['testusers'] || []"
+                            (selectionChange)="onProfileSelectChange('testusers', true, $event.value)">
+                            <mat-option *ngFor="let profile of newNames; trackBy: trackByProfileId" [value]="profile.id">{{ profile.name }}</mat-option>
+                          </mat-select>
                         </mat-form-field>
                         <div *ngIf="settingsForm.get('testusers')?.value?.length > 0">
+                          <p class="setting-row-desc">Selected {{ settingsForm.get('testusers')?.value?.length || 0 }} users</p>
                           <mat-chip-set>
-                            <ng-container *ngFor="let profile of names">
-                              <mat-chip *ngIf="settingsForm.get('testusers')?.value?.includes(profile.id)"
-                                [removable]="true" (removed)="removeUser(profile.id)">
-                                {{ profile.name }}
-                                <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                              </mat-chip>
-                            </ng-container>
+                            <mat-chip *ngFor="let id of settingsForm.get('testusers')?.value; trackBy: trackById"
+                              [removable]="true" (removed)="removeProfileId('testusers', id)">
+                              {{ nameFor(id) }}
+                              <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                            </mat-chip>
                           </mat-chip-set>
                         </div>
                       </div>
@@ -1183,21 +1184,27 @@
                       </div>
                       <div *ngIf="settingsForm.get('facilitator')?.value" class="setting-row-expand">
                         <mat-form-field appearance="outline" class="w-100">
-                          <mat-label>Select Facilitators</mat-label>
-                          <mat-select formControlName="facilitatorprofiles" multiple>
-                            <mat-option *ngFor="let facilitators of names" [value]="facilitators.id">{{ facilitators.name }}</mat-option>
+                          <mat-label>Select Profile</mat-label>
+                          <mat-select multiple [value]="regularSelections['facilitatorprofiles'] || []"
+                            (selectionChange)="onProfileSelectChange('facilitatorprofiles', false, $event.value)">
+                            <mat-option *ngFor="let facilitators of names; trackBy: trackByProfileId" [value]="facilitators.id">{{ facilitators.name }}</mat-option>
                           </mat-select>
-                          <mat-hint>Selected {{ settingsForm.get('facilitatorprofiles')?.value?.length || 0 }} facilitators</mat-hint>
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Select New Profile</mat-label>
+                          <mat-select multiple [value]="newSelections['facilitatorprofiles'] || []"
+                            (selectionChange)="onProfileSelectChange('facilitatorprofiles', true, $event.value)">
+                            <mat-option *ngFor="let facilitators of newNames; trackBy: trackByProfileId" [value]="facilitators.id">{{ facilitators.name }}</mat-option>
+                          </mat-select>
                         </mat-form-field>
                         <div *ngIf="settingsForm.get('facilitatorprofiles')?.value?.length > 0">
+                          <p class="setting-row-desc">Selected {{ settingsForm.get('facilitatorprofiles')?.value?.length || 0 }} facilitators</p>
                           <mat-chip-set>
-                            <ng-container *ngFor="let facilitators of names">
-                              <mat-chip *ngIf="settingsForm.get('facilitatorprofiles')?.value?.includes(facilitators.id)"
-                                [removable]="true" (removed)="removeFacilitator(facilitators.id)">
-                                {{ facilitators.name }}
-                                <button matChipRemove><mat-icon>cancel</mat-icon></button>
-                              </mat-chip>
-                            </ng-container>
+                            <mat-chip *ngFor="let id of settingsForm.get('facilitatorprofiles')?.value; trackBy: trackById"
+                              [removable]="true" (removed)="removeProfileId('facilitatorprofiles', id)">
+                              {{ nameFor(id) }}
+                              <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                            </mat-chip>
                           </mat-chip-set>
                         </div>
                       </div>
@@ -1233,18 +1240,196 @@
                               rows="4" cdkTextareaAutosize cdkAutosizeMinRows="3" cdkAutosizeMaxRows="8"></textarea>
                             <mat-hint>Shown to participants after completing the final challenge</mat-hint>
                           </mat-form-field>
-                          <div formArrayName="dailyCommunication" class="settings-subsection">
+                          <div class="settings-subsection">
                             <h4 class="settings-subsection-title">Daily Communication</h4>
-                            <mat-form-field *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
-                              appearance="outline" class="w-100">
-                              <mat-label>Day {{ i + 1 }} Message</mat-label>
-                              <textarea matInput [formControlName]="i"
-                                placeholder="Enter message for day {{ i + 1 }}..."
-                                cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
-                            </mat-form-field>
+                            <div *ngFor="let ctrl of getDailyCommunicationArray().controls; let i = index"
+                              class="daily-comm-day">
+                              <ng-container formArrayName="dailyCommunication">
+                                <mat-form-field appearance="outline" class="w-100">
+                                  <mat-label>Day {{ i + 1 }} Message 1</mat-label>
+                                  <textarea matInput [formControlName]="i"
+                                    placeholder="Enter message 1 for day {{ i + 1 }}..."
+                                    cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
+                                </mat-form-field>
+                              </ng-container>
+                              <ng-container formArrayName="dailyCommunication2">
+                                <mat-form-field appearance="outline" class="w-100">
+                                  <mat-label>Day {{ i + 1 }} Message 2</mat-label>
+                                  <textarea matInput [formControlName]="i"
+                                    placeholder="Enter message 2 for day {{ i + 1 }}..."
+                                    cdkTextareaAutosize cdkAutosizeMinRows="2" cdkAutosizeMaxRows="6"></textarea>
+                                </mat-form-field>
+                              </ng-container>
+                            </div>
                           </div>
                         </div>
                       </ng-container>
+
+                      <div *ngIf="settingsForm.get('evergreenWorkshop')?.value" class="setting-row-expand">
+
+                        <!-- Referral Workshop -->
+                        <div class="setting-row-main">
+                          <div class="setting-row-text">
+                            <h4 class="setting-row-title">Referral Workshop</h4>
+                            <p class="setting-row-desc">{{ settingsForm.get('referralworkshop')?.value ? 'Participants can refer this workshop' : 'Referral is disabled' }}</p>
+                          </div>
+                          <mat-slide-toggle formControlName="referralworkshop" color="primary"></mat-slide-toggle>
+                        </div>
+                        <mat-form-field *ngIf="settingsForm.get('referralworkshop')?.value" appearance="outline" class="w-100">
+                          <mat-label>Refer User Count</mat-label>
+                          <input matInput type="number" formControlName="refercount"
+                            placeholder="Enter number of users to refer" min="0" />
+                          <mat-hint>How many users each participant can refer</mat-hint>
+                        </mat-form-field>
+                        <mat-form-field *ngIf="settingsForm.get('referralworkshop')?.value" appearance="outline" class="w-100">
+                          <mat-label>Referral Code Starts With</mat-label>
+                          <input matInput type="text" formControlName="referralcodestartswith"
+                            (input)="onReferralCodeInput($event)" placeholder="Enter prefix (CAPS only)"
+                            style="text-transform:uppercase;" autocapitalize="characters" />
+                          <mat-hint>Uppercase letters only (A–Z)</mat-hint>
+                          <mat-error *ngIf="settingsForm.get('referralcodestartswith')?.hasError('pattern')">
+                            Only uppercase letters are allowed
+                          </mat-error>
+                        </mat-form-field>
+                        <mat-form-field *ngIf="settingsForm.get('referralworkshop')?.value" appearance="outline" class="w-100">
+                          <mat-label>Referral Message</mat-label>
+                          <textarea matInput formControlName="referralmessage" rows="3"
+                            (keydown.enter)="$event.preventDefault()" (input)="onReferralMessageInput($event)"
+                            placeholder="Enter the referral message..."></textarea>
+                          <mat-hint>Single line — new lines are not allowed</mat-hint>
+                        </mat-form-field>
+                        <mat-form-field *ngIf="settingsForm.get('referralworkshop')?.value" appearance="outline" class="w-100">
+                          <mat-label>Referral Dialog Message</mat-label>
+                          <textarea matInput formControlName="referraldialogmessage" rows="3"
+                            placeholder="Enter the referral dialog message..."></textarea>
+                        </mat-form-field>
+                        <mat-form-field *ngIf="settingsForm.get('referralworkshop')?.value" appearance="outline" class="w-100">
+                          <mat-label>Enrollment Not Allowed Message</mat-label>
+                          <textarea matInput formControlName="enrollmentnotallowedmessage" rows="3"
+                            placeholder="Enter the enrollment not allowed message..."></textarea>
+                        </mat-form-field>
+                        <mat-form-field *ngIf="settingsForm.get('referralworkshop')?.value" appearance="outline" class="w-100">
+                          <mat-label>Enrollment Not Allowed Message (New)</mat-label>
+                          <textarea matInput formControlName="enrollmentnotallowedmessagenew" rows="3"
+                            placeholder="Enter the enrollment not allowed message (new)..."></textarea>
+                        </mat-form-field>
+
+                        <!-- Payment -->
+                        <div class="setting-row-main">
+                          <div class="setting-row-text">
+                            <h4 class="setting-row-title">Payment</h4>
+                            <p class="setting-row-desc">{{ settingsForm.get('payment')?.value ? 'Payment is enabled for this workshop' : 'Payment is disabled' }}</p>
+                          </div>
+                          <mat-slide-toggle formControlName="payment" color="primary"></mat-slide-toggle>
+                        </div>
+                        <div *ngIf="settingsForm.get('payment')?.value" formGroupName="paymentmap" class="settings-subsection">
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Amount</mat-label>
+                            <input matInput type="number" formControlName="amount" placeholder="Enter amount" min="0" />
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Amount Striked</mat-label>
+                            <input matInput type="number" formControlName="amountstriked" placeholder="Enter striked amount" min="0" />
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>API</mat-label>
+                            <input matInput type="text" formControlName="api" placeholder="Enter API" />
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>ID</mat-label>
+                            <input matInput type="text" formControlName="id" placeholder="Enter ID" />
+                          </mat-form-field>
+                        </div>
+
+                        <!-- Who can refer this workshop -->
+                        <div formGroupName="referallowedusers" class="settings-subsection">
+                          <h4 class="settings-subsection-title">Who are all able to refer this workshop</h4>
+                          <div class="setting-row-main">
+                            <div class="setting-row-text">
+                              <h4 class="setting-row-title">All</h4>
+                              <p class="setting-row-desc">{{ settingsForm.get('referallowedusers.all')?.value ? 'All users can refer' : 'Only selected users can refer' }}</p>
+                            </div>
+                            <mat-slide-toggle formControlName="all" color="primary"></mat-slide-toggle>
+                          </div>
+                          <ng-container *ngIf="!settingsForm.get('referallowedusers.all')?.value">
+                            <mat-form-field appearance="outline" class="w-100">
+                              <mat-label>Select Profile</mat-label>
+                              <mat-select multiple [value]="regularSelections['referallowedusers.referallowedusers'] || []"
+                                (selectionChange)="onProfileSelectChange('referallowedusers.referallowedusers', false, $event.value)">
+                                <mat-option *ngFor="let profile of names; trackBy: trackByProfileId" [value]="profile.id">{{ profile.name }}</mat-option>
+                              </mat-select>
+                            </mat-form-field>
+                            <mat-form-field appearance="outline" class="w-100">
+                              <mat-label>Select New Profile</mat-label>
+                              <mat-select multiple [value]="newSelections['referallowedusers.referallowedusers'] || []"
+                                (selectionChange)="onProfileSelectChange('referallowedusers.referallowedusers', true, $event.value)">
+                                <mat-option *ngFor="let profile of newNames; trackBy: trackByProfileId" [value]="profile.id">{{ profile.name }}</mat-option>
+                              </mat-select>
+                            </mat-form-field>
+                            <div *ngIf="settingsForm.get('referallowedusers.referallowedusers')?.value?.length > 0">
+                              <p class="setting-row-desc">Selected {{ settingsForm.get('referallowedusers.referallowedusers')?.value?.length || 0 }} users</p>
+                              <mat-chip-set>
+                                <mat-chip *ngFor="let id of settingsForm.get('referallowedusers.referallowedusers')?.value; trackBy: trackById"
+                                  [removable]="true" (removed)="removeProfileId('referallowedusers.referallowedusers', id)">
+                                  {{ nameFor(id) }}
+                                  <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                                </mat-chip>
+                              </mat-chip-set>
+                            </div>
+                          </ng-container>
+                          <div class="setting-row-main">
+                            <div class="setting-row-text">
+                              <h4 class="setting-row-title">New User</h4>
+                              <p class="setting-row-desc">{{ settingsForm.get('referallowedusers.newuserreferallowed')?.value ? 'New users are also allowed to refer' : 'New users cannot refer' }}</p>
+                            </div>
+                            <mat-slide-toggle formControlName="newuserreferallowed" color="primary"></mat-slide-toggle>
+                          </div>
+                        </div>
+
+                        <!-- Evergreen Access To -->
+                        <div formGroupName="evergreenaccessto" class="settings-subsection">
+                          <h4 class="settings-subsection-title">Evergreen Access To</h4>
+                          <div class="setting-row-main">
+                            <div class="setting-row-text">
+                              <h4 class="setting-row-title">All</h4>
+                              <p class="setting-row-desc">{{ settingsForm.get('evergreenaccessto.all')?.value ? 'All users have access' : 'Only selected users have access' }}</p>
+                            </div>
+                            <mat-slide-toggle formControlName="all" color="primary"></mat-slide-toggle>
+                          </div>
+                          <div class="setting-row-main">
+                            <div class="setting-row-text">
+                              <h4 class="setting-row-title">New</h4>
+                              <p class="setting-row-desc">{{ settingsForm.get('evergreenaccessto.new')?.value ? 'New users have access' : 'New users do not have access' }}</p>
+                            </div>
+                            <mat-slide-toggle formControlName="new" color="primary"></mat-slide-toggle>
+                          </div>
+                          <mat-form-field *ngIf="!settingsForm.get('evergreenaccessto.all')?.value" appearance="outline" class="w-100">
+                            <mat-label>Select Profile</mat-label>
+                            <mat-select multiple [value]="regularSelections['evergreenaccessto.selected'] || []"
+                              (selectionChange)="onProfileSelectChange('evergreenaccessto.selected', false, $event.value)">
+                              <mat-option *ngFor="let profile of names; trackBy: trackByProfileId" [value]="profile.id">{{ profile.name }}</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Select New Profile</mat-label>
+                            <mat-select multiple [value]="newSelections['evergreenaccessto.selected'] || []"
+                              (selectionChange)="onProfileSelectChange('evergreenaccessto.selected', true, $event.value)">
+                              <mat-option *ngFor="let profile of newNames; trackBy: trackByProfileId" [value]="profile.id">{{ profile.name }}</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          <div *ngIf="settingsForm.get('evergreenaccessto.selected')?.value?.length > 0">
+                            <p class="setting-row-desc">Selected {{ settingsForm.get('evergreenaccessto.selected')?.value?.length || 0 }} users</p>
+                            <mat-chip-set>
+                              <mat-chip *ngFor="let id of settingsForm.get('evergreenaccessto.selected')?.value; trackBy: trackById"
+                                [removable]="true" (removed)="removeProfileId('evergreenaccessto.selected', id)">
+                                {{ nameFor(id) }}
+                                <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                              </mat-chip>
+                            </mat-chip-set>
+                          </div>
+                        </div>
+
+                      </div>
                     </div>
 
                   </div>
@@ -1293,6 +1478,17 @@
                       <mat-form-field appearance="outline" class="w-100">
                         <mat-label>Message</mat-label>
                         <textarea matInput formControlName="enrollwattimessage" rows="3"></textarea>
+                      </mat-form-field>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
+                    <h3 class="section-title">Congratulations Message</h3>
+                    <div class="comm-section-body">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Congratulations Message</mat-label>
+                        <textarea matInput formControlName="enrolledcongrats" rows="3"
+                          placeholder="Enter the congratulations message..."></textarea>
                       </mat-form-field>
                     </div>
                   </div>
@@ -1347,23 +1543,35 @@
                       </mat-form-field>
                       <div class="upload-block">
                         <p class="upload-label">Choose Web Hero Image — Recommended Size: 3840 × 1350</p>
-                        <input type="file" (change)="onHeroImageUpload($event)" />
+                        <input #webHeroInput type="file" (change)="onHeroImageUpload($event)" />
                         <div *ngIf="settingsForm.get('heroImage')?.value" class="upload-preview">
                           <img [src]="settingsForm.get('heroImage')?.value" alt="Hero Image">
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroImage', webHeroInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                       <div class="upload-block">
                         <p class="upload-label">Choose Mobile Hero Image — Recommended Size: EiFlix Series Image Size</p>
-                        <input type="file" (change)="onHeroMobileImageUpload($event)" />
+                        <input #mobileHeroInput type="file" (change)="onHeroMobileImageUpload($event)" />
                         <div *ngIf="settingsForm.get('heroImageMobile')?.value" class="upload-preview">
                           <img [src]="settingsForm.get('heroImageMobile')?.value" alt="Hero Image">
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroImageMobile', mobileHeroInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                       <div class="upload-block">
                         <p class="upload-label">Choose Video</p>
-                        <input type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
+                        <input #heroVideoInput type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
                         <div *ngIf="settingsForm.get('heroVideo')?.value" class="upload-preview">
                           <video [src]="settingsForm.get('heroVideo')?.value" controls></video>
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroVideo', heroVideoInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                     </div>

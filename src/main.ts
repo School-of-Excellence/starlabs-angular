@@ -2,7 +2,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 import { environment } from './environments/environment';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
+import { initializeFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
 import { getAuth, connectAuthEmulator } from '@angular/fire/auth';
 import { getStorage, connectStorageEmulator } from '@angular/fire/storage';
 import { initializeApp } from '@angular/fire/app';
@@ -27,10 +27,23 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   if (e.storage) connectStorageEmulator(getStorage(app), e.storage.host, e.storage.port);
   console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);
 } else {
-  // PROD/DEV: durable, multi-tab offline persistence (default + named ATC database) before any component reads them
-  const offlineCache = { };
-  initializeFirestore(app, offlineCache);
-  initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }, 'firestore-atc');
+  // Default DB: FORCE long-polling. `experimentalAutoDetectLongPolling` is
+  // already the firebase-js-sdk v11 default, so it was in effect before this
+  // line and was NOT enough — the same reason the `firestore-atc` DB below
+  // force-long-polls: this network interferes with Firestore's WebChannel
+  // streaming, and auto-detect can still stall the first-load Listen stream.
+  // The stall is most visible with a SECOND concurrent tab on the same origin
+  // (e.g. two Arena boards) — one tab's stream never establishes and that
+  // board shows no data. Forcing long-polling uses a plain-XHR transport that
+  // this network passes reliably, so every tab loads. Trade-off: slightly
+  // chattier than streaming, applied app-wide — matches the ATC workaround.
+  initializeFirestore(app, { experimentalForceLongPolling: true });
+  // Named DB `firestore-atc`: force long-polling here — this is the canonical,
+  // earliest initializer, so every consumer (getFirestore('firestore-atc') and
+  // AtcFirebaseService) reuses this one instance with a consistent transport.
+  // The network blocks Firestore WebChannel streaming, so long-polling avoids
+  // the "RPC 'Listen' stream transport errored" first-load stall for all ATC screens.
+  initializeFirestore(app, { experimentalForceLongPolling: true }, 'firestore-atc');
 }
 
 (window as any).process = {

@@ -26,8 +26,10 @@
   width: 900px;
   max-width: 100%;
   height: max-content;
+  max-height: 90vh;
   /* border-radius: 20px; */
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   position: relative;
   padding: 0px;
@@ -434,6 +436,49 @@
   .game {
     min-height: 250px;
   }
+}
+
+/* Short viewport — high browser zoom (175%–200%) shrinks the vertical space.
+   Scale the timer, header and game down so the dialog fits without clipping.
+   The container also scrolls (overflow-y:auto) as a final safety net. */
+@media (max-height: 820px) {
+  .left {
+    padding: 20px 18px;
+  }
+  .icon-wrapper {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 12px;
+  }
+  .left h2 {
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+  .timer-container {
+    width: 118px;
+    height: 118px;
+    margin: 12px 0;
+  }
+  .time {
+    font-size: 34px;
+  }
+  .status-box {
+    padding: 12px;
+    margin: 12px 0;
+  }
+  .right {
+    padding: 18px;
+  }
+  .game {
+    min-height: 190px;
+  }
+}
+@media (max-height: 620px) {
+  .icon-wrapper { display: none; }
+  .timer-container { width: 96px; height: 96px; margin: 8px 0; }
+  .time { font-size: 28px; }
+  .left h2 { font-size: 18px; }
+  .game { min-height: 150px; }
 }
 
 @media (max-width: 600px) {

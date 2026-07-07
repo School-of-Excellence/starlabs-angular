@@ -210,6 +210,15 @@ body {
   width: 80vw;
   flex-direction: column;
 }
+/* Enter-studio "Participant accepted" popup — rounded white card */
+.enter-studio-dialog .mat-mdc-dialog-surface {
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, .18) !important;
+}
+.enter-studio-dialog .mat-mdc-dialog-container {
+  --mdc-dialog-container-color: #fff;
+}
 /* =============================================================
    Dynamic Studio V2 — body scroll lock
    When the studio takes over the viewport with position:fixed,
@@ -227,6 +236,38 @@ html:has(.dyn-studio-v2-app) {
   overflow: hidden !important;
   height: 100vh !important;
 }
+/* When the studio un-pins on short/narrow viewports (tablet, mobile, high
+   browser zoom) it re-enters normal document flow, so the host page must be
+   allowed to scroll again — otherwise the overflowing content is stuck with
+   no scrollbar. Keep these breakpoints in sync with the .ds-app un-pin rule
+   in dynamic-studio-v2.component.css (max-width:459px / max-height:380px). */
+@media (max-width: 459px), (max-height: 380px) {
+  body:has(.dyn-studio-v2-app),
+  html:has(.dyn-studio-v2-app) {
+    overflow: auto !important;
+  }
+  .mat-drawer-content:has(.dyn-studio-v2-app),
+  .mat-drawer-container:has(.dyn-studio-v2-app) {
+    overflow: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+}
+
+/* =============================================================
+   Zoom meeting view — blend the Safari bottom gap to black.
+   Safari sizes the Zoom gallery a hair under the window height, leaving a strip
+   of page background at the bottom. Paint the page black so it blends into the
+   meeting instead of flashing white. COLOUR ONLY — no layout change. Targets
+   `html` AND `body` (the template renders a nested <body> shorter than the
+   viewport). Harmless in Chrome.
+   Bisect (2026-07-06) confirmed the Safari control-bar being hidden is INHERENT
+   to Zoom SDK 6.1.0 (present even on 3-days-ago code), NOT a recent regression —
+   so we do NOT try to reposition #zmmtg-root (that only displaced the bar). The
+   real fix for visible Safari controls is the custom control bar rendered by the
+   component (see .sx-zoom-controls + isSafariBrowser). */
+html:has(#zmmtg-root),
+body:has(#zmmtg-root) { background: #000; }
 
 /* =============================================================
    Event Participation Confirmations — CDK overlay theming.
@@ -284,3 +325,16 @@ html:has(.dyn-studio-v2-app) {
 
 /* Snackbars (sx-snack via MAT_SNACK_BAR_DEFAULT_OPTIONS) */
 .sx-snack { --mdc-snackbar-container-shape: 12px; --mat-snack-bar-button-color: #4da3ff; }
+
+/* PWA "update available" snackbar — compact, centered dark pill (design 5).
+   MDC gives the surface a 344px min-width + light-dark default bg; override so
+   it hugs its content and takes a dark, minimal look at the bottom-center. */
+.update-snackbar .mdc-snackbar__surface {
+  min-width: auto;
+  background: #15191F;
+  border-radius: 13px;
+  padding: 9px 10px 9px 16px;
+  box-shadow: 0 14px 32px -14px rgba(0, 0, 0, .55);
+}
+.update-snackbar .mat-mdc-snack-bar-label,
+.update-snackbar .mdc-snackbar__label { padding: 0; color: #EAEDF2; }

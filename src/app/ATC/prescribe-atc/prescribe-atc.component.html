@@ -9,14 +9,14 @@
     </nav>
     
     <nav class="navbar navbar-light justify-content-end status-bar autosave-bar" *ngIf="autoSaveID != null && isonline">
-      <div>
+      <div class="status-row">
         <span class="icon-text-container" (click)="autoSave()">
           <mat-icon [ngClass]="draftStatus.code == 1 ? 'text-success' : draftStatus.code == 0 ? 'text-warning' : 'text-danger'">sync</mat-icon>
           <span>{{draftStatus.message}}</span>
           <span class="ml-2 text-secondary" *ngIf="draftStatus.code == 1 && lastDraftSavedOn">({{lastDraftSavedOn | date: 'medium'}})</span>
         </span>
         <!-- explicit retry shown only when a save failed -->
-        <button *ngIf="draftStatus.code == -1" mat-button class="retry-button" (click)="autoSave()">Retry</button>
+        <button *ngIf="draftStatus.code == -1" type="button" class="retry-button" (click)="autoSave()">Retry</button>
       </div>
       <!-- <div *ngIf="autosaveonprogress">
         <span class="icon-text-container">
@@ -119,7 +119,7 @@
       <!-- Authors Section -->
       <section class="content-section" id="atcfield-author" *ngIf="!this.bigActivity()">
         <h2 class="section-heading">AUTHORS</h2>
-        <div class="personnel-container">
+        <div class="personnel-container" *ngIf="personnelReady">
           <div class="field-grid field-header">
             <div class="field-activity">Activity</div>
             <div class="field-person">Specialist</div>
@@ -150,7 +150,7 @@
       <!-- Observers Section -->
       <section class="content-section" *ngIf="!this.bigActivity()">
         <h2 class="section-heading">OBSERVERS</h2>
-        <div class="personnel-container">
+        <div class="personnel-container" *ngIf="personnelReady">
           <div class="field-grid field-header">
             <div class="field-activity">Activity</div>
             <div class="field-person">Shadow</div>
@@ -181,7 +181,7 @@
       <!-- Mentors Section -->
       <section class="content-section">
         <h2 class="section-heading">MENTORS</h2>
-        <div class="personnel-container">
+        <div class="personnel-container" *ngIf="personnelReady">
           <div class="field-grid field-header">
             <div class="field-activity">Activity</div>
             <div class="field-person">Mentor</div>
