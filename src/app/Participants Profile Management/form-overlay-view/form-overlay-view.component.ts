@@ -29,7 +29,6 @@ export class FormOverlayViewComponent {
   mapWorkshopNew: any = {};
 
   async viewFormOverlay(row: any) {
-    console.log("form", row);
     this.currentOverlayRow = row;
     this.overlayMode = 'individual';
     this.overlayTitle = row.formname || 'Form View';

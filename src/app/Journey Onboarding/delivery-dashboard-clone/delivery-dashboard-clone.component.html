@@ -70,6 +70,7 @@
               <mat-select-trigger>{{ productSelectTrigger }}</mat-select-trigger>
               <mat-option *ngFor="let p of availableCardLabels" [value]="p">{{ p }}</mat-option>
             </mat-select>
+
           </mat-form-field>
         </button>
       </div>
@@ -247,8 +248,8 @@
               <span class="up-confirmed">
                 <mat-form-field appearance="outline" class="event-select">
                   <mat-label>Select Event</mat-label>
-                  <mat-select [(value)]="selectedEvent" (click)="getAllEvents()" (selectionChange)="onEventChange($event.value)"
-                    panelClass="event-dropdown">
+                  <mat-select [(value)]="selectedEvent" (click)="getAllEvents()"
+                    (selectionChange)="onEventChange($event.value)" panelClass="event-dropdown">
                     <mat-option *ngFor="let event of events" [value]="event">
                       {{ event.name }}
                     </mat-option>
@@ -671,7 +672,7 @@
                         <td>{{ item['statusdate']?.['initiated'] ?
                           (getDateFromFieldPublic(item['statusdate']['initiated']) |
                           date:'dd MMM yyyy') : '-' }}</td>
-                      <td>{{ item['statusdate']?.['ongoing'] ? (getDateFromFieldPublic(item['statusdate']['ongoing'])
+                        <td>{{ item['statusdate']?.['ongoing'] ? (getDateFromFieldPublic(item['statusdate']['ongoing'])
                           |
                           date:'dd MMM yyyy') : '-' }}</td>
                         <td>{{ item['statusdate']?.['completed'] ?
@@ -1030,7 +1031,7 @@
                           </span>
                         </div>
                         <!-- View Form Button -->
-                        <button class='btn-primary' *ngIf="c?.status === 'submitted'" (click)="openFormOverlay(c)">View Form</button>
+                        <button class='btn btn-primary' *ngIf="c?.status === 'submitted'" (click)="openFormOverlay(c)">View Form</button>
                         <!-- Expandable Section -->
                         <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
                           <hr class="divider">
@@ -1700,7 +1701,6 @@
                   </ng-template>
                 </ng-container>
               </section>
-
             </ng-container>
           </div>
         </ng-template>
@@ -1732,7 +1732,7 @@
                   <mat-form-field appearance="outline" class="pm-filter-field"
                     *ngIf="currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity'">
                     <mat-label>Product</mat-label>
-                    <mat-select placeholder="Select Product" formControlName="product"
+                    <mat-select placeholder="Select Product" formControlName="productSearch"
                       (selectionChange)="filterTableData()" multiple>
                       <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product
                         }}</mat-option>
@@ -1775,6 +1775,35 @@
                         </th>
                       </tr>
                     </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
+                  </table>
+                </div>
+              </mat-tab>
+              <mat-tab>
+                <ng-template mat-tab-label>
+                  <span class="pm-tab-text">Ready to Start</span>
+                  <span class="pm-tab-count">{{ originalData['readyForInitiation'].count }}</span>
+                </ng-template>
+                <div *ngIf="isFilterActive()" class="pm-filter-indicator">
+                  <span class="pm-filter-text">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right:8px">
+                      <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+                    </svg>{{ getFilterDisplayText() }}<span class="pm-filter-count" *ngIf="getActiveFilterCount()"> ({{
+                      getActiveFilterCount() }})</span>
+                  </span>
+                  <button class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
+                </div>
+                <div class="pm-table-container">
+                  <table class="pm-data-table">
+                    <thead>
+                      <tr>
+                        <th *ngFor="let header of getCurrentTabHeaders()"
+                          [class.checkbox-col]="header.key === 'checkbox'" [style.width]="header.width">
+                          <input *ngIf="header.key === 'checkbox'" type="checkbox" class="pm-table-checkbox">
+                          <span *ngIf="header.key !== 'checkbox'">{{ header.label }}</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
                   </table>
                 </div>
               </mat-tab>

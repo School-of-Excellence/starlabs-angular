@@ -279,6 +279,7 @@ export class DeliveryDashboardCloneComponent {
             'EI Solution for Husband',
             'EI for Entrepreneurs',
             'EI for Academy Growth',
+            'EI Custom Solutions',
         ],
         'Critical Support Diagnostics and Implementation': [
             'Critical Support Diagnostics And Implementation',
@@ -566,7 +567,7 @@ export class DeliveryDashboardCloneComponent {
     selectedDeliveryType: string = '';
     mergedSeatSlots: any[] = [];
 
-    upConfirmedMap: any = {};
+    upConfirmedMap: { [key: string]: any[] } = {};
     upConfirmedModalOpen = false;
     selectedUPConfirmedParticipants: any[] = [];
     selectedUPConfirmedProduct = '';
@@ -661,7 +662,8 @@ export class DeliveryDashboardCloneComponent {
         this.filterForm = this.fb.group({
             search: [''],
             journey: [[]],
-            product: [[]]
+            product: [[]],
+            productSearch: [[]]
         });
 
         this.filterForm.get('product')!.valueChanges.subscribe(() => {
@@ -1579,21 +1581,34 @@ export class DeliveryDashboardCloneComponent {
 
             // ========================= COMPLETED DATA =========================
             const completedData = this.funnelData[productId]?.completed || [];
+
             for (let data of completedData) {
+
                 let appointments = Array.from(allAppointments.values() || [])
                     .filter((app: any) => app.participantproductid === data.docid);
 
-                data = {
+                await Promise.all(
+                    appointments.map(async (appointment) => {
+                        if (!appointment.appointmentTypeName) {
+                            appointment.appointmentTypeName =
+                                await this.resolveAppointmentType(appointment);
+                        }
+                    })
+                );
+
+                let mergedData = {
                     ...data,
                     allappointments: appointments
                 };
 
-                if (productType === 'eiStarterPack') {
-                    productData.eiStarterPack.celebrationCall.push(data);
-                } else if (productType === 'criticalSupport') {
-                    productData.criticalSupport.completion.push(data);
-                } else if (productType === 'eiCustomSolutions') {
-                    productData.eiCustomSolutions.celebrationCall.push(data);
+                if (this.selectedProductType === 'eiStarterPack') {
+                    productData.eiStarterPack.celebrationCall.push(mergedData);
+                }
+                else if (this.selectedProductType === 'criticalSupport') {
+                    productData.criticalSupport.completion.push(mergedData);
+                }
+                else if (this.selectedProductType === 'eiCustomSolutions') {
+                    productData.eiCustomSolutions.celebrationCall.push(mergedData);
                 }
             }
             Object.assign(this.productData, productData);
@@ -1938,92 +1953,77 @@ export class DeliveryDashboardCloneComponent {
         }
     }
 
-    async getApprovedDFUParticipants(eventId: string) {
-        try {
-            const eventRef = doc(
-                this.firestore,
-                `event collection/${eventId}`
-            );
+   async getApprovedDFUParticipants(eventId: string) {
+    try {
+        const eventRef = doc(
+            this.firestore,
+            `event collection/${eventId}`
+        );
 
-            const dfuProductSet = new Set(this.dfuProductIds);
+        const dfuProductSet = new Set(this.dfuProductIds);
 
-            const approvedRequestsSnap = await getDocs(
-                query(
-                    collection(this.firestore, 'event participation request'),
-                    where('eventref', '==', eventRef),
-                    where('status', '==', 'approved')
-                )
-            );
+        const approvedRequestsSnap = await getDocs(
+            query(
+                collection(this.firestore, 'event participation request'),
+                where('eventref', '==', eventRef),
+                where('status', '==', 'approved')
+            )
+        );
 
-            const filteredParticipants: any[] = [];
-            approvedRequestsSnap.forEach((requestDoc) => {
-                const requestData: any = requestDoc.data();
-                const participantMeta =
-                    this.mapMetaData?.[requestData.profileid];
+       const filteredParticipants: any[] = [];
+const seenProfileIds = new Set<string>(); 
 
-                if (!participantMeta) {
-                    return;
+approvedRequestsSnap.forEach((requestDoc) => {
+    const requestData: any = requestDoc.data();
+    const profileId = requestData.profileid;
+
+    if (!profileId || seenProfileIds.has(profileId)) {
+        return;
+    }
+
+    const participantMeta = this.mapMetaData?.[profileId];
+    if (!participantMeta) return;
+
+    const activeProducts = participantMeta.activeproduct || [];
+    const matchedDFUProducts = activeProducts.filter(
+        (productId: string) => dfuProductSet.has(productId)
+    );
+
+    if (matchedDFUProducts.length > 0) {
+        seenProfileIds.add(profileId);
+        filteredParticipants.push({
+            requestId: requestDoc.id,
+            ...requestData,
+            participantMeta,
+            matchedDFUProducts
+        });
+    }
+});
+
+        this.approvedDFUParticipants = filteredParticipants;
+
+        // Product-wise grouping
+        this.upConfirmedMap = {};
+        this.approvedDFUParticipants.forEach((participant: any) => {
+            participant.matchedDFUProducts.forEach((productId: string) => {
+                if (!this.upConfirmedMap[productId]) {
+                    this.upConfirmedMap[productId] = [];
                 }
-
-                const activeProducts =
-                    participantMeta.activeproduct || [];
-                const matchedDFUProducts = activeProducts.filter(
-                    (productId: string) =>
-                        dfuProductSet.has(productId)
-                );
-                if (matchedDFUProducts.length > 0) {
-                    filteredParticipants.push({
-                        requestId: requestDoc.id,
-                        ...requestData,
-                        participantMeta,
-                        matchedDFUProducts
-                    });
-                }
+                this.upConfirmedMap[productId].push(participant);
             });
-            this.approvedDFUParticipants = filteredParticipants;
+        });
 
-            // Product-wise grouping
-            this.upConfirmedMap = {};
-            this.approvedDFUParticipants.forEach(
-                (participant: any) => {
-                    participant.matchedDFUProducts.forEach(
-                        (productId: string) => {
-                            if (!this.upConfirmedMap[productId]) {
-                                this.upConfirmedMap[productId] = [];
-                            }
-                            this.upConfirmedMap[productId].push(
-                                participant
-                            );
-                        }
-                    );
-                }
-            );
-
-        } catch (error) {
-            console.error(
-                'Error fetching approved DFU participants:',
-                error
-            );
-
-            this.approvedDFUParticipants = [];
-            this.upConfirmedMap = {};
-        }
+    } catch (error) {
+        console.error('Error fetching approved DFU participants:', error);
+        this.approvedDFUParticipants = [];
+        this.upConfirmedMap = {};
     }
+}
 
-    getUPConfirmedCount(productId: string): number {
-        return this.upConfirmedMap?.[productId]?.length || 0;
-    }
-
-    openUPConfirmedModal(productId: string) {
-
-        this.selectedUPConfirmedProduct =
-            this.mapProductName?.[productId] ||
-            this.mapProduct?.[productId] ||
-            productId;
-
-        this.selectedUPConfirmedParticipants =
-            this.upConfirmedMap?.[productId] || [];
-
+    openUPConfirmedModal(cardId: string) {
+        this.selectedUPConfirmedProduct = this.getCardName(cardId);
+        this.selectedUPConfirmedParticipants = this.getCardProductIds(cardId)
+            .flatMap(pid => this.upConfirmedMap?.[pid] || []);
         this.upConfirmedModalOpen = true;
     }
 
@@ -3005,10 +3005,11 @@ export class DeliveryDashboardCloneComponent {
     // Tab indices: outer 0=Overview, 1=Analytics, 2=Participants
     // Inner sub-tabs: 0=Awaiting Initiation, 1=Initiated–Not Consuming, 2=Stuck Cases
     navToAttention(target: 'stuck' | 'awaiting' | 'ready' | 'idle') {
+        this.isFilterButtonClick = true;
         this.outerTabIndex = 2;
         switch (target) {
             case 'stuck':
-                this.currentTabIndex = 2;
+                this.currentTabIndex = 3;
                 this.activeFilter = 'none';
                 break;
             case 'awaiting':
@@ -3016,19 +3017,23 @@ export class DeliveryDashboardCloneComponent {
                 this.activeFilter = 'none';
                 break;
             case 'ready':
-                this.currentTabIndex = 0;
-                this.activeFilter = 'readyForInitiation';
-                break;
-            case 'idle':
                 this.currentTabIndex = 1;
                 this.activeFilter = 'none';
                 break;
+            case 'idle':
+                this.currentTabIndex = 2;
+                this.activeFilter = 'none';
+                break;
         }
-        if (this.tabGroup) this.tabGroup.selectedIndex = this.currentTabIndex;
+        this.currentSelectedLabels = (this.productFilterControl.value as string[]) || [];
         this.populateActionableCohorts(this.currentSelectedLabels);
-        // Re-trigger paginated data for the newly active sub-tab
-        try { this.filterTableData?.(); } catch { /* ignore if not ready */ }
+        if (this.tabGroup) this.tabGroup.selectedIndex = this.currentTabIndex;
+        this.currentPage = 1;
+        this.updatePaginatedData();
+        this.cdr.detectChanges();
+        this.scrollToTable();
     }
+
 
     // Human-readable active sub-tab name for the Export button label
     get participantsActiveTabName(): string {
@@ -3224,6 +3229,12 @@ export class DeliveryDashboardCloneComponent {
         return this.getCardProductIds(cardId).flatMap((pid) => this.groupedNonActive[pid] || []);
     };
 
+    getUPConfirmedCount(cardId: string): number {
+        return this.getCardProductIds(cardId).reduce((count, pid) => {
+            return count + (this.upConfirmedMap[pid] || []).length;
+        }, 0);
+    }
+
     getCardFunnel(cardId: string): any {
         const pids = this.getCardProductIds(cardId);
         return {
@@ -3387,32 +3398,37 @@ export class DeliveryDashboardCloneComponent {
         this.showHiddenProducts = !this.showHiddenProducts;
     }
 
-    resolveProductGroups() {
-        const nameToId: { [name: string]: string } = {};
-        for (const pid of Object.keys(this.mapProductName)) {
-            nameToId[this.mapProductName[pid]] = pid;
-        }
+  resolveProductGroups() {
+    // Use name -> ALL matching ids (not just the last one), since two different
+    // Firestore product docs can share the same 'product' name (e.g. duplicate
+    // "EI Solution" entries). A single-value map silently drops one of them,
+    // leaving it un-merged and showing up as its own separate card.
+    const nameToIds: { [name: string]: string[] } = {};
+    for (const pid of Object.keys(this.mapProductName)) {
+        const name = this.mapProductName[pid];
+        (nameToIds[name] ||= []).push(pid);
+    }
 
-        this.hiddenProductIds = new Set();
-        for (const name of this.hiddenProductNames) {
-            const id = nameToId[name];
-            if (id) this.hiddenProductIds.add(id);
-        }
-
-        this.mergedGroupIds = {};
-        this.productIdToGroup = {};
-        for (const groupName of Object.keys(this.mergedGroups)) {
-            const ids = new Set<string>();
-            for (const name of this.mergedGroups[groupName]) {
-                const id = nameToId[name];
-                if (id) {
-                    ids.add(id);
-                    this.productIdToGroup[id] = groupName;
-                }
-            }
-            this.mergedGroupIds[groupName] = ids;
+    this.hiddenProductIds = new Set();
+    for (const name of this.hiddenProductNames) {
+        for (const id of (nameToIds[name] || [])) {
+            this.hiddenProductIds.add(id);
         }
     }
+
+    this.mergedGroupIds = {};
+    this.productIdToGroup = {};
+    for (const groupName of Object.keys(this.mergedGroups)) {
+        const ids = new Set<string>();
+        for (const name of this.mergedGroups[groupName]) {
+            for (const id of (nameToIds[name] || [])) {
+                ids.add(id);
+                this.productIdToGroup[id] = groupName;
+            }
+        }
+        this.mergedGroupIds[groupName] = ids;
+    }
+}
 
     getDateFromFieldPublic(field: any): Date | null {
         if (!field) return null;
@@ -3807,6 +3823,20 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'action', label: 'ACTION REQUIRED', width: '20%' }
             ],
             dataKey: 'awaitingInitiation'
+        },
+        readyForInitiation: {
+            headers: [
+                { key: 'priority', label: 'PRIORITY', width: '5%' },
+                { key: 'profileid', label: 'NAME', width: '12%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'name' },
+                { key: 'profileid', label: 'MOBILE', width: '8%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'phonenumber' },
+                { key: 'journey', label: 'JOURNEY', width: '10%', type: 'text' },
+                { key: 'onboardedtime', label: 'ONBOARDED', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'waitingperiod', label: 'DAYS WAITING', width: '10%', type: 'number' },
+                { key: 'lastpaymentdate', label: 'LAST PAYMENT', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'bottleneck', label: 'NEXT STEP', width: '15%' },
+                { key: 'action', label: 'ACTION REQUIRED', width: '20%' }
+            ],
+            dataKey: 'readyForInitiation'
         },
         initiatedPending: {
             headers: [
@@ -4560,13 +4590,13 @@ export class DeliveryDashboardCloneComponent {
         if (this.activeFilter === 'thisMonthActivity') {
             return this.tabTableConfigs['thisMonthActivityHeaders']?.headers || [];
         }
-        const tabKeys = ['awaitingInitiation', 'initiatedPending', 'stuckCases'];
+        const tabKeys = ['awaitingInitiation', 'readyForInitiation', 'initiatedPending', 'stuckCases'];
         const currentTabKey = tabKeys[this.currentTabIndex || 0];
         return this.tabTableConfigs[currentTabKey]?.headers || [];
     }
 
     getCurrentTabData(): any[] {
-        const tabKeys = ['awaitingInitiation', 'initiatedPending', 'stuckCases'];
+        const tabKeys = ['awaitingInitiation', 'readyForInitiation', 'initiatedPending', 'stuckCases'];
         const currentTabKey = tabKeys[this.currentTabIndex || 0];
         const dataKey = this.tabTableConfigs[currentTabKey]?.dataKey;
 
@@ -4582,11 +4612,8 @@ export class DeliveryDashboardCloneComponent {
         if (this.activeFilter === 'thisMonthActivity') {
             return this.originalData['thisMonthActivity']?.data || [];
         }
-
-        if (currentTabKey === 'awaitingInitiation') {
-            if (this.activeFilter === 'readyForInitiation') {
-                return this.originalData['readyForInitiation']?.data || [];
-            } else if (this.activeFilter === 'clearedMoreThan7Days') {
+        if (currentTabKey === 'readyForInitiation') {
+            if (this.activeFilter === 'clearedMoreThan7Days') {
                 return this.originalData['clearedMoreThan7Days']?.data || [];
             } else if (this.activeFilter === 'clearedMoreThan30Days') {
                 return this.originalData['clearedMoreThan30Days']?.data || [];
@@ -4643,7 +4670,7 @@ export class DeliveryDashboardCloneComponent {
         const formValue = this.filterForm.value;
         const searchTerm = formValue.search?.toLowerCase().trim() || '';
         const selectedJourneys = formValue.journey || [];
-        const selectedProducts = formValue.product || [];
+        const selectedProducts = formValue.productSearch || [];
 
         if (!searchTerm && selectedJourneys.length === 0 && selectedProducts.length === 0) {
             this.filteredData = allData;
@@ -4679,7 +4706,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getCurrentTabDataBeforeFilter(): any[] {
-        const tabKeys = ['awaitingInitiation', 'initiatedPending', 'stuckCases'];
+        const tabKeys = ['awaitingInitiation', 'readyForInitiation', 'initiatedPending', 'stuckCases'];
         const currentTabKey = tabKeys[this.currentTabIndex || 0];
         const dataKey = this.tabTableConfigs[currentTabKey]?.dataKey;
 
@@ -4727,6 +4754,7 @@ export class DeliveryDashboardCloneComponent {
         this.filterForm.patchValue({
             search: '',
             journey: [],
+            productSearch: [],
         });
         this.searchText = '';
         this.filteredData = [];
@@ -4738,7 +4766,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     updatePaginatedDataWithSearch(): void {
-        const dataToDisplay = (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.filterForm.value.product?.length > 0) ? this.filteredData : this.getCurrentTabData();
+        const dataToDisplay = (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.filterForm.value.productSearch?.length > 0) ? this.filteredData : this.getCurrentTabData();
         this.totalPages = Math.ceil(dataToDisplay.length / this.itemsPerPage);
 
         const startIndex = (this.currentPage - 1) * this.itemsPerPage;
@@ -4955,7 +4983,7 @@ export class DeliveryDashboardCloneComponent {
             };
         }
 
-        const tabNames = ['Awaiting_Initiation', 'Initiated_Pending', 'Stuck_Cases'];
+        const tabNames = ['Awaiting_Initiation', 'Ready_To_Start', 'Initiated_Pending', 'Stuck_Cases'];
         const sheetName = tabNames[this.currentTabIndex || 0];
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
@@ -5009,7 +5037,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getCurrentTabDataLength(): number {
-        if (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.filterForm.value.product?.length > 0) {
+        if (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.filterForm.value.productSearch?.length > 0) {
             return this.filteredData.length;
         }
         return this.getCurrentTabData().length;
@@ -5086,58 +5114,37 @@ export class DeliveryDashboardCloneComponent {
         this.currentPage = 1;
         this.itemsPerPage = 10;
 
-        // save product selection before reset
         const savedProductLabels = this.productFilterControl.value as string[] || [];
-
-        // reset only search and journey, NOT product
-        this.filterForm.patchValue({
-            search: '',
-            journey: [],
-        });
+        this.filterForm.patchValue({ search: '', journey: [], productSearch: [] });
         this.searchText = '';
         this.filteredData = [];
 
         if (!this.isFilterButtonClick) {
             this.activeFilter = 'none';
         } else {
-            if (this.activeFilter === 'todayActivity') {
+            if (this.activeFilter === 'todayActivity') this.activeFilter = 'none';
+            if (this.currentTabIndex === 2 && this.activeFilter === 'initiatedToday') this.activeFilter = 'none';
+            if (this.currentTabIndex !== 1 && ['clearedMoreThan7Days', 'clearedMoreThan30Days'].includes(this.activeFilter)) {
                 this.activeFilter = 'none';
             }
-            if (this.currentTabIndex === 0 && this.activeFilter === 'initiatedToday') {
-                this.activeFilter = 'none';
-            }
-            if (this.currentTabIndex === 1 && ['readyForInitiation', 'clearedMoreThan7Days', 'clearedMoreThan30Days'].includes(this.activeFilter)) {
-                this.activeFilter = 'none';
-            }
-            if (this.currentTabIndex === 2) {
-                const appointmentFilters = ['welcomeCall', 'clarityCall', 'diagnostics', 'implementation', 'midReviewDiagnostics', 'finalReview', 'implementationPhase2', 'completed'];
-                if (!appointmentFilters.includes(this.activeFilter)) {
-                    this.activeFilter = 'none';
-                }
-            }
-            if (this.currentTabIndex !== 2) {
-                const appointmentFilters = ['welcomeCall', 'clarityCall', 'diagnostics', 'implementation', 'midReviewDiagnostics', 'finalReview', 'implementationPhase2', 'completed'];
-                if (appointmentFilters.includes(this.activeFilter)) {
-                    this.activeFilter = 'none';
-                }
-            }
+            const appointmentFilters = ['welcomeCall', 'clarityCall', 'diagnostics', 'implementation', 'midReviewDiagnostics', 'finalReview', 'implementationPhase2', 'completed'];
+            if (this.currentTabIndex === 3 && !appointmentFilters.includes(this.activeFilter)) this.activeFilter = 'none';
+            if (this.currentTabIndex !== 3 && appointmentFilters.includes(this.activeFilter)) this.activeFilter = 'none';
         }
 
         this.isFilterButtonClick = false;
-
-        // use saved labels to ensure product filter is preserved
         this.currentSelectedLabels = savedProductLabels;
         this.populateActionableCohorts(this.currentSelectedLabels);
+        this.updatePaginatedData();
+        this.cdr.detectChanges();
     }
 
     onBulkInitiateClick() {
         this.isFilterButtonClick = true;
-        this.activeFilter = 'readyForInitiation';
+        this.activeFilter = 'none';
         this.currentPage = 1;
-        this.currentTabIndex = 0;
-        if (this.tabGroup) {
-            this.tabGroup.selectedIndex = 0;
-        }
+        this.currentTabIndex = 1;
+        if (this.tabGroup) this.tabGroup.selectedIndex = 1;
         this.updatePaginatedData();
         this.scrollToTable();
     }
@@ -5146,9 +5153,9 @@ export class DeliveryDashboardCloneComponent {
         this.isFilterButtonClick = true;
         this.activeFilter = 'clearedMoreThan7Days';
         this.currentPage = 1;
-        this.currentTabIndex = 0;
+        this.currentTabIndex = 1;
         if (this.tabGroup) {
-            this.tabGroup.selectedIndex = 0;
+            this.tabGroup.selectedIndex = 1;
         }
         this.updatePaginatedData();
         this.scrollToTable();
@@ -5158,9 +5165,9 @@ export class DeliveryDashboardCloneComponent {
         this.isFilterButtonClick = true;
         this.activeFilter = 'clearedMoreThan30Days';
         this.currentPage = 1;
-        this.currentTabIndex = 0;
+        this.currentTabIndex = 1;
         if (this.tabGroup) {
-            this.tabGroup.selectedIndex = 0;
+            this.tabGroup.selectedIndex = 1;
         }
         this.updatePaginatedData();
         this.scrollToTable();
@@ -5170,13 +5177,14 @@ export class DeliveryDashboardCloneComponent {
         this.isFilterButtonClick = true;
         this.activeFilter = 'initiatedToday';
         this.currentPage = 1;
-        this.currentTabIndex = 1;
+        this.currentTabIndex = 2;
         if (this.tabGroup) {
-            this.tabGroup.selectedIndex = 1;
+            this.tabGroup.selectedIndex = 2;
         }
         this.updatePaginatedData();
         this.scrollToTable();
     }
+
 
     clearActiveFilter() {
         this.activeFilter = 'none';
@@ -5271,23 +5279,20 @@ export class DeliveryDashboardCloneComponent {
 
     onKanbanColumnClick(filterType: string) {
         this.isFilterButtonClick = true;
-
         if (filterType === 'currentJourneyInitiated') {
             this.activeFilter = 'none';
-            this.currentPage = 1;
-            this.currentTabIndex = 1;
-            if (this.tabGroup) {
-                this.tabGroup.selectedIndex = 1;
-            }
-        } else {
-            this.activeFilter = filterType as any;
-            this.currentPage = 1;
             this.currentTabIndex = 2;
             if (this.tabGroup) {
                 this.tabGroup.selectedIndex = 2;
             }
+        } else {
+            this.activeFilter = filterType as any;
+            this.currentTabIndex = 3;
+            if (this.tabGroup) {
+                this.tabGroup.selectedIndex = 3;
+            }
         }
-
+        this.currentPage = 1;
         this.updatePaginatedData();
         this.scrollToTable();
     }
@@ -6211,6 +6216,12 @@ export class DeliveryDashboardCloneComponent {
             // This ensures the charts reflect the current product-filter selection.
             this.analyticsLoaded = false;
             this.loadAnalytics();
+        } else if (label === 'Participants') {
+            this.currentSelectedLabels = (this.productFilterControl.value as string[]) || [];
+            this.populateActionableCohorts(this.currentSelectedLabels);
+            this.currentPage = 1;
+            this.updatePaginatedData();
+            this.cdr.detectChanges();
         }
     }
 
