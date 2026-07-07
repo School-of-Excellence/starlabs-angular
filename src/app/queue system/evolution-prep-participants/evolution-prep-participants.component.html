@@ -27,14 +27,13 @@
         <mat-icon style="font-size:15px;vertical-align:middle">flag</mat-icon>
         Queue
       </mat-label>
-      <mat-select [(ngModel)]="selectedQueue" (ngModelChange)="onQueueChange()">
+      <mat-select [(ngModel)]="selectedQueues" (openedChange)="onQueueDropdownToggle($event)" multiple>
         <mat-option *ngFor="let q of queueOptions" [value]="q.id">{{ q.label }}</mat-option>
       </mat-select>
     </mat-form-field>
     <span class="diag-total" *ngIf="!loading">
-      <strong>{{ totalAll }}</strong>
-      <ng-container *ngIf="isPrepQueue">participants past Scope Enhancement, still in prep (not in Diagnostics)</ng-container>
-      <ng-container *ngIf="!isPrepQueue">participants in this Diagnostics queue</ng-container>
+      <strong>{{ totalAll }}</strong> participants across
+      <strong>{{ selectedQueues.length }}</strong> queue(s)
     </span>
   </div>
 
@@ -56,6 +55,30 @@
       <span>Checking Zoom transcripts in firestore-atc…</span>
     </div>
 
+    <!-- View toggle -->
+    <div class="view-toggle">
+      <!-- COMMENTED OUT: Participant Flow tab (kept for reference)
+      <button type="button" class="toggle-btn" [class.active]="viewMode==='flow'"
+              (click)="viewMode='flow'">
+        <mat-icon>route</mat-icon> Participant Flow
+      </button>
+      -->
+      <!-- COMMENTED OUT: Existing Videos tab (kept for reference)
+      <button type="button" class="toggle-btn" [class.active]="viewMode==='videos'"
+              (click)="viewMode='videos'">
+        <mat-icon>video_library</mat-icon> Existing Videos
+        <span class="toggle-count" *ngIf="!videosLoading">{{ videoLinkCount }}</span>
+        <mat-spinner *ngIf="videosLoading" diameter="14" strokeWidth="2"></mat-spinner>
+      </button>
+      -->
+      <button type="button" class="toggle-btn" [class.active]="viewMode==='branches'"
+              (click)="viewMode='branches'">
+        <mat-icon>fork_right</mat-icon> Branch A / B
+        <span class="toggle-count" *ngIf="!seLoading">{{ branchYesCount }}</span>
+        <mat-spinner *ngIf="seLoading" diameter="14" strokeWidth="2"></mat-spinner>
+      </button>
+    </div>
+
     <!-- Filter bar -->
     <div class="filter-bar mat-elevation-z1">
       <mat-form-field appearance="outline" class="search-field">
@@ -64,7 +87,8 @@
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="filter-field">
+      <!-- COMMENTED OUT: Zoom Transcript filter belonged to the Participant Flow tab
+      <mat-form-field appearance="outline" class="filter-field" *ngIf="viewMode==='flow'">
         <mat-label>Zoom Transcript</mat-label>
         <mat-select [(ngModel)]="filterTranscript" (ngModelChange)="applyFilters()">
           <mat-option value="">All</mat-option>
@@ -72,6 +96,7 @@
           <mat-option value="no">❌ No (needs Dropbox link)</mat-option>
         </mat-select>
       </mat-form-field>
+      -->
 
       <button mat-stroked-button (click)="clearFilters()" class="clear-btn">
         <mat-icon>filter_alt_off</mat-icon> Clear
@@ -82,8 +107,8 @@
       </span>
     </div>
 
-    <!-- Table -->
-    <div class="body mat-elevation-z2">
+    <!-- COMMENTED OUT: Participant Flow view — disabled via *ngIf="false" (markup kept for reference) -->
+    <div class="body mat-elevation-z2" *ngIf="false">
       <table mat-table [dataSource]="dataSource" matSort>
 
         <!-- Participant Name -->
@@ -148,24 +173,44 @@
         <ng-container matColumnDef="dropboxLink">
           <th mat-header-cell *matHeaderCellDef class="col-link">Dropbox Link</th>
           <td mat-cell *matCellDef="let row" class="col-link">
-            <!-- Only show the link input when the Zoom transcript is missing (No) -->
+            <!-- Only relevant when the Zoom transcript is missing (No) -->
             <div class="link-cell" *ngIf="row.zoomTranscript === false">
-              <input class="link-input"
-                     type="url"
-                     placeholder="Paste Dropbox link…"
-                     [(ngModel)]="row.dropboxLink"
-                     (keyup.enter)="saveDropboxLink(row)">
-              <button mat-icon-button class="link-save-btn"
-                      matTooltip="Save link"
-                      [disabled]="row.linkSaving"
-                      (click)="saveDropboxLink(row)">
-                <mat-spinner *ngIf="row.linkSaving" diameter="16" strokeWidth="2"></mat-spinner>
-                <mat-icon *ngIf="!row.linkSaving">save</mat-icon>
-              </button>
-              <a *ngIf="row.dropboxLink" [href]="row.dropboxLink" target="_blank"
-                 class="link-open-btn" matTooltip="Open link">
-                <mat-icon>open_in_new</mat-icon>
-              </a>
+
+              <!-- looking up Participant Videos -->
+              <span *ngIf="row.existingVideoLoading" class="checking-dot"
+                    matTooltip="Looking up Participant Videos…">
+                <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              </span>
+
+              <ng-container *ngIf="!row.existingVideoLoading">
+                <!-- existing link found in Participant Videos → show for validation -->
+                <a *ngIf="row.existingVideoUrl" [href]="row.existingVideoUrl" target="_blank"
+                   class="existing-link"
+                   matTooltip="Most-recent link from the Participant Videos screen">
+                  <mat-icon>link</mat-icon>
+                  <span class="existing-link-text">{{ row.existingVideoUrl }}</span>
+                </a>
+
+                <!-- no existing link → fall back to manual entry -->
+                <div class="link-manual" *ngIf="!row.existingVideoUrl">
+                  <input class="link-input"
+                         type="url"
+                         placeholder="Paste Dropbox link…"
+                         [(ngModel)]="row.dropboxLink"
+                         (keyup.enter)="saveDropboxLink(row)">
+                  <button mat-icon-button class="link-save-btn"
+                          matTooltip="Save link"
+                          [disabled]="row.linkSaving"
+                          (click)="saveDropboxLink(row)">
+                    <mat-spinner *ngIf="row.linkSaving" diameter="16" strokeWidth="2"></mat-spinner>
+                    <mat-icon *ngIf="!row.linkSaving">save</mat-icon>
+                  </button>
+                  <a *ngIf="row.dropboxLink" [href]="row.dropboxLink" target="_blank"
+                     class="link-open-btn" matTooltip="Open link">
+                    <mat-icon>open_in_new</mat-icon>
+                  </a>
+                </div>
+              </ng-container>
             </div>
             <!-- transcript present (Yes) or still checking → leave plain -->
           </td>
@@ -186,6 +231,280 @@
                      pageSize="25"
                      showFirstLastButtons>
       </mat-paginator>
+    </div>
+
+    <!-- COMMENTED OUT: Existing Videos view — disabled via *ngIf="false" (markup kept for reference) -->
+    <div class="body mat-elevation-z2" *ngIf="false">
+      <div class="videos-filterbar">
+        <mat-form-field appearance="outline" class="videos-filter-field">
+          <mat-label>Filter</mat-label>
+          <mat-select [(ngModel)]="videoFilter" multiple
+                      panelClass="videos-filter-panel"
+                      placeholder="All participants">
+            <mat-option value="transcripts">Transcripts only ({{ transcriptsOnlyCount }})</mat-option>
+            <mat-option value="links">Links only ({{ linksOnlyCount }})</mat-option>
+            <mat-option value="both">Both ({{ bothCount }})</mat-option>
+            <mat-option value="notboth">Not both ({{ neitherCount }})</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <span class="videos-shown"><strong>{{ videoRows.length }}</strong> shown</span>
+        <button mat-stroked-button *ngIf="videoFilter.length" (click)="videoFilter=[]" class="clear-btn">
+          <mat-icon>filter_alt_off</mat-icon> Clear filter
+        </button>
+      </div>
+
+      <div class="videos-summary">
+        <span><strong>{{ laTranscriptCount }}</strong> with transcript
+          <mat-spinner *ngIf="laLoading" diameter="12" strokeWidth="2"></mat-spinner>
+        </span>
+        <span class="dot">·</span>
+        <span><strong>{{ videoLinkCount }}</strong> with video link
+          <mat-spinner *ngIf="videosLoading" diameter="12" strokeWidth="2"></mat-spinner>
+        </span>
+        <span class="dot">·</span>
+        <span><strong>{{ neitherCount }}</strong> with neither</span>
+      </div>
+
+      <table class="videos-table">
+        <thead>
+          <tr>
+            <th>Participant Name</th>
+            <th class="col-yn">Transcription</th>
+            <th class="col-yn">Link</th>
+            <th>Video URL</th>
+            <th>Queue Movement Flow</th>
+            <th class="col-addlink">Link added?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of videoRows" class="videos-row">
+            <td class="videos-name">
+              <div class="name-cell">
+                <div class="avatar">{{ row.profile_name?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <div class="name-info">
+                  <span class="name-text">{{ row.profile_name || '—' }}</span>
+                  <span class="profile-id">{{ row.profile_id }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Transcription (from 'live assignment') -->
+            <td class="col-yn">
+              <span *ngIf="row.hasTranscriptLA === null" class="checking-dot" matTooltip="Checking live assignment…">
+                <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              </span>
+              <span *ngIf="row.hasTranscriptLA === true" class="yn-yes">Yes</span>
+              <span *ngIf="row.hasTranscriptLA === false" class="yn-no">No</span>
+            </td>
+
+            <!-- Link (participant videos videourl present?) -->
+            <td class="col-yn">
+              <span *ngIf="row.existingVideoLoading" class="checking-dot" matTooltip="Checking participant videos…">
+                <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              </span>
+              <ng-container *ngIf="!row.existingVideoLoading">
+                <span *ngIf="row.existingVideoUrl" class="yn-yes">Yes</span>
+                <span *ngIf="!row.existingVideoUrl" class="yn-no">No</span>
+              </ng-container>
+            </td>
+
+            <!-- Video URL -->
+            <td class="videos-url">
+              <a *ngIf="row.existingVideoUrl" [href]="row.existingVideoUrl" target="_blank" rel="noopener"
+                 class="video-url-link" matTooltip="Open in a new tab">
+                <span class="video-url-text">{{ row.existingVideoUrl }}</span>
+                <mat-icon>open_in_new</mat-icon>
+              </a>
+              <span *ngIf="!row.existingVideoUrl" class="muted">—</span>
+            </td>
+
+            <!-- Queue Movement Flow (same chain as the flow view) -->
+            <td class="col-flow">
+              <span *ngIf="row.flowLoading" class="checking-dot">
+                <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              </span>
+              <span *ngIf="!row.flowLoading" class="flow-wrap">
+                <ng-container *ngFor="let q of row.flow; let last = last">
+                  <span class="flow-node" [class.flow-final]="last" [class.flow-prep]="!last">{{ q }}</span>
+                  <mat-icon *ngIf="!last" class="flow-arrow">arrow_forward</mat-icon>
+                </ng-container>
+              </span>
+            </td>
+
+            <!-- "Link added?" checkbox → re-checks 'participant videos' for a videourl.
+                 Only for "Not both" rows (no transcript AND no link). -->
+            <td class="col-addlink">
+              <div class="link-confirm" *ngIf="isNotBoth(row)">
+                <mat-checkbox [(ngModel)]="row.linkConfirmed" [disabled]="row.linkSaving"
+                              (change)="recheckLink(row)"
+                              matTooltip="Tick after adding the link in the mapping screen — we'll re-check participant videos and fetch it">
+                  Added
+                </mat-checkbox>
+                <mat-spinner *ngIf="row.linkSaving" diameter="16" strokeWidth="2"></mat-spinner>
+              </div>
+              <span *ngIf="!isNotBoth(row)" class="muted">—</span>
+            </td>
+          </tr>
+
+          <tr *ngIf="videoRows.length === 0">
+            <td colspan="6" class="no-data-cell">
+              <mat-icon>video_library</mat-icon>
+              <p>No participants match.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Branches tab: Participant · Branch A (recent link) · Branch B (SE transcript) · flow -->
+    <div class="body mat-elevation-z2" *ngIf="viewMode==='branches'">
+      <div class="videos-filterbar">
+        <!-- Branch A filter -->
+        <mat-form-field appearance="outline" class="videos-filter-field">
+          <mat-label>Branch A · Video link</mat-label>
+          <mat-select [(ngModel)]="branchAFilter" multiple placeholder="All">
+            <mat-option value="link">Link present ({{ branchLinkCount }})</mat-option>
+            <mat-option value="nolink">No link ({{ branchNoLinkCount }})</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Branch B filter -->
+        <mat-form-field appearance="outline" class="videos-filter-field">
+          <mat-label>Branch B · Transcript</mat-label>
+          <mat-select [(ngModel)]="branchBFilter" multiple placeholder="All">
+            <mat-option value="yes">Yes ({{ branchYesCount }})</mat-option>
+            <mat-option value="no">No ({{ branchNoCount }})</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Queue flow filter -->
+        <mat-form-field appearance="outline" class="videos-filter-field">
+          <mat-label>Queue flow</mat-label>
+          <mat-select [(ngModel)]="branchFlowFilter" multiple placeholder="All queues">
+            <mat-option *ngFor="let q of allFlowQueues" [value]="q">{{ q }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <span class="videos-shown"><strong>{{ branchRows.length }}</strong> shown</span>
+        <button mat-stroked-button
+                *ngIf="branchAFilter.length || branchBFilter.length || branchFlowFilter.length"
+                (click)="clearBranchFilters()" class="clear-btn">
+          <mat-icon>filter_alt_off</mat-icon> Clear filters
+        </button>
+      </div>
+
+      <table class="videos-table">
+        <thead>
+          <tr>
+            <th>Participant Name</th>
+            <!-- COMMENTED OUT: Branch A · Video URL column
+            <th>Branch A · Video URL</th>
+            -->
+            <th class="col-yn">Branch B · Transcript</th>
+            <th>Add transcript / link</th>
+            <th>Queue Movement Flow</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of branchRows" class="videos-row">
+            <!-- Participant -->
+            <td class="videos-name">
+              <div class="name-cell">
+                <div class="avatar">{{ row.profile_name?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <div class="name-info">
+                  <span class="name-text">{{ row.profile_name || '—' }}</span>
+                  <span class="profile-id">{{ row.profile_id }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- COMMENTED OUT: Branch A · Video URL cell — disabled via *ngIf="false" (markup kept for reference) -->
+            <td class="videos-url" *ngIf="false">
+              <span *ngIf="row.existingVideoLoading" class="checking-dot" matTooltip="Checking participant videos…">
+                <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              </span>
+              <ng-container *ngIf="!row.existingVideoLoading">
+                <a *ngIf="row.existingVideoUrl" [href]="row.existingVideoUrl" target="_blank" rel="noopener"
+                   class="video-url-link" matTooltip="Most-recent link from Participant Videos">
+                  <span class="video-url-text">{{ row.existingVideoUrl }}</span>
+                  <mat-icon>open_in_new</mat-icon>
+                </a>
+                <!-- blank when no link -->
+              </ng-container>
+            </td>
+
+            <!-- Branch B: per-SE-session transcript (queue stage log → live assignment) -->
+            <td class="col-yn">
+              <span *ngIf="row.seSessionLoading" class="checking-dot" matTooltip="Checking SE session transcript…">
+                <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              </span>
+              <ng-container *ngIf="!row.seSessionLoading">
+                <span *ngIf="row.seSessionTranscript === true" class="yn-yes">Yes</span>
+                <span *ngIf="row.seSessionTranscript === false" class="yn-no">No</span>
+              </ng-container>
+            </td>
+
+            <!-- Add transcript / link → both write to the participant's SE live-assignment doc.
+                 Two separate inputs: paste a transcript OR paste a video link.
+                 Only shown when Branch B transcript is "No" (missing). -->
+            <td class="col-addtranscript">
+              <div class="add-transcript-cell" *ngIf="row.seSessionTranscript === false">
+                <!-- Transcript paste -->
+                <div class="paste-row">
+                  <textarea class="transcript-input"
+                            rows="2"
+                            placeholder="Paste .vtt transcript…"
+                            [(ngModel)]="row.pasteTranscript"></textarea>
+                  <button mat-icon-button class="paste-save-btn"
+                          matTooltip="Save transcript to live assignment"
+                          [disabled]="row.transcriptSaving || !row.pasteTranscript"
+                          (click)="saveTranscript(row)">
+                    <mat-spinner *ngIf="row.transcriptSaving" diameter="16" strokeWidth="2"></mat-spinner>
+                    <mat-icon *ngIf="!row.transcriptSaving">save</mat-icon>
+                  </button>
+                </div>
+                <!-- Video link paste -->
+                <div class="paste-row">
+                  <input class="link-input"
+                         type="url"
+                         placeholder="Paste video link…"
+                         [(ngModel)]="row.dropboxLink"
+                         (keyup.enter)="saveDropboxLink(row)">
+                  <button mat-icon-button class="paste-save-btn"
+                          matTooltip="Save video link to live assignment"
+                          [disabled]="row.linkSaving || !row.dropboxLink"
+                          (click)="saveDropboxLink(row)">
+                    <mat-spinner *ngIf="row.linkSaving" diameter="16" strokeWidth="2"></mat-spinner>
+                    <mat-icon *ngIf="!row.linkSaving">save</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <!-- transcript already present, or still checking → nothing to add -->
+              <span *ngIf="row.seSessionTranscript !== false" class="muted">—</span>
+            </td>
+
+            <!-- Queue Movement Flow -->
+            <td class="col-flow">
+              <span *ngIf="row.flowLoading" class="checking-dot">
+                <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              </span>
+              <span *ngIf="!row.flowLoading" class="flow-wrap">
+                <ng-container *ngFor="let q of row.flow; let last = last">
+                  <span class="flow-node" [class.flow-final]="last" [class.flow-prep]="!last">{{ q }}</span>
+                  <mat-icon *ngIf="!last" class="flow-arrow">arrow_forward</mat-icon>
+                </ng-container>
+              </span>
+            </td>
+          </tr>
+
+          <tr *ngIf="branchRows.length === 0">
+            <td colspan="4" class="no-data-cell">
+              <mat-icon>fork_right</mat-icon>
+              <p>No participants match.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
   </ng-container>
