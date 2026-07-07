@@ -1417,8 +1417,8 @@
       </header>
       <div class="checkin-conflict__body">
         <p class="checkin-conflict__copy">
-          The following specialist on this studio is already in an activity in
-          another studio. You can check in once they finish there:
+          The following specialist on this studio is already busy in another
+          studio. You can check in once they're free there:
         </p>
         <ul class="checkin-conflict__studios">
           <li *ngFor="let c of data.collaborators; trackBy: trackByDocId">
@@ -1431,7 +1431,7 @@
                 <span class="checkin-conflict__live-tag">LIVE</span>
               </div>
               <div class="checkin-conflict__stage checkin-conflict__stage--muted" *ngIf="!c.stageName">
-                <span>In a live activity elsewhere</span>
+                <span>{{ c.isLive ? 'In a live activity elsewhere' : 'Checked in to another studio' }}</span>
               </div>
             </div>
           </li>
@@ -1445,6 +1445,9 @@
     </div>
   </ng-template>
 
+  <!-- Studio chat bubble + popup commented out per request
+       (bottom-right chat button leads to studio_chat). Re-enable by removing
+       this comment opener and the matching close marker after the popup below.
   <button *ngIf="selectedStudio['docid']" type="button" class="std-chat-fab"
       matTooltip="Chat" matTooltipPosition="above"
       (click)="isChatOpen ? closeChat() : openChat()">
@@ -1529,4 +1532,5 @@
       </button>
     </div>
   </div>
+  -->
 </div>
