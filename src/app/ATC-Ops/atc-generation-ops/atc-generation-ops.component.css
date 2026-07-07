@@ -120,10 +120,12 @@
 /* column widths — stage/participant absorb the slack, status stays compact */
 .atc-table .mat-column-status { width: 190px; }
 .atc-table .mat-column-name { width: 170px; }
+.atc-table .mat-column-queue { width: 150px; }
 .atc-table .mat-column-type { width: 74px; }
 .atc-table .mat-column-attempts { width: 52px; text-align: center; }
 .atc-table .mat-column-age { width: 66px; }
 .atc-table .mat-column-createdAt { width: 118px; }
+.atc-table .mat-column-promptAt { width: 118px; }
 .atc-table .mat-column-actions { width: 38px; text-align: right; }
 .atc-table th.mat-mdc-header-cell {
   background: #f8fafc; color: #64748b; font-weight: 700; font-size: 11.5px;
@@ -137,6 +139,11 @@
 .row.selected { background: #eff6ff; box-shadow: inset 3px 0 0 #2563eb; }
 .nm { font-weight: 600; color: #0f172a; }
 .submuted { font-size: 11px; color: #94a3b8; }
+.qpill {
+  display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: 14px;
+  background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
+}
 .att { display: inline-block; min-width: 20px; text-align: center; font-weight: 600; }
 .att.warn { color: #b45309; background: #fffbeb; border-radius: 6px; padding: 0 6px; }
 .age-warn { color: #b91c1c; font-weight: 700; }

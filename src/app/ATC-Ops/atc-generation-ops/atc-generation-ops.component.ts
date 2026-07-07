@@ -34,7 +34,7 @@ import {
   StageData,
 } from '../atc-ops.types';
 import { toDate, toMillis } from '../ist-time.util';
-import { AtcGenDataService, QueueOption } from './atc-gen-data.service';
+import { AtcGenDataService, DocLite, QueueOption } from './atc-gen-data.service';
 
 type ChipKind = 'own' | 'resolved' | 'missing-mandatory' | 'atleastone';
 interface StageChip {
@@ -52,6 +52,8 @@ interface RowBreakdown {
 
 interface AtcRow extends AtcGenDoc {
   name: string;
+  queueId: string; // queue this doc belongs to
+  queueName: string; // resolved queue display name
   ageMs: number | null; // time in current status
   stuck: boolean; // processing & started > 30m
   nearMax: boolean; // attempts >= 2
@@ -101,7 +103,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   queues: QueueOption[] = [];
   queuesLoading = true;
   queuesError: string | null = null;
-  selectedQueueId: string | null = null;
+  selectedQueueIds: string[] = [];
 
   // ---- pod status ----
   pod: PodWorker | null = null;
@@ -111,11 +113,13 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   readonly displayedColumns = [
     'status',
     'name',
+    'queue',
     'stage',
     'type',
     'attempts',
     'age',
     'createdAt',
+    'promptAt',
     'actions',
   ];
   dataSource = new MatTableDataSource<AtcRow>([]);
@@ -157,7 +161,9 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   authExpired = false;
 
   private mapProfileData: Record<string, string> = {};
-  private queueUnsub: (() => void) | null = null;
+  private queueUnsubs: Array<() => void> = []; // one live listener per selected queue
+  private queueDocs = new Map<string, DocLite[]>(); // latest docs per queue id
+  private queuesReported = new Set<string>(); // queues that have delivered a snapshot
   private detailUnsub: (() => void) | null = null;
   private podUnsub: (() => void) | null = null;
 
@@ -187,7 +193,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.queueUnsub?.();
+    this.queueUnsubs.forEach((u) => u());
     this.detailUnsub?.();
     this.podUnsub?.();
   }
@@ -197,12 +203,16 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
       switch (col) {
         case 'createdAt':
           return toMillis(row.createdAt) ?? 0;
+        case 'promptAt':
+          return toMillis(row.promptUpdatedAt) ?? 0;
         case 'age':
           return row.ageMs ?? 0;
         case 'attempts':
           return row.attempts ?? 0;
         case 'name':
           return (row.name ?? '').toLowerCase();
+        case 'queue':
+          return (row.queueName ?? '').toLowerCase();
         default:
           return ((row as any)[col] ?? '').toString().toLowerCase();
       }
@@ -244,7 +254,10 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
 
   onQueueChange(): void {
     this.closeDetail();
-    this.queueUnsub?.();
+    this.queueUnsubs.forEach((u) => u());
+    this.queueUnsubs = [];
+    this.queueDocs.clear();
+    this.queuesReported.clear();
     this.dataSource.data = [];
     this.availableFailures = [];
     this.allStages = [];
@@ -252,38 +265,58 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     this.totalRows = 0;
     this.listError = null;
     this.diag = null;
-    if (!this.selectedQueueId) return;
+    if (!this.selectedQueueIds.length) return;
 
+    // One live listener per selected queue; snapshots are merged in rebuildRows.
     this.listLoading = true;
-    this.queueUnsub = this.data.listenQueueDocs(
-      this.selectedQueueId,
-      (docs) => {
-        const now = Date.now();
-        const rows: AtcRow[] = docs.map(({ id, data }) => this.toRow(id, data, now));
-        rows.sort((a, b) => (toMillis(b.createdAt) ?? 0) - (toMillis(a.createdAt) ?? 0));
-        this.dataSource.data = rows;
-        this.totalRows = rows.length;
-        this.availableFailures = this.distinct(
-          rows.map((r) => r.failureCategory ?? undefined),
-        );
-        // all stages present across the queue's docs (every stagedata key)
-        this.allStages = this.distinct(
-          rows.flatMap((r) => (r.stagedata ? Object.keys(r.stagedata) : [])),
-        );
-        this.statusCounts = this.countBy(rows);
-        this.applyFilters();
-        this.listLoading = false;
-        if (rows.length === 0) this.runProbe();
-        else this.diag = null;
-      },
-      (err) => {
-        this.listLoading = false;
-        this.listError =
-          err?.code === 'permission-denied'
-            ? 'Access denied reading the "firestore-atc" database. Its security rules are likely not deployed for client reads — deploy Firestore rules for the firestore-atc database (see firebase.json).'
-            : 'Could not load ATC docs for this queue. Retry.';
-      },
+    for (const qid of this.selectedQueueIds) {
+      this.queueUnsubs.push(
+        this.data.listenQueueDocs(
+          qid,
+          (docs) => {
+            this.queueDocs.set(qid, docs);
+            this.queuesReported.add(qid);
+            // hide the spinner once every selected queue has reported once
+            if (this.queuesReported.size >= this.selectedQueueIds.length)
+              this.listLoading = false;
+            this.rebuildRows();
+          },
+          (err) => {
+            this.listLoading = false;
+            this.listError =
+              err?.code === 'permission-denied'
+                ? 'Access denied reading the "firestore-atc" database. Its security rules are likely not deployed for client reads — deploy Firestore rules for the firestore-atc database (see firebase.json).'
+                : 'Could not load ATC docs for these queues. Retry.';
+          },
+        ),
+      );
+    }
+  }
+
+  /** Merge every selected queue's latest snapshot into one sorted row set. */
+  private rebuildRows(): void {
+    const now = Date.now();
+    const nameById = new Map(this.queues.map((q) => [q.id, q.name]));
+    const rows: AtcRow[] = [];
+    for (const [qid, docs] of this.queueDocs) {
+      const qname = nameById.get(qid) ?? qid;
+      for (const { id, data } of docs) rows.push(this.toRow(id, data, now, qid, qname));
+    }
+    rows.sort((a, b) => (toMillis(b.createdAt) ?? 0) - (toMillis(a.createdAt) ?? 0));
+    this.dataSource.data = rows;
+    this.totalRows = rows.length;
+    this.availableFailures = this.distinct(
+      rows.map((r) => r.failureCategory ?? undefined),
     );
+    // all stages present across the selected queues' docs (every stagedata key)
+    this.allStages = this.distinct(
+      rows.flatMap((r) => (r.stagedata ? Object.keys(r.stagedata) : [])),
+    );
+    this.statusCounts = this.countBy(rows);
+    this.applyFilters();
+    // the 0-doc probe only makes sense for a single queue
+    if (rows.length === 0 && this.selectedQueueIds.length === 1) this.runProbe();
+    else this.diag = null;
   }
 
   retryQueueLoad(): void {
@@ -292,7 +325,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
 
   /** When a queue returns 0 docs, probe the collection to explain why. */
   private async runProbe(): Promise<void> {
-    const qid = this.selectedQueueId;
+    const qid = this.selectedQueueIds[0];
     if (!qid) return;
     const p = await this.data.probeCollection(qid);
     console.warn('[ATC-ops] queue returned 0 docs — probe:', p);
@@ -310,7 +343,13 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private toRow(id: string, data: AtcGenDoc, now: number): AtcRow {
+  private toRow(
+    id: string,
+    data: AtcGenDoc,
+    now: number,
+    queueId: string,
+    queueName: string,
+  ): AtcRow {
     const started = toMillis(data.startedAt);
     const created = toMillis(data.createdAt);
     const finalized = toMillis(data.finalizedAt);
@@ -336,6 +375,8 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
       ...(lean as AtcGenDoc),
       docid: id,
       name: this.resolveName(data.profileid),
+      queueId,
+      queueName,
       ageMs,
       stuck,
       nearMax: (data.attempts ?? 0) >= 2,
