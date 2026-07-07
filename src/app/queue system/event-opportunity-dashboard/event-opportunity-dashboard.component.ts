@@ -11,7 +11,7 @@ import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { EventOpportunityComponent } from './event-opportunity/event-opportunity.component';
-import { PlanningTabComponent } from './planning-tab/planning-tab.component';
+import { EventsStageDataComponent } from '../../Events/events-stage-data/events-stage-data.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -39,7 +39,7 @@ import { MatChipsModule } from '@angular/material/chips';
     DragDropModule,
     MatMenuModule,
     MatChipsModule,
-    PlanningTabComponent
+    EventsStageDataComponent
   ],
   templateUrl: './event-opportunity-dashboard.component.html',
   styleUrl: './event-opportunity-dashboard.component.css'
