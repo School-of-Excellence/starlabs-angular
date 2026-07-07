@@ -2100,6 +2100,8 @@ export class DynamicStudioV2Component {
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
     this.initChatThread()
     console.log(this.liveAssignment, 'this.liveAssignment');
+    console.log('[studio] queue studio pairing id:', this.selectedStudio?.['docid'] ?? null,
+      '| live assignment id:', this.liveAssignment?.['docid'] ?? null);
     // Switching the active studio changes which invitations count as
     // "another studio's" — re-derive the chip map.
     this.subscribeOtherStudioInvitations()
