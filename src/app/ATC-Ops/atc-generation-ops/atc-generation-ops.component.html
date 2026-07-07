@@ -186,6 +186,17 @@
               </td>
             </ng-container>
 
+            <ng-container matColumnDef="outputAt">
+              <th mat-header-cell *matHeaderCellDef mat-sort-header
+                  matTooltip="When ATC output was generated (completed docs)">Output generated</th>
+              <td mat-cell *matCellDef="let r">
+                <ng-container *ngIf="outputGeneratedAt(r) as ts; else noOutputAt">
+                  <span [matTooltip]="(asDate(ts) | date:'medium') || ''">{{ relativeTime(ts) }} ago</span>
+                </ng-container>
+                <ng-template #noOutputAt><span class="submuted">—</span></ng-template>
+              </td>
+            </ng-container>
+
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef></th>
               <td mat-cell *matCellDef="let r">

@@ -120,6 +120,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     'age',
     'createdAt',
     'promptAt',
+    'outputAt',
     'actions',
   ];
   dataSource = new MatTableDataSource<AtcRow>([]);
@@ -205,6 +206,8 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
           return toMillis(row.createdAt) ?? 0;
         case 'promptAt':
           return toMillis(row.promptUpdatedAt) ?? 0;
+        case 'outputAt':
+          return toMillis(this.outputGeneratedAt(row)) ?? 0;
         case 'age':
           return row.ageMs ?? 0;
         case 'attempts':
@@ -698,6 +701,10 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   }
   asDate(ts: any): Date | null {
     return toDate(ts);
+  }
+  /** When ATC output was generated — only meaningful for completed docs. */
+  outputGeneratedAt(r: AtcGenDoc): any {
+    return r.status === 'completed' ? (r.completedAt ?? r.finalizedAt) : null;
   }
   relativeTime(ts: any): string {
     return this.humanDur(this.msSince(ts));

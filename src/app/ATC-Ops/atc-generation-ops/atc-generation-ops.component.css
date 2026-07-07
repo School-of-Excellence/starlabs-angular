@@ -126,6 +126,7 @@
 .atc-table .mat-column-age { width: 66px; }
 .atc-table .mat-column-createdAt { width: 118px; }
 .atc-table .mat-column-promptAt { width: 118px; }
+.atc-table .mat-column-outputAt { width: 130px; }
 .atc-table .mat-column-actions { width: 38px; text-align: right; }
 .atc-table th.mat-mdc-header-cell {
   background: #f8fafc; color: #64748b; font-weight: 700; font-size: 11.5px;
