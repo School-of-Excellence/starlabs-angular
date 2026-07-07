@@ -127,7 +127,97 @@ td.mat-mdc-cell {
 }
 .link-open-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
+/* existing link found in Participant Videos (read-only, for validation) */
+.link-manual { display: flex; align-items: center; gap: 4px; flex: 1; }
+.existing-link {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  color: #1565c0; text-decoration: none; font-size: 12px;
+  padding: 4px 8px; border: 1px solid #cfe3f7; border-radius: 6px;
+  background: #f2f8fe;
+}
+.existing-link:hover { text-decoration: underline; }
+.existing-link mat-icon { font-size: 16px; width: 16px; height: 16px; flex: 0 0 auto; }
+.existing-link-text {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;
+}
+
+/* View toggle */
+.view-toggle { display: flex; gap: 8px; margin: 4px 0 12px; }
+.toggle-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid #d0d0d0; background: #fff; color: #37474f;
+  border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.toggle-btn:hover { border-color: rgb(0,50,67); }
+.toggle-btn.active { background: rgb(0,50,67); color: #fff; border-color: rgb(0,50,67); }
+.toggle-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.toggle-count {
+  background: rgba(0,0,0,.12); border-radius: 10px; padding: 1px 8px;
+  font-size: 11px; min-width: 18px; text-align: center;
+}
+.toggle-btn.active .toggle-count { background: rgba(255,255,255,.25); }
+
+/* Videos list */
+.videos-loading { display: flex; align-items: center; gap: 10px; padding: 24px; color: #607d8b; }
+.videos-table { width: 100%; border-collapse: collapse; }
+.videos-table thead th {
+  text-align: left; background: rgb(0,50,67); color: #fff;
+  padding: 14px 16px; font-size: 13px; font-weight: 600; position: sticky; top: 0;
+}
+.videos-count { font-weight: 400; opacity: .7; margin-left: 8px; font-size: 12px; }
+.videos-row { border-bottom: 1px solid #eceff1; }
+.videos-row:hover { background: #f7fafb; }
+.videos-name, .videos-url { padding: 10px 16px; vertical-align: middle; }
+.video-url-link {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 640px;
+  color: #1565c0; text-decoration: none; font-size: 13px;
+}
+.video-url-link:hover { text-decoration: underline; }
+.video-url-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-url-link mat-icon { font-size: 16px; width: 16px; height: 16px; flex: 0 0 auto; }
+.videos-filterbar {
+  display: flex; align-items: center; gap: 14px; padding: 12px 16px 0;
+}
+.videos-filter-field { width: 260px; }
+.videos-filter-field ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
+.videos-shown { color: #37474f; font-size: 13px; }
+.videos-summary {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  color: #37474f; font-size: 13px; border-bottom: 1px solid #eceff1;
+}
+.videos-summary .dot { color: #b0bec5; }
+.videos-summary mat-spinner { display: inline-block; vertical-align: middle; margin-left: 4px; }
+.col-yn { width: 110px; text-align: center; }
+.videos-table td.col-yn { text-align: center; }
+.yn-yes {
+  display: inline-block; min-width: 42px; padding: 3px 10px; border-radius: 12px;
+  background: #e6f4ea; color: #1b7a3d; font-size: 12px; font-weight: 600;
+}
+.yn-no {
+  display: inline-block; min-width: 42px; padding: 3px 10px; border-radius: 12px;
+  background: #fdecea; color: #c0392b; font-size: 12px; font-weight: 600;
+}
+.muted { color: #b0bec5; }
+.col-addlink { min-width: 150px; }
+.videos-table td.col-addlink { padding: 8px 16px; }
+.link-confirm { display: flex; align-items: center; gap: 8px; }
+
 /* No data */
 .no-data-cell { text-align: center !important; padding: 50px !important; color: #9e9e9e; }
 .no-data-cell mat-icon { font-size: 44px; width: 44px; height: 44px; display: block; margin: 0 auto 10px; }
 .no-data-cell p { margin: 0; font-size: 14px; }
+
+/* Branches tab — "Add transcript / link" column */
+.col-addtranscript { min-width: 300px; }
+.add-transcript-cell { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.paste-row { display: flex; align-items: flex-start; gap: 4px; }
+.transcript-input {
+  flex: 1; min-width: 180px; resize: vertical;
+  border: 1px solid #d0d0d0; border-radius: 6px;
+  padding: 6px 10px; font-size: 12px; outline: none; font-family: inherit;
+  transition: border-color .15s;
+}
+.transcript-input:focus { border-color: rgb(0,50,67); }
+.paste-save-btn { color: rgb(0,50,67); width: 34px; height: 34px; line-height: 34px; flex: 0 0 auto; }
+.paste-save-btn mat-spinner { margin: 0 auto; }

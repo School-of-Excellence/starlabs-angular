@@ -325,3 +325,16 @@ body:has(#zmmtg-root) { background: #000; }
 
 /* Snackbars (sx-snack via MAT_SNACK_BAR_DEFAULT_OPTIONS) */
 .sx-snack { --mdc-snackbar-container-shape: 12px; --mat-snack-bar-button-color: #4da3ff; }
+
+/* PWA "update available" snackbar — compact, centered dark pill (design 5).
+   MDC gives the surface a 344px min-width + light-dark default bg; override so
+   it hugs its content and takes a dark, minimal look at the bottom-center. */
+.update-snackbar .mdc-snackbar__surface {
+  min-width: auto;
+  background: #15191F;
+  border-radius: 13px;
+  padding: 9px 10px 9px 16px;
+  box-shadow: 0 14px 32px -14px rgba(0, 0, 0, .55);
+}
+.update-snackbar .mat-mdc-snack-bar-label,
+.update-snackbar .mdc-snackbar__label { padding: 0; color: #EAEDF2; }

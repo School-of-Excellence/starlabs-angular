@@ -108,6 +108,11 @@ export class EventOpportunityDashboardComponent {
   isEditMode: boolean = false;
 
   queueTokens: any[] = [];
+  /** The single live queue_token listener. Re-created (and the previous one torn down)
+   *  on every queue-selection change so exactly ONE listener is ever active — otherwise
+   *  stacked listeners for different queue sets race to overwrite queueTokens and the
+   *  counts become nondeterministic (differ machine-to-machine by click history). */
+  private queueTokensSub?: Subscription;
   developerRole:boolean = false;
   currentProfileId: string = '';
   queueTokenMap: Map<string, any> = new Map();
@@ -220,6 +225,7 @@ export class EventOpportunityDashboardComponent {
 
   ngOnDestroy() {
     if (this.studioWatchTimer) clearInterval(this.studioWatchTimer);
+    this.queueTokensSub?.unsubscribe();
     this.subscription.complete();
     this.subscription.next();
   }
@@ -1563,6 +1569,10 @@ export class EventOpportunityDashboardComponent {
   }
 
   fetchQueueTokens() {
+    // Tear down the previous listener FIRST — a new selection must not leave the old
+    // query streaming into queueTokens (that stacking is what made counts differ across
+    // machines). Exactly one live queue_token listener at a time.
+    this.queueTokensSub?.unsubscribe();
     const queues = this.loadedQueues;
     if (queues.length === 0) {
       this.queueTokens = [];
@@ -1570,7 +1580,7 @@ export class EventOpportunityDashboardComponent {
       return;
     }
     const selectedQueueRef = queues.map((e) => this.mapQueue[e]['docref'])
-    collectionData(query(
+    this.queueTokensSub = collectionData(query(
       collection(this.firestore, 'queue_token'),
       where('queueref', 'in', selectedQueueRef)
     )).pipe(takeUntil(this.subscription)).subscribe(tokens => {
