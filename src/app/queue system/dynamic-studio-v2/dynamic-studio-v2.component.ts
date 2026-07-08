@@ -114,6 +114,11 @@ export class DynamicStudioV2Component {
   stageTokenList = []
   // Studio Invitation
   invitationCountdown:MatDialogRef<any> = null
+  // The "select activity & profiles" assign dialog (EnterStudioAssign) opened
+  // from assignStudio(). Tracked so that in a collaborator studio, once ANY
+  // collaborator submits it and the shared live assignment appears, the other
+  // collaborator's still-open copy is auto-closed as they enter the studio.
+  enterStudioAssignRef:MatDialogRef<any> = null
   studioInvitationSubscription: Subscription
   studioInvitation = null
   studioGroupingInvitationSubscription: Subscription = null
@@ -880,6 +885,14 @@ export class DynamicStudioV2Component {
       // Reflect the (possibly auto-selected) step in the URL too, so a refresh
       // on the very first step — before any manual switch — still reopens it.
       // syncStepUrl is idempotent, so this no-ops once the URL matches.
+      this.syncStepUrl(this.activeStepId)
+    }
+
+    // Default-step URL guarantee: if they arrived WITHOUT a `?step=` (or the step
+    // list didn't change so the block above was skipped on re-entry), still put
+    // the resolved active step — the first step by default — into the URL.
+    // Idempotent: syncStepUrl no-ops when the URL already matches.
+    if (this.activeStepId && this.route.snapshot.queryParamMap.get('step') !== this.activeStepId) {
       this.syncStepUrl(this.activeStepId)
     }
 
@@ -1908,6 +1921,14 @@ export class DynamicStudioV2Component {
             }
 
             if(this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != null && this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != undefined){
+              // A collaborator submitted the assign dialog and created the shared
+              // live assignment — both specialists now enter the studio. If this
+              // specialist still has the "select activity & profiles" dialog open,
+              // close it so it doesn't linger over the live studio.
+              if (this.enterStudioAssignRef) {
+                this.enterStudioAssignRef.close()
+                this.enterStudioAssignRef = null
+              }
               this.liveAssignment = {
                 ...{token: (this.liveAssignment ?? {})["token"]},
                 ...this.mapStudioLiveAssignment[this.selectedStudio["docid"]]
@@ -2023,14 +2044,19 @@ export class DynamicStudioV2Component {
                     })
                   }
                   // Denied by B!G Participant
-                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
+                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result=>{
                     console.log(result)
                     if(result == "invitation cancelled"){
-                      deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
-                        console.log(err)
-                      }).catch(err =>{
-                        console.log(err)
-                      })
+                      try {
+                        const docid = this.studioInvitation["docid"]
+                        const url = `https://cutstudiocall-kakybqnyrq-uc.a.run.app?docid=${encodeURIComponent(docid)}`
+                        await this.http.get(url).toPromise()
+                        await deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
+                          console.log(err)
+                        })
+                      } catch(err) {
+                        console.error("Error cutting call", err)
+                      }
                     }
                     this.studioInvitation = null
                     this.invitationCountdown = null
@@ -2074,6 +2100,8 @@ export class DynamicStudioV2Component {
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
     this.initChatThread()
     console.log(this.liveAssignment, 'this.liveAssignment');
+    console.log('[studio] queue studio pairing id:', this.selectedStudio?.['docid'] ?? null,
+      '| live assignment id:', this.liveAssignment?.['docid'] ?? null);
     // Switching the active studio changes which invitations count as
     // "another studio's" — re-derive the chip map.
     this.subscribeOtherStudioInvitations()
@@ -2378,23 +2406,56 @@ export class DynamicStudioV2Component {
         .filter((p: string) => p !== this.profileid)
       if (collaborators.length === 0) return []
 
+      const thisStudioId = studio?.['docid']
+      // Restrict "checked into another studio" to the specialist's currently
+      // live/ongoing queues (mirrors findActiveCheckins) — a check-in on a
+      // studio whose queue has ended shouldn't block.
+      const liveQueueIds = new Set(
+        (this.ongoingQueueList || []).map((q: any) => q['docid'])
+      )
+
       const conflicts: any[] = []
-      const seen = new Set<string>()
       for (const collab of collaborators) {
-        const snap = await getDocs(query(
+        // 1) In a LIVE activity in another studio — hard busy, carries the stage.
+        let matched = false
+        const laSnap = await getDocs(query(
           collection(this.firestore, 'live assignment'),
           where('pairing', 'array-contains', collab),
         ))
-        for (const d of snap.docs) {
+        for (const d of laSnap.docs) {
           const la: any = d.data()
-          if (la['status'] === 'live' && la['studioid'] && la['studioid'] !== studio?.['docid']) {
-            if (seen.has(collab)) continue
-            seen.add(collab)
+          if (la['status'] === 'live' && la['studioid'] && la['studioid'] !== thisStudioId) {
             conflicts.push({
               collaborator: collab,
               collaboratorName: this.mapProfile[collab] ?? collab,
               studioid: la['studioid'],
               stageName: la['stagename'] ?? '',
+              isLive: true,
+            })
+            matched = true
+            break
+          }
+        }
+        if (matched) continue
+
+        // 2) Checked into another studio (even with no live activity yet) —
+        //    still blocks this check-in.
+        const pairSnap = await getDocs(query(
+          collection(this.firestore, 'queue studio pairing'),
+          where('participants', 'array-contains', collab),
+          where('checkin', '==', true),
+        ))
+        for (const d of pairSnap.docs) {
+          const s: any = d.data()
+          if (s['docid'] && s['docid'] !== thisStudioId &&
+              [null, undefined, false].includes(s['delete']) &&
+              (liveQueueIds.size === 0 || liveQueueIds.has(s['queueref']?.id))) {
+            conflicts.push({
+              collaborator: collab,
+              collaboratorName: this.mapProfile[collab] ?? collab,
+              studioid: s['docid'],
+              stageName: '',
+              isLive: false,
             })
             break
           }
@@ -2684,7 +2745,13 @@ export class DynamicStudioV2Component {
       maxWidth: "90vw",
       maxHeight: "90vh"
     })
+    // Track this dialog so the live-assignment listener can auto-close it for a
+    // collaborator once the shared live assignment appears (see #enterStudioAssignRef).
+    this.enterStudioAssignRef = assignStudio
     assignStudio.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result=>{
+      // Closed (submitted, cancelled, or auto-closed on entering the studio) —
+      // drop the tracked ref.
+      this.enterStudioAssignRef = null
       console.log(result)
       if(result != null && this.liveAssignment == null){
         var loading = this.dialog.open(LoadingProgressComponent,{
@@ -3288,6 +3355,14 @@ export class DynamicStudioV2Component {
     // below already consumes. The "Confirm who attended" flow (reviewSpecialist
     // == true, from moveStage) keeps the AssignQueueStudio dialog since it also
     // needs studio selection + attendance semantics.
+    // Everyone already in this live assignment (main pairing + already-invited
+    // bonus specialists) — hidden from the activity specialist lists so you can't
+    // re-invite someone who's already been called into the session.
+    const alreadyInAssignment = Array.from(new Set<string>([
+      ...(this.liveAssignment['pairing'] ?? []),
+      ...(this.liveAssignment['bonusactivityparticipant'] ?? []),
+      ...Object.keys(this.liveAssignment['bonusactivity'] ?? {}),
+    ]))
     let inviteParticipant: any
     if (!reviewSpecialist) {
       inviteParticipant = await this.openEnterStudioAssign({
@@ -3299,7 +3374,8 @@ export class DynamicStudioV2Component {
           currentprofileid: this.profileid,
           mapprofile: this.mapProfile,
           mapactivity: this.mapActivity,
-          activityspecialists: this.activitySpecialistMap
+          activityspecialists: this.activitySpecialistMap,
+          excludeprofileids: alreadyInAssignment
         },
         autoFocus: false,
         panelClass: "enter-studio-dialog",

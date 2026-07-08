@@ -36,7 +36,7 @@ jobs:
           node-version: '22.16.0'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install
 
       # Env files first — the typecheck and the build both import src/environments/*.
       - name: Generate TEST environment files

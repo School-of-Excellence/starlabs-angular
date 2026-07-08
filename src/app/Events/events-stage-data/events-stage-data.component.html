@@ -1,0 +1,215 @@
+<div class="esd">
+
+  <!-- Steps indicator -->
+  <div class="steps">
+    <span class="stp" [class.on]="step==='events'">1. Event</span>
+    <span class="arw">›</span>
+    <span class="stp" [class.on]="step==='arenas'">2. Arena event</span>
+    <span class="arw">›</span>
+    <span class="stp" [class.on]="step==='participants'">3. Queue &amp; stages</span>
+  </div>
+
+  <!-- ============ Step 1: pick an event ============ -->
+  <div *ngIf="step==='events'">
+    <h2>Events stage data</h2>
+    <p class="hint">Step 1 · Select an event</p>
+
+    <div class="row">
+      <label><input type="radio" name="mode" [checked]="mode==='upcoming'" (change)="setMode('upcoming')"> Upcoming</label>
+      <label><input type="radio" name="mode" [checked]="mode==='past'" (change)="setMode('past')"> Past</label>
+      <input class="search" type="text" [(ngModel)]="searchEvents" (ngModelChange)="onEventSearch()" placeholder="Search event name">
+    </div>
+
+    <p *ngIf="loadingEvents">Loading events…</p>
+    <p *ngIf="eventsError" class="err">Couldn't load events. <button (click)="retryEvents()">Retry</button></p>
+
+    <table *ngIf="!loadingEvents && !eventsError">
+      <thead><tr><th>Event</th><th>Dates</th><th></th></tr></thead>
+      <tbody>
+        <tr *ngFor="let row of pagedEvents">
+          <td>{{ row.name }}</td>
+          <td>{{ row.dateLabel || '—' }}</td>
+          <td><button (click)="selectEvent(row)">Select</button></td>
+        </tr>
+        <tr *ngIf="filteredEvents.length === 0"><td colspan="3" class="empty">No events</td></tr>
+      </tbody>
+    </table>
+    <mat-paginator *ngIf="!loadingEvents && !eventsError" [length]="filteredEvents.length" [pageSize]="eventPageSize"
+      [pageSizeOptions]="[10, 25, 50]" [pageIndex]="eventPageIndex" (page)="onEventPage($event)"></mat-paginator>
+  </div>
+
+  <!-- ============ Step 2: pick an arena event ============ -->
+  <div *ngIf="step==='arenas'">
+    <p class="crumb"><button (click)="goToEvents()">← Events</button></p>
+    <h2>{{ selectedEvent?.name }}</h2>
+    <p class="hint">Step 2 · Select an arena event</p>
+
+    <p *ngIf="loadingArenas">Loading arena events…</p>
+    <p *ngIf="arenasError" class="err">Couldn't load arena events. <button (click)="selectedEvent && loadArenas(selectedEvent)">Retry</button></p>
+
+    <table *ngIf="!loadingArenas && !arenasError">
+      <thead><tr><th>Product</th><th>Type</th><th></th></tr></thead>
+      <tbody>
+        <tr *ngFor="let row of arenaRows">
+          <td>{{ row.productName }}</td>
+          <td>{{ row.type }}</td>
+          <td><button (click)="selectArena(row)">Select</button></td>
+        </tr>
+        <tr *ngIf="arenaRows.length === 0"><td colspan="3" class="empty">No arena events for this event</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============ Step 3: queue, stages & participants ============ -->
+  <div *ngIf="step==='participants'">
+    <p class="crumb">
+      <button (click)="goToEvents()">← Events</button>
+      <button (click)="goToArenas()">← Arena events</button>
+    </p>
+    <h2>{{ selectedArena?.productName }}</h2>
+    <p class="hint">{{ selectedEvent?.name }}</p>
+
+    <!-- Queue selector: pick one or more live queues (mapped ones pre-selected) -->
+    <div class="row">
+      <span>Queues:</span>
+      <label class="qchk" *ngFor="let q of queues">
+        <input type="checkbox" [checked]="isQueueSelected(q.id)" (change)="toggleQueue(q.id, $any($event.target).checked)">
+        {{ q.name }}<span class="mapped" *ngIf="q.mapped"> (mapped)</span>
+      </label>
+      <b *ngIf="!queues.length && !loadingQueue">No live queues</b>
+      <span *ngIf="loadingQueue">loading…</span>
+    </div>
+
+    <!-- Stage columns: merged across all selected queues; add/remove individually -->
+    <div class="row" *ngIf="selectedQueueIds.length">
+      <span>Stage columns:</span>
+      <select [(ngModel)]="colToAdd">
+        <option value="">Select stage</option>
+        <option *ngFor="let c of availableCols" [value]="c.key">{{ c.label }}</option>
+      </select>
+      <button (click)="addCol()" [disabled]="!colToAdd">+ Add</button>
+      <button (click)="addAllCols()" [disabled]="!mergedStages.length">Add all</button>
+      <button (click)="clearCols()" [disabled]="!addedCols.length">Clear</button>
+      <span class="added" *ngFor="let c of addedCols">
+        {{ c.label }} <button class="rm" (click)="removeCol(c.key)" title="Remove">×</button>
+      </span>
+    </div>
+
+    <!-- Filters -->
+    <div class="row filters">
+      <label>Request:
+        <select [(ngModel)]="requestFilter" (ngModelChange)="onFilterChange()">
+          <option value="">All</option>
+          <option value="requested">Requested</option>
+          <option value="approved">Approved</option>
+        </select>
+      </label>
+      <label>Current stage:
+        <select [(ngModel)]="stageFilter" (ngModelChange)="onFilterChange()">
+          <option value="">All</option>
+          <option *ngFor="let s of currentStageOptions" [value]="s">{{ s }}</option>
+          <option value="__none">Not in queue</option>
+        </select>
+      </label>
+      <label>Customer status:
+        <select [(ngModel)]="customerFilter" (ngModelChange)="onFilterChange()">
+          <option value="">All</option>
+          <option *ngFor="let c of customerStatusOptions" [value]="c">{{ c }}</option>
+        </select>
+      </label>
+      <label *ngIf="variationOptions.length">Variation:
+        <select [(ngModel)]="variationFilter" (ngModelChange)="onFilterChange()">
+          <option value="">All</option>
+          <option *ngFor="let v of variationOptions" [value]="v">{{ v }}</option>
+          <option value="__none">No variation</option>
+        </select>
+      </label>
+      <label>Completed date:
+        <input type="date" [(ngModel)]="completedFrom" (ngModelChange)="onFilterChange()">
+        <span>–</span>
+        <input type="date" [(ngModel)]="completedTo" (ngModelChange)="onFilterChange()">
+      </label>
+      <label>Slot date:
+        <input type="date" [(ngModel)]="slotFrom" (ngModelChange)="onFilterChange()">
+        <span>–</span>
+        <input type="date" [(ngModel)]="slotTo" (ngModelChange)="onFilterChange()">
+      </label>
+      <label class="notbooked" [class.on]="notBookedOnly">
+        <input type="checkbox" [(ngModel)]="notBookedOnly" (ngModelChange)="onFilterChange()"> Not booked only
+      </label>
+      <button *ngIf="isStageFiltered" (click)="clearFilters()">Clear filters</button>
+    </div>
+
+    <!-- Dashboard tiles: one per added stage column, over the filtered rows -->
+    <div class="dash" *ngIf="!loadingStage && !stageError">
+      <div class="tile tile-total">
+        <div class="t-label">Participants</div>
+        <div class="t-num">{{ filteredStageRows.length }}</div>
+        <div class="t-mini" *ngIf="isStageFiltered">of {{ stageRows.length }}</div>
+      </div>
+      <div class="tile" *ngFor="let s of stageSummaries">
+        <div class="t-label">{{ s.label }}</div>
+        <div class="t-num">{{ s.completed }} <span class="t-sub">completed</span></div>
+        <div class="t-bar">
+          <span class="seg seg-done" [style.flex]="s.completed || 0"></span>
+          <span class="seg seg-book" [style.flex]="s.booked || 0"></span>
+          <span class="seg seg-none" [style.flex]="s.notBooked || 0"></span>
+        </div>
+        <div class="t-legend">
+          <span><i class="dot d-done"></i>{{ s.completed }} done</span>
+          <span><i class="dot d-book"></i>{{ s.booked }} booked</span>
+          <span><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
+        </div>
+      </div>
+      <div class="tile tile-hint" *ngIf="!addedCols.length">
+        <i class="hint-i">＋</i> Add a stage column to see its breakdown
+      </div>
+    </div>
+
+    <div class="row toolbar">
+      <span class="search-wrap">
+        <span class="search-i">⌕</span>
+        <input class="search" type="text" [(ngModel)]="searchStage" (ngModelChange)="onStageSearch()" placeholder="Search name, email, phone, stage">
+      </span>
+      <span class="count" *ngIf="!loadingStage && !stageError">{{ filteredStageRows.length }} participant(s)</span>
+      <span class="spacer"></span>
+      <button class="btn-primary" (click)="exportCsv()" [disabled]="loadingStage || !filteredStageRows.length">Export CSV</button>
+    </div>
+
+    <p *ngIf="loadingStage">Loading participants…</p>
+    <p *ngIf="stageError" class="err">Couldn't load participants. <button (click)="selectedArena && selectArena(selectedArena)">Retry</button></p>
+
+    <div class="tbl-wrap" *ngIf="!loadingStage && !stageError">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>Email</th><th>Phone</th><th>Customer status</th><th>Request</th><th>Variation</th><th>Current stage</th>
+            <ng-container *ngFor="let c of addedCols">
+              <th class="stage-col">{{ c.label }} · Completed</th>
+              <th class="stage-col">{{ c.label }} · Slot booking</th>
+            </ng-container>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of pagedStageRows">
+            <td>{{ r.name || '—' }}<span *ngIf="r.metaMissing" class="miss"> (no metadata)</span></td>
+            <td>{{ r.email || '—' }}</td>
+            <td>{{ r.phone || '—' }}</td>
+            <td>{{ r.customerStatus || '—' }}</td>
+            <td><span class="req" [class.req-app]="r.status==='approved'">{{ r.status || '—' }}</span></td>
+            <td>{{ variationsDisplay(r) || '—' }}</td>
+            <td>{{ currentStagesDisplay(r) || '—' }}</td>
+            <ng-container *ngFor="let c of addedCols">
+              <td><span class="pill" [ngClass]="crossedStage(r, c) ? 'p-done' : 'p-none'">{{ completedLabel(r, c) }}</span></td>
+              <td><span class="pill" [ngClass]="'p-' + slotKind(r, c)">{{ slotCell(r, c) }}</span></td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="filteredStageRows.length === 0"><td [attr.colspan]="7 + addedCols.length * 2" class="empty">No participants</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <mat-paginator *ngIf="!loadingStage && !stageError" [length]="filteredStageRows.length" [pageSize]="stagePageSize"
+      [pageSizeOptions]="[25, 50, 100]" [pageIndex]="stagePageIndex" (page)="onStagePage($event)"></mat-paginator>
+  </div>
+
+</div>
