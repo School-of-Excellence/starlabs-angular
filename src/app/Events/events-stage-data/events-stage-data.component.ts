@@ -121,6 +121,7 @@ export class EventsStageDataComponent {
   journeyGroups: { name: string; journeyIds: string[] }[] = [];
   private groupsDocId: string | null = null;
   groupsEditorOpen = false;
+  configOpen = false;
 
   // ---- Per-arena "ready" stage config (stored in the same config doc) ----
   readyStages: string[] = [];
@@ -249,6 +250,7 @@ export class EventsStageDataComponent {
     this.notBookedOnly = false;
     this.summaryLoaded = false;
     this.groupsEditorOpen = false;
+    this.configOpen = false;
     this.readyStages = [];
     this.step = 'participants';
     await this.loadJourneyGroups(row.docid);

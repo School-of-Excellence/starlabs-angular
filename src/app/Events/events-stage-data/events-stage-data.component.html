@@ -71,7 +71,7 @@
 
     <!-- Cohort summary: requested/approved × active/non-active, with per-journey split -->
     <div class="cohort-summary" *ngIf="summaryLoaded">
-      <div class="cs-head">Cohort summary</div>
+      <div class="cs-head"><span>Cohort summary</span><button type="button" class="cs-config-btn" (click)="configOpen = !configOpen">{{ configOpen ? 'Done' : 'Config' }}</button></div>
       <div class="cs-stats">
         <div class="cs-stat">
           <div class="cs-label">Total in queue</div>
@@ -91,13 +91,26 @@
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryApproved.active, summaryApproved.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryApproved.active, summaryApproved.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryApproved.active }}</span><span class="cs-lg-n">Non-active {{ summaryApproved.nonactive }}</span></div>
         </div>
+        <div class="cs-stat">
+          <div class="cs-label">Ready</div>
+          <div class="cs-total">{{ summaryReady.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryReady.active, summaryReady.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryReady.active, summaryReady.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryReady.active }}</span><span class="cs-lg-n">Non-active {{ summaryReady.nonactive }}</span></div>
+        </div>
       </div>
 
-      <!-- Ready-stage picker: participant is "ready" when their current stage is one of these -->
-      <div class="cs-ready" *ngIf="readyStageOptions.length">
-        <span class="cs-ready-lbl">Ready when current stage is:</span>
-        <button type="button" class="cs-ready-chip" *ngFor="let s of readyStageOptions" [class.on]="isReadyStage(s)" (click)="toggleReadyStage(s)">{{ s }}</button>
-        <span class="cs-ready-hint" *ngIf="!readyStages.length">pick one or more stages · select a queue below first</span>
+      <!-- Config: pick the queue and the ready stages (hidden until Config is clicked) -->
+      <div class="cs-config" *ngIf="configOpen">
+        <div class="cs-config-sec">
+          <span class="cs-config-lbl">Queue</span>
+          <button type="button" class="cs-cfg-chip" *ngFor="let q of queues" [class.on]="isQueueSelected(q.id)" (click)="toggleQueue(q.id, !isQueueSelected(q.id))">{{ q.name }}</button>
+          <span class="cs-config-hint" *ngIf="!queues.length">No queues for this arena.</span>
+        </div>
+        <div class="cs-config-sec" *ngIf="readyStageOptions.length">
+          <span class="cs-config-lbl">Ready when current stage is</span>
+          <button type="button" class="cs-cfg-chip" *ngFor="let s of readyStageOptions" [class.on]="isReadyStage(s)" (click)="toggleReadyStage(s)">{{ s }}</button>
+        </div>
+        <span class="cs-config-hint" *ngIf="!selectedQueueIds.length">Pick a queue above to choose its ready stages.</span>
       </div>
       <div class="cs-jhead">
         <span>Journey-wise split</span>
