@@ -116,6 +116,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   loggedinProfile: string = null;
   mapProfile: any = {};
   mapProfileNew: any = {};
+  // cached participant-metadata docdata for enrolled ids, so mapProfile can be
+  // re-merged live whenever either enrolled metadata or new_user_data changes
+  enrolledMetaDocdata: any = {};
   loading = true;
   error: string | null = null;
   isMovingParticipant: string | null = null;
@@ -126,6 +129,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   allSelected = false;
 
   unsubscribes: Unsubscribe[] = [];
+  private destroyed = false;
   private destroy$ = new Subject<void>();
   private recalculateSubject$ = new Subject<void>();
   journeyData: any[] = [];
@@ -246,19 +250,26 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return { docdata, map, list };
   }
 
-  private async initializeProfileData() {
-    try {
-      const userRef = collection(this.firestoreDefault, 'new_user_data');
-      const userSnap = await getDocs(userRef);
-      this.mapProfileNew = {};
-      userSnap.forEach(doc => {
-        const data = doc.data();
-        data['id'] = doc.id;
-        this.mapProfileNew[data['id']] = data;
+  // Live listener for new_user_data (drives the New Users metrics). Kept live so
+  // there is nothing left to manually refresh now that the refresh button is gone.
+  private initializeProfileData() {
+    const userRef = collection(this.firestoreDefault, 'new_user_data');
+    const unsubscribe = onSnapshot(userRef, (userSnap) => {
+      if (this.destroyed) return;
+      const map: any = {};
+      userSnap.forEach(d => {
+        const data = d.data();
+        data['id'] = d.id;
+        map[data['id']] = data;
       });
-    } catch (err) {
-      console.error('Error fetching new_user_data:', err);
-    }
+      this.mapProfileNew = map;
+      // Keep mapProfile (name resolution) current from both live sources.
+      this.mapProfile = { ...this.enrolledMetaDocdata, ...this.mapProfileNew };
+      // New-user metrics are getters over mapProfileNew; nudge change detection.
+      try { this.cdr.detectChanges(); } catch { /* view not ready yet */ }
+    }, (err) => console.error('new_user_data snapshot error', err));
+
+    this.unsubscribes.push(unsubscribe);
   }
 
   private initializeJourneyData() {
@@ -342,8 +353,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.clearSelectedParticipant();
-    this.unsubscribes.forEach(unsubscribe => unsubscribe());
+    // Tear down every live Firestore listener (workshop config, enrolled,
+    // participant workshop, referral, new_user_data). Guarded so one bad
+    // unsubscribe can't leave the rest attached.
+    this.unsubscribes.forEach(unsubscribe => {
+      try { unsubscribe(); } catch (e) { console.error('unsubscribe failed', e); }
+    });
+    this.unsubscribes = [];
     this.destroy$.next();
     this.destroy$.complete();
     this.participantDataCache.clear();
@@ -381,6 +399,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const unsubscribe = onSnapshot(workshopRef, (docSnap) => {
+      if (this.destroyed) return;
       if (docSnap.exists()) {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
         this.updateWorkshopDisplayData();
@@ -440,7 +459,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.shareClaimedProfileIds = claimed;
       this.shareClaimedReferralByProfile = referralByProfile;
       // Referral sharers may not be enrolled, so resolve their names from profile_data.
-      this.shareProfileNames = await this.getProfileNameMapForIds([...clicked, ...claimed]);
+      const names = await this.getProfileNameMapForIds([...clicked, ...claimed]);
+      if (this.destroyed) return; // component torn down while awaiting
+      this.shareProfileNames = names;
     }, (err) => console.error('workshopreferral snapshot error', err));
 
     this.unsubscribes.push(unsubscribe);
@@ -990,7 +1011,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
-      this.mapProfile = { ...participantData.docdata, ...this.mapProfileNew };
+      if (this.destroyed) return; // component torn down while awaiting
+      this.enrolledMetaDocdata = participantData.docdata;
+      this.mapProfile = { ...this.enrolledMetaDocdata, ...this.mapProfileNew };
       // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
       // here we just re-derive from the current (live) participantWorkshopMap.
       this.recomputeDerivedState();
@@ -1020,6 +1043,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     );
 
     const unsubscribe = onSnapshot(pwQuery, (pwSnap) => {
+      if (this.destroyed) return;
       this.participantWorkshopMap.clear();
       pwSnap.docs.forEach(d => {
         const data = d.data();
