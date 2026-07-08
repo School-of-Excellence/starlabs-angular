@@ -1,7 +1,7 @@
 import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, getDoc, writeBatch, serverTimestamp, updateDoc, setDoc
+  doc, writeBatch, serverTimestamp, updateDoc, setDoc
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -34,6 +34,7 @@ type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noP
 
 interface ImportPreviewRow { name: string; email: string; }
 interface Split { key: string; label: string; count: number; }
+interface JourneyRow { key: string; label: string; total: number; first: number; repeat: number; }
 
 interface PRow {
   profileid: string;
@@ -65,6 +66,7 @@ interface PRow {
   purchaseValue: number | null;
   paid: number | null;
   customerStatus: string;
+  completedProduct?: boolean;   // this product's id is in the participant's consumedproducts → "repeat"
   metaLoaded: boolean;
   subLoaded: boolean;
   metaError: boolean;
@@ -195,6 +197,18 @@ export class ProductFunnelComponent implements OnInit {
     this.statusSplits = out;
     this.customerStatusList = [...allStatuses.entries()].map(([key, label]) => ({ key, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
+
+    // Approved cohort by journey, each split into first-timer vs repeat (for the cross-tab card).
+    const jm = new Map<string, JourneyRow>();
+    for (const r of rows) {
+      if (!r.isApproved) continue;
+      const label = (r.journey || '').trim() || 'Not set';
+      const e = jm.get(label) ?? { key: label, label, total: 0, first: 0, repeat: 0 };
+      e.total++;
+      if (r.completedProduct) e.repeat++; else e.first++;
+      jm.set(label, e);
+    }
+    this.approvedByJourney = [...jm.values()].sort((a, b) => b.total - a.total);
   }
 
   mapProfile: Record<string, any> = {};
@@ -243,14 +257,52 @@ export class ProductFunnelComponent implements OnInit {
     this.refreshMeta();
   }
 
-  // Post-approval checks (Clearance / Venue / Contract / Queue stage) — shown only on the approved cohort.
-  productMinimum: number | null = null;                 // product.minimumrequiredamount, for the auto finance hint
-  financeClearedByPid = new Map<string, boolean>();     // manual finance sign-off, from the finance_clearance collection
-  venuePaidByPid = new Map<string, boolean>();          // manual venue-fee sign-off, from the venue_clearance collection
+  // Approved cohort broken down by journey, each split into first-timer vs repeat — for the
+  // "Approved by journey" cross-tab card (computed in computeSplits once journeys are loaded).
+  // Repeat = this product's id is in the participant's `consumedproducts` (participant metadata),
+  // captured per-row as PRow.completedProduct during loadMeta.
+  approvedByJourney: JourneyRow[] = [];
+  journeyFilter = 'all';   // 'all' or a journey label
+  frFilter = 'all';        // 'all' | 'first' | 'repeat'
+  private readonly journeyPalette = ['#1f8a3b', '#0060df', '#534ab7', '#c25e00', '#0f6e56', '#d4537e', '#185fa5'];
+  journeyColor(key: string): string {
+    const i = this.approvedByJourney.findIndex(j => j.key === key);
+    return this.journeyPalette[(i < 0 ? 0 : i) % this.journeyPalette.length];
+  }
+  // Click a journey row → filter the table to that whole journey (clears the first/repeat sub-filter).
+  setJourneyChip(key: string): void {
+    this.segment = 'approved';
+    const same = this.journeyFilter === key && this.frFilter === 'all';
+    this.journeyFilter = same ? 'all' : key;
+    this.frFilter = 'all';
+    this.pageIndex = 0;
+    this.defaultSelection();
+    this.refreshMeta();
+  }
+  // Click a first-timer/repeat pill under a journey → filter to that journey ∩ that group (toggles off if repeated).
+  setJourneyFr(jKey: string, frKey: string): void {
+    this.segment = 'approved';
+    const same = this.journeyFilter === jKey && this.frFilter === frKey;
+    this.journeyFilter = same ? 'all' : jKey;
+    this.frFilter = same ? 'all' : frKey;
+    this.pageIndex = 0;
+    this.defaultSelection();
+    this.refreshMeta();
+  }
+  private journeyMatches(r: PRow): boolean {
+    if (this.journeyFilter === 'all') return true;
+    return ((r.journey || '').trim() || 'Not set') === this.journeyFilter;
+  }
+  private frMatches(r: PRow): boolean {
+    if (this.frFilter === 'all') return true;
+    const isRepeat = !!r.completedProduct;
+    return this.frFilter === 'repeat' ? isRepeat : !isRepeat;
+  }
+
+  // Post-approval checks (Queue stage) — shown only on the approved cohort.
   queueStageByPid = new Map<string, string>();          // queue_token.currentstage per participant (queue events)
   queueStagesLoaded = false;
   private queueStagesLoading = false;
-  private currentUserId: string | null = null;          // for the venue_clearance audit field
 
   // owner email → row, and active-queue profile ids — used by bulk import categorisation
   private ownerByEmail = new Map<string, PRow>();
@@ -282,8 +334,6 @@ export class ProductFunnelComponent implements OnInit {
     this.mapEmailData = profile.mapEmailData;
     this.mapProduct = await this.guard.getProductMap();
     this.mapJourney = await this.guard.getJourneyMap();
-    const u: any = await this.guard.getUser();
-    this.currentUserId = u?.email ?? u?.uid ?? null;
     await this.loadData();
   }
 
@@ -301,28 +351,15 @@ export class ProductFunnelComponent implements OnInit {
     this.queueStagesLoaded = false;
     const arena = this.arena;
     try {
-      const [ownSnap, eprSnap, scanSnap, financeSnap, venueSnap, productSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
           where('arenaeventid', '==', arena['docid']),
           where('status', 'in', ['requested', 'approved', 'attended', 'unattended']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
-          where('eventref', '==', arena['eventref']))),
-        // Finance + venue clearance are isolated collections — tolerate them being absent / not yet ruled.
-        getDocs(query(collection(this.firestore, 'finance_clearance'),
-          where('arenaeventid', '==', arena['docid']))).catch(() => null),
-        getDocs(query(collection(this.firestore, 'venue_clearance'),
-          where('arenaeventid', '==', arena['docid']))).catch(() => null),
-        getDoc(arena['productref']).catch(() => null)
+          where('eventref', '==', arena['eventref'])))
       ]);
-
-      // Product minimum (for the auto finance hint) + the two manual sign-off maps.
-      this.productMinimum = (productSnap && productSnap.exists()) ? Number(productSnap.data()?.['minimumrequiredamount'] ?? 0) : 0;
-      this.financeClearedByPid = new Map<string, boolean>();
-      financeSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.financeClearedByPid.set(x['profileid'], x['financeCleared'] === true); });
-      this.venuePaidByPid = new Map<string, boolean>();
-      venueSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.venuePaidByPid.set(x['profileid'], x['venuePaid'] === true); });
 
       const owners = new Map<string, string>();
       ownSnap.docs.forEach(d => {
@@ -477,6 +514,7 @@ export class ProductFunnelComponent implements OnInit {
   private async loadMeta(rows: PRow[]) {
     const pending = rows.filter(r => !r.metaLoaded);
     if (pending.length === 0) return;
+    const productId = this.arena?.['productref']?.id;   // for the consumedproducts "repeat" check
     const byId = new Map<string, PRow>();
     pending.forEach(r => byId.set(r.profileid, r));
     const ids = [...byId.keys()];
@@ -491,11 +529,20 @@ export class ProductFunnelComponent implements OnInit {
           const row = byId.get(pid);
           if (!row) return;
           const m = metaById[pid] ?? {};
-          row.journey = this.mapJourney[m['activejourney']] ?? '';
+          // Current journey depends on customer status: active → activejourney,
+          // non active → lastcompletedjourney, otherwise → lastsubscribedjourney.
+          const cs = (m['customerstatus'] ?? '').toString().trim().toLowerCase();
+          const journeyId = cs === 'active' ? m['activejourney']
+            : cs === 'non active' ? m['lastcompletedjourney']
+            : m['lastsubscribedjourney'];
+          row.journey = this.mapJourney[journeyId] ?? '';
           row.finance = m['financialstatus'] ?? '';
           row.purchaseValue = m['pp_totalpurchasevalue'] ?? null;
           row.paid = m['pp_totalpaid'] ?? null;
           row.customerStatus = m['customerstatus'] ?? '';
+          // "Repeat" = this product is already in the participant's consumedproducts (product ids).
+          row.completedProduct = !!productId && Array.isArray(m['consumedproducts'])
+            && m['consumedproducts'].some((p: any) => String(p) === String(productId));
           // Name + number come from participant metadata (profile_data value stays only as fallback).
           if (m['name']) row.name = m['name'];
           const metaNum = m['phonenumber'] ?? m['number'];
@@ -545,29 +592,27 @@ export class ProductFunnelComponent implements OnInit {
   private refreshMeta() {
     this.loadMeta(this.pagedRows);
     this.loadSubscriptions(this.pagedRows);   // PJP only for the visible page
-    // Finance + customer filters depend on metadata, so load it for the whole segment when either is active.
-    if (this.financeFilter !== 'all' || this.customerFilter !== 'all') this.loadMeta(this.segmentMembers());
+    // Finance + customer + journey filters depend on metadata, so load it for the whole segment when any is active.
+    if (this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all') this.loadMeta(this.segmentMembers());
   }
 
   // ---- Segments ----
   setSegment(s: SegmentKey) {
     this.segment = s;
+    this.journeyFilter = 'all';   // the journey filter is scoped to the Approved-by-journey card; clear it on navigation
+    this.frFilter = 'all';        // same for the first-timer/repeat filter
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
     if (this.showApprovalChecks) this.ensureQueueStages();
   }
 
-  // ---- Post-approval checks (Clearance / Venue / Contract / Queue stage) ----
+  // ---- Post-approval checks (Queue stage) ----
   get showApprovalChecks(): boolean {
     return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
   }
   get colSpan(): number {
-    return (this.showSelect ? 1 : 0) + 7 + (this.showApprovalChecks ? 4 : 0);
-  }
-  // Auto hint beside the Finance checkbox: has the participant paid at least the product minimum?
-  meetsMinPayment(r: PRow): boolean {
-    return (+(r.paid || 0)) >= (this.productMinimum ?? 0);
+    return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 1 : 0);
   }
   // Lazily load queue_token.currentstage for the whole event once (queue events only).
   async ensureQueueStages() {
@@ -584,40 +629,6 @@ export class ProductFunnelComponent implements OnInit {
       this.queueStagesLoading = false;
     }
   }
-  // Manual AR toggle — persisted to the isolated venue_clearance collection (optimistic, reverts on failure).
-  async toggleVenuePaid(r: PRow, checked: boolean) {
-    const prev = this.venuePaidByPid.get(r.profileid) === true;
-    this.venuePaidByPid.set(r.profileid, checked);
-    try {
-      const id = `${this.arena['docid']}_${r.profileid}`;
-      await setDoc(doc(this.firestore, 'venue_clearance', id), {
-        arenaeventid: this.arena['docid'], profileid: r.profileid,
-        venuePaid: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
-      }, { merge: true });
-    } catch (e) {
-      console.log('venue clearance write failed', e);
-      this.venuePaidByPid.set(r.profileid, prev);
-      this.snackbar.open('Could not save venue status', 'OK', { duration: 4000 });
-    }
-  }
-
-  // Manual finance sign-off — persisted to the isolated finance_clearance collection (optimistic, reverts on failure).
-  async toggleFinanceCleared(r: PRow, checked: boolean) {
-    const prev = this.financeClearedByPid.get(r.profileid) === true;
-    this.financeClearedByPid.set(r.profileid, checked);
-    try {
-      const id = `${this.arena['docid']}_${r.profileid}`;
-      await setDoc(doc(this.firestore, 'finance_clearance', id), {
-        arenaeventid: this.arena['docid'], profileid: r.profileid,
-        financeCleared: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
-      }, { merge: true });
-    } catch (e) {
-      console.log('finance clearance write failed', e);
-      this.financeClearedByPid.set(r.profileid, prev);
-      this.snackbar.open('Could not save finance status', 'OK', { duration: 4000 });
-    }
-  }
-
   private inSegment(r: PRow): boolean { return this.matchesSegment(r, this.segment); }
 
   private matchesSegment(r: PRow, key: SegmentKey): boolean {
@@ -655,7 +666,7 @@ export class ProductFunnelComponent implements OnInit {
   }
 
   get segmentRows(): PRow[] {
-    return this.segmentMembers().filter(r => this.financeMatches(r) && this.customerMatches(r));
+    return this.segmentMembers().filter(r => this.financeMatches(r) && this.customerMatches(r) && this.journeyMatches(r) && this.frMatches(r));
   }
 
   get pagedRows(): PRow[] {
@@ -663,7 +674,7 @@ export class ProductFunnelComponent implements OnInit {
     return this.segmentRows.slice(start, start + this.pageSize);
   }
 
-  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.searchText.trim().length > 0; }
+  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all' || this.frFilter !== 'all' || this.searchText.trim().length > 0; }
 
   onPage(e: PageEvent) { this.pageIndex = e.pageIndex; this.pageSize = e.pageSize; this.refreshMeta(); }
   onSearch() { this.pageIndex = 0; this.refreshMeta(); }
