@@ -1,4 +1,9 @@
-<div class="update-snackbar-container">
+<div
+  class="update-snackbar-container"
+  (pointerdown)="onDragStart($event)"
+  (pointermove)="onDragMove($event)"
+  (pointerup)="onDragEnd($event)"
+  (pointercancel)="onDragEnd($event)">
     <span class="update-dot"></span>
     <span class="update-message">Update available</span>
     <button

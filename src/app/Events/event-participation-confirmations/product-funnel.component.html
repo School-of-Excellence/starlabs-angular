@@ -70,6 +70,37 @@
           <div class="sx-oc-num">{{ overallRequested | number }}</div>
         </button>
       </div>
+
+      <!-- Approved by journey × first-timer/repeat — cross-tab card beside the approved stack -->
+      <div class="sx-bd-stack" *ngIf="counts.approved > 0">
+        <div class="sx-jcard">
+          <div class="sx-jhead">
+            <span class="sx-jdot"></span>
+            <span class="sx-jtitle">Approved by journey</span>
+          </div>
+          <div class="sx-jsub">of {{ counts.approved | number }} approved · journey, split by first-timer vs repeat</div>
+          <div class="sx-jload" *ngIf="!splitsReady"><mat-icon class="spin">progress_activity</mat-icon> journeys…</div>
+          <ng-container *ngIf="splitsReady">
+            <div class="sx-jgrp" *ngFor="let j of approvedByJourney">
+              <button type="button" class="sx-jrow"
+                [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='all'"
+                (click)="setJourneyChip(j.key)" matTooltipClass="sx-tip" [matTooltip]="'Show all approved from ' + j.label">
+                <span class="sx-jrdot" [style.background]="journeyColor(j.key)"></span>
+                <span class="sx-jrlab">{{ j.label }}</span>
+                <span class="sx-jnum">{{ j.total | number }}</span>
+              </button>
+              <div class="sx-jfr">
+                <button type="button" class="sx-frpill first"
+                  [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='first'"
+                  (click)="setJourneyFr(j.key, 'first')" matTooltipClass="sx-tip" [matTooltip]="'Show first-timers from ' + j.label">First-timer {{ j.first | number }}</button>
+                <button type="button" class="sx-frpill rpt"
+                  [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='repeat'"
+                  (click)="setJourneyFr(j.key, 'repeat')" matTooltipClass="sx-tip" [matTooltip]="'Show repeat from ' + j.label">Repeat {{ j.repeat | number }}</button>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
     </div>
 
     <!-- Action bar -->
@@ -163,9 +194,6 @@
             <th>Customer status</th>
             <th>Finance</th>
             <th>Paid</th>
-            <th *ngIf="showApprovalChecks">Finance clearance</th>
-            <th *ngIf="showApprovalChecks">Venue fee</th>
-            <th *ngIf="showApprovalChecks">Contract</th>
             <th *ngIf="showApprovalChecks">Queue stage</th>
             <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
           </tr>
@@ -226,26 +254,6 @@
               </span>
             </td>
             <td *ngIf="showApprovalChecks">
-              <div class="sx-fin">
-                <mat-checkbox [checked]="financeClearedByPid.get(row.profileid) === true"
-                  (change)="toggleFinanceCleared(row, $event.checked)"
-                  [attr.aria-label]="'Finance cleared for ' + row.name"></mat-checkbox>
-                <span *ngIf="!row.metaLoaded" class="sx-mut">…</span>
-                <span *ngIf="row.metaLoaded" class="sx-fin-hint" [class.no]="!meetsMinPayment(row)"
-                  [matTooltip]="meetsMinPayment(row) ? 'Paid at least the product minimum' : 'Below the product minimum'" matTooltipClass="sx-tip">
-                  {{ meetsMinPayment(row) ? 'paid' : 'short' }}
-                </span>
-              </div>
-            </td>
-            <td *ngIf="showApprovalChecks" class="sx-c-check">
-              <mat-checkbox [checked]="venuePaidByPid.get(row.profileid) === true"
-                (change)="toggleVenuePaid(row, $event.checked)"
-                [attr.aria-label]="'Venue fee paid for ' + row.name"></mat-checkbox>
-            </td>
-            <td *ngIf="showApprovalChecks">
-              <span class="sx-mut" matTooltip="Contract status — automated later" matTooltipClass="sx-tip">—</span>
-            </td>
-            <td *ngIf="showApprovalChecks">
               <ng-container *ngIf="arena?.type === 'queue'; else noQueue">
                 <span *ngIf="!queueStagesLoaded" class="sx-mut">…</span>
                 <span *ngIf="queueStagesLoaded" class="sx-stage">{{ queueStageByPid.get(row.profileid) || '—' }}</span>
@@ -283,7 +291,7 @@
           <tr *ngIf="segmentRows.length === 0">
             <td [attr.colspan]="colSpan" class="sx-empty">
               {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
-              <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; customerFilter='all'; onFinance()">Clear filter</button>
+              <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; customerFilter='all'; journeyFilter='all'; frFilter='all'; onFinance()">Clear filter</button>
             </td>
           </tr>
         </tbody>
