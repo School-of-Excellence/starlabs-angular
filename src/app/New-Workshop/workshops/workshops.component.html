@@ -109,8 +109,8 @@
           <ng-container matColumnDef="type">
             <th mat-header-cell *matHeaderCellDef>Type</th>
             <td mat-cell *matCellDef="let workshop">
-              <span class="type-badge" [class.type-cp]="workshop?.categorybased">
-                {{ workshop?.categorybased ? 'CP Workshop' : 'Workshop' }}
+              <span class="type-badge" [class.type-evergreen]="workshop?.evergreenWorkshop" [class.type-cp]="!workshop?.evergreenWorkshop && workshop?.categorybased">
+                {{ workshop?.evergreenWorkshop ? 'Evergreen Workshop' : (workshop?.categorybased ? 'CP Workshop' : 'Workshop') }}
               </span>
             </td>
           </ng-container>
