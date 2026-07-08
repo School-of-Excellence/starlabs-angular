@@ -34,6 +34,7 @@ type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noP
 
 interface ImportPreviewRow { name: string; email: string; }
 interface Split { key: string; label: string; count: number; }
+interface JourneyRow { key: string; label: string; total: number; first: number; repeat: number; }
 
 interface PRow {
   profileid: string;
@@ -195,6 +196,18 @@ export class ProductFunnelComponent implements OnInit {
     this.statusSplits = out;
     this.customerStatusList = [...allStatuses.entries()].map(([key, label]) => ({ key, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
+
+    // Approved cohort by journey, each split into first-timer vs repeat (for the cross-tab card).
+    const jm = new Map<string, JourneyRow>();
+    for (const r of rows) {
+      if (!r.isApproved) continue;
+      const label = (r.journey || '').trim() || 'Not set';
+      const e = jm.get(label) ?? { key: label, label, total: 0, first: 0, repeat: 0 };
+      e.total++;
+      if (this.completedByPid.has(r.profileid)) e.repeat++; else e.first++;
+      jm.set(label, e);
+    }
+    this.approvedByJourney = [...jm.values()].sort((a, b) => b.total - a.total);
   }
 
   mapProfile: Record<string, any> = {};
@@ -241,6 +254,48 @@ export class ProductFunnelComponent implements OnInit {
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
+  }
+
+  // Approved cohort broken down by journey, each split into first-timer vs repeat — for the
+  // "Approved by journey" cross-tab card (computed in computeSplits once journeys are loaded).
+  // Repeat = the participant has a prior Completed participantsproduct for this product (completedByPid).
+  approvedByJourney: JourneyRow[] = [];
+  journeyFilter = 'all';   // 'all' or a journey label
+  frFilter = 'all';        // 'all' | 'first' | 'repeat'
+  private completedByPid = new Set<string>();
+  private readonly journeyPalette = ['#1f8a3b', '#0060df', '#534ab7', '#c25e00', '#0f6e56', '#d4537e', '#185fa5'];
+  journeyColor(key: string): string {
+    const i = this.approvedByJourney.findIndex(j => j.key === key);
+    return this.journeyPalette[(i < 0 ? 0 : i) % this.journeyPalette.length];
+  }
+  // Click a journey row → filter the table to that whole journey (clears the first/repeat sub-filter).
+  setJourneyChip(key: string): void {
+    this.segment = 'approved';
+    const same = this.journeyFilter === key && this.frFilter === 'all';
+    this.journeyFilter = same ? 'all' : key;
+    this.frFilter = 'all';
+    this.pageIndex = 0;
+    this.defaultSelection();
+    this.refreshMeta();
+  }
+  // Click a first-timer/repeat pill under a journey → filter to that journey ∩ that group (toggles off if repeated).
+  setJourneyFr(jKey: string, frKey: string): void {
+    this.segment = 'approved';
+    const same = this.journeyFilter === jKey && this.frFilter === frKey;
+    this.journeyFilter = same ? 'all' : jKey;
+    this.frFilter = same ? 'all' : frKey;
+    this.pageIndex = 0;
+    this.defaultSelection();
+    this.refreshMeta();
+  }
+  private journeyMatches(r: PRow): boolean {
+    if (this.journeyFilter === 'all') return true;
+    return ((r.journey || '').trim() || 'Not set') === this.journeyFilter;
+  }
+  private frMatches(r: PRow): boolean {
+    if (this.frFilter === 'all') return true;
+    const isRepeat = this.completedByPid.has(r.profileid);
+    return this.frFilter === 'repeat' ? isRepeat : !isRepeat;
   }
 
   // Post-approval checks (Clearance / Venue / Contract / Queue stage) — shown only on the approved cohort.
@@ -301,7 +356,7 @@ export class ProductFunnelComponent implements OnInit {
     this.queueStagesLoaded = false;
     const arena = this.arena;
     try {
-      const [ownSnap, eprSnap, scanSnap, financeSnap, venueSnap, productSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap, financeSnap, venueSnap, productSnap, completedSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
@@ -314,7 +369,10 @@ export class ProductFunnelComponent implements OnInit {
           where('arenaeventid', '==', arena['docid']))).catch(() => null),
         getDocs(query(collection(this.firestore, 'venue_clearance'),
           where('arenaeventid', '==', arena['docid']))).catch(() => null),
-        getDoc(arena['productref']).catch(() => null)
+        getDoc(arena['productref']).catch(() => null),
+        // Prior completed cycles of THIS product (both casings) — for first-timer vs repeat.
+        getDocs(query(collection(this.firestore, 'participantsproduct'),
+          where('productref', '==', arena['productref']), where('status', 'in', ['Completed', 'completed']))).catch(() => null)
       ]);
 
       // Product minimum (for the auto finance hint) + the two manual sign-off maps.
@@ -323,6 +381,9 @@ export class ProductFunnelComponent implements OnInit {
       financeSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.financeClearedByPid.set(x['profileid'], x['financeCleared'] === true); });
       this.venuePaidByPid = new Map<string, boolean>();
       venueSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.venuePaidByPid.set(x['profileid'], x['venuePaid'] === true); });
+      // Profiles who have completed this product before → they are "repeat" (else first-timer).
+      this.completedByPid = new Set<string>();
+      completedSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.completedByPid.add(x['profileid']); });
 
       const owners = new Map<string, string>();
       ownSnap.docs.forEach(d => {
@@ -545,13 +606,15 @@ export class ProductFunnelComponent implements OnInit {
   private refreshMeta() {
     this.loadMeta(this.pagedRows);
     this.loadSubscriptions(this.pagedRows);   // PJP only for the visible page
-    // Finance + customer filters depend on metadata, so load it for the whole segment when either is active.
-    if (this.financeFilter !== 'all' || this.customerFilter !== 'all') this.loadMeta(this.segmentMembers());
+    // Finance + customer + journey filters depend on metadata, so load it for the whole segment when any is active.
+    if (this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all') this.loadMeta(this.segmentMembers());
   }
 
   // ---- Segments ----
   setSegment(s: SegmentKey) {
     this.segment = s;
+    this.journeyFilter = 'all';   // the journey filter is scoped to the Approved-by-journey card; clear it on navigation
+    this.frFilter = 'all';        // same for the first-timer/repeat filter
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
@@ -563,7 +626,7 @@ export class ProductFunnelComponent implements OnInit {
     return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
   }
   get colSpan(): number {
-    return (this.showSelect ? 1 : 0) + 7 + (this.showApprovalChecks ? 4 : 0);
+    return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 4 : 0);
   }
   // Auto hint beside the Finance checkbox: has the participant paid at least the product minimum?
   meetsMinPayment(r: PRow): boolean {
@@ -655,7 +718,7 @@ export class ProductFunnelComponent implements OnInit {
   }
 
   get segmentRows(): PRow[] {
-    return this.segmentMembers().filter(r => this.financeMatches(r) && this.customerMatches(r));
+    return this.segmentMembers().filter(r => this.financeMatches(r) && this.customerMatches(r) && this.journeyMatches(r) && this.frMatches(r));
   }
 
   get pagedRows(): PRow[] {
@@ -663,7 +726,7 @@ export class ProductFunnelComponent implements OnInit {
     return this.segmentRows.slice(start, start + this.pageSize);
   }
 
-  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.searchText.trim().length > 0; }
+  get isFiltered(): boolean { return this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all' || this.frFilter !== 'all' || this.searchText.trim().length > 0; }
 
   onPage(e: PageEvent) { this.pageIndex = e.pageIndex; this.pageSize = e.pageSize; this.refreshMeta(); }
   onSearch() { this.pageIndex = 0; this.refreshMeta(); }
