@@ -855,8 +855,7 @@ export class ProductFunnelComponent implements OnInit {
       const batch = writeBatch(this.firestore);
       targets.forEach((r, i) => {
         batch.update(refList[i], {
-          status: 'attended', attendance_state: 'attended',
-          attendance_source: 'manual', attendance_marked_at: serverTimestamp()
+          status: 'attended'
         });
         batch.set(doc(collection(this.firestore, 'events_profiles')), {
           event_ref: this.arena['eventref'],
@@ -908,8 +907,7 @@ export class ProductFunnelComponent implements OnInit {
       const batch = writeBatch(this.firestore);
       const reqRefs = targets.map(r => doc(this.firestore, 'event participation request', r.approvedRequestId!));
       targets.forEach((r, i) => {
-        batch.update(reqRefs[i], { status: 'unattended', attendance_state: 'unattended', attendance_source: 'manual', attendance_marked_at: serverTimestamp() });
-        if (r.participantproductid) batch.update(doc(this.firestore, 'participantsproduct', r.participantproductid), { status: 'cancelled' });
+        batch.update(reqRefs[i], { status: 'unattended' });
       });
       // Delete the events_profiles record for each (profile + event).
       for (const r of targets) {
@@ -918,12 +916,18 @@ export class ProductFunnelComponent implements OnInit {
           where('event_ref', '==', this.arena['eventref'])));
         epSnap.docs.forEach(d => batch.delete(d.ref));
       }
-      // Null the deliverables that point at these requests.
+      // Cancel the product from the deliverable (matches event-participation-approve), then null the deliverables.
       for (let i = 0; i < reqRefs.length; i += 10) {
         const sub = reqRefs.slice(i, i + 10);
         const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'),
           where('fileref', 'array-contains-any', sub)));
-        delSnap.docs.forEach(d => batch.update(d.ref, { status: null }));
+        delSnap.docs.forEach(d => {
+          const dd = d.data();
+          if (dd['participantproductid']) {
+            batch.update(doc(this.firestore, 'participantsproduct', dd['participantproductid']), { status: 'cancelled' });
+          }
+          batch.update(d.ref, { status: null });
+        });
       }
       await batch.commit();
       this.snackbar.open(`Marked ${targets.length} not attended`, 'OK', { duration: 4000 });
