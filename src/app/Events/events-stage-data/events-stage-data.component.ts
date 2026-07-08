@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc
+  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc, setDoc, updateDoc
 } from '@angular/fire/firestore';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import * as XLSX from 'xlsx';
@@ -111,6 +111,25 @@ export class EventsStageDataComponent {
   addedCols: StageCol[] = [];            // stage columns the operator added
   colToAdd = '';                         // dropdown selection (a StageCol.key)
 
+  // ---- Cohort summary (top of step 3) ----
+  summaryLoaded = false;
+  summaryLoading = false;
+  private journeyIdByPid = new Map<string, string>();   // pid -> journey docId
+  summaryRequested = { active: 0, nonactive: 0, total: 0 };
+  summaryApproved = { active: 0, nonactive: 0, total: 0 };
+  summaryInQueue = { active: 0, nonactive: 0, total: 0 };
+  summaryReady = { active: 0, nonactive: 0, total: 0 };
+  summaryJourneyRows: { key: string; label: string; reqA: number; reqNA: number; appA: number; appNA: number; readyA: number; readyNA: number; }[] = [];
+
+  // ---- Per-arena journey group config ----
+  journeyGroups: { name: string; journeyIds: string[] }[] = [];
+  private groupsDocId: string | null = null;
+  groupsEditorOpen = false;
+  configOpen = false;
+
+  // ---- Per-arena "ready" stage config (stored in the same config doc) ----
+  readyStages: string[] = [];
+
   // Filters
   requestFilter = '';    // '' | 'requested' | 'approved'
   stageFilter = '';      // '' | a stage name | '__none' (not in any selected queue)
@@ -126,7 +145,7 @@ export class EventsStageDataComponent {
   // ---- Journey / segments / products reference data (loaded once, cached) ----
   journeyMap: Record<string, string> = {};      // journeyId → journey name
   profileSegments: Record<string, string[]> = {}; // profileId → segment names
-  refDataLoaded = false;
+  private refDataPromise: Promise<void> | null = null;  // memoized one-shot ref-data load
 
   // New filters
   segmentFilter = '';                           // '' | a segment name
@@ -257,8 +276,13 @@ export class EventsStageDataComponent {
     this.notBookedOnly = false;
     this.showReconcile = false; this.reconcileError = ''; this.reconcileFileName = '';
     this.extraInTable = []; this.extraInSheet = []; this.sheetCount = 0; this.matchedCount = 0;
+    this.summaryLoaded = false;
+    this.groupsEditorOpen = false;
+    this.configOpen = false;
+    this.readyStages = [];
     this.step = 'participants';
     this.loadRefData();   // journey names + segment membership (cached, non-blocking)
+    await this.loadJourneyGroups(row.docid);
     await this.loadParticipants(row);
     await this.loadQueues(row);
   }
@@ -274,10 +298,12 @@ export class EventsStageDataComponent {
     return (id ?? '').toString();
   }
 
-  // Load journey names and segment membership once, then cache.
-  private async loadRefData() {
-    if (this.refDataLoaded) return;
-    this.refDataLoaded = true;
+  // Load journey names and segment membership once, then cache (memoized so concurrent
+  // callers await the SAME load instead of racing / re-reading).
+  private loadRefData(): Promise<void> {
+    return this.refDataPromise ??= this.doLoadRefData();
+  }
+  private async doLoadRefData(): Promise<void> {
     try {
       const [journeyMap, segSnap, listSnap] = await Promise.all([
         this.guard.getJourneyMap(),
@@ -309,7 +335,7 @@ export class EventsStageDataComponent {
       this.profileSegments = flat;
     } catch (e) {
       console.log('stage-data ref data load failed', e);
-      this.refDataLoaded = false;   // allow a later retry
+      this.refDataPromise = null;   // allow a later retry
     }
   }
 
@@ -360,11 +386,139 @@ export class EventsStageDataComponent {
 
       rows.sort((a, b) => (a.name || 'zzz').localeCompare(b.name || 'zzz'));
       this.stageRows = rows;
+      this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
     } catch (err) {
       console.log('stage-data participants load failed', err);
       this.stageError = true;
     } finally {
       this.loadingStage = false;
+    }
+  }
+
+  // ---- Cohort summary: journey meta (record-level) + group config ----
+  // Journey per participant = the same customerstatus-driven pick used by the main table's
+  // Journey column (`pickJourneyId` → active/last-completed/last-subscribed), already stored on
+  // each StageRow.journeyId. No `participantjourneyproduct` read.
+  private async loadJourneyMeta(): Promise<void> {
+    await this.loadRefData();   // journeyMap (journeyId → name) is loaded once and reused — no extra 'journey' read
+    this.journeyIdByPid = new Map();
+    (this.stageRows || []).forEach(r => { if (r.journeyId) this.journeyIdByPid.set(r.profileid, r.journeyId); });
+  }
+
+  // Per-arena journey group config, persisted in `stage opportunity count` (kind='journeygroups').
+  private async loadJourneyGroups(arenaeventid: string): Promise<void> {
+    this.journeyGroups = []; this.groupsDocId = null; this.readyStages = [];
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'stage opportunity count'),
+        where('kind', '==', 'journeygroups'), where('arenaeventid', '==', arenaeventid)));
+      if (!snap.empty) {
+        // Multiple docs can exist from earlier saves — always use the most recently updated one.
+        const d = snap.docs.reduce((a, b) =>
+          (((b.data() as any)['updated']?.toMillis?.() ?? 0) >= ((a.data() as any)['updated']?.toMillis?.() ?? 0)) ? b : a);
+        this.groupsDocId = d.id;
+        const data = d.data() as any;
+        this.journeyGroups = (data['groups'] || []).map((g: any) => ({ name: g.name || '', journeyIds: g.journeyIds || [] }));
+        this.readyStages = (data['readyStages'] || []);
+      }
+    } catch (e) { console.error('load journey groups failed', e); }
+  }
+  // Persist the arena config doc (journey groups + ready stages) to the single `journeygroups` doc.
+  private async saveArenaConfig(): Promise<void> {
+    const arenaeventid = this.selectedArena?.docid; if (!arenaeventid) return;
+    const groups = this.journeyGroups.filter(g => (g.name || '').trim()).map(g => ({ name: g.name.trim(), journeyIds: g.journeyIds || [] }));
+    const readyStages = this.readyStages;
+    if (this.groupsDocId) {
+      await updateDoc(doc(this.firestore, 'stage opportunity count', this.groupsDocId), { groups, readyStages, updated: new Date() });
+    } else {
+      const id = doc(collection(this.firestore, 'stage opportunity count')).id;
+      await setDoc(doc(this.firestore, 'stage opportunity count', id), { kind: 'journeygroups', arenaeventid, groups, readyStages, updated: new Date() });
+      this.groupsDocId = id;
+    }
+  }
+  async saveJourneyGroups(): Promise<void> {
+    if (!this.selectedArena?.docid) return;
+    try {
+      await this.saveArenaConfig();
+      this.groupsEditorOpen = false;
+      this.computeCohortSummary();
+    } catch (e: any) { console.error('save journey groups failed', e); alert('Could not save groups: ' + (e?.code || e?.message || e)); }
+  }
+  async saveReadyStages(): Promise<void> {
+    if (!this.selectedArena?.docid) return;
+    try {
+      await this.saveArenaConfig();
+    } catch (e: any) { console.error('save ready stages failed', e); }
+  }
+
+  // ---- Ready-stage config helpers ----
+  get readyStageOptions(): string[] {
+    const seen = new Set<string>(); const out: string[] = [];
+    this.mergedStages.forEach(s => { if (!seen.has(s.stage)) { seen.add(s.stage); out.push(s.stage); } });
+    return out;
+  }
+  isReadyStage(stage: string): boolean { return this.readyStages.includes(stage); }
+  toggleReadyStage(stage: string): void {
+    this.readyStages = this.readyStages.includes(stage)
+      ? this.readyStages.filter(s => s !== stage)
+      : [...this.readyStages, stage];
+    this.computeCohortSummary();
+    this.saveReadyStages();
+  }
+  addJourneyGroup(): void { this.journeyGroups = [...this.journeyGroups, { name: '', journeyIds: [] }]; }
+  removeJourneyGroup(i: number): void { this.journeyGroups = this.journeyGroups.filter((_, idx) => idx !== i); }
+  toggleGroupJourney(i: number, journeyId: string): void {
+    const g = this.journeyGroups[i]; const has = g.journeyIds.includes(journeyId);
+    g.journeyIds = has ? g.journeyIds.filter(x => x !== journeyId) : [...g.journeyIds, journeyId];
+  }
+  isInGroup(i: number, journeyId: string): boolean { return this.journeyGroups[i]?.journeyIds.includes(journeyId); }
+
+  // The pickable set = journeys actually present in this arena's cohort (with headcounts).
+  get cohortJourneys(): { id: string; name: string; count: number }[] {
+    const m = new Map<string, number>();
+    (this.stageRows || []).forEach(r => { const jid = this.journeyIdByPid.get(r.profileid); if (jid) m.set(jid, (m.get(jid) || 0) + 1); });
+    return [...m.entries()].map(([id, count]) => ({ id, name: this.journeyMap[id] || id, count })).sort((a, b) => b.count - a.count);
+  }
+
+  pct(n: number, total: number): number { return total > 0 ? Math.round(n / total * 100) : 0; }
+
+  // ---- Queue-scoped predicates (only count against ticked queues) ----
+  private inSelectedQueue(r: any): boolean { return this.selectedQueueIds.some(qid => !!r.tokens?.[qid]); }
+  private isReady(r: any): boolean {
+    return this.selectedQueueIds.some(qid => {
+      const cs = r.tokens?.[qid]?.currentstage;
+      return !!cs && this.readyStages.includes(cs);
+    });
+  }
+
+  private async computeCohortSummary(): Promise<void> {
+    this.summaryLoading = true;   // keep prior data visible during a recompute; just flag "updating"
+    try {
+      const rows = this.stageRows || [];
+      await this.loadJourneyMeta();
+      const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+      const seg = (pred: (r: any) => boolean) => { let a = 0, n = 0; rows.filter(pred).forEach(r => isActive(r) ? a++ : n++); return { active: a, nonactive: n, total: a + n }; };
+      this.summaryRequested = seg(r => r.status === 'requested');
+      this.summaryApproved = seg(r => r.status === 'approved');
+      this.summaryInQueue = seg(r => this.inSelectedQueue(r));
+      this.summaryReady = seg(r => this.isReady(r));
+      const groupOf = (pid: string): string => {
+        const jid = this.journeyIdByPid.get(pid);
+        if (jid) { const g = this.journeyGroups.find(gr => gr.journeyIds.includes(jid)); if (g) return g.name; }
+        return 'Other';
+      };
+      const keys = [...this.journeyGroups.map(g => g.name).filter(Boolean), 'Other'];
+      const jr: Record<string, any> = {};
+      keys.forEach(k => jr[k] = { key: k, label: k, reqA: 0, reqNA: 0, appA: 0, appNA: 0, readyA: 0, readyNA: 0 });
+      rows.forEach(r => {
+        const b = jr[groupOf(r.profileid)]; const act = isActive(r);
+        if (r.status === 'requested') act ? b.reqA++ : b.reqNA++;
+        else if (r.status === 'approved') act ? b.appA++ : b.appNA++;
+        if (this.isReady(r)) act ? b.readyA++ : b.readyNA++;
+      });
+      this.summaryJourneyRows = keys.map(k => jr[k]);
+      this.summaryLoaded = true;
+    } finally {
+      this.summaryLoading = false;
     }
   }
 
@@ -442,6 +596,7 @@ export class EventsStageDataComponent {
         tokSnap.docs.forEach(d => {
           const x = d.data();
           if (x['delete'] === true) return;
+          if (x['tokenstatus'] !== 'Active') return;   // only active tokens
           const pid = x['profile_id'] ?? x['profileid'];
           if (!pid) return;
           const ms = this.toMillis(x['logdate']);
@@ -488,6 +643,8 @@ export class EventsStageDataComponent {
     } finally {
       this.loadingQueue = false;
     }
+    // In step 3 with a cohort loaded, recompute Total-in-queue / Ready when queues toggle.
+    if (this.summaryLoaded) this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
   }
 
   // ---- Merged stage columns ----
@@ -725,12 +882,14 @@ export class EventsStageDataComponent {
     this.selectedArena = null;
     this.arenaRows = [];
     this.stageRows = [];
+    this.summaryLoaded = false;
   }
   goToArenas() {
     if (!this.selectedEvent) return this.goToEvents();
     this.step = 'arenas';
     this.selectedArena = null;
     this.stageRows = [];
+    this.summaryLoaded = false;
   }
 
   // ===========================================================================
