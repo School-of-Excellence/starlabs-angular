@@ -18,7 +18,7 @@ import { RouterModule } from '@angular/router';
 import {
   Firestore, collection, doc, query, where,
   updateDoc, Timestamp, Unsubscribe,
-  getDoc, getDocs, onSnapshot, getFirestore,
+  getDoc, getDocs, onSnapshot, getFirestore, documentId,
 } from '@angular/fire/firestore';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
@@ -57,6 +57,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   showParticipantPanel = false;
   selectedParticipants: any[] = [];
   selectedStatusInfo: any = null;
+
+  // Evergreen-only referral metrics (workshopreferral collection)
+  shareClickedProfileIds: string[] = [];
+  shareClaimedProfileIds: string[] = [];
+  // profileid -> name for referral sharers (resolved from profile_data,
+  // since sharers are not necessarily enrolled and so aren't in mapProfile)
+  shareProfileNames: { [id: string]: string } = {};
 
   selectedParticipantData: any = null;
   participantWorkshopData: any = null;
@@ -384,6 +391,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (!this.workshopId) return;
 
     let enrolledSnapshotInitialized = false;
+    let referralSnapshotInitialized = false;
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const unsubscribe = onSnapshot(workshopRef, (docSnap) => {
@@ -394,6 +402,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
         if (this.workshopData.categorybased === true) {
           this.loadCategoryNames();
+        }
+
+        if (this.workshopData.evergreenWorkshop === true && !referralSnapshotInitialized) {
+          referralSnapshotInitialized = true;
+          this.setupWorkshopReferralSnapshot();
         }
 
         if (!enrolledSnapshotInitialized) {
@@ -410,6 +423,58 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     this.unsubscribes.push(unsubscribe);
+  }
+
+  // Evergreen only: live counts of share referrals for this workshop.
+  // Share Clicked = docs with no/0 `claimed`; Share Claimed = docs with `claimed > 0`.
+  setupWorkshopReferralSnapshot() {
+    if (!this.workshopId) return;
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
+    const referralQuery = query(
+      collection(this.firestoreDefault, 'workshopreferral'),
+      where('workshopref', '==', workshopRef)
+    );
+    const unsubscribe = onSnapshot(referralQuery, async (snap) => {
+      const clicked: string[] = [];
+      const claimed: string[] = [];
+      snap.forEach(d => {
+        const data: any = d.data();
+        if (!data?.profileid) return;
+        const claimedCount = Number(data?.claimed) || 0; // missing/0 => 0
+        if (claimedCount > 0) claimed.push(data.profileid);
+        else clicked.push(data.profileid);
+      });
+      this.shareClickedProfileIds = clicked;
+      this.shareClaimedProfileIds = claimed;
+      // Referral sharers may not be enrolled, so resolve their names from profile_data.
+      this.shareProfileNames = await this.getProfileNameMapForIds([...clicked, ...claimed]);
+    }, (err) => console.error('workshopreferral snapshot error', err));
+
+    this.unsubscribes.push(unsubscribe);
+  }
+
+  // Batched profileid -> name lookup from the full profile_data directory.
+  async getProfileNameMapForIds(profileIds: string[]): Promise<{ [id: string]: string }> {
+    const nameMap: { [id: string]: string } = {};
+    const uniqueIds = [...new Set(profileIds)].filter(Boolean);
+    if (uniqueIds.length === 0) return nameMap;
+    const BATCH_SIZE = 30; // Firestore 'in' query limit
+    const batches: Promise<any>[] = [];
+    for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
+      const batchIds = uniqueIds.slice(i, i + BATCH_SIZE);
+      const q = query(
+        collection(this.firestoreDefault, 'profile_data'),
+        where(documentId(), 'in', batchIds)
+      );
+      batches.push(getDocs(q));
+    }
+    const results = await Promise.all(batches);
+    for (const snap of results) {
+      for (const d of snap.docs) {
+        nameMap[d.id] = d.data()?.['name'] || 'Unknown';
+      }
+    }
+    return nameMap;
   }
 
   async loadSubscriberCodes(): Promise<void> {
@@ -1406,6 +1471,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   get totalStarted() { return this.metrics.get('totalStarted')?.length || 0; }
   get notStarted() { return this.metrics.get('notStarted')?.length || 0; }
   get activeParticipants() { return this.metrics.get('activeParticipants')?.length || 0; }
+  get shareClicked() { return this.shareClickedProfileIds.length; }
+  get shareClaimed() { return this.shareClaimedProfileIds.length; }
   get completionRate() {
     const total = this.totalEnrolled;
     const completed = this.metrics.get('completedParticipants')?.length || 0;
@@ -1514,6 +1581,25 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       // ✅ Reset new user filters on open
       this.selectedSubscriberCode = [];
       this.showReferredOnly = false;
+      this.filterOption = 'all';
+      this.applyFilterSide();
+
+    } else if (metricType === 'shareClicked' || metricType === 'shareClaimed') {
+      const ids = metricType === 'shareClicked'
+        ? this.shareClickedProfileIds
+        : this.shareClaimedProfileIds;
+      this.selectedParticipants = ids.map(id => ({
+        profileid: id,
+        name: this.shareProfileNames[id] || this.mapProfile[id]?.name || 'Unknown',
+        metadata: this.mapProfile[id]
+      }));
+      this.selectedStatusInfo = {
+        status: metricType,
+        challengeName: 'Share',
+        subChallengeName: metricType === 'shareClicked' ? 'Share Clicked' : 'Share Claimed',
+        count: this.selectedParticipants.length
+      };
+      this.showParticipantPanel = true;
       this.filterOption = 'all';
       this.applyFilterSide();
     } else {

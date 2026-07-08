@@ -324,6 +324,33 @@
             </mat-card>
           </ng-container>
 
+          <!-- Evergreen-only referral cards -->
+          <ng-container *ngIf="workshopData?.evergreenWorkshop === true">
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClicked')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">share</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ shareClicked }}</h2>
+                    <p class="metric-label">Share Clicked</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClaimed')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">redeem</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ shareClaimed }}</h2>
+                    <p class="metric-label">Share Claimed</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+
         </div>
       </div>
       <!-- <div class="metrics-section">
