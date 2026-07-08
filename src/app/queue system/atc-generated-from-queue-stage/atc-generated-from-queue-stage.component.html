@@ -1,0 +1,625 @@
+<main class="container-fluid py-4 px-4">
+
+  <div class="row mb-4">
+    <div class="col-12">
+      <h4 class="fw-bold text-primary mb-1">Scope Enhancement Rubrics Review</h4>
+      <p class="text-muted mb-0 small">
+        Review ATC documents scored against rubrics at the Scope Enhancement stage.
+      </p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-6 col-lg-4">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Select Queue</mat-label>
+            <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueChange()">
+              <mat-option [value]="null">None</mat-option>
+              <mat-option *ngFor="let queue of queueGenerationList" [value]="queue.docid">
+                {{ queue.queuename }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="col-12 col-md-6 col-lg-3" *ngIf="selectedQueue">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Name</mat-label>
+            <input matInput
+                   [ngModel]="nameFilter"
+                   (ngModelChange)="onNameFilterChange($event)"
+                   placeholder="Search by name...">
+          </mat-form-field>
+        </div>
+
+        <div class="col-12 col-md-6 col-lg-3" *ngIf="selectedQueue">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Type</mat-label>
+            <mat-select [ngModel]="typeFilter" (ngModelChange)="onTypeFilterChange($event)">
+              <mat-option [value]="''">All</mat-option>
+              <mat-option *ngFor="let t of availableTypes" [value]="t.toLowerCase()">{{ t }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="col-12 col-lg-2 text-lg-end" *ngIf="selectedQueue && !isLoadingAtc">
+          <span class="badge bg-light text-dark border">
+            {{ dataSource.filteredData.length }} / {{ dataSource.data.length }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4" *ngIf="selectedQueue">
+    <div class="card-body p-0">
+
+      <div class="d-flex justify-content-center py-5" *ngIf="isLoadingAtc">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <div class="table-responsive" *ngIf="!isLoadingAtc">
+        <table mat-table [dataSource]="dataSource" class="w-100" matSort>
+
+          <ng-container matColumnDef="profileid">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+            <td mat-cell *matCellDef="let element">
+              {{ mapProfileData[element.profileid] || element.profileid }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="stage">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Stage</th>
+            <td mat-cell *matCellDef="let element">{{ element.stage }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="createdAt">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Created At</th>
+            <td mat-cell *matCellDef="let element">
+              {{ element.createdAt?.toDate ? (element.createdAt.toDate() | date: 'MMM d, y, h:mm a') : (element.createdAt | date: 'MMM d, y, h:mm a') }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="text-end">Actions</th>
+            <td mat-cell *matCellDef="let element" class="text-end">
+              <button mat-stroked-button color="primary" (click)="viewDetails(element)">
+                View Prompt / Output
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+              [class.table-active]="selectedParticipant === row"></tr>
+
+          <tr class="mat-row" *matNoDataRow>
+            <td class="mat-cell text-center py-4" [attr.colspan]="displayedColumns.length">
+              <!-- <div class="text-muted">No records matching "{{ input.value }}"</div> -->
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <mat-paginator
+        [pageSizeOptions]="[10, 25, 50, 100]"
+        [pageSize]="10"
+        showFirstLastButtons
+        aria-label="Select page">
+      </mat-paginator>
+    </div>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="card shadow-sm mb-4" *ngIf="selectedParticipant">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h6 class="fw-bold mb-0">
+          {{ mapProfileData[selectedParticipant.profileid] || selectedParticipant.profileid }}
+        </h6>
+        <small class="text-muted">
+          Stage: {{ selectedParticipant.stage }}
+          <span *ngIf="selectedParticipant.type"> · Type: {{ selectedParticipant.type }}</span>
+        </small>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <mat-button-toggle-group [value]="viewMode" (change)="setViewMode($event.value)" hideSingleSelectionIndicator>
+          <mat-button-toggle value="rubric" [disabled]="!canShowRubricView()"
+                             [matTooltip]="canShowRubricView() ? 'Rubric scoring view' : 'No rubric output to display'">
+            <mat-icon class="align-middle me-1" style="font-size:18px;width:18px;height:18px;">dashboard</mat-icon>
+            Rubric view
+          </mat-button-toggle>
+          <mat-button-toggle value="raw" matTooltip="Raw prompt / output">
+            <mat-icon class="align-middle me-1" style="font-size:18px;width:18px;height:18px;">code</mat-icon>
+            Raw view
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+        <button mat-icon-button (click)="closeDetails()" aria-label="Close">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="card-body">
+
+      <!-- Rubrics dashboard -->
+      <ng-container *ngIf="viewMode === 'rubric' && rubricsOutput; else rawView">
+
+        <!-- Header row -->
+        <div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+          <div>
+            <div class="fw-medium" style="font-size: 18px;">ATC mentor review</div>
+            <div class="text-muted small">
+              {{ rubricsOutput.meta?.participant_description || '—' }}
+              <span *ngIf="rubricsOutput.meta?.form_type"> · {{ rubricsOutput.meta.form_type }}</span>
+              <span *ngIf="rubricsOutput.meta?.participant_type"> · {{ rubricsOutput.meta.participant_type }}</span>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="pill" [ngClass]="verdictPill(rubricsOutput.meta?.overall_verdict)">
+              {{ humanizeVerdict(rubricsOutput.meta?.overall_verdict) || '—' }}
+            </span>
+            <span *ngIf="checkpointBadgeVisible()" class="pill pill-red"
+                  [matTooltip]="'Checkpoint: ' + rubricsOutput.meta?.checkpoint_status_carried_forward">
+              Gold standard flagged — review with caution
+            </span>
+          </div>
+        </div>
+
+        <!-- Verdict bar -->
+        <div class="verdict-bar d-flex align-items-center gap-3 mb-3"
+             *ngIf="rubricsOutput.meta?.overall_verdict_text">
+          <span class="pill pill-amber">Overall read</span>
+          <span class="small">{{ rubricsOutput.meta.overall_verdict_text }}</span>
+        </div>
+
+        <!-- Metrics row -->
+        <div class="row g-3 mb-3" *ngIf="rubricsOutput.metrics as m">
+          <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card">
+              <div class="metric-value">{{ m.specialist_adjustment_count }}</div>
+              <div class="metric-label">Specialist adjustments</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card">
+              <div class="metric-value">{{ m.ai_adjustment_count }}</div>
+              <div class="metric-label">A&amp;H AI ATC adjustments</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card">
+              <div class="d-flex align-items-center gap-2">
+                <span class="metric-value" [ngClass]="aiCaughtClass()">{{ m.ai_patterns_specialist_caught }}</span>
+                <span class="dot" [ngClass]="confidenceDot(m.ai_patterns_specialist_caught_confidence)"
+                      [matTooltip]="confidenceTooltip(m.ai_patterns_specialist_caught_confidence)"></span>
+              </div>
+              <div class="metric-label">AI patterns Specialist caught</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card">
+              <div class="d-flex align-items-center gap-2">
+                <span class="metric-value" [ngClass]="proceduresCorrectClass()">{{ m.specialist_procedures_correct }}</span>
+                <span class="dot" [ngClass]="confidenceDot(m.specialist_procedures_correct_confidence)"
+                      [matTooltip]="confidenceTooltip(m.specialist_procedures_correct_confidence)"></span>
+              </div>
+              <div class="metric-label">Specialist procedures correct</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4 col-lg">
+            <div class="metric-card score-card" [class.open]="showScoreBreakdown" (click)="toggleScoreBreakdown()">
+              <div class="d-flex align-items-center gap-2">
+                <span class="metric-value" [ngClass]="overallReadinessClass(m.overall_readiness_pct)">
+                  {{ m.overall_readiness_pct }}%
+                </span>
+                <span class="dot" [ngClass]="confidenceDot(m.overall_readiness_confidence)"
+                      [matTooltip]="confidenceTooltip(m.overall_readiness_confidence)"></span>
+              </div>
+              <div class="metric-label">Overall ATC readiness</div>
+              <div class="small text-muted mt-1">
+                {{ showScoreBreakdown ? 'Tap to hide breakdown' : 'Tap to see breakdown' }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Score breakdown -->
+        <div class="card mb-3" *ngIf="showScoreBreakdown && rubricsOutput.score_breakdown?.length">
+          <div class="card-body">
+            <div class="section-label mb-2">Dimension breakdown</div>
+            <div class="score-row" *ngFor="let s of rubricsOutput.score_breakdown" [matTooltip]="s.reasoning || ''">
+              <span class="dim-name">{{ s.dimension }}</span>
+              <span class="dot" [ngClass]="confidenceDot(s.confidence)"
+                    [matTooltip]="confidenceTooltip(s.confidence)"></span>
+              <span class="score-bar">
+                <span class="score-bar-fill" [ngClass]="scoreBarColor(s.color)"
+                      [style.width.%]="s.score_pct"></span>
+              </span>
+              <span class="pct">{{ s.score_pct }}%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <mat-tab-group [(selectedIndex)]="activeTabIndex" animationDuration="0ms">
+
+          <!-- Tab 1 -->
+          <mat-tab label="What this participant needs">
+            <div class="pt-3 small text-muted mb-3">{{ tabDetailLines[0] }}</div>
+
+            <div class="card">
+              <div class="card-body">
+                <div class="d-flex align-items-start mb-3"
+                     *ngFor="let c of rubricsOutput.participant_capabilities || []">
+                  <span class="cap-dot" [ngClass]="capabilityDot(c.type)"></span>
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="fw-medium">{{ c.capability }}</span>
+                      <span class="dot" [ngClass]="confidenceDot(c.confidence)"
+                            [matTooltip]="confidenceTooltip(c.confidence)"></span>
+                      <span *ngIf="c.source === 'ai_atc'" class="text-muted small"
+                            matTooltip="AI ATC flagged by checkpoint — mentor to verify.">*</span>
+                    </div>
+                    <div class="text-muted small">{{ c.detail }}</div>
+                  </div>
+                </div>
+
+                <div *ngIf="!(rubricsOutput.participant_capabilities?.length)" class="text-muted small">
+                  No capabilities recorded.
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-3 small text-muted mt-3">
+              <span><span class="cap-dot cap-dot-green"></span>Suboptimal pattern to shift</span>
+              <span><span class="cap-dot cap-dot-purple"></span>Trajectory shift installation</span>
+              <span><span class="cap-dot cap-dot-amber"></span>Needs more data</span>
+            </div>
+          </mat-tab>
+
+          <!-- Tab 2 -->
+          <mat-tab label="Trajectory shift">
+            <div class="pt-3 small text-muted mb-3">{{ tabDetailLines[1] }}</div>
+
+            <div class="trajectory-ideal mb-3" *ngIf="rubricsOutput.trajectory_shift?.ideal_description">
+              <span class="section-label me-2">Ideal</span>
+              {{ rubricsOutput.trajectory_shift.ideal_description }}
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-lg-6" *ngFor="let d of rubricsOutput.trajectory_shift?.dimensions || []">
+                <div class="border rounded">
+                  <div class="dim-header">{{ d.name }}</div>
+                  <div class="row g-0">
+                    <div class="col-6 p-2">
+                      <div class="ai-cell">
+                        <div class="section-label mb-1">AI ATC</div>
+                        <div class="small mb-2">{{ d.ai_assessment }}</div>
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="pill" [ngClass]="verdictPill(d.ai_verdict)">{{ humanizeVerdict(d.ai_verdict) }}</span>
+                          <span class="dot" [ngClass]="confidenceDot(d.ai_confidence)"
+                                [matTooltip]="confidenceTooltip(d.ai_confidence)"></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-6 p-2">
+                      <div class="specialist-cell">
+                        <div class="section-label mb-1">Specialist</div>
+                        <div class="small mb-2">{{ d.specialist_assessment }}</div>
+                        <div class="d-flex align-items-center gap-2">
+                          <span class="pill" [ngClass]="verdictPill(d.specialist_verdict)">{{ humanizeVerdict(d.specialist_verdict) }}</span>
+                          <span class="dot" [ngClass]="confidenceDot(d.specialist_confidence)"
+                                [matTooltip]="confidenceTooltip(d.specialist_confidence)"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="zone-gray">
+              <div class="section-label mb-2">Summary</div>
+              <div class="row g-2">
+                <div class="col-6" *ngFor="let d of rubricsOutput.trajectory_shift?.dimensions || []">
+                  <div class="d-flex justify-content-between align-items-center small">
+                    <span>{{ d.name }}</span>
+                    <span class="pill" [ngClass]="verdictPill(d.ai_verdict)">{{ humanizeVerdict(d.ai_verdict) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </mat-tab>
+
+          <!-- Tab 3 -->
+          <mat-tab label="Specialist identified vs missed">
+            <div class="pt-3 small text-muted mb-3">{{ tabDetailLines[2] }}</div>
+
+            <div class="row g-3">
+              <div class="col-12 col-lg-6">
+                <div class="zone-green h-100">
+                  <div class="section-label mb-2">Specialist identified</div>
+                  <div *ngFor="let i of rubricsOutput.coverage?.specialist_identified || []"
+                       class="d-flex justify-content-between align-items-start py-2 border-bottom">
+                    <div class="small pe-2">
+                      <div>{{ i.pattern }}</div>
+                      <div class="text-muted" *ngIf="i.note">{{ i.note }}</div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                      <span class="pill pill-green">Yes</span>
+                      <span class="dot" [ngClass]="confidenceDot(i.confidence)"
+                            [matTooltip]="confidenceTooltip(i.confidence)"></span>
+                    </div>
+                  </div>
+                  <div class="small text-muted pt-2" *ngIf="!(rubricsOutput.coverage?.specialist_identified?.length)">
+                    None recorded.
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12 col-lg-6">
+                <div class="zone-pink h-100">
+                  <div class="section-label mb-2">Specialist missed</div>
+                  <div *ngFor="let i of rubricsOutput.coverage?.specialist_missed || []"
+                       class="d-flex justify-content-between align-items-start py-2 border-bottom">
+                    <div class="small pe-2">
+                      <div>{{ i.pattern }}</div>
+                      <div class="text-muted" *ngIf="i.note">{{ i.note }}</div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                      <span class="pill" [ngClass]="i.checkpoint_flagged ? 'pill-amber' : 'pill-red'"
+                            [matTooltip]="i.checkpoint_flagged ? 'Checkpoint flagged this as uncertain in the gold standard.' : ''">
+                        {{ i.checkpoint_flagged ? 'Review' : 'Missed' }}
+                      </span>
+                      <span class="dot" [ngClass]="confidenceDot(i.confidence)"
+                            [matTooltip]="confidenceTooltip(i.confidence)"></span>
+                    </div>
+                  </div>
+                  <div class="small text-muted pt-2" *ngIf="!(rubricsOutput.coverage?.specialist_missed?.length)">
+                    None recorded.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="zone-gray mt-3" *ngIf="rubricsOutput.coverage?.neither_addressed?.length">
+              <div class="section-label mb-2">Neither ATC addressed — requires mentor attention</div>
+              <div *ngFor="let n of rubricsOutput.coverage.neither_addressed"
+                   class="d-flex justify-content-between align-items-start py-2 border-bottom">
+                <div class="small pe-2">
+                  <div>{{ n.pattern }}</div>
+                  <div class="text-muted" *ngIf="n.note">{{ n.note }}</div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                  <span class="pill pill-gray">{{ humanizeVerdict(n.source) }}</span>
+                  <span class="dot" [ngClass]="confidenceDot(n.confidence)"
+                        [matTooltip]="confidenceTooltip(n.confidence)"></span>
+                </div>
+              </div>
+            </div>
+          </mat-tab>
+
+          <!-- Tab 4 -->
+          <mat-tab label="A&H AI ATC vs Specialist ATC">
+            <div class="pt-3 small text-muted mb-3">{{ tabDetailLines[3] }}</div>
+
+            <div class="row g-2 mb-2">
+              <div class="col-6"><div class="ai-header-bar">A&amp;H AI ATC</div></div>
+              <div class="col-6"><div class="specialist-header-bar">Specialist ATC</div></div>
+            </div>
+
+            <div class="mb-3" *ngFor="let c of rubricsOutput.atc_comparison || []"
+                 [class.cat-shift]="c.category === 'Trajectory shift installation'">
+              <div class="category-label" [class.unknown]="c.category_type === 'specialist_only_unknown'">
+                <span *ngIf="c.category_type === 'specialist_only_unknown'">Unknown — </span>{{ c.category }}
+              </div>
+
+              <div class="row g-2">
+                <!-- AI side -->
+                <div class="col-12 col-lg-6">
+                  <div class="ai-cell" *ngIf="c.ai_adjustment; else aiEmpty"
+                       [class.checkpoint-flagged]="c.ai_adjustment.checkpoint_flagged"
+                       [matTooltip]="c.ai_adjustment.checkpoint_flag_reason || ''">
+                    <div class="adj-title">{{ c.ai_adjustment.adj }}</div>
+                    <div class="adj-procs" *ngIf="c.ai_adjustment.procedures?.length">
+                      {{ c.ai_adjustment.procedures.join(', ') }}
+                    </div>
+                    <div class="adj-outcome" *ngIf="c.ai_adjustment.outcome">{{ c.ai_adjustment.outcome }}</div>
+                    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                      <span *ngFor="let t of c.ai_adjustment.tags || []" class="pill pill-purple">{{ t }}</span>
+                      <span class="dot" [ngClass]="confidenceDot(c.ai_adjustment.confidence)"
+                            [matTooltip]="confidenceTooltip(c.ai_adjustment.confidence)"></span>
+                    </div>
+                  </div>
+                  <ng-template #aiEmpty>
+                    <div class="dashed-empty">Not in A&amp;H AI ATC</div>
+                  </ng-template>
+                </div>
+
+                <!-- Specialist side -->
+                <div class="col-12 col-lg-6">
+                  <div class="specialist-cell" *ngIf="c.specialist_adjustment; else specEmpty">
+                    <div class="adj-title">{{ c.specialist_adjustment.adj }}</div>
+                    <div class="adj-procs" *ngIf="c.specialist_adjustment.procedures?.length">
+                      {{ c.specialist_adjustment.procedures.join(', ') }}
+                    </div>
+                    <div class="adj-outcome" *ngIf="c.specialist_adjustment.outcome">{{ c.specialist_adjustment.outcome }}</div>
+                    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                      <span class="pill" [ngClass]="groundingPill(c.specialist_adjustment.grounding)"
+                            [matTooltip]="confidenceTooltip(c.specialist_adjustment.grounding_confidence)">
+                        {{ humanizeVerdict(c.specialist_adjustment.grounding) }}
+                      </span>
+                      <span class="pill" [ngClass]="procedureFitPill(c.specialist_adjustment.procedure_fit)"
+                            [matTooltip]="confidenceTooltip(c.specialist_adjustment.procedure_fit_confidence)">
+                        {{ humanizeVerdict(c.specialist_adjustment.procedure_fit) }}
+                      </span>
+                      <span class="pill" [ngClass]="outcomeSpecPill(c.specialist_adjustment.outcome_specificity)"
+                            [matTooltip]="confidenceTooltip(c.specialist_adjustment.outcome_specificity_confidence)">
+                        {{ humanizeVerdict(c.specialist_adjustment.outcome_specificity) }}
+                      </span>
+                    </div>
+                  </div>
+                  <ng-template #specEmpty>
+                    <div class="dashed-empty">Not in Specialist ATC</div>
+                  </ng-template>
+                </div>
+              </div>
+            </div>
+          </mat-tab>
+
+          <!-- Tab 5 -->
+          <mat-tab label="Procedure accuracy">
+            <div class="pt-3 small text-muted mb-3">{{ tabDetailLines[4] }}</div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr class="small text-muted text-uppercase">
+                    <th>Procedure</th>
+                    <th>A&amp;H AI ATC trigger</th>
+                    <th>Specialist trigger</th>
+                    <th>Match</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let p of rubricsOutput.procedure_accuracy || []">
+                    <td>
+                      <div class="fw-medium small">{{ p.procedure }}</div>
+                      <div class="text-muted small">Adjustment #{{ p.adjustment_number }}</div>
+                    </td>
+                    <td class="small" style="color: #534AB7;">{{ p.ai_trigger }}</td>
+                    <td class="small" style="color: #a23f3d;">{{ p.specialist_trigger }}</td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="pill" [ngClass]="procedureFitPill(p.match)"
+                              [matTooltip]="p.match_reasoning || ''">
+                          {{ humanizeVerdict(p.match) }}
+                        </span>
+                        <span class="dot" [ngClass]="confidenceDot(p.match_confidence)"
+                              [matTooltip]="confidenceTooltip(p.match_confidence)"></span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr *ngIf="!(rubricsOutput.procedure_accuracy?.length)">
+                    <td colspan="4" class="text-center text-muted small py-3">No procedures recorded.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </mat-tab>
+
+          <!-- Tab 6 -->
+          <mat-tab label="Areas for specialist mentoring">
+            <div class="pt-3 small text-muted mb-3">{{ tabDetailLines[5] }}</div>
+
+            <ng-container *ngIf="rubricsOutput.mentor_session as ms">
+              <div class="mentor-block-green mb-3" *ngIf="ms.acknowledge">
+                <div class="section-label text-success mb-1">Acknowledge first</div>
+                <div class="fw-medium">{{ ms.acknowledge.heading }}</div>
+                <div class="text-muted small mt-1">{{ ms.acknowledge.body }}</div>
+                <div class="border-top mt-2 pt-2">
+                  <span class="fst-italic" style="color:#534AB7;">{{ ms.acknowledge.question }}</span>
+                  <span class="dot ms-2" [ngClass]="confidenceDot(ms.acknowledge.confidence)"
+                        [matTooltip]="confidenceTooltip(ms.acknowledge.confidence)"></span>
+                </div>
+              </div>
+
+              <div *ngFor="let f of ms.focus_points || []"
+                   class="mb-3"
+                   [ngClass]="f.confidence === 'low' ? 'mentor-block-amber' : 'mentor-block-purple'">
+                <div class="section-label mb-1" style="color:#534AB7;">Focus {{ f.number }}</div>
+                <div class="fw-medium">{{ f.heading }}</div>
+                <div class="text-muted small mt-1">{{ f.body }}</div>
+                <div class="border-top mt-2 pt-2">
+                  <span class="fst-italic" style="color:#534AB7;">{{ f.question }}</span>
+                  <span class="dot ms-2" [ngClass]="confidenceDot(f.confidence)"
+                        [matTooltip]="confidenceTooltip(f.confidence)"></span>
+                </div>
+                <div class="small text-muted mt-2" *ngIf="f.confidence === 'low'">
+                  Mentor to verify — evaluation required inference.
+                </div>
+              </div>
+
+              <div class="zone-gray" *ngIf="ms.review_together">
+                <span class="fw-semibold">One to review together:</span>
+                {{ ms.review_together }}
+                <span class="dot ms-2" [ngClass]="confidenceDot(ms.review_together_confidence)"
+                      [matTooltip]="confidenceTooltip(ms.review_together_confidence)"></span>
+              </div>
+            </ng-container>
+          </mat-tab>
+        </mat-tab-group>
+
+      </ng-container>
+
+      <!-- Raw prompt / output -->
+      <ng-template #rawView>
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="border rounded h-100 d-flex flex-column">
+              <div class="px-3 py-2 border-bottom bg-light d-flex justify-content-between align-items-center">
+                <span class="fw-semibold small text-uppercase text-muted">Prompt</span>
+                <button mat-stroked-button color="primary"
+                        (click)="copyToClipboard(selectedParticipant['prompt'], 'Prompt')"
+                        matTooltip="Copy prompt">
+                  <mat-icon class="align-middle" style="font-size:18px;width:18px;height:18px;">content_copy</mat-icon>
+                  Copy
+                </button>
+              </div>
+              <div class="p-3 flex-grow-1" style="max-height: 70vh; overflow: auto;">
+                <pre class="mb-0 small" style="white-space: pre-wrap; word-wrap: break-word; user-select: text;">{{ selectedParticipant['prompt'] }}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-6">
+            <div class="border rounded h-100 d-flex flex-column">
+              <div class="px-3 py-2 border-bottom bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="fw-semibold small text-uppercase text-muted">
+                  Output
+                  <span *ngIf="hasOutputChanged()" class="pill pill-amber ms-2">Unsaved</span>
+                </span>
+                <div class="d-flex align-items-center gap-2">
+                  <button mat-stroked-button
+                          (click)="copyToClipboard(editedOutput, 'Output')"
+                          matTooltip="Copy output">
+                    <mat-icon class="align-middle" style="font-size:18px;width:18px;height:18px;">content_copy</mat-icon>
+                    Copy
+                  </button>
+                  <button mat-stroked-button color="primary"
+                          (click)="pasteOutputFromClipboard()"
+                          matTooltip="Replace output with clipboard contents">
+                    <mat-icon class="align-middle" style="font-size:18px;width:18px;height:18px;">content_paste</mat-icon>
+                    Paste
+                  </button>
+                  <button mat-stroked-button
+                          *ngIf="hasOutputChanged()"
+                          (click)="resetOutputEdit()"
+                          matTooltip="Discard unsaved changes">
+                    <mat-icon class="align-middle" style="font-size:18px;width:18px;height:18px;">undo</mat-icon>
+                    Reset
+                  </button>
+                  <button mat-flat-button color="primary"
+                          [disabled]="!hasOutputChanged() || isSavingOutput"
+                          (click)="saveOutputToFirestore()"
+                          matTooltip="Save output to database">
+                    <mat-icon class="align-middle" style="font-size:18px;width:18px;height:18px;">save</mat-icon>
+                    {{ isSavingOutput ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
+              </div>
+              <div class="p-3 flex-grow-1" style="max-height: 70vh; overflow: auto;">
+                <pre class="mb-0 small" style="white-space: pre-wrap; word-wrap: break-word; user-select: text;">{{ editedOutput }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-template>
+
+    </div>
+  </div>
+
+</main>

@@ -61,12 +61,22 @@ export class DeliverySequenceComponent {
       const productToDeliverySequenceDocRef = doc(this.firestore, "productToDeliverySequence", this.data);
       getDoc(productToDeliverySequenceDocRef).then(async snap => {
         this.producttodelivery = snap.data()
-        this.producttodelivery['product'] = this.producttodelivery['product']['path']
+        // Convert the stored Firestore refs -> path strings IN PLACE: the two-way-bound edit form renders
+        // these strings, and onproducttodeliverysubmit() converts the SAME strings back to refs before
+        // setDoc (the load-bearing round-trip — keep the path-string shape). Null-guard every hop: a mapping
+        // may be authored with a delivery option that has NO deliverysequence (e.g. the seeded jny_PDS1 ->
+        // deliveryoptions:[{deliverytype:'Standard Delivery'}]) or a null activity, which pre-guard threw
+        // "Cannot read properties of undefined" inside this .then() and stranded the form. Normalize
+        // deliveryoptions/deliverysequence to arrays in place so BOTH the form binding and the submit walk
+        // are safe; `?.path ?? value` tolerates an already-string path (idempotent).
+        this.producttodelivery['product'] = this.producttodelivery['product']?.path ?? this.producttodelivery['product'] ?? null
+        this.producttodelivery['deliveryoptions'] = this.producttodelivery['deliveryoptions'] ?? []
         for (let i = 0; i < this.producttodelivery['deliveryoptions'].length; i++) {
           let element = this.producttodelivery['deliveryoptions'][i]
+          element['deliverysequence'] = element['deliverysequence'] ?? []
           for (let j = 0; j < element['deliverysequence'].length; j++) {
             const seqelement = element['deliverysequence'][j];
-            seqelement['activity'] = seqelement['activity']['path']
+            seqelement['activity'] = seqelement['activity']?.path ?? seqelement['activity'] ?? null
           }
         }
         console.log(this.producttodelivery);

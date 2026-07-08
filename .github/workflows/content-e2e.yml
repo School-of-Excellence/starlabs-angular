@@ -14,7 +14,7 @@ name: content-e2e (emulator gate)
 
 on:
   pull_request:
-    branches: [cicd-dev, cicd-prod]   # sudo branches — match queue/journey/authroles/business. Switch to [development] at cutover.
+    branches: [development, production]   # CUTOVER 2026-07-05: real release branches (was [cicd-dev, cicd-prod])
     types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - 'src/app/content/**'
