@@ -2030,6 +2030,10 @@
                     <ng-container *ngIf="!participant.isFacilitator && !participant.isCohort">{{ participant.categoryName }}</ng-container>
                   </span>
                 </ng-container>
+                <span *ngIf="participant.referredNames?.length"
+                      style="font-size: 11px; margin-top: 3px; display: block; opacity: 0.7;">
+                  Enrolled via code: {{ participant.referredNames.join(', ') }}
+                </span>
               </div>
             </a>
           </mat-card-content>

@@ -64,6 +64,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // profileid -> name for referral sharers (resolved from profile_data,
   // since sharers are not necessarily enrolled and so aren't in mapProfile)
   shareProfileNames: { [id: string]: string } = {};
+  // claimed sharer profileid -> their referralcode (used to find who enrolled via that code)
+  shareClaimedReferralByProfile: { [id: string]: string } = {};
 
   selectedParticipantData: any = null;
   participantWorkshopData: any = null;
@@ -437,15 +439,21 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     const unsubscribe = onSnapshot(referralQuery, async (snap) => {
       const clicked: string[] = [];
       const claimed: string[] = [];
+      const referralByProfile: { [id: string]: string } = {};
       snap.forEach(d => {
         const data: any = d.data();
         if (!data?.profileid) return;
         const claimedCount = Number(data?.claimed) || 0; // missing/0 => 0
-        if (claimedCount > 0) claimed.push(data.profileid);
-        else clicked.push(data.profileid);
+        if (claimedCount > 0) {
+          claimed.push(data.profileid);
+          if (data?.referralcode) referralByProfile[data.profileid] = data.referralcode;
+        } else {
+          clicked.push(data.profileid);
+        }
       });
       this.shareClickedProfileIds = clicked;
       this.shareClaimedProfileIds = claimed;
+      this.shareClaimedReferralByProfile = referralByProfile;
       // Referral sharers may not be enrolled, so resolve their names from profile_data.
       this.shareProfileNames = await this.getProfileNameMapForIds([...clicked, ...claimed]);
     }, (err) => console.error('workshopreferral snapshot error', err));
@@ -990,6 +998,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           workshopStartedAt: data['workshopStartedAt'],
           status: data['status'],
           workshopcategory: data['workshopcategory'] || null,
+          referralcode: data['referralcode'] || null,
           id: d.id
         };
       });
@@ -1585,14 +1594,34 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.applyFilterSide();
 
     } else if (metricType === 'shareClicked' || metricType === 'shareClaimed') {
-      const ids = metricType === 'shareClicked'
-        ? this.shareClickedProfileIds
-        : this.shareClaimedProfileIds;
-      this.selectedParticipants = ids.map(id => ({
-        profileid: id,
-        name: this.shareProfileNames[id] || this.mapProfile[id]?.name || 'Unknown',
-        metadata: this.mapProfile[id]
-      }));
+      const isClaimed = metricType === 'shareClaimed';
+      const ids = isClaimed ? this.shareClaimedProfileIds : this.shareClickedProfileIds;
+      this.selectedParticipants = ids.map(id => {
+        const entry: any = {
+          profileid: id,
+          name: this.shareProfileNames[id] || this.mapProfile[id]?.name || 'Unknown',
+          metadata: this.mapProfile[id]
+        };
+        // For Share Claimed: show (display-only) who enrolled using this sharer's referral code.
+        // These referred profileids are intentionally NOT added as participant entries, so they
+        // are excluded from WhatsApp / notification / mail recipients (which use filteredParticipants).
+        if (isClaimed) {
+          const code = (this.shareClaimedReferralByProfile[id] || '').trim();
+          if (code) {
+            const seen = new Set<string>();
+            const referredNames: string[] = [];
+            for (const p of this.enrolledParticipants) {
+              const pCode = (p.referralcode || '').trim();
+              if (pCode && pCode === code && p.profileid && p.profileid !== id && !seen.has(p.profileid)) {
+                seen.add(p.profileid);
+                referredNames.push(this.mapProfile[p.profileid]?.name || this.shareProfileNames[p.profileid] || 'Unknown');
+              }
+            }
+            if (referredNames.length) entry.referredNames = referredNames;
+          }
+        }
+        return entry;
+      });
       this.selectedStatusInfo = {
         status: metricType,
         challengeName: 'Share',
