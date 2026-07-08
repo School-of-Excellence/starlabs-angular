@@ -103,3 +103,36 @@ tbody tr:hover td { background: #fafafd; }
 .err { color: #d70015; }
 .miss { color: #c25e00; font-size: 12px; }
 .queue { margin: 0 0 10px; font-size: 14px; color: #333; }
+
+/* Toolbar action buttons: keep Import + Export together on one row, both look like buttons */
+.toolbar-actions { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 600; padding: 7px 15px; border-radius: 9px;
+  white-space: nowrap; line-height: 1.2; }
+.btn-primary { border: none; background: #007aff; color: #fff; }
+.btn-primary:hover { background: #006ae0; }
+.btn-primary:disabled { background: rgba(60,60,67,.15); color: rgba(60,60,67,.5); cursor: default; }
+.btn-secondary { border: .5px solid rgba(60,60,67,.18); background: #fff; color: #007aff; }
+.btn-secondary:hover { background: #f2f2f7; }
+.btn-secondary.disabled { opacity: .5; pointer-events: none; }
+
+/* Sheet comparison panel */
+.reconcile { margin: 12px 0 16px; background: #fff; border: .5px solid rgba(60,60,67,.14);
+  border-radius: 16px; padding: 14px 16px; }
+.rec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.rec-head b { font-size: 14px; }
+.rec-file { font-size: 12px; color: rgba(60,60,67,.55); }
+.rec-x { background: none; border: none; font-size: 18px; line-height: 1; color: rgba(60,60,67,.6); cursor: pointer; padding: 0 4px; }
+.rec-summary { font-size: 13px; color: rgba(60,60,67,.7); margin: 2px 0 12px; }
+.rec-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rec-col { border: .5px solid rgba(60,60,67,.1); border-radius: 12px; overflow: hidden; }
+.rec-col-h { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 12.5px;
+  font-weight: 600; background: #fafafd; border-bottom: .5px solid rgba(60,60,67,.1); }
+.rec-n { margin-left: auto; font-size: 12px; background: rgba(120,120,128,.16); color: rgba(60,60,67,.7);
+  border-radius: 999px; padding: 1px 9px; }
+.rec-col ul { list-style: none; margin: 0; padding: 6px 0; max-height: 260px; overflow: auto; }
+.rec-col li { padding: 6px 12px; font-size: 13px; border-bottom: .5px solid rgba(60,60,67,.05); }
+.rec-col li:last-child { border-bottom: none; }
+.rec-sub { color: rgba(60,60,67,.5); font-size: 12px; margin-left: 6px; }
+.rec-empty { color: rgba(60,60,67,.5); font-style: italic; }
+@media (max-width: 720px) { .rec-cols { grid-template-columns: 1fr; } }
