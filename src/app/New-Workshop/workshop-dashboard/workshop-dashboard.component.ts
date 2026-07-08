@@ -117,7 +117,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   mapProfile: any = {};
   mapProfileNew: any = {};
   loading = true;
-  isRefreshing = false;
   error: string | null = null;
   isMovingParticipant: string | null = null;
 
@@ -374,28 +373,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async refreshData() {
-    if (this.isRefreshing) return;
-    try {
-      this.isRefreshing = true;
-      await this.loadAllParticipantWorkshopData();
-      this.rebuildProgressFromMap();
-      if (this.selectedParticipantData) {
-        const profileId = this.selectedParticipantData.profileid;
-        this.participantWorkshopData = this.participantWorkshopMap.get(profileId) || null;
-        this.updateParticipantDisplayData();
-      }
-      this.triggerRecalculation();
-      this.snackbarService.show('Data refreshed');
-    } catch (err) {
-      console.error('Refresh error:', err);
-      this.snackbarService.show('Failed to refresh data');
-    } finally {
-      this.isRefreshing = false;
-      this.cdr.detectChanges();
-    }
-  }
-
   async setupWorkshopSnapshot() {
     if (!this.workshopId) return;
 
@@ -420,6 +397,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
         if (!enrolledSnapshotInitialized) {
           enrolledSnapshotInitialized = true;
+          this.setupParticipantWorkshopSnapshot();
           this.setupEnrolledParticipantsSnapshot();
         }
       } else {
@@ -1013,24 +991,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
       this.mapProfile = { ...participantData.docdata, ...this.mapProfileNew };
-      await this.loadAllParticipantWorkshopData();
-      if (this.workshopData?.categorybased === true) {
-        this.participantCohortMap.clear();
-        this.participantWorkshopCategoryMap.clear();
-        for (const p of this.enrolledParticipants) {
-          const pwData = this.participantWorkshopMap.get(p.profileid);
-          if (pwData) {
-            this.participantCohortMap.set(p.profileid, pwData['cohortparticipant'] === true);
-            if (pwData['workshopcategory']) {
-              this.participantWorkshopCategoryMap.set(p.profileid, pwData['workshopcategory']);
-            }
-          }
-        }
-        this.updateCohortCount();
-      }
-      this.rebuildProgressFromMap();
-      this.updateMetrics();
-      this.triggerRecalculation();
+      // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
+      // here we just re-derive from the current (live) participantWorkshopMap.
+      this.recomputeDerivedState();
 
       if (this.loading) {
         this.loading = false;
@@ -1044,10 +1007,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.unsubscribes.push(unsubscribe);
   }
 
-  private async loadAllParticipantWorkshopData(): Promise<void> {
+  // Live listener for participant progress (the 'participant workshop' collection).
+  // Replaces the old one-time fetch + manual refresh button: any progress change
+  // now re-derives the whole dashboard automatically.
+  setupParticipantWorkshopSnapshot() {
     if (!this.workshopId) return;
-
-    this.participantWorkshopMap.clear();
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const pwQuery = query(
@@ -1055,8 +1019,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       where('workshopref', '==', workshopRef)
     );
 
-    try {
-      const pwSnap = await getDocs(pwQuery);
+    const unsubscribe = onSnapshot(pwQuery, (pwSnap) => {
+      this.participantWorkshopMap.clear();
       pwSnap.docs.forEach(d => {
         const data = d.data();
         const profileid: string = data['profileid'];
@@ -1064,9 +1028,48 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           this.participantWorkshopMap.set(profileid, { id: d.id, ...data });
         }
       });
-    } catch (err) {
-      console.error('Error fetching participant workshop collection:', err);
+      this.recomputeDerivedState();
+    }, (err) => {
+      console.error('Error listening to participant workshop collection:', err);
+    });
+
+    this.unsubscribes.push(unsubscribe);
+  }
+
+  // Re-derives all dashboard state from the current live snapshots
+  // (enrolledParticipants + participantWorkshopMap + mapProfile). Shared by the
+  // enrolled-participants and participant-workshop snapshots so both stay in sync,
+  // for evergreen, category-based, and plain workshops alike.
+  private recomputeDerivedState() {
+    if (this.workshopData?.categorybased === true) {
+      this.participantCohortMap.clear();
+      this.participantWorkshopCategoryMap.clear();
+      for (const p of this.enrolledParticipants) {
+        const pwData = this.participantWorkshopMap.get(p.profileid);
+        if (pwData) {
+          this.participantCohortMap.set(p.profileid, pwData['cohortparticipant'] === true);
+          if (pwData['workshopcategory']) {
+            this.participantWorkshopCategoryMap.set(p.profileid, pwData['workshopcategory']);
+          }
+        }
+      }
+      this.updateCohortCount();
     }
+
+    this.rebuildProgressFromMap();
+    this.updateMetrics();
+
+    // Keep an open participant-detail panel live when its underlying data changes.
+    if (this.selectedParticipantData) {
+      const pid = this.selectedParticipantData.profileid;
+      const pwData = this.participantWorkshopMap.get(pid) || null;
+      if (pwData) {
+        this.participantWorkshopData = pwData;
+        this.updateParticipantDisplayData();
+      }
+    }
+
+    this.triggerRecalculation();
   }
 
   private rebuildProgressFromMap(): void {
