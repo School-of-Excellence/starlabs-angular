@@ -16,6 +16,23 @@
     </div>
   </header>
 
+  <!-- Initial load spinner — shown until the first board data arrives, so the
+       coordinator doesn't see a flash of empty "— none —" columns. -->
+  <div class="arena__loader" *ngIf="isLoading && !loadError" role="status" aria-live="polite">
+    <span class="arena__spinner"></span>
+    <span class="arena__loader-text">Loading board…</span>
+  </div>
+
+  <!-- Board-data load failure (silent-blank guard). Surfaces a stalled Listen
+       stream / index / rules error instead of an empty board, with recovery. -->
+  <div class="arena__load-error" *ngIf="loadError" role="alert">
+    <mat-icon>cloud_off</mat-icon>
+    <span>{{ loadError }}</span>
+    <button type="button" class="arena__load-retry" (click)="retryLoad()">
+      <mat-icon>refresh</mat-icon> Retry
+    </button>
+  </div>
+
   <!-- ============================== BODY ============================== -->
   <main class="arena__body" [class.is-left-closed]="!leftOpen" [class.is-right-closed]="!rightOpen">
 
@@ -39,7 +56,7 @@
         </button>
         <button class="ltab" [class.ltab--active]="leftTab === 'specialists'" (click)="leftTab = 'specialists'">
           <mat-icon>person</mat-icon> Specialists
-          <span class="ltab__count">{{ studios.length }}</span>
+          <span class="ltab__count">{{ stageStudios.length }}</span>
         </button>
       </div>
 

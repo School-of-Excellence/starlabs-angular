@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {collection, collectionData, doc, docData, Firestore,query, where, orderBy, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, writeBatch, limit, startAfter, collectionGroup} from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
-import { Subject, Subscription, takeUntil } from 'rxjs';
+import { Subject, Subscription, takeUntil, catchError, of } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 
 type ArenaTab = 'participants' | 'specialists';
@@ -82,6 +82,25 @@ export class ArenaBoardComponent implements OnDestroy {
   stage = '';
   queueName = '';
   queueData: any = null;
+
+  // Set when any board-data Firestore stream errors out (e.g. the WebChannel
+  // Listen stream stalls on a hostile network, a missing composite index, or a
+  // rules denial). Without this the stream dies silently and the board just
+  // shows nothing with no explanation — the exact "board not showing data"
+  // symptom. Surfaced as a retryable banner instead.
+  loadError: string | null = null;
+  private flagLoadError = (e: any) => {
+    console.error('[arena-board] data load error', e);
+    this.loadError = 'Some board data failed to load (connection or permissions). Tap Retry.';
+    this.isLoading = false;
+    return of([] as any[]);
+  };
+  retryLoad(): void { this.loadError = null; this.isLoading = true; window.location.reload(); }
+
+  // True until the first board data arrives (or a load error). Drives the
+  // full-screen loader so the coordinator sees a spinner instead of a flash of
+  // empty "— none —" columns while the Firestore streams are still connecting.
+  isLoading = true;
 
   // Tabs
   leftTab: ArenaTab = 'participants';
@@ -183,7 +202,9 @@ export class ArenaBoardComponent implements OnDestroy {
         where('tokenstatus', '==', 'Active')
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
+      // First board data has arrived — drop the loader.
+      this.isLoading = false;
       // Sort by `queueposition` (same field the dynamic queue manager uses to
       // order the queue) so Waiting / Queued show the same canonical order.
       // Fall back to `tokennumber` if `queueposition` is missing.
@@ -216,7 +237,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('queueref', '==', queueRef)
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       this.studios = (rows as ArenaStudio[]).filter((s: any) =>
         s['studioin'] === true && s['checkin'] === true
       );
@@ -232,7 +253,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('queueref', '==', doc(this.firestore, 'queue generation', this.queueid))
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       // Keep only pending (still alive)
       const now = new Date();
       this.invitations = (rows as ArenaInvitation[]).filter(inv => {
@@ -251,7 +272,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('status', '==', 'live')
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       this.liveAssignments = rows as ArenaAssignment[];
       this.sortStudiosAndAssignments();
       // Lazy-load profiles for participants and pairing specialists so cards
@@ -275,7 +296,7 @@ export class ArenaBoardComponent implements OnDestroy {
         where('status', '==', 'completed')
       ),
       { idField: 'docid' }
-    ).pipe(takeUntil(this.destroy$)).subscribe(rows => {
+    ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       const list = (rows as ArenaAssignment[]).filter((a: any) => a['isactivitydone'] === true);
       list.sort((a: any, b: any) => {
         const tb = b?.['created']?.toMillis ? b['created'].toMillis() : 0;
@@ -296,12 +317,41 @@ export class ArenaBoardComponent implements OnDestroy {
     return this.tokens.filter(t => t.status == null || t.status === 'queued' || t.status === 'invited');
   }
 
+  // Studios that actually serve THIS stage. `this.studios` holds every
+  // checked-in studio in the queue (a studio isn't bound to one stage — it can
+  // be eligible for several), so without this filter the IDLE column, the
+  // Specialists tab count and the right-panel studio list bleed in studios from
+  // OTHER stages of the same queue — i.e. data unrelated to the card that was
+  // clicked, and identical across two different-stage boards of one queue.
+  // Eligibility is derived the same way dynamic-studio-v2 + the dashboard do it:
+  // the studio's sorted participant-activity signature must match one of the
+  // stage's `compulsoryactivity` combinations. If the stage has no activity
+  // config we deliberately DON'T filter (fall back to all checked-in studios)
+  // so a missing/edge config can never blank the board.
+  get stageStudios(): ArenaStudio[] {
+    const combos = this.stageActivityCombos();
+    if (combos.length === 0) return this.studios;
+    return this.studios.filter(s => combos.includes(this.studioActivitySignature(s)));
+  }
+
+  private stageActivityCombos(): string[] {
+    const sp = this.queueData?.['stageproperty']?.[this.stage];
+    return Object.values(sp?.['compulsoryactivity'] ?? {}).map((c: any) =>
+      (Array.isArray(c) ? c : [c]).map(String).sort((a, b) => a.localeCompare(b)).join(',')
+    );
+  }
+
+  private studioActivitySignature(s: ArenaStudio): string {
+    return Object.values(s.participantsactivity ?? {})
+      .map(String).sort((a, b) => a.localeCompare(b)).join(',');
+  }
+
   // Studios in each column
   get idleStudios(): ArenaStudio[] {
     // A studio is "idle" if it is checked in but has no live assignment AND no active invitation
     const liveStudioIds = new Set(this.liveAssignments.map(a => a.studioid));
     const invitingStudioIds = new Set(this.invitations.map(i => i.studioid));
-    return this.studios.filter(s => !liveStudioIds.has(s.docid) && !invitingStudioIds.has(s.docid));
+    return this.stageStudios.filter(s => !liveStudioIds.has(s.docid) && !invitingStudioIds.has(s.docid));
   }
 
   // Studios with an active live session (joined or active)

@@ -328,7 +328,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.snackBarRef = this.snackBar.openFromComponent(UpdatesnackbarComponent, {
       duration: 0,
-      horizontalPosition: 'end',
+      horizontalPosition: 'center',
       verticalPosition: 'bottom',
       panelClass: ['update-snackbar'],
       data: {

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, NgZone } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
@@ -195,6 +195,7 @@ export class PrescribeATCComponent {
   arenamode:boolean = false
   liveassignmentid = null
   liveassignmentdata = null
+  personnelReady = true   // toggled false→true after a programmatic patch to force the author/observer/mentor mat-selects to rebuild
   tokendata = null
   queueid:string = null
   stagename:string = null
@@ -281,7 +282,8 @@ export class PrescribeATCComponent {
     private networkStatusService : NetworkStatusService,
     private connectivity: ConnectivityGuardService,
     private mediaCache: MediaCacheService,
-    private draftService: ATCDraftService
+    private draftService: ATCDraftService,
+    private ngZone: NgZone
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -458,13 +460,18 @@ export class PrescribeATCComponent {
     this.route.queryParams.subscribe(async params => {
       if (!params['aigenerated'] || !params['docid']) return;
       const docid = params['docid'];
-      const draftRef = doc(this.firestoreATC, 'temporary_ATC', docid);
-      const draftSnap = await getDoc(draftRef);
+      // Load through the offline-capable draft service (local-first): openDraft returns the cached
+      // copy when the server is unreachable, so an already-opened AI draft still loads offline —
+      // matching the normal prescribe flow. Only when NO draft exists anywhere do we parse the AI
+      // source below. (Was a raw getDoc, which failed offline since firestore-atc has no persistence.)
+      const existing = await this.draftService.openDraft(
+        this.firestoreATC, 'temporary_ATC', docid,
+        (mine, theirs) => this.openConflictDialog(mine, theirs));
 
-      if (draftSnap.exists()) {
-        console.log('Draft exists → loading from temporary_ATC');
+      if (existing) {
+        console.log('Draft exists → loading from temporary_ATC (local-first)');
 
-        const value = draftSnap.data();
+        const value = existing;
 
         this.autoSaveID = docid;
         this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
@@ -580,7 +587,11 @@ export class PrescribeATCComponent {
       this.aigeneratedsource = aiSourceCollection;
       this.aigeneratedid = docid;
 
-      await setDoc(draftRef, {
+      // Create the draft through the offline-capable draft service: saveLocal writes to IndexedDB
+      // first (durable across refresh/offline), then sync pushes to the server when online — the same
+      // path the normal flow uses, so the AI draft gets the offline safety net. (Was a raw setDoc,
+      // which wrote only to the server and skipped the local cache.)
+      await this.draftService.saveLocal('temporary_ATC', docid, {
         profileid: this.participantProfileid,
         transcript: [],
         aiatcsummary: this.summarystring,
@@ -590,9 +601,9 @@ export class PrescribeATCComponent {
         aiedited: true,
         aigeneratedsource: aiSourceCollection,
         aigeneratedid: docid,
-        created: serverTimestamp(),
-        lastupdated: serverTimestamp()
+        lastupdated: new Date(),
       });
+      await this.draftService.sync(this.firestoreATC, 'temporary_ATC', docid);
 
       if (this.proceduresLoaded) {
         this.patchAIAdjustments(this.pendingAIJson);
@@ -999,18 +1010,28 @@ export class PrescribeATCComponent {
                   otherValue[value].push("profile_data/"+key)
                 }
               })
-              this.authorMap = authorValue
-              this.observerMap = observerValue
-              this.mentorMap = mentorValue
-              Object.keys(otherValue).forEach(key=>{
-                this.additionalActivityMap.push({
-                  activity: key,
-                  specialist: otherValue[key]
+              // mat-select is OnPush: setting authorMap/observerMap/mentorMap during this async CD pass updates the
+              // model, but the CLOSED trigger stays stale until the NEXT detection tick — which is why the selected
+              // name only appears once the dropdown is opened. Schedule the assignment on a fresh macrotask INSIDE
+              // Angular's zone so a clean top-down change-detection cycle renders the selected names immediately.
+              this.ngZone.run(() => {
+                this.authorMap = authorValue
+                this.observerMap = observerValue
+                this.mentorMap = mentorValue
+                Object.keys(otherValue).forEach(key=>{
+                  this.additionalActivityMap.push({
+                    activity: key,
+                    specialist: otherValue[key]
+                  })
                 })
+                this.onObserverSelect()
+                console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
+                // mat-select is OnPush: a value set programmatically mid-CD only shows once the dropdown is opened.
+                // Rebuild the personnel selects (hide→show) so they initialise WITH the patched values and their
+                // CLOSED triggers render the specialist names from the first paint — no interaction needed.
+                this.personnelReady = false
+                setTimeout(() => this.personnelReady = true)
               })
-              console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
-              this.onObserverSelect()
-              console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
 
             }
             else{
@@ -2703,7 +2724,10 @@ async removeATCImage(index: number) {
   */
 
   moveToStudio(){
-    this.router.navigateByUrl("/dynamicstudio")
+    // Return to the studio ON the prescribe-atc step (mirrors the zoom-clientview
+    // return URL). The studio reads ?step= into pendingDeepLinkStep and reopens
+    // that stage instead of snapping to the first step.
+    this.router.navigateByUrl("/dynamicstudio?step=prescribe-atc")
   }
 
   //Big Assignment
