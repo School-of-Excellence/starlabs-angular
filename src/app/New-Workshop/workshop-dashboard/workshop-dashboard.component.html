@@ -353,6 +353,47 @@
 
         </div>
       </div>
+
+      <!-- ===== Evergreen: participant day-journey timeline ===== -->
+      <section class="ev-day-section"
+               *ngIf="workshopData?.evergreenWorkshop === true && evergreenWorkshopDays > 0">
+        <div class="ev-day-head">
+          <div class="ev-day-heading">
+            <h3 class="ev-day-title">Participant Journey</h3>
+            <p class="ev-day-sub">
+              {{ evergreenWorkshopDays }}-day workshop
+              <span class="ev-day-dot">•</span>
+              {{ evergreenDayTotal }} {{ evergreenDayTotal === 1 ? 'participant' : 'participants' }}
+            </p>
+          </div>
+          <span class="ev-day-pill">{{ evergreenWorkshopDays }} Days</span>
+        </div>
+
+        <div class="ev-day-track">
+          <button type="button"
+                  class="ev-day-node"
+                  *ngFor="let d of evergreenDayDistribution"
+                  [class.is-empty]="d.count === 0"
+                  [disabled]="d.count === 0"
+                  (click)="onDayClick(d)">
+            <span class="ev-day-badge">{{ d.day }}</span>
+            <span class="ev-day-count">{{ d.count }}</span>
+            <span class="ev-day-caption">Day {{ d.day }}</span>
+          </button>
+
+          <button type="button"
+                  class="ev-day-node ev-day-node--done"
+                  *ngIf="evergreenCompletedBucket.count > 0"
+                  (click)="onDayClick(evergreenCompletedBucket)">
+            <span class="ev-day-badge ev-day-badge--done">
+              <mat-icon>check</mat-icon>
+            </span>
+            <span class="ev-day-count">{{ evergreenCompletedBucket.count }}</span>
+            <span class="ev-day-caption">Completed</span>
+          </button>
+        </div>
+      </section>
+
       <!-- <div class="metrics-section">
         <div class="metrics-grid">
 

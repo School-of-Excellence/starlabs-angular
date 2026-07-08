@@ -67,6 +67,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // claimed sharer profileid -> their referralcode (used to find who enrolled via that code)
   shareClaimedReferralByProfile: { [id: string]: string } = {};
 
+  // Evergreen day-journey distribution (only when evergreenWorkshop === true).
+  // Each participant's "day" = floor((now - enrollmentdate) / 24h) + 1, exact to the second.
+  evergreenDayDistribution: { day: number; count: number; profileIds: string[] }[] = [];
+  evergreenCompletedBucket: { day: number; count: number; profileIds: string[]; completed: boolean } =
+    { day: -1, count: 0, profileIds: [], completed: true };
+  evergreenDayTotal = 0;
+
   selectedParticipantData: any = null;
   participantWorkshopData: any = null;
   loadingParticipantWorkshop = false;
@@ -1305,6 +1312,61 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.facilitatorCount = this.facilitatorProfileIds.length;
       this.updateCategoryBasedMetrics();
     }
+
+    if (this.workshopData?.evergreenWorkshop === true) {
+      this.computeEvergreenDayDistribution();
+    }
+  }
+
+  // Buckets enrolled participants by their current workshop day, based on enrollmentdate.
+  // day = floor((now - enrollmentdate) / 24h) + 1 (exact to the second). Days beyond
+  // workshopDays fall into the "Completed" bucket.
+  computeEvergreenDayDistribution() {
+    const days = this.evergreenWorkshopDays;
+    if (this.workshopData?.evergreenWorkshop !== true || days <= 0) {
+      this.evergreenDayDistribution = [];
+      this.evergreenCompletedBucket = { day: -1, count: 0, profileIds: [], completed: true };
+      this.evergreenDayTotal = 0;
+      return;
+    }
+
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const buckets: { day: number; count: number; profileIds: string[] }[] = [];
+    for (let i = 1; i <= days; i++) buckets.push({ day: i, count: 0, profileIds: [] });
+    const completed = { day: -1, count: 0, profileIds: [] as string[], completed: true };
+    let total = 0;
+
+    for (const p of this.enrolledParticipants) {
+      const enrolledMs = this.toMillis(p.enrollmentdate);
+      if (enrolledMs == null) continue;
+      total++;
+      let day = Math.floor((now - enrolledMs) / DAY_MS) + 1;
+      if (day < 1) day = 1; // guard against clock skew / future-dated enrollment
+      if (day > days) {
+        completed.count++;
+        completed.profileIds.push(p.profileid);
+      } else {
+        const b = buckets[day - 1];
+        b.count++;
+        b.profileIds.push(p.profileid);
+      }
+    }
+
+    this.evergreenDayDistribution = buckets;
+    this.evergreenCompletedBucket = completed;
+    this.evergreenDayTotal = total;
+  }
+
+  private toMillis(ts: any): number | null {
+    if (!ts) return null;
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+    if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+    if (ts instanceof Date) return ts.getTime();
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? null : d.getTime();
   }
 
   async loadCategoryNames() {
@@ -1482,6 +1544,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   get activeParticipants() { return this.metrics.get('activeParticipants')?.length || 0; }
   get shareClicked() { return this.shareClickedProfileIds.length; }
   get shareClaimed() { return this.shareClaimedProfileIds.length; }
+  get evergreenWorkshopDays(): number {
+    return Number(this.workshopData?.evergreenWorkshopMeta?.workshopDays) || 0;
+  }
   get completionRate() {
     const total = this.totalEnrolled;
     const completed = this.metrics.get('completedParticipants')?.length || 0;
@@ -1648,6 +1713,29 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
     }
+  }
+
+  // Opens the shared side panel with the participants currently in the given evergreen day bucket.
+  onDayClick(bucket: { day: number; count: number; profileIds: string[]; completed?: boolean }) {
+    if (!bucket || bucket.count === 0) return;
+    const label = bucket.completed ? 'Completed' : `Day ${bucket.day}`;
+    this.selectedParticipants = bucket.profileIds.map(id => this.buildParticipantEntry(id));
+    this.selectedStatusInfo = {
+      status: label,
+      challengeName: label,
+      subChallengeName: bucket.completed
+        ? `Past day ${this.evergreenWorkshopDays} of ${this.evergreenWorkshopDays}`
+        : `Day ${bucket.day} of ${this.evergreenWorkshopDays}`,
+      count: bucket.count
+    };
+    this.showParticipantPanel = true;
+    this.filterOption = 'all';
+    this.selectedJourneyFilters = [];
+    this.selectedEnrollmentStatusFilters = [];
+    this.selectedTierFilters = [];
+    this.selectedCategoryFilters = [];
+    this.selectedNotStartedTypeFilters = [];
+    this.applyFilterSide();
   }
 
   onChallengeMainStatusClick(status: string, challengeIndex: number, count: number) {
