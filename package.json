@@ -76,6 +76,8 @@
     "ngx-mat-select-search": "^8.0.2",
     "ngx-material-timepicker": "^13.1.1",
     "recordrtc": "^5.6.2",
+    "redux": "^5.0.1",
+    "redux-thunk": "^3.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "uuid": "^13.0.0",
