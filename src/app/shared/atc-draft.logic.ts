@@ -57,9 +57,18 @@ function normalize(v: any): any {
   if (v === null || v === undefined) return null;
   if (Array.isArray(v)) return v.map(normalize);
   if (typeof v === 'object') {
-    // Firestore Timestamp / Date -> ISO string so two clocks of the "same" content still differ only via VOLATILE keys
+    // Firestore Timestamp (native) / Date -> ISO string so two clocks of the "same" content differ only via VOLATILE keys
     if (typeof v.toDate === 'function' && typeof v.seconds === 'number') return v.toDate().toISOString();
     if (v instanceof Date) return v.toISOString();
+    // Firestore native DocumentReference -> stable path. MUST short-circuit BEFORE the generic recursion below:
+    // a DocumentReference holds the Firestore instance in its own fields, and that object graph is circular —
+    // recursing it overflows the stack (the "Maximum call stack size exceeded" that made saveLocal fail, so the
+    // draft was neither stored nor synced). `type === 'document'` is the modular SDK marker for a doc ref.
+    if (v.type === 'document' && typeof v.path === 'string') return `ref:${v.path}`;
+    // The IndexedDB-serialized forms of the same types -> the SAME canonical primitives, so a native `working`
+    // compares content-equal to a map-shaped `base` (keeps dirty-detection accurate across the clone round-trip).
+    if (v.type === 'firestore/documentReference/1.0' && typeof v.referencePath === 'string') return `ref:${v.referencePath}`;
+    if (v.type === 'firestore/timestamp/1.0' && typeof v.seconds === 'number') return new Date(v.seconds * 1000 + (v.nanoseconds ?? 0) / 1e6).toISOString();
     const out: Record<string, any> = {};
     for (const k of Object.keys(v).filter(k => !VOLATILE_FIELDS.includes(k)).sort()) {
       out[k] = normalize(v[k]);
