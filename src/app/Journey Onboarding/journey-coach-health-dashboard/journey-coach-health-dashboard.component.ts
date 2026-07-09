@@ -3,7 +3,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, setDoc, deleteDoc, serverTimestamp,
+  Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, setDoc, serverTimestamp,
   orderBy, startAfter, limit, documentId, getCountFromServer, QueryDocumentSnapshot, writeBatch
 } from '@angular/fire/firestore';
 import { Auth, authState } from '@angular/fire/auth';
@@ -1900,15 +1900,27 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return out.sort((a, b) => b.count - a.count);
   });
 
-  /** Personal groups for the logged-in coach (owner == actorUid). Degrades to none on failure. */
+  /** Personal groups for the logged-in coach — stored locally (per-coach, this browser only).
+   *  Key is scoped by actorUid so coaches sharing a browser don't see each other's groups. */
+  private journeyGroupKey(): string { return `jchd_journeygroups_${this.actorUid}`; }
+  private newGroupId(): string {
+    try { return crypto.randomUUID(); }
+    catch { return 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  }
+  private persistJourneyGroups(groups: JourneyGroup[]): void {
+    if (!this.actorUid) return;
+    localStorage.setItem(this.journeyGroupKey(), JSON.stringify(groups));
+  }
   private async loadJourneyGroups(): Promise<void> {
     if (!this.actorUid) return;
     try {
-      const snap = await getDocs(query(collection(this.firestore, 'healthtracker_journeygroup'), where('owner', '==', this.actorUid)));
-      this.journeyGroups.set(snap.docs.map(d => {
-        const x: any = d.data();
-        return { id: d.id, name: (x['name'] ?? '').toString(), journeys: Array.isArray(x['journeys']) ? x['journeys'] : [] };
-      }));
+      const raw = localStorage.getItem(this.journeyGroupKey());
+      const arr = raw ? JSON.parse(raw) : [];
+      this.journeyGroups.set(Array.isArray(arr) ? arr.map((x: any) => ({
+        id: (x?.id ?? '').toString(),
+        name: (x?.name ?? '').toString(),
+        journeys: Array.isArray(x?.journeys) ? x.journeys : [],
+      })) : []);
     } catch (e) { console.warn('journey groups load failed (non-fatal)', e); }
   }
 
@@ -1934,27 +1946,29 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (!name) { this.guard.openSnackBar('Give the group a name', 'Close'); return; }
     if (!journeys.length) { this.guard.openSnackBar('Pick at least one journey', 'Close'); return; }
     try {
+      const groups = [...this.journeyGroups()];
       if (this.editingGroupId) {
-        await updateDoc(doc(this.firestore, 'healthtracker_journeygroup', this.editingGroupId), { name, journeys });
+        const i = groups.findIndex(g => g.id === this.editingGroupId);
+        if (i >= 0) groups[i] = { ...groups[i], name, journeys };
       } else {
-        await addDoc(collection(this.firestore, 'healthtracker_journeygroup'),
-          { name, journeys, owner: this.actorUid, createdBy: this.coachName, created: serverTimestamp() });
+        groups.push({ id: this.newGroupId(), name, journeys });
       }
+      this.persistJourneyGroups(groups);
       await this.loadJourneyGroups();
       this.startNewGroup();
       this.guard.openSnackBar(`Group "${name}" saved`, 'Close');
     } catch (e: any) {
-      this.guard.openSnackBar('Could not save group: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+      this.guard.openSnackBar('Could not save group: ' + (e?.message ?? 'unknown error'), 'Close', 5000);
     }
   }
   async deleteGroup(g: JourneyGroup): Promise<void> {
     try {
-      await deleteDoc(doc(this.firestore, 'healthtracker_journeygroup', g.id));
+      this.persistJourneyGroups(this.journeyGroups().filter(x => x.id !== g.id));
       await this.loadJourneyGroups();
       if (this.editingGroupId === g.id) this.startNewGroup();
       this.guard.openSnackBar(`Group "${g.name}" removed`, 'Close');
     } catch (e: any) {
-      this.guard.openSnackBar('Could not delete: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+      this.guard.openSnackBar('Could not delete: ' + (e?.message ?? 'unknown error'), 'Close', 5000);
     }
   }
 
