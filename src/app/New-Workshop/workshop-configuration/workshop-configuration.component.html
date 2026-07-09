@@ -990,6 +990,16 @@
                     <div class="setting-row">
                       <div class="setting-row-main">
                         <div class="setting-row-text">
+                          <h4 class="setting-row-title">Enable Home Screen Widget</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('homescreenwidget')?.value ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="homescreenwidget" (change)="onToggleChange('homescreenwidget', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
                           <h4 class="setting-row-title">Enable Q&amp;A</h4>
                           <p class="setting-row-desc">{{ settingsForm.get('qanda')?.value ? 'Q&A is active and visible to participants' : 'Q&A is inactive and hidden from participants' }}</p>
                         </div>

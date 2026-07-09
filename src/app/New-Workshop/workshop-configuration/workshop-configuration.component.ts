@@ -968,6 +968,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     const noterichTextControls = {};
     this.settingsForm = this.fb.group({
       active: [false],
+      homescreenwidget: [false],
       qanda: [false],
       breakdown: [false],
       enableshare: [false],
@@ -2171,6 +2172,7 @@ private rebuildActivityIds(): void {
     if (data && typeof data === 'object') {
       this.settingsForm.patchValue({
         active: data['active'] || false,
+        homescreenwidget: data['homescreenwidget'] || false,
         qanda: data['qanda'] || false,
         breakdown: data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
@@ -2391,6 +2393,7 @@ private rebuildActivityIds(): void {
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
       await updateDoc(ref, {
         active: this.settingsForm.get('active')?.value || false,
+        homescreenwidget: this.settingsForm.get('homescreenwidget')?.value || false,
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
         enableshare: this.settingsForm.get('enableshare')?.value || false,
@@ -2510,7 +2513,7 @@ private rebuildActivityIds(): void {
       input.value = '';
     }
   }
-  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
+  onToggleChange(field: 'active' | 'homescreenwidget' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }
