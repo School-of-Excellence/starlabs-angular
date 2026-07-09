@@ -1096,6 +1096,10 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       sneakpeak: this.fb.array([]),
       knowinfo: this.fb.array([]),
       faq: this.fb.array([]),
+      // Outcomes: array of { value, title } maps.
+      outcome: this.fb.array([]),
+      // Hometags: simple string list (same shape as "Who is this workshop for?").
+      hometags: this.fb.array([]),
     });
   this.detailPageForm.get('selectedTestimonials')?.valueChanges
     .pipe(takeUntil(this.subscription))
@@ -1290,6 +1294,23 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         array.push(group);
       });
     });
+
+    // Outcomes: array of { value, title } maps.
+    const outcomeArray = this.getFormArray('outcome');
+    outcomeArray.clear();
+    (data.detailpage['outcome'] || []).forEach((item: any) => {
+      outcomeArray.push(this.fb.group({
+        value: [item?.value || ''],
+        title: [item?.title || '']
+      }));
+    });
+
+    // Hometags: simple string list (same shape as "Who is this workshop for?").
+    const hometagsArray = this.getFormArray('hometags');
+    hometagsArray.clear();
+    (data.detailpage['hometags'] || []).forEach((value: string) => {
+      hometagsArray.push(this.fb.control(value));
+    });
   }
 
   onEditorContentChange(content: string, fieldKey: string): void {
@@ -1381,6 +1402,21 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
   isAllFilled(key: string): boolean {
     const formArray = this.detailPageForm.get(key) as FormArray;
     return formArray.controls.every(control => control.value && control.valid);
+  }
+
+  get outcomeArray(): FormArray {
+    return this.detailPageForm.get('outcome') as FormArray;
+  }
+
+  addOutcome(): void {
+    this.outcomeArray.push(this.fb.group({
+      value: [''],
+      title: ['']
+    }));
+  }
+
+  removeOutcome(index: number): void {
+    if (index >= 0) this.outcomeArray.removeAt(index);
   }
 
   get primarylyTaughtArray(): FormArray {

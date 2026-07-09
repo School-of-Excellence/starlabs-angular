@@ -340,6 +340,63 @@
               </ng-container>
             </div>
 
+            <mat-divider class="section-divider"></mat-divider>
+            <div class="row g-3">
+              <div class="col-12 d-flex">
+                <div class="section-wrapper full-width">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <h3 class="section-title">Outcomes</h3>
+                    <button mat-icon-button type="button" class="btn-primary-outline" (click)="addOutcome()"
+                      matTooltip="Add outcome" aria-label="Add outcome">
+                      <mat-icon>add</mat-icon>
+                    </button>
+                  </div>
+                  <div formArrayName="outcome">
+                    <div *ngFor="let group of outcomeArray.controls; let i = index" [formGroupName]="i"
+                      class="form-row align-items-center">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Value</mat-label>
+                        <input matInput formControlName="value" placeholder="Enter value" />
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Title</mat-label>
+                        <input matInput formControlName="title" placeholder="Enter title" />
+                      </mat-form-field>
+                      <button mat-icon-button class="btn-danger-icon" type="button" (click)="removeOutcome(i)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <mat-divider class="section-divider"></mat-divider>
+            <div class="row g-3">
+              <div class="col-md-6 d-flex">
+                <div class="section-wrapper">
+                  <h3 class="section-title">Hometags</h3>
+                  <div formArrayName="hometags" cdkDropList (cdkDropListDropped)="drop($event, 'hometags')">
+                    <div *ngFor="let control of getFormArray('hometags').controls; let j = index"
+                      class="form-row align-items-center" cdkDrag>
+                      <mat-icon matTooltip="Drag to reorder" class="drag-icon" cdkDragHandle>drag_indicator</mat-icon>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <input matInput [formControlName]="j" placeholder="Enter a hometag" />
+                      </mat-form-field>
+                      <button mat-icon-button class="btn-danger-icon"
+                        (click)="removeField('hometags', j, 'At least 1 hometag is required.')">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                  <button mat-stroked-button class="btn-primary-outline" type="button"
+                    (click)="addField('hometags')" *ngIf="isAllFilled('hometags')">
+                    <mat-icon>add</mat-icon> Add to your response
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </form>
         </mat-card-content>
           </mat-card>
