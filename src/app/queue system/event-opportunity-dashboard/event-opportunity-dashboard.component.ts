@@ -11,7 +11,7 @@ import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { EventOpportunityComponent } from './event-opportunity/event-opportunity.component';
-import { PlanningTabComponent } from './planning-tab/planning-tab.component';
+import { EventsStageDataComponent } from '../../Events/events-stage-data/events-stage-data.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -41,7 +41,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     MatMenuModule,
     MatChipsModule,
     NgxMatSelectSearchModule,
-    PlanningTabComponent
+    EventsStageDataComponent
   ],
   templateUrl: './event-opportunity-dashboard.component.html',
   styleUrl: './event-opportunity-dashboard.component.css'
@@ -109,6 +109,11 @@ export class EventOpportunityDashboardComponent {
   isEditMode: boolean = false;
 
   queueTokens: any[] = [];
+  /** The single live queue_token listener. Re-created (and the previous one torn down)
+   *  on every queue-selection change so exactly ONE listener is ever active — otherwise
+   *  stacked listeners for different queue sets race to overwrite queueTokens and the
+   *  counts become nondeterministic (differ machine-to-machine by click history). */
+  private queueTokensSub?: Subscription;
   developerRole:boolean = false;
   queueTokenMap: Map<string, any> = new Map();
   selectedProductFilter: string | null = null;
@@ -212,6 +217,8 @@ export class EventOpportunityDashboardComponent {
   }
 
   ngOnDestroy() {
+    if (this.studioWatchTimer) clearInterval(this.studioWatchTimer);
+    this.queueTokensSub?.unsubscribe();
     this.subscription.complete();
     this.subscription.next();
   }
@@ -1459,13 +1466,18 @@ export class EventOpportunityDashboardComponent {
   }
 
   fetchQueueTokens() {
-    if (this.selectedQueueList.length === 0) {
+    // Tear down the previous listener FIRST — a new selection must not leave the old
+    // query streaming into queueTokens (that stacking is what made counts differ across
+    // machines). Exactly one live queue_token listener at a time.
+    this.queueTokensSub?.unsubscribe();
+    const queues = this.loadedQueues;
+    if (queues.length === 0) {
       this.queueTokens = [];
       this.queueTokenMap.clear();
       return;
     }
-    const selectedQueueRef = this.selectedQueueList.map((e) => this.mapQueue[e]['docref'])
-    collectionData(query(
+    const selectedQueueRef = queues.map((e) => this.mapQueue[e]['docref'])
+    this.queueTokensSub = collectionData(query(
       collection(this.firestore, 'queue_token'),
       where('queueref', 'in', selectedQueueRef)
     )).pipe(takeUntil(this.subscription)).subscribe(tokens => {

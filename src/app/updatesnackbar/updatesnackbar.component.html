@@ -1,21 +1,11 @@
 <div class="update-snackbar-container">
-    <div class="update-content">
-      <mat-icon class="update-icon">system_update</mat-icon>
-      <span class="update-message">A new version is available!</span>
-    </div>
-    <div class="update-actions">
-      <!-- <button 
-        mat-button 
-        class="dismiss-btn"
-        (click)="dismiss()">
-        Later
-      </button> -->
-      <button 
-        mat-raised-button 
-        color="primary"
-        class="update-btn"
-        (click)="update()">
-        Update Now
-      </button>
-    </div>
+    <span class="update-dot"></span>
+    <span class="update-message">Update available</span>
+    <button
+      mat-raised-button
+      class="update-btn"
+      (click)="update()">
+      <mat-icon>refresh</mat-icon>
+      Reload
+    </button>
 </div>

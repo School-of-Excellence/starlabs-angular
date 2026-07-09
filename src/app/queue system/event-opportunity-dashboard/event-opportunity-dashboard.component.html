@@ -356,20 +356,7 @@
     </div>
     </ng-container>
 
-    <app-planning-tab
-      *ngIf="activeTab === 'planning'"
-      [selectedQueueList]="selectedQueueList"
-      [mapQueue]="mapQueue"
-      [mapData]="mapData"
-      [queueTokens]="queueTokens"
-      [allCompletedStageCount]="allCompletedStageCount"
-      [mapProfile]="mapProfile"
-      [mapNumber]="mapNumber"
-      [eventList]="eventList"
-      [queueList]="queueList"
-      (queueChange)="onPlanningQueueChange($event)"
-      [refreshKey]="planningRefreshKey">
-    </app-planning-tab>
+    <app-events-stage-data [hidden]="activeTab !== 'planning'"></app-events-stage-data>
   </div>
 
   <!-- Side Panel for Stage Details -->
