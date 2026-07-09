@@ -134,25 +134,33 @@
               </button>
             </div>
           </div>
-          <div class="col-auto d-flex gap-2">
-            <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
-              <mat-icon>upload_file</mat-icon> Import
-            </button>
-            <input type="file" #fileInput style="display: none" (change)="onImportData($event)"
-              accept=".csv,.xlsx,.xls" />
+          <div class="col-auto d-flex flex-column gap-2">
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
+                <mat-icon>upload_file</mat-icon> Import
+              </button>
+              <input type="file" #fileInput style="display: none" (change)="onImportData($event)"
+                accept=".csv,.xlsx,.xls" />
 
-            <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()"
-              [disabled]="getSelectedTokens().length === 0">
-              <mat-icon>local_offer</mat-icon> Add Tag
-            </button>
-            <button
-              class="btn btn-outline-primary"
-              mat-stroked-button
-              (click)="openBulkMovePanel()"
-              [disabled]="getSelectedTokens().length === 0">
-              <mat-icon>multiple_stop</mat-icon>
-              Bulk Move ({{getSelectedTokens().length}}/10)
-            </button>
+              <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()"
+                [disabled]="getSelectedTokens().length === 0">
+                <mat-icon>local_offer</mat-icon> Add Participant Tag
+              </button>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkQueueTags()"
+                [disabled]="getSelectedTokens().length === 0">
+                <mat-icon>local_offer</mat-icon> Add Queue Tag
+              </button>
+              <button
+                class="btn btn-outline-primary"
+                mat-stroked-button
+                (click)="openBulkMovePanel()"
+                [disabled]="getSelectedTokens().length === 0">
+                <mat-icon>multiple_stop</mat-icon>
+                Bulk Move ({{getSelectedTokens().length}}/10)
+              </button>
+            </div>
           </div>
         </section>
 
@@ -426,7 +434,7 @@
             (click)="!dfuFilterActive && !selectedStageSlot && (tagDropdownOpen=!tagDropdownOpen); !dfuFilterActive && !selectedStageSlot && tagDropdownOpen && onTagDropdownOpen()">
             <mat-icon class="fsb-icon">local_offer</mat-icon>
             <span class="fsb-label">
-              <span *ngIf="selectedTags.length === 0">Filter by Tags</span>
+              <span *ngIf="selectedTags.length === 0">Filter by Participant Tags</span>
               <span *ngIf="selectedTags.length > 0">{{selectedTags.length}} Tag(s)</span>
             </span>
             <span class="fsb-count" *ngIf="selectedTags.length > 0">{{selectedTags.length}}</span>
@@ -453,6 +461,45 @@
             </div>
             <div class="fsb-dropdown-footer" *ngIf="selectedTags.length > 0">
               <button (click)="selectedTags=[]; onTagFilterChange(); $event.stopPropagation()">Clear selection</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUEUE TAGS ROW -->
+        <div class="fsb-expandable" *ngIf="availableQueueTags.length > 0">
+          <div class="fsb-row" [class.fsb-row-active]="selectedQueueTags.length > 0"
+            [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
+            (click)="toggleQueueTagDropdown()">
+            <mat-icon class="fsb-icon">sell</mat-icon>
+            <span class="fsb-label">
+              <span *ngIf="selectedQueueTags.length === 0">Filter by Queue Tags</span>
+              <span *ngIf="selectedQueueTags.length > 0">{{selectedQueueTags.length}} Queue Tag(s)</span>
+            </span>
+            <span class="fsb-count" *ngIf="selectedQueueTags.length > 0">{{selectedQueueTags.length}}</span>
+            <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="queueTagDropdownOpen">expand_more</mat-icon>
+          </div>
+          <div class="fsb-dropdown" *ngIf="queueTagDropdownOpen && !dfuFilterActive && !selectedStageSlot">
+            <div class="fsb-dropdown-search">
+              <mat-icon>search</mat-icon>
+              <input type="text" [(ngModel)]="queueTagSearchTerm" (input)="filterQueueTags()"
+                (click)="$event.stopPropagation()" placeholder="Search queue tags...">
+              <button *ngIf="queueTagSearchTerm" (click)="clearQueueTagSearch(); $event.stopPropagation()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="fsb-dropdown-options">
+              <div class="fsb-option" *ngFor="let tag of filteredQueueTags"
+                [class.fsb-option-selected]="isQueueTagSelected(tag.id)"
+                (click)="toggleQueueTagSelection(tag.id); $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{isQueueTagSelected(tag.id) ? 'check_box' :
+                  'check_box_outline_blank'}}</mat-icon>
+                <span>{{tag.name}}</span>
+              </div>
+              <div class="fsb-empty" *ngIf="filteredQueueTags.length === 0">No queue tags found</div>
+            </div>
+            <div class="fsb-dropdown-footer" *ngIf="selectedQueueTags.length > 0">
+              <button (click)="selectedQueueTags=[]; onQueueTagFilterChange(); $event.stopPropagation()">Clear
+                selection</button>
             </div>
           </div>
         </div>
@@ -1153,6 +1200,9 @@
           </mat-chip>
           <mat-chip *ngFor="let tagId of selectedTags" (removed)="removeTag(tagId)" data-testid="qm-tag-chip" [attr.data-tag-id]="tagId">
             {{getTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
+          <mat-chip *ngFor="let tagId of selectedQueueTags" (removed)="removeQueueTag(tagId)">
+            {{getQueueTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="preassignedFilter !== 'all'"
             (removed)="preassignedFilter='all'; onPreassignedFilterChange()">
