@@ -63,7 +63,8 @@ export class CreateupcomingworkshopsComponent {
       buttonname: [''],
       totalseats: [null],
       unlimitedseat: [false],
-      showconfirmedseat: [false]
+      showconfirmedseat: [false],
+      show: [false]
     });
 
     // When "Unlimited seat" is on, disable and clear the total seats input.
@@ -93,7 +94,8 @@ export class CreateupcomingworkshopsComponent {
         buttonname: w.buttonname || '',
         totalseats: w.totalseats ?? null,
         unlimitedseat: !!w.unlimitedseat,
-        showconfirmedseat: !!w.showconfirmedseat
+        showconfirmedseat: !!w.showconfirmedseat,
+        show: !!w.show
       });
       if (w.unlimitedseat) {
         this.form.get('totalseats')?.disable();
@@ -131,7 +133,8 @@ export class CreateupcomingworkshopsComponent {
       buttonname: (raw.buttonname || '').trim(),
       totalseats: raw.unlimitedseat ? null : (raw.totalseats ?? null),
       unlimitedseat: !!raw.unlimitedseat,
-      showconfirmedseat: !!raw.showconfirmedseat
+      showconfirmedseat: !!raw.showconfirmedseat,
+      show: !!raw.show
     };
 
     try {
