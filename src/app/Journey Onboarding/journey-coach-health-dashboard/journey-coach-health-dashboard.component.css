@@ -1931,6 +1931,28 @@ td.mat-mdc-cell span {
 .ios-card .ios-card-title.tint-slate {
   color: #6e6e73;
 }
+
+/* Assigned-to-me status band (Active / Non-active / Discontinued) */
+.jchd-status-band { margin-bottom: 12px; }
+.jchd-status-band .ios-card-head { display: flex; align-items: baseline; justify-content: space-between; }
+.jchd-status-band .sb-total { font-size: 13px; color: #6e6e73; font-variant-numeric: tabular-nums; }
+.sb-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin: 10px 0 14px; background: #f2f2f7; }
+.sb-seg { height: 100%; }
+.sb-active { background: #34c759; }
+.sb-nonactive { background: #ff9500; }
+.sb-disc { background: #8e8e93; }
+.sb-segs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sb-tile { text-align: left; border: none; font: inherit; background: #f2f2f7; border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: background .15s ease, box-shadow .15s ease, transform .1s ease; }
+.sb-tile:hover { background: #ebebf0; }
+.sb-tile.is-on { box-shadow: inset 0 0 0 2px #007aff; }
+.sb-tile:active { transform: scale(0.99); }
+.sb-label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #6e6e73; }
+.sb-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.sb-dot.dot-active { background: #34c759; }
+.sb-dot.dot-nonactive { background: #ff9500; }
+.sb-dot.dot-disc { background: #8e8e93; }
+.sb-num { display: block; font-size: 24px; font-weight: 600; color: #1c1c1e; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.sb-sub { display: block; font-size: 11px; color: #aeaeb2; }
 .ios-card .ios-bignum {
   font-size: 40px;
   font-weight: 700;

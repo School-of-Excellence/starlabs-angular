@@ -66,6 +66,37 @@
     <!-- ===== Summary view (iOS cards) ===== -->
     <ng-container *ngIf="view === 'summary'">
     <div class="jchd-anim">
+
+      <!-- Assigned-to-me status band: Active / Non-active / Discontinued (per current scope) -->
+      <section class="ios-card jchd-status-band">
+        <div class="ios-card-head">
+          <span class="ios-card-title tint-slate">{{ selectedCoachId === ALL ? 'All participants' : (selectedCoachId === UNASSIGNED ? 'Unassigned' : 'Assigned to me') }}</span>
+          <span class="sb-total">{{ summary.total }} participants</span>
+        </div>
+        <div class="sb-bar" *ngIf="summary.total">
+          <span class="sb-seg sb-active" [style.width.%]="(summary.total - summary.nonActive - summary.discontinued) / summary.total * 100"></span>
+          <span class="sb-seg sb-nonactive" [style.width.%]="summary.nonActive / summary.total * 100"></span>
+          <span class="sb-seg sb-disc" [style.width.%]="summary.discontinued / summary.total * 100"></span>
+        </div>
+        <div class="sb-segs">
+          <button type="button" class="sb-tile" [class.is-on]="lifecycleFilter==='active'" (click)="goToStatus('active')">
+            <span class="sb-label"><i class="sb-dot dot-active"></i>Active</span>
+            <span class="sb-num">{{ summary.total - summary.nonActive - summary.discontinued }}</span>
+            <span class="sb-sub">subscription live</span>
+          </button>
+          <button type="button" class="sb-tile" [class.is-on]="lifecycleFilter==='nonactive'" (click)="goToStatus('nonactive')">
+            <span class="sb-label"><i class="sb-dot dot-nonactive"></i>Non-active</span>
+            <span class="sb-num">{{ summary.nonActive }}</span>
+            <span class="sb-sub">subscription ended</span>
+          </button>
+          <button type="button" class="sb-tile" [class.is-on]="lifecycleFilter==='discontinued'" (click)="goToStatus('discontinued')">
+            <span class="sb-label"><i class="sb-dot dot-disc"></i>Discontinued</span>
+            <span class="sb-num">{{ summary.discontinued }}</span>
+            <span class="sb-sub">off the active board</span>
+          </button>
+        </div>
+      </section>
+
       <section class="ios-grid">
 
         <!-- HERO: Needs Attention — click navigates to the filtered Participants tab -->
