@@ -302,6 +302,9 @@ export const routes: Routes = [
 
   // LiveKit (new call flow with DeepFilterNet3 client-side noise suppression)
   {path: 'joinlivekit/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},
+  // LiveKit Cloud + Krisp variant. NOTE: enter via a full page load (not client-side nav) so the
+  // coi-serviceworker COEP exemption for this path takes effect — Krisp requires NO cross-origin isolation.
+  {path: 'livekit-cloud-room/:roomid', loadComponent: () => import('./LiveKit-Cloud/livekit-cloud-room/livekit-cloud-room.component').then(m => m.LivekitCloudRoomComponent), canActivate: [authGuard]},
   {path: 'participantstudio', loadComponent: () => import('./OpenVidu/list-openvidu-room/list-openvidu-room.component').then(m => m.ListOpenviduRoomComponent), canActivate: [authGuard]},
   {path: 'openvidurecordings', loadComponent: () => import('./OpenVidu/openvidu-recording/openvidu-recording.component').then(m => m.OpenviduRecordingComponent), canActivate: [authGuard]},
 

@@ -20,11 +20,12 @@ import { InstanceStatusService } from '../../instance-status.service';
 import { MatDividerModule } from '@angular/material/divider';
 import { AdaptiveQualityService } from '../../Service/AdaptiveQuality/adaptive-quality.service';
 import { VideoLayoutService, LayoutMode } from '../../Service/VideoLayout/video-layout.service';
-// Patched DFN build (adds makeupGain + post-DFN gate); vendored from the videoconference
-// repo because npm deepfilternet3-noise-filter@1.2.1 lacks these. See vendor/.../package.json.
-import { DeepFilterNoiseFilterProcessor } from '../dfn/vendor/deepfilternet3-noise-filter';
-import { DfnStateService } from '../dfn/dfn-state.service';
-import { startJitterController } from '../dfn/jitter-buffer';
+// LiveKit-Cloud variant: noise filtering is Krisp (Cloud-only), handled by the standalone
+// <app-krisp-controls> component. DFN is intentionally NOT used here (no COEP/SAB needed).
+// DfnState (tile badges) + jitter controller are generic and reused from the LiveKit folder.
+import { DfnStateService } from '../../LiveKit/dfn/dfn-state.service';
+import { startJitterController } from '../../LiveKit/dfn/jitter-buffer';
+import { KrispControlsComponent } from '../krisp/krisp-controls.component';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -43,7 +44,7 @@ type RoomInfo = {
 
 
 @Component({
-  selector: 'app-join-livekit-call',
+  selector: 'app-livekit-cloud-room',
   imports: [
     OpenviduVideoElementComponent,
     OpenviduAudioElementComponent,
@@ -51,12 +52,13 @@ type RoomInfo = {
     MatIconModule,
     MatMenuModule,
     MatDividerModule,
-    CdkDrag
+    CdkDrag,
+    KrispControlsComponent
   ],
-  templateUrl: './join-livekit-call.component.html',
-  styleUrl: './join-livekit-call.component.css'
+  templateUrl: './livekit-cloud-room.component.html',
+  styleUrl: './livekit-cloud-room.component.css'
 })
-export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
+export class LivekitCloudRoomComponent implements AfterViewInit, OnDestroy {
 
   loggedinProfileid = null
   loggedinProfileRole = {}
@@ -95,20 +97,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   private previewStream: MediaStream | null = null;
 
-  // ── DeepFilterNet3 (exact videoconference TrackProcessor architecture) ──────
-  private static readonly DFN_PROCESSOR_NAME = 'deepfilternet3-noise-filter';
-  private dfnProc: DeepFilterNoiseFilterProcessor | null = null;
-  private dfnBroadcastTimer: any = null;
+  // ── Audio: noise filtering is Krisp, owned by <app-krisp-controls> (see template).
+  //    Only the generic per-track jitter controllers live here (reused from the LiveKit port).
   private jitterStops = new Map<string, () => void>();
-  // UI state — exact defaults from DfnControls.tsx
-  dfnEnabled = (typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4) >= 4; // off on <4-core devices
-  dfnAtten = 80;        // attenuation / noiseReductionLevel (0–100)
-  dfnNorm = 1.2;        // makeup gain (1.0–2.5)
-  dfnNormOn = true;     // normalize toggle
-  dfnGateOn = true;     // gate toggle
-  dfnGateDb = -45;      // gate threshold dBFS (-70…-25)
-  dfnPanelOpen = false; // tuning popover visibility
-  get dfnEffNorm(): number { return this.dfnNormOn ? this.dfnNorm : 1.0; }
   // Cache active blur processor — avoids recreating the canvas pipeline on every camera re-enable
   private cachedBlurProcessor: any = null;
   private cachedBlurRadius: number = 0;
@@ -209,29 +200,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async checkServer(){
-    this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
-      next: (serverData) => {
-        if (serverData) {
-          const masterStatus = serverData["master"]["state"]
-          const mediaNode = serverData["media"]["instanceStates"]["healthy"] || 0
-
-          if(masterStatus == "running" && mediaNode > 0){
-            this.prepareParticipant()
-            this.serverSubscription?.next()
-            this.serverSubscription?.complete()
-          }
-          else if(masterStatus == "running" || masterStatus == "starting"){
-            this.meetingRoomStatus = "serverstarting"
-          }
-          else {
-            this.meetingRoomStatus = "serverfailed"
-          }
-        }
-      },
-      error: (err) => {
-        console.error('Infrastructure status error:', err);
-      }
-    });
+    // LiveKit Cloud is fully managed and always available — there is NO AWS master/media node to
+    // poll (that's the self-hosted flow). Skip the infrastructure health check and go straight to
+    // requesting devices / preparing the participant.
+    this.prepareParticipant();
   }
 
   async prepareParticipant() {
@@ -456,17 +428,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // premature downgrades during the first 15 seconds).
       this.adaptiveQuality.startMonitoring(room);
 
-      // Publish the mic (LiveKit-managed), then apply the DeepFilterNet3 TrackProcessor —
-      // the exact videoconference architecture. applyDfnProcessor() also sets the input
-      // constraints (raw input / voiceIsolation off while DFN is on). LiveKit owns the
-      // track lifecycle (mute / device-switch), so no separate raw-stream handling needed.
+      // Publish the mic (LiveKit-managed) with the browser's default DSP. The noise filter
+      // (Off / Native / Krisp) is applied by <app-krisp-controls>, which attaches the Krisp
+      // TrackProcessor to this published mic track and manages device-switch re-enable.
       await room.localParticipant.setMicrophoneEnabled(true, {
         noiseSuppression: true,
         echoCancellation: true,
         autoGainControl: true,
       });
-      await this.applyDfnProcessor();
-      this.startDfnBroadcast();
 
       // Expose this component so the audio A/B test can be driven from the console:
       //   await __lk.audioDiag()
@@ -492,33 +461,19 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   private async getTokenWithRetry(): Promise<any> {
     const roomName = this.roomDetail.roomId;
+    // LiveKit Cloud has no capacity-scaling handshake (fully managed), so no 503 retry loop.
+    // The CF (createLivekitCloudToken) makes the LiveKit identity unique per request, so two
+    // tabs of the same user no longer collide and evict each other.
     const participantId = this.loggedinProfileid || `user-${Date.now()}`;
     const participantName = this.loggedinProfileRole["name"] || 'Guest';
 
-    let retryCount = 0;
-
-    while (retryCount <= 3) {
-      try {
-        return await firstValueFrom(
-          this.httpClient.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
-            roomName,
-            participantName,
-            participantId
-          })
-        );
-      } catch (error: any) {
-        if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {
-          retryCount++;
-          if (retryCount > 3) throw new Error('System at capacity');
-
-          const wait = error.error?.retryAfter || 60;
-          console.log(`Scaling... retry in ${wait}s`);
-          await new Promise(r => setTimeout(r, wait * 1000));
-        } else {
-          throw error;
-        }
-      }
-    }
+    return await firstValueFrom(
+      this.httpClient.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createLivekitCloudToken`, {
+        roomName,
+        participantName,
+        participantId
+      })
+    );
   }
 
   // Leave/Disconnect from the Room
@@ -538,12 +493,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     currentRoom?.removeAllListeners();
     await currentRoom?.disconnect();
 
-    // Tear down DFN: broadcast timer, jitter controllers, processor, shared state.
-    if (this.dfnBroadcastTimer) { clearInterval(this.dfnBroadcastTimer); this.dfnBroadcastTimer = null; }
+    // Tear down: jitter controllers + shared filter-state plumbing. The Krisp processor is
+    // owned/torn-down by <app-krisp-controls> (its own ngOnDestroy stops the processor).
     this.jitterStops.forEach(stop => stop());
     this.jitterStops.clear();
-    try { (this.dfnProc as any)?.destroy?.(); } catch (_) {}
-    this.dfnProc = null;
     this.dfnState.stop();
 
     // Reset all variables
@@ -568,7 +521,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     if(confirm("Sure, do you want to close this meeting for all?")){
       var progress = this.dialog.open(LoadingProgressComponent, {data:{msg: "Ending Call..."},disableClose:true})
       try {
-        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduCloseRoom`;
+        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/livekitCloudCloseRoom`;
         const response = await lastValueFrom(
           this.httpClient.post(url, {
             roomName: this.roomDetail["roomId"]
@@ -616,118 +569,6 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     else{
       micPub.mute()
     }
-  }
-
-  // ── DeepFilterNet3 control methods (exact DfnControls.tsx behaviour) ─────────
-
-  /** Apply or remove the DFN TrackProcessor on the local mic + set input constraints. */
-  private async applyDfnProcessor(): Promise<void> {
-    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
-    if (!micTrack) return;
-    try {
-      if (this.dfnEnabled) {
-        if (!this.dfnProc) {
-          if (!DeepFilterNoiseFilterProcessor.isSupported()) {
-            console.warn('DeepFilterNet3 not supported on this browser');
-            return;
-          }
-          // Clock-domain: force the mic track onto a 48 kHz AudioContext (no drift).
-          try {
-            const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
-            const t = micTrack as any;
-            if (AC && typeof t.setAudioContext === 'function' && t.audioContext?.sampleRate !== 48000) {
-              t.setAudioContext(new AC({ sampleRate: 48000 }));
-            }
-          } catch (_) {}
-          const proc = new DeepFilterNoiseFilterProcessor({
-            sampleRate: 48000,
-            noiseReductionLevel: this.dfnAtten,
-            enabled: true,
-            makeupGain: this.dfnEffNorm,
-            gateEnabled: this.dfnGateOn,
-            gateThresholdDb: this.dfnGateDb,
-            assetConfig: { cdnUrl: '/assets/df3' },
-          });
-          this.dfnProc = proc;
-          await micTrack.setProcessor(proc as any);
-        }
-      } else if (this.dfnProc) {
-        this.dfnProc = null;
-        await micTrack.stopProcessor();
-      }
-
-      // Input constraints: when DFN is ON keep the input raw (voiceIsolation off) so we
-      // don't double-process; when OFF, enable Chrome's own NS/EC/AGC + voiceIsolation.
-      try {
-        const mst = micTrack.mediaStreamTrack;
-        if (mst) {
-          const constraints = this.dfnEnabled
-            ? { voiceIsolation: false }
-            : { echoCancellation: true, noiseSuppression: true, autoGainControl: true, voiceIsolation: true };
-          await mst.applyConstraints(constraints as unknown as MediaTrackConstraints);
-        }
-      } catch (ce) {
-        console.warn('DFN applyConstraints (voiceIsolation) not supported', ce);
-      }
-    } catch (e) {
-      console.error('DFN control error', e);
-    }
-  }
-
-  /** Broadcast this participant's DFN settings so peers can badge the tile (every 3 s). */
-  private broadcastDfn(): void {
-    const room = this.room();
-    if (!room) return;
-    const id = room.localParticipant?.identity;
-    const info = { dfn: this.dfnEnabled, atten: this.dfnAtten, norm: this.dfnEffNorm };
-    if (id) this.dfnState.update(id, info);
-    if (!id) return;
-    try {
-      room.localParticipant.publishData(
-        new TextEncoder().encode(JSON.stringify({ type: 'dfn', ...info })),
-        { reliable: true },
-      );
-    } catch (_) {}
-  }
-
-  private startDfnBroadcast(): void {
-    this.broadcastDfn();
-    this.dfnBroadcastTimer = setInterval(() => this.broadcastDfn(), 3000);
-  }
-
-  /** Master DFN on/off. */
-  async toggleDfn(): Promise<void> {
-    this.dfnEnabled = !this.dfnEnabled;
-    await this.applyDfnProcessor();
-    this.broadcastDfn();
-  }
-
-  onDfnAttenChange(v: number): void {
-    this.dfnAtten = v;
-    try { this.dfnProc?.setSuppressionLevel(v); } catch (_) {}
-    this.broadcastDfn();
-  }
-
-  onDfnNormOnChange(on: boolean): void {
-    this.dfnNormOn = on;
-    try { this.dfnProc?.setMakeupGain(this.dfnEffNorm); } catch (_) {}
-    this.broadcastDfn();
-  }
-
-  onDfnNormChange(v: number): void {
-    this.dfnNorm = v;
-    try { this.dfnProc?.setMakeupGain(this.dfnEffNorm); } catch (_) {}
-    this.broadcastDfn();
-  }
-
-  onDfnGateOnChange(on: boolean): void {
-    this.dfnGateOn = on;
-    try { this.dfnProc?.setGateEnabled(on); } catch (_) {}
-  }
-
-  onDfnGateDbChange(v: number): void {
-    this.dfnGateDb = v;
-    try { this.dfnProc?.setGateThreshold(v); } catch (_) {}
   }
 
   /**
@@ -886,7 +727,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.roomDetail.recordingstatus = "starting";
     try {
       var roomId = this.roomDetail["roomId"]
-      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStartRecording`;
+      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/livekitCloudStartRecording`;
       const response = await lastValueFrom(
         this.httpClient.post(url, { roomId })
       );
@@ -904,7 +745,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.roomDetail.recordingstatus = "ending";
       var egressId = this.roomDetail["egressId"]
       if(egressId){
-        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStopRecording`;
+        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/livekitCloudStopRecording`;
         const response = await lastValueFrom(
           this.httpClient.post(url, { egressId: egressId, roomId: this.roomDetail.roomId })
         );
@@ -1077,7 +918,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     if (!confirmed) return;
 
     try {
-      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/kickParticipant`;
+      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/livekitCloudKickParticipant`;
 
       const response = await firstValueFrom(
         this.httpClient.post<{ success: boolean; message: string }>(
@@ -1124,13 +965,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     const micPub = this.getLocalTrackPublication(Track.Source.Microphone);
     const micTrack: any = micPub?.audioTrack;
-    const dfn = {
-      processorAttached: !!this.dfnProc,
-      processorName: micTrack?.getProcessor?.()?.name ?? null,   // expect 'deepfilternet3-noise-filter'
-      enabled: this.dfnEnabled,
-      attenuation: this.dfnAtten,
-      makeupGain: this.dfnEffNorm,
-      gate: this.dfnGateOn ? `${this.dfnGateDb} dBFS` : 'off',
+    const proc = micTrack?.getProcessor?.();
+    const filter = {
+      processorName: proc?.name ?? null,                 // 'livekit-noise-filter' when Krisp is active
+      krispEnabled: proc?.isEnabled?.() ?? null,         // true only when Krisp is actually processing
+      processedTrackLive: proc?.processedTrack?.readyState ?? null,
       micSampleRate: micTrack?.mediaStreamTrack?.getSettings?.()?.sampleRate ?? '?',
     };
 
@@ -1222,7 +1061,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       crossOriginIsolated: typeof window !== 'undefined' ? (window as any).crossOriginIsolated : '?',
     };
 
-    console.log('%c[diag] DFN status', 'font-weight:bold;color:#4caf50', dfn);
+    console.log('%c[diag] Krisp filter status', 'font-weight:bold;color:#4caf50', filter);
     console.log('%c[diag] CLIENT load (blur/CPU — A/B blur off vs on)', 'font-weight:bold;color:#9c27b0', client);
     console.log('%c[diag] UPLINK (this mic → SFU) — works solo', 'font-weight:bold;color:#2196f3');
     console.table([uplink]);
@@ -1230,7 +1069,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     console.table(rows.length ? rows : [{ note: 'no remote audio streams — join a 2nd participant to measure downlink breakup' }]);
     console.log(`[diag] window ${dt.toFixed(1)}s · GOOD: conceal <15 ms/s, loss <1%, jitter <30 ms, rtt <120 ms, pair host/srflx (NOT relay)`);
     console.log('[diag] BAD breakup: conceal >50 ms/s, loss >2%, rtt >250 ms, or pair contains "relay"');
-    return { dfn, client, uplink, downlink: rows };
+    return { filter, client, uplink, downlink: rows };
   }
 
   /**
@@ -1248,7 +1087,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     try {
 
-      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/muteParticipant`;
+      const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/livekitCloudMuteParticipant`;
 
       const response = await firstValueFrom(
         this.httpClient.post<{ success: boolean; message: string }>(

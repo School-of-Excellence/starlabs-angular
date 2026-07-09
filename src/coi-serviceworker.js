@@ -23,6 +23,11 @@ if (typeof window === 'undefined') {
 
     self.addEventListener("fetch", function (event) {
         const r = event.request;
+        // LiveKit-Cloud room needs NO cross-origin isolation (Krisp becomes a silent pass-through
+        // under COEP). Let this path's document load untouched so crossOriginIsolated stays false.
+        try {
+            if (new URL(r.url).pathname.startsWith("/livekit-cloud-room")) return;
+        } catch (e) {}
         if (r.cache === "only-if-cached" && r.mode !== "same-origin") {
             return;
         }
@@ -60,6 +65,10 @@ if (typeof window === 'undefined') {
 
 } else {
     (() => {
+        // LiveKit-Cloud room route: skip all COOP/COEP enforcement (no isolation, no degrade-reload
+        // loop) so Krisp works. Enter this route via a full page load for the exemption to apply.
+        if (window.location.pathname.startsWith("/livekit-cloud-room")) return;
+
         const reloadedBySelf = window.sessionStorage.getItem("coiReloadedBySelf");
         window.sessionStorage.removeItem("coiReloadedBySelf");
         const coepDegrading = (reloadedBySelf == "coepdegrade");

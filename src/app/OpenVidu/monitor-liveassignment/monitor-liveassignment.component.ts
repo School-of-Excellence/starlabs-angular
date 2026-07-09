@@ -289,7 +289,19 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     const participantName = (this.loggedinProfileRole["name"] || 'Guest') + this.ghostID;
 
     console.log({roomName, participantId, participantName})
-    
+
+    // Cloud rooms: fully-managed token endpoint — no capacity/503 handshake, so no retry loop.
+    if (this.getProvider(roomID) === 'livekit-cloud') {
+      return await firstValueFrom(
+        this.http.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createLivekitCloudToken`, {
+          roomName,
+          participantName,
+          participantId
+        })
+      );
+    }
+
+    // OpenVidu self-hosted: existing capacity-aware retry loop (unchanged)
     let retryCount = 0;
 
     while (retryCount <= 3) {
@@ -320,7 +332,9 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     if(confirm("Sure, do you want to close this meeting for all?")){
       var progress = this.dialog.open(LoadingProgressComponent, {data:{msg: "Ending Call..."},disableClose:true})
       try {
-        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduCloseRoom`;
+        // Close on the correct backend for this room's provider.
+        const closeFn = this.getProvider(RoomId) === 'livekit-cloud' ? 'livekitCloudCloseRoom' : 'openViduCloseRoom';
+        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/${closeFn}`;
         const response = await lastValueFrom(
           this.http.post(url, {
             roomName: RoomId
@@ -537,6 +551,16 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     if (status === 'stable') return 'state-stable';
     if (status === 'scaling-up' || status === 'scaling-down') return 'state-transitioning';
     return 'state-unknown';
+  }
+
+  /** Which backend this room runs on. Missing provider == self-hosted (default). */
+  getProvider(roomId: string): 'livekit-cloud' | 'openvidu' {
+    return this.mapOpenViduRoom[roomId]?.['provider'] === 'livekit-cloud' ? 'livekit-cloud' : 'openvidu';
+  }
+
+  /** Human label for the provider badge. */
+  getProviderLabel(roomId: string): string {
+    return this.getProvider(roomId) === 'livekit-cloud' ? 'LiveKit Cloud' : 'OpenVidu AWS';
   }
 
   isParticipantMuted(roomId: string, identity: string): boolean {
