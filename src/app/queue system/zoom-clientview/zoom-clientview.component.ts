@@ -868,9 +868,6 @@ export class ZoomClientviewComponent {
 
   // Close on any click outside the menu/pill (both stop propagation).
   @HostListener('document:click')
-  private onDocumentClick(): void {
-    if (this.menuKind) { this.nativeMenuItems = []; this.ngZone.run(() => { this.menuKind = ''; this.menuItems = []; }); }
-  }
 
   ngOnDestroy() {
     window.removeEventListener('keydown', this.boundKeyDown);
