@@ -3,7 +3,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, setDoc, serverTimestamp,
+  Firestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, setDoc, deleteDoc, serverTimestamp,
   orderBy, startAfter, limit, documentId, getCountFromServer, QueryDocumentSnapshot, writeBatch
 } from '@angular/fire/firestore';
 import { Auth, authState } from '@angular/fire/auth';
@@ -124,6 +124,7 @@ interface LiteIndexRow {
   name: string;
   number: string | null;
   coachedby: any;                  // raw coachedby value (for isMine / isUnassigned)
+  journeyname: string;             // resolved journey name (for the journey / journey-group filter base-wide)
   productType: ProductType;
   atcmodel: string | null;
   customerstatus: string | null;
@@ -139,6 +140,9 @@ interface LiteIndexRow {
   notStarted: boolean;             // onboarded but journey not started
   goingQuiet: boolean;             // no coach contact in QUIET_DAYS+ days (set once contact data loads)
 }
+
+/** A coach's personal journey group: a chosen name over a set of journey names (one journey per group). */
+interface JourneyGroup { id: string; name: string; journeys: string[]; }
 
 /** Phase C: one coach's gamified scoreboard row for the selected date range. */
 interface ScoreboardRow {
@@ -487,10 +491,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const flagsP = this.loadFlags();
     // Base-wide 'addressed' snapshots — needed so Needs Attention excludes addressed participants from render.
     const addressedP = this.loadAddressed();
+    // Personal journey groups (owner == actorUid, resolved in resolveCoach before this runs).
+    const groupsP = this.loadJourneyGroups();
     // coach names are resolved from profileMap, so loadCoaches chains after it (still parallel
     // with meta / journey / flags).
     const coachesP = profileP.then(() => this.loadCoaches());
-    await Promise.all([profileP, metaP, journeyP, flagsP, addressedP, coachesP]);
+    await Promise.all([profileP, metaP, journeyP, flagsP, addressedP, groupsP, coachesP]);
     this.setProgress(35, 'Resolving your base…');
 
     const matchedCoach = !!(this.coachId && this.coaches.some(c => c.id === this.coachId));
@@ -1859,6 +1865,117 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return total > 0 ? (count / total) * 100 : 0;
   }
 
+  /** Journey-wise split of the current scope's participants (actual journey names, desc by count).
+   *  Exact in a coach's full view; page-local in the paged All view (the lite index carries no
+   *  journey name yet). */
+  journeyMix = computed<{ name: string; count: number }[]>(() => {
+    const m = new Map<string, number>();
+    for (const r of this.allRows()) {
+      const j = (r.journeyname && r.journeyname !== '-') ? r.journeyname : 'Unknown';
+      m.set(j, (m.get(j) ?? 0) + 1);
+    }
+    return [...m.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  });
+
+  // ---- personal journey groups (a named roll-up over chosen journeys, one journey per group) ----
+  journeyGroups = signal<JourneyGroup[]>([]);
+  groupPanelOpen = false;
+  editingGroupId: string | null = null;
+  newGroupName = '';
+  newGroupJourneys = new Set<string>();
+  journeyGroupFilter: string[] = [];   // journeys of the tapped group (Participants filter)
+
+  /** The "By journey" split with groups rolled up + ungrouped journeys individual, desc by count. */
+  journeyView = computed<{ name: string; count: number; group: boolean; journeys: string[] }[]>(() => {
+    const mix = this.journeyMix();
+    const countOf = new Map(mix.map(j => [j.name, j.count] as const));
+    const grouped = new Set<string>();
+    const out: { name: string; count: number; group: boolean; journeys: string[] }[] = [];
+    for (const g of this.journeyGroups()) {
+      let c = 0;
+      for (const j of g.journeys) { c += countOf.get(j) ?? 0; grouped.add(j); }
+      out.push({ name: g.name, count: c, group: true, journeys: g.journeys });
+    }
+    for (const j of mix) if (!grouped.has(j.name)) out.push({ name: j.name, count: j.count, group: false, journeys: [j.name] });
+    return out.sort((a, b) => b.count - a.count);
+  });
+
+  /** Personal groups for the logged-in coach (owner == actorUid). Degrades to none on failure. */
+  private async loadJourneyGroups(): Promise<void> {
+    if (!this.actorUid) return;
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'healthtracker_journeygroup'), where('owner', '==', this.actorUid)));
+      this.journeyGroups.set(snap.docs.map(d => {
+        const x: any = d.data();
+        return { id: d.id, name: (x['name'] ?? '').toString(), journeys: Array.isArray(x['journeys']) ? x['journeys'] : [] };
+      }));
+    } catch (e) { console.warn('journey groups load failed (non-fatal)', e); }
+  }
+
+  /** Every journey in the base — what the group picker offers. */
+  pickerJourneys(): string[] { return this.journeyMix().map(j => j.name); }
+  /** Group a journey already belongs to (excluding the one being edited) — one-journey-per-group. */
+  groupOfJourney(name: string): JourneyGroup | null {
+    return this.journeyGroups().find(g => g.id !== this.editingGroupId && g.journeys.includes(name)) ?? null;
+  }
+  isJourneyPicked(name: string): boolean { return this.newGroupJourneys.has(name); }
+  toggleGroupPanel(): void { this.groupPanelOpen = !this.groupPanelOpen; if (this.groupPanelOpen) this.startNewGroup(); }
+  startNewGroup(): void { this.editingGroupId = null; this.newGroupName = ''; this.newGroupJourneys = new Set(); }
+  editGroup(g: JourneyGroup): void { this.groupPanelOpen = true; this.editingGroupId = g.id; this.newGroupName = g.name; this.newGroupJourneys = new Set(g.journeys); }
+  toggleJourneyInNewGroup(name: string): void {
+    if (this.groupOfJourney(name)) return;                 // locked to another group
+    if (this.newGroupJourneys.has(name)) this.newGroupJourneys.delete(name); else this.newGroupJourneys.add(name);
+  }
+
+  /** Create or update the group being edited (honest write; optimistic reload). */
+  async saveGroup(): Promise<void> {
+    const name = this.newGroupName.trim();
+    const journeys = [...this.newGroupJourneys];
+    if (!name) { this.guard.openSnackBar('Give the group a name', 'Close'); return; }
+    if (!journeys.length) { this.guard.openSnackBar('Pick at least one journey', 'Close'); return; }
+    try {
+      if (this.editingGroupId) {
+        await updateDoc(doc(this.firestore, 'healthtracker_journeygroup', this.editingGroupId), { name, journeys });
+      } else {
+        await addDoc(collection(this.firestore, 'healthtracker_journeygroup'),
+          { name, journeys, owner: this.actorUid, createdBy: this.coachName, created: serverTimestamp() });
+      }
+      await this.loadJourneyGroups();
+      this.startNewGroup();
+      this.guard.openSnackBar(`Group "${name}" saved`, 'Close');
+    } catch (e: any) {
+      this.guard.openSnackBar('Could not save group: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+    }
+  }
+  async deleteGroup(g: JourneyGroup): Promise<void> {
+    try {
+      await deleteDoc(doc(this.firestore, 'healthtracker_journeygroup', g.id));
+      await this.loadJourneyGroups();
+      if (this.editingGroupId === g.id) this.startNewGroup();
+      this.guard.openSnackBar(`Group "${g.name}" removed`, 'Close');
+    } catch (e: any) {
+      this.guard.openSnackBar('Could not delete: ' + (e?.message ?? 'permission denied'), 'Close', 5000);
+    }
+  }
+
+  /** A By-journey row (single journey OR a group) → Participants filtered to its journey(s). */
+  goToJourney(item: { name: string; group: boolean; journeys: string[] }): void {
+    this.statusFilter = '';
+    this.financeFilters = [];
+    this.lifecycleFilter = '';
+    this.activeLever = 'all';
+    if (item.group) {
+      const same = this.journeyGroupFilter.length === item.journeys.length && item.journeys.every(j => this.journeyGroupFilter.includes(j));
+      this.journeyFilter = '';
+      this.journeyGroupFilter = same ? [] : [...item.journeys];
+    } else {
+      this.journeyGroupFilter = [];
+      this.journeyFilter = this.journeyFilter === item.name ? '' : item.name;
+    }
+    this.view = 'base';
+    this.applyFilters();
+  }
+
   /** Real top-of-queue participants for a coach (Coaches view), from the loaded base rows.
    *  Matches a row to the coach via the row's own coachname (resolved in computeRows), so it
    *  never fabricates — it only previews participants actually present in the loaded base. */
@@ -2436,7 +2553,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted'
       || this.activeLever === 'flagged' || this.activeLever === 'needsAttention'
       // the status-band Non-active / Discontinued segments legitimately show non-subActive people
-      || this.lifecycleFilter === 'nonactive' || this.lifecycleFilter === 'discontinued';
+      || this.lifecycleFilter === 'nonactive' || this.lifecycleFilter === 'discontinued'
+      // journey filter shows the WHOLE journey cohort (all lifecycle states), matching the split count
+      || !!this.journeyFilter || this.journeyGroupFilter.length > 0;
     if (!bypassActiveGate && r.subActive === wantInactive) return false;
     // "Assigned to me" status band segments (discontinued wins over active/non-active)
     if (this.lifecycleFilter === 'discontinued' && !this.isInactiveStatus(r.customerstatus)) return false;
@@ -2454,6 +2573,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'active' && !r.subActive) return false;
     if (this.activeLever === 'tickets' && !(r.openTickets > 0)) return false;
     if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
+    if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(r.journeyname)) return false;
     if (this.statusFilter && (r.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${r.name} ${r.number ?? ''}`.toLowerCase().includes(term))) return false;
     // --- intelligent filter panel ---
@@ -2486,7 +2606,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // non-subActive people, so they bypass the default subActive gate here too.
     const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted'
       || this.activeLever === 'flagged' || this.activeLever === 'needsAttention'
-      || this.lifecycleFilter === 'nonactive' || this.lifecycleFilter === 'discontinued';
+      || this.lifecycleFilter === 'nonactive' || this.lifecycleFilter === 'discontinued'
+      || !!this.journeyFilter;
     if (!bypassActiveGate && lite.subActive === wantInactive) return false;
     // "Assigned to me" status band segments (base-wide via the lite index)
     if (this.lifecycleFilter === 'discontinued' && !this.isInactiveStatus(lite.customerstatus)) return false;
@@ -2495,6 +2616,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // flags are a base-wide global Set, so the flagged filter covers the WHOLE base in paged mode.
     if (this.activeLever === 'flagged' && !this.flaggedIds().has(lite.profileid)) return false;
     if (this.activeLever === 'active' && !lite.subActive) return false;
+    if (this.journeyFilter && lite.journeyname !== this.journeyFilter) return false;
+    if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(lite.journeyname)) return false;
     if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(lite.productType)) return false;
@@ -2576,6 +2699,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
         number: this.profileMap.phonenumber?.[profileid] ?? null,
         coachedby: d['coachedby'] ?? null,
+        journeyname: journeyId ? (this.journeyNameMap[journeyId] ?? journeyId) : (meta['activejourney'] ?? '-'),
         productType,
         atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
         customerstatus: meta['customerstatus'] ?? null,
@@ -2639,6 +2763,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   clearFilters(): void {
     this.search = '';
     this.journeyFilter = '';
+    this.journeyGroupFilter = [];
     this.statusFilter = '';
     this.lifecycleFilter = '';
     this.activeLever = 'all';
@@ -2655,7 +2780,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** True when any filter differs from its default (drives the "Clear filters" affordance). */
   get hasActiveFilters(): boolean {
-    return !!this.search || !!this.journeyFilter || !!this.statusFilter || !!this.lifecycleFilter || this.activeLever !== 'all'
+    return !!this.search || !!this.journeyFilter || this.journeyGroupFilter.length > 0 || !!this.statusFilter || !!this.lifecycleFilter || this.activeLever !== 'all'
       || !(this.productTypeFilters.length === 1 && this.productTypeFilters[0] === 'ecosystem') || this.tierFilters.length > 0 || this.bandFilters.length > 0
       || this.healthFilters.length > 0 || this.financeFilters.length > 0
       || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
