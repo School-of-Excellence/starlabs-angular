@@ -43,6 +43,7 @@ export class UpcomingworkshopsComponent implements OnInit {
     'location',
     'seats',
     'showconfirmedseat',
+    'show',
     'actions'
   ];
 

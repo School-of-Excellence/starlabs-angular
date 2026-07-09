@@ -144,6 +144,11 @@
   color: #4f63c4;
 }
 
+.chip-off {
+  background: #f1f3f6;
+  color: #98a2b3;
+}
+
 .bool-icon {
   color: #cbd2dd;
 }
