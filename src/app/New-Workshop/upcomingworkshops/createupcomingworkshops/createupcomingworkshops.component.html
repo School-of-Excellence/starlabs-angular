@@ -1,0 +1,90 @@
+<div class="dialog-wrap">
+  <div class="dialog-head">
+    <h2 mat-dialog-title>{{ isEditMode ? 'Edit Upcoming Workshop' : 'Add Upcoming Workshop' }}</h2>
+    <button mat-icon-button type="button" (click)="cancel()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <mat-dialog-content class="dialog-body">
+      <div class="grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Event Date</mat-label>
+          <input matInput [matDatepicker]="picker" formControlName="eventdate" readonly (click)="picker.open()" />
+          <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+          <mat-error *ngIf="form.get('eventdate')?.hasError('required')">Event date is required.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Type</mat-label>
+          <input matInput formControlName="type" placeholder="Enter type" />
+          <mat-error *ngIf="form.get('type')?.hasError('required')">Type is required.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Cost</mat-label>
+          <mat-select formControlName="cost">
+            <mat-option value="Free">Free</mat-option>
+            <mat-option value="Paid">Paid</mat-option>
+          </mat-select>
+          <mat-error *ngIf="form.get('cost')?.hasError('required')">Cost is required.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Title</mat-label>
+          <input matInput formControlName="title" placeholder="Enter title" />
+          <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>With</mat-label>
+          <input matInput formControlName="with" placeholder="Enter with" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Location</mat-label>
+          <input matInput formControlName="location" placeholder="Enter location" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Button Name</mat-label>
+          <input matInput formControlName="buttonname" placeholder="Enter button name" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Total Seats</mat-label>
+          <input matInput type="number" min="0" formControlName="totalseats" placeholder="Enter total seats" />
+          <mat-hint *ngIf="form.get('unlimitedseat')?.value">Unlimited seats enabled</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="toggles">
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-title">Unlimited Seat</span>
+            <span class="toggle-desc">Turn on to allow unlimited seats (total seats is disabled).</span>
+          </div>
+          <mat-slide-toggle formControlName="unlimitedseat" color="primary"></mat-slide-toggle>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-title">Show Confirmed Seat</span>
+            <span class="toggle-desc">Display confirmed seats to participants.</span>
+          </div>
+          <mat-slide-toggle formControlName="showconfirmedseat" color="primary"></mat-slide-toggle>
+        </div>
+      </div>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end" class="dialog-actions">
+      <button mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
+      <button mat-flat-button color="primary" type="submit" [disabled]="isSaving">
+        <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
+        <span *ngIf="!isSaving">{{ isEditMode ? 'Update' : 'Save' }}</span>
+      </button>
+    </mat-dialog-actions>
+  </form>
+</div>
