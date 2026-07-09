@@ -1,0 +1,353 @@
+<div class="esd">
+
+  <!-- Steps indicator -->
+  <div class="steps">
+    <span class="stp" [class.on]="step==='events'">1. Event</span>
+    <span class="arw">›</span>
+    <span class="stp" [class.on]="step==='arenas'">2. Arena event</span>
+    <span class="arw">›</span>
+    <span class="stp" [class.on]="step==='participants'">3. Queue &amp; stages</span>
+  </div>
+
+  <!-- ============ Step 1: pick an event ============ -->
+  <div *ngIf="step==='events'">
+    <h2>Events stage data</h2>
+    <p class="hint">Step 1 · Select an event</p>
+
+    <div class="row">
+      <label><input type="radio" name="mode" [checked]="mode==='upcoming'" (change)="setMode('upcoming')"> Upcoming</label>
+      <label><input type="radio" name="mode" [checked]="mode==='past'" (change)="setMode('past')"> Past</label>
+      <input class="search" type="text" [(ngModel)]="searchEvents" (ngModelChange)="onEventSearch()" placeholder="Search event name">
+    </div>
+
+    <p *ngIf="loadingEvents">Loading events…</p>
+    <p *ngIf="eventsError" class="err">Couldn't load events. <button (click)="retryEvents()">Retry</button></p>
+
+    <table *ngIf="!loadingEvents && !eventsError">
+      <thead><tr><th>Event</th><th>Dates</th><th></th></tr></thead>
+      <tbody>
+        <tr *ngFor="let row of pagedEvents">
+          <td>{{ row.name }}</td>
+          <td>{{ row.dateLabel || '—' }}</td>
+          <td><button (click)="selectEvent(row)">Select</button></td>
+        </tr>
+        <tr *ngIf="filteredEvents.length === 0"><td colspan="3" class="empty">No events</td></tr>
+      </tbody>
+    </table>
+    <mat-paginator *ngIf="!loadingEvents && !eventsError" [length]="filteredEvents.length" [pageSize]="eventPageSize"
+      [pageSizeOptions]="[10, 25, 50]" [pageIndex]="eventPageIndex" (page)="onEventPage($event)"></mat-paginator>
+  </div>
+
+  <!-- ============ Step 2: pick an arena event ============ -->
+  <div *ngIf="step==='arenas'">
+    <p class="crumb"><button (click)="goToEvents()">← Events</button></p>
+    <h2>{{ selectedEvent?.name }}</h2>
+    <p class="hint">Step 2 · Select an arena event</p>
+
+    <p *ngIf="loadingArenas">Loading arena events…</p>
+    <p *ngIf="arenasError" class="err">Couldn't load arena events. <button (click)="selectedEvent && loadArenas(selectedEvent)">Retry</button></p>
+
+    <table *ngIf="!loadingArenas && !arenasError">
+      <thead><tr><th>Product</th><th>Type</th><th></th></tr></thead>
+      <tbody>
+        <tr *ngFor="let row of arenaRows">
+          <td>{{ row.productName }}</td>
+          <td>{{ row.type }}</td>
+          <td><button (click)="selectArena(row)">Select</button></td>
+        </tr>
+        <tr *ngIf="arenaRows.length === 0"><td colspan="3" class="empty">No arena events for this event</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============ Step 3: queue, stages & participants ============ -->
+  <div *ngIf="step==='participants'">
+    <p class="crumb">
+      <button (click)="goToEvents()">← Events</button>
+      <button (click)="goToArenas()">← Arena events</button>
+    </p>
+    <h2>{{ selectedArena?.productName }}</h2>
+    <p class="hint">{{ selectedEvent?.name }}</p>
+
+    <!-- Cohort summary loading (first load) -->
+    <div class="cohort-summary cs-skeleton" *ngIf="summaryLoading && !summaryLoaded">
+      <span class="cs-spin"></span><span>Loading cohort summary…</span>
+    </div>
+
+    <!-- Cohort summary: requested/approved × active/non-active, with per-journey split -->
+    <div class="cohort-summary" *ngIf="summaryLoaded">
+      <div class="cs-head"><span>Cohort summary <span class="cs-updating" *ngIf="summaryLoading">· updating…</span></span>
+        <!-- Config disabled: keeps the cohort card read-only (no writes to 'stage opportunity count').
+        <button type="button" class="cs-config-btn" (click)="configOpen = !configOpen">{{ configOpen ? 'Done' : 'Config' }}</button>
+        --></div>
+      <div class="cs-stats">
+        <div class="cs-stat">
+          <div class="cs-label">Total in queue</div>
+          <div class="cs-total">{{ summaryInQueue.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryInQueue.active, summaryInQueue.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryInQueue.active, summaryInQueue.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryInQueue.active }}</span><span class="cs-lg-n">Non-active {{ summaryInQueue.nonactive }}</span></div>
+        </div>
+        <div class="cs-stat">
+          <div class="cs-label">Requested</div>
+          <div class="cs-total">{{ summaryRequested.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryRequested.active, summaryRequested.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryRequested.active, summaryRequested.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryRequested.active }}</span><span class="cs-lg-n">Non-active {{ summaryRequested.nonactive }}</span></div>
+        </div>
+        <div class="cs-stat">
+          <div class="cs-label">Approved</div>
+          <div class="cs-total">{{ summaryApproved.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryApproved.active, summaryApproved.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryApproved.active, summaryApproved.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryApproved.active }}</span><span class="cs-lg-n">Non-active {{ summaryApproved.nonactive }}</span></div>
+        </div>
+        <div class="cs-stat">
+          <div class="cs-label">Ready</div>
+          <div class="cs-total">{{ summaryReady.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryReady.active, summaryReady.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryReady.active, summaryReady.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryReady.active }}</span><span class="cs-lg-n">Non-active {{ summaryReady.nonactive }}</span></div>
+        </div>
+      </div>
+
+      <!-- Config: pick the queue and the ready stages (hidden until Config is clicked) -->
+      <div class="cs-config" *ngIf="configOpen">
+        <div class="cs-config-sec">
+          <span class="cs-config-lbl">Queue</span>
+          <button type="button" class="cs-cfg-chip" *ngFor="let q of queues" [class.on]="isQueueSelected(q.id)" (click)="toggleQueue(q.id, !isQueueSelected(q.id))">{{ q.name }}</button>
+          <span class="cs-config-hint" *ngIf="!queues.length">No queues for this arena.</span>
+        </div>
+        <div class="cs-config-sec" *ngIf="readyStageOptions.length">
+          <span class="cs-config-lbl">Ready when current stage is</span>
+          <button type="button" class="cs-cfg-chip" *ngFor="let s of readyStageOptions" [class.on]="isReadyStage(s)" (click)="toggleReadyStage(s)">{{ s }}</button>
+        </div>
+        <span class="cs-config-hint" *ngIf="!selectedQueueIds.length">Pick a queue above to choose its ready stages.</span>
+      </div>
+      <div class="cs-jhead">
+        <span>Journey-wise split</span>
+        <!-- Edit groups disabled: keeps the cohort card read-only (no writes to 'stage opportunity count').
+        <button type="button" class="cs-edit" (click)="groupsEditorOpen = !groupsEditorOpen">{{ groupsEditorOpen ? 'Done' : 'Edit groups' }}</button>
+        -->
+      </div>
+      <div class="cs-grp-editor" *ngIf="groupsEditorOpen">
+        <div class="cs-grp" *ngFor="let g of journeyGroups; let i = index">
+          <div class="cs-grp-top">
+            <input class="cs-grp-name" type="text" [(ngModel)]="g.name" placeholder="Group name (e.g. Accelerators)">
+            <button type="button" class="cs-grp-x" (click)="removeJourneyGroup(i)" aria-label="Remove group">&times;</button>
+          </div>
+          <div class="cs-grp-journeys">
+            <label class="cs-grp-j" *ngFor="let j of cohortJourneys">
+              <input type="checkbox" [checked]="isInGroup(i, j.id)" (change)="toggleGroupJourney(i, j.id)">
+              <span>{{ j.name }} <span class="cs-grp-cnt">{{ j.count }}</span></span>
+            </label>
+          </div>
+        </div>
+        <div class="cs-grp-actions">
+          <button type="button" class="cs-grp-add" (click)="addJourneyGroup()">+ Add group</button>
+          <button type="button" class="cs-grp-save" (click)="saveJourneyGroups()">Save groups</button>
+        </div>
+        <div class="cs-grp-hint" *ngIf="!cohortJourneys.length">No journeys found for this cohort yet.</div>
+      </div>
+      <div class="cs-jwrap">
+        <table class="cs-jtbl">
+          <thead>
+            <tr><th class="jl" rowspan="2">Journey</th><th class="grp" colspan="2">Requested</th><th class="grp" colspan="2">Approved</th><th class="grp" colspan="2">Ready</th></tr>
+            <tr><th>Active</th><th>Non-active</th><th>Active</th><th>Non-active</th><th>Active</th><th>Non-active</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of summaryJourneyRows" [class.other]="r.key==='Other'">
+              <td class="jl">{{ r.label }}</td>
+              <td [class.z]="r.reqA===0">{{ r.reqA }}</td><td [class.z]="r.reqNA===0">{{ r.reqNA }}</td>
+              <td [class.z]="r.appA===0">{{ r.appA }}</td><td [class.z]="r.appNA===0">{{ r.appNA }}</td>
+              <td [class.z]="r.readyA===0">{{ r.readyA }}</td><td [class.z]="r.readyNA===0">{{ r.readyNA }}</td>
+            </tr>
+            <tr class="jtot"><td class="jl">All journeys</td><td>{{ summaryRequested.active }}</td><td>{{ summaryRequested.nonactive }}</td><td>{{ summaryApproved.active }}</td><td>{{ summaryApproved.nonactive }}</td><td>{{ summaryReady.active }}</td><td>{{ summaryReady.nonactive }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Queue selector: pick one or more live queues (mapped ones pre-selected) -->
+    <div class="row">
+      <span>Queues:</span>
+      <label class="qchk" *ngFor="let q of queues">
+        <input type="checkbox" [checked]="isQueueSelected(q.id)" (change)="toggleQueue(q.id, $any($event.target).checked)">
+        {{ q.name }}<span class="mapped" *ngIf="q.mapped"> (mapped)</span>
+      </label>
+      <b *ngIf="!queues.length && !loadingQueue">No live queues</b>
+      <span *ngIf="loadingQueue">loading…</span>
+    </div>
+
+    <!-- Stage columns: merged across all selected queues; add/remove individually -->
+    <div class="row" *ngIf="selectedQueueIds.length">
+      <span>Stage columns:</span>
+      <app-searchable-select [options]="ssAddColOpts" [value]="colToAdd" (valueChange)="colToAdd=$event"
+        placeholder="Select stage" searchPlaceholder="Search stage…"></app-searchable-select>
+      <button (click)="addCol()" [disabled]="!colToAdd">+ Add</button>
+      <button (click)="addAllCols()" [disabled]="!mergedStages.length">Add all</button>
+      <button (click)="clearCols()" [disabled]="!addedCols.length">Clear</button>
+      <span class="added" *ngFor="let c of addedCols">
+        {{ c.label }} <button class="rm" (click)="removeCol(c.key)" title="Remove">×</button>
+      </span>
+    </div>
+
+    <!-- Filters -->
+    <div class="row filters">
+      <label>Request:
+        <app-searchable-select [options]="ssRequestOpts" [value]="requestFilter"
+          (valueChange)="requestFilter=$event; onFilterChange()" placeholder="All"></app-searchable-select>
+      </label>
+      <label>Current stage:
+        <app-searchable-select [options]="ssStageOpts" [value]="stageFilter"
+          (valueChange)="stageFilter=$event; onFilterChange()" placeholder="All" searchPlaceholder="Search stage…"></app-searchable-select>
+      </label>
+      <label>Customer status:
+        <app-searchable-select [options]="ssCustomerOpts" [value]="customerFilter"
+          (valueChange)="customerFilter=$event; onFilterChange()" placeholder="All" searchPlaceholder="Search status…"></app-searchable-select>
+      </label>
+      <label *ngIf="variationOptions.length">Variation:
+        <app-searchable-select [options]="ssVariationOpts" [value]="variationFilter"
+          (valueChange)="variationFilter=$event; onFilterChange()" placeholder="All" searchPlaceholder="Search variation…"></app-searchable-select>
+      </label>
+      <label *ngIf="segmentOptions.length">Segment:
+        <app-searchable-select [options]="ssSegmentOpts" [value]="segmentFilter"
+          (valueChange)="segmentFilter=$event; onFilterChange()" placeholder="All" searchPlaceholder="Search segment…"></app-searchable-select>
+      </label>
+      <label>Product (unconsumed):
+        <app-searchable-select [options]="ssProductOpts" [value]="productFilter"
+          (valueChange)="productFilter=$event; onFilterChange()" placeholder="Any" searchPlaceholder="Search product…"></app-searchable-select>
+        <app-searchable-select *ngIf="productFilter" [options]="ssProductModeOpts" [value]="productMode"
+          (valueChange)="productMode=$any($event); onFilterChange()" placeholder="Show only"></app-searchable-select>
+      </label>
+      <label>Completed date:
+        <input type="date" [(ngModel)]="completedFrom" (ngModelChange)="onFilterChange()">
+        <span>–</span>
+        <input type="date" [(ngModel)]="completedTo" (ngModelChange)="onFilterChange()">
+        <app-searchable-select *ngIf="completedFrom || completedTo" [options]="ssCompletedStageOpts" [value]="completedStage"
+          (valueChange)="completedStage=$event; onFilterChange()" placeholder="Any stage" searchPlaceholder="Search stage…"></app-searchable-select>
+      </label>
+      <label>Slot date:
+        <input type="date" [(ngModel)]="slotFrom" (ngModelChange)="onFilterChange()">
+        <span>–</span>
+        <input type="date" [(ngModel)]="slotTo" (ngModelChange)="onFilterChange()">
+      </label>
+      <label class="notbooked" [class.on]="notBookedOnly">
+        <input type="checkbox" [(ngModel)]="notBookedOnly" (ngModelChange)="onFilterChange()"> Not booked only
+      </label>
+      <button *ngIf="isStageFiltered" (click)="clearFilters()">Clear filters</button>
+    </div>
+
+    <!-- Dashboard tiles: one per added stage column, over the filtered rows -->
+    <div class="dash" *ngIf="!loadingStage && !stageError">
+      <div class="tile tile-total">
+        <div class="t-label">Participants</div>
+        <div class="t-num">{{ filteredStageRows.length }}</div>
+        <div class="t-mini" *ngIf="isStageFiltered">of {{ stageRows.length }}</div>
+      </div>
+      <div class="tile" *ngFor="let s of stageSummaries">
+        <div class="t-label">{{ s.label }}</div>
+        <div class="t-num">{{ s.completed }} <span class="t-sub">completed</span></div>
+        <div class="t-bar">
+          <span class="seg seg-done" [style.flex]="s.completed || 0"></span>
+          <span class="seg seg-book" [style.flex]="s.booked || 0"></span>
+          <span class="seg seg-none" [style.flex]="s.notBooked || 0"></span>
+        </div>
+        <div class="t-legend">
+          <span><i class="dot d-done"></i>{{ s.completed }} done</span>
+          <span><i class="dot d-book"></i>{{ s.booked }} booked</span>
+          <span><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
+        </div>
+      </div>
+      <div class="tile tile-hint" *ngIf="!addedCols.length">
+        <i class="hint-i">＋</i> Add a stage column to see its breakdown
+      </div>
+    </div>
+
+    <div class="row toolbar">
+      <span class="search-wrap">
+        <span class="search-i">⌕</span>
+        <input class="search" type="text" [(ngModel)]="searchStage" (ngModelChange)="onStageSearch()" placeholder="Search name, email, phone, stage">
+      </span>
+      <span class="count" *ngIf="!loadingStage && !stageError">{{ filteredStageRows.length }} participant(s)</span>
+      <span class="spacer"></span>
+      <div class="toolbar-actions">
+        <label class="btn btn-secondary" [class.disabled]="loadingStage || !stageRows.length">
+          Import sheet to compare
+          <input type="file" accept=".xlsx,.xls,.csv" (change)="onImportSheet($event)" [disabled]="loadingStage || !stageRows.length" hidden>
+        </label>
+        <button class="btn btn-primary" (click)="exportCsv()" [disabled]="loadingStage || !filteredStageRows.length">Export CSV</button>
+      </div>
+    </div>
+
+    <!-- Sheet reconcile results: who is only in the table vs only in the imported sheet -->
+    <div class="reconcile" *ngIf="showReconcile">
+      <div class="rec-head">
+        <b>Sheet comparison</b>
+        <span class="rec-file" *ngIf="reconcileFileName">{{ reconcileFileName }}</span>
+        <span class="spacer"></span>
+        <button *ngIf="!reconcileError && (extraInTable.length || extraInSheet.length)" (click)="exportReconcile()">Export diff CSV</button>
+        <button class="rec-x" (click)="closeReconcile()" title="Close">×</button>
+      </div>
+      <p class="err" *ngIf="reconcileError">{{ reconcileError }}</p>
+      <div *ngIf="!reconcileError">
+        <p class="rec-summary">Table: <b>{{ stageRows.length }}</b> · Sheet: <b>{{ sheetCount }}</b> · Matched: <b>{{ matchedCount }}</b></p>
+        <div class="rec-cols">
+          <div class="rec-col">
+            <div class="rec-col-h">In table, not in sheet <span class="rec-n">{{ extraInTable.length }}</span></div>
+            <ul>
+              <li *ngFor="let r of extraInTable">{{ r.name || '—' }} <span class="rec-sub">{{ r.email }}</span></li>
+              <li class="rec-empty" *ngIf="!extraInTable.length">None — every table participant is in the sheet</li>
+            </ul>
+          </div>
+          <div class="rec-col">
+            <div class="rec-col-h">In sheet, not in table <span class="rec-n">{{ extraInSheet.length }}</span></div>
+            <ul>
+              <li *ngFor="let s of extraInSheet">{{ s.name || '—' }} <span class="rec-sub">{{ s.email }}</span></li>
+              <li class="rec-empty" *ngIf="!extraInSheet.length">None — every sheet row is in the table</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p *ngIf="loadingStage">Loading participants…</p>
+    <p *ngIf="stageError" class="err">Couldn't load participants. <button (click)="selectedArena && selectArena(selectedArena)">Retry</button></p>
+
+    <div class="tbl-wrap" *ngIf="!loadingStage && !stageError">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>Email</th><th>Phone</th><th>Customer status</th><th>Journey</th><th>Segments</th><th>Request</th><th>Variation</th>
+            <ng-container *ngFor="let q of selectedQueues">
+              <th>{{ selectedQueues.length > 1 ? 'Current stage · ' + q.name : 'Current stage' }}</th>
+            </ng-container>
+            <ng-container *ngFor="let c of addedCols">
+              <th class="stage-col">{{ c.label }} · Completed</th>
+              <th class="stage-col">{{ c.label }} · Slot booking</th>
+            </ng-container>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of pagedStageRows">
+            <td>{{ r.name || '—' }}<span *ngIf="r.metaMissing" class="miss"> (no metadata)</span></td>
+            <td>{{ r.email || '—' }}</td>
+            <td>{{ r.phone || '—' }}</td>
+            <td>{{ r.customerStatus || '—' }}</td>
+            <td>{{ journeyDisplay(r) || '—' }}</td>
+            <td>{{ segmentsDisplay(r) || '—' }}</td>
+            <td><span class="req" [class.req-app]="r.status==='approved'">{{ r.status || '—' }}</span></td>
+            <td>{{ variationsDisplay(r) || '—' }}</td>
+            <ng-container *ngFor="let q of selectedQueues">
+              <td>{{ currentStageFor(r, q.id) || '—' }}</td>
+            </ng-container>
+            <ng-container *ngFor="let c of addedCols">
+              <td><span class="pill" [ngClass]="crossedStage(r, c) ? 'p-done' : 'p-none'">{{ completedLabel(r, c) }}</span></td>
+              <td><span class="pill" [ngClass]="'p-' + slotKind(r, c)">{{ slotCell(r, c) }}</span></td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="filteredStageRows.length === 0"><td [attr.colspan]="8 + selectedQueues.length + addedCols.length * 2" class="empty">No participants</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <mat-paginator *ngIf="!loadingStage && !stageError" [length]="filteredStageRows.length" [pageSize]="stagePageSize"
+      [pageSizeOptions]="[25, 50, 100]" [pageIndex]="stagePageIndex" (page)="onStagePage($event)"></mat-paginator>
+  </div>
+
+</div>

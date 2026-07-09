@@ -119,6 +119,7 @@ export const routes: Routes = [
   {path: 'tieraccessconfig', loadComponent: () => import('./content/tier-access-config/view-tier-access/view-tier-access.component').then(m => m.ViewTierAccessComponent), canActivate: [authGuard]},
   {path: 'event_participation_approve', loadComponent: () => import('./Events/event-participation-approve/event-participation-approve.component').then(m => m.EventParticipationApproveComponent), canActivate: [authGuard]},
   {path: 'event-participation-confirmation', loadComponent: () => import('./Events/event-participation-confirmations/event-participation-confirmations.component').then(m => m.EventParticipationConfirmationsComponent), canActivate: [authGuard]},
+  {path: 'events-stage-data', loadComponent: () => import('./Events/events-stage-data/events-stage-data.component').then(m => m.EventsStageDataComponent), canActivate: [authGuard]},
   {path: 'create_event', loadComponent: () => import('./Events/event-list/event-list.component').then(m => m.EventListComponent), canActivate: [authGuard]},
   {path: 'arena_e_ticket_approve', loadComponent: () => import('./Events/arena-e-ticket-approve/arena-e-ticket-approve.component').then(m => m.ArenaETicketApproveComponent), canActivate: [authGuard]},
   {path: 'qr-scanner', loadComponent: () => import('./Events/qr-scanner/qr-scanner.component').then(m => m.QrScannerComponent), canActivate: [authGuard]},

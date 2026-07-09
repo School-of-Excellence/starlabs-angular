@@ -1,0 +1,14 @@
+<div class="ss" [class.open]="open" [class.disabled]="disabled">
+  <button type="button" class="ss-trigger" (click)="toggle()" [disabled]="disabled">
+    <span class="ss-val" [class.ss-ph]="!selectedLabel">{{ selectedLabel || placeholder }}</span>
+    <span class="ss-caret">▾</span>
+  </button>
+  <div class="ss-panel" *ngIf="open">
+    <input *ngIf="showSearch" #searchInput class="ss-search" type="text" [(ngModel)]="term"
+      [placeholder]="searchPlaceholder" (keydown)="onSearchKey($event)">
+    <ul class="ss-list">
+      <li *ngFor="let o of filtered" [class.sel]="o.value === value" (click)="pick(o)">{{ o.label }}</li>
+      <li *ngIf="!filtered.length" class="ss-empty">No matches</li>
+    </ul>
+  </div>
+</div>
