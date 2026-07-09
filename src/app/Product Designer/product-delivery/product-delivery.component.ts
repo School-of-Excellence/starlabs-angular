@@ -141,20 +141,26 @@ export class ProductDeliveryComponent {
       var data = []
       for (let i = 0; i < productDelivery.length; i++) {
         const snapshot = productDelivery[i];
-        var snapdata = snapshot.data()
-        snapdata['product'] = snapdata['product']['path']
-        for (let i = 0; i < snapdata['deliveryoptions'].length; i++) {
-          const element = snapdata['deliveryoptions'][i];
-          for (let j = 0; j < element['deliverysequence'].length; j++) {
-            const seqelement = element['deliverysequence'][j];
-            if(seqelement['activity']){
-              seqelement['activity'] = seqelement['activity']['path']
-            }
-          }
-        }
+        const snapdata = snapshot.data()
+        // Build a FRESH derived view-model per emit — never mutate snapdata. collectionSnapshots
+        // re-emits on every change (and may hand back the same underlying objects), so writing the
+        // resolved `.path` back onto snapdata['product'] / seqelement['activity'] would, on the next
+        // emit, run ['path'] on an already-string value (-> undefined) and the deliverysequence loop
+        // would throw "Cannot read properties of undefined (reading 'length')" — collapsing the table
+        // to zero rows. Reading each ref's path into NEW objects/arrays is idempotent
+        // (`?.path ?? value` tolerates an already-string path) and null-safe (a mapping with no
+        // deliverysequence yet maps to []).
+        const productPath = snapdata['product']?.path ?? snapdata['product'] ?? null
+        const sequence = (snapdata['deliveryoptions'] ?? []).map(element => ({
+          ...element,
+          deliverysequence: (element['deliverysequence'] ?? []).map(seqelement => ({
+            ...seqelement,
+            activity: seqelement['activity']?.path ?? seqelement['activity'] ?? null,
+          })),
+        }))
         data.push({
-          product: snapdata["product"],
-          sequence: snapdata["deliveryoptions"],
+          product: productPath,
+          sequence: sequence,
           docid: snapshot.id
         })
       }

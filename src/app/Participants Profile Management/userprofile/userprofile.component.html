@@ -3,12 +3,9 @@
   
   <div class="profile-card">
     <div class="profile-avatar">
-      <app-profile-picture
-        [profileId]="profileId"
-        [name]="userProfileData['name']"
-        [size]="90">
-      </app-profile-picture>
-      <h3 class="profile-name">{{ userProfileData['name'] }}</h3>
+      <img [src]="profileimage[profileId] ? profileimage[profileId] : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'" 
+      alt="Profile Picture" class="profile-image">
+      <h3 class="profile-name">{{ userData['name'] }}</h3>
     </div>
 
     <div class="profile-details">

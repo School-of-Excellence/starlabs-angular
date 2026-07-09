@@ -19,6 +19,10 @@ export class QueueInvitationApprovalComponent implements OnInit, OnDestroy {
 
   subscription!: Subscription;
   expiryInSeconds!: number;
+  // Full invitation window (start→expiry) in seconds. The ring scales to this so
+  // it drains correctly regardless of the queue's configured timer length
+  // (hardcoding 120 made the ring run backwards when the timer was longer).
+  totalSeconds = 120;
 
   // GAME STATE
   gameActive = true;
@@ -40,6 +44,20 @@ export class QueueInvitationApprovalComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // Full timer window for the ring. Prefer the configured value from the
+    // classify/studiotimer doc (passed as data.timerSeconds); fall back to the
+    // invitation's createddate→expirydate, then the initial remaining time.
+    const configured = Number(this.data?.timerSeconds);
+    const expiry = this.data?.expirydate?.toDate?.().getTime?.();
+    const created = this.data?.createddate?.toDate?.().getTime?.();
+    if (!isNaN(configured) && configured > 0) {
+      this.totalSeconds = Math.max(1, Math.round(configured));
+    } else if (expiry && created && expiry > created) {
+      this.totalSeconds = Math.max(1, Math.round((expiry - created) / 1000));
+    } else {
+      this.totalSeconds = Math.max(1, this.getTimeDiff() || 120);
+    }
+
     this.initMemoryGame();
     this.spawnTarget();
 

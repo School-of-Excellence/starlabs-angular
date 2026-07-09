@@ -1,18 +1,23 @@
 <div class="main-container" [class.panel-open]="showDetailPanel || showCustomStagePanel">
   <!-- Main Content Area -->
-  <div class="content-area">
+  <div class="content-area" [class.board-active]="activeTab === 'board'">
     <span class="d-flex flex-row justify-content-center mt-2 mb-2">
       <h4 class="text-center" (click)="showQueueSelect = !showQueueSelect">
         Arena Opportunities
       </h4>
     </span>
 
-    <div *ngIf="showQueueSelect" class="d-flex flex-row justify-content-center">
+    <div class="planning-tabs">
+      <button class="planning-tab-btn" [class.active]="activeTab === 'board'" (click)="setActiveTab('board')">Board</button>
+      <button class="planning-tab-btn" [class.active]="activeTab === 'planning'" (click)="setActiveTab('planning')">Planning</button>
+    </div>
+
+    <div *ngIf="showQueueSelect && activeTab === 'board'" class="d-flex flex-row justify-content-center">
       <mat-form-field appearance="outline">
         <mat-label>Select queue</mat-label>
-        <mat-select [value]="selectedQueueList" multiple panelClass="eod-ios-pane">
-          <mat-option *ngFor="let item of queueList" [value]="item['docid']"
-            (onSelectionChange)="updateSelectedQueues(item['docid'], $event)">
+        <mat-select [ngModel]="selectedQueueList" (ngModelChange)="onQueueSelectionChange($event)"
+                    multiple disableOptionCentering panelClass="eod-ios-pane">
+          <mat-option *ngFor="let item of queueList" [value]="item['docid']">
             {{item.queuename}}
           </mat-option>
         </mat-select>
@@ -55,17 +60,12 @@
           </mat-chip>
         </mat-chip-listbox>
       </div>
-    <ng-container *ngFor="let queueId of selectedQueueList">
+    <ng-container *ngFor="let queueId of loadedQueues">
       <app-event-opportunity [queueid]="queueId" (eventData)="handleEventData($event, queueId)">
       </app-event-opportunity>
     </ng-container>
 
-    <div class="planning-tabs">
-      <button class="planning-tab-btn" [class.active]="activeTab === 'board'" (click)="setActiveTab('board')">Board</button>
-      <button class="planning-tab-btn" [class.active]="activeTab === 'planning'" (click)="setActiveTab('planning')">Planning</button>
-    </div>
-
-    <ng-container *ngIf="activeTab === 'board'">
+    <div [hidden]="activeTab !== 'board'">
     <div *ngIf="isContainerOpen" class="diagnostic-dashboard">
       <div class="drag-drop-container" 
            cdkDropList 
@@ -311,22 +311,60 @@
         </ng-container>
       </div>
     </div>
-    </ng-container>
+    </div>
 
-    <app-planning-tab
-      *ngIf="activeTab === 'planning'"
-      [selectedQueueList]="selectedQueueList"
-      [mapQueue]="mapQueue"
-      [mapData]="mapData"
-      [queueTokens]="queueTokens"
-      [allCompletedStageCount]="allCompletedStageCount"
-      [mapProfile]="mapProfile"
-      [mapNumber]="mapNumber"
-      [eventList]="eventList"
-      [queueList]="queueList"
-      (queueChange)="onPlanningQueueChange($event)"
-      [refreshKey]="planningRefreshKey">
-    </app-planning-tab>
+    <!-- ===== Studio Watch — right-side panel ============================== -->
+    <div class="studio-watch" *ngIf="activeTab === 'board' && studioWatchCount > 0">
+      <!-- Collapsed pill -->
+      <button type="button" class="sw-pill" *ngIf="!studioWatchOpen" (click)="studioWatchOpen = true">
+        <span class="sw-pill__count">{{ studioWatchCount }}</span>
+        <span class="sw-pill__label">Studio Watch</span>
+      </button>
+
+      <!-- Expanded panel -->
+      <div class="sw-panel" *ngIf="studioWatchOpen">
+        <div class="sw-panel__header">
+          <span class="sw-dot"></span>
+          <span class="sw-panel__title">Studio Watch</span>
+          <button type="button" class="sw-panel__collapse" (click)="studioWatchOpen = false"
+                  matTooltip="Collapse">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+
+        <div class="sw-section">
+          <div class="sw-section__head">
+            <span class="sw-section__title">Over 4h — action needed</span>
+            <span class="sw-section__count">{{ studioWatchCount }}</span>
+          </div>
+          <p class="sw-section__note">
+            Activity done? Please free the studio — participants left on it can't
+            move ahead in the queue, and it holds up everyone waiting behind them.
+          </p>
+
+          <div class="sw-card" *ngFor="let item of studioWatchItems"
+               [matTooltip]="item.queuename + ' · ' + (item.type === 'active' ? 'Call started' : 'In studio') + ' ' + formatWatchElapsed(item.elapsedMs) + ' ago'">
+            <div class="sw-card__top">
+              <span class="sw-card__stage">{{ item.stage }}</span>
+              <span class="sw-card__time">{{ formatWatchElapsed(item.elapsedMs) }}</span>
+            </div>
+            <span class="sw-card__type"
+                  [class.sw-card__type--active]="item.type === 'active'"
+                  [class.sw-card__type--joined]="item.type === 'joined'">
+              {{ item.type === 'active' ? 'Active' : 'Joined' }}
+            </span>
+            <div class="sw-card__people">
+              <span class="sw-card__participant">{{ item.participant }}</span>
+              <span class="sw-card__arrow">→</span>
+              <span class="sw-card__coach">{{ item.coach }}</span>
+            </div>
+            <div class="sw-card__studio">{{ item.studioLabel }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <app-events-stage-data [hidden]="activeTab !== 'planning'"></app-events-stage-data>
   </div>
 
   <!-- Side Panel for Stage Details -->
@@ -883,7 +921,7 @@
     
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Select stages from selected queues</mat-label>
-            <mat-select [compareWith]="compareFnc" formControlName="stage" multiple panelClass="eod-ios-pane">
+            <mat-select [compareWith]="compareFnc" formControlName="stage" multiple disableOptionCentering panelClass="eod-ios-pane">
               <mat-option *ngFor="let item of updatestages" [value]="item">
                 {{item.stagename}} - {{item.status === 'instudio' ? 'activity' : (item.status ?? 'all')}}
                 <span class="queue-name-hint">({{mapQueue[item.queueid]?.queuename || mapQueue[item.queueid]}})</span>

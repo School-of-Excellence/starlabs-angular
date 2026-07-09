@@ -1,0 +1,87 @@
+<div class="esa">
+  <!-- Header -->
+  <div class="esa__check" aria-hidden="true">
+    <mat-icon>{{ headerIcon }}</mat-icon>
+  </div>
+  <h2 class="esa__title">{{ title }}</h2>
+  <p class="esa__sub" *ngIf="subtitle">{{ subtitle }}</p>
+
+  <hr class="esa__divider">
+
+  <!-- Required activity rows (studio mandatory + carried-over activities) -->
+  <section class="esa__section" *ngIf="requiredRows.length">
+    <div class="esa__row" *ngFor="let row of requiredRows; let i = index">
+      <div class="esa__rowhead">
+        <div class="esa__actlabel" *ngIf="row.locked">{{ mapActivity[row.activity] || 'Activity' }}</div>
+        <mat-form-field *ngIf="!row.locked" class="esa__ff" appearance="outline">
+          <mat-label>Activity</mat-label>
+          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
+            <mat-option>
+              <ngx-mat-select-search [ngModel]="activitySearch" (ngModelChange)="onActivitySearchChange($event)" [ngModelOptions]="{standalone: true}"
+                [placeholderLabel]="'Search activity'" [noEntriesFoundLabel]="'No matching activity'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let a of filteredActivities" [value]="a.key">{{ a.value }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <span class="esa__mandatory-tag">Mandatory</span>
+      </div>
+      <div class="esa__pills esa__pills--specialist" *ngIf="row.activity">
+        <button type="button" class="esa__pill"
+                *ngFor="let s of specialistsFor(row.activity)"
+                [class.esa__pill--on]="row.selected.has(s.profileid)"
+                (click)="toggleSpecialist(row, s.profileid)"
+                data-testid="esa-specialist-pill">
+          <span class="esa__pill-tick" *ngIf="row.selected.has(s.profileid)"><mat-icon>check</mat-icon></span>
+          {{ s.name }}
+        </button>
+        <span class="esa__empty" *ngIf="specialistsFor(row.activity).length === 0">No specialists in cohorts for this activity.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Optional: invite more specialists -->
+  <section class="esa__section esa__section--optional">
+    <h3 class="esa__label">{{ optionalTitle }} <span class="esa__opt" *ngIf="optionalShowOptionalTag">· optional</span></h3>
+    <p class="esa__hint" *ngIf="optionalHint">{{ optionalHint }}</p>
+
+    <div class="esa__row" *ngFor="let row of optionalRows; let i = index">
+      <div class="esa__rowhead">
+        <mat-form-field class="esa__ff" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Activity</mat-label>
+          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
+            <mat-option>
+              <ngx-mat-select-search [ngModel]="activitySearch" (ngModelChange)="onActivitySearchChange($event)" [ngModelOptions]="{standalone: true}"
+                [placeholderLabel]="'Search activity'" [noEntriesFoundLabel]="'No matching activity'" ngDefaultControl></ngx-mat-select-search>
+            </mat-option>
+            <mat-option *ngFor="let a of filteredActivities" [value]="a.key">{{ a.value }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button type="button" class="esa__rowremove" (click)="removeOptionalRow(i)" aria-label="Remove">
+          <mat-icon>remove_circle_outline</mat-icon>
+        </button>
+      </div>
+      <div class="esa__pills esa__pills--specialist" *ngIf="row.activity">
+        <button type="button" class="esa__pill"
+                *ngFor="let s of specialistsFor(row.activity)"
+                [class.esa__pill--on]="row.selected.has(s.profileid)"
+                (click)="toggleSpecialist(row, s.profileid)">
+          <span class="esa__pill-tick" *ngIf="row.selected.has(s.profileid)"><mat-icon>check</mat-icon></span>
+          {{ s.name }}
+        </button>
+        <span class="esa__empty" *ngIf="specialistsFor(row.activity).length === 0">No specialists in cohorts for this activity.</span>
+      </div>
+    </div>
+
+    <button type="button" class="esa__add" (click)="addOptionalRow()" data-testid="esa-add-specialist">
+      <mat-icon>add</mat-icon> Add Other Specialists
+    </button>
+  </section>
+
+  <!-- Footer -->
+  <div class="esa__foot">
+    <button type="button" class="esa__ghost" (click)="dialogRef.close(null)">Cancel</button>
+    <button type="button" class="esa__enter" [disabled]="!canEnter" (click)="enterStudio()" data-testid="esa-enter-studio">
+      {{ ctaLabel }} <mat-icon>arrow_forward</mat-icon>
+    </button>
+  </div>
+</div>

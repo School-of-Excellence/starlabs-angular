@@ -1,0 +1,52 @@
+# events-e2e — THIN CALLER for the Stage-2 hermetic Playwright gate (EVENTS system).
+#
+# Mirrors the other system callers: the gate logic lives in the hub
+# (starlabs-e2e-tests/.github/workflows/web-e2e.yml); this file just wires the app's PR triggers + path
+# filters and selects the EVENTS suite via `config` + `suite`. Requires repo/org secret with read on the
+# private e2e + cloud-function repos, passed via `secrets: inherit`.
+#
+# ⚠️ VALIDATION PIN: the events ENGINE files (playwright.events.emulator(.evidence).config.ts,
+#    events/support/emulator-global-setup|teardown.ts, seed-events.js initAdminAuto, and the EVT-03/04
+#    mat-select open fix) live on the hub branch `systems-emulator` (`3bfc712`), NOT yet on hub `main`.
+#    So `uses:` + `e2e_ref:` are pinned there; flip BOTH to `@main` / `main` after the next hub merge.
+#    REPORT-ONLY (non-required) until proven green N times, then promote per-system.
+# CF NOTE: events has NO CF-side-effect cases, so `cf_branch: development` (the standard CF branch) — no
+#    feature-branch pin needed (unlike modes).
+name: events-e2e (emulator gate)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Spec subset (space-separated). Empty = all events specs.'
+        type: string
+        default: ''
+      evidence:
+        description: '1 = capture screenshots + traces (to debug a CI-only failure)'
+        type: string
+        default: '0'
+
+jobs:
+  gate:
+    # Cost control: skip the heavy gate on DRAFT PRs unless explicitly labeled `run-e2e`.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.draft == false ||
+      contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      cf_branch: development
+      e2e_ref: main                      # VALIDATION PIN — flip to `main` after the hub merge
+      firebase_project: starlabs-cicd                # MUST match the app's projectId or auth silently fails
+      config: playwright.events.emulator.evidence.config.ts  # EVIDENCE variant: screenshot+trace per test → browsable report
+      suite: events                                  # spec root (events/) + history audit tag
+      only: ${{ (github.event_name == 'workflow_dispatch' && inputs.only) || '' }}
+      evidence: ${{ (github.event_name == 'workflow_dispatch' && inputs.evidence) || '1' }}
+    secrets: inherit
+
+# Re-trigger: hub fix 6323c45 (EVT-15/16 pickQueueOption poll) is on systems-emulator; re-run gate.
+
+# Re-trigger #2: hub 674deab (force-click unstable EOD queue mat-option) on systems-emulator.
+
+# re-validate 2026-07-02: EVT-15/16 real root-cause on hub systems-emulator (d635ea1) — /eventopportunitydashboard
+# serves legacy EOD v1 on cicd-dev (v2 only on cicd), so EVT-15/16 self-skip there (CN-14 class), not force-click.

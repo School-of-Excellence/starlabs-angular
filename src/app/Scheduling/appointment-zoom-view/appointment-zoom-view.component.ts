@@ -84,7 +84,7 @@ export class AppointmentZoomViewComponent {
       
     })
     if (this.zoomdata && this.zoomdata['zoomdata']) {
-      ZoomMtg.setZoomJSLib('https://source.zoom.us/3.13.2/lib', '/av');
+      ZoomMtg.setZoomJSLib(`${window.location.origin}/zoom/lib`, '/av');
 
       ZoomMtg.preLoadWasm();
       ZoomMtg.prepareWebSDK();

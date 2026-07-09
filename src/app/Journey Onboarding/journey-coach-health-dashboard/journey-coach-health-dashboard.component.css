@@ -1928,6 +1928,9 @@ td.mat-mdc-cell span {
 .ios-card .ios-card-title.tint-pink {
   color: #ff2d55;
 }
+.ios-card .ios-card-title.tint-slate {
+  color: #6e6e73;
+}
 .ios-card .ios-bignum {
   font-size: 40px;
   font-weight: 700;

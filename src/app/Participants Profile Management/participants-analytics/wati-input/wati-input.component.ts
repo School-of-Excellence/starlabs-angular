@@ -131,6 +131,7 @@ export class WatiInputComponent {
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
   private profileSearchSubject = new Subject<string>();
+  workshopTitle = '';
 
   // ── Schedule ──────────────────────────────────────────────────────────
   isScheduled = false;
@@ -140,13 +141,6 @@ export class WatiInputComponent {
   schedulePeriod: 'AM' | 'PM' = 'AM';
   hours: string[] = [];
   minutes: string[] = [];
-
-  // ── WATI Categories ───────────────────────────────────────────────────
-  watiCategories: { id: string; name: string }[] = [];
-  selectedWatiCategory = '';
-  newWatiCategoryName = '';
-  isAddingCategory = false;
-  manageCategoryDialogOpen = false;
 
   // ── Parameter Presets ─────────────────────────────────────────────────
   private readonly PARAM_PRESETS_KEY = 'wati_param_presets';
@@ -167,7 +161,6 @@ export class WatiInputComponent {
     private snackBar: MatSnackBar,
     private http: HttpClient,
   ) {
-    this.loadWatiCategories();
     this.categoryCollectionSnapShot = doc(this.firestore, 'email validators', 'templateCategories');
     docData(this.categoryCollectionSnapShot).pipe(takeUntil(this.destroy$)).subscribe((d: any) => {
       this.templateCategories = d['categories'];
@@ -201,6 +194,7 @@ export class WatiInputComponent {
     this.loadQueuedTemplates();
     this.loadProfiles();
     this.loadMetadataFields();
+    this.loadWorkshopTitle();
   }
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
@@ -210,6 +204,23 @@ export class WatiInputComponent {
     setTimeout(() => {
       document.getElementById('configure-params-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 150);
+  }
+
+  async loadWorkshopTitle() {
+    try {
+      const snap = await getDocs(collection(this.firestore, 'workshopconfiguration'));
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        this.workshopTitle = data?.['detailpage']?.['title'] ?? '';
+        const p = this.templateParams.find(p => p.name === 'workshoptitle');
+        if (p && !p.staticValue) {
+          p.staticValue = this.workshopTitle;
+          this.updatePreview();
+        }
+      }
+    } catch (e) {
+      console.error('Error loading workshop title', e);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -224,40 +235,6 @@ export class WatiInputComponent {
         this.favouriteIds = new Set(this.favouriteTemplates.map((t: any) => this.favouriteKey(t)));
       }
     } catch { this.favouriteTemplates = []; }
-  }
-
-  async loadWatiCategories() {
-    try {
-      const snap = await getDoc(doc(this.firestore, 'classify', 'waticategories'));
-      console.log('waticategories snap exists:', snap.exists(), snap.data()); // ← ADD THIS
-      this.watiCategories = snap.exists() ? (snap.data()?.['categories'] || []) : [];
-      console.log('watiCategories loaded:', this.watiCategories); // ← AND THIS
-    } catch (e) { console.error('Error loading wati categories', e); }
-  }
-
-  getWatiCategoryName(categoryId: string | null): string {
-    if (!categoryId) return '—';
-    return this.watiCategories.find(c => c.id === categoryId)?.name ?? '—';
-  }
-
-  async addWatiCategory() {
-    const name = this.newWatiCategoryName.trim();
-    if (!name) return;
-    if (this.watiCategories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-      this.snackBar.open(`"${name}" already exists`, 'Close', { duration: 2000 }); return;
-    }
-    this.isAddingCategory = true;
-    try {
-      const newItem = { id: doc(collection(this.firestore, '_')).id, name };
-      const updated = [...this.watiCategories, newItem];
-      await setDoc(doc(this.firestore, 'classify', 'waticategories'), { categories: updated }, { merge: true });
-      this.watiCategories = updated;
-      this.selectedWatiCategory = newItem.id;
-      this.newWatiCategoryName = '';
-      this.manageCategoryDialogOpen = false;
-      this.snackBar.open('Category added', 'Close', { duration: 2000 });
-    } catch (e) { console.error(e); this.snackBar.open('Failed to add category', 'Close', { duration: 2000 }); }
-    finally { this.isAddingCategory = false; }
   }
 
   private persistFavourites() {
@@ -334,8 +311,12 @@ export class WatiInputComponent {
   }
 
   private initParamConfig(paramNames: string[]) {
-    this.templateParamNames = paramNames;
-    this.templateParams = paramNames.map(name => {
+    const headerBody = this.selectedTemplate['header']?.['headerOriginal'] || '';
+    const headerParams = this.parseTemplateParams(headerBody);
+    const allParams = [...new Set([...headerParams, ...paramNames])];
+
+    this.templateParamNames = allParams;
+    this.templateParams = allParams.map(name => {
       const existing = this.templateParams.find(p => p.name === name);
       return existing ?? { name, fillType: 'static', staticValue: '', metadataField: '', excelColumn: '' };
     });
@@ -431,16 +412,10 @@ export class WatiInputComponent {
 
   applyFiltersAndLimit() {
     let filtered = [...this.watiTemplates];
-
     if (this.searchTemplate.trim()) {
       const s = this.searchTemplate.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.elementName?.toLowerCase().includes(s) ||
-        t.category?.toLowerCase().includes(s) ||
-        t.servername?.toLowerCase().includes(s) ||
-        t.bodyOriginal?.toLowerCase().includes(s));
+      filtered = filtered.filter(t => t.elementName?.toLowerCase().includes(s) || t.category?.toLowerCase().includes(s) || t.servername?.toLowerCase().includes(s) || t.bodyOriginal?.toLowerCase().includes(s));
     }
-
     this.filteredTemplates = filtered;
     this.hasMoreTemplates = filtered.length > this.DISPLAY_LIMIT;
     this.displayTemplates = filtered.slice(0, this.DISPLAY_LIMIT);
@@ -466,10 +441,6 @@ export class WatiInputComponent {
     this.filteredProfiles = this.profiles.filter(p => p.name?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s) || p.number?.includes(s));
   }
 
-  isCategorySelected(): boolean {
-    return !!this.selectedWatiCategory;
-  }
-
   async onTemplateChange(event: any) {
     this.resetQueuedTemplateState();
     this.selectedTemplate = event.value;
@@ -488,17 +459,33 @@ export class WatiInputComponent {
     this.scrollToConfigureParams();
   }
 
-  selectRecentTemplate(template: any) {
+  async selectRecentTemplate(template: any) {
     this.resetQueuedTemplateState();
-    this.selectedTemplate = {
+
+    const liveMatch = this.watiTemplates.find(t =>
+      t.id === template.templateid || t.elementName === (template.watitemplateid ?? template.templatename)
+    );
+
+    this.selectedTemplate = liveMatch ? { ...liveMatch } : {
       elementName: template.watitemplateid ?? template.templatename ?? '', bodyOriginal: template.textbody ?? template.htmlbody ?? '',
       serverurl: template.serverurl ?? '', serverid: template.serverid ?? '', servername: template.servername ?? '',
       id: template.templateid ?? '', templateid: template.templateid ?? '', docid: template.id,
       category: template.category ?? null, subcategory: template.subcategory ?? null, notes: template.notes ?? '',
     };
-    this.bufferDoc.serverurl = template.serverurl ?? '';
-    this.bufferDoc.serverid = template.serverid ?? '';
-    this.isTemplateAvailable = true;
+
+    this.bufferDoc.serverurl = this.selectedTemplate['serverurl'] ?? '';
+    this.bufferDoc.serverid = this.selectedTemplate['serverid'] ?? '';
+    this.isTemplateAvailable = false;
+
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'wati templates'), where('templateid', '==', this.selectedTemplate['id'])));
+      if (!snap.empty) {
+        this.isTemplateAvailable = true;
+        const data = snap.docs[0].data();
+        Object.assign(this.selectedTemplate, { docid: data['docid'], category: data['category'], subcategory: data['subcategory'], notes: data['notes'], templateid: data['templateid'] });
+      }
+    } catch (e) { console.error(e); this.isTemplateAvailable = false; }
+
     this.initParamConfig(this.parseTemplateParams(this.selectedTemplate['bodyOriginal'] || ''));
     this.scrollToConfigureParams();
   }
@@ -743,7 +730,7 @@ export class WatiInputComponent {
       notes: this.isTemplateAvailable ? this.selectedTemplate['notes'] : this.notes,
       parameterConfig: this.buildParamConfigForSave(), paramFillMode: this.getDominantFillMode(),
       templateData: { ...this.selectedTemplate },
-      watiCategory: this.selectedWatiCategory || null,
+      workshopTitle: this.workshopTitle,
     };
     if (status === 'queued') { archiveDoc.queuedAt = serverTimestamp(); archiveDoc.templatevalidated = false; }
     if (this.uploadedFile && this.fileUploadUrl) {

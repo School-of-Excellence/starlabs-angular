@@ -51,12 +51,17 @@ export class ATCDraftService {
     try {
       const key = draftKey(collection, docId);
       const prev = await this.get(key);
+      // Clone ONCE and use the serialized (plain-JSON) copy for BOTH storage and dirty-diffing.
+      // Diffing the raw `working` would walk any native Firestore DocumentReference it contains into the
+      // circular Firestore-instance graph → "Maximum call stack size exceeded". `base` is already stored in
+      // this same serialized form, so map-vs-map is symmetric and dirty-detection stays correct.
+      const cloned = this.clone(working);
       const entry: CachedDraft = {
         key, collection, docId,
-        working: this.clone(working),
+        working: cloned,
         base: prev?.base ?? null,
         baseRev: prev?.baseRev ?? 0,
-        dirty: computeDirty(working, prev?.base ?? null),
+        dirty: computeDirty(cloned, prev?.base ?? null),
         deviceId: this.deviceId,
         updatedAt: Date.now(),
         pendingDelete: prev?.pendingDelete,
