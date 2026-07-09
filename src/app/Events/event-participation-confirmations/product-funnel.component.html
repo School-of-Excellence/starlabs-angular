@@ -77,25 +77,55 @@
           <div class="sx-jhead">
             <span class="sx-jdot"></span>
             <span class="sx-jtitle">Approved by journey</span>
+            <button type="button" class="sx-jgroup-btn" [class.on]="groupEditMode"
+              (click)="toggleGroupEdit()" matTooltipClass="sx-tip"
+              [matTooltip]="groupEditMode ? 'Done grouping' : 'Group journeys together'">
+              <mat-icon>{{ groupEditMode ? 'check' : 'workspaces' }}</mat-icon>{{ groupEditMode ? 'Done' : 'Group' }}
+            </button>
           </div>
           <div class="sx-jsub">of {{ counts.approved | number }} approved · journey, split by first-timer vs repeat</div>
           <div class="sx-jload" *ngIf="!splitsReady"><mat-icon class="spin">progress_activity</mat-icon> journeys…</div>
-          <ng-container *ngIf="splitsReady">
-            <div class="sx-jgrp" *ngFor="let j of approvedByJourney">
+
+          <!-- Group edit mode: tick journeys → name → Group. Repeat to maintain multiple groups. Saved per event. -->
+          <ng-container *ngIf="splitsReady && groupEditMode">
+            <div class="sx-jedit-hint">Tick journeys, type a group name, then Group. Repeat to build more groups.</div>
+            <div class="sx-jgroup-bar">
+              <input class="sx-jgroup-input" type="text" placeholder="Group name…" list="sxJourneyGroups" [(ngModel)]="groupNameInput">
+              <button type="button" class="sx-jgroup-apply" [disabled]="!journeySel.size || !groupNameInput.trim()"
+                (click)="groupSelected()">Group{{ journeySel.size ? ' (' + journeySel.size + ')' : '' }}</button>
+              <button type="button" class="sx-jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
+            </div>
+            <datalist id="sxJourneyGroups">
+              <option *ngFor="let g of existingGroupNames" [value]="g"></option>
+            </datalist>
+            <label class="sx-jedit" *ngFor="let j of approvedByJourney">
+              <input type="checkbox" class="sx-jchk" [checked]="isJourneySel(j.label)" (change)="toggleJourneySel(j.label)">
+              <span class="sx-jrdot" [style.background]="journeyColor(journeyGroups[j.label] ? ('grp:' + journeyGroups[j.label]) : j.key)"></span>
+              <span class="sx-jrlab">{{ j.label }}</span>
+              <span class="sx-jgroup-tag" *ngIf="journeyGroups[j.label]">{{ journeyGroups[j.label] }}</span>
+              <span class="sx-jnum">{{ j.total | number }}</span>
+            </label>
+          </ng-container>
+
+          <!-- Normal mode: grouped/aggregated rows; click filters the table to the union of the group's journeys -->
+          <ng-container *ngIf="splitsReady && !groupEditMode">
+            <div class="sx-jgrp" *ngFor="let j of displayedJourneys">
               <button type="button" class="sx-jrow"
                 [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='all'"
-                (click)="setJourneyChip(j.key)" matTooltipClass="sx-tip" [matTooltip]="'Show all approved from ' + j.label">
+                (click)="setJourneyChip(j)" matTooltipClass="sx-tip" [matTooltip]="'Show all approved from ' + j.label">
                 <span class="sx-jrdot" [style.background]="journeyColor(j.key)"></span>
-                <span class="sx-jrlab">{{ j.label }}</span>
+                <span class="sx-jrlab">
+                  <mat-icon class="sx-jgrp-ic" *ngIf="j.isGroup">workspaces</mat-icon>{{ j.label }}<span class="sx-jmembers" *ngIf="j.isGroup"> · {{ j.members?.length }} journeys</span>
+                </span>
                 <span class="sx-jnum">{{ j.total | number }}</span>
               </button>
               <div class="sx-jfr">
                 <button type="button" class="sx-frpill first"
                   [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='first'"
-                  (click)="setJourneyFr(j.key, 'first')" matTooltipClass="sx-tip" [matTooltip]="'Show first-timers from ' + j.label">First-timer {{ j.first | number }}</button>
+                  (click)="setJourneyFr(j, 'first')" matTooltipClass="sx-tip" [matTooltip]="'Show first-timers from ' + j.label">First-timer {{ j.first | number }}</button>
                 <button type="button" class="sx-frpill rpt"
                   [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='repeat'"
-                  (click)="setJourneyFr(j.key, 'repeat')" matTooltipClass="sx-tip" [matTooltip]="'Show repeat from ' + j.label">Repeat {{ j.repeat | number }}</button>
+                  (click)="setJourneyFr(j, 'repeat')" matTooltipClass="sx-tip" [matTooltip]="'Show repeat from ' + j.label">Repeat {{ j.repeat | number }}</button>
               </div>
             </div>
           </ng-container>
@@ -134,6 +164,10 @@
         <button mat-stroked-button class="sx-danger" [disabled]="selectedToUnattend.length===0" (click)="markUnattended(selectedToUnattend)"
           matTooltipClass="sx-tip" matTooltip="Mark not attended and cancel the product (destructive)">
           <mat-icon>person_off</mat-icon> Mark {{ selectedToUnattend.length }} not attended
+        </button>
+        <button mat-stroked-button class="sx-danger" [disabled]="selectedToRevoke.length===0" (click)="markRevoked(selectedToRevoke)"
+          matTooltipClass="sx-tip" matTooltip="Revoke: cancel the product, then assign a new one (destructive)">
+          <mat-icon>block</mat-icon> Revoke {{ selectedToRevoke.length }}
         </button>
       </ng-container>
 
@@ -276,13 +310,21 @@
                   <button mat-button class="sx-mark" (click)="markAttended([row])">Mark attended</button>
                 </ng-container>
                 <button mat-button class="sx-mark-danger" (click)="markUnattended([row])">Not attended</button>
+                <button mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
               </ng-container>
               <!-- Unattended segment -->
               <span class="sx-unatt" *ngIf="segment==='unattended'">
                 <mat-icon>person_off</mat-icon> Unattended <span class="sx-mut">· product cancelled</span>
               </span>
+              <!-- Revoked segment -->
+              <span class="sx-unatt" *ngIf="segment==='revoked'">
+                <mat-icon>block</mat-icon> Revoked
+                <span class="sx-mut" *ngIf="row.revokedBy">· by {{ row.revokedBy }}</span>
+                <span class="sx-mut" *ngIf="row.revokedDate">· {{ row.revokedDate | date:'d MMM y, h:mm a' }}</span>
+                <span class="sx-mut" *ngIf="!row.revokedBy && !row.revokedDate">· product cancelled</span>
+              </span>
               <!-- Status (other segments) -->
-              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && segment!=='unattended' && selectionMode!=='attend'">
+              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && segment!=='unattended' && segment!=='revoked' && selectionMode!=='attend'">
                 <ng-container *ngIf="segment==='overallRequested'; else stdStatus">{{ row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested' }}</ng-container>
                 <ng-template #stdStatus>{{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
               </span>
