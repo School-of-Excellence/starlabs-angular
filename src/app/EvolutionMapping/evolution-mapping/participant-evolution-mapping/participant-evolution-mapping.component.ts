@@ -115,19 +115,9 @@ export class ParticipantEvolutionMappingComponent {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }),
       takeWhile(val => val !== '00:00:00', true),
-      tap(async val => {
+      tap(val => {
         if (val === '00:00:00' && !this.expiredLive) {
           this.expiredLive = true;
-          try {
-            const liveDocRef = doc(
-              this.firestore,
-              'liveevolutionmapping',
-              this.currentProfile['profileid']
-            );
-            await updateDoc(liveDocRef, { live: false });
-          } catch (err) {
-            console.error('Error updating live status on expiry', err);
-          }
           if (this.liveEvolutionMapping.length > 0) {
             this.liveEvolutionMapping = [
               { ...this.liveEvolutionMapping[0], live: false }
