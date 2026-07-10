@@ -67,6 +67,33 @@
     <ng-container *ngIf="view === 'summary'">
     <div class="jchd-anim">
 
+      <!-- Global summary filter: lifecycle + journey/group. Rescopes every metric below.
+           Active only when the full base is loaded; disabled in the paged/All view (honest). -->
+      <div class="ios2-filter" [class.is-disabled]="pagedMode">
+        <span class="fb-label"><mat-icon>tune</mat-icon>Filter</span>
+        <div class="fb-seg" role="group" aria-label="Lifecycle">
+          <button type="button" [class.on]="shownLifecycle==='all'" (click)="setSumLifecycle('all')">All</button>
+          <button type="button" [class.on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">Active</button>
+          <button type="button" [class.on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">Non-active</button>
+          <button type="button" [class.on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">Discontinued</button>
+        </div>
+        <div class="fb-journey">
+          <button type="button" class="fb-jbtn" [class.on]="!!sumJourney()" (click)="toggleJourneyMenu()">
+            <mat-icon *ngIf="sumJourney()?.group" class="fb-jgico">folder</mat-icon>{{ summaryJourneyLabel }}<mat-icon class="fb-jchev">expand_more</mat-icon>
+          </button>
+          <div class="fb-menu" *ngIf="journeyMenuOpen">
+            <button type="button" class="fb-mitem" [class.on]="!sumJourney()" (click)="setSumJourney(null)">All journeys</button>
+            <button type="button" class="fb-mitem" *ngFor="let j of journeyView()" [class.on]="isSummaryJourneyOn(j)" (click)="setSumJourney(j)">
+              <mat-icon *ngIf="j.group" class="fb-mgico">folder</mat-icon>
+              <span class="fb-mname">{{ j.name }}</span><span class="fb-mcount">{{ j.count }}</span>
+            </button>
+          </div>
+        </div>
+        <button type="button" class="fb-clear" *ngIf="summaryFilterActive" (click)="clearSummaryFilter()"><mat-icon>close</mat-icon>Clear</button>
+        <span class="fb-count" *ngIf="!pagedMode">{{ filteredRows().length }} of {{ allRows().length }}</span>
+        <span class="fb-hint" *ngIf="pagedMode">Available in a coach view</span>
+      </div>
+
       <!-- Row 1: Needs attention (who needs you) + Your base (lifecycle split) -->
       <div class="ios2-top">
         <button type="button" class="ios2-card ios2-hero" (click)="goToParticipantsWithLever('needsAttention')">
@@ -97,15 +124,15 @@
             <span class="sb-seg sb-disc" [style.width.%]="summary.discontinued / summary.total * 100"></span>
           </div>
           <div class="sb-segs">
-            <button type="button" class="sb-tile" [class.is-on]="lifecycleFilter==='active'" (click)="goToStatus('active')">
+            <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">
               <span class="sb-num">{{ summary.total - summary.nonActive - summary.discontinued }}</span>
               <span class="sb-label"><i class="sb-dot dot-active"></i>Active</span>
             </button>
-            <button type="button" class="sb-tile" [class.is-on]="lifecycleFilter==='nonactive'" (click)="goToStatus('nonactive')">
+            <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">
               <span class="sb-num">{{ summary.nonActive }}</span>
               <span class="sb-label"><i class="sb-dot dot-nonactive"></i>Non-active</span>
             </button>
-            <button type="button" class="sb-tile" [class.is-on]="lifecycleFilter==='discontinued'" (click)="goToStatus('discontinued')">
+            <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">
               <span class="sb-num">{{ summary.discontinued }}</span>
               <span class="sb-label"><i class="sb-dot dot-disc"></i>Discontinued</span>
             </button>
@@ -175,8 +202,8 @@
 
           <div class="jm-chips" *ngIf="journeyView().length; else noJourneys">
             <button type="button" class="jm-chip" *ngFor="let j of journeyView()" [class.is-group]="j.group"
-                    [class.is-on]="j.group ? (journeyGroupFilter.length === j.journeys.length && j.journeys[0] === journeyGroupFilter[0]) : (journeyFilter === j.name)"
-                    (click)="goToJourney(j)">
+                    [class.is-on]="isSummaryJourneyOn(j)"
+                    (click)="setSumJourney(j)">
               <mat-icon *ngIf="j.group" class="jm-gicon">folder</mat-icon>
               <span class="jm-name">{{ j.name }}</span><span class="jm-count">{{ j.count }}</span>
             </button>
