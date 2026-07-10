@@ -1810,35 +1810,39 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   trackByCoachId = (_: number, c: { coachId: string }): string => c.coachId;
 
   needsAttentionRows = computed<PortfolioRow[]>(() =>
-    this.allRows()
+    this.filteredRows()
       .filter(r => (r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0) && !this.isAddressed(r))
       .sort((a, b) => b.priority - a.priority));
   // backing computed for the parens-free `needsAttentionCount` getter (template binds the getter).
   private _needsAttentionCount = computed<number>(() => {
+    // Always read the local (filtered) count first so this computed stays subscribed to
+    // needsAttentionRows — otherwise, after taking the paged branch, it never recomputes when
+    // allRows changes on a scope switch (it would show a stale base-wide number in a coach view).
+    const local = this.needsAttentionRows().length;
     // paged: use the base-wide count once contact data has loaded (else page-local rows).
     if (this.pagedMode && this.contactDataLoaded()) return this.fullBaseNeedsAttention();
-    return this.needsAttentionRows().length;
+    return local;
   });
   get needsAttentionCount(): number { return this._needsAttentionCount(); }
 
   /** Real participant rows behind a given Summary card (from the loaded base). */
   goingQuietRows = computed<PortfolioRow[]>(() =>
-    this.allRows().filter(r => r.goingQuiet).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0)));
+    this.filteredRows().filter(r => r.goingQuiet).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0)));
   paymentsLockedRows = computed<PortfolioRow[]>(() =>
-    this.allRows().filter(r => (r.financialstatus ?? '').toLowerCase() === 'locked').sort((a, b) => b.priority - a.priority));
+    this.filteredRows().filter(r => (r.financialstatus ?? '').toLowerCase() === 'locked').sort((a, b) => b.priority - a.priority));
   renewalRows = computed<PortfolioRow[]>(() =>
-    this.allRows().filter(r => r.renewalWindow).sort((a, b) => (a.daysToRenewal ?? 0) - (b.daysToRenewal ?? 0)));
+    this.filteredRows().filter(r => r.renewalWindow).sort((a, b) => (a.daysToRenewal ?? 0) - (b.daysToRenewal ?? 0)));
   openTicketRows = computed<PortfolioRow[]>(() =>
-    this.allRows().filter(r => r.openTickets > 0).sort((a, b) => b.openTickets - a.openTickets));
+    this.filteredRows().filter(r => r.openTickets > 0).sort((a, b) => b.openTickets - a.openTickets));
   flaggedRows = computed<PortfolioRow[]>(() =>
-    this.allRows().filter(r => r.flagged).sort((a, b) => b.priority - a.priority));
+    this.filteredRows().filter(r => r.flagged).sort((a, b) => b.priority - a.priority));
   /** Scope-aware flagged count: base-wide for the ALL view, but this coach's flagged participants
    *  for a specific coach (allRows is that coach's full base in non-paged mode). The global
    *  flaggedIds set is base-wide, so it must NOT be used as the count when a coach is selected.
    *  (selectedCoachId is read as a plain field — it co-changes with an allRows rebuild on scope
    *  switch, and flaggedIds is a signal, so the memoized count stays correct.) */
   flaggedCount = computed<number>(() =>
-    this.selectedCoachId === this.ALL ? this.flaggedIds().size : this.flaggedRows().length);
+    this.pagedMode ? this.flaggedIds().size : this.flaggedRows().length);
 
   /** Coach-set health distribution across the CURRENT scope's loaded rows (allRows). Honest: it
    *  reflects only KNOWN/loaded states — every row without a coach assessment is Not assessed (no
@@ -1846,7 +1850,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  coachHealthByProfile in computeRows). */
   healthDistribution = computed<{ happy: number; neutral: number; unhappy: number; atRisk: number; critical: number; notAssessed: number; total: number }>(() => {
     const d = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
-    for (const r of this.allRows()) {
+    for (const r of this.filteredRows()) {
       d.total++;
       switch (r.coachHealthState?.state) {
         case 'HAPPY': d.happy++; break;
@@ -1899,6 +1903,65 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     for (const j of mix) if (!grouped.has(j.name)) out.push({ name: j.name, count: j.count, group: false, journeys: [j.name] });
     return out.sort((a, b) => b.count - a.count);
   });
+
+  // ---- global summary filter: lifecycle + journey/group, scopes EVERY summary metric ----
+  // Only active when the base is fully loaded (!pagedMode); in the paged/All view the numbers come
+  // from base-wide server/index counts that can't be row-filtered accurately, so the bar is disabled.
+  sumLifecycle = signal<'all' | 'active' | 'nonactive' | 'discontinued'>('all');
+  sumJourney = signal<{ label: string; group: boolean; journeys: string[] } | null>(null);
+  journeyMenuOpen = false;
+
+  private summaryJourneyName(r: { journeyname?: string }): string {
+    return (r.journeyname && r.journeyname !== '-') ? r.journeyname : 'Unknown';
+  }
+  private matchesSummaryJourney(r: PortfolioRow): boolean {
+    const j = this.sumJourney();
+    return !j || j.journeys.includes(this.summaryJourneyName(r));
+  }
+  private matchesSummaryLifecycle(r: PortfolioRow): boolean {
+    switch (this.sumLifecycle()) {
+      case 'active': return r.subActive && !this.isInactiveStatus(r.customerstatus);
+      case 'nonactive': return !r.subActive && !this.isInactiveStatus(r.customerstatus);
+      case 'discontinued': return this.isInactiveStatus(r.customerstatus);
+      default: return true;
+    }
+  }
+  /** allRows scoped by the JOURNEY filter only — the band shows the full lifecycle split for it. */
+  journeyFilteredRows = computed<PortfolioRow[]>(() => this.allRows().filter(r => this.matchesSummaryJourney(r)));
+  /** allRows scoped by BOTH filters — the source for every KPI / needs-attention / health count. */
+  filteredRows = computed<PortfolioRow[]>(() => this.journeyFilteredRows().filter(r => this.matchesSummaryLifecycle(r)));
+
+  get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'all' || this.sumJourney() !== null; }
+  get summaryJourneyLabel(): string { return this.sumJourney()?.label ?? 'All journeys'; }
+  isSummaryJourneyOn(item: { name: string; group: boolean; journeys: string[] }): boolean {
+    const cur = this.sumJourney();
+    return !!cur && cur.group === item.group && cur.journeys.length === item.journeys.length
+      && item.journeys.every(j => cur.journeys.includes(j));
+  }
+
+  /** Status-band tile / segmented control → set the lifecycle filter in place. 'all' resets the
+   *  lifecycle (keeps the journey); a repeated segment toggles back to 'all'. */
+  setSumLifecycle(kind: 'all' | 'active' | 'nonactive' | 'discontinued'): void {
+    if (this.pagedMode) return;
+    this.sumLifecycle.set(kind === 'all' ? 'all' : (this.sumLifecycle() === kind ? 'all' : kind));
+    this.journeyMenuOpen = false;
+    this.computeSummary();
+  }
+  /** Journey chip / dropdown → set the journey-or-group filter in place (null clears; re-pick toggles). */
+  setSumJourney(item: { name: string; group: boolean; journeys: string[] } | null): void {
+    if (this.pagedMode) return;
+    if (!item) this.sumJourney.set(null);
+    else this.sumJourney.set(this.isSummaryJourneyOn(item) ? null : { label: item.name, group: item.group, journeys: item.journeys });
+    this.journeyMenuOpen = false;
+    this.computeSummary();
+  }
+  toggleJourneyMenu(): void { if (!this.pagedMode) this.journeyMenuOpen = !this.journeyMenuOpen; }
+  clearSummaryFilter(): void {
+    this.sumLifecycle.set('all');
+    this.sumJourney.set(null);
+    this.journeyMenuOpen = false;
+    this.computeSummary();
+  }
 
   /** Personal groups for the logged-in coach — stored locally (per-coach, this browser only).
    *  Key is scoped by actorUid so coaches sharing a browser don't see each other's groups. */
@@ -2239,6 +2302,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.selectedCoachId = id;
     this.activeLever = 'all';
     this.assignTargetCoachId = '';
+    // scope changed → the summary filter's journey/lifecycle no longer apply; reset to unfiltered.
+    this.sumLifecycle.set('all');
+    this.sumJourney.set(null);
+    this.journeyMenuOpen = false;
     this.pagedMode = this.isPagedView(id);
     this.applyPaginatorBinding();
     this.loadProgress = 0;
@@ -2477,13 +2544,18 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // allRows is already per-distinct-participant. Active/Inactive are SUBSCRIPTION-based
     // (subActive), NOT customerstatus (empty on pjp — the prior bug). Total = distinct participants.
     const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0 };
-    for (const r of this.allRows()) {
+    // Band (lifecycle split) reflects the JOURNEY filter only, so all three segments stay visible and
+    // switchable even while one is selected as the active lifecycle filter.
+    for (const r of this.journeyFilteredRows()) {
       s.total++;
       if (r.subActive) s.active++; else s.inactive++;
       // 3-way lifecycle split for the "Assigned to me" band (discontinued wins over active/non-active):
       // Discontinued = customerstatus late/discontinued/banned; Non-active = subscription ended, not discontinued.
       if (this.isInactiveStatus(r.customerstatus)) s.discontinued++;
       else if (!r.subActive) s.nonActive++;
+    }
+    // Lever counts reflect BOTH filters (lifecycle + journey) — the fully-scoped subset.
+    for (const r of this.filteredRows()) {
       if (r.renewalWindow) s.renewalsSoon++;
       if (r.lapsed) s.lapsed++;
       if (r.openTickets > 0) s.withOpenTickets++;
