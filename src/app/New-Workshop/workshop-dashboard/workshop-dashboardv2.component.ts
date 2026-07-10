@@ -37,7 +37,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsapp-progress-dialog.component';
 
 @Component({
-  selector: 'app-workshop-dashboard',
+  selector: 'app-workshop-dashboardv2',
   standalone: true,
   imports: [
     CommonModule, MatCardModule, MatButtonModule, MatIconModule, MatCheckboxModule,
@@ -46,10 +46,10 @@ import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsa
     MatListModule, MatTooltipModule, MatDialogModule, MatFormFieldModule, MatInputModule,
     RouterModule, MatMenuModule, MatRadioModule, FormsModule, MatSelectModule
   ],
-  templateUrl: './workshop-dashboard.component.html',
-  styleUrls: ['./workshop-dashboard.component.css']
+  templateUrl: './workshop-dashboardv2.component.html',
+  styleUrls: ['./workshop-dashboardv2.component.css']
 })
-export class WorkshopDashboardComponent implements OnInit, OnDestroy {
+export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
   @ViewChild(MatPaginator, { static: false }) paginator!: MatPaginator;
   @ViewChild(MatSort, { static: false }) sort!: MatSort;
   @ViewChild('participantDataSection', { static: false }) participantDataSection!: ElementRef;

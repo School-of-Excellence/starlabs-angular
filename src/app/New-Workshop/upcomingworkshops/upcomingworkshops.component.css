@@ -1,9 +1,11 @@
 .page {
-  padding: 24px;
-  max-width: 1200px;
+  padding: 24px clamp(16px, 3vw, 40px);
+  width: 100%;
+  max-width: 1700px;
   margin: 0 auto;
   background: #f7f9fc;
   min-height: 100%;
+  box-sizing: border-box;
 }
 
 .page-head {
@@ -79,8 +81,36 @@
   overflow: hidden;
 }
 
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 14px 4px 14px;
+}
+
+.search-field {
+  width: 320px;
+  max-width: 100%;
+}
+
+.search-field mat-icon[matPrefix] {
+  color: #9ca3af;
+  margin-right: 6px;
+}
+
 .table-scroll {
   overflow-x: auto;
+}
+
+.no-match-cell {
+  padding: 28px 14px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+mat-paginator {
+  background: transparent;
+  border-top: 1px solid #f0f2f6;
 }
 
 .upcoming-table {
@@ -92,16 +122,29 @@
   background: #f9fafb;
   color: #6b7280;
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  padding: 12px 10px;
 }
 
 .upcoming-table td.mat-mdc-cell {
   color: #374151;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   border-bottom-color: #f0f2f6;
+  padding: 10px;
+}
+
+/* Keep the compact columns from stretching; let title/location breathe. */
+.upcoming-table .mat-column-eventdate,
+.upcoming-table .mat-column-cost,
+.upcoming-table .mat-column-seats,
+.upcoming-table .mat-column-confirmed,
+.upcoming-table .mat-column-showconfirmedseat,
+.upcoming-table .mat-column-show {
+  white-space: nowrap;
+  width: 1%;
 }
 
 .upcoming-table tr.mat-mdc-row:hover {
@@ -155,6 +198,20 @@
 
 .bool-icon.on {
   color: #22a866;
+}
+
+.view-btn {
+  border-radius: 8px;
+  line-height: 32px;
+  height: 34px;
+  font-weight: 600;
+}
+
+.view-btn mat-icon {
+  font-size: 18px;
+  height: 18px;
+  width: 18px;
+  margin-right: 2px;
 }
 
 .actions-col {
