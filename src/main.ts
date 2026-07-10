@@ -27,17 +27,15 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   if (e.storage) connectStorageEmulator(getStorage(app), e.storage.host, e.storage.port);
   console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);
 } else {
-  // Default DB: FORCE long-polling. `experimentalAutoDetectLongPolling` is
-  // already the firebase-js-sdk v11 default, so it was in effect before this
-  // line and was NOT enough — the same reason the `firestore-atc` DB below
-  // force-long-polls: this network interferes with Firestore's WebChannel
-  // streaming, and auto-detect can still stall the first-load Listen stream.
-  // The stall is most visible with a SECOND concurrent tab on the same origin
-  // (e.g. two Arena boards) — one tab's stream never establishes and that
-  // board shows no data. Forcing long-polling uses a plain-XHR transport that
-  // this network passes reliably, so every tab loads. Trade-off: slightly
-  // chattier than streaming, applied app-wide — matches the ATC workaround.
-  initializeFirestore(app, { experimentalForceLongPolling: true });
+  // Default DB: default transport (WebChannel streaming with v11 auto-detect
+  // long-polling fallback). App-wide `experimentalForceLongPolling` was REMOVED
+  // here (was added in 185e8412 for the two-tab Arena "second board shows no
+  // data" stall) because it forced plain-XHR polling on EVERY default-DB read
+  // app-wide, not just Arena. `firestore-atc` below is a separate DB instance
+  // and still force-long-polls, so ATC screens are unaffected.
+  // WATCH: if two concurrent Arena boards blank out on the production network,
+  // WebChannel is stalling again — restore `{ experimentalForceLongPolling: true }`.
+  initializeFirestore(app, {});
   // Named DB `firestore-atc`: force long-polling here — this is the canonical,
   // earliest initializer, so every consumer (getFirestore('firestore-atc') and
   // AtcFirebaseService) reuses this one instance with a consistent transport.
