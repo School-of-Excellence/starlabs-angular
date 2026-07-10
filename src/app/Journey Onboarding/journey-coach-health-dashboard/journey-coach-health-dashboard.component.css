@@ -2100,6 +2100,46 @@ td.mat-mdc-cell span {
 .jchd-journey-card .jm-manage:hover { background: rgba(0,122,255,0.16); }
 .jchd-journey-card .jm-manage mat-icon { font-size: 16px; width: 16px; height: 16px; }
 
+/* --- Global summary filter bar (lifecycle segmented control + journey/group menu) --- */
+.ios2-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: #fff; border-radius: var(--card-radius);
+  padding: 8px 12px; margin-bottom: 12px; box-shadow: var(--card-shadow); }
+.ios2-filter.is-disabled { opacity: .55; pointer-events: none; }
+.ios2-filter .fb-label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.ios2-filter .fb-label mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+.fb-seg { display: inline-flex; background: #f2f2f7; border-radius: 9px; padding: 2px; }
+.fb-seg button { border: none; background: transparent; font: inherit; font-size: 13px; color: var(--ink-2);
+  padding: 5px 12px; border-radius: 7px; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.fb-seg button:hover { color: var(--ink); }
+.fb-seg button.on { background: #fff; color: var(--ink); font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.fb-seg button:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
+
+.fb-journey { position: relative; }
+.fb-jbtn { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 13px; color: var(--ink);
+  background: #fff; border: 0.5px solid #d1d1d6; border-radius: 999px; padding: 6px 10px 6px 12px; cursor: pointer; transition: background .15s ease; }
+.fb-jbtn:hover { background: #f7f7fa; }
+.fb-jbtn.on { background: #eaf2ff; border-color: #007aff; color: #007aff; }
+.fb-jbtn .fb-jchev { font-size: 16px; width: 16px; height: 16px; }
+.fb-jbtn .fb-jgico { font-size: 15px; width: 15px; height: 15px; margin-right: 2px; }
+
+.fb-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; min-width: 220px; max-height: 300px; overflow-y: auto;
+  background: #fff; border-radius: 12px; padding: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.18), 0 0 0 0.5px rgba(0,0,0,.06); }
+.fb-mitem { display: flex; align-items: center; gap: 6px; width: 100%; border: none; background: transparent; font: inherit; font-size: 13px;
+  color: var(--ink); text-align: left; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.fb-mitem:hover { background: #f2f2f7; }
+.fb-mitem.on { background: #eaf2ff; color: #007aff; font-weight: 500; }
+.fb-mname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fb-mcount { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.fb-mitem.on .fb-mcount { color: #007aff; }
+.fb-mgico { font-size: 15px; width: 15px; height: 15px; }
+
+.fb-clear { display: inline-flex; align-items: center; gap: 3px; font: inherit; font-size: 12px; color: var(--ink-2);
+  background: transparent; border: 0.5px solid #e5e5ea; border-radius: 999px; padding: 5px 10px 5px 8px; cursor: pointer; }
+.fb-clear:hover { background: #f2f2f7; }
+.fb-clear mat-icon { font-size: 14px; width: 14px; height: 14px; }
+.fb-count { margin-left: auto; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.fb-hint { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+
 /* --- Responsive collapse --- */
 @media (max-width: 1100px) { .ios2-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
