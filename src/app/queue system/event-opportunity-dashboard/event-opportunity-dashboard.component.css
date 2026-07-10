@@ -35,13 +35,14 @@
 .content-area {
   width: 100%;
   padding: 0 18px 28px;
-  max-width: 1180px;
+  max-width: 1680px;
   margin: 0 auto;
   transition: width var(--dur) var(--ease);
 }
 
 /* Board tab is a dashboard — let its cards use the full screen width.
-   Planning tab + header controls stay centered at the 1180px design width. */
+   Planning tab + header controls stay centered, capped at 1680px so the wide
+   participant table has room without stretching edge-to-edge on huge monitors. */
 .content-area.board-active {
   max-width: none;
   padding: 0 28px 28px;
