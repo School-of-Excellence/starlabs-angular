@@ -14,7 +14,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
-// import { UnassignedParticipantsDialogComponent } from '../unassigned-participants-dialog/unassigned-participants-dialog.component';
 import { environment } from '../../../environments/environment.development';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
@@ -158,7 +157,7 @@ export class CohortManagementComponent {
   // Grouping States
   groupBy: 'none' | 'levels' | 'daterange' | 'category' | 'studio' | 'zone' = 'none'
   showTemporaryOnly: boolean = false
-  showExpiredCohorts: boolean = false
+  // showExpiredCohorts: boolean = false
 
   // Tags from participant tags collection
   participantTagsList: any[] = []
@@ -203,6 +202,10 @@ export class CohortManagementComponent {
 
   bigActivityMap = {};
 
+   // Cohort sorting - simplified to date and name only
+  sortBy: 'date' | 'name' = 'date';
+  sortOrder: 'asc' | 'desc' = 'desc';
+
   // LocalStorage keys
   private readonly STORAGE_KEY_QUEUE = 'big_cohort_selected_queue';
   private readonly STORAGE_KEY_EVENT = 'big_cohort_selected_event';
@@ -229,7 +232,10 @@ export class CohortManagementComponent {
 
     // Load saved selections from localStorage
     this.loadSavedSelections();
+  }
 
+  ngOnInit(): void {
+    // initial load of cohorts
     getDocs(collection(this.firestore, "big cohorts")).then(snap => {
       this.cohortsList = snap.docs.map(e => {
         let element: any = e.data()
@@ -239,6 +245,8 @@ export class CohortManagementComponent {
       this.filteredCohortsList = this.cohortsList
       this.toRunFilterFunctions()
     })
+
+    // load marathons
     getDocs(query(collection(this.firestore, "big marathon"), orderBy("startdate", "asc"))).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const element: any = snap.docs[i].data();
@@ -251,6 +259,8 @@ export class CohortManagementComponent {
       this.selectedMarathon = this.marathonList[this.marathonList.length - 1]['docid']
       this.toRunFilterFunctions()
     })
+
+    // load events
     getDocs(collection(this.firestore, "event collection")).then(snap => {
       this.acceleratorEventList = snap.docs.map((e) => {
         let element: any = e.data()
@@ -264,12 +274,13 @@ export class CohortManagementComponent {
 
       this.filteredAcceleratorEventList = this.acceleratorEventList
       this.searchableEventList = [...this.acceleratorEventList]
-      
+
       // Patch saved event selections
       this.patchSavedEventSelections();
       this.toRunFilterFunctions()
     });
 
+    // load event zones
     getDocs(collection(this.firestore, 'event zones')).then((zones) => {
       this.zoneEventEventList = zones.docs.map((e) => {
         let element: any = e.data();
@@ -286,8 +297,7 @@ export class CohortManagementComponent {
       this.patchSavedZoneSelections();
     });
 
-    let collectionName = "participant metadata"
-
+    // load journey
     getDocs(query(collection(this.firestore, "journey"), where("atcmodel", "==", "B!G"))).then((snap) => {
       if (!snap.empty) {
         let bigJourneyList = snap.docs.map(e => e.id)
@@ -296,12 +306,14 @@ export class CohortManagementComponent {
       }
     });
 
-    getDocs(query(collection(this.firestore, collectionName),orderBy('name','asc'))).then((participants) => {
+    // load participant details from participant metadata
+    getDocs(query(collection(this.firestore, "participant metadata"), orderBy('name', 'asc'))).then((participants) => {
       let participantsList = participants.docs.map(e => e.data())
-      let list = participants.docs.forEach((e)=>this.mapParticipantMetaData[e.id] = e.data())
+      let list = participants.docs.forEach((e) => this.mapParticipantMetaData[e.id] = e.data())
       this.participantlist = participantsList;
-    })    
+    })
 
+    // load available queues
     getDocs(collection(this.firestore, "queue generation")).then(queue => {
       const queueData = queue.docs.map((doc) => {
         const data = doc.data();
@@ -311,13 +323,13 @@ export class CohortManagementComponent {
           ...data
         };
       });
-      
+
       // Sort queues - ongoing first
       const sortedQueueData = this.sortQueuesWithOngoingFirst(queueData);
-      
+
       this.searchableQueueList = [...sortedQueueData];
       this.filteredQueueList = [...sortedQueueData];
-      
+
       queue.docs.forEach((doc) => {
         this.mapQueueName[doc.id] = doc.data()['queuename'];
       });
@@ -328,16 +340,13 @@ export class CohortManagementComponent {
 
   }
 
-  ngOnInit(): void {
-
-  }
-
   ngOnDestroy(): void {
     this.subscription.next();
     this.subscription.complete();
   }
 
-  async loadCohorts(){
+  // functon to load cohorts
+  loadCohorts(){
     this.loading = true;
     getDocs(collection(this.firestore, "big cohorts")).then(snap => {
       this.cohortsList = snap.docs.map(e => {
@@ -350,6 +359,7 @@ export class CohortManagementComponent {
     })
   }
 
+  // function to load bigactivity
   loadActivity(){
     getDocs(query(collection(this.firestore, 'bigactivity'),orderBy('activity','asc'))).then((activity)=>{
       this.bigActivityMap = {};
@@ -381,6 +391,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to load participant tages for participant tag filters
   loadParticipantTags() {
     getDocs(collection(this.firestore, "participant tags")).then(snap => {
       this.participantTagsList = snap.docs.map(e => {
@@ -391,6 +402,7 @@ export class CohortManagementComponent {
     });
   }
 
+  // function to load big inviatations
   loadBigInvitations() {
     getDocs(query(collection(this.firestore, "biginvitation"), where("status", "==", "accepted"))).then(snap => {
       this.bigInvitationList = snap.docs.map(e => {
@@ -401,6 +413,7 @@ export class CohortManagementComponent {
     });
   }
 
+  // load event participants requests
   loadEventParticipationRequests() {
     if (this.selectedAcceleratorEvent.length === 0) {
       this.eventParticipationList = [];
@@ -429,10 +442,12 @@ export class CohortManagementComponent {
     });
   }
 
+  // load live events
   loadLiveAssignments() {
     if (this.liveassignmentSubscription) { this.liveassignmentSubscription.unsubscribe(); }
     if (this.queuestudioSubscription) { this.queuestudioSubscription.unsubscribe(); }
 
+    // default values if queue not selected
     if (this.selectedQueueEvent.length === 0) {
       this.liveAssignmentList = [];
       this.studioPairingList = [];
@@ -483,6 +498,7 @@ export class CohortManagementComponent {
     });
   }
 
+  // calculating participant mapping
   updateParticipantStudioMappings() {
     this.mapLiveParticipants = {};
     this.mapParticipantStudios = {};
@@ -513,7 +529,6 @@ export class CohortManagementComponent {
 
         if (isLive) {
           this.mapLiveParticipants[queueId][participantId] = true;
-          // this.mapLiveParticipants[participantId] = true;
         }
       });
     });
@@ -531,13 +546,15 @@ export class CohortManagementComponent {
     });
   }
 
-    calculateUnassignedParticipants() {
+  // calculating unassigned participant list
+  calculateUnassignedParticipants() {
     if (this.selectedAcceleratorEvent.length === 0 && this.selectedQueueEvent.length === 0) {
       this.unassignedParticipants = [];
       this.filterUnassignSearch();
       return;
     }
 
+    // get the list of participants in event cohorts
     const assignedParticipantIds = new Set<string>();
     this.cohortsList.forEach(cohort => {
       const eventRefId = cohort['eventref']?.id;
@@ -559,6 +576,7 @@ export class CohortManagementComponent {
 
     const participantMap = new Map<string, any>();
 
+    // get unassigned participants from event approved participants
     if (useEventParticipation && this.eventParticipationList.length > 0) {
       this.eventParticipationList.forEach(request => {
         const eventRefId = request['eventref']?.id;
@@ -580,6 +598,7 @@ export class CohortManagementComponent {
       });
     }
 
+    // get unassigned participants from big invitation
     if (useBigInvitation && this.bigInvitationList.length > 0) {
       this.bigInvitationList.forEach(invitation => {
         const eventRefId = invitation['eventref']?.id;
@@ -707,21 +726,22 @@ export class CohortManagementComponent {
   }
 
   // Check if queue is ongoing
-  isQueueOngoing(queue: any): boolean {
-    const now = new Date();
-    const start = queue['queuestartdate']?.toDate ? queue['queuestartdate'].toDate() : new Date(queue['queuestartdate'] || 0);
-    const end = queue['queueenddate']?.toDate ? queue['queueenddate'].toDate() : new Date(queue['queueenddate'] || 0);
-    return now >= start && now <= end;
-  }
+  // isQueueOngoing(queue: any): boolean {
+  //   const now = new Date();
+  //   const start = queue['queuestartdate']?.toDate ? queue['queuestartdate'].toDate() : new Date(queue['queuestartdate'] || 0);
+  //   const end = queue['queueenddate']?.toDate ? queue['queueenddate'].toDate() : new Date(queue['queueenddate'] || 0);
+  //   return now >= start && now <= end;
+  // }
 
   // Check if event is ongoing
-  isEventOngoing(event: any): boolean {
-    const now = new Date();
-    const start = event['startdate']?.toDate ? event['startdate'].toDate() : new Date(event['startdate'] || 0);
-    const end = event['enddate']?.toDate ? event['enddate'].toDate() : new Date(event['enddate'] || 0);
-    return now >= start && now <= end;
-  }
+  // isEventOngoing(event: any): boolean {
+  //   const now = new Date();
+  //   const start = event['startdate']?.toDate ? event['startdate'].toDate() : new Date(event['startdate'] || 0);
+  //   const end = event['enddate']?.toDate ? event['enddate'].toDate() : new Date(event['enddate'] || 0);
+  //   return now >= start && now <= end;
+  // }
 
+  // function to check whether participant present in any cohorts
   isParticipantInStudio(queueId : string , participantId: string): boolean {
     if(this.mapLiveParticipants[queueId]){
       return this.mapLiveParticipants[queueId][participantId] === true;
@@ -729,11 +749,13 @@ export class CohortManagementComponent {
     return false;
   }
 
+  // function to get the list of active studios a participant has
   getParticipantStudioInList(queueId : string , participantId: string): any[] {
     const studios = this.mapParticipantStudios[queueId]?.[participantId] || [];
     return studios.filter(s => s.studioin === true);
   }
 
+  // get participant live assignment stats
   getParticipantLiveAssignmentStats(participantId: string): {
     total: number;
     live: number;
@@ -772,11 +794,13 @@ export class CohortManagementComponent {
     };
   }
 
+  // function to get list of participant checked in studios list
   getParticipantCheckedInCount(queueId : string , participantId: string): any[] {
     const studios = this.mapParticipantStudios[queueId]?.[participantId] || [];
     return studios.filter(s => s.checkin === true);
   }
 
+  // function to move participant from unassign list to cohort
   async assignUnassignedToCohort(participantIds: string[], targetCohort: any): Promise<void> {
     try {
     if (!participantIds?.length || !targetCohort?.docid) return;
@@ -792,9 +816,7 @@ export class CohortManagementComponent {
       });
 
       this.chatConfigModelData = data
-      
       this.chatModelRef = this.dialog.open(this.chatConfig);
-
       const result = await this.chatModelRef.afterClosed().toPromise();
 
       if(result){
@@ -813,6 +835,7 @@ export class CohortManagementComponent {
       }
 
     }
+    
     alert(`Assigned ${participantIds.length} participant(s) to ${targetCohort.name}`);
     batch.update(targetRef, { participantidlist: arrayUnion(...participantIds) });
     batch.commit();
@@ -824,25 +847,29 @@ export class CohortManagementComponent {
     this.unassignedParticipants = (this.unassignedParticipants || []).filter(
       (p: any) => !participantIds.includes(p.participantId || p.id)
     );
+    
     this.filterUnassignSearch();
     this.chatModelRef = null;
-    } catch (err) {
+    
+  } catch (err) {
       console.error('Error assigning participants:', err);
       alert('Error assigning participants. Please try again.');
     }
 
   }
  
+  // function to open support chat from cohort
   openCohortChat(cohort: any) {
     const chatDocId = cohort['docid'];
     window.open(window.location.origin + '/group-chat');
   }
 
+  // function to filter cohorts in cohorts move menu
   filterMoveMenuCohorts(cohort: string) {
     const cohortId = cohort['docid'];
     const eventId = cohort['eventref']?.id;
     const query = this.moveMenuSearchQuery.toLowerCase().trim();
-    let cohorts = this.filteredCohortsList.filter(c => c.docid !== cohortId && c['eventref']?.id === eventId);
+    let cohorts = this.cohortsList.filter(c => c.docid !== cohortId && c['eventref']?.id === eventId);
 
     if (query) {
       cohorts = cohorts.filter(c => c.name?.toLowerCase().includes(query));
@@ -851,18 +878,39 @@ export class CohortManagementComponent {
     this.moveMenuFilteredCohorts = cohorts;
   }
 
+  // function to open cohorts move menu
   onMoveMenuOpen(cohort: any) {
     this.moveMenuSearchQuery = '';
     this.filterMoveMenuCohorts(cohort);
   }
 
+  // function to handle search in cohort move menu
   onMoveMenuSearch(event: Event, cohort: any) {
     event.stopPropagation();
     this.filterMoveMenuCohorts(cohort);
   }
   
+  // function to move participants between cohorts
   async moveParticipantToCohort(participantId: string[], sourceCohort: any, targetCohort: any) {
+    if (this.isMovingParticipant) return;
+    const msg = confirm(`do you want to move this participant from ${sourceCohort?.name} to ${targetCohort?.name}`);
+    if(!msg) return
+
+    // code to check selected cohorts are mapped to same event
+    if ( sourceCohort['eventref']?.id !== targetCohort['eventref']?.id) {
+        let alretMsg = '';
+        if(sourceCohort['eventref']?.id && targetCohort['eventref']?.id){
+          alretMsg = `Can not move participants between ${this.mapAcceleratorEvent[sourceCohort?.['eventref']?.id]} to ${this.mapAcceleratorEvent[targetCohort?.['eventref']?.id]}`;
+        } else {
+          alretMsg = `Can't move participant to ${targetCohort.name}`;
+        }
+        alert(alretMsg);
+        return
+    }
+
     try {
+      this.isMovingParticipant = true;
+      const batch = writeBatch(this.firestore);
       const checkForActiveStudio = [];
 
       for (let pid of participantId) {
@@ -870,15 +918,13 @@ export class CohortManagementComponent {
         if (check) checkForActiveStudio.push(this.mapProfile[pid]);
       }
 
+      // check if any active studios present for the selected participants
       if (checkForActiveStudio.length > 0) {
         alert('There are active stuido for the selected participant please disbale it before moving to another cohorts');
         return
       }
-      if (this.isMovingParticipant) return;
 
-      this.isMovingParticipant = true;
-      const batch = writeBatch(this.firestore);
-
+      // handle the open of support chat config
       if (sourceCohort?.enableGroupChat || targetCohort?.enableGroupChat) {
         let sorucecohortmembers = [];
         let targetcohortmembers = [];
@@ -934,7 +980,7 @@ export class CohortManagementComponent {
         }
       }
 
-
+      // handles the participant cohort movement
       const sourceCohortRef = doc(this.firestore, "big cohorts", sourceCohort.docid);
       batch.update(sourceCohortRef, {
         participantidlist: arrayRemove(...participantId)
@@ -962,6 +1008,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to create cohort movement log
   async createMoveLog(participantId: string, sourceCohort: any, targetCohort: any) {
     const logDocId = doc(collection(this.firestore, "big cohorts log")).id;
 
@@ -1033,25 +1080,18 @@ export class CohortManagementComponent {
     if (target.closest('.dialog, .dialog-scrim, .sheet, .scrim, .fi, .fg, .mat-mdc-menu-panel')) return;
   }
 
-  toggleViewMode() {
-    this.viewMode = this.viewMode === 'horizontal' ? 'vertical' : 'horizontal';
-  }
+  // onMarathonSearch() {
+  //   const query = this.marathonSearchQuery.toLowerCase().trim();
+  //   if (!query) {
+  //     this.filteredMarathonList = [...this.marathonList];
+  //   } else {
+  //     this.filteredMarathonList = this.marathonList.filter(m =>
+  //       m['title']?.toLowerCase().includes(query)
+  //     );
+  //   }
+  // }
 
-  setViewMode(mode: 'horizontal' | 'vertical') {
-    this.viewMode = mode;
-  }
-
-  onMarathonSearch() {
-    const query = this.marathonSearchQuery.toLowerCase().trim();
-    if (!query) {
-      this.filteredMarathonList = [...this.marathonList];
-    } else {
-      this.filteredMarathonList = this.marathonList.filter(m =>
-        m['title']?.toLowerCase().includes(query)
-      );
-    }
-  }
-
+  // function handles marathon selection
   selectMarathon() {
     this.marathonDropdownOpen = false;
     this.marathonSearchQuery = '';
@@ -1060,23 +1100,26 @@ export class CohortManagementComponent {
     this.onFilter();
   }
 
-  onEventSearch() {
-    const query = this.eventSearchQuery.toLowerCase().trim();
-    if (!query) {
-      this.searchableEventList = [...this.filteredAcceleratorEventList];
-    } else {
-      this.searchableEventList = this.filteredAcceleratorEventList.filter(e =>
-        e['name']?.toLowerCase().includes(query)
-      );
-    }
-  }
+  // 
+  // onEventSearch() {
+  //   const query = this.eventSearchQuery.toLowerCase().trim();
+  //   if (!query) {
+  //     this.searchableEventList = [...this.filteredAcceleratorEventList];
+  //   } else {
+  //     this.searchableEventList = this.filteredAcceleratorEventList.filter(e =>
+  //       e['name']?.toLowerCase().includes(query)
+  //     );
+  //   }
+  // }
 
+  // function to toggel selected event
   toggleEventSelection() {
     this.saveEventSelection();
     this.onFilter();
     this.loadEventParticipationRequests();
   }
 
+  // function helps to clear event selection
   clearEventSelection() {
     this.selectedAcceleratorEvent = [];
     this.eventParticipationList = [];
@@ -1085,29 +1128,27 @@ export class CohortManagementComponent {
     this.calculateUnassignedParticipants();
   }
 
-  onQueueSearch() {
-    const searchTerm = this.queueSearchQuery.toLowerCase().trim();
-    if (!searchTerm) {
-      this.searchableQueueList = [...this.filteredQueueList];
-    } else {
-      this.searchableQueueList = this.filteredQueueList.filter((e: any) => {
-        const queueName = (e['queuename'] || '').toLowerCase();
-        const queueId = (e['id'] || e['docid'] || '').toLowerCase();
-        return queueName.includes(searchTerm) || queueId.includes(searchTerm);
-      });
-    }
-  }
+  // onQueueSearch() {
+  //   const searchTerm = this.queueSearchQuery.toLowerCase().trim();
+  //   if (!searchTerm) {
+  //     this.searchableQueueList = [...this.filteredQueueList];
+  //   } else {
+  //     this.searchableQueueList = this.filteredQueueList.filter((e: any) => {
+  //       const queueName = (e['queuename'] || '').toLowerCase();
+  //       const queueId = (e['id'] || e['docid'] || '').toLowerCase();
+  //       return queueName.includes(searchTerm) || queueId.includes(searchTerm);
+  //     });
+  //   }
+  // }
     
+  // function handles queue selection
   toggleQueueSelection() {
     this.saveQueueSelection();
     this.loadLiveAssignments();
     this.calculateUnassignedParticipants();
   }
 
-  toggleMarathonSelection(){
-    this.selectMarathon();
-  }
-
+  // function helps to clear queue selection
   clearQueueSelection() {
     this.selectedQueueEvent = [];
     this.queueSearchQuery = '';
@@ -1117,27 +1158,19 @@ export class CohortManagementComponent {
     this.calculateUnassignedParticipants();
   }
 
-  onQueueDropdownOpen() {
-    this.queueSearchQuery = '';
-    this.searchableQueueList = [...this.filteredQueueList];
-  }
+  // onTagSearch() {
+  //   const query = this.tagSearchQuery.toLowerCase().trim();
+  //   if (!query) {
+  //     this.filteredTagsList = [...this.participantTagsList];
+  //   } else {
+  //     this.filteredTagsList = this.participantTagsList.filter(tag =>
+  //       tag['name']?.toLowerCase().includes(query) ||
+  //       tag['tagname']?.toLowerCase().includes(query)
+  //     );
+  //   }
+  // }
 
-  onTagSearch() {
-    const query = this.tagSearchQuery.toLowerCase().trim();
-    if (!query) {
-      this.filteredTagsList = [...this.participantTagsList];
-    } else {
-      this.filteredTagsList = this.participantTagsList.filter(tag =>
-        tag['name']?.toLowerCase().includes(query) ||
-        tag['tagname']?.toLowerCase().includes(query)
-      );
-    }
-  }
-
-  toggleTagSelection() {
-    this.onFilter();
-  }
-
+  // function to clear tag selection
   clearTagSelection() {
     this.selectedTags = [];
     this.tagSearchQuery = '';
@@ -1145,14 +1178,14 @@ export class CohortManagementComponent {
     this.onFilter();
   }
 
+  // helper function to get tag name
   getTagName(tagId: string): string {
     const tag = this.participantTagsList.find(t => t.id === tagId);
     return tag?.name || tag?.tagname || tagId;
   }
 
+  // function to filter cohorts based on active filters
   onFilter() {
-    // const searchTerm = this.searchQuery?.toLowerCase().trim() || '';
-    
     let filtered = this.cohortsList.filter(e => {
       const marathonMatch = this.selectedMarathon ? this.selectedMarathon == e['marathonref']?.id : true;
 
@@ -1167,13 +1200,15 @@ export class CohortManagementComponent {
         statusMatch = e['status'] === 'active' || e['status'] === undefined;
       } else if (this.statusFilter === 'nonactive') {
         statusMatch = e['status'] === 'nonactive';
-      } else {
-        // 'all' filter - but still hide nonactive unless showExpiredCohorts is checked
-        if (!this.showExpiredCohorts) {
-          statusMatch = e['status'] !== 'nonactive';
-        }
-      }
+      } 
+      // else {
+      //   // 'all' filter - but still hide nonactive unless showExpiredCohorts is checked
+      //   if (!this.showExpiredCohorts) {
+      //     statusMatch = e['status'] !== 'nonactive';
+      //   }
+      // }
 
+      // category
       let categoryMatch = true;
       if (this.categoryFilter === 'studio') {
         categoryMatch = e['cohortCategory'] === 'studio' || e['cohortCategory'] === undefined;
@@ -1185,6 +1220,7 @@ export class CohortManagementComponent {
         categoryMatch = e['cohortCategory'] === 'operational';
       }
 
+      // cohort type
       let typeMatch = true;
       if (this.typeFilter === 'general') {
         typeMatch = e['cohortType'] === 'general' || e['cohortType'] === undefined || !e['eventref'];
@@ -1192,11 +1228,13 @@ export class CohortManagementComponent {
         typeMatch = e['cohortType'] === 'event' || e['eventref'] != null;
       }
 
+      // temporary
       let temporaryMatch = true;
       if (this.showTemporaryOnly) {
         temporaryMatch = e['isTemporary'] === true;
       }
 
+      // tag filter
       let tagMatch = true;
       if (this.selectedTags.length > 0) {
         const cohortTags = e['tags'] || [];
@@ -1206,20 +1244,15 @@ export class CohortManagementComponent {
         );
       }
 
+      // zone filter
       let zoneMatch = true;
       if (this.selectedZoneEvent.length > 0) {
         zoneMatch = this.zoneMappedCohortIds.has(e['docid']);
       }
 
+      // search
       let searchMatch = true;
-      // const cohortSearchTerm = this.cohortSearchQuery?.toLowerCase().trim() || '';
       const participantSearchTerm = this.participantSearchQuery?.toLowerCase().trim() || '';
-
-      // if (cohortSearchTerm) {
-      //   const cohortName = (e['name'] || '').toLowerCase();
-      //   const eventName = this.mapAcceleratorEvent[e['eventref']?.id]?.toLowerCase() || '';
-      //   searchMatch = cohortName.includes(cohortSearchTerm) || eventName.includes(cohortSearchTerm);
-      // }
 
       if (participantSearchTerm) {
         const cohortName = (e['name'] || '').toLowerCase();
@@ -1248,6 +1281,7 @@ export class CohortManagementComponent {
     return this.filteredCohortsList;
   }
 
+  // function to get live studio counts
   getCohortLiveAssignmentsCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
     let totalLive = 0;
@@ -1260,18 +1294,19 @@ export class CohortManagementComponent {
     return totalLive;
   }
 
-  getCohortCompletedAssignmentsCount(cohort: any): number {
-    const participants = cohort['participantidlist'] || [];
-    let totalCompleted = 0;
+  // getCohortCompletedAssignmentsCount(cohort: any): number {
+  //   const participants = cohort['participantidlist'] || [];
+  //   let totalCompleted = 0;
     
-    participants.forEach((pid: string) => {
-      const stats = this.getParticipantLiveAssignmentStats(pid);
-      totalCompleted += stats.completed;
-    });
+  //   participants.forEach((pid: string) => {
+  //     const stats = this.getParticipantLiveAssignmentStats(pid);
+  //     totalCompleted += stats.completed;
+  //   });
     
-    return totalCompleted;
-  }
+  //   return totalCompleted;
+  // }
 
+  // function to get cohorts total studio count
   getCohortTotalStudiosCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
     const queueId = cohort['queueref']?.id ?? null;
@@ -1289,6 +1324,7 @@ export class CohortManagementComponent {
     return studioSet.size;
   }
 
+  // function to get total checked in studio count for an cohort
   getCohortTotalCheckedStudiosCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
     const queueId = cohort['queueref']?.id ?? null;
@@ -1307,6 +1343,7 @@ export class CohortManagementComponent {
     return studioSet.size;
   }
 
+  // function to get days between given date to current date
   getDaysRemaining(endDate: any): number {
     if (!endDate) return 0;
     const end = endDate?.toDate ? endDate.toDate() : new Date(endDate);
@@ -1316,10 +1353,12 @@ export class CohortManagementComponent {
     return Math.max(0, daysRemaining);
   }
 
+  // function to check whether cohort is expired or not
   isExpired(endDate: any): boolean {
     return this.getDaysRemaining(endDate) <= 0;
   }
 
+  // function to get event name for an cohort
   getCohortEventName(cohort: any): string {
     if (cohort['eventref']) {
       return this.mapAcceleratorEvent[cohort['eventref'].id] || '';
@@ -1327,15 +1366,18 @@ export class CohortManagementComponent {
     return '';
   }
 
+  // function to change the cohort view to any selected category
   applyGrouping() {
     this.groupedCohorts = {};
     this.groupedCohortsDateRange = {};
 
+    // default view
     if (this.groupBy === 'none') {
       this.groupedCohorts['All Cohorts'] = this.filteredCohortsList;
       return;
     }
 
+    // levels view
     if (this.groupBy === 'levels') {
       this.filteredCohortsList.forEach(cohort => {
         const level = cohort['level'] || 'level1';
@@ -1356,6 +1398,7 @@ export class CohortManagementComponent {
       this.groupedCohorts = sortedGroups;
     }
 
+    // category view
     if (this.groupBy === 'category') {
       const labelMap: any = {
         studio: 'STUDIO BASED',
@@ -1376,6 +1419,7 @@ export class CohortManagementComponent {
       this.groupedCohorts = sortedGroups;
     }
 
+    // studio view
     if (this.groupBy === 'studio') {
       this.filteredCohortsList.forEach(cohort => {
         const activityId = cohort['bigactivity'];
@@ -1396,6 +1440,7 @@ export class CohortManagementComponent {
       this.groupedCohorts = sortedGroups;
     }
 
+    // zone view
     if (this.groupBy === 'zone') {
       const cohortToZones: { [cohortId: string]: string[] } = {};
       Object.keys(this.mapZoneData || {}).forEach(zoneId => {
@@ -1430,6 +1475,7 @@ export class CohortManagementComponent {
       this.groupedCohorts = sortedGroups;
     }
 
+    // based on cohort created date range view
     if (this.groupBy === 'daterange') {
       // Sort cohorts by created date based on sortOrder
       const sortedCohorts = [...this.filteredCohortsList].sort((a, b) => {
@@ -1489,6 +1535,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // helper to format date range label
   formatDateRangeLabel(startDate: Date, endDate: Date): string {
     const formatOptions: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
     const startStr = startDate.toLocaleDateString('en-US', formatOptions);
@@ -1500,6 +1547,7 @@ export class CohortManagementComponent {
     return `${startStr} - ${endStr}`;
   }
 
+  // function to get level labels
   getLevelLabel(level: string): string {
     const levelMap: { [key: string]: string } = {
       'level1': 'Level 1',
@@ -1511,6 +1559,7 @@ export class CohortManagementComponent {
     return levelMap[level] || 'Unassigned';
   }
 
+  // function to get date range label
   getDateRangeLabel(date: Date): string {
     if (!date || isNaN(date.getTime())) return 'Unknown Date';
 
@@ -1525,51 +1574,61 @@ export class CohortManagementComponent {
     return 'Older';
   }
 
+  // function to get grouped cohorts
   getGroupKeys(): string[] {
     return Object.keys(this.groupedCohorts);
   }
 
+  // function to get date range 
   getGroupDateRange(groupKey: string): { startDate: Date, endDate: Date } | null {
     return this.groupedCohortsDateRange[groupKey] || null;
   }
 
+  // status filter handler 
   setStatusFilter(status: 'all' | 'active' | 'nonactive') {
     this.statusFilter = status;
     this.statusDropdownOpen = false;
     this.onFilter();
   }
 
+    // category filter handler 
   setCategoryFilter(category: 'all' | 'studio' | 'readiness' | 'educational' | 'operational') {
     this.categoryFilter = category;
     this.categoryDropdownOpen = false;
     this.onFilter();
   }
 
+    // type filter handler 
   setTypeFilter(type: 'all' | 'general' | 'event') {
     this.typeFilter = type;
     this.typeDropdownOpen = false;
     this.onFilter();
   }
 
+  // grouped view handler 
   setGroupBy(groupBy: 'none' | 'levels' | 'daterange' | 'category' | 'studio' | 'zone') {
     this.groupBy = groupBy;
     this.applyGrouping();
   }
 
+  // handle temporary filter 
   toggleTemporaryOnly() {
     this.showTemporaryOnly = !this.showTemporaryOnly;
     this.onFilter();
   }
 
-  toggleExpiredCohorts() {
-    this.showExpiredCohorts = !this.showExpiredCohorts;
-    this.onFilter();
-  }
+  // toggles expired cohorts filter
+  // toggleExpiredCohorts() {
+  //   this.showExpiredCohorts = !this.showExpiredCohorts;
+  //   this.onFilter();
+  // }
 
+  // function to toggle cohort view participants or activities
   toggleCohortView(cohort: any) {
     cohort['contentview'] = cohort['contentview'] === 'activities' ? 'participants' : 'activities';
   }
 
+  // wrapper function to handle filter function
   toRunFilterFunctions() {
     if (this.cohortsList && this.cohortsList.length != 0 && this.selectedMarathon) {
       this.onFilter();
@@ -1579,6 +1638,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // functoin to create assignment for cohort
   onCreateAssignment(cohorts: any) {
     console.log(this.cohortsList.map((e)=> e.marathonref || null));
     console.log(this.cohortsList);
@@ -1602,6 +1662,7 @@ export class CohortManagementComponent {
     })
   }
 
+  // function to open assignment in edit mode
   onEditAssignment(cohorts: any, assignment: any , event : Event) {
     event.stopPropagation();
     console.log('parameters : ',cohorts , assignment)
@@ -1626,6 +1687,7 @@ export class CohortManagementComponent {
     })
   }
 
+  // function to handel event filter
   onFilterAcceleratorEvent() {
     this.getAssignmentData()
     this.filteredAcceleratorEventList = this.acceleratorEventList.filter(e => e['bigmarathonref'].id === this.selectedMarathon)
@@ -1636,6 +1698,7 @@ export class CohortManagementComponent {
     return this.filteredAcceleratorEventList
   }
 
+  // function to get big assignment
   getAssignmentData() {
     if (!this.selectedMarathon || !this.mapMarathon[this.selectedMarathon]) return;
 
@@ -1686,17 +1749,18 @@ export class CohortManagementComponent {
     this.loading = false
   }
 
-  onStartMetting(assignmentid: string) {
-    let url = this.router.createUrlTree(['/zoommeeting_bigparticipants/'], {
-      queryParams: {
-        assignmentid: assignmentid,
-        profileid: this.loggedInProfile['profileid'],
-        participantAssignmentId: null,
-        type: 1
-      }
-    })
-    window.open(url.toString(), "_blank")
-  }
+  // function to open meeting
+  // onStartMetting(assignmentid: string) {
+  //   let url = this.router.createUrlTree(['/zoommeeting_bigparticipants/'], {
+  //     queryParams: {
+  //       assignmentid: assignmentid,
+  //       profileid: this.loggedInProfile['profileid'],
+  //       participantAssignmentId: null,
+  //       type: 1
+  //     }
+  //   })
+  //   window.open(url.toString(), "_blank")
+  // }
 
   onValidateParticipantAssignment(assignmentDocId: string, cohortId?: string) {
     let url = this.router.createUrlTree(['/validateParticipantAssignments/'], {
@@ -1709,10 +1773,7 @@ export class CohortManagementComponent {
     window.open(url.toString(), "_blank")
   }
 
-  onCohortSearch() {
-    this.onFilter();
-  }
-
+  // funtion to handle participant search
   onParticipantSearch() {
     if (this.participantSearchQuery && this.participantSearchQuery.trim()) {
       this.cohortsList.forEach(cohort => {
@@ -1722,20 +1783,22 @@ export class CohortManagementComponent {
     this.onFilter();
   }
 
-  changeOverAllView(view){
-    if (view == 'participants') {
-      this.contentview = 'participants';
-      this.cohortsList.forEach(cohort => {
-        cohort['contentview'] = 'participants';
-      });
-    } else {
-      this.contentview = 'activities';
-      this.cohortsList.forEach(cohort => {
-        cohort['contentview'] = 'activities';
-      });
-    }
-  }
+  // 
+  // changeOverAllView(view){
+  //   if (view == 'participants') {
+  //     this.contentview = 'participants';
+  //     this.cohortsList.forEach(cohort => {
+  //       cohort['contentview'] = 'participants';
+  //     });
+  //   } else {
+  //     this.contentview = 'activities';
+  //     this.cohortsList.forEach(cohort => {
+  //       cohort['contentview'] = 'activities';
+  //     });
+  //   }
+  // }
 
+  // function to get the filter participants in cohorts
   getFilteredParticipants(cohort : any): string[] {
     const participantList = cohort['participantidlist'] ?? [];
     const cohortName = (cohort['name'] || '').toLowerCase();
@@ -1756,26 +1819,23 @@ export class CohortManagementComponent {
     return filteredParticipants;
   }
 
-  clearCohortSearch() {
-    this.cohortSearchQuery = '';
-    this.onCohortSearch();
-  }
 
-  clearParticipantSearch() {
-    this.participantSearchQuery = '';
-    this.onParticipantSearch();
-  }
+  // clearParticipantSearch() {
+  //   this.participantSearchQuery = '';
+  //   this.onParticipantSearch();
+  // }
 
-  isCohortNameMatch(cohort: any): boolean {
-    if (!this.cohortSearchQuery || !this.cohortSearchQuery.trim()) return true;
+  // isCohortNameMatch(cohort: any): boolean {
+  //   if (!this.cohortSearchQuery || !this.cohortSearchQuery.trim()) return true;
     
-    const searchTerm = this.cohortSearchQuery.toLowerCase().trim();
-    const cohortName = (cohort['name'] || '').toLowerCase();
-    const eventName = this.mapAcceleratorEvent[cohort['eventref']?.id]?.toLowerCase() || '';
+  //   const searchTerm = this.cohortSearchQuery.toLowerCase().trim();
+  //   const cohortName = (cohort['name'] || '').toLowerCase();
+  //   const eventName = this.mapAcceleratorEvent[cohort['eventref']?.id]?.toLowerCase() || '';
     
-    return cohortName.includes(searchTerm) || eventName.includes(searchTerm);
-  }
+  //   return cohortName.includes(searchTerm) || eventName.includes(searchTerm);
+  // }
 
+  // function to get the participant count
   getMatchingParticipantCount(cohort: any): number {
     if (!this.participantSearchQuery || !this.participantSearchQuery.trim()) {
       return cohort['participantidlist']?.length || 0;
@@ -1783,57 +1843,55 @@ export class CohortManagementComponent {
     return this.getFilteredParticipants(cohort['participantidlist'] || []).length;
   }
 
-  getSelectedEventNames(): string {
-    if (this.selectedAcceleratorEvent.length === 0) {
-      return 'Select Event';
-    }
-    const names = this.selectedAcceleratorEvent.map(id => this.mapAcceleratorEvent[id]).filter(Boolean);
-    if (names.length === 1) {
-      return names[0];
-    }
-    if (names.length > 1) {
-      return `${names[0]} +${names.length - 1}`;
-    }
-    return 'Select Event';
-  }
+  // getSelectedEventNames(): string {
+  //   if (this.selectedAcceleratorEvent.length === 0) {
+  //     return 'Select Event';
+  //   }
+  //   const names = this.selectedAcceleratorEvent.map(id => this.mapAcceleratorEvent[id]).filter(Boolean);
+  //   if (names.length === 1) {
+  //     return names[0];
+  //   }
+  //   if (names.length > 1) {
+  //     return `${names[0]} +${names.length - 1}`;
+  //   }
+  //   return 'Select Event';
+  // }
 
-  getSelectedQueueNames(): string {
-    if (this.selectedQueueEvent.length === 0) {
-      return 'Select Queue';
-    }
-    const names = this.selectedQueueEvent.map(id => this.mapQueueName[id]).filter(Boolean);
-    if (names.length === 1) {
-      return names[0];
-    }
-    if (names.length > 1) {
-      return `${names[0]} +${names.length - 1}`;
-    }
-    return 'Select Queue';
-  }
+  // getSelectedQueueNames(): string {
+  //   if (this.selectedQueueEvent.length === 0) {
+  //     return 'Select Queue';
+  //   }
+  //   const names = this.selectedQueueEvent.map(id => this.mapQueueName[id]).filter(Boolean);
+  //   if (names.length === 1) {
+  //     return names[0];
+  //   }
+  //   if (names.length > 1) {
+  //     return `${names[0]} +${names.length - 1}`;
+  //   }
+  //   return 'Select Queue';
+  // }
 
-  getSelectedTagNames(): string {
-    if (this.selectedTags.length === 0) {
-      return 'Tagging';
-    }
-    if (this.selectedTags.length === 1) {
-      return this.getTagName(this.selectedTags[0]);
-    }
-    return `${this.getTagName(this.selectedTags[0])} +${this.selectedTags.length - 1}`;
-  }
+  // getSelectedTagNames(): string {
+  //   if (this.selectedTags.length === 0) {
+  //     return 'Tagging';
+  //   }
+  //   if (this.selectedTags.length === 1) {
+  //     return this.getTagName(this.selectedTags[0]);
+  //   }
+  //   return `${this.getTagName(this.selectedTags[0])} +${this.selectedTags.length - 1}`;
+  // }
 
+  // functoin to open create cohort model in edit 
   onEditCohort(cohorts: any) {
     this.openCohortDialog('edit', cohorts);
   }
 
+  // functoin to open create cohort model
   onCreateCohort() {
     this.openCohortDialog('new', null);
   }
 
-  /**
-   * Arrow on card → opens the Cohort Detail screen as a Material dialog.
-   * Reuses all already-loaded maps (mapProfile, bigActivityMap, mapMarathon, etc.)
-   * so auth and Firestore aren't re-fetched.
-   */
+  // function to open cohort details model to create studios
   async openCohortStudio(cohorts: any, $event?: Event , viewType ?: string) {
     if ($event) { $event.preventDefault(); $event.stopPropagation(); }
     if (!cohorts) return;
@@ -1859,7 +1917,7 @@ export class CohortManagementComponent {
         cohortName: cohorts['name'] || '',
         marathonId: this.selectedMarathon || cohorts['marathonref']?.id || null,
         eventId: cohorts['eventref']?.id || null,
-        // Pre-loaded maps — passed by reference (no re-fetch)
+       
         mapProfile: this.mapProfile,
         mapParticipantMeta: this.mapParticipantMetaData,
         mapMarathon: this.mapMarathon,
@@ -1888,6 +1946,7 @@ export class CohortManagementComponent {
 
   }
 
+  // function to open cohort create model
   openCohortDialog(type: string, cohortDoc: any) {
     const dialogRef = this.dialog.open(ManageCohertsComponent, {
       width: '560px',
@@ -1916,6 +1975,7 @@ export class CohortManagementComponent {
     });
   }
 
+  // function to get unassigned participant count
   getUnassignedCount(): number {
     if (this.unassignedParticipants.length > 0) return this.unassignedParticipants.length;
     // Live fallback: count big invitations whose participant isn't in any cohort.
@@ -1931,32 +1991,34 @@ export class CohortManagementComponent {
     return count;
   }
 
-  getStatusFilterLabel(): string {
-    switch (this.statusFilter) {
-      case 'active': return 'Active/Non Active';
-      case 'nonactive': return 'Non Active/Active';
-      default: return 'All/Active/Non Active';
-    }
-  }
+  // 
+  // getStatusFilterLabel(): string {
+  //   switch (this.statusFilter) {
+  //     case 'active': return 'Active/Non Active';
+  //     case 'nonactive': return 'Non Active/Active';
+  //     default: return 'All/Active/Non Active';
+  //   }
+  // }
 
-  getCategoryFilterLabel(): string {
-    switch (this.categoryFilter) {
-      case 'studio': return 'Studio Group/Readiness/Educational/Operational';
-      case 'readiness': return 'Readiness/Studio Group/Educational/Operational';
-      case 'educational': return 'Educational/Studio Group/Readiness/Operational';
-      case 'operational': return 'Operational/Studio Group/Educational/Readiness';
-      default: return 'All/Readiness/Studio Group';
-    }
-  }
+  // getCategoryFilterLabel(): string {
+  //   switch (this.categoryFilter) {
+  //     case 'studio': return 'Studio Group/Readiness/Educational/Operational';
+  //     case 'readiness': return 'Readiness/Studio Group/Educational/Operational';
+  //     case 'educational': return 'Educational/Studio Group/Readiness/Operational';
+  //     case 'operational': return 'Operational/Studio Group/Educational/Readiness';
+  //     default: return 'All/Readiness/Studio Group';
+  //   }
+  // }
 
-  getTypeFilterLabel(): string {
-    switch (this.typeFilter) {
-      case 'general': return 'General/Event';
-      case 'event': return 'Event/General';
-      default: return 'All/General/Event';
-    }
-  }
+  // getTypeFilterLabel(): string {
+  //   switch (this.typeFilter) {
+  //     case 'general': return 'General/Event';
+  //     case 'event': return 'Event/General';
+  //     default: return 'All/General/Event';
+  //   }
+  // }
 
+  // function to get activities count for cohort
   getActivitiesCount(cohortId: string): number {
     const assignments = this.mapParticiantsAssignments[cohortId];
     if (!assignments) return 0;
@@ -1989,6 +2051,7 @@ export class CohortManagementComponent {
     return '';
   }
 
+  // checks whether date ends today
   isEndsToday(endDate: any): boolean {
     if (!endDate) return false;
     const end = endDate instanceof Date ? endDate : (endDate?.toDate ? endDate.toDate() : new Date(endDate));
@@ -1998,6 +2061,7 @@ export class CohortManagementComponent {
            end.getFullYear() === today.getFullYear();
   }
 
+  // check is temporary cohorts ends today
   isTemporaryCohortEndsToday(cohort: any): boolean {
     if (!cohort['isTemporary']) return false;
     const endDate = cohort['endDate']?.toDate ? cohort['endDate'].toDate() : (cohort['endDate'] ? new Date(cohort['endDate']) : null);
@@ -2011,25 +2075,23 @@ export class CohortManagementComponent {
     return createdDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  // Cohort sorting - simplified to date and name only
-  sortBy: 'date' | 'name' = 'date';
-  sortOrder: 'asc' | 'desc' = 'desc';
+  // 
+  // setSorting(sortBy: 'date' | 'name') {
+  //   if (this.sortBy === sortBy) {
+  //     this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+  //   } else {
+  //     this.sortBy = sortBy;
+  //     this.sortOrder = sortBy === 'name' ? 'asc' : 'desc';
+  //   }
+  //   this.applySorting();
+  // }
 
-  setSorting(sortBy: 'date' | 'name') {
-    if (this.sortBy === sortBy) {
-      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortBy = sortBy;
-      this.sortOrder = sortBy === 'name' ? 'asc' : 'desc';
-    }
-    this.applySorting();
-  }
+  // toggleSortOrder() {
+  //   this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+  //   this.applySorting();
+  // }
 
-  toggleSortOrder() {
-    this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
-    this.applySorting();
-  }
-
+  // function to apply soring for cohorts
   applySorting() {
     this.filteredCohortsList.sort((a, b) => {
       let comparison = 0;
@@ -2051,6 +2113,7 @@ export class CohortManagementComponent {
     this.applyGrouping();
   }
 
+  // function to export cohorts to excel
   exportCohortsData() {
     const exportData: any[] = [];
 
@@ -2227,6 +2290,7 @@ export class CohortManagementComponent {
     });
   }
 
+  // function to download excel in csv format
   downloadCSV(data: any[]) {
     if (data.length === 0) {
       alert('No data to export');
@@ -2262,67 +2326,71 @@ export class CohortManagementComponent {
     document.body.removeChild(link);
   }
 
-  openProgressionReport() {
-    this.showProgressionDialog = true;
-    this.progressionLoading = true;
-    this.progressionSearchQuery = '';
-    this.loadProgressionData();
-  }
+  // 
+  // openProgressionReport() {
+  //   this.showProgressionDialog = true;
+  //   this.progressionLoading = true;
+  //   this.progressionSearchQuery = '';
+  //   this.loadProgressionData();
+  // }
 
-  closeProgressionDialog() {
-    this.showProgressionDialog = false;
-    this.progressionData = [];
-    this.groupedProgressionData = {};
-    this.filteredProgressionProfiles = [];
-    this.progressionSearchQuery = '';
-  }
+  // closeProgressionDialog() {
+  //   this.showProgressionDialog = false;
+  //   this.progressionData = [];
+  //   this.groupedProgressionData = {};
+  //   this.filteredProgressionProfiles = [];
+  //   this.progressionSearchQuery = '';
+  // }
 
-  loadProgressionData() {
-    getDocs(query(collection(this.firestore, "big cohorts log"), orderBy("createddate", "desc"))).then(snap => {
-      this.progressionData = snap.docs.map(e => {
-        const data: any = e.data();
-        return { id: e.id, ...data };
-      });
+  // function to load big cohort log
+  // loadProgressionData() {
+  //   getDocs(query(collection(this.firestore, "big cohorts log"), orderBy("createddate", "desc"))).then(snap => {
+  //     this.progressionData = snap.docs.map(e => {
+  //       const data: any = e.data();
+  //       return { id: e.id, ...data };
+  //     });
       
-      this.groupedProgressionData = {};
-      this.progressionData.forEach(log => {
-        const profileId = log['participantid'] || log['profileid'];
-        if (profileId) {
-          if (!this.groupedProgressionData[profileId]) {
-            this.groupedProgressionData[profileId] = [];
-          }
-          this.groupedProgressionData[profileId].push(log);
-        }
-      });
+  //     this.groupedProgressionData = {};
+  //     this.progressionData.forEach(log => {
+  //       const profileId = log['participantid'] || log['profileid'];
+  //       if (profileId) {
+  //         if (!this.groupedProgressionData[profileId]) {
+  //           this.groupedProgressionData[profileId] = [];
+  //         }
+  //         this.groupedProgressionData[profileId].push(log);
+  //       }
+  //     });
       
-      Object.keys(this.groupedProgressionData).forEach(profileId => {
-        this.groupedProgressionData[profileId].sort((a, b) => {
-          const dateA = a['createddate']?.toDate ? a['createddate'].toDate() : new Date(a['createddate']);
-          const dateB = b['createddate']?.toDate ? b['createddate'].toDate() : new Date(b['createddate']);
-          return dateA.getTime() - dateB.getTime();
-        });
-      });
+  //     Object.keys(this.groupedProgressionData).forEach(profileId => {
+  //       this.groupedProgressionData[profileId].sort((a, b) => {
+  //         const dateA = a['createddate']?.toDate ? a['createddate'].toDate() : new Date(a['createddate']);
+  //         const dateB = b['createddate']?.toDate ? b['createddate'].toDate() : new Date(b['createddate']);
+  //         return dateA.getTime() - dateB.getTime();
+  //       });
+  //     });
       
-      this.filteredProgressionProfiles = Object.keys(this.groupedProgressionData);
-      this.progressionLoading = false;
-    }).catch(err => {
-      console.error('Error loading progression data:', err);
-      this.progressionLoading = false;
-    });
-  }
+  //     this.filteredProgressionProfiles = Object.keys(this.groupedProgressionData);
+  //     this.progressionLoading = false;
+  //   }).catch(err => {
+  //     console.error('Error loading progression data:', err);
+  //     this.progressionLoading = false;
+  //   });
+  // }
 
-  onProgressionSearch() {
-    const query = this.progressionSearchQuery.toLowerCase().trim();
-    if (!query) {
-      this.filteredProgressionProfiles = Object.keys(this.groupedProgressionData);
-    } else {
-      this.filteredProgressionProfiles = Object.keys(this.groupedProgressionData).filter(profileId => {
-        const name = (this.mapProfile[profileId] || profileId).toLowerCase();
-        return name.includes(query);
-      });
-    }
-  }
+  // 
+  // onProgressionSearch() {
+  //   const query = this.progressionSearchQuery.toLowerCase().trim();
+  //   if (!query) {
+  //     this.filteredProgressionProfiles = Object.keys(this.groupedProgressionData);
+  //   } else {
+  //     this.filteredProgressionProfiles = Object.keys(this.groupedProgressionData).filter(profileId => {
+  //       const name = (this.mapProfile[profileId] || profileId).toLowerCase();
+  //       return name.includes(query);
+  //     });
+  //   }
+  // }
 
+  // function to get colors based on participant status
   getStatusColor(status: string): string {
     switch (status?.toLowerCase()) {
       case 'added':
@@ -2357,6 +2425,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to format cohort log time
   formatTimelineDate(date: any): string {
     if (!date) return 'Unknown';
     const d = date?.toDate ? date.toDate() : new Date(date);
@@ -2369,21 +2438,23 @@ export class CohortManagementComponent {
     });
   }
 
-  async deleteCohort(cohort){
-    const check = confirm('Are you sure do you want to delet this cohort?');
-    if(check){
-     await deleteDoc(doc(this.firestore, 'big cohorts',cohort.docid)).then(()=>{
-        console.log('Cohort Deleted Successfully');
-        this.authguard.openSnackBar('Cohort Deleted Successfully','ok',600);
-      }).catch((error)=>{
-        console.log('Error while Deleting',error);
-        this.authguard.openSnackBar('Error while Deleting','ok',600);
-      });
-    }else{
-      console.log('Not Deleted');
-    }
-  }
+  // function to delete cohort
+  // async deleteCohort(cohort){
+  //   const check = confirm('Are you sure do you want to delet this cohort?');
+  //   if(check){
+  //    await deleteDoc(doc(this.firestore, 'big cohorts',cohort.docid)).then(()=>{
+  //       console.log('Cohort Deleted Successfully');
+  //       this.authguard.openSnackBar('Cohort Deleted Successfully','ok',600);
+  //     }).catch((error)=>{
+  //       console.log('Error while Deleting',error);
+  //       this.authguard.openSnackBar('Error while Deleting','ok',600);
+  //     });
+  //   }else{
+  //     console.log('Not Deleted');
+  //   }
+  // }
 
+  // function to save zone selection 
   saveZoneSelection() {
     try {
       localStorage.setItem(this.STORAGE_KEY_ZONE, JSON.stringify(this.selectedZoneEvent));
@@ -2392,6 +2463,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to patch local saved zone selection 
   patchSavedZoneSelections() {
     if (this.selectedZoneEvent.length > 0) {
       this.selectedZoneEvent = this.selectedZoneEvent.filter(id =>
@@ -2403,7 +2475,8 @@ export class CohortManagementComponent {
       }
     }
   }
-
+  
+  // function to update the saved zone filter value
   updateZoneMappedCohortIds() {
     this.zoneMappedCohortIds = new Set<string>();
     this.selectedZoneEvent.forEach(zoneId => {
@@ -2416,23 +2489,26 @@ export class CohortManagementComponent {
     });
   }
 
-  onZoneSearch() {
-    const query = this.zoneSearchQuery.toLowerCase().trim();
-    if (!query) {
-      this.searchableZoneEventList = [...this.zoneEventEventList];
-    } else {
-      this.searchableZoneEventList = this.zoneEventEventList.filter(z =>
-        (z['name'] || '').toLowerCase().includes(query)
-      );
-    }
-  }
+  // 
+  // onZoneSearch() {
+  //   const query = this.zoneSearchQuery.toLowerCase().trim();
+  //   if (!query) {
+  //     this.searchableZoneEventList = [...this.zoneEventEventList];
+  //   } else {
+  //     this.searchableZoneEventList = this.zoneEventEventList.filter(z =>
+  //       (z['name'] || '').toLowerCase().includes(query)
+  //     );
+  //   }
+  // }
 
+  // function to handle zone selection
   toggleZoneSelection() {
     this.saveZoneSelection();
     this.updateZoneMappedCohortIds();
     this.onFilter();
   }
 
+  // function to reset zone selection
   clearZoneSelection() {
     this.selectedZoneEvent = [];
     this.zoneSearchQuery = '';
@@ -2442,22 +2518,23 @@ export class CohortManagementComponent {
     this.onFilter();
   }
 
-  onZoneDropdownOpen() {
-    this.zoneSearchQuery = '';
-    this.searchableZoneEventList = [...this.zoneEventEventList];
-  }
+  // 
+  // onZoneDropdownOpen() {
+  //   this.zoneSearchQuery = '';
+  //   this.searchableZoneEventList = [...this.zoneEventEventList];
+  // }
 
-  getSelectedZoneNames(): string {
-    if (this.selectedZoneEvent.length === 0) {
-      return 'Select Zone';
-    }
-    const names = this.selectedZoneEvent
-      .map(id => this.mapZoneData[id]?.['name'] || this.mapZoneEvent[id])
-      .filter(Boolean);
-    if (names.length === 1) return names[0];
-    if (names.length > 1) return `${names[0]} +${names.length - 1}`;
-    return 'Select Zone';
-  }
+  // getSelectedZoneNames(): string {
+  //   if (this.selectedZoneEvent.length === 0) {
+  //     return 'Select Zone';
+  //   }
+  //   const names = this.selectedZoneEvent
+  //     .map(id => this.mapZoneData[id]?.['name'] || this.mapZoneEvent[id])
+  //     .filter(Boolean);
+  //   if (names.length === 1) return names[0];
+  //   if (names.length > 1) return `${names[0]} +${names.length - 1}`;
+  //   return 'Select Zone';
+  // }
 
   getAvatar(name : string){
     if ([null , undefined , ''].includes(name)) {
@@ -2470,6 +2547,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to handel unassigned section search
   filterUnassignSearch(){
     const query = this.unassignSearch.toLowerCase().trim();
     if (!query) {
@@ -2483,6 +2561,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to handel big cohorts log
   loadProgressionDataLog(){
     try {
       this.progressionLoading = true;
@@ -2503,6 +2582,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to handel search in cohorts log section
   filterProgressData(){
     let data = [...this.progressionData];
 
@@ -2515,27 +2595,29 @@ export class CohortManagementComponent {
     this.filteredProgressionProfiles = data;
   }
 
+  // function to toggle unassign section
   toggleUnassignedSelectMode(){
     this.selectedUnassignParticipants = this.selectedUnassignParticipants? null : new Set();
   }  
 
+  // function to select all unassign participant
   selectAllUnassignedParticipants(){
     for(let {participantId} of this.filterUnassignParticipants){
       this.selectedUnassignParticipants.add(participantId)
     }
   }
 
+  // function to get list of cohort to show on participant select in unassign list
   getCohortsForUnassign(){
     return this.filteredCohortsList.filter((cohorts)=>cohorts?.name?.toLowerCase()?.trim()?.includes(this.unassignCohortSearchQuery.toLowerCase().trim()))
   }
-  onUnassignCohortSearch(){
-    
-  }
 
+  // function to check whether an participant is selected in unassign list
   isUnassignedParticipantChecked(pid){
     return this.selectedUnassignParticipants?.has(pid);
   }
 
+  // function to toggle unassign paricipant selection
   toggleUnassignChecked(pid , event : Event){
     event.stopPropagation();
     if (this.selectedUnassignParticipants.has(pid)) {
@@ -2545,6 +2627,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to move participant from unassign to cohort
   unassignToCohort(cohort : any){
     const eventId = cohort['eventref']?.id;
     const participants = Array.from(this.selectedUnassignParticipants.values())
@@ -2561,6 +2644,7 @@ export class CohortManagementComponent {
     this.selectedUnassignParticipants.clear()
   }
 
+  // function to filter cohorts activity log
   filterActivityLog(){
     const keys = Object.keys(this.activityLogFilters);
     const logs = [...this.progressionData];
@@ -2607,6 +2691,7 @@ export class CohortManagementComponent {
       this.filteredProgressionProfiles = filteredLogs; 
   }
 
+  // function to filter log based in logged in participant
   toggleLogedToMe(event: Event) {
     event.stopPropagation();
     this.activityLogFilters['assigntome'] = !this.activityLogFilters['assigntome'];
@@ -2653,11 +2738,11 @@ export class CohortManagementComponent {
   }
 
   // chat config
-
   onChatToggle(cohort: any, event: MatCheckboxChange): void {
       cohort.selected = event.checked;
   }
 
+  // function to close chat model
   chatModelClose(result){
     this.chatModelRef.close(result);
   }
@@ -2672,20 +2757,22 @@ export class CohortManagementComponent {
     try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
   }
 
-  onCohortDragStart(event: DragEvent, cohort: any) {
-    if (!event.dataTransfer) return
-    // Only allow drag when starting from the card-handle (set via .card-handle)
-    const tgt = event.target as HTMLElement
-    if (!tgt || !tgt.closest('.card-handle')) {
-      event.preventDefault()
-      return
-    }
-    event.stopPropagation()
-    this.dragPayload = { kind: 'cohort', cohortId: cohort?.['docid'] }
-    event.dataTransfer.effectAllowed = 'move'
-    try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
-  }
+  // function handles on cohort drag
+  // onCohortDragStart(event: DragEvent, cohort: any) {
+  //   if (!event.dataTransfer) return
+  //   // Only allow drag when starting from the card-handle (set via .card-handle)
+  //   const tgt = event.target as HTMLElement
+  //   if (!tgt || !tgt.closest('.card-handle')) {
+  //     event.preventDefault()
+  //     return
+  //   }
+  //   event.stopPropagation()
+  //   this.dragPayload = { kind: 'cohort', cohortId: cohort?.['docid'] }
+  //   event.dataTransfer.effectAllowed = 'move'
+  //   try { event.dataTransfer.setData('text/plain', JSON.stringify(this.dragPayload)) } catch {}
+  // }
 
+  // function handles on cohort drag over event
   onCohortDragOver(event: DragEvent, cohort: any) {
     if (!this.dragPayload) return
     event.preventDefault()
@@ -2693,12 +2780,14 @@ export class CohortManagementComponent {
     this.hoverDropTargetCohortId = cohort?.['docid']
   }
 
+  // function handles on cohort drag leave event
   onCohortDragLeave(_event: DragEvent, cohort: any) {
     if (this.hoverDropTargetCohortId === cohort?.['docid']) {
       this.hoverDropTargetCohortId = null
     }
   }
 
+  // function handles on cohort drop event
   async onCohortDrop(event: DragEvent, targetCohort: any) {
     event.preventDefault()
     event.stopPropagation()
@@ -2720,11 +2809,7 @@ export class CohortManagementComponent {
       if (payload.sourceCohortId === targetCohort['docid']) return
       const sourceCohort = this.cohortsList.find(c => c['docid'] === payload.sourceCohortId);
       if (sourceCohort) {
-        if (sourceCohort['eventref']?.id === targetCohort['eventref']?.id) {
-          await this.moveParticipantToCohort([payload.participantId], sourceCohort, targetCohort)
-        } else{
-          alert(`Can not move participants between ${this.mapAcceleratorEvent[sourceCohort?.['eventref']?.id]} to ${this.mapAcceleratorEvent[targetCohort?.['eventref']?.id]}`)
-        }
+        await this.moveParticipantToCohort([payload.participantId], sourceCohort, targetCohort)
       }
       return
     }
@@ -2734,6 +2819,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to delete participant from cohort
   async deleteParticipantFromCohort(cohort : any){
     const con = confirm('Do you want to delete the selected Participants');
     if (!con) return
@@ -2751,12 +2837,13 @@ export class CohortManagementComponent {
         if (check) checkForActiveStudio.push(this.mapProfile[pid]);
       }
 
-      console.log(checkForActiveStudio)
+      // function to check active studios
       if (checkForActiveStudio.length > 0) {
         alert(`Selected Participant (${checkForActiveStudio.join(', ')}) has Active Studios in cohort, Please Disable all before delete`);
         return
       }
 
+      // function to check active chat
       const batch = writeBatch(this.firestore);
 
       const sorucecohortmembers = (await getDoc(doc(this.firestore, cohort?.chatref.path))).data()['members'] ?? [];
@@ -2781,7 +2868,6 @@ export class CohortManagementComponent {
         data.push(d);
       }
 
-      console.log()
       if(data.length > 0){
       this.chatConfigModelData = data
 
@@ -2820,6 +2906,7 @@ export class CohortManagementComponent {
     }
   }
 
+  // function to check active studio for an participant
   async checkForActiveParticipantStuidosInCohort(cohort : any , participantId : string){
     const queueId = cohort['queueref'];
     const activity = cohort['bigactivity'] ?? '';
@@ -2845,6 +2932,7 @@ export class CohortManagementComponent {
     return false
   }
 
+  // 
   onGridDragOver(event: DragEvent) {
     if (!this.dragPayload || this.dragPayload.kind !== 'cohort') return
     event.preventDefault()
@@ -3008,12 +3096,12 @@ export class CohortManagementComponent {
       || this.typeFilter !== 'all'
       || (this.selectedTags?.length || 0) > 0
       || this.showTemporaryOnly
-      || this.showExpiredCohorts
+      // || this.showExpiredCohorts
       || !!this.participantSearchQuery
   }
 
   clearAllFilters(): void {
-    if (this.selectedMarathon) this.toggleMarathonSelection?.()
+    if (this.selectedMarathon) this.selectMarathon?.()
     this.clearEventSelection?.()
     this.clearQueueSelection?.()
     this.setStatusFilter?.('all')
@@ -3023,7 +3111,7 @@ export class CohortManagementComponent {
     ;(this as any).clearTagSelection?.();
     this.participantSearchQuery = ''
     if (this.showTemporaryOnly) { this.showTemporaryOnly = false }
-    if (this.showExpiredCohorts) { this.showExpiredCohorts = false }
+    // if (this.showExpiredCohorts) { this.showExpiredCohorts = false }
     this.onFilter?.()
   }
 
@@ -3066,7 +3154,7 @@ export class CohortManagementComponent {
       chips.push({ key: 'TAG', value: this.getTagName(tid), type: 'tag', id: tid })
     })
     if (this.showTemporaryOnly) chips.push({ key: 'TEMPORARY', value: 'Only', type: 'temporary' })
-    if (this.showExpiredCohorts) chips.push({ key: 'EXPIRED', value: 'Shown', type: 'expired' })
+    // if (this.showExpiredCohorts) chips.push({ key: 'EXPIRED', value: 'Shown', type: 'expired' })
     if (this.participantSearchQuery) chips.push({ key: 'SEARCH', value: this.participantSearchQuery, type: 'search' })
     return chips
   }
@@ -3091,10 +3179,10 @@ export class CohortManagementComponent {
         break
       case 'tag':
         this.selectedTags = (this.selectedTags || []).filter(id => id !== chip.id)
-        this.toggleTagSelection?.()
+        this.onFilter?.()
         break
       case 'temporary': this.showTemporaryOnly = false; this.onFilter?.(); break
-      case 'expired': this.showExpiredCohorts = false; this.onFilter?.(); break
+      // case 'expired': this.showExpiredCohorts = false; this.onFilter?.(); break
       case 'search': this.participantSearchQuery = ''; this.onParticipantSearch?.(); break
     }
   }
@@ -3191,7 +3279,7 @@ export class CohortManagementComponent {
 
   selectSingleMarathon(id: string) {
     this.selectedMarathon = id
-    this.toggleMarathonSelection?.()
+    this.selectMarathon?.()
   }
 
   toggleEventInSelection(eventId: string) {
@@ -3216,7 +3304,7 @@ export class CohortManagementComponent {
     const idx = (this.selectedTags || []).indexOf(tagId)
     if (idx >= 0) this.selectedTags.splice(idx, 1)
     else this.selectedTags.push(tagId)
-    this.toggleTagSelection?.()
+    this.onFilter?.()
   }
   isEventSelected(eventId: string): boolean { return (this.selectedAcceleratorEvent || []).includes(eventId) }
   isQueueSelected(queueId: string): boolean { return (this.selectedQueueEvent || []).includes(queueId) }
@@ -3238,104 +3326,106 @@ export class CohortManagementComponent {
     }
   }
 
-  getActivityCount(): number {
-    return this.getActivityFeed('lastHour').length + this.getActivityFeed('earlier').length
-  }
+  // getActivityCount(): number {
+  //   return this.getActivityFeed('lastHour').length + this.getActivityFeed('earlier').length
+  // }
 
-  getActivityFeed(bucket: 'lastHour' | 'earlier'): Array<any> {
-    // Build from move logs / live assignments if available; placeholder otherwise.
-    const list: any[] = []
-    // Source: bigInvitationList + cohort logs would be wired in real backend.
-    // Use any in-memory data we already have.
-    const now = Date.now()
-    const hourMs = 60 * 60 * 1000
-    const allEntries: any[] = []
+  // getActivityFeed(bucket: 'lastHour' | 'earlier'): Array<any> {
+  //   // Build from move logs / live assignments if available; placeholder otherwise.
+  //   const list: any[] = []
+  //   // Source: bigInvitationList + cohort logs would be wired in real backend.
+  //   // Use any in-memory data we already have.
+  //   const now = Date.now()
+  //   const hourMs = 60 * 60 * 1000
+  //   const allEntries: any[] = []
 
-    // Live assignments → "checked in to"
-    ;(this.liveAssignmentList || []).forEach((la: any) => {
-      const t = la?.createddate?.toDate ? la.createddate.toDate().getTime() : (la?.createddate ? new Date(la.createddate).getTime() : now)
-      allEntries.push({
-        ts: t,
-        actor: this.mapProfile?.[la?.participantid] || la?.participantid || 'Someone',
-        action: 'checked in to',
-        target: la?.studioid || la?.queueid || '',
-        meta: la?.cohortname || '',
-        badge: la?.eventcode || '',
-        ago: this.timeAgo(t),
-        type: 'system',
-      })
-    })
+  //   // Live assignments → "checked in to"
+  //   ;(this.liveAssignmentList || []).forEach((la: any) => {
+  //     const t = la?.createddate?.toDate ? la.createddate.toDate().getTime() : (la?.createddate ? new Date(la.createddate).getTime() : now)
+  //     allEntries.push({
+  //       ts: t,
+  //       actor: this.mapProfile?.[la?.participantid] || la?.participantid || 'Someone',
+  //       action: 'checked in to',
+  //       target: la?.studioid || la?.queueid || '',
+  //       meta: la?.cohortname || '',
+  //       badge: la?.eventcode || '',
+  //       ago: this.timeAgo(t),
+  //       type: 'system',
+  //     })
+  //   })
 
-    // Cohort moves: scan cohortsList for recent updates
-    ;(this.cohortsList || []).forEach((c: any) => {
-      const t = c?.lastupdated?.toDate ? c.lastupdated.toDate().getTime() : (c?.lastupdated ? new Date(c.lastupdated).getTime() : 0)
-      if (!t) return
-      allEntries.push({
-        ts: t,
-        actor: c['name'] || 'Cohort',
-        action: 'cohort created',
-        target: '',
-        meta: '',
-        badge: '',
-        ago: this.timeAgo(t),
-        type: 'system',
-      })
-    })
+  //   // Cohort moves: scan cohortsList for recent updates
+  //   ;(this.cohortsList || []).forEach((c: any) => {
+  //     const t = c?.lastupdated?.toDate ? c.lastupdated.toDate().getTime() : (c?.lastupdated ? new Date(c.lastupdated).getTime() : 0)
+  //     if (!t) return
+  //     allEntries.push({
+  //       ts: t,
+  //       actor: c['name'] || 'Cohort',
+  //       action: 'cohort created',
+  //       target: '',
+  //       meta: '',
+  //       badge: '',
+  //       ago: this.timeAgo(t),
+  //       type: 'system',
+  //     })
+  //   })
 
-    const filtered = allEntries
-      .filter(e => this.activityFilter === 'all' || (this.activityFilter === 'system' && e.type === 'system') || (this.activityFilter === 'you' && e.type === 'you'))
-      .sort((a, b) => b.ts - a.ts)
+  //   const filtered = allEntries
+  //     .filter(e => this.activityFilter === 'all' || (this.activityFilter === 'system' && e.type === 'system') || (this.activityFilter === 'you' && e.type === 'you'))
+  //     .sort((a, b) => b.ts - a.ts)
 
-    return filtered.filter(e => bucket === 'lastHour' ? (now - e.ts) <= hourMs : (now - e.ts) > hourMs).slice(0, 10)
-  }
+  //   return filtered.filter(e => bucket === 'lastHour' ? (now - e.ts) <= hourMs : (now - e.ts) > hourMs).slice(0, 10)
+  // }
 
-  private timeAgo(ts: number): string {
-    const diff = Math.max(0, Date.now() - ts)
-    const m = Math.floor(diff / 60000)
-    if (m < 1) return 'just now'
-    if (m < 60) return `${m}m ago`
-    const h = Math.floor(m / 60)
-    if (h < 24) return `${h}h ago`
-    const d = Math.floor(h / 24)
-    return `${d}d ago`
-  }
+  // private timeAgo(ts: number): string {
+  //   const diff = Math.max(0, Date.now() - ts)
+  //   const m = Math.floor(diff / 60000)
+  //   if (m < 1) return 'just now'
+  //   if (m < 60) return `${m}m ago`
+  //   const h = Math.floor(m / 60)
+  //   if (h < 24) return `${h}h ago`
+  //   const d = Math.floor(h / 24)
+  //   return `${d}d ago`
+  // }
 
   // ════════════════════════════════════════════════════════════════
   // Status bar
   // ════════════════════════════════════════════════════════════════
-  getStatusTotal(): number {
-    return (this.cohortsList || []).reduce((sum: number, c: any) => sum + (c?.participantidlist?.length || 0), 0)
-  }
-  getStatusBucket(kind: 'se' | 'diagnostics' | 'consultation' | 'others'): number {
-    let n = 0
-    ;(this.cohortsList || []).forEach((c: any) => {
-      const name = (c?.name || '').toLowerCase()
-      const cat = (c?.cohortCategory || '').toLowerCase()
-      const count = c?.participantidlist?.length || 0
-      if (kind === 'se' && (name.includes('se ') || name.startsWith('se') || cat.includes('scope'))) n += count
-      else if (kind === 'diagnostics' && (name.includes('diagnostic') || cat.includes('diagnostic'))) n += count
-      else if (kind === 'consultation' && (name.includes('consultation') || cat.includes('consultation'))) n += count
-      else if (kind === 'others') {
-        const isSe = name.includes('se ') || name.startsWith('se') || cat.includes('scope')
-        const isDiag = name.includes('diagnostic') || cat.includes('diagnostic')
-        const isCons = name.includes('consultation') || cat.includes('consultation')
-        if (!isSe && !isDiag && !isCons) n += count
-      }
-    })
-    return n
-  }
-  refreshStatus() {
-    this.statusUpdatedAgo = 'just now'
-    this.onFilter?.()
-    setTimeout(() => { this.statusUpdatedAgo = '1 min ago' }, 60000)
-  }
+  // getStatusTotal(): number {
+  //   return (this.cohortsList || []).reduce((sum: number, c: any) => sum + (c?.participantidlist?.length || 0), 0)
+  // }
+  
+  // getStatusBucket(kind: 'se' | 'diagnostics' | 'consultation' | 'others'): number {
+  //   let n = 0
+  //   ;(this.cohortsList || []).forEach((c: any) => {
+  //     const name = (c?.name || '').toLowerCase()
+  //     const cat = (c?.cohortCategory || '').toLowerCase()
+  //     const count = c?.participantidlist?.length || 0
+  //     if (kind === 'se' && (name.includes('se ') || name.startsWith('se') || cat.includes('scope'))) n += count
+  //     else if (kind === 'diagnostics' && (name.includes('diagnostic') || cat.includes('diagnostic'))) n += count
+  //     else if (kind === 'consultation' && (name.includes('consultation') || cat.includes('consultation'))) n += count
+  //     else if (kind === 'others') {
+  //       const isSe = name.includes('se ') || name.startsWith('se') || cat.includes('scope')
+  //       const isDiag = name.includes('diagnostic') || cat.includes('diagnostic')
+  //       const isCons = name.includes('consultation') || cat.includes('consultation')
+  //       if (!isSe && !isDiag && !isCons) n += count
+  //     }
+  //   })
+  //   return n
+  // }
 
-  onCardClick(event: MouseEvent, cohort: any): void {
-    if (!this.selectMode) return
-    const target = event.target as HTMLElement
-    if (target.closest('button, .card-menu, .row-action, .foot-btn, .seg button, mat-menu, .mat-menu-content')) return
-    this.toggleCohortSelected(cohort.docid)
-  }
+  // refreshStatus() {
+  //   this.statusUpdatedAgo = 'just now'
+  //   this.onFilter?.()
+  //   setTimeout(() => { this.statusUpdatedAgo = '1 min ago' }, 60000)
+  // }
+
+  // onCardClick(event: MouseEvent, cohort: any): void {
+  //   if (!this.selectMode) return
+  //   const target = event.target as HTMLElement
+  //   if (target.closest('button, .card-menu, .row-action, .foot-btn, .seg button, mat-menu, .mat-menu-content')) return
+  //   this.toggleCohortSelected(cohort.docid)
+  // }
 
   // communications 
 

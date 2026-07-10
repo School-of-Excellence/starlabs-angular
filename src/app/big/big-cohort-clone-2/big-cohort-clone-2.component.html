@@ -325,7 +325,7 @@
         </span>
         <span style="flex:1"></span>
         <button class="p-move-btn" *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0"
-          [matMenuTriggerFor]="moveMultiMenuOut" (menuOpened)="onMoveMenuOpen(cohorts.docid)"
+          [matMenuTriggerFor]="moveMultiMenuOut" (menuOpened)="onMoveMenuOpen(cohorts)"
           (click)="$event.stopPropagation()">
           <mat-icon>swap_horiz</mat-icon> Move
         </button>
@@ -336,7 +336,7 @@
           <div class="move-menu-search" (click)="$event.stopPropagation()">
             <mat-icon>search</mat-icon>
             <input type="text" placeholder="Search cohorts…" [(ngModel)]="moveMenuSearchQuery"
-              (input)="onMoveMenuSearch($event, cohorts.docid)" (click)="$event.stopPropagation()">
+              (input)="onMoveMenuSearch($event, cohorts)" (click)="$event.stopPropagation()">
           </div>
           <div class="move-menu-list">
             <button mat-menu-item *ngFor="let targetCohort of moveMenuFilteredCohorts"
@@ -447,7 +447,7 @@
             </div>
             <span class="badge-live" *ngIf="selectedQueueEvent.length > 0 && cohorts['cohortCategory'] == 'studio' && isParticipantInStudio(participant)">Live</span>
             <button class="row-move" *ngIf="!isParticipantSelectActive(cohorts['docid'])"
-              [matMenuTriggerFor]="moveMenu" (menuOpened)="onMoveMenuOpen(cohorts.docid)"
+              [matMenuTriggerFor]="moveMenu" (menuOpened)="onMoveMenuOpen(cohorts)"
               (click)="$event.stopPropagation()" title="Move to another cohort">
               <mat-icon>swap_horiz</mat-icon>
             </button>
@@ -459,7 +459,7 @@
               <div class="move-menu-search" (click)="$event.stopPropagation()">
                 <mat-icon>search</mat-icon>
                 <input type="text" placeholder="Search cohorts…" [(ngModel)]="moveMenuSearchQuery"
-                  (input)="onMoveMenuSearch($event, cohorts.docid)" (click)="$event.stopPropagation()">
+                  (input)="onMoveMenuSearch($event, cohorts)" (click)="$event.stopPropagation()">
               </div>
               <div class="move-menu-list">
                 <button mat-menu-item *ngFor="let targetCohort of moveMenuFilteredCohorts"

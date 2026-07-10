@@ -5,8 +5,7 @@
    softer depth via shadow instead of heavy borders, calmer typography.
    ================================================================ */
 
-/* ── Design tokens ─────────────────────────────────────────────── */
-.bc-root {
+:host {
   --c-bg:        #F6F6F8;
   --c-surface:   #FFFFFF;
   --c-surface-2: #FBFBFD;
@@ -877,24 +876,14 @@ button {
 }
 
 .card-open-btn {
-  background: none;
   border: none;
   padding: 2px 3px;
-  color: var(--c-text-mute);
   border-radius: 5px;
   line-height: 0;
   flex-shrink: 0;
-  opacity: 0;
   transition: opacity 0.15s, color 0.15s;
   cursor: pointer;
-}
-
-.cohort-card:hover .card-open-btn {
-  opacity: 1;
-}
-
-.card-open-btn:hover {
-  color: var(--c-accent);
+  color: var(--c-accent-dark);
   background: var(--c-accent-soft);
 }
 
@@ -1315,20 +1304,16 @@ button {
 .activity-row {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   background: var(--c-surface-2);
   border-radius: var(--r-md);
-  padding: 10px 13px;
+  padding: 11px 13px;
   border: 1px solid var(--c-border-2);
   margin-bottom: 6px;
   transition: background 0.12s, border-color 0.12s;
   cursor: pointer;
 }
 
-.activity-row:hover {
-  background: var(--c-accent-soft);
-  border-color: var(--c-accent-line);
-}
 
 /* .act-icon (legacy markup) and .ac-icon (actual class used in the
    activities-tab template) both point at the same icon-chip styling —
@@ -1384,13 +1369,80 @@ button {
   min-width: 0;
 }
 
+/* Title + action buttons share a row; title ellipsizes first so the
+   buttons never get pushed off / wrapped by a long assignment name. */
+.act-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .act-title {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   font-weight: 650;
   color: var(--c-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.act-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.act-action-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.act-action-btn mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+}
+
+.act-action-btn.edit {
+  color: var(--c-accent-dark);
+}
+.act-action-btn.edit:hover {
+  background: var(--c-accent-soft);
+  border-color: var(--c-accent-line);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, .18);
+}
+
+.act-action-btn.validate {
+  color: #0B7A44;
+}
+.act-action-btn.validate:hover {
+  background: var(--c-green-soft);
+  border-color: #BEE9D2;
+  box-shadow: 0 2px 6px rgba(15, 157, 88, .18);
+}
+
+/* Narrow cards: action buttons collapse to icon-only so a long title
+   never forces them to wrap under it. */
+@container cohortcard (max-width: 420px) {
+  .act-action-btn span { display: none; }
+  .act-action-btn { padding: 0 6px; }
 }
 
 .act-meta {
@@ -1989,6 +2041,7 @@ button {
   transition: width 0.3s ease;
 }
 
+
 /* ================================================================
    DESIGN ALIGNMENT — Topbar / Refine / Cards / Drag-drop
    ================================================================ */
@@ -2270,8 +2323,6 @@ button {
   box-shadow: 0 0 0 3px var(--c-accent-soft) !important;
   transform: translateY(-2px);
 }
-.cohort-card { cursor: grab; }
-.cohort-card:active { cursor: grabbing; }
 
 /* ── Card tag variants (event/studio/specialist/draft) ────────── */
 .tag.event       { background: var(--c-blue-soft); color: #1D4ED8; }
@@ -2408,7 +2459,6 @@ button {
   align-items: center;
   justify-content: center;
 }
-.cohort-card:hover .card-open-btn { color: var(--c-accent-dark); }
 .card-top .card-open-btn:hover {
   color: var(--c-accent-dark);
   background: var(--c-accent-soft);

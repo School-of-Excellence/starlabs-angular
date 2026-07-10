@@ -40,7 +40,6 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
     DragDropModule,
     MatMenuModule,
     MatChipsModule,
-    NgxMatSelectSearchModule,
     EventsStageDataComponent
   ],
   templateUrl: './event-opportunity-dashboard.component.html',
@@ -132,6 +131,10 @@ export class EventOpportunityDashboardComponent {
   hideParticipants: boolean = false;
   private initializedStagesPerQueue: Set<string> = new Set();
   private seenStageKeys: Set<string> = new Set();
+  private studioWatchTimer: any = null;
+  private studioWatchTick = 0;     // bumped by a timer so elapsed labels refresh
+  planningQueues: string[] = []
+  get loadedQueues(): string[] { return [...new Set([...this.selectedQueueList, ...this.planningQueues])]; }
 
   isStageVisibleOnScreen(queueid: string, stage: string): boolean {
     const opp = this.getStageTokenCount(queueid, stage, 'waiting') + this.getStageTokenCount(queueid, stage, 'queued');
@@ -197,16 +200,16 @@ export class EventOpportunityDashboardComponent {
           this.developerRole = true;
         }
 
-        this.loadEventCohorts();
+      this.loadEventCohorts();
         // this.getQueueData();
-        getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
+      getDocs(query(collection(this.firestore, 'event collection'), orderBy('start_date', 'desc'))).then(snap => {
         this.eventList = snap.docs.map(e => {
-        let element = e.data()
-        element["id"] = e.id 
-        element["ref"] = e.ref 
-        this.mapEvent[e.id] = e.data()['name'];
-        return element
-      })
+          let element = e.data()
+          element["id"] = e.id
+          element["ref"] = e.ref
+          this.mapEvent[e.id] = e.data()['name'];
+          return element
+        })
       this.liveEventList = this.eventList.filter(e => e["start_date"].toDate() <= new Date() && e["end_date"].toDate() >= new Date());
     })
         // this.getQueueData()
@@ -214,6 +217,7 @@ export class EventOpportunityDashboardComponent {
       //   this.router.navigateByUrl("/")
       // }
     })
+    this.studioWatchTimer = setInterval(() => { this.studioWatchTick++; }, 30000);
   }
 
   ngOnDestroy() {
@@ -1476,8 +1480,9 @@ export class EventOpportunityDashboardComponent {
       this.queueTokenMap.clear();
       return;
     }
-    const selectedQueueRef = queues.map((e) => this.mapQueue[e]['docref'])
-    this.queueTokensSub = collectionData(query(
+
+    const selectedQueueRef = this.selectedQueueList.map((e) => this.mapQueue[e]['docref'])
+    collectionData(query(
       collection(this.firestore, 'queue_token'),
       where('queueref', 'in', selectedQueueRef)
     )).pipe(takeUntil(this.subscription)).subscribe(tokens => {

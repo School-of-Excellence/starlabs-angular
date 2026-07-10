@@ -401,10 +401,14 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   // so a client-built /home/<path> URL 404s). Null until a file has landed in
   // Dropbox, or when the API base isn't configured.
   dropboxFolderUrl(record: any): string | null {
-    const withPath = this.normalizeFiles(record?.files).find(f => f?.dropboxPath)
-    const path: string | undefined = withPath?.dropboxPath
-    if (!path) return null
-    const folder = path.substring(0, path.lastIndexOf('/'))
+    let folder = '';
+    if (record?.dropboxFolderPath) {
+      folder = record.dropboxFolderPath;
+    } else {
+      const withPath = this.normalizeFiles(record?.files).find(f => f?.dropboxPath);
+      const path: string | undefined = withPath?.dropboxPath ?? '';
+      folder = path.substring(0, path.lastIndexOf('/'));
+    }
     if (!folder) return null
     return this.migrationApi.folderOpenUrl(folder) || null
   }

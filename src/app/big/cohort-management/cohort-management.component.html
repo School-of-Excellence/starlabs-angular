@@ -178,10 +178,10 @@
         Temporary only
       </label>
 
-      <label class="toggle-label">
+      <!-- <label class="toggle-label">
         <input type="checkbox" [checked]="showExpiredCohorts" (change)="toggleExpiredCohorts()" />
         <span>Show expired</span>
-      </label>
+      </label> -->
 
       <div class="refine-spacer"></div>
 
@@ -373,14 +373,13 @@
             (dragover)="onCohortDragOver($event, cohorts)"
             (dragleave)="onCohortDragLeave($event, cohorts)"
             (drop)="onCohortDrop($event, cohorts)"
-            (click)="openCohortStudio(cohorts, $event , 'participants');"
             *ngFor="let cohorts of groupedCohorts[groupKey]">
             <div class="card-top">
               <span class="card-check select-overlay" *ngIf="selectMode" (click)="toggleCohortSelected(cohorts['docid']); $event.stopPropagation()" title="Select cohort">
                 <mat-icon>{{isCohortSelected(cohorts['docid']) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
               </span>
               <span class="card-name" (click)="onEditCohort(cohorts); $event.stopPropagation()" title="Click to edit cohort">{{cohorts['name']}}</span>
-              <button class="card-open-btn" title="Open studio view">
+              <button class="card-open-btn" title="Open studio view" (click)="openCohortStudio(cohorts, $event , 'participants');">
                 <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12"/>
                   <polyline points="12 5 19 12 12 19"/>
@@ -594,11 +593,30 @@
                     <mat-icon>warning</mat-icon>
                     <span>Assignment deleted</span>
                   </div>
-
-                  <div class="activity-row" *ngIf="mapBigAssignment[$any(assignment.key)]" (click)="onEditAssignment(cohorts , mapBigAssignment[$any(assignment.key)],$event);$event.stopPropagation();">
+                
+                  <div class="activity-row" *ngIf="mapBigAssignment[$any(assignment.key)]">
                     <div class="ac-icon"><mat-icon>assignment</mat-icon></div>
                     <div class="act-info">
-                      <div class="act-title">{{mapBigAssignment[$any(assignment.key)]?.['title'] || 'Untitled'}}</div>
+                      <div class="act-head">
+                        <div class="act-title">{{mapBigAssignment[$any(assignment.key)]?.['title'] || 'Untitled'}}</div>
+                
+                        <div class="act-actions">
+                          <button class="act-action-btn edit" type="button"
+                            (click)="onEditAssignment(cohorts , mapBigAssignment[$any(assignment.key)],$event); $event.stopPropagation();"
+                            title="Edit activity">
+                            <mat-icon>edit</mat-icon>
+                            <span>Edit</span>
+                          </button>
+                
+                          <button class="act-action-btn validate" type="button"
+                            (click)="onValidateParticipantAssignment($any(assignment.key), cohorts['docid']); $event.stopPropagation();"
+                            title="Validate participant assignments">
+                            <mat-icon>fact_check</mat-icon>
+                            <span>Validate</span>
+                          </button>
+                        </div>
+                      </div>
+                
                       <div class="ac-stats">
                         <div class="ac-stat ongoing">
                           <span class="ac-stat-num">{{mapOngoingAssignments[$any(assignment.key)]?.length ||
@@ -617,7 +635,6 @@
                         </div>
                       </div>
                     </div>
-                    <!-- <span class="act-badge published">published</span> -->
                   </div>
                 </ng-container>
                 <!-- <div class="activity-row">
