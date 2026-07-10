@@ -114,17 +114,7 @@ export class ParticipantEvolutionMappingComponent {
 
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }),
-      takeWhile(val => val !== '00:00:00', true),
-      tap(val => {
-        if (val === '00:00:00' && !this.expiredLive) {
-          this.expiredLive = true;
-          if (this.liveEvolutionMapping.length > 0) {
-            this.liveEvolutionMapping = [
-              { ...this.liveEvolutionMapping[0], live: false }
-            ];
-          }
-        }
-      })
+      takeWhile(val => val !== '00:00:00', true)
     );
   }
 
