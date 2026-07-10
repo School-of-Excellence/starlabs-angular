@@ -1907,7 +1907,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // ---- global summary filter: lifecycle + journey/group, scopes EVERY summary metric ----
   // Only active when the base is fully loaded (!pagedMode); in the paged/All view the numbers come
   // from base-wide server/index counts that can't be row-filtered accurately, so the bar is disabled.
-  sumLifecycle = signal<'all' | 'active' | 'nonactive' | 'discontinued'>('all');
+  // Default view is ACTIVE participants; other segments (All / Non-active / Discontinued) are opt-in.
+  // Switching between them only re-slices the already-loaded allRows — never a new fetch.
+  sumLifecycle = signal<'all' | 'active' | 'nonactive' | 'discontinued'>('active');
   sumJourney = signal<{ label: string; group: boolean; journeys: string[] } | null>(null);
   journeyMenuOpen = false;
 
@@ -1931,7 +1933,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** allRows scoped by BOTH filters — the source for every KPI / needs-attention / health count. */
   filteredRows = computed<PortfolioRow[]>(() => this.journeyFilteredRows().filter(r => this.matchesSummaryLifecycle(r)));
 
-  get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'all' || this.sumJourney() !== null; }
+  /** Default is Active; a filter is "active" (Clear appears) only when it differs from that default. */
+  get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'active' || this.sumJourney() !== null; }
+  /** Highlighted lifecycle segment. In the paged/All view the filter isn't applied, so show 'all'
+   *  (matching the base-wide numbers on screen) instead of the underlying default. */
+  get shownLifecycle(): 'all' | 'active' | 'nonactive' | 'discontinued' { return this.pagedMode ? 'all' : this.sumLifecycle(); }
   get summaryJourneyLabel(): string { return this.sumJourney()?.label ?? 'All journeys'; }
   isSummaryJourneyOn(item: { name: string; group: boolean; journeys: string[] }): boolean {
     const cur = this.sumJourney();
@@ -1943,7 +1949,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  lifecycle (keeps the journey); a repeated segment toggles back to 'all'. */
   setSumLifecycle(kind: 'all' | 'active' | 'nonactive' | 'discontinued'): void {
     if (this.pagedMode) return;
-    this.sumLifecycle.set(kind === 'all' ? 'all' : (this.sumLifecycle() === kind ? 'all' : kind));
+    this.sumLifecycle.set(kind);   // plain selector — pick one, no toggle back to 'all'
     this.journeyMenuOpen = false;
     this.computeSummary();
   }
@@ -1957,7 +1963,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
   toggleJourneyMenu(): void { if (!this.pagedMode) this.journeyMenuOpen = !this.journeyMenuOpen; }
   clearSummaryFilter(): void {
-    this.sumLifecycle.set('all');
+    this.sumLifecycle.set('active');   // reset to the default view, not to 'all'
     this.sumJourney.set(null);
     this.journeyMenuOpen = false;
     this.computeSummary();
@@ -2302,8 +2308,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.selectedCoachId = id;
     this.activeLever = 'all';
     this.assignTargetCoachId = '';
-    // scope changed → the summary filter's journey/lifecycle no longer apply; reset to unfiltered.
-    this.sumLifecycle.set('all');
+    // scope changed → reset the summary filter to its default (Active, no journey).
+    this.sumLifecycle.set('active');
     this.sumJourney.set(null);
     this.journeyMenuOpen = false;
     this.pagedMode = this.isPagedView(id);
