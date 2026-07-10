@@ -1,0 +1,82 @@
+.dialog-wrap {
+  width: min(680px, 92vw);
+  background: #ffffff;
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 0 4px;
+}
+
+.dialog-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.dialog-body {
+  padding-top: 8px !important;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+}
+
+.grid mat-form-field {
+  width: 100%;
+}
+
+.toggles {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggle-title {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.92rem;
+}
+
+.toggle-desc {
+  color: #6b7280;
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.dialog-actions {
+  padding: 12px 4px 4px 4px;
+  gap: 10px;
+}
+
+.dialog-actions button mat-spinner {
+  display: inline-block;
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
