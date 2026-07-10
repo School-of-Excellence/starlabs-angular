@@ -96,6 +96,19 @@ export class ZoomClientviewComponent {
   // now derived from `specialistJoinedAt && !specialistLeftAt`.
   private specialistUnloadHandler: ((ev?: any) => void) | null = null;
 
+  // `specialistLeftAt` is stamped by tab-lifecycle events (pagehide, bfcache,
+  // component destroy) that do NOT necessarily mean the host left the meeting,
+  // and until now only a fresh `ZoomMtg.join` success ever cleared it. A
+  // participant who reached the wait screen AFTER such a stamp therefore waited
+  // on a field that would never flip. The two members below make "the host is
+  // inside the call" the source of truth instead.
+  //
+  // `specialistLeaving` is raised the moment we stamp (or are about to stamp) a
+  // genuine leave, so the self-heal listener cannot undo it.
+  private specialistLeaving = false;
+  private specialistPageShowHandler: ((ev?: any) => void) | null = null;
+  private specialistPresenceSub: Subscription | null = null;
+
   // Background-tab attention grabbers (used when the gate releases)
   private originalTitle: string = '';
   private titleFlashTimer: any = null;
@@ -212,6 +225,7 @@ export class ZoomClientviewComponent {
     const ref = doc(this.firestore, 'live assignment', this.documentId);
 
     this.specialistUnloadHandler = () => {
+      this.stopSpecialistPresenceSelfHeal();
       try {
         updateDoc(ref, {
           specialistLeftAt: serverTimestamp()
@@ -219,13 +233,55 @@ export class ZoomClientviewComponent {
       } catch {}
     };
     window.addEventListener('pagehide', this.specialistUnloadHandler);
+
+    // A page restored from the back/forward cache never re-runs `ZoomMtg.join`,
+    // so nothing would clear the leave that the matching `pagehide` stamped —
+    // yet the host is still in the call. Undo it here.
+    this.specialistPageShowHandler = (ev?: any) => {
+      if (!ev?.persisted || !this.isJoined) return;
+      this.startSpecialistPresenceSelfHeal();
+      updateDoc(ref, { specialistLeftAt: null })
+        .catch(err => console.warn('Could not clear specialistLeftAt on bfcache restore', err));
+    };
+    window.addEventListener('pageshow', this.specialistPageShowHandler);
   }
 
   private stopSpecialistHeartbeat() {
+    this.stopSpecialistPresenceSelfHeal();
     if (this.specialistUnloadHandler) {
       window.removeEventListener('pagehide', this.specialistUnloadHandler);
       this.specialistUnloadHandler = null;
     }
+    if (this.specialistPageShowHandler) {
+      window.removeEventListener('pageshow', this.specialistPageShowHandler);
+      this.specialistPageShowHandler = null;
+    }
+  }
+
+  // While the host is genuinely inside Zoom (`isJoined`), `specialistLeftAt`
+  // must stay null — otherwise the participant's wait gate reads "specialist
+  // left" and never releases. Clear any stamp that appears, whatever wrote it
+  // (bfcache pagehide, a transient `meetingStatus === 3`, an out-of-band
+  // component destroy). Genuine leaves raise `specialistLeaving` first, so they
+  // are never undone.
+  private startSpecialistPresenceSelfHeal() {
+    this.specialistLeaving = false;
+    if (this.specialistPresenceSub) return;
+    if (!this.profileHost || this.collectiontype !== 'queue' || !this.documentId) return;
+
+    const ref = doc(this.firestore, 'live assignment', this.documentId);
+    this.specialistPresenceSub = docData(ref).subscribe((data: any) => {
+      if (!data || this.specialistLeaving || !this.isJoined) return;
+      if (!data['specialistLeftAt']) return;
+      updateDoc(ref, { specialistLeftAt: null })
+        .catch(err => console.warn('Could not clear stale specialistLeftAt', err));
+    });
+  }
+
+  private stopSpecialistPresenceSelfHeal() {
+    this.specialistLeaving = true;
+    this.specialistPresenceSub?.unsubscribe();
+    this.specialistPresenceSub = null;
   }
 
   // Specialist is present when they joined the Zoom call and have not left.
@@ -393,6 +449,7 @@ export class ZoomClientviewComponent {
           // Host ending the call = "End meeting for all" → everyone is gone.
           // Stamp BOTH leaves so the arena flips to "Call ended" even if the
           // participant's own client can't write before its redirect.
+          this.stopSpecialistPresenceSelfHeal();
           const leaveWrite = updateDoc(ref, {
             specialistLeftAt: serverTimestamp(),
             participantLeftAt: serverTimestamp()
@@ -1134,6 +1191,7 @@ export class ZoomClientviewComponent {
                   updateDoc(doc(this.firestore, 'live assignment', this.documentId), update)
                     .catch(err => console.warn('Could not mark specialistJoinedAt', err));
                   this.startSpecialistHeartbeat();
+                  this.startSpecialistPresenceSelfHeal();
                 }
 
                 // Participant successfully joined Zoom → record the
