@@ -152,6 +152,36 @@
 .sx-jgroup-btn mat-icon { font-size: 15px; height: 15px; width: 15px; }
 .sx-jgroup-btn:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
 .sx-jgrp-ic { font-size: 15px; height: 15px; width: 15px; vertical-align: -3px; margin-right: 3px; color: #534ab7; }
+/* expandable group → participant list */
+.sx-jrowline { display: flex; align-items: center; }
+.sx-jrowline .sx-jrow { flex: 1 1 auto; min-width: 0; }
+.sx-jexp { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border: none;
+  background: none; cursor: pointer; padding: 3px; margin-right: 4px; border-radius: 6px; color: rgba(60,60,67,.55); }
+.sx-jexp:hover { background: #f0f0f4; color: #1c1c1e; }
+.sx-jexp mat-icon { font-size: 18px; height: 18px; width: 18px; }
+.sx-jexp:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
+/* participants overlay (mat-menu panel). The panel lives in the CDK overlay container, outside this
+   component's DOM, so it needs ::ng-deep — scoped by the unique .sx-jmenu-panel class. */
+::ng-deep .sx-jmenu-panel .mat-mdc-menu-content { padding: 0; }
+::ng-deep .sx-jmenu-panel.mat-mdc-menu-panel { max-width: 360px; border-radius: 12px; }
+.sx-jmenu { padding: 10px 12px 8px; min-width: 260px; max-width: 340px; }
+.sx-jmenu-head { padding-bottom: 4px; border-bottom: .5px solid rgba(60,60,67,.08); }
+.sx-jmenu-title { display: flex; align-items: center; gap: 3px; font-size: 13.5px; font-weight: 700;
+  color: #1c1c1e; line-height: 1.3; }
+.sx-jmenu-sub { font-size: 11px; font-weight: 400; color: rgba(60,60,67,.5); line-height: 1.4; margin-top: 1px; }
+.sx-jmemlist { margin-top: 6px; max-height: 300px; overflow-y: auto; }
+.sx-jmemgrp { padding: 2px 0 4px; }
+.sx-jmemgrp + .sx-jmemgrp { border-top: .5px solid rgba(60,60,67,.08); margin-top: 3px; padding-top: 5px; }
+.sx-jmemgrp-head { display: flex; align-items: center; gap: 7px; padding: 1px 0 3px; }
+.sx-jmemgrp-count { margin-left: auto; font-size: 11px; font-weight: 600; color: rgba(60,60,67,.55);
+  font-variant-numeric: tabular-nums; }
+.sx-jmem { display: flex; align-items: baseline; gap: 8px; padding: 3px 0 3px 8px; }
+.sx-jmem + .sx-jmem { border-top: .5px solid rgba(60,60,67,.04); }
+.sx-jmem-name { flex: 1 1 auto; font-size: 12.5px; color: #1c1c1e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sx-jmem-journey { flex: 0 1 auto; font-size: 11px; font-weight: 600; color: #534ab7; background: rgba(83,74,183,.1);
+  border-radius: 5px; padding: 1px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sx-jmem-journey.sm { font-weight: 500; font-size: 10.5px; color: rgba(60,60,67,.62); background: rgba(60,60,67,.06); max-width: 48%; }
+.sx-jmem-empty { font-size: 11.5px; color: rgba(60,60,67,.5); padding: 2px 0 2px 8px; }
 .sx-jmembers { font-size: 11px; color: rgba(60,60,67,.5); font-weight: 400; }
 .sx-jedit-hint { font-size: 11px; color: rgba(60,60,67,.5); padding: 2px 0 6px 14px; }
 .sx-jgroup-bar { display: flex; align-items: center; gap: 7px; padding: 2px 6px 8px 14px; }
@@ -164,6 +194,13 @@
 .sx-jgroup-ungroup { color: #b3261e; background: rgba(179,38,30,.09); }
 .sx-jgroup-apply:hover, .sx-jgroup-ungroup:hover { filter: brightness(.97); }
 .sx-jgroup-apply:disabled, .sx-jgroup-ungroup:disabled { opacity: .4; cursor: default; filter: none; }
+.sx-jgroup-existing { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 0 6px 8px 14px; }
+.sx-jgroup-existing-lab { font-size: 11px; color: rgba(60,60,67,.5); }
+.sx-jgroup-chip { font: inherit; font-size: 11px; font-weight: 600; color: #534ab7; background: rgba(83,74,183,.1);
+  border: 1px solid transparent; border-radius: 6px; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+.sx-jgroup-chip:hover { filter: brightness(.96); }
+.sx-jgroup-chip.on { color: #fff; background: #534ab7; }
+.sx-jgroup-chip:focus-visible { outline: 2px solid #007aff; outline-offset: 1px; }
 .sx-jedit { display: flex; align-items: center; gap: 9px; padding: 5px 6px 5px 14px; cursor: pointer; border-radius: 8px; }
 .sx-jedit:hover { background: #f6f6f9; }
 .sx-jedit + .sx-jedit { border-top: .5px solid rgba(60,60,67,.06); }
