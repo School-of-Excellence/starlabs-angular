@@ -119,6 +119,7 @@ export const routes: Routes = [
   {path: 'tieraccessconfig', loadComponent: () => import('./content/tier-access-config/view-tier-access/view-tier-access.component').then(m => m.ViewTierAccessComponent), canActivate: [authGuard]},
   {path: 'event_participation_approve', loadComponent: () => import('./Events/event-participation-approve/event-participation-approve.component').then(m => m.EventParticipationApproveComponent), canActivate: [authGuard]},
   {path: 'event-participation-confirmation', loadComponent: () => import('./Events/event-participation-confirmations/event-participation-confirmations.component').then(m => m.EventParticipationConfirmationsComponent), canActivate: [authGuard]},
+  {path: 'events-stage-data', loadComponent: () => import('./Events/events-stage-data/events-stage-data.component').then(m => m.EventsStageDataComponent), canActivate: [authGuard]},
   {path: 'create_event', loadComponent: () => import('./Events/event-list/event-list.component').then(m => m.EventListComponent), canActivate: [authGuard]},
   {path: 'arena_e_ticket_approve', loadComponent: () => import('./Events/arena-e-ticket-approve/arena-e-ticket-approve.component').then(m => m.ArenaETicketApproveComponent), canActivate: [authGuard]},
   {path: 'qr-scanner', loadComponent: () => import('./Events/qr-scanner/qr-scanner.component').then(m => m.QrScannerComponent), canActivate: [authGuard]},
@@ -181,6 +182,7 @@ export const routes: Routes = [
   // {path: 'dynamicqueuemanager', loadComponent: () => import('./queue system/dynamic-queue-manager/dynamic-queue-manager.component').then(m => m.DynamicQueueManagerComponent), canActivate: [authGuard]},
   {path: 'dynamicqueuemanager', loadComponent: () => import('./queue system/dynamic-queue-manager-clone/dynamic-queue-manager-clone.component').then(m => m.DynamicQueueManagerCloneComponent), canActivate: [authGuard]},
   {path: 'openmeeting/:id/:collectiontype', loadComponent: () => import('./queue system/zoom-clientview/zoom-clientview.component').then(m => m.ZoomClientviewComponent), canActivate:[authGuard]},
+  {path: 'viewrubrics_scoring_atc', loadComponent: () => import('./queue system/atc-generated-from-queue-stage/atc-generated-from-queue-stage.component').then(m => m.AtcGeneratedFromQueueStageComponent), canActivate:[authGuard]},
 
   // ATC
   {path: 'prescribeATC', loadComponent: () => import('./ATC/prescribe-atc/prescribe-atc.component').then(m => m.PrescribeATCComponent), canActivate: [authGuard]},
@@ -266,6 +268,7 @@ export const routes: Routes = [
   {path: 'create-workshop', loadComponent: () => import('./New-Workshop/create-workshop/create-workshop.component').then(m => m.CreateWorkshopComponent)},
   {path: 'workshopconfig/:id', loadComponent: () => import('./New-Workshop/workshop-configuration/workshop-configuration.component').then(m => m.WorkshopConfigurationComponent)},
   {path: 'workshops', loadComponent: () => import('./New-Workshop/workshops/workshops.component').then(m => m.WorkshopsComponent),canActivate:[authGuard]},
+  {path: 'upcomingworkshops', loadComponent: () => import('./New-Workshop/upcomingworkshops/upcomingworkshops.component').then(m => m.UpcomingworkshopsComponent)},
   {path: 'workshop_dashboard/:id', loadComponent: () => import('./New-Workshop/workshop-dashboard/workshop-dashboard.component').then(m => m.WorkshopDashboardComponent), canActivate:[authGuard]},
   {path: 'formtemplateworkshop', loadComponent: () => import('./New-Workshop/form-assignment/form-assignment.component').then(m => m.FormAssignmentComponent), canActivate:[authGuard]},
   {path: 'productpageworkshop', loadComponent: () => import('./New-Workshop/product-page/product-page.component').then(m => m.ProductPageComponent),canActivate:[authGuard]},
@@ -331,6 +334,11 @@ export const routes: Routes = [
   // Dev - Test
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
 
+  // ATC generation pipeline ops
+  {path: 'queue-atc-generation', loadComponent: () => import('./ATC-Ops/atc-generation-ops/atc-generation-ops.component').then(m => m.AtcGenerationOpsComponent), canActivate: [authGuard]},
+  {path: 'queue-atc-usage', loadComponent: () => import('./ATC-Ops/atc-usage-dashboard/atc-usage-dashboard.component').then(m => m.AtcUsageDashboardComponent), canActivate: [authGuard]},
+
+  // Wildcard must stay LAST — it catches every unmatched path
   {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},
 ];
 

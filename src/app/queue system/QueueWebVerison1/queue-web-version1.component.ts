@@ -56,6 +56,19 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
   inlineFormId: string = null;
   inlineQueueId: string = null;
 
+  // --- Single-tab guard -------------------------------------------------
+  // Ensures queue-web is effectively a single tab per browser. When the
+  // participant lands here from the Zoom leaveUrl after the host ends the call
+  // (see zoom-clientview: participant leaveUrl -> /queue-web) AND they already
+  // had queue-web open in another tab, this focuses the existing tab and closes
+  // the freshly-opened duplicate — instead of leaving two queue-web tabs.
+  // Cross-tab coordination uses BroadcastChannel (same-origin, works even from
+  // the cross-origin-isolated Zoom page's successor tab). The OLDER tab (lower
+  // id) survives; the newer one hands focus over and closes itself.
+  private qwTabId = '';
+  private qwChannel: BroadcastChannel | null = null;
+  private qwClosing = false;
+
   constructor() {
     // Resolve user and profile map before fetching queue data
     this.auth.username().then((userdata: any) => {
@@ -78,13 +91,59 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
     });
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.initSingleTabGuard();
+  }
 
   ngOnDestroy(): void {
     this.chatListUnsub?.();
     this.pinnedChatUnsub?.();
     this.queueLiveUnsub?.();
     this.queueTokenUnsub?.();
+    try { this.qwChannel?.close(); } catch { /* ignore */ }
+    this.qwChannel = null;
+  }
+
+  // Point to an already-open queue-web tab instead of duplicating it. See the
+  // field comments above for the why. Best-effort: window.close()/focus() only
+  // work for a script-opened tab (the post-meeting tab qualifies — it was
+  // opened via window.open); a manually-typed tab can't be auto-closed, in
+  // which case focus is still handed to the older tab.
+  private initSingleTabGuard(): void {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+    this.qwTabId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    try {
+      this.qwChannel = new BroadcastChannel('starlabs-queue-web');
+    } catch { return; }
+
+    this.qwChannel.onmessage = (ev: MessageEvent) => {
+      const msg: any = ev?.data || {};
+      if (!msg.type || msg.from === this.qwTabId) return;
+
+      // A newly-opened queue-web tab announced itself → tell it we exist.
+      if (msg.type === 'qw-ping') {
+        this.qwChannel?.postMessage({ type: 'qw-pong', from: this.qwTabId, to: msg.from });
+        return;
+      }
+      // An existing tab replied to our announce. The OLDER tab (lower id) stays;
+      // if the replier is older than us, we're the duplicate → hand over focus
+      // and close ourselves.
+      if (msg.type === 'qw-pong' && msg.to === this.qwTabId && !this.qwClosing) {
+        if (msg.from < this.qwTabId) {
+          this.qwClosing = true;
+          this.qwChannel?.postMessage({ type: 'qw-focus', to: msg.from });
+          setTimeout(() => { try { window.close(); } catch { /* not script-opened */ } }, 60);
+        }
+        return;
+      }
+      // We're the surviving (older) tab — pull ourselves to the front.
+      if (msg.type === 'qw-focus' && msg.to === this.qwTabId) {
+        try { window.focus(); } catch { /* ignore */ }
+      }
+    };
+
+    // Announce ourselves; any existing older tab will pong and we close.
+    this.qwChannel.postMessage({ type: 'qw-ping', from: this.qwTabId });
   }
 
   objectKeys(obj: any): string[] {

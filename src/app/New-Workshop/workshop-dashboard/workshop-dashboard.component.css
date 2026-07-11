@@ -1672,3 +1672,171 @@
 .referred-checkbox{
   font-size: 13px;
 }
+
+/* ===== EVERGREEN — PARTICIPANT DAY JOURNEY TIMELINE ===== */
+.ev-day-section {
+  background: #ffffff;
+  border: 1px solid #edf0f5;
+  border-radius: 18px;
+  padding: 24px 26px 22px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -18px rgba(16, 24, 40, 0.18);
+}
+
+.ev-day-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.ev-day-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.ev-day-sub {
+  margin: 5px 0 0;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.ev-day-dot {
+  margin: 0 6px;
+  color: #cbd5e1;
+}
+
+.ev-day-pill {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: 1px solid #e0e4f7;
+  border-radius: 999px;
+  padding: 7px 14px;
+  white-space: nowrap;
+}
+
+/* Horizontal, swipeable timeline strip with a connecting rail behind the badges */
+.ev-day-track {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 6px 2px 6px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+.ev-day-track::before {
+  content: "";
+  position: absolute;
+  top: 34px;              /* aligns with badge vertical center */
+  left: 18px;
+  right: 18px;
+  height: 2px;
+  background: linear-gradient(90deg, #eceff5 0%, #e6e9f2 100%);
+  z-index: 0;
+}
+.ev-day-track::-webkit-scrollbar { height: 6px; }
+.ev-day-track::-webkit-scrollbar-thumb { background: #e2e6ee; border-radius: 999px; }
+
+.ev-day-node {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 118px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px 16px;
+  background: #ffffff;
+  border: 1px solid #eceff4;
+  border-radius: 16px;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.ev-day-node:hover:not(.is-empty) {
+  transform: translateY(-3px);
+  border-color: #d8dcf5;
+  box-shadow: 0 10px 26px -12px rgba(79, 70, 229, 0.35);
+}
+.ev-day-node:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.ev-day-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  box-shadow: 0 0 0 4px #ffffff, 0 0 0 5px #e7eafb;
+}
+
+.ev-day-count {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.ev-day-caption {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+/* Empty day: muted, non-interactive */
+.ev-day-node.is-empty {
+  cursor: default;
+  background: #fbfbfd;
+  border-color: #f1f2f6;
+}
+.ev-day-node.is-empty .ev-day-badge {
+  color: #b6bdca;
+  background: #f1f3f7;
+  box-shadow: 0 0 0 4px #fbfbfd, 0 0 0 5px #eef0f4;
+}
+.ev-day-node.is-empty .ev-day-count { color: #c2c8d2; }
+
+/* Completed bucket: emerald accent */
+.ev-day-node--done .ev-day-badge--done {
+  color: #ffffff;
+  background: #10b981;
+  box-shadow: 0 0 0 4px #ffffff, 0 0 0 5px #c9f0e0;
+}
+.ev-day-node--done .ev-day-badge--done mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+.ev-day-node--done:hover {
+  box-shadow: 0 10px 26px -12px rgba(16, 185, 129, 0.4);
+  border-color: #bce9d6;
+}
+
+@media (max-width: 600px) {
+  .ev-day-section { padding: 20px 16px; border-radius: 14px; }
+  .ev-day-node { width: 104px; }
+}

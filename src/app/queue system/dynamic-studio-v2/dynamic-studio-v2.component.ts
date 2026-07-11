@@ -46,7 +46,12 @@ export class DynamicStudioV2Component {
   @ViewChild('formDialogTpl') formDialogTpl!: TemplateRef<any>;
   @ViewChild('atcDialogTpl') atcDialogTpl!: TemplateRef<any>;
   @ViewChild('checkinConflictTpl') checkinConflictTpl!: TemplateRef<any>;
+  @ViewChild('collaboratorBusyTpl') collaboratorBusyTpl!: TemplateRef<any>;
   @ViewChild('chatScroll') chatScroll: ElementRef
+  // The scrollable content area of the live studio. Reset to the top whenever the
+  // active step changes so a new stage always shows its top content (previously
+  // it kept the scroll position from the stage you switched away from).
+  @ViewChild('dsMainScroll') dsMainScroll?: ElementRef<HTMLElement>
   profileRoles = {}
   profileid = null
   mapProfile = {}
@@ -57,6 +62,11 @@ export class DynamicStudioV2Component {
   queueStudioCounts: { [queueid: string]: number } = {}
   queuesWithStudios: any[] = []
   noStudioInAnyQueue = false
+  // Flat list of ALL the user's studios across every queue (mockup lobby: shows
+  // studios directly, no queue-selection step). Built from the same
+  // "queue studio pairing" subscription that powers the per-queue counts.
+  allStudios: any[] = []
+  private allStudioChunks: any[][] = []
   queueStudioCountSubscriptions: Subscription[] = []
   mapVariationName = {}
   queueVariation = {}
@@ -64,6 +74,15 @@ export class DynamicStudioV2Component {
   // Activity
   activitySubscription:Subscription = null
   mapActivity:any = {}
+  // activityId -> [profileId] of specialists who can run that activity, sourced
+  // from `big cohorts` (bigactivity -> participantidlist). Powers the
+  // activity-scoped specialist chips in the Enter-Studio popup (mirrors the
+  // big-planner screen's filterInvitedParticipant logic).
+  activitySpecialistMap: { [activityId: string]: string[] } = {}
+  // Raw `big cohorts` snapshot, cached so activitySpecialistMap can be rebuilt
+  // (scoped to the current queue's event) whenever either the cohorts OR the
+  // active queue change. See rebuildActivitySpecialistMap().
+  private allCohortsCache: any[] = []
   // Studio
   additionalActivities = {}
   mapStudio = {}
@@ -81,6 +100,13 @@ export class DynamicStudioV2Component {
   outsideLiveAssignment = []
   // Studio Assignment
   liveassignmentSubscription:Subscription = null
+  // The studio-id set the live-assignment listener was last built with. The
+  // listener filters `studioid in <this set>`, so it MUST be rebuilt whenever the
+  // specialist's studio list changes — otherwise a collaborator studio added
+  // after the listener was first created never matches, and that specialist never
+  // receives its live assignment (they get stuck on the invitation / pre-live
+  // view while the co-specialist enters). See the rebuild guard below.
+  liveAssignmentSubStudioIds = ''
   liveAssignment = null
   mapStudioLiveAssignment = {}
   // Token
@@ -88,6 +114,11 @@ export class DynamicStudioV2Component {
   stageTokenList = []
   // Studio Invitation
   invitationCountdown:MatDialogRef<any> = null
+  // The "select activity & profiles" assign dialog (EnterStudioAssign) opened
+  // from assignStudio(). Tracked so that in a collaborator studio, once ANY
+  // collaborator submits it and the shared live assignment appears, the other
+  // collaborator's still-open copy is auto-closed as they enter the studio.
+  enterStudioAssignRef:MatDialogRef<any> = null
   studioInvitationSubscription: Subscription
   studioInvitation = null
   studioGroupingInvitationSubscription: Subscription = null
@@ -182,10 +213,27 @@ export class DynamicStudioV2Component {
   aelLevelList = []
   private aelLevelListLoaded = false
   participantAEL = {}
+  // AEL slider modal (mockup): opened from the AEL step. The slider indexes the
+  // existing band list (aelLevelList) so the stored "start---end" value model is
+  // unchanged — this is UI only.
+  aelModalOpen = false
+  // "Move to Next Stage" dropdown (mockup): replaces the old Mark-as-Completed
+  // step. Same moveStage()/movetoNextMonthReview() actions, now in a popup
+  // opened from the header or footer trigger.
+  nextStageMenuOpen: 'header' | 'footer' | null = null
+  // Full-specialist-roster overlay, opened from the sidebar "View all" chip that
+  // appears when the roster is long AND the window is short (zoomed in).
+  specialistsOverlayOpen = false
   isLoadingStudios: boolean;
 
   // Stepper state (v2)
   activeStepId: string = ''
+  // Deep-link target: a step id requested via the `?step=` query param (e.g. the
+  // "Prescribe ATC" bubble in the in-call Zoom view). The stepper is built async
+  // once the live assignment loads, so we can't set activeStepId in the
+  // constructor — it would be overwritten by the visibleSteps re-sync. Instead we
+  // stash the request here and apply it in that re-sync once the step exists.
+  private pendingDeepLinkStep: string = ''
   // Precomputed index of activeStepId within visibleSteps. Kept in sync at the
   // three points activeStepId / the step list can change (the visibleSteps
   // getter's re-sync block, setActiveStep, goToStep) so the template can read a
@@ -198,15 +246,23 @@ export class DynamicStudioV2Component {
   // persists, instead of being destroyed/recreated — and re-fetching all its ATC
   // getDocs — on every step change.
   prevHistoryMounted: boolean = false
-  // Master switch for the AI-ATC pre-check. While false the whole studio-side feature is held:
-  // no queue_atc_generation query, and the "Use AI-Generated ATC" buttons never render. Flip to
-  // true to release the feature.
-  aiAtcFeatureEnabled: boolean = false
+  // Code-level kill-switch for the AI-ATC pre-check. While false the whole studio-side feature is
+  // held OFF for everyone regardless of config: no queue_atc_generation query, and the "Use
+  // AI-Generated ATC" buttons never render. When true, per-user access is decided by the
+  // admin-editable feature_config/ai_atc allowlist (see loadAiAtcAccess). Set false for an
+  // emergency all-users off without touching the config doc.
+  aiAtcFeatureEnabled: boolean = true
   // Inline "Use AI ATC" button state for the Prescribe ATC step (populated by
   // checkAiAtcAvailability() when a completed queue_atc_generation doc exists for the participant).
   aiAtcAvailable: boolean = false
   aiAtcDocId: string | null = null
   aiAtcCheckedKey: string | null = null
+  // Whether THIS logged-in specialist may use the AI-ATC feature at all. Resolved once at load
+  // from the admin-editable classify/queue-atc-edit-config doc — either global (everyone) or an
+  // allowlist (by profileid / email / role) — on top of the aiAtcFeatureEnabled code-level
+  // kill-switch. Fail-closed: any read error or missing/disabled config leaves it false, so
+  // checkAiAtcAvailability() never queries and no button shows.
+  aiAtcAllowedForUser: boolean = false
   private lastStepSignature: string = ''
   private userNavigated: boolean = false
   private lastAssignmentId: string = ''
@@ -747,21 +803,23 @@ export class DynamicStudioV2Component {
     return total
   }
 
-  get visibleSteps(): { id: string, label: string, icon: string, color: string }[] {
+  get visibleSteps(): { id: string, label: string, sub: string, icon: string, color: string }[] {
     if (!this.liveAssignment) return []
     const stagename = this.liveAssignment['stagename']
     const stageprop = this.ongoingQueue?.['stageproperty']?.[stagename] || {}
     const widgets: string[] = stageprop?.studiowidgets || []
-    const steps: { id: string, label: string, icon: string, color: string }[] = []
+    const steps: { id: string, label: string, sub: string, icon: string, color: string }[] = []
 
-    // 1. Submitted form(s) - Current uP! cycle
+    // 1. Review Forms + Love Letters - Current uP! cycle. Love Letters now live
+    // here (mockup step 1), so the step also shows when only the loveletters
+    // widget is configured, even with no submitted forms.
     if (this.participantForm && this.participantForm.length) {
-      steps.push({ id: 'current-forms', label: 'Submitted Forms', icon: 'description', color: '#0ea5e9' })
+      steps.push({ id: 'current-forms', label: 'Submitted Forms', sub: 'Current Cycle', icon: 'description', color: '#0ea5e9' })
     }
 
-    // 2. ATC & Love Letter - Previous uP! cycle(s)
-    if (widgets.includes('previousatc') || widgets.includes('loveletters') || widgets.includes('evolutionwishlist')) {
-      steps.push({ id: 'prev-history', label: 'Previous ATC & Love Letters', icon: 'history', color: '#84cc16' })
+    // 2. Previous ATC + Love Letters - Previous uP! cycle(s).
+    if (widgets.includes('previousatc') || widgets.includes('evolutionwishlist') || widgets.includes('loveletters')) {
+      steps.push({ id: 'prev-history', label: 'Previous ATC & Love Letters', sub: 'Previous Cycle(s)', icon: 'history', color: '#84cc16' })
     }
 
     // 3. View submitted ATC - Current uP! cycle
@@ -769,11 +827,11 @@ export class DynamicStudioV2Component {
         widgets.includes('prescribedunvalidatedatc') ||
         widgets.includes('assignedatc') ||
         widgets.includes('viewtripleatc')) {
-      steps.push({ id: 'view-atc', label: 'View Submitted ATC', icon: 'fact_check', color: '#22c55e' })
+      steps.push({ id: 'view-atc', label: 'View Submitted ATC', sub: 'Current Cycle', icon: 'fact_check', color: '#22c55e' })
     }
 
     // 4. Zoom session — the meeting itself (always shown)
-    steps.push({ id: 'getstarted', label: 'Zoom Session', icon: 'videocam', color: '#4f46e5' })
+    steps.push({ id: 'getstarted', label: 'Zoom Session', sub: 'Connect with participant', icon: 'videocam', color: '#4f46e5' })
 
     // 5. Prescribe ATC — only when there's an actual prescribe / assign action
     // for the stage. The shared list widgets (validated/unvalidated/triple)
@@ -782,18 +840,16 @@ export class DynamicStudioV2Component {
     if (widgets.includes('addunvalidatedatc') ||
         widgets.includes('addvalidatedatc') ||
         widgets.includes('assignprocedure')) {
-      steps.push({ id: 'prescribe-atc', label: 'Prescribe ATC', icon: 'add_circle', color: '#ef4444' })
+      steps.push({ id: 'prescribe-atc', label: 'Prescribe ATC', sub: 'Current Cycle', icon: 'add_circle', color: '#ef4444' })
     }
 
     // 6. AEL validation
     if (widgets.includes('validateael')) {
-      steps.push({ id: 'ael-validation', label: 'AEL Validation', icon: 'verified', color: '#14b8a6' })
+      steps.push({ id: 'ael-validation', label: 'AEL Validation', sub: '', icon: 'verified', color: '#14b8a6' })
     }
 
-    // 7. Mark as completed
-    if (widgets.includes('movetonextqueue') || stageprop?.nextstage?.length) {
-      steps.push({ id: 'mark-completed', label: 'Mark as Completed', icon: 'flag', color: '#a855f7' })
-    }
+    // (Mark as Completed is NOT a step anymore — per mockup its actions live in
+    // the "Move to Next Stage" dropdown triggered from the header/footer.)
 
     // Reset userNavigated flag when the live assignment changes (new session)
     const assignmentId = this.liveAssignment?.['docid'] || this.liveAssignment?.['token']?.tokenid || ''
@@ -809,9 +865,16 @@ export class DynamicStudioV2Component {
     const signature = steps.map(s => s.id).join('|')
     if (signature !== this.lastStepSignature) {
       this.lastStepSignature = signature
+      // Deep-link: honor a `?step=` request once its step actually exists in the
+      // list. Consumed once so later step-list changes fall back to normal rules.
+      if (this.pendingDeepLinkStep && steps.find(s => s.id === this.pendingDeepLinkStep)) {
+        this.activeStepId = this.pendingDeepLinkStep
+        this.userNavigated = true
+        this.pendingDeepLinkStep = ''
+      }
       // If user hasn't navigated, always snap to first step (handles async step inserts).
       // If user has navigated and their step disappeared, also reset.
-      if (!this.userNavigated || !steps.find(s => s.id === this.activeStepId)) {
+      else if (!this.userNavigated || !steps.find(s => s.id === this.activeStepId)) {
         this.activeStepId = steps[0]?.id || ''
       }
       // Auto-select may land on the prescribe step without going through setActiveStep().
@@ -819,6 +882,18 @@ export class DynamicStudioV2Component {
       // Step list changed (or active step was reset) — refresh the cached index.
       this.activeStepIndex = steps.findIndex(s => s.id === this.activeStepId)
       if (this.activeStepId === 'prev-history') this.prevHistoryMounted = true
+      // Reflect the (possibly auto-selected) step in the URL too, so a refresh
+      // on the very first step — before any manual switch — still reopens it.
+      // syncStepUrl is idempotent, so this no-ops once the URL matches.
+      this.syncStepUrl(this.activeStepId)
+    }
+
+    // Default-step URL guarantee: if they arrived WITHOUT a `?step=` (or the step
+    // list didn't change so the block above was skipped on re-entry), still put
+    // the resolved active step — the first step by default — into the URL.
+    // Idempotent: syncStepUrl no-ops when the URL already matches.
+    if (this.activeStepId && this.route.snapshot.queryParamMap.get('step') !== this.activeStepId) {
+      this.syncStepUrl(this.activeStepId)
     }
 
     return steps
@@ -831,6 +906,9 @@ export class DynamicStudioV2Component {
     if (id === 'prev-history') this.prevHistoryMounted = true
     // Lazily check for an AI-generated ATC only when the specialist opens the prescribe step.
     if (id === 'prescribe-atc') this.checkAiAtcAvailability()
+    this.syncStepUrl(id)
+    this.scrollMainToTop()
+    this.scrollActiveStepIntoView()
   }
 
   goToStep(offset: number) {
@@ -843,6 +921,72 @@ export class DynamicStudioV2Component {
     this.userNavigated = true
     // next/prev arrows bypass setActiveStep — trigger the AI-ATC check when landing here too.
     if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
+    this.syncStepUrl(this.activeStepId)
+    this.scrollMainToTop()
+    this.scrollActiveStepIntoView()
+  }
+
+  // Reflect the active step in the URL (`?step=<id>`) so a refresh reopens the
+  // same stage — the init reads `?step=` into pendingDeepLinkStep. replaceUrl so
+  // stepping through stages doesn't spam browser history.
+  private syncStepUrl(id: string) {
+    const current = this.route.snapshot.queryParamMap.get('step')
+    // No active step (the live session ended — participant moved to another
+    // stage / sent back to queue / studio closed). Drop the stale `?step=` param
+    // instead of leaving the URL stuck on the last step. Idempotent: only
+    // navigates when a param is actually present.
+    if (!id) {
+      if (current == null) return
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { step: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      })
+      return
+    }
+    // Idempotent: skip if the URL already points at this step. This makes it
+    // safe to call from the visibleSteps auto-select path (runs during change
+    // detection) without re-navigating on every cycle.
+    if (current === id) return
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { step: id },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    })
+  }
+
+  // Scroll the content area back to the top on every step change so a new stage
+  // always shows its top content instead of inheriting the previous stage's
+  // scroll position. Runs after render (the step content swaps via *ngIf, so the
+  // new, possibly taller content must exist before we reset). Guards the un-pinned
+  // (short/mobile) mode where the window scrolls instead of the inner container.
+  private scrollMainToTop() {
+    const reset = () => {
+      const el = this.dsMainScroll?.nativeElement
+      if (el && el.scrollTop) el.scrollTop = 0
+      // Un-pinned fallback: the page itself scrolls, so send the container's top
+      // to the viewport top only if it's currently above the fold.
+      if (el && getComputedStyle(el).overflowY === 'visible' && el.getBoundingClientRect().top < 0) {
+        el.scrollIntoView({ block: 'start' })
+      }
+    }
+    reset()
+    setTimeout(reset) // catch the case where new content mounts after this tick
+  }
+
+  // Keep the ACTIVE step chip in view in the left stepper — so advancing via the
+  // footer Next/Back also scrolls the sidebar stepper to follow (when it scrolls).
+  // `block:'nearest'` moves the nearest scroll container the minimum needed, so it
+  // works for both the vertical sidebar list and the horizontal wrapped band.
+  private scrollActiveStepIntoView() {
+    const run = () => {
+      const active = document.querySelector('.ds-app .ds-vstep.active') as HTMLElement | null
+      active?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+    }
+    run()
+    setTimeout(run)
   }
 
   getStepIndex(id: string): number {
@@ -879,27 +1023,36 @@ export class DynamicStudioV2Component {
     }
   }
 
-  // Fetch the participant's active journey name (from metadata/<profileid>.activejourney → journey/<id>).
-  // Idempotent per participant id; safe to call repeatedly.
+  // Fetch the participant's journey NAME to show in the studio (instead of the
+  // product). Source: `participant metadata/<profileid>`. Which journey field to
+  // use depends on customer status (mirrors journeycoach-dashboard's
+  // mapCustomerStatusVariable): active → activejourney, non active →
+  // lastcompletedjourney. The resolved id is looked up in the `journey`
+  // collection for its display name. Idempotent per participant id.
   async fetchParticipantJourney(profileid: string) {
     if (!profileid || this.journeyLoadedForProfile === profileid) return
     this.journeyLoadedForProfile = profileid
     this.participantJourneyName = null
-    console.log('[Journey] fetching metadata for profile', profileid)
+    console.log('[Journey] fetching participant metadata for profile', profileid)
     try {
-      const metaSnap = await getDoc(doc(this.firestore, 'metadata', profileid))
+      const metaSnap = await getDoc(doc(this.firestore, 'participant metadata', profileid))
       if (!metaSnap.exists()) {
-        console.warn('[Journey] metadata doc does not exist for', profileid)
+        console.warn('[Journey] participant metadata doc does not exist for', profileid)
         return
       }
       const metaData: any = metaSnap.data()
-      console.log('[Journey] metadata doc data:', metaData)
-      const journeyId = metaData?.activejourney
+      console.log('[Journey] participant metadata doc data:', metaData)
+      const status = (metaData?.customerstatus ?? '').toString().trim().toLowerCase()
+      const journeyId =
+        status === 'active' ? metaData?.activejourney
+        : status === 'non active' ? metaData?.lastcompletedjourney
+        // Tolerant fallback for other/blank statuses so something still shows.
+        : (metaData?.activejourney || metaData?.lastcompletedjourney)
       if (!journeyId) {
-        console.warn('[Journey] activejourney field is empty on metadata', profileid)
+        console.warn('[Journey] no journey id for status', status, 'on', profileid)
         return
       }
-      console.log('[Journey] resolving journey doc', journeyId)
+      console.log('[Journey] resolving journey doc', journeyId, 'status', status)
       const journeySnap = await getDoc(doc(this.firestore, 'journey', journeyId))
       if (!journeySnap.exists()) {
         console.warn('[Journey] journey doc not found:', journeyId)
@@ -909,7 +1062,9 @@ export class DynamicStudioV2Component {
       }
       const data: any = journeySnap.data()
       console.log('[Journey] journey data:', data)
-      this.participantJourneyName = data?.journeyname || data?.name || data?.title || journeyId
+      // The journey collection stores the display name in the `journey` field
+      // (see journeycoach-dashboard: mapjourneyname[id] = doc['journey']).
+      this.participantJourneyName = data?.journey || data?.journeyname || data?.name || data?.title || journeyId
     } catch (err) {
       console.warn('Could not fetch participant journey', err)
     }
@@ -946,6 +1101,8 @@ export class DynamicStudioV2Component {
     private storage: Storage
   ) {
     const overrideProfileId = this.route.snapshot.queryParamMap.get('profileid')
+    // Honor a deep-linked step (e.g. ?step=prescribe-atc from the Zoom in-call bubble).
+    this.pendingDeepLinkStep = this.route.snapshot.queryParamMap.get('step') || ''
     var loading = this.dialog.open(LoadingProgressComponent, {
       data: {msg: "Loading..."},
       disableClose: true
@@ -986,6 +1143,8 @@ export class DynamicStudioV2Component {
           }
         }),
       ]);
+      // Resolve AI-ATC access for this specialist now that profileid/roles/email are known.
+      await this.loadAiAtcAccess();
       // if(roles["eis"] || roles["changeagent"] || roles["ah"] || roles["admin"] || roles["developer"]){
         await getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()))).then(async queue=>{
           var activeQueueList = queue.docs.filter(e => e.data()["queuestartdate"].toDate() <= new Date()) // Find Ongoing Queue
@@ -1064,15 +1223,70 @@ export class DynamicStudioV2Component {
         this.mapActivity[data["docid"]] = data["activity"]
       })
     })
+    // Build activity -> specialists map from cohorts (see big-planner). Cache the
+    // raw cohort list and (re)build the map via rebuildActivitySpecialistMap(),
+    // which SCOPES the cohorts to the event mapped to the current queue (a cohort's
+    // `eventref` -> an `event collection` doc, matched against the queue's
+    // `eventid`). So the Enter-Studio / Invite-More chips only offer specialists
+    // from THIS event's cohorts, not every cohort in the system. The rebuild runs
+    // both here (cohorts changed) and from getStudio() (queue loaded/switched), so
+    // whichever resolves last produces a correctly-scoped map regardless of load order.
+    collectionData(collection(this.firestore,"big cohorts"), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(cohorts=>{
+      this.allCohortsCache = cohorts
+      this.rebuildActivitySpecialistMap()
+    })
     this.enableZoomLinkGenerator()
     // Start the studio-presence heartbeat. It writes only when there is a
     // currently selected studio with a live assignment, so an idle / empty
     // studio screen produces no writes.
       this.startStudioPresence()
       this.requestNotificationPermission()
+      this.wireStudioChannel()
+  }
+
+  // Listen for step-jump pings from the in-call Zoom view (a separate,
+  // cross-origin-isolated tab that can't reach this one by window name). When a
+  // ping arrives we ACK (so the Zoom view knows a studio tab is already open and
+  // does NOT open a new one) and switch the stepper straight to the requested
+  // step — "open that screen directly" in the already-open tab.
+  private studioChannel: BroadcastChannel | null = null
+  private wireStudioChannel() {
+    const jump = (step: string) => this.ngZone.run(() => {
+      if (this.visibleSteps.find(s => s.id === step)) this.setActiveStep(step)
+      else this.pendingDeepLinkStep = step
+      this.cdr.detectChanges()
+      try { window.focus() } catch { /* background tabs can't self-focus; best-effort */ }
+    })
+    // BroadcastChannel: the Zoom view pings to switch the step (immediate reuse).
+    try {
+      this.studioChannel = new BroadcastChannel('starlabs-dynamic-studio')
+      this.studioChannel.onmessage = (ev: MessageEvent) => {
+        const data = ev?.data
+        // The Zoom view ended → bring THIS existing Studio tab forward instead of
+        // it loading a fresh /dynamicstudio. ACK so the Zoom tab knows we're here.
+        if (data?.type === 'focus-studio') {
+          this.studioChannel?.postMessage({ type: 'studio-here' })
+          this.ngZone.run(() => { try { window.focus() } catch { /* background tabs can't self-focus */ } })
+          return
+        }
+        if (data?.type !== 'goto-step' || !data.step) return
+        this.studioChannel?.postMessage({ type: 'studio-here' })
+        jump(data.step)
+      }
+    } catch { /* BroadcastChannel unsupported — Zoom view falls back to a new tab */ }
+    // Service worker: when the host clicks the "Prescribe ATC" notification, the
+    // SW focuses THIS tab and posts goto-step here — switch the stepper to match.
+    try {
+      navigator.serviceWorker?.addEventListener('message', (ev: MessageEvent) => {
+        const data = ev?.data
+        if (data?.type === 'goto-step' && data.step) jump(data.step)
+      })
+    } catch { /* ignore */ }
   }
 
   ngOnDestroy(){
+   this.studioChannel?.close()
+   this.studioChannel = null
    this.chatUnreadSub?.unsubscribe()
    this.chatLiveSub?.unsubscribe()
    // takeUntil tears down only on a notifier `next` — emitting it BEFORE
@@ -1128,8 +1342,13 @@ export class DynamicStudioV2Component {
 
     this.studioPairingSubscription = null
     this.liveassignmentSubscription = null
+    this.liveAssignmentSubStudioIds = ''
     this.tokenSubscription = null
-    // this.studioInvitationSubscription = null
+    // Must null it (like every other sub here): resetSubscription() already
+    // unsubscribed it above, and getStudio() only rebuilds the invitation
+    // listener when this handle is null/closed. Leaving a closed non-null object
+    // here left the "Bring to Studio" countdown subscription permanently dead.
+    this.studioInvitationSubscription = null
     this.studioGroupingInvitationSubscription = null
     this.tripleATCSubscription = null
     this.outsideLiveAssignmentSubscription = null
@@ -1261,6 +1480,7 @@ export class DynamicStudioV2Component {
     if (chunks.length === 0) return
 
     const chunkResults: { [qid: string]: number }[] = chunks.map(() => ({}))
+    this.allStudioChunks = chunks.map(() => [])
     let firstEmitCount = 0
     const resolveFirst: { resolve?: () => void } = {}
     const firstEmitPromise = new Promise<void>(res => (resolveFirst.resolve = res))
@@ -1282,6 +1502,8 @@ export class DynamicStudioV2Component {
         const isFirst = Object.keys(chunkResults[idx]).length === 0 && !(chunkResults[idx] as any).__seeded
         ;(chunkResults[idx] as any).__seeded = true
         chunkResults[idx] = local
+        this.allStudioChunks[idx] = studios.filter(s => [null, undefined, false].includes(s['delete']))
+        this.rebuildAllStudios()
         this.recomputeQueueStudioCounts(chunkResults)
         if (isFirst) {
           firstEmitCount += 1
@@ -1324,6 +1546,84 @@ export class DynamicStudioV2Component {
     this.ongoingQueue = queue
     this.selectedQueue = queue
     this.onQueueSelect()
+  }
+
+  /** Build the flat, cross-queue studio-card list for the mockup lobby. */
+  private rebuildAllStudios(){
+    const flat = ([] as any[]).concat(...this.allStudioChunks)
+    this.allStudios = flat.map(s => {
+      const queueId = s['queueref']?.id
+      const queue = this.ongoingQueueList.find(q => q['docid'] === queueId)
+      const participants: string[] = s['participants'] || []
+      const activities = [...new Set(participants
+        .map(p => this.mapActivity[s['participantsactivity']?.[p]])
+        .filter(Boolean))]
+      const specialists = participants
+        .map(p => p === this.profileid ? 'You' : (this.mapProfile[p] || ''))
+        .filter(Boolean)
+      return {
+        studioId: s['docid'],
+        queueId,
+        queueName: queue?.['queuename'] || '',
+        studio: s,
+        activity: activities.join(', ') || 'Studio',
+        specialists: specialists.join(', '),
+        isLive: !!this.mapStudioLiveAssignment?.[s['docid']],
+        checkin: !!s['checkin']
+      }
+    }).sort((a, b) => (a.queueName + a.activity).localeCompare(b.queueName + b.activity))
+  }
+
+  /** Lobby card click: switch to the studio's queue if needed, then open it. */
+  async openStudioCard(entry: any){
+    if (!entry) return
+    const queue = this.ongoingQueueList.find(q => q['docid'] === entry.queueId)
+    if (queue && queue['docid'] !== this.ongoingQueue?.['docid']){
+      this.checkoutQueue()
+      this.ongoingQueue = queue
+      this.selectedQueue = queue
+      await this.onQueueSelect()
+    }
+    const studio = this.studioList.find(s => s['docid'] === entry.studioId) ?? entry.studio
+    if (studio) this.onStudioSelect(studio)
+  }
+
+  /**
+   * Back from a studio's waiting list to the lobby studio grid ("All studios").
+   * If we're currently CHECKED IN to this studio, check out FIRST — leaving the
+   * studio should take you offline here, so opening another studio afterwards no
+   * longer triggers a checkout-conflict prompt. Direct write (mirrors the
+   * checkout-log shape in checkinStudio) so it isn't gated by the check-in
+   * schedule/hold logic — leaving is always allowed.
+   */
+  async backToStudios(){
+    const studio = this.selectedStudio
+    if (studio?.['checkin'] && studio?.['docid']){
+      // Leaving the studio checks you out — confirm first so it isn't a silent
+      // background surprise. Cancel keeps you in the studio, still checked in.
+      if (!window.confirm('You are checked in to this studio. Going back to All Studios will check you out. Continue?')) return
+      studio['checkin'] = false
+      try {
+        await updateDoc(doc(this.firestore, 'queue studio pairing', studio['docid']), { checkin: false })
+        const logid = doc(collection(this.firestore, 'studio checkin log')).id
+        setDoc(doc(this.firestore, 'studio checkin log', logid), {
+          logparticipant: this.profileid,
+          queueref: studio['queueref'],
+          logdate: new Date(),
+          activity: 'checkout',
+          participants: studio['participants'] || [],
+          studio: studio['docid']
+        })
+      } catch (err) {
+        console.log('Checkout on back failed', err)
+      }
+    }
+    this.selectedStudio = {}
+    this.stageTokenList = []
+    this.liveAssignment = null
+    // Left the studio → clear the stale `?step=` from the URL.
+    this.activeStepId = ''
+    this.syncStepUrl('')
   }
 
   /**
@@ -1378,6 +1678,39 @@ export class DynamicStudioV2Component {
     })
     await this.getStudio()
     loading.close()
+  }
+
+  /**
+   * Build activitySpecialistMap (activityId -> specialist profileIds) from the
+   * cached cohorts, SCOPED to the event mapped to the current queue. A `big
+   * cohorts` doc's `eventref` points to an `event collection` doc (a "Live
+   * Event"), and the queue-generation doc carries that event's id in its
+   * `eventid` field — same mapping big-planner uses
+   * (`where('eventref','==', doc('event collection', selectedQueue.eventid))`).
+   * So we keep only cohorts whose eventref is the event-collection doc for this
+   * queue's `eventid` — the Enter-Studio / Invite-More chips then offer
+   * specialists from THIS event's cohorts only. Active cohorts'
+   * `participantidlist`s are unioned per `bigactivity`. Safe to call before the
+   * queue resolves (produces an empty map until getStudio() re-runs it).
+   */
+  private rebuildActivitySpecialistMap(){
+    const eventId = this.ongoingQueue?.["eventid"]
+    const map: { [activityId: string]: string[] } = {}
+    if(eventId){
+      this.allCohortsCache.forEach(cohort=>{
+        const activityId = cohort["bigactivity"]
+        if(activityId == null) return
+        if(cohort["status"] != null && cohort["status"] !== "active") return
+        // Keep only cohorts of the event collection doc mapped to this queue.
+        const ref = cohort["eventref"]
+        if(ref?.id !== eventId || ref?.parent?.id !== "event collection") return
+        const ids: string[] = Array.isArray(cohort["participantidlist"]) ? cohort["participantidlist"] : []
+        const set = new Set<string>(map[activityId] ?? [])
+        ids.forEach(id => set.add(id))
+        map[activityId] = Array.from(set)
+      })
+    }
+    this.activitySpecialistMap = map
   }
 
   checkoutQueue(){
@@ -1466,6 +1799,10 @@ export class DynamicStudioV2Component {
     this.selectedStudio = {}
     this.liveAssignment = null
     this.isLoadingStudios = true;
+    // Now that the active queue is set, (re)scope the specialist chips to the
+    // event mapped to this queue. Also covers the load-order race where cohorts
+    // resolved before the queue did (map would otherwise be empty).
+    this.rebuildActivitySpecialistMap()
     // .where("participants", "array-contains", this.profileid)
     this.studioPairingSubscription = collectionData(query(collection(this.firestore,"queue studio pairing"), where("studioin", "==", true),where("queueref", "==", doc(this.firestore,"queue generation",this.ongoingQueue["docid"])))).pipe(takeUntil(this.subscriptionHandle)).subscribe(studio=>{
       this.mapStudio = studio.reduce(function(r, a){
@@ -1534,12 +1871,20 @@ export class DynamicStudioV2Component {
         
         // Check if Live Assignment is On
         var studioID = this.studioList.map(e => e["docid"])
-        if(this.liveassignmentSubscription == null){
-          // Store the handle so the `== null` guard above actually works.
-          // Before, the result was discarded, so a brand-new live-assignment
-          // listener was created on EVERY pairing emission — each one
-          // independently re-ran the auto-enter logic below, multiplying the
-          // "studio opens blank then loads" race and leaking listeners.
+        // Rebuild the listener when it doesn't exist yet OR when the specialist's
+        // studio set changed. The query filters `studioid in studioID`, and that
+        // list is captured in the subscription closure — if we only built it once
+        // (the old `== null` guard), a collaborator studio added to studioList
+        // later would never be in the filter, so its live assignment would never
+        // arrive and that specialist would stay stuck on the invitation/pre-live
+        // view while the co-specialist (whose filter already had the studio)
+        // entered. Keying on the sorted studio-id set means we rebuild only when
+        // the set actually changes (not on every check-in/status emission), so
+        // the single-specialist path is unchanged.
+        const studioIdKey = [...studioID].sort().join(',')
+        if(this.liveassignmentSubscription == null || this.liveAssignmentSubStudioIds !== studioIdKey){
+          this.liveassignmentSubscription?.unsubscribe()
+          this.liveAssignmentSubStudioIds = studioIdKey
           this.liveassignmentSubscription = collectionData(query(collection(this.firestore,"live assignment"), where("queueid", "==", this.ongoingQueue["docid"]),where("status", "==", "live"),where("studioid", "in", studioID)), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async assignment=>{
             var activeStudio = []
             assignment.forEach(e =>{
@@ -1576,6 +1921,14 @@ export class DynamicStudioV2Component {
             }
 
             if(this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != null && this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != undefined){
+              // A collaborator submitted the assign dialog and created the shared
+              // live assignment — both specialists now enter the studio. If this
+              // specialist still has the "select activity & profiles" dialog open,
+              // close it so it doesn't linger over the live studio.
+              if (this.enterStudioAssignRef) {
+                this.enterStudioAssignRef.close()
+                this.enterStudioAssignRef = null
+              }
               this.liveAssignment = {
                 ...{token: (this.liveAssignment ?? {})["token"]},
                 ...this.mapStudioLiveAssignment[this.selectedStudio["docid"]]
@@ -1606,6 +1959,11 @@ export class DynamicStudioV2Component {
               this.liveAssignment = null
               this.participantJourneyName = null
               this.journeyLoadedForProfile = ''
+              // Session ended (e.g. participant moved to another stage) — drop the
+              // stale `?step=` from the URL so it no longer points at a step of a
+              // studio that's no longer live.
+              this.activeStepId = ''
+              this.syncStepUrl('')
             }
           })
         }
@@ -1618,9 +1976,9 @@ export class DynamicStudioV2Component {
           // it stayed falsy and a fresh listener leaked on every emission.
           this.studioInvitationSubscription = null
         }
-        if(!this.studioInvitationSubscription){
+        if(!this.studioInvitationSubscription || this.studioInvitationSubscription.closed){
           console.log(this.studioInvitationSubscription, 'studioInvitationSubscription');
-          
+
           this.studioInvitationSubscription = collectionData(query(collection(this.firestore,"studioinvitation"), where("specialistpairing", 'array-contains', this.profileid),where("queueref", '==', doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("studioid", "in", studioID),where("expirydate", ">=", new Date())), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async invitationSnap => {
           // this.studioInvitationSubscription = this.firestore.collection("studioinvitation", ref => ref.where("specialistpairing", 'array-contains', this.profileid).where("queueref", '==', this.firestore.collection("queue generation").doc(this.ongoingQueue["docid"]).ref).where("studioid", "in", studioID).where("expirydate", ">=", new Date())).valueChanges().subscribe(async invitationSnap => {
             console.log(invitationSnap)
@@ -1677,20 +2035,28 @@ export class DynamicStudioV2Component {
                   if(this.invitationCountdown == null){
                     this.invitationCountdown = await this.openQueueInvitationApproval({
                       disableClose:true,
-                      data: this.studioInvitation,
+                      // timerSeconds = classify/studiotimer.timerinseconds (the
+                      // same value used to set the invitation's expiry) so the
+                      // dialog ring scales to the configured duration directly.
+                      data: { ...this.studioInvitation, timerSeconds: this.invitationTimerSeconds },
                       maxHeight: "90vh",
                       maxWidth: '95vw',
                     })
                   }
                   // Denied by B!G Participant
-                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
+                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result=>{
                     console.log(result)
                     if(result == "invitation cancelled"){
-                      deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
-                        console.log(err)
-                      }).catch(err =>{
-                        console.log(err)
-                      })
+                      try {
+                        const docid = this.studioInvitation["docid"]
+                        const url = `https://cutstudiocall-kakybqnyrq-uc.a.run.app?docid=${encodeURIComponent(docid)}`
+                        await this.http.get(url).toPromise()
+                        await deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
+                          console.log(err)
+                        })
+                      } catch(err) {
+                        console.error("Error cutting call", err)
+                      }
                     }
                     this.studioInvitation = null
                     this.invitationCountdown = null
@@ -1734,6 +2100,8 @@ export class DynamicStudioV2Component {
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
     this.initChatThread()
     console.log(this.liveAssignment, 'this.liveAssignment');
+    console.log('[studio] queue studio pairing id:', this.selectedStudio?.['docid'] ?? null,
+      '| live assignment id:', this.liveAssignment?.['docid'] ?? null);
     // Switching the active studio changes which invitations count as
     // "another studio's" — re-derive the chip map.
     this.subscribeOtherStudioInvitations()
@@ -1870,8 +2238,39 @@ export class DynamicStudioV2Component {
    * batch-checks-out the others before proceeding with this check-in.
    * Checkouts (value === false) skip the conflict check entirely.
    */
-  async checkinStudio(value){
+  async checkinStudio(event){
+    // Accept either the MatSlideToggleChange event (from the template) or a raw
+    // boolean (defensive). When the user cancels the conflict dialog we must
+    // snap the toggle back to its real state — a one-way [checked] binding won't
+    // do it because the model value never changed.
+    const toggle = (event && typeof event === 'object') ? event.source : null
+    const value = (event && typeof event === 'object') ? event.checked : event
+    const revertToggle = () => {
+      if (toggle) {
+        toggle.checked = !!this.selectedStudio?.['checkin']
+        this.cdr.detectChanges()
+      }
+    }
     if (value === true) {
+      // Collaborator conflict (hard block): a co-specialist on THIS studio is
+      // already busy in a live activity in another studio. Unlike the self
+      // check-in conflict below, this cannot be resolved by checking out — the
+      // busy person is someone else — so we alert and refuse the check-in.
+      const collaboratorConflicts = await this.findCollaboratorConflicts(this.selectedStudio)
+      if (collaboratorConflicts.length > 0) {
+        await firstValueFrom(
+          this.dialog.open(this.collaboratorBusyTpl, {
+            data: { collaborators: collaboratorConflicts },
+            disableClose: true,
+            width: '460px',
+            maxWidth: '92vw',
+            autoFocus: false,
+          }).afterClosed()
+        )
+        revertToggle()
+        return
+      }
+
       const conflicts = await this.findActiveCheckins(this.selectedStudio?.['docid'])
       if (conflicts.length > 0) {
         const confirmed = await firstValueFrom(
@@ -1886,7 +2285,7 @@ export class DynamicStudioV2Component {
             autoFocus: false,
           }).afterClosed()
         )
-        if (!confirmed) return
+        if (!confirmed) { revertToggle(); return }
         // Batch-checkout the conflicting studios atomically before continuing.
         try {
           const batch = writeBatch(this.firestore)
@@ -1909,6 +2308,7 @@ export class DynamicStudioV2Component {
         } catch (err) {
           console.log('Failed to checkout other studios', err)
           alert('Could not check out of the other studio. Please try again.')
+          revertToggle()
           return
         }
       }
@@ -1984,6 +2384,86 @@ export class DynamicStudioV2Component {
       return enriched
     } catch (err) {
       console.log('findActiveCheckins error', err)
+      return []
+    }
+  }
+
+  /**
+   * Collaborator conflict finder. Looks at the OTHER specialists paired on
+   * `studio` (everyone in `participants` except the current user) and returns
+   * any of them who is currently in a LIVE activity in a DIFFERENT studio.
+   *
+   * "In activity" = they appear in a `live assignment` whose `status` is
+   * 'live' and whose `studioid` is not this studio. We query only by
+   * `pairing array-contains <collaborator>` (a single-field index that always
+   * exists) and filter status/studio client-side to avoid needing a composite
+   * index. Best-effort — returns [] on error so a lookup failure never blocks
+   * a legitimate check-in.
+   */
+  private async findCollaboratorConflicts(studio: any): Promise<any[]> {
+    try {
+      const collaborators: string[] = (studio?.['participants'] ?? [])
+        .filter((p: string) => p !== this.profileid)
+      if (collaborators.length === 0) return []
+
+      const thisStudioId = studio?.['docid']
+      // Restrict "checked into another studio" to the specialist's currently
+      // live/ongoing queues (mirrors findActiveCheckins) — a check-in on a
+      // studio whose queue has ended shouldn't block.
+      const liveQueueIds = new Set(
+        (this.ongoingQueueList || []).map((q: any) => q['docid'])
+      )
+
+      const conflicts: any[] = []
+      for (const collab of collaborators) {
+        // 1) In a LIVE activity in another studio — hard busy, carries the stage.
+        let matched = false
+        const laSnap = await getDocs(query(
+          collection(this.firestore, 'live assignment'),
+          where('pairing', 'array-contains', collab),
+        ))
+        for (const d of laSnap.docs) {
+          const la: any = d.data()
+          if (la['status'] === 'live' && la['studioid'] && la['studioid'] !== thisStudioId) {
+            conflicts.push({
+              collaborator: collab,
+              collaboratorName: this.mapProfile[collab] ?? collab,
+              studioid: la['studioid'],
+              stageName: la['stagename'] ?? '',
+              isLive: true,
+            })
+            matched = true
+            break
+          }
+        }
+        if (matched) continue
+
+        // 2) Checked into another studio (even with no live activity yet) —
+        //    still blocks this check-in.
+        const pairSnap = await getDocs(query(
+          collection(this.firestore, 'queue studio pairing'),
+          where('participants', 'array-contains', collab),
+          where('checkin', '==', true),
+        ))
+        for (const d of pairSnap.docs) {
+          const s: any = d.data()
+          if (s['docid'] && s['docid'] !== thisStudioId &&
+              [null, undefined, false].includes(s['delete']) &&
+              (liveQueueIds.size === 0 || liveQueueIds.has(s['queueref']?.id))) {
+            conflicts.push({
+              collaborator: collab,
+              collaboratorName: this.mapProfile[collab] ?? collab,
+              studioid: s['docid'],
+              stageName: '',
+              isLive: false,
+            })
+            break
+          }
+        }
+      }
+      return conflicts
+    } catch (err) {
+      console.log('findCollaboratorConflicts error', err)
       return []
     }
   }
@@ -2151,6 +2631,11 @@ export class DynamicStudioV2Component {
           participantname: this.mapProfile[token['profile_id']],
           stage: token["currentstage"],
           expirydate: new Date(new Date().getTime() + this.invitationTimerSeconds * 1000),
+          // Intended countdown window (seconds). The participant's timer counts
+          // down from THIS plain number via a local interval, so it's immune to
+          // clock skew / timezone differences between devices (see
+          // web-studio-invitation StudioInvitationListener).
+          durationSeconds: this.invitationTimerSeconds,
           queueref: token['queueref'],
           createddate: new Date(),
           clientresponse: null,
@@ -2236,24 +2721,37 @@ export class DynamicStudioV2Component {
     console.log(invitation)
     var token = this.stageTokenList.filter(e => e["stagename"] == invitation["stage"])[0]["tokenlist"].find(e => e["profile_id"] == invitation["profileid"])
     console.log(token)
-    var assignStudio = await this.openAssignQueueStudio({
+    // New redesigned "Participant accepted the invitation" popup. It is a
+    // restyled sibling of AssignQueueStudioComponent (left untouched for the
+    // invite/update flows) and closes with the same result contract, so the
+    // afterClosed handler below is unchanged.
+    var assignStudio = await this.openEnterStudioAssign({
       data: {
-        title: "Update Specialist and Activity in the Studio",
-        studiolist: [this.selectedStudio],
+        participantname: invitation["participantname"] ?? this.mapProfile[invitation["profileid"]],
+        studio: this.selectedStudio,
+        currentprofileid: this.profileid,
         mapprofile: this.mapProfile,
         mapactivity: this.mapActivity,
+        activityspecialists: this.activitySpecialistMap,
         additionalactivities: this.additionalActivities
       },
       autoFocus: false,
       // Don't let a stray backdrop tap dismiss the assign step — an
       // accidentally-closed dialog used to be unrecoverable. The dialog has its
-      // own "Close" button for an intentional cancel, and the waiting-list
+      // own "Cancel" button for an intentional cancel, and the waiting-list
       // "Approved · Assign studio" CTA can reopen it.
       disableClose: true,
+      panelClass: "enter-studio-dialog",
       maxWidth: "90vw",
       maxHeight: "90vh"
     })
+    // Track this dialog so the live-assignment listener can auto-close it for a
+    // collaborator once the shared live assignment appears (see #enterStudioAssignRef).
+    this.enterStudioAssignRef = assignStudio
     assignStudio.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result=>{
+      // Closed (submitted, cancelled, or auto-closed on entering the studio) —
+      // drop the tracked ref.
+      this.enterStudioAssignRef = null
       console.log(result)
       if(result != null && this.liveAssignment == null){
         var loading = this.dialog.open(LoadingProgressComponent,{
@@ -2704,6 +3202,9 @@ export class DynamicStudioV2Component {
     })
     await this.clearChatThread()
     this.liveAssignment = null
+    // Studio closed — clear the stale `?step=` from the URL.
+    this.activeStepId = ''
+    this.syncStepUrl('')
   }
 
   // async moveStage(nextstage){
@@ -2847,18 +3348,54 @@ export class DynamicStudioV2Component {
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]].push(profileid)
     })
     console.log(additionalActivities)
-    var inviteParticipant = await this.openAssignQueueStudio({
-      data: {
-        title: reviewSpecialist ? "Confirm Specialist(s) who attended this Studio" : "Update Additional Specialist and Activity in the Studio",
-        studiolist: reviewSpecialist ? [this.selectedStudio] : null,
-        mapprofile: this.mapProfile,
-        mapactivity: this.mapActivity,
-        additionalactivities: reviewSpecialist ? additionalActivities : null
-      },
-      autoFocus: false,
-      maxWidth: "90vw",
-      maxHeight: "90vh"
-    })
+    // "Invite More Specialist(s)" (reviewSpecialist == false) now uses the same
+    // chips-design dialog as the lobby "Participant accepted the invitation"
+    // popup (EnterStudioAssign, invite mode) — activity dropdown + tap-to-select
+    // specialist chips. It returns the same { bonusactivity } contract the block
+    // below already consumes. The "Confirm who attended" flow (reviewSpecialist
+    // == true, from moveStage) keeps the AssignQueueStudio dialog since it also
+    // needs studio selection + attendance semantics.
+    // Everyone already in this live assignment (main pairing + already-invited
+    // bonus specialists) — hidden from the activity specialist lists so you can't
+    // re-invite someone who's already been called into the session.
+    const alreadyInAssignment = Array.from(new Set<string>([
+      ...(this.liveAssignment['pairing'] ?? []),
+      ...(this.liveAssignment['bonusactivityparticipant'] ?? []),
+      ...Object.keys(this.liveAssignment['bonusactivity'] ?? {}),
+    ]))
+    let inviteParticipant: any
+    if (!reviewSpecialist) {
+      inviteParticipant = await this.openEnterStudioAssign({
+        data: {
+          mode: 'invite',
+          title: 'Invite more specialist(s)',
+          subtitle: 'Add another specialist and activity to this studio.',
+          cta: 'Add to Studio',
+          currentprofileid: this.profileid,
+          mapprofile: this.mapProfile,
+          mapactivity: this.mapActivity,
+          activityspecialists: this.activitySpecialistMap,
+          excludeprofileids: alreadyInAssignment
+        },
+        autoFocus: false,
+        panelClass: "enter-studio-dialog",
+        maxWidth: "90vw",
+        maxHeight: "90vh"
+      })
+    } else {
+      inviteParticipant = await this.openAssignQueueStudio({
+        data: {
+          title: "Confirm Specialist(s) who attended this Studio",
+          studiolist: [this.selectedStudio],
+          mapprofile: this.mapProfile,
+          mapactivity: this.mapActivity,
+          additionalactivities: additionalActivities
+        },
+        autoFocus: false,
+        maxWidth: "90vw",
+        maxHeight: "90vh"
+      })
+    }
     
     try {
       const result = await inviteParticipant.afterClosed().toPromise();
@@ -2924,6 +3461,9 @@ export class DynamicStudioV2Component {
       url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/studioZoomLinkRegenerate?liveassignmentid="+this.liveAssignment["docid"]+"&zoomdata="+JSON.stringify(this.liveAssignment['zoomdata'])
     }
     var generateLoading = this.dialog.open(LoadingProgressComponent, {
+      // Don't let a backdrop/ESC click dismiss the loader — it must stay up until
+      // the regenerate call resolves (success or failure) and we close it in code.
+      disableClose: true,
       data:{
         msg: "Generating Link...."
       }
@@ -2940,6 +3480,21 @@ export class DynamicStudioV2Component {
       console.log('[regenerateZoomLink] response', res)
     } catch (err) {
       console.log('[regenerateZoomLink] error (ignored, link regenerates server-side)', err)
+    }
+
+    // A fresh link is a fresh session: clear the ended-session presence one-shots
+    // so `callEnded` resets (re-enabling "Start Meeting" for the new link) and no
+    // stale status (e.g. "participant in call") lingers from the old meeting.
+    try {
+      await updateDoc(doc(this.firestore, 'live assignment', this.liveAssignment['docid']), {
+        specialistJoinedAt: null,
+        specialistLeftAt: null,
+        participantLeftAt: null,
+        participantInCallAt: null,
+        participantReadyAt: null
+      })
+    } catch (e) {
+      console.warn('[regenerateZoomLink] could not reset presence one-shots', e)
     }
 
     generateLoading.close()
@@ -3156,7 +3711,7 @@ export class DynamicStudioV2Component {
   // Open prescribe-ATC pre-filled from the completed AI-generated ATC (queue_atc_generation).
   // Only callable when checkAiAtcAvailability() found a doc and surfaced the "Use AI ATC" button.
   useAiAtc(validated) {
-    if (!this.aiAtcDocId) return;
+    if (!this.aiAtcAllowedForUser || !this.aiAtcDocId) return;
     const url = this.router.createUrlTree(['/prescribeATC'], {
       queryParams: { aigenerated: true, docid: this.aiAtcDocId, source: 'queueatc', validation: validated }
     }).toString();
@@ -3167,8 +3722,45 @@ export class DynamicStudioV2Component {
   // inline "Use AI ATC" button. Keyed on profileid+token so it queries once per participant; any
   // failure leaves the button hidden (manual prescribe always remains available). Reads only
   // (firestore-atc, queue_atc_generation), never writes.
+  // Resolve whether this logged-in specialist may use the AI-ATC feature, from the admin-editable
+  // config doc classify/queue-atc-edit-config (default DB — same collection the app uses for other
+  // config like wati/queuesystem). Called once from the constructor after getRoles()/currentuserData
+  // are set. Layers on the aiAtcFeatureEnabled code-level kill-switch. Config shape:
+  //   { enabled:boolean,          // master on/off for the whole feature (off => nobody)
+  //     global:boolean,           // true => enabled for EVERYONE (allowlist ignored)
+  //     allowedProfileIds?:string[], allowedEmails?:string[], allowAllForRoles?:string[] }  // used when !global
+  // Fail-closed — missing/disabled config or any error => no access.
+  private async loadAiAtcAccess(): Promise<void> {
+    if (!this.aiAtcFeatureEnabled) { this.aiAtcAllowedForUser = false; return; }  // code-level kill-switch
+    try {
+      const cfgSnap = await getDoc(doc(this.firestore, 'classify', 'queue-atc-edit-config'));
+      const cfg: any = cfgSnap.exists() ? cfgSnap.data() : null;
+      if (!cfg || cfg.enabled !== true) { this.aiAtcAllowedForUser = false; return; }  // feature off
+      if (cfg.global === true) { this.aiAtcAllowedForUser = true; this.maybeRecheckAiAtc(); return; }  // enabled globally for everyone
+      // Not global → restrict to the configured allowed users (by profileid / email / role).
+      const email = this.currentuserData?.['email'] || this.guard?.email || null;
+      const byProfile = Array.isArray(cfg.allowedProfileIds) && cfg.allowedProfileIds.includes(this.profileid);
+      const byEmail   = !!email && Array.isArray(cfg.allowedEmails) && cfg.allowedEmails.includes(email);
+      const byRole    = Array.isArray(cfg.allowAllForRoles) && cfg.allowAllForRoles.some((r: string) => !!this.profileRoles?.[r]);
+      this.aiAtcAllowedForUser = byProfile || byEmail || byRole;
+      this.maybeRecheckAiAtc();
+    } catch (err) {
+      console.error('AI-ATC access config read failed; feature hidden for this user', err);
+      this.aiAtcAllowedForUser = false;  // fail-closed
+    }
+  }
+
+  // If access resolved after the Prescribe-ATC step was already opened, checkAiAtcAvailability()
+  // would have returned early (not allowed yet) and never re-run. Re-trigger it once access is known.
+  private maybeRecheckAiAtc(): void {
+    if (this.aiAtcAllowedForUser && this.activeStepId === 'prescribe-atc') {
+      this.aiAtcCheckedKey = null;  // clear the "already checked this participant" guard so it re-queries
+      this.checkAiAtcAvailability();
+    }
+  }
+
   async checkAiAtcAvailability() {
-    if (!this.aiAtcFeatureEnabled) { this.aiAtcAvailable = false; return; }  // feature held — no query, no buttons
+    if (!this.aiAtcAllowedForUser) { this.aiAtcAvailable = false; return; }  // not configured for this user — no query, no buttons
     const token = this.liveAssignment?.['token'];
     const profileid = this.participantProfileId;
     const queueTokenId = token?.['docid'];
@@ -3197,20 +3789,25 @@ export class DynamicStudioV2Component {
       // (cloud fn: adminATC.doc(queueRef.path)); the studio token's queueref points at the default
       // DB, so rebuild it against firestore-atc for the equality query to match.
       const atcQueueRef = doc(firestoreATC, 'queue generation', tokenQueueRef.id);
+      // Match on participant + token + queue, newest first (stage filter removed, no limit). Take the
+      // latest generation that has actually COMPLETED — an incomplete doc (pending/processing/error)
+      // has no usable `output`, so offering it would open prescribe-ATC with nothing to prefill and
+      // draft creation fails. Status is filtered client-side to reuse the existing composite index.
       const aiSnap = await getDocs(query(
         collection(firestoreATC, 'queue_atc_generation'),
         where('profileid', '==', profileid),
         where('queue_token_id', '==', queueTokenId),
         where('queueref', '==', atcQueueRef),
-        where('stage', '==', 'Scope Enhancement'),
-        where('status', '==', 'completed')
+        orderBy('createdAt', 'desc')
       ));
 
       // Guard against a participant switch that happened while this query was awaiting.
       if (this.aiAtcCheckedKey !== key) return;
 
-      if (!aiSnap.empty) {
-        this.aiAtcDocId = aiSnap.docs[0].id;
+      // docs are newest-first, so the first completed one is the latest completed generation.
+      const completedDoc = aiSnap.docs.find(d => d.data()?.['status'] === 'completed');
+      if (completedDoc) {
+        this.aiAtcDocId = completedDoc.id;
         this.aiAtcAvailable = true;
       }
     } catch (err) {
@@ -3825,6 +4422,39 @@ export class DynamicStudioV2Component {
     }
   }
   
+  // ---- Move to Next Stage dropdown (mockup) — same actions, popup UI ----
+  get hasNextStageOptions(): boolean {
+    const sp = this.ongoingQueue?.['stageproperty']?.[this.liveAssignment?.['stagename']] || {}
+    return !!(sp?.nextstage?.length) || !!(sp?.studiowidgets?.includes('movetonextqueue'))
+  }
+  toggleNextStageMenu(which: 'header' | 'footer'){ this.nextStageMenuOpen = this.nextStageMenuOpen === which ? null : which }
+  closeNextStageMenu(){ this.nextStageMenuOpen = null }
+
+  // ---- AEL slider modal helpers (UI only; band model unchanged) ----
+  openAelModal(){ if(this.participantAEL['aelStatus'] !== 'validated' && this.participantAEL['crossovermetric'] != null) this.aelModalOpen = true }
+  closeAelModal(){ this.aelModalOpen = false }
+  /** index of the current band ("start---end") within aelLevelList (0 if none). */
+  aelBandIndex(value: any): number {
+    const idx = this.aelLevelList.findIndex(o => (o['startpoint'] + '---' + o['endpoint']) === value)
+    return idx < 0 ? 0 : idx
+  }
+  /** set the band from a slider index; keeps the exact stored value string. */
+  setAelBand(crossover: any, idx: any){
+    const o = this.aelLevelList[+idx]
+    if(!o) return
+    crossover.value['value'] = o['startpoint'] + '---' + o['endpoint']
+    this.participantAEL['aelStatus'] = 'edited'
+  }
+  /** human label for the current band, e.g. "0 – 10". */
+  aelBandLabel(value: any): string {
+    const o = this.aelLevelList[this.aelBandIndex(value)]
+    return o ? (o['startpoint'] + ' – ' + o['endpoint']) : '—'
+  }
+  async validateAelFromModal(){
+    await this.updateCurrentAEL()
+    this.aelModalOpen = false
+  }
+
   async updateCurrentAEL(){
     var reviewed = false
     // Generate new document ID
@@ -3884,9 +4514,40 @@ export class DynamicStudioV2Component {
     return !url || url === 'Link Broken'
   }
 
+  // True once the meeting has ENDED — both parties left after the call had
+  // started (e.g. the specialist clicked "End meeting for all"). Same signal as
+  // the "Call ended" top-bar status. Once ended, the Zoom link is dead, so
+  // reusing "Start Meeting" would drop the specialist on Zoom's link-timeout
+  // page — they MUST generate a fresh link instead.
+  get callEnded(): boolean {
+    void this.presenceTick // re-run this getter on the presence tick
+    const la: any = this.liveAssignment || {}
+    return !!(la['participantLeftAt'] && la['specialistLeftAt'] && la['specialistJoinedAt'])
+  }
+
+  // True while the specialist is currently inside the meeting (joined and not
+  // left, and the call hasn't ended). Used to relabel "Start Meeting" → "In
+  // Meeting" so they know they're already in.
+  get specialistInMeeting(): boolean {
+    void this.presenceTick
+    const la: any = this.liveAssignment || {}
+    return !!la['specialistJoinedAt'] && !la['specialistLeftAt'] && !this.callEnded
+  }
+
   navigateMeeting(doc:any){
     console.log(doc);
     const zoomData = doc["zoomdata"] ?? {}
+
+    // Meeting already ended → the Zoom link is dead. Don't open it (that lands on
+    // Zoom's "link timeout" page); point the specialist at "Generate new link".
+    if(this.callEnded){
+      this.snackBar.open(
+        'This meeting has ended. Generate a new link below to start again.',
+        'Dismiss',
+        { duration: 5000, horizontalPosition: 'center', verticalPosition: 'top' }
+      )
+      return
+    }
 
     if(!zoomData["start_url"] || zoomData["start_url"] == "Link Broken"){
       // Replace the blunt alert with an inline snackbar pointing the user at
@@ -4217,6 +4878,10 @@ export class DynamicStudioV2Component {
     const { AssignQueueStudioComponent } = await import('../assign-queue-studio/assign-queue-studio.component')
     return this.dialog.open(AssignQueueStudioComponent, cfg)
   }
+  private async openEnterStudioAssign(cfg?: any){
+    const { EnterStudioAssignComponent } = await import('../enter-studio-assign/enter-studio-assign.component')
+    return this.dialog.open(EnterStudioAssignComponent, cfg)
+  }
   private async openStageIncompleteConfirmation(cfg?: any){
     const { StageIncompleteConfirmationComponent } = await import('../stage-incomplete-confirmation/stage-incomplete-confirmation.component')
     return this.dialog.open(StageIncompleteConfirmationComponent, cfg)
@@ -4240,6 +4905,10 @@ export class DynamicStudioV2Component {
   // non-reordering inner lists).
   trackByDocId(index: number, item: any): any {
     return item?.docid ?? item?.id ?? index;
+  }
+
+  trackByStudioId(index: number, item: any): any {
+    return item?.studioId ?? index;
   }
 
   async joinOpenViduRoom(){
