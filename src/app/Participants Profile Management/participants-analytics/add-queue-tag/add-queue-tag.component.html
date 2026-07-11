@@ -4,7 +4,7 @@
     <div class="dialog-container">
         <!-- Header -->
         <div class="dialog-header">
-            <h2>Participant Tag Management</h2>
+            <h2>Queue Tag Management</h2>
             <button class="close-btn" mat-dialog-close (click)="dialogRef.close()">
                 <i class="fas fa-times"></i>
             </button>
@@ -29,11 +29,6 @@
                 <div class="add-tag-form">
                     <div class="tag-input-wrapper">
                         <input class="tag-name-input" type="text" placeholder="Enter tag name..." [(ngModel)]="newTagName" />
-                        <mat-select class="tagsfor-inline" multiple [(ngModel)]="newTagsFor" placeholder="Tags For">
-                            <mat-option *ngFor="let option of tagsForOptions" [value]="option">
-                                {{ option }}
-                            </mat-option>
-                        </mat-select>
                     </div>
                     <button class="btn-primary" (click)="addTag()">
                         <i class="fas fa-plus"></i> Add Tag
@@ -41,14 +36,14 @@
                 </div>
 
                 <!-- Tags List -->
-                <div class="tag-item" *ngFor="let tag of activeTags">
-                    
+                <div class="tag-item" *ngFor="let tag of allTags">
+
                     <!-- VIEW MODE -->
                     <div class="tag-info" *ngIf="editTagId != tag.id">
                         <span class="tag-name">{{ tag.name }}</span>
                     </div>
 
-                    <!-- EDIT MODE - same wrapper as add form -->
+                    <!-- EDIT MODE -->
                     <div class="tag-input-wrapper" *ngIf="isEditing && editTagId == tag.id">
                         <input
                             type="text"
@@ -56,17 +51,6 @@
                             [(ngModel)]="tag.name"
                             (keyup.enter)="saveTagEdit(tag)"
                         />
-                        <mat-select class="tagsfor-inline" multiple [(ngModel)]="tag.tagsfor" placeholder="Tags For">
-                            <mat-option *ngFor="let option of tagsForOptions" [value]="option">
-                                {{ option }}
-                            </mat-option>
-                        </mat-select>
-                    </div>
-
-                    <!-- show tags when not editing -->
-                    <div class="tag-for-display" *ngIf="editTagId != tag.id">
-                        <span class="tagsfor-badge" *ngFor="let t of tag.tagsfor">{{ t }}</span>
-                        <span class="tagsfor-empty" *ngIf="!tag.tagsfor?.length">—</span>
                     </div>
 
                     <div class="tag-actions">
@@ -92,7 +76,7 @@
 
                 </div>
 
-                <div class="empty-state" *ngIf="activeTags.length === 0">
+                <div class="empty-state" *ngIf="allTags.length === 0">
                     <i class="fas fa-tags"></i>
                     <p>No tags yet. Create your first tag above!</p>
                 </div>
