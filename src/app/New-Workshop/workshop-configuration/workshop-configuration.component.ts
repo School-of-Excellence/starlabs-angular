@@ -287,7 +287,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 70
+      maxLength: 300
     },
     {
       key: 'workshopoverview',
@@ -297,7 +297,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 70
+      maxLength: 300
     },
     {
       key: 'knowinfo',
@@ -307,7 +307,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 150
+      maxLength: 300
     },
     {
       key: 'faq',
@@ -317,7 +317,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'inputfield',
       iconLabel: 'Enter FAQ Question',
       descriptionLabel: 'Enter FAQ Answer',
-      maxLength: 500
+      maxLength: 600
     }
   ];
   //challenge type
@@ -968,6 +968,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     const noterichTextControls = {};
     this.settingsForm = this.fb.group({
       active: [false],
+      homescreenwidget: [false],
       qanda: [false],
       breakdown: [false],
       enableshare: [false],
@@ -1032,6 +1033,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       facilitatorprofiles:[[],],
       selectedgroup: [''],
       enrollwattimessage: [''],
+      enrolledcongrats: [''],
       loginlogchannel:['workshop-logs'],
       workshopactivitychannel:['workshop-logs'],
       selectedjourneys: [[],],
@@ -1095,6 +1097,10 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       sneakpeak: this.fb.array([]),
       knowinfo: this.fb.array([]),
       faq: this.fb.array([]),
+      // Outcomes: array of { value, title } maps.
+      outcome: this.fb.array([]),
+      // Hometags: simple string list (same shape as "Who is this workshop for?").
+      hometags: this.fb.array([]),
     });
   this.detailPageForm.get('selectedTestimonials')?.valueChanges
     .pipe(takeUntil(this.subscription))
@@ -1289,6 +1295,23 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         array.push(group);
       });
     });
+
+    // Outcomes: array of { value, title } maps.
+    const outcomeArray = this.getFormArray('outcome');
+    outcomeArray.clear();
+    (data.detailpage['outcome'] || []).forEach((item: any) => {
+      outcomeArray.push(this.fb.group({
+        value: [item?.value || ''],
+        title: [item?.title || '']
+      }));
+    });
+
+    // Hometags: simple string list (same shape as "Who is this workshop for?").
+    const hometagsArray = this.getFormArray('hometags');
+    hometagsArray.clear();
+    (data.detailpage['hometags'] || []).forEach((value: string) => {
+      hometagsArray.push(this.fb.control(value));
+    });
   }
 
   onEditorContentChange(content: string, fieldKey: string): void {
@@ -1380,6 +1403,21 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
   isAllFilled(key: string): boolean {
     const formArray = this.detailPageForm.get(key) as FormArray;
     return formArray.controls.every(control => control.value && control.valid);
+  }
+
+  get outcomeArray(): FormArray {
+    return this.detailPageForm.get('outcome') as FormArray;
+  }
+
+  addOutcome(): void {
+    this.outcomeArray.push(this.fb.group({
+      value: [''],
+      title: ['']
+    }));
+  }
+
+  removeOutcome(index: number): void {
+    if (index >= 0) this.outcomeArray.removeAt(index);
   }
 
   get primarylyTaughtArray(): FormArray {
@@ -2134,6 +2172,7 @@ private rebuildActivityIds(): void {
     if (data && typeof data === 'object') {
       this.settingsForm.patchValue({
         active: data['active'] || false,
+        homescreenwidget: data['homescreenwidget'] || false,
         qanda: data['qanda'] || false,
         breakdown: data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
@@ -2184,6 +2223,7 @@ private rebuildActivityIds(): void {
         facilitatorprofiles: data['facilitatorprofiles'] || [],
         selectedgroup: data['selectedgroup'] || null,
         enrollwattimessage: data['enrollwattimessage'] || null,
+        enrolledcongrats: data['enrolledcongrats'] ?? '',
         loginlogchannel: data['loginlogchannel'] || 'workshop-logs',
         workshopactivitychannel: data['workshopactivitychannel'] || 'workshop-logs',
         mailTemplate: data['mailTemplate'] || null,
@@ -2353,6 +2393,7 @@ private rebuildActivityIds(): void {
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
       await updateDoc(ref, {
         active: this.settingsForm.get('active')?.value || false,
+        homescreenwidget: this.settingsForm.get('homescreenwidget')?.value || false,
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
         enableshare: this.settingsForm.get('enableshare')?.value || false,
@@ -2382,6 +2423,7 @@ private rebuildActivityIds(): void {
         selectedgroup: this.settingsForm.get('selectedgroup')?.value || null,
         loginlogchannel: this.settingsForm.get('loginlogchannel')?.value || null,
         enrollwattimessage: this.settingsForm.get('enrollwattimessage')?.value || null,
+        enrolledcongrats: this.settingsForm.get('enrolledcongrats')?.value || '',
         workshopactivitychannel: this.settingsForm.get('workshopactivitychannel')?.value || null,
         mailTemplate: this.settingsForm.get('mailTemplate')?.value || null,
         testusers: this.settingsForm.get('testusers')?.value || [],
@@ -2463,7 +2505,15 @@ private rebuildActivityIds(): void {
       this.snackBar.open('Video upload failed', 'Close', { duration: 2000 });
     }
   }
-  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
+  // Clear a selected hero asset (web image / mobile image / video). Only removes
+  // it from the config; the actual file in Storage is left untouched.
+  removeHeroAsset(field: 'heroImage' | 'heroImageMobile' | 'heroVideo', input?: HTMLInputElement): void {
+    this.settingsForm.get(field)?.setValue('');
+    if (input) {
+      input.value = '';
+    }
+  }
+  onToggleChange(field: 'active' | 'homescreenwidget' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }

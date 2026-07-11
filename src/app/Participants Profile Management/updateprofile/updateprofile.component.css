@@ -50,3 +50,147 @@
     margin-top: -8px;
     margin-bottom: 10px;
   }
+
+  .country-dropdown-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 95px;
+    margin-right: 8px;
+    vertical-align: top;
+  }
+
+  .country-selected {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px 8px;
+    cursor: pointer;
+    font-size: 14px;
+    background: white;
+    height: 56px;
+    box-sizing: border-box;
+  }
+
+  .country-selected:hover {
+    border-color: #1976d2;
+  }
+
+  .country-panel {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    z-index: 9999;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    width: 260px;
+    max-height: 300px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .country-search {
+    padding: 10px 12px;
+    border: none;
+    border-bottom: 1px solid #eee;
+    outline: none;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .country-option {
+    padding: 9px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    overflow-y: auto;
+  }
+
+  .country-option:hover {
+    background: #f0f4ff;
+  }
+
+  .country-option.active {
+    background: #e3ecff;
+    font-weight: 500;
+    color: #1976d2;
+  }
+
+  .country-selected span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+  }
+
+  .country-panel {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  z-index: 9999;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  width: 280px;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.country-search {
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid #eee;
+  outline: none;
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.country-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.country-option {
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.country-option:hover {
+  background: #f0f4ff;
+}
+
+.country-option.active {
+  background: #e3ecff;
+  font-weight: 500;
+  color: #1976d2;
+}
+
+.country-option .flag {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.country-option .dial {
+  color: #555;
+  min-width: 44px;
+  font-size: 12px;
+}
+
+.country-option .cname {
+  color: #222;
+  font-size: 13px;
+}

@@ -185,6 +185,11 @@
         <!-- PARAMS LIST -->
         <div class="params-list" *ngIf="templateParams.length > 0 && !isQueuedTemplate">
           <div *ngFor="let param of templateParams" class="param-item">
+            <!-- Workshop title special label -->
+            <div class="workshop-param-badge" *ngIf="param.name === 'workshoptitle'">
+              <mat-icon>event</mat-icon>
+              Workshop Title — pre-filled from configuration, edit if needed
+            </div>
             <div class="param-top-row">
               <div class="param-token">{{ '{' }}{{ '{' }}{{param.name}}{{ '}' }}{{ '}' }}</div>
               <div class="mode-pills">

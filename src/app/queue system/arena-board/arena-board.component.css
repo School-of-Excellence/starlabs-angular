@@ -1044,3 +1044,65 @@
   background: transparent;
   font-family: inherit;
 }
+/* Board-data load-failure banner (see loadError in the component). */
+.arena__load-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #FDECEA;
+  border: 1px solid #F5C6C0;
+  color: #B23A2E;
+  font-size: 13px;
+}
+.arena__load-error mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.arena__load-retry {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.arena__load-retry:hover { background: rgba(178, 58, 46, 0.08); }
+
+/* Initial-load spinner overlay (see isLoading in the component). Covers the
+   board area so empty "— none —" columns don't flash before data arrives. */
+.arena__loader {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(247, 248, 250, 0.72);
+  backdrop-filter: saturate(1.1) blur(2px);
+}
+.arena__spinner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid rgba(60, 60, 67, 0.15);
+  border-top-color: #5856D6;
+  animation: arena-spin 0.8s linear infinite;
+}
+.arena__loader-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(60, 60, 67, 0.7);
+  letter-spacing: 0.2px;
+}
+@keyframes arena-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .arena__spinner { animation-duration: 2s; }
+}

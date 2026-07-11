@@ -409,17 +409,12 @@ openParticipantsPanel(event: Event, chat: any): void {
   const memberIds: string[] = chat.members || [];
 
   this.participantsPanelList = memberIds
-    .map((profileDocId: string) => {
-      const idx = this.profileList.indexOf(profileDocId);
-      if (idx === -1) return null;
-
-      const uid = this.userListId[idx];
-      if (!uid) return null;
-
+    .map((uid: string) => {
+      // chat.members holds UIDs (user_ref.id); mapProfileuid is keyed by that UID.
       const profile = this.mapProfileuid[uid];
       if (!profile) return null;
 
-      return { ...profile, profileDocId };
+      return { ...profile, uid };
     })
     .filter((p: any) => p !== null);
 

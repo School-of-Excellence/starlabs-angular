@@ -23,7 +23,7 @@
             class="timer-circle-progress" 
             cx="100" cy="100" r="90"
             [class.warning]="expiryInSeconds <= 30"
-            [style.stroke-dashoffset]="565.48 * (1 - expiryInSeconds / 120)">
+            [style.stroke-dashoffset]="565.48 * (1 - expiryInSeconds / totalSeconds)">
           </circle>
         </svg>
         <div class="timer-text">
