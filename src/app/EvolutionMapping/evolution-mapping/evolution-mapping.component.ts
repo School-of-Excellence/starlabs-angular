@@ -507,20 +507,35 @@ export class EvolutionMappingComponent {
     clearSelection() {
       this.selection.clear();
     }
-    makeLive(row:any){
-      var dialogRef = this.dialog.open(LiveEvolutionMappingComponent, { 
-        data: row == null ? this.selection : row,
-        disableClose: true,
-        autoFocus: false,
-        width: '90%',
-        height: '95%',
-      });
-      dialogRef.afterClosed().subscribe(value => {  
-        this.getEvolutionMapping();
-        this.getLiveEvolutionMapping();
-        this.clearSelection();
-      });
-      console.log('making live Selected Rows:', Array.from(this.selection));
+    makeLive(row:any) {
+        const isSingleRow = row != null && typeof row === 'object' && 'profileid' in row;
+        const isReactivating = isSingleRow && row['live'] == false;
+
+        if (isReactivating) {
+          const confirmed = confirm(
+            "While making a participant from Not‑Live to Live, first move them from In Evolution Mapping Activity to Evolution Mapping, and then mark them as Live so the 48‑hour and 24‑hour reminder notifications are triggered.\n\nDo you want to proceed?"
+          );
+          if (!confirmed) {
+            return;
+          }
+        }
+
+        const dialogData = row == null 
+          ? this.selection 
+          : (isSingleRow ? row['profileid'] : row); 
+        var dialogRef = this.dialog.open(LiveEvolutionMappingComponent, { 
+          data: dialogData,
+          disableClose: true,
+          autoFocus: false,
+          width: '90%',
+          height: '95%',
+        });
+        dialogRef.afterClosed().subscribe(value => {  
+          this.getEvolutionMapping();
+          this.getLiveEvolutionMapping();
+          this.clearSelection();
+        });
+        console.log('making live Selected Rows:', Array.from(this.selection));
     }
     sanitize(url: string) {
       return this.sanitizer.bypassSecurityTrustUrl(url);
