@@ -10,8 +10,22 @@
 
   <!-- Add new webhook form -->
   <div class="add-form" *ngIf="showAddForm">
-    <div class="add-form-row">
-      <label>
+    <!-- Step 1: type of webhook -->
+    <div class="type-choice">
+      <span class="type-label">Type of Webhook</span>
+      <label class="radio">
+        <input type="radio" name="webhookType" value="form" [(ngModel)]="newWebhookType" />
+        Integrate Form
+      </label>
+      <label class="radio">
+        <input type="radio" name="webhookType" value="standard" [(ngModel)]="newWebhookType" />
+        Standard
+      </label>
+    </div>
+
+    <div class="add-form-row" *ngIf="newWebhookType">
+      <!-- Standard: type the webhook name (doc id) -->
+      <label *ngIf="newWebhookType === 'standard'">
         Webhook name (doc id)
         <input
           type="text"
@@ -19,6 +33,16 @@
           placeholder="e.g. slackNewIntegration"
         />
       </label>
+
+      <!-- Form: choose a delivery form; its doc id becomes the webhook name -->
+      <label *ngIf="newWebhookType === 'form'">
+        Form
+        <select [(ngModel)]="selectedFormId">
+          <option value="">Select a form...</option>
+          <option *ngFor="let f of forms" [value]="f.id">{{ f.formname }}</option>
+        </select>
+      </label>
+
       <label class="url-field">
         webhookurl
         <input
@@ -27,7 +51,17 @@
           placeholder="https://hooks.slack.com/services/..."
         />
       </label>
+
+      <label>
+        channel
+        <input
+          type="text"
+          [(ngModel)]="newWebhookChannel"
+          placeholder="e.g. #general"
+        />
+      </label>
     </div>
+
     <div class="add-form-actions">
       <button class="btn btn-primary" (click)="addWebhook()" [disabled]="savingAdd">
         {{ savingAdd ? 'Saving...' : 'Save' }}
@@ -45,14 +79,15 @@
   <table class="webhook-table" *ngIf="!loading">
     <thead>
       <tr>
-        <th class="col-id">Doc ID</th>
-        <th class="col-url">webhookurl</th>
+        <th class="col-id">Webhook Name</th>
+        <th class="col-url">webhookURL</th>
+        <th class="col-channel">channel</th>
         <th class="col-actions"></th>
       </tr>
     </thead>
     <tbody>
       <tr *ngFor="let wh of webhooks">
-        <td class="col-id">{{ wh.id }}</td>
+        <td class="col-id">{{ webhookName(wh) }}</td>
         <td class="col-url">
           <ng-container *ngIf="editingId === wh.id; else viewMode">
             <input type="text" class="edit-input" [(ngModel)]="editUrlValue" />
@@ -80,6 +115,12 @@
             </span>
           </ng-template>
         </td>
+        <td class="col-channel">
+          <ng-container *ngIf="editingId === wh.id; else channelView">
+            <input type="text" class="edit-input" [(ngModel)]="editChannelValue" />
+          </ng-container>
+          <ng-template #channelView>{{ wh.channel }}</ng-template>
+        </td>
         <td class="col-actions">
           <ng-container *ngIf="editingId === wh.id; else viewActions">
             <button class="btn btn-primary btn-sm" (click)="saveEdit(wh)" [disabled]="savingEdit">
@@ -91,11 +132,18 @@
           </ng-container>
           <ng-template #viewActions>
             <button class="btn btn-secondary btn-sm" (click)="startEdit(wh)">Edit</button>
+            <button
+              class="btn btn-danger btn-sm"
+              (click)="deleteWebhook(wh)"
+              [disabled]="deletingId === wh.id"
+            >
+              {{ deletingId === wh.id ? 'Deleting...' : 'Delete' }}
+            </button>
           </ng-template>
         </td>
       </tr>
       <tr *ngIf="webhooks.length === 0">
-        <td colspan="3" class="empty-row">No webhooks found.</td>
+        <td colspan="4" class="empty-row">No webhooks found.</td>
       </tr>
     </tbody>
   </table>
