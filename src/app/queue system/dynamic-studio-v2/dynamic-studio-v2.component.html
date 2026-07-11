@@ -694,13 +694,13 @@
                 <div class="zoom-regen"
                      *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.enablezoom">
                   <div class="zoom-regen__text">
-                    <div class="choice-title">{{ callEnded ? 'Meeting ended — start a new one' : isZoomLinkBroken ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
+                    <div class="choice-title">{{ callEnded ? 'Meeting ended — start a new one' : (isZoomLinkBroken || linkExpired) ? 'Link broken or expired?' : 'Need a fresh link?' }}</div>
                     <div class="choice-desc">Generate a new link — it's resent to the participant automatically.</div>
                   </div>
                   <button type="button" class="btn btn-sm"
-                          [class.btn-ghost]="!isZoomLinkBroken && !callEnded"
-                          [class.btn-primary]="isZoomLinkBroken || callEnded"
-                          [disabled]="!isZoomLinkBroken && !callEnded && !zoomlinkGenerator"
+                          [class.btn-ghost]="!canRegenerate"
+                          [class.btn-primary]="canRegenerate"
+                          [disabled]="!canRegenerate"
                           (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">
                     <mat-icon class="ic">refresh</mat-icon>
                     Generate new link &amp; resend
