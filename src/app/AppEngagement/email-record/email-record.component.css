@@ -712,6 +712,269 @@
 }
 
 /* Participants List Container */
+
+/* CATEGORY PARTICIPANTS DIALOG  */
+.cat-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.cat-dialog {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cat-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 12px;
+}
+
+.cat-dialog-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cat-dialog-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cat-dialog-subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.cat-dialog-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  justify-content: center;
+  color: #64748b;
+}
+
+.cat-dialog-loading .spin {
+  animation: catSpin 1s linear infinite;
+}
+
+@keyframes catSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.cat-dialog-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cat-stat {
+  flex: 1;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.cat-stat-num {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.cat-stat-lbl {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.cat-stat.sent .cat-stat-num { color: #059669; }
+.cat-stat.open .cat-stat-num { color: #2563eb; }
+.cat-stat.failed .cat-stat-num { color: #dc2626; }
+
+.cat-dialog-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cat-result-count {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.cat-dialog-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cat-dialog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 0;
+  color: #94a3b8;
+}
+
+.cat-table-header {
+  display: grid;
+  grid-template-columns: 2fr 3fr 2fr;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cat-table-row {
+  display: grid;
+  grid-template-columns: 2fr 3fr 2fr;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+  align-items: start;
+}
+
+.cat-col-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cat-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.cat-pname {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cat-pemail, .cat-pid {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.cat-col-templates {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  padding-bottom: 4px;
+}
+
+.cat-tpl-block {
+  flex: 0 0 auto;
+  min-width: 160px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #eef2f7;
+}
+
+.cat-tpl-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.cat-tpl-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.cat-col-total {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cat-col-templates::-webkit-scrollbar {
+  height: 4px;
+}
+
+.cat-col-templates::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+
+.cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.cat-pill mat-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.pill-sent { background: #d1fae5; color: #059669; }
+.pill-open { background: #dbeafe; color: #2563eb; }
+.pill-failed { background: #fee2e2; color: #dc2626; }
+
+.cat-dash {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.cat-dialog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.cat-page-info {
+  font-size: 13px;
+  color: #64748b;
+}
+
 .participants-list-container {
   background: white;
   border-radius: 12px;
