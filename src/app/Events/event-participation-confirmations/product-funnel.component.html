@@ -58,14 +58,14 @@
           </ng-container>
         </div>
 
-        <!-- Overall requested = still-requested + approved — its own clickable card below the Approved card -->
+        <!-- Overall requested = still-requested + approved + terminal (unattended, revoked) — clickable card below Approved -->
         <button type="button" class="sx-overall-card" *ngIf="p.total === 'approved'"
           [class.on]="segment==='overallRequested'" (click)="setSegment('overallRequested')"
-          matTooltip="Show everyone who raised their hand: still-requested + approved" matTooltipClass="sx-tip">
+          matTooltip="Show everyone who raised their hand: still-requested + approved + unattended + revoked" matTooltipClass="sx-tip">
           <span class="sx-oc-dot"></span>
           <div class="sx-oc-text">
             <div class="sx-oc-lab">Overall requested</div>
-            <div class="sx-oc-hint">requested + approved</div>
+            <div class="sx-oc-hint">requested + approved + unattended + revoked</div>
           </div>
           <div class="sx-oc-num">{{ overallRequested | number }}</div>
         </button>
@@ -90,15 +90,19 @@
           <ng-container *ngIf="splitsReady && groupEditMode">
             <div class="sx-jedit-hint">Tick journeys, type a group name, then Group. Repeat to build more groups.</div>
             <div class="sx-jgroup-bar">
-              <input class="sx-jgroup-input" type="text" placeholder="Group name…" list="sxJourneyGroups" [(ngModel)]="groupNameInput">
+              <input class="sx-jgroup-input" type="text" placeholder="Group name…" [(ngModel)]="groupNameInput">
               <button type="button" class="sx-jgroup-apply" [disabled]="!journeySel.size || !groupNameInput.trim()"
                 (click)="groupSelected()">Group{{ journeySel.size ? ' (' + journeySel.size + ')' : '' }}</button>
               <button type="button" class="sx-jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
             </div>
-            <datalist id="sxJourneyGroups">
-              <option *ngFor="let g of existingGroupNames" [value]="g"></option>
-            </datalist>
-            <label class="sx-jedit" *ngFor="let j of approvedByJourney">
+            <!-- Existing groups: click one to reuse its name (adds the ticked journeys to that group) -->
+            <div class="sx-jgroup-existing" *ngIf="existingGroupNames.length">
+              <span class="sx-jgroup-existing-lab">Add to:</span>
+              <button type="button" class="sx-jgroup-chip" *ngFor="let g of existingGroupNames"
+                [class.on]="groupNameInput.trim() === g" (click)="groupNameInput = g"
+                matTooltipClass="sx-tip" [matTooltip]="'Use the group “' + g + '”'">{{ g }}</button>
+            </div>
+            <label class="sx-jedit" *ngFor="let j of approvedByJourney; trackBy: trackJourneyKey">
               <input type="checkbox" class="sx-jchk" [checked]="isJourneySel(j.label)" (change)="toggleJourneySel(j.label)">
               <span class="sx-jrdot" [style.background]="journeyColor(journeyGroups[j.label] ? ('grp:' + journeyGroups[j.label]) : j.key)"></span>
               <span class="sx-jrlab">{{ j.label }}</span>
@@ -109,26 +113,76 @@
 
           <!-- Normal mode: grouped/aggregated rows; click filters the table to the union of the group's journeys -->
           <ng-container *ngIf="splitsReady && !groupEditMode">
-            <div class="sx-jgrp" *ngFor="let j of displayedJourneys">
-              <button type="button" class="sx-jrow"
-                [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='all'"
-                (click)="setJourneyChip(j)" matTooltipClass="sx-tip" [matTooltip]="'Show all approved from ' + j.label">
-                <span class="sx-jrdot" [style.background]="journeyColor(j.key)"></span>
-                <span class="sx-jrlab">
-                  <mat-icon class="sx-jgrp-ic" *ngIf="j.isGroup">workspaces</mat-icon>{{ j.label }}<span class="sx-jmembers" *ngIf="j.isGroup"> · {{ j.members?.length }} journeys</span>
-                </span>
-                <span class="sx-jnum">{{ j.total | number }}</span>
-              </button>
+            <div class="sx-jgrp" *ngFor="let j of displayedJourneys; trackBy: trackJourneyKey">
+              <div class="sx-jrowline">
+                <button type="button" class="sx-jrow"
+                  [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='all'"
+                  (click)="setJourneyChip(j)" matTooltipClass="sx-tip" [matTooltip]="'Show all approved from ' + j.label">
+                  <span class="sx-jrdot" [style.background]="journeyColor(j.key)"></span>
+                  <span class="sx-jrlab">
+                    <mat-icon class="sx-jgrp-ic" *ngIf="j.isGroup">workspaces</mat-icon>{{ j.label }}<span class="sx-jmembers" *ngIf="j.isGroup"> · {{ j.members?.length }} journeys</span>
+                  </span>
+                  <span class="sx-jnum">{{ j.total | number }}</span>
+                </button>
+                <!-- Participants open in an overlay (mat-menu), so the card stays compact -->
+                <button type="button" class="sx-jexp" [matMenuTriggerFor]="jmenu" (click)="$event.stopPropagation()"
+                  matTooltipClass="sx-tip" matTooltip="Show participants and their journeys">
+                  <mat-icon>group</mat-icon>
+                </button>
+              </div>
+
+              <!-- Overlay: all approved in this row, grouped by journey -->
+              <mat-menu #jmenu="matMenu" class="sx-jmenu-panel" xPosition="before">
+                <ng-template matMenuContent>
+                  <ng-container *ngTemplateOutlet="frPanelTpl; context: { j: j, fr: 'all', count: j.total, label: 'approved' }"></ng-container>
+                </ng-template>
+              </mat-menu>
+
               <div class="sx-jfr">
-                <button type="button" class="sx-frpill first"
+                <!-- Clicking a pill filters the table AND opens the same journey-grouped breakdown for that subset -->
+                <button type="button" class="sx-frpill first" [matMenuTriggerFor]="frFirstMenu"
                   [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='first'"
                   (click)="setJourneyFr(j, 'first')" matTooltipClass="sx-tip" [matTooltip]="'Show first-timers from ' + j.label">First-timer {{ j.first | number }}</button>
-                <button type="button" class="sx-frpill rpt"
+                <mat-menu #frFirstMenu="matMenu" class="sx-jmenu-panel" xPosition="before">
+                  <ng-template matMenuContent>
+                    <ng-container *ngTemplateOutlet="frPanelTpl; context: { j: j, fr: 'first', count: j.first, label: 'first-timer' }"></ng-container>
+                  </ng-template>
+                </mat-menu>
+
+                <button type="button" class="sx-frpill rpt" [matMenuTriggerFor]="frRepeatMenu"
                   [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='repeat'"
                   (click)="setJourneyFr(j, 'repeat')" matTooltipClass="sx-tip" [matTooltip]="'Show repeat from ' + j.label">Repeat {{ j.repeat | number }}</button>
+                <mat-menu #frRepeatMenu="matMenu" class="sx-jmenu-panel" xPosition="before">
+                  <ng-template matMenuContent>
+                    <ng-container *ngTemplateOutlet="frPanelTpl; context: { j: j, fr: 'repeat', count: j.repeat, label: 'repeat' }"></ng-container>
+                  </ng-template>
+                </mat-menu>
               </div>
             </div>
           </ng-container>
+
+          <!-- Shared overlay body: participants grouped by journey, each showing their own journey. -->
+          <ng-template #frPanelTpl let-j="j" let-fr="fr" let-count="count" let-label="label">
+            <div class="sx-jmenu" (click)="$event.stopPropagation()">
+              <div class="sx-jmenu-head">
+                <div class="sx-jmenu-title"><mat-icon class="sx-jgrp-ic" *ngIf="j.isGroup">workspaces</mat-icon>{{ j.label }}</div>
+                <div class="sx-jmenu-sub">{{ count | number }} {{ label }}<span *ngIf="j.isGroup"> · {{ j.members?.length }} journeys</span></div>
+              </div>
+              <div class="sx-jmemlist">
+                <div class="sx-jmemgrp" *ngFor="let b of groupJourneyBreakdown(j, fr); trackBy: trackBreakdown">
+                  <div class="sx-jmemgrp-head">
+                    <span class="sx-jmem-journey" [title]="b.journey">{{ b.journey }}</span>
+                    <span class="sx-jmemgrp-count">{{ b.participants.length | number }}</span>
+                  </div>
+                  <div class="sx-jmem" *ngFor="let p of b.participants; trackBy: trackParticipant">
+                    <span class="sx-jmem-name" [title]="p.email">{{ p.name }}</span>
+                    <span class="sx-jmem-journey sm">{{ p.journey || 'Not set' }}</span>
+                  </div>
+                  <div class="sx-jmem-empty" *ngIf="!b.participants.length">None</div>
+                </div>
+              </div>
+            </div>
+          </ng-template>
         </div>
       </div>
     </div>
@@ -325,7 +379,7 @@
               </span>
               <!-- Status (other segments) -->
               <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && segment!=='unattended' && segment!=='revoked' && selectionMode!=='attend'">
-                <ng-container *ngIf="segment==='overallRequested'; else stdStatus">{{ row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested' }}</ng-container>
+                <ng-container *ngIf="segment==='overallRequested'; else stdStatus">{{ row.isUnattended ? 'unattended' : (row.isRevoked ? 'revoked' : (row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested')) }}</ng-container>
                 <ng-template #stdStatus>{{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
               </span>
             </td>

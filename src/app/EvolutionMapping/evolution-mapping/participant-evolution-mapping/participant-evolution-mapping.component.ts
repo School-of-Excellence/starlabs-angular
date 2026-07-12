@@ -108,7 +108,7 @@ export class ParticipantEvolutionMappingComponent {
 
         if (diff <= 0) return '00:00:00';
 
-        const hours   = Math.floor(diff / (1000 * 60 * 60));
+        const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
@@ -117,8 +117,6 @@ export class ParticipantEvolutionMappingComponent {
       takeWhile(val => val !== '00:00:00', true)
     );
   }
-
-
 
   async fetchOngoingLiveEvolutionMapping() {
   this.profileJourneyProduct['group'] = {};

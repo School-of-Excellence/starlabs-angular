@@ -214,6 +214,7 @@ export class ProductFunnelComponent implements OnInit {
       jm.set(label, e);
     }
     this.approvedByJourney = [...jm.values()].sort((a, b) => b.total - a.total);
+    this.rebuildDisplayedJourneys();
   }
 
   mapProfile: Record<string, any> = {};
@@ -244,9 +245,13 @@ export class ProductFunnelComponent implements OnInit {
     potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, revoked: 0, overallRequested: 0
   };
 
-  // Everyone who ever raised their hand for this event. `requested` excludes the approved
-  // cohort (see loadData), so this is a clean total, not a double-count.
-  get overallRequested(): number { return this.counts.requested + this.counts.approved; }
+  // Everyone who ever raised their hand for this event — including the terminal outcomes
+  // (unattended / revoked), who were approved once and then had their product cancelled.
+  // `requested` excludes the approved cohort, and terminal rows are excluded from both
+  // (see loadData), so these four buckets are disjoint — no double-count.
+  get overallRequested(): number {
+    return this.counts.requested + this.counts.approved + this.counts.unattended + this.counts.revoked;
+  }
 
   // Customer-status split of the Potential pool (Active / Non-Active / Discontinued), shown as
   // clickable chips below the Potential card. Counts come from the precomputed statusSplits.
@@ -288,12 +293,14 @@ export class ProductFunnelComponent implements OnInit {
       const raw = localStorage.getItem(this.journeyGroupsKey());
       this.journeyGroups = raw ? (JSON.parse(raw) || {}) : {};
     } catch { this.journeyGroups = {}; }
+    this.rebuildDisplayedJourneys();
   }
   private saveJourneyGroups(): void {
     try {
       if (typeof localStorage === 'undefined') return;
       localStorage.setItem(this.journeyGroupsKey(), JSON.stringify(this.journeyGroups));
     } catch { /* storage unavailable — grouping just won't persist */ }
+    this.rebuildDisplayedJourneys();
   }
   toggleGroupEdit(): void {
     this.groupEditMode = !this.groupEditMode;
@@ -332,7 +339,13 @@ export class ProductFunnelComponent implements OnInit {
 
   // The rows actually shown in the card: journeys sharing a group name collapse into one aggregated
   // row (summing total/first/repeat, members = the grouped journey labels); ungrouped journeys stay as-is.
-  get displayedJourneys(): JourneyRow[] {
+  //
+  // This MUST be a cached field, not a getter. As a getter it returned fresh objects on every change
+  // detection pass, so *ngFor (identity tracking) destroyed and rebuilt every row continuously — a real
+  // mouse click then never fired, because mousedown and mouseup landed on different DOM nodes.
+  // Rebuilt only when the journeys or the grouping actually change. trackBy below is a second guard.
+  displayedJourneys: JourneyRow[] = [];
+  private rebuildDisplayedJourneys(): void {
     const groups = new Map<string, JourneyRow>();
     const singles: JourneyRow[] = [];
     for (const j of this.approvedByJourney) {
@@ -343,10 +356,45 @@ export class ProductFunnelComponent implements OnInit {
       e.total += j.total; e.first += j.first; e.repeat += j.repeat; e.members!.push(j.label);
       groups.set(key, e);
     }
-    return [...groups.values(), ...singles].sort((a, b) => b.total - a.total);
+    this.displayedJourneys = [...groups.values(), ...singles].sort((a, b) => b.total - a.total);
+  }
+  trackJourneyKey = (_: number, j: JourneyRow) => j.key;
+  trackBreakdown = (_: number, b: { journey: string }) => b.journey;
+  trackParticipant = (_: number, p: PRow) => p.profileid;
+
+  // Participants for a journey/group are shown in a mat-menu overlay (see the card template),
+  // so the card itself stays compact regardless of how many people are in a group.
+  private journeyLabelOf(r: PRow): string { return (r.journey || '').trim() || 'Not set'; }
+  // The approved participants whose journey falls inside this group, sorted by name.
+  groupParticipants(row: JourneyRow): PRow[] {
+    const members = new Set(row.members ?? [row.label]);
+    return this.rows
+      .filter(r => r.isApproved && members.has(this.journeyLabelOf(r)))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  // Which journeys are inside this group, and who is approved under each — powers the overlay panels.
+  // Every member journey is listed even if it currently has no matching participants.
+  // `fr` narrows to first-timers ('first') or repeats ('repeat'); 'all' is the whole approved cohort.
+  groupJourneyBreakdown(row: JourneyRow, fr: 'all' | 'first' | 'repeat' = 'all'): { journey: string; participants: PRow[] }[] {
+    const members = row.members ?? [row.label];
+    const byJourney = new Map<string, PRow[]>();
+    members.forEach(m => byJourney.set(m, []));
+    for (const r of this.rows) {
+      if (!r.isApproved) continue;
+      const isRepeat = !!r.completedProduct;
+      if (fr === 'first' && isRepeat) continue;
+      if (fr === 'repeat' && !isRepeat) continue;
+      const lbl = this.journeyLabelOf(r);
+      if (byJourney.has(lbl)) byJourney.get(lbl)!.push(r);
+    }
+    return [...members].sort((a, b) => a.localeCompare(b)).map(m => ({
+      journey: m,
+      participants: (byJourney.get(m) ?? []).sort((a, b) => a.name.localeCompare(b.name))
+    }));
   }
 
   // Click a journey/group row → filter the table to the union of its journeys (clears the first/repeat sub-filter).
+  // The participant list lives in the overlay opened by the people icon, not here.
   setJourneyChip(row: JourneyRow): void {
     this.segment = 'approved';
     const same = this.journeyFilter === row.key && this.frFilter === 'all';
@@ -500,8 +548,10 @@ export class ProductFunnelComponent implements OnInit {
       cohort.forEach(p => requestedData.delete(p));
 
       // Unattended/revoked are terminal — drop them from the live cohort/owner sets so they only show in their terminal segment.
-      unattendedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); });
-      revokedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); });
+      // `cohort` must lose them too: someone scanned at the event and revoked afterwards would otherwise be counted
+      // in BOTH `approved` (cohort.size) and `revoked`, double-counting them in `overallRequested`.
+      unattendedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); cohort.delete(p); });
+      revokedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); cohort.delete(p); });
 
       const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds, ...revokedIds]);
       const rows: PRow[] = [];
@@ -556,7 +606,8 @@ export class ProductFunnelComponent implements OnInit {
       this.counts = {
         potential: owners.size,
         requested: requestedData.size,
-        notRequested: [...owners.keys()].filter(o => !requestedData.has(o) && !cohort.has(o)).length,
+        notRequested: [...owners.keys()].filter(o => !requestedData.has(o) && !cohort.has(o)
+          && !unattendedIds.has(o) && !revokedIds.has(o)).length,
         eligible: rows.filter(r => r.isEligible).length,
         noProduct: rows.filter(r => r.isNoProduct).length,
         inQueue: rows.filter(r => r.isInQueueReq).length,
@@ -565,7 +616,7 @@ export class ProductFunnelComponent implements OnInit {
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
         unattended: rows.filter(r => r.isUnattended).length,
         revoked: rows.filter(r => r.isRevoked).length,
-        overallRequested: requestedData.size + cohort.size
+        overallRequested: requestedData.size + cohort.size + unattendedIds.size + revokedIds.size
       };
 
       this.deliverySetList = await this.loadDeliverySets(arena);
@@ -740,7 +791,7 @@ export class ProductFunnelComponent implements OnInit {
       case 'noShow': return r.attendanceState === 'no_show';
       case 'unattended': return r.isUnattended;
       case 'revoked': return r.isRevoked;
-      case 'overallRequested': return r.isRequested || r.isApproved;
+      case 'overallRequested': return r.isRequested || r.isApproved || r.isUnattended || r.isRevoked;
     }
     return false;
   }
