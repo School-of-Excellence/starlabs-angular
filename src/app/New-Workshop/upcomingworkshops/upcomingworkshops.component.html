@@ -1,130 +1,336 @@
 <div class="page">
   <div class="page-head">
     <div class="page-head-text">
-      <h1>Upcoming Workshops</h1>
-      <p>Create and manage upcoming workshop events.</p>
+      <h1>Home Widgets</h1>
+      <p>Manage the EiFlix home screen widgets.</p>
     </div>
-    <button mat-flat-button color="primary" class="add-btn" (click)="openDialog()">
-      <mat-icon>add</mat-icon>
-      Add Workshop
-    </button>
   </div>
 
   <div class="loading" *ngIf="loading">
     <mat-spinner diameter="36"></mat-spinner>
   </div>
 
-  <div class="empty-state" *ngIf="!loading && dataSource.data.length === 0">
-    <mat-icon>event_note</mat-icon>
-    <h3>No upcoming workshops yet</h3>
-    <p>Click "Add Workshop" to create your first event.</p>
-  </div>
+  <mat-tab-group *ngIf="!loading" class="widget-tabs" animationDuration="200ms" [mat-stretch-tabs]="false">
 
-  <div class="table-card" *ngIf="!loading && dataSource.data.length > 0">
-    <div class="table-toolbar">
-      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
-        <mat-icon matPrefix>search</mat-icon>
-        <input matInput (keyup)="applyFilter($event)" placeholder="Search workshops" />
-      </mat-form-field>
-    </div>
+    <!-- ============ TAB 1: Create / Assign EiFlix Home ============ -->
+    <mat-tab label="Create / Assign EiFlix Home">
+      <div class="tab-content">
+        <app-eiflixhomeconfig></app-eiflixhomeconfig>
+      </div>
+    </mat-tab>
 
-    <div class="table-scroll">
-      <table mat-table [dataSource]="dataSource" matSort class="upcoming-table">
-
-        <ng-container matColumnDef="eventdate">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Event Date</th>
-          <td mat-cell *matCellDef="let w">{{ toDate(w.eventdate) | date: 'mediumDate' }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="title">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
-          <td mat-cell *matCellDef="let w">
-            <div class="cell-title">{{ w.title || '—' }}</div>
-            <div class="cell-sub" *ngIf="w.with">with {{ w.with }}</div>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="type">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
-          <td mat-cell *matCellDef="let w">{{ w.type || '—' }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="cost">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Cost</th>
-          <td mat-cell *matCellDef="let w">
-            <span class="chip" [class.chip-free]="w.cost === 'free'" [class.chip-paid]="w.cost === 'paid'">
-              {{ (w.cost | titlecase) || '—' }}
-            </span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="location">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Location</th>
-          <td mat-cell *matCellDef="let w">{{ w.location || '—' }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="seats">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Seats</th>
-          <td mat-cell *matCellDef="let w">
-            <span *ngIf="w.unlimitedseat" class="chip chip-soft">Unlimited</span>
-            <span *ngIf="!w.unlimitedseat">{{ w.totalseats != null ? w.totalseats : '—' }}</span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="confirmed">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Confirmed</th>
-          <td mat-cell *matCellDef="let w">{{ w.confirmed != null ? w.confirmed : 0 }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="showconfirmedseat">
-          <th mat-header-cell *matHeaderCellDef>Confirmed Seats</th>
-          <td mat-cell *matCellDef="let w">
-            <mat-icon class="bool-icon" [class.on]="w.showconfirmedseat">
-              {{ w.showconfirmedseat ? 'check_circle' : 'remove_circle_outline' }}
-            </mat-icon>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="show">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Show</th>
-          <td mat-cell *matCellDef="let w">
-            <span class="chip" [class.chip-free]="w.show" [class.chip-off]="!w.show">
-              {{ w.show ? 'Visible' : 'Hidden' }}
-            </span>
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="view">
-          <th mat-header-cell *matHeaderCellDef>View</th>
-          <td mat-cell *matCellDef="let w">
-            <button mat-stroked-button color="primary" class="view-btn" (click)="openResponses(w)">
-              <mat-icon>visibility</mat-icon>
-              View
+    <!-- ============ TAB 2: Upcoming Workshops ============ -->
+    <mat-tab label="Upcoming Workshops">
+      <div class="tab-content">
+        <div class="table-card">
+          <div class="table-toolbar">
+            <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput (keyup)="applyComingSoonFilter($event)" placeholder="Search workshops" />
+            </mat-form-field>
+            <button mat-flat-button color="primary" class="add-btn" (click)="openDialog()">
+              <mat-icon>add</mat-icon>
+              Add Workshop
             </button>
-          </td>
-        </ng-container>
+          </div>
 
-        <ng-container matColumnDef="actions">
-          <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
-          <td mat-cell *matCellDef="let w" class="actions-col">
-            <button mat-icon-button matTooltip="Edit" (click)="openDialog(w)">
-              <mat-icon>edit</mat-icon>
+          <div class="empty-state" *ngIf="comingsoonData.data.length === 0">
+            <mat-icon>event_note</mat-icon>
+            <h3>No upcoming workshops yet</h3>
+            <p>Click "Add Workshop" to create your first event.</p>
+          </div>
+
+          <ng-container *ngIf="comingsoonData.data.length > 0">
+            <div class="table-scroll">
+              <table mat-table [dataSource]="comingsoonData" matSort #csSort="matSort" class="upcoming-table"
+                cdkDropList [cdkDropListData]="comingsoonData.data" (cdkDropListDropped)="dropComingSoon($event)">
+
+                <ng-container matColumnDef="drag">
+                  <th mat-header-cell *matHeaderCellDef class="drag-col"></th>
+                  <td mat-cell *matCellDef="let w" class="drag-col">
+                    <mat-icon class="drag-handle" cdkDragHandle matTooltip="Drag to reorder">drag_indicator</mat-icon>
+                    <div class="row-drag-preview" *cdkDragPreview>{{ w.title || 'Item' }}</div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="eventdate">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Event Date</th>
+                  <td mat-cell *matCellDef="let w">{{ toDate(w.eventdate) | date: 'mediumDate' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="title">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
+                  <td mat-cell *matCellDef="let w">
+                    <div class="cell-title">{{ w.title || '—' }}</div>
+                    <div class="cell-sub" *ngIf="w.with">with {{ w.with }}</div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="type">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+                  <td mat-cell *matCellDef="let w">{{ w.type || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="cost">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Cost</th>
+                  <td mat-cell *matCellDef="let w">
+                    <span class="chip" [class.chip-free]="w.cost === 'free'" [class.chip-paid]="w.cost === 'paid'">
+                      {{ (w.cost | titlecase) || '—' }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="location">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Location</th>
+                  <td mat-cell *matCellDef="let w">{{ w.location || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="seats">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Seats</th>
+                  <td mat-cell *matCellDef="let w">
+                    <span *ngIf="w.unlimitedseat" class="chip chip-soft">Unlimited</span>
+                    <span *ngIf="!w.unlimitedseat">{{ w.totalseats != null ? w.totalseats : '—' }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="confirmed">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Confirmed</th>
+                  <td mat-cell *matCellDef="let w">{{ w.confirmed != null ? w.confirmed : 0 }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="showconfirmedseat">
+                  <th mat-header-cell *matHeaderCellDef>Confirmed Seats</th>
+                  <td mat-cell *matCellDef="let w">
+                    <mat-icon class="bool-icon" [class.on]="w.showconfirmedseat">
+                      {{ w.showconfirmedseat ? 'check_circle' : 'remove_circle_outline' }}
+                    </mat-icon>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="show">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Show</th>
+                  <td mat-cell *matCellDef="let w">
+                    <span class="chip" [class.chip-free]="w.show" [class.chip-off]="!w.show">
+                      {{ w.show ? 'Visible' : 'Hidden' }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="view">
+                  <th mat-header-cell *matHeaderCellDef>View</th>
+                  <td mat-cell *matCellDef="let w">
+                    <button mat-stroked-button color="primary" class="view-btn" (click)="openResponses(w)">
+                      <mat-icon>visibility</mat-icon>
+                      View
+                    </button>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
+                  <td mat-cell *matCellDef="let w" class="actions-col">
+                    <button mat-icon-button matTooltip="Edit" (click)="openDialog(w)">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteWidget(w)">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="comingsoonColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: comingsoonColumns" cdkDrag [cdkDragData]="row"></tr>
+
+                <tr class="no-match-row" *matNoDataRow>
+                  <td class="no-match-cell" [attr.colspan]="comingsoonColumns.length">No workshops match your search.</td>
+                </tr>
+              </table>
+            </div>
+
+            <mat-paginator #csPaginator [pageSize]="20" [pageSizeOptions]="[20, 50, 100]" showFirstLastButtons></mat-paginator>
+          </ng-container>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ============ TAB 3: Ads ============ -->
+    <mat-tab label="Ads">
+      <div class="tab-content">
+        <div class="table-card">
+          <div class="table-toolbar">
+            <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput (keyup)="applyAdsFilter($event)" placeholder="Search ads" />
+            </mat-form-field>
+            <button mat-flat-button color="primary" class="add-btn" (click)="openAdsDialog()">
+              <mat-icon>add</mat-icon>
+              Add Ad
             </button>
-            <button mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteWorkshop(w)">
-              <mat-icon>delete</mat-icon>
+          </div>
+
+          <div class="empty-state" *ngIf="adsData.data.length === 0">
+            <mat-icon>campaign</mat-icon>
+            <h3>No ads yet</h3>
+            <p>Click "Add Ad" to create your first ad.</p>
+          </div>
+
+          <ng-container *ngIf="adsData.data.length > 0">
+            <div class="table-scroll">
+              <table mat-table [dataSource]="adsData" matSort #adsSort="matSort" class="upcoming-table"
+                cdkDropList [cdkDropListData]="adsData.data" (cdkDropListDropped)="dropAds($event)">
+
+                <ng-container matColumnDef="drag">
+                  <th mat-header-cell *matHeaderCellDef class="drag-col"></th>
+                  <td mat-cell *matCellDef="let a" class="drag-col">
+                    <mat-icon class="drag-handle" cdkDragHandle matTooltip="Drag to reorder">drag_indicator</mat-icon>
+                    <div class="row-drag-preview" *cdkDragPreview>{{ a.title || 'Item' }}</div>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="head">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Head</th>
+                  <td mat-cell *matCellDef="let a">{{ a.head || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="headright">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Head Right</th>
+                  <td mat-cell *matCellDef="let a">{{ a.headright || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="title">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
+                  <td mat-cell *matCellDef="let a"><div class="cell-title">{{ a.title || '—' }}</div></td>
+                </ng-container>
+
+                <ng-container matColumnDef="subtitle">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Subtitle</th>
+                  <td mat-cell *matCellDef="let a">{{ a.subtitle || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="description">
+                  <th mat-header-cell *matHeaderCellDef>Description</th>
+                  <td mat-cell *matCellDef="let a" class="desc-cell">{{ a.description || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="footer">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Footer</th>
+                  <td mat-cell *matCellDef="let a">{{ a.footer || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="buttonname">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Button</th>
+                  <td mat-cell *matCellDef="let a">{{ a.buttonname || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="navigationlink">
+                  <th mat-header-cell *matHeaderCellDef>Navigation Link</th>
+                  <td mat-cell *matCellDef="let a" class="link-cell">{{ a.navigationlink || '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="show">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Show</th>
+                  <td mat-cell *matCellDef="let a">
+                    <span class="chip" [class.chip-free]="a.show" [class.chip-off]="!a.show">
+                      {{ a.show ? 'Visible' : 'Hidden' }}
+                    </span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
+                  <td mat-cell *matCellDef="let a" class="actions-col">
+                    <button mat-icon-button matTooltip="Edit" (click)="openAdsDialog(a)">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteWidget(a)">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="adsColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: adsColumns" cdkDrag [cdkDragData]="row"></tr>
+
+                <tr class="no-match-row" *matNoDataRow>
+                  <td class="no-match-cell" [attr.colspan]="adsColumns.length">No ads match your search.</td>
+                </tr>
+              </table>
+            </div>
+
+            <mat-paginator #adsPaginator [pageSize]="20" [pageSizeOptions]="[20, 50, 100]" showFirstLastButtons></mat-paginator>
+          </ng-container>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ============ TAB 4: Home Series ============ -->
+    <mat-tab label="Home Series">
+      <div class="tab-content">
+        <div class="table-card">
+          <div class="table-toolbar">
+            <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput (keyup)="applySeriesFilter($event)" placeholder="Search home series" />
+            </mat-form-field>
+            <button mat-flat-button color="primary" class="add-btn" (click)="openHomeSeriesDialog()">
+              <mat-icon>add</mat-icon>
+              Add Home Series
             </button>
-          </td>
-        </ng-container>
+          </div>
 
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+          <div class="empty-state" *ngIf="seriesData.data.length === 0">
+            <mat-icon>subscriptions</mat-icon>
+            <h3>No home series yet</h3>
+            <p>Click "Add Home Series" to create your first one.</p>
+          </div>
 
-        <tr class="no-match-row" *matNoDataRow>
-          <td class="no-match-cell" [attr.colspan]="displayedColumns.length">No workshops match your search.</td>
-        </tr>
-      </table>
-    </div>
+          <ng-container *ngIf="seriesData.data.length > 0">
+            <div class="table-scroll">
+              <table mat-table [dataSource]="seriesData" matSort #hsSort="matSort" class="upcoming-table">
 
-    <mat-paginator [pageSize]="20" [pageSizeOptions]="[20, 50, 100]" showFirstLastButtons></mat-paginator>
-  </div>
+                <ng-container matColumnDef="title">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
+                  <td mat-cell *matCellDef="let s"><div class="cell-title">{{ s.title || '—' }}</div></td>
+                </ng-container>
+
+                <ng-container matColumnDef="episodes">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Episodes</th>
+                  <td mat-cell *matCellDef="let s">
+                    <span class="chip chip-soft">{{ seriesCount(s) }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="created">
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Created</th>
+                  <td mat-cell *matCellDef="let s">{{ toDate(s.created) ? (toDate(s.created) | date: 'medium') : '—' }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
+                  <td mat-cell *matCellDef="let s" class="actions-col">
+                    <button mat-icon-button matTooltip="Edit" (click)="openHomeSeriesDialog(s)">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteSeries(s)">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="seriesColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: seriesColumns"></tr>
+
+                <tr class="no-match-row" *matNoDataRow>
+                  <td class="no-match-cell" [attr.colspan]="seriesColumns.length">No home series match your search.</td>
+                </tr>
+              </table>
+            </div>
+
+            <mat-paginator #hsPaginator [pageSize]="20" [pageSizeOptions]="[20, 50, 100]" showFirstLastButtons></mat-paginator>
+          </ng-container>
+        </div>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
 </div>
