@@ -1,0 +1,168 @@
+.resp-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.resp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 4px 0 4px;
+}
+
+.resp-head-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.resp-head-text .resp-title {
+  margin: 0;
+  padding: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: normal;
+  text-align: left;
+  color: #1f2937;
+}
+
+.resp-head-text .resp-subtitle {
+  margin: 4px 0 0 0;
+  padding: 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+  text-align: left;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resp-head button {
+  flex: 0 0 auto;
+  margin-top: -4px;
+}
+
+.resp-body {
+  padding-top: 8px !important;
+  max-height: unset;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: #6b7280;
+}
+
+.empty-state mat-icon {
+  font-size: 44px;
+  height: 44px;
+  width: 44px;
+  color: #c4cbd7;
+}
+
+.empty-state p {
+  margin: 10px 0 0 0;
+  font-size: 0.9rem;
+}
+
+.resp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.count {
+  font-size: 0.82rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.search-field {
+  width: 280px;
+  max-width: 100%;
+}
+
+.search-field mat-icon[matPrefix] {
+  color: #9ca3af;
+  margin-right: 6px;
+}
+
+/* No horizontal scroll: the table always fits the dialog width and cells wrap. */
+.table-wrap {
+  width: 100%;
+  overflow-x: hidden;
+  border: 1px solid #eceff4;
+  border-radius: 10px;
+}
+
+.resp-table {
+  width: 100%;
+  background: transparent;
+  table-layout: fixed;
+}
+
+.resp-table th.mat-mdc-header-cell {
+  background: #f9fafb;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 10px 12px;
+}
+
+.resp-table td.mat-mdc-cell {
+  color: #374151;
+  font-size: 0.86rem;
+  border-bottom-color: #f0f2f6;
+  padding: 10px 12px;
+  white-space: normal;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.email-cell {
+  overflow-wrap: anywhere;
+}
+
+.resp-table tr.mat-mdc-row:hover {
+  background: #f8fafc;
+}
+
+.no-match-cell {
+  padding: 24px 12px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+mat-paginator {
+  background: transparent;
+}
+
+@media (max-width: 700px) {
+  .resp-table th.mat-mdc-header-cell,
+  .resp-table td.mat-mdc-cell {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+  }
+
+  .search-field {
+    width: 100%;
+  }
+}

@@ -67,6 +67,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // claimed sharer profileid -> their referralcode (used to find who enrolled via that code)
   shareClaimedReferralByProfile: { [id: string]: string } = {};
 
+  // Evergreen day-journey distribution (only when evergreenWorkshop === true).
+  // Each participant's "day" = floor((now - enrollmentdate) / 24h) + 1, exact to the second.
+  evergreenDayDistribution: { day: number; count: number; profileIds: string[] }[] = [];
+  evergreenCompletedBucket: { day: number; count: number; profileIds: string[]; completed: boolean } =
+    { day: -1, count: 0, profileIds: [], completed: true };
+  evergreenDayTotal = 0;
+
   selectedParticipantData: any = null;
   participantWorkshopData: any = null;
   loadingParticipantWorkshop = false;
@@ -110,7 +117,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   mapProfile: any = {};
   mapProfileNew: any = {};
   loading = true;
-  isRefreshing = false;
   error: string | null = null;
   isMovingParticipant: string | null = null;
 
@@ -120,6 +126,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   allSelected = false;
 
   unsubscribes: Unsubscribe[] = [];
+  private destroyed = false;
   private destroy$ = new Subject<void>();
   private recalculateSubject$ = new Subject<void>();
   journeyData: any[] = [];
@@ -240,6 +247,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return { docdata, map, list };
   }
 
+  // new_user_data is loaded once (not live) — it drives only the peripheral
+  // New Users counts and is a large, growing collection.
   private async initializeProfileData() {
     try {
       const userRef = collection(this.firestoreDefault, 'new_user_data');
@@ -336,8 +345,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.clearSelectedParticipant();
-    this.unsubscribes.forEach(unsubscribe => unsubscribe());
+    // Tear down every live Firestore listener (workshop config, enrolled,
+    // participant workshop, and referral for evergreen). Guarded so one bad
+    // unsubscribe can't leave the rest attached.
+    this.unsubscribes.forEach(unsubscribe => {
+      try { unsubscribe(); } catch (e) { console.error('unsubscribe failed', e); }
+    });
+    this.unsubscribes = [];
     this.destroy$.next();
     this.destroy$.complete();
     this.participantDataCache.clear();
@@ -367,28 +383,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async refreshData() {
-    if (this.isRefreshing) return;
-    try {
-      this.isRefreshing = true;
-      await this.loadAllParticipantWorkshopData();
-      this.rebuildProgressFromMap();
-      if (this.selectedParticipantData) {
-        const profileId = this.selectedParticipantData.profileid;
-        this.participantWorkshopData = this.participantWorkshopMap.get(profileId) || null;
-        this.updateParticipantDisplayData();
-      }
-      this.triggerRecalculation();
-      this.snackbarService.show('Data refreshed');
-    } catch (err) {
-      console.error('Refresh error:', err);
-      this.snackbarService.show('Failed to refresh data');
-    } finally {
-      this.isRefreshing = false;
-      this.cdr.detectChanges();
-    }
-  }
-
   async setupWorkshopSnapshot() {
     if (!this.workshopId) return;
 
@@ -397,6 +391,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const unsubscribe = onSnapshot(workshopRef, (docSnap) => {
+      if (this.destroyed) return;
       if (docSnap.exists()) {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
         this.updateWorkshopDisplayData();
@@ -413,6 +408,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
         if (!enrolledSnapshotInitialized) {
           enrolledSnapshotInitialized = true;
+          this.setupParticipantWorkshopSnapshot();
           this.setupEnrolledParticipantsSnapshot();
         }
       } else {
@@ -455,7 +451,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.shareClaimedProfileIds = claimed;
       this.shareClaimedReferralByProfile = referralByProfile;
       // Referral sharers may not be enrolled, so resolve their names from profile_data.
-      this.shareProfileNames = await this.getProfileNameMapForIds([...clicked, ...claimed]);
+      const names = await this.getProfileNameMapForIds([...clicked, ...claimed]);
+      if (this.destroyed) return; // component torn down while awaiting
+      this.shareProfileNames = names;
     }, (err) => console.error('workshopreferral snapshot error', err));
 
     this.unsubscribes.push(unsubscribe);
@@ -1005,25 +1003,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
+      if (this.destroyed) return; // component torn down while awaiting
       this.mapProfile = { ...participantData.docdata, ...this.mapProfileNew };
-      await this.loadAllParticipantWorkshopData();
-      if (this.workshopData?.categorybased === true) {
-        this.participantCohortMap.clear();
-        this.participantWorkshopCategoryMap.clear();
-        for (const p of this.enrolledParticipants) {
-          const pwData = this.participantWorkshopMap.get(p.profileid);
-          if (pwData) {
-            this.participantCohortMap.set(p.profileid, pwData['cohortparticipant'] === true);
-            if (pwData['workshopcategory']) {
-              this.participantWorkshopCategoryMap.set(p.profileid, pwData['workshopcategory']);
-            }
-          }
-        }
-        this.updateCohortCount();
-      }
-      this.rebuildProgressFromMap();
-      this.updateMetrics();
-      this.triggerRecalculation();
+      // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
+      // here we just re-derive from the current (live) participantWorkshopMap.
+      this.recomputeDerivedState();
 
       if (this.loading) {
         this.loading = false;
@@ -1037,10 +1021,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.unsubscribes.push(unsubscribe);
   }
 
-  private async loadAllParticipantWorkshopData(): Promise<void> {
+  // Live listener for participant progress (the 'participant workshop' collection).
+  // Replaces the old one-time fetch + manual refresh button: any progress change
+  // now re-derives the whole dashboard automatically.
+  setupParticipantWorkshopSnapshot() {
     if (!this.workshopId) return;
-
-    this.participantWorkshopMap.clear();
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const pwQuery = query(
@@ -1048,8 +1033,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       where('workshopref', '==', workshopRef)
     );
 
-    try {
-      const pwSnap = await getDocs(pwQuery);
+    const unsubscribe = onSnapshot(pwQuery, (pwSnap) => {
+      if (this.destroyed) return;
+      this.participantWorkshopMap.clear();
       pwSnap.docs.forEach(d => {
         const data = d.data();
         const profileid: string = data['profileid'];
@@ -1057,9 +1043,48 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           this.participantWorkshopMap.set(profileid, { id: d.id, ...data });
         }
       });
-    } catch (err) {
-      console.error('Error fetching participant workshop collection:', err);
+      this.recomputeDerivedState();
+    }, (err) => {
+      console.error('Error listening to participant workshop collection:', err);
+    });
+
+    this.unsubscribes.push(unsubscribe);
+  }
+
+  // Re-derives all dashboard state from the current live snapshots
+  // (enrolledParticipants + participantWorkshopMap + mapProfile). Shared by the
+  // enrolled-participants and participant-workshop snapshots so both stay in sync,
+  // for evergreen, category-based, and plain workshops alike.
+  private recomputeDerivedState() {
+    if (this.workshopData?.categorybased === true) {
+      this.participantCohortMap.clear();
+      this.participantWorkshopCategoryMap.clear();
+      for (const p of this.enrolledParticipants) {
+        const pwData = this.participantWorkshopMap.get(p.profileid);
+        if (pwData) {
+          this.participantCohortMap.set(p.profileid, pwData['cohortparticipant'] === true);
+          if (pwData['workshopcategory']) {
+            this.participantWorkshopCategoryMap.set(p.profileid, pwData['workshopcategory']);
+          }
+        }
+      }
+      this.updateCohortCount();
     }
+
+    this.rebuildProgressFromMap();
+    this.updateMetrics();
+
+    // Keep an open participant-detail panel live when its underlying data changes.
+    if (this.selectedParticipantData) {
+      const pid = this.selectedParticipantData.profileid;
+      const pwData = this.participantWorkshopMap.get(pid) || null;
+      if (pwData) {
+        this.participantWorkshopData = pwData;
+        this.updateParticipantDisplayData();
+      }
+    }
+
+    this.triggerRecalculation();
   }
 
   private rebuildProgressFromMap(): void {
@@ -1305,6 +1330,61 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.facilitatorCount = this.facilitatorProfileIds.length;
       this.updateCategoryBasedMetrics();
     }
+
+    if (this.workshopData?.evergreenWorkshop === true) {
+      this.computeEvergreenDayDistribution();
+    }
+  }
+
+  // Buckets enrolled participants by their current workshop day, based on enrollmentdate.
+  // day = floor((now - enrollmentdate) / 24h) + 1 (exact to the second). Days beyond
+  // workshopDays fall into the "Completed" bucket.
+  computeEvergreenDayDistribution() {
+    const days = this.evergreenWorkshopDays;
+    if (this.workshopData?.evergreenWorkshop !== true || days <= 0) {
+      this.evergreenDayDistribution = [];
+      this.evergreenCompletedBucket = { day: -1, count: 0, profileIds: [], completed: true };
+      this.evergreenDayTotal = 0;
+      return;
+    }
+
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const buckets: { day: number; count: number; profileIds: string[] }[] = [];
+    for (let i = 1; i <= days; i++) buckets.push({ day: i, count: 0, profileIds: [] });
+    const completed = { day: -1, count: 0, profileIds: [] as string[], completed: true };
+    let total = 0;
+
+    for (const p of this.enrolledParticipants) {
+      const enrolledMs = this.toMillis(p.enrollmentdate);
+      if (enrolledMs == null) continue;
+      total++;
+      let day = Math.floor((now - enrolledMs) / DAY_MS) + 1;
+      if (day < 1) day = 1; // guard against clock skew / future-dated enrollment
+      if (day > days) {
+        completed.count++;
+        completed.profileIds.push(p.profileid);
+      } else {
+        const b = buckets[day - 1];
+        b.count++;
+        b.profileIds.push(p.profileid);
+      }
+    }
+
+    this.evergreenDayDistribution = buckets;
+    this.evergreenCompletedBucket = completed;
+    this.evergreenDayTotal = total;
+  }
+
+  private toMillis(ts: any): number | null {
+    if (!ts) return null;
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+    if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+    if (ts instanceof Date) return ts.getTime();
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? null : d.getTime();
   }
 
   async loadCategoryNames() {
@@ -1482,6 +1562,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   get activeParticipants() { return this.metrics.get('activeParticipants')?.length || 0; }
   get shareClicked() { return this.shareClickedProfileIds.length; }
   get shareClaimed() { return this.shareClaimedProfileIds.length; }
+  get evergreenWorkshopDays(): number {
+    return Number(this.workshopData?.evergreenWorkshopMeta?.workshopDays) || 0;
+  }
   get completionRate() {
     const total = this.totalEnrolled;
     const completed = this.metrics.get('completedParticipants')?.length || 0;
@@ -1648,6 +1731,29 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
     }
+  }
+
+  // Opens the shared side panel with the participants currently in the given evergreen day bucket.
+  onDayClick(bucket: { day: number; count: number; profileIds: string[]; completed?: boolean }) {
+    if (!bucket || bucket.count === 0) return;
+    const label = bucket.completed ? 'Completed' : `Day ${bucket.day}`;
+    this.selectedParticipants = bucket.profileIds.map(id => this.buildParticipantEntry(id));
+    this.selectedStatusInfo = {
+      status: label,
+      challengeName: label,
+      subChallengeName: bucket.completed
+        ? `Past day ${this.evergreenWorkshopDays} of ${this.evergreenWorkshopDays}`
+        : `Day ${bucket.day} of ${this.evergreenWorkshopDays}`,
+      count: bucket.count
+    };
+    this.showParticipantPanel = true;
+    this.filterOption = 'all';
+    this.selectedJourneyFilters = [];
+    this.selectedEnrollmentStatusFilters = [];
+    this.selectedTierFilters = [];
+    this.selectedCategoryFilters = [];
+    this.selectedNotStartedTypeFilters = [];
+    this.applyFilterSide();
   }
 
   onChallengeMainStatusClick(status: string, challengeIndex: number, count: number) {

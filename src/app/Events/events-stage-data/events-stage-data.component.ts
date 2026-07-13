@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc, setDoc, updateDoc
+  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc
 } from '@angular/fire/firestore';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import * as XLSX from 'xlsx';
@@ -37,6 +37,7 @@ interface QueueOption {
   stages: string[];       // ordered stage names (the `stages` field — matches token.currentstage)
   mapped: boolean;        // this queue is linked to the current arena event
   endValue: number;
+  live: boolean;          // true if the queue is live (no end date or end date >= today)
   variations: Record<string, string>;   // variationId → variationname (from `queue variation`)
 }
 
@@ -47,6 +48,12 @@ interface StageCol {
   stage: string;
   key: string;            // queueId + '|' + stage
   label: string;          // stage (or "stage · queue" when >1 queue selected)
+}
+
+interface CombinedCol {
+  id: string;                       // unique id
+  name: string;                     // operator-typed column name
+  byQueue: Record<string, string>;  // queueId -> stage (only the queues the operator mapped)
 }
 
 // Step 3 — one participant. Metadata columns + a token per selected queue.
@@ -66,7 +73,7 @@ interface StageRow {
 
 const PAST_WINDOW_MS = 180 * 86400000;
 
-type Step = 'events' | 'arenas' | 'participants';
+type Step = 'events' | 'arenas' | 'queues' | 'plan';
 
 @Component({
   selector: 'app-events-stage-data',
@@ -98,6 +105,7 @@ export class EventsStageDataComponent {
 
   // ---- Step 3: queues + participants + dynamic stage columns ----
   stageRows: StageRow[] = [];
+  private loadedTokenQueues = new Set<string>();   // selected queues whose tokens + members are loaded
   loadingStage = false;
   stageError = false;
   searchStage = '';
@@ -105,11 +113,16 @@ export class EventsStageDataComponent {
   stagePageSize = 25;
 
   queues: QueueOption[] = [];            // all live queues (+ mapped ones)
+  queueLimit = 5;                        // Step 3: show 5 at a time, "Load more" reveals the rest
   selectedQueueIds: string[] = [];       // multi-select
   loadingQueue = false;
   mergedStages: StageCol[] = [];         // stages of all selected queues, merged
   addedCols: StageCol[] = [];            // stage columns the operator added
   colToAdd = '';                         // dropdown selection (a StageCol.key)
+  combinedCols: CombinedCol[] = [];      // operator-defined cross-queue stage columns (Step 4)
+  builderName = '';                      // Step 4 builder: column name
+  builderSel: Record<string, string> = {}; // Step 4 builder: queueId -> picked stage
+  private combinedSeq = 0;               // id counter for combined columns
 
   // ---- Cohort summary (top of step 3) ----
   summaryLoaded = false;
@@ -118,17 +131,20 @@ export class EventsStageDataComponent {
   summaryRequested = { active: 0, nonactive: 0, total: 0 };
   summaryApproved = { active: 0, nonactive: 0, total: 0 };
   summaryInQueue = { active: 0, nonactive: 0, total: 0 };
+  summaryApprovedNotQueued = { active: 0, nonactive: 0, total: 0 };  // approved but no queue token
+  cardFilter = '';   // quick-filter the table by a clicked cohort card ('inqueue'|'requested'|'approved'|'approved-nq'|'ready')
+  selectedParticipant: StageRow | null = null;   // row opened in the detail side panel
   summaryReady = { active: 0, nonactive: 0, total: 0 };
-  summaryJourneyRows: { key: string; label: string; reqA: number; reqNA: number; appA: number; appNA: number; readyA: number; readyNA: number; }[] = [];
 
   // ---- Per-arena journey group config ----
   journeyGroups: { name: string; journeyIds: string[] }[] = [];
-  private groupsDocId: string | null = null;
   groupsEditorOpen = false;
   configOpen = false;
 
-  // ---- Per-arena "ready" stage config (stored in the same config doc) ----
+  // ---- Per-arena "ready" stage config (stored in the same localStorage entry) ----
   readyStages: string[] = [];
+  readyStageByQueue: Record<string, string> = {};   // queueId -> the stage that marks "ready for the event"
+  readyCfgOpen = false;                              // collapsed by default to save space
 
   // Filters
   requestFilter = '';    // '' | 'requested' | 'approved'
@@ -141,6 +157,7 @@ export class EventsStageDataComponent {
   slotFrom = '';         // yyyy-mm-dd — slot start-date range
   slotTo = '';
   notBookedOnly = false; // show only participants with an unbooked (not-completed, no-slot) stage
+  filtersOpen = false;   // Step 4: the collapsible filter panel toggle
 
   // ---- Journey / segments / products reference data (loaded once, cached) ----
   journeyMap: Record<string, string> = {};      // journeyId → journey name
@@ -149,6 +166,7 @@ export class EventsStageDataComponent {
 
   // New filters
   segmentFilter = '';                           // '' | a segment name
+  journeyFilters: string[] = [];                // selected journeys (multi-select filter)
   productFilter = '';                           // '' | a product id (checked against unconsumedproducts)
   productMode: 'only' | 'exclude' = 'only';     // show only / remove those who have the product unconsumed
 
@@ -265,22 +283,29 @@ export class EventsStageDataComponent {
     this.mergedStages = [];
     this.addedCols = [];
     this.colToAdd = '';
+    this.combinedCols = [];
+    this.builderName = '';
+    this.builderSel = {};
     this.requestFilter = '';
     this.stageFilter = '';
     this.customerFilter = '';
     this.variationFilter = '';
     this.segmentFilter = '';
+    this.journeyFilters = [];
     this.productFilter = ''; this.productMode = 'only';
     this.completedFrom = ''; this.completedTo = ''; this.completedStage = '';
     this.slotFrom = ''; this.slotTo = '';
     this.notBookedOnly = false;
+    this.cardFilter = '';
+    this.selectedParticipant = null;
     this.showReconcile = false; this.reconcileError = ''; this.reconcileFileName = '';
     this.extraInTable = []; this.extraInSheet = []; this.sheetCount = 0; this.matchedCount = 0;
     this.summaryLoaded = false;
     this.groupsEditorOpen = false;
     this.configOpen = false;
     this.readyStages = [];
-    this.step = 'participants';
+    this.readyStageByQueue = {};
+    this.step = 'queues';   // Step 3: pick the relevant queues; Step 4 ('plan') shows them.
     this.loadRefData();   // journey names + segment membership (cached, non-blocking)
     await this.loadJourneyGroups(row.docid);
     await this.loadParticipants(row);
@@ -339,6 +364,27 @@ export class EventsStageDataComponent {
     }
   }
 
+  // Build a StageRow from a profile's participant-metadata doc. `status` is the arena
+  // request status ('requested' | 'approved') or '' for a queue-only member.
+  private async buildRowFromMeta(pid: string, status: string): Promise<StageRow> {
+    try {
+      const metaSnap = await getDoc(doc(this.firestore, 'participant metadata', pid));
+      const m: any = metaSnap.exists() ? metaSnap.data() : null;
+      return {
+        profileid: pid,
+        name: m?.['name'] ?? '',
+        email: m?.['email'] ?? '',
+        phone: (m?.['phonenumber'] ?? m?.['number'] ?? '')?.toString?.() ?? '',
+        customerStatus: m?.['customerstatus'] ?? '',
+        journeyId: this.pickJourneyId(m),
+        unconsumedProducts: Array.isArray(m?.['unconsumedproducts']) ? m['unconsumedproducts'].map((p: any) => (p ?? '').toString()) : [],
+        status, tokens: {}, metaMissing: !m
+      } as StageRow;
+    } catch {
+      return { profileid: pid, name: '', email: '', phone: '', customerStatus: '', journeyId: '', unconsumedProducts: [], status, tokens: {}, metaMissing: true } as StageRow;
+    }
+  }
+
   // Requested + approved participation requests → participant metadata columns.
   private async loadParticipants(row: ArenaRow) {
     this.loadingStage = true;
@@ -360,33 +406,13 @@ export class EventsStageDataComponent {
         statusByPid.set(pid, s);
       });
 
-      const rows: StageRow[] = await Promise.all([...statusByPid.keys()].map(async pid => {
-        const reqStatus = statusByPid.get(pid) ?? 'approved';
-        try {
-          const metaSnap = await getDoc(doc(this.firestore, 'participant metadata', pid));
-          const m: any = metaSnap.exists() ? metaSnap.data() : null;
-          return {
-            profileid: pid,
-            name: m?.['name'] ?? '',
-            email: m?.['email'] ?? '',
-            phone: (m?.['phonenumber'] ?? m?.['number'] ?? '')?.toString?.() ?? '',
-            customerStatus: m?.['customerstatus'] ?? '',
-            journeyId: this.pickJourneyId(m),
-            unconsumedProducts: Array.isArray(m?.['unconsumedproducts']) ? m['unconsumedproducts'].map((p: any) => (p ?? '').toString()) : [],
-            status: reqStatus, tokens: {}, metaMissing: !m
-          } as StageRow;
-        } catch {
-          return {
-            profileid: pid, name: '', email: '', phone: '', customerStatus: '',
-            journeyId: '', unconsumedProducts: [],
-            status: reqStatus, tokens: {}, metaMissing: true
-          } as StageRow;
-        }
-      }));
+      const rows: StageRow[] = await Promise.all(
+        [...statusByPid.keys()].map(pid => this.buildRowFromMeta(pid, statusByPid.get(pid) ?? 'approved')));
 
       rows.sort((a, b) => (a.name || 'zzz').localeCompare(b.name || 'zzz'));
       this.stageRows = rows;
-      this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
+      this.loadedTokenQueues = new Set();   // fresh cohort: no queue tokens/members loaded yet
+      // Summary is computed after queue members are unioned in (see loadSelectedTokens).
     } catch (err) {
       console.log('stage-data participants load failed', err);
       this.stageError = true;
@@ -405,35 +431,26 @@ export class EventsStageDataComponent {
     (this.stageRows || []).forEach(r => { if (r.journeyId) this.journeyIdByPid.set(r.profileid, r.journeyId); });
   }
 
-  // Per-arena journey group config, persisted in `stage opportunity count` (kind='journeygroups').
+  // Per-arena journey group config, persisted in localStorage (key esd_journeygroups_<arenaeventid>).
+  // Same structure as before ({ groups, readyStages }); no `stage opportunity count` read/write.
+  private journeyGroupsKey(arenaeventid: string): string { return `esd_journeygroups_${arenaeventid}`; }
   private async loadJourneyGroups(arenaeventid: string): Promise<void> {
-    this.journeyGroups = []; this.groupsDocId = null; this.readyStages = [];
+    this.journeyGroups = []; this.readyStages = [];
     try {
-      const snap = await getDocs(query(collection(this.firestore, 'stage opportunity count'),
-        where('kind', '==', 'journeygroups'), where('arenaeventid', '==', arenaeventid)));
-      if (!snap.empty) {
-        // Multiple docs can exist from earlier saves — always use the most recently updated one.
-        const d = snap.docs.reduce((a, b) =>
-          (((b.data() as any)['updated']?.toMillis?.() ?? 0) >= ((a.data() as any)['updated']?.toMillis?.() ?? 0)) ? b : a);
-        this.groupsDocId = d.id;
-        const data = d.data() as any;
+      const raw = localStorage.getItem(this.journeyGroupsKey(arenaeventid));
+      if (raw) {
+        const data = JSON.parse(raw) || {};
         this.journeyGroups = (data['groups'] || []).map((g: any) => ({ name: g.name || '', journeyIds: g.journeyIds || [] }));
         this.readyStages = (data['readyStages'] || []);
       }
     } catch (e) { console.error('load journey groups failed', e); }
   }
-  // Persist the arena config doc (journey groups + ready stages) to the single `journeygroups` doc.
+  // Persist the arena config (journey groups + ready stages) to localStorage.
   private async saveArenaConfig(): Promise<void> {
     const arenaeventid = this.selectedArena?.docid; if (!arenaeventid) return;
     const groups = this.journeyGroups.filter(g => (g.name || '').trim()).map(g => ({ name: g.name.trim(), journeyIds: g.journeyIds || [] }));
     const readyStages = this.readyStages;
-    if (this.groupsDocId) {
-      await updateDoc(doc(this.firestore, 'stage opportunity count', this.groupsDocId), { groups, readyStages, updated: new Date() });
-    } else {
-      const id = doc(collection(this.firestore, 'stage opportunity count')).id;
-      await setDoc(doc(this.firestore, 'stage opportunity count', id), { kind: 'journeygroups', arenaeventid, groups, readyStages, updated: new Date() });
-      this.groupsDocId = id;
-    }
+    localStorage.setItem(this.journeyGroupsKey(arenaeventid), JSON.stringify({ groups, readyStages, updated: new Date().toISOString() }));
   }
   async saveJourneyGroups(): Promise<void> {
     if (!this.selectedArena?.docid) return;
@@ -479,15 +496,77 @@ export class EventsStageDataComponent {
     return [...m.entries()].map(([id, count]) => ({ id, name: this.journeyMap[id] || id, count })).sort((a, b) => b.count - a.count);
   }
 
+  // Journey-wise split: every journey is its own row; a named local group collapses its journeys into one row.
+  get summaryJourneyRows(): { key: string; label: string; reqA: number; reqNA: number; appA: number; appNA: number; readyA: number; readyNA: number }[] {
+    const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+    const groupNames = this.journeyGroups.map(g => (g.name || '').trim()).filter(Boolean);
+    const keyOf = (pid: string): string => {
+      const jid = this.journeyIdByPid.get(pid);
+      if (jid) {
+        const g = this.journeyGroups.find(gr => (gr.name || '').trim() && gr.journeyIds.includes(jid));
+        if (g) return g.name.trim();
+        return this.journeyMap[jid] ?? jid;
+      }
+      return 'Other';
+    };
+    const jr: Record<string, any> = {};
+    (this.stageRows || []).forEach(r => {
+      const k = keyOf(r.profileid);
+      const b = jr[k] ??= { key: k, label: k, reqA: 0, reqNA: 0, appA: 0, appNA: 0, readyA: 0, readyNA: 0 };
+      const act = isActive(r);
+      if (r.status === 'requested') act ? b.reqA++ : b.reqNA++;
+      else if (r.status === 'approved') act ? b.appA++ : b.appNA++;
+      if (this.isReady(r)) act ? b.readyA++ : b.readyNA++;
+    });
+    const groups = groupNames.filter(n => jr[n]).map(n => jr[n]);
+    const rest = Object.keys(jr).filter(k => !groupNames.includes(k))
+      .sort((a, b) => a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b)).map(k => jr[k]);
+    return [...groups, ...rest];
+  }
+
   pct(n: number, total: number): number { return total > 0 ? Math.round(n / total * 100) : 0; }
 
+  // Whole cohort = everyone requested or approved for the arena (matches the participants table).
+  get cohortTotal(): number { return this.summaryRequested.total + this.summaryApproved.total; }
+  // Requested/approved but not holding a token in any selected queue (the "5 of 6" gap).
+  get notInQueue(): number { return Math.max(0, this.cohortTotal - this.summaryInQueue.total); }
+  // The actual participants behind that gap — surfaced as their own card so they're easy to spot/action.
+  get notInQueueRows(): StageRow[] { return (this.stageRows || []).filter(r => !this.inSelectedQueue(r)); }
+
   // ---- Queue-scoped predicates (only count against ticked queues) ----
-  private inSelectedQueue(r: any): boolean { return this.selectedQueueIds.some(qid => !!r.tokens?.[qid]); }
-  private isReady(r: any): boolean {
+  // "Unattended Participants" is a parking stage — those people don't count as actively in the queue.
+  private isUnattendedStage(s: string): boolean { return (s || '').trim().toLowerCase() === 'unattended participants'; }
+  // In a selected queue AND not parked at the Unattended Participants stage.
+  private inSelectedQueue(r: any): boolean {
     return this.selectedQueueIds.some(qid => {
-      const cs = r.tokens?.[qid]?.currentstage;
-      return !!cs && this.readyStages.includes(cs);
+      const t = r.tokens?.[qid];
+      return !!t && !this.isUnattendedStage(t.currentstage);
     });
+  }
+  // Ready for the event = approved AND, in some selected queue, their current stage is at or
+  // past the operator-picked "ready" stage for that queue (using the queue's ordered stage list).
+  private isReady(r: any): boolean {
+    if (r.status !== 'approved') return false;
+    const norm = (s: string) => (s || '').trim().toLowerCase();
+    return this.selectedQueueIds.some(qid => {
+      const ready = this.readyStageByQueue[qid];
+      const cs = r.tokens?.[qid]?.currentstage;
+      if (!ready || !cs || this.isUnattendedStage(cs)) return false;
+      const stages = (this.queues.find(x => x.id === qid)?.stages ?? []).map(norm);
+      const readyIdx = stages.indexOf(norm(ready));
+      const curIdx = stages.indexOf(norm(cs));
+      return readyIdx >= 0 && curIdx >= 0 && curIdx >= readyIdx;
+    });
+  }
+  // Set a queue's "ready" stage and recompute the Ready count.
+  setReadyStage(qid: string, stage: string) {
+    this.readyStageByQueue[qid] = stage;
+    this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
+  }
+  // Compact one-line summary of the ready stages (for the collapsed picker).
+  get readyStageSummary(): string {
+    return this.selectedQueues.filter(q => this.readyStageByQueue[q.id])
+      .map(q => `${q.name}: ${this.readyStageByQueue[q.id]}`).join(' · ');
   }
 
   private async computeCohortSummary(): Promise<void> {
@@ -501,22 +580,8 @@ export class EventsStageDataComponent {
       this.summaryApproved = seg(r => r.status === 'approved');
       this.summaryInQueue = seg(r => this.inSelectedQueue(r));
       this.summaryReady = seg(r => this.isReady(r));
-      const groupOf = (pid: string): string => {
-        const jid = this.journeyIdByPid.get(pid);
-        if (jid) { const g = this.journeyGroups.find(gr => gr.journeyIds.includes(jid)); if (g) return g.name; }
-        return 'Other';
-      };
-      const keys = [...this.journeyGroups.map(g => g.name).filter(Boolean), 'Other'];
-      const jr: Record<string, any> = {};
-      keys.forEach(k => jr[k] = { key: k, label: k, reqA: 0, reqNA: 0, appA: 0, appNA: 0, readyA: 0, readyNA: 0 });
-      rows.forEach(r => {
-        const b = jr[groupOf(r.profileid)]; const act = isActive(r);
-        if (r.status === 'requested') act ? b.reqA++ : b.reqNA++;
-        else if (r.status === 'approved') act ? b.appA++ : b.appNA++;
-        if (this.isReady(r)) act ? b.readyA++ : b.readyNA++;
-      });
-      this.summaryJourneyRows = keys.map(k => jr[k]);
-      this.summaryLoaded = true;
+      this.summaryApprovedNotQueued = seg(r => r.status === 'approved' && !this.inSelectedQueue(r));
+      this.summaryLoaded = true;   // summaryJourneyRows is a reactive getter (grouping updates live)
     } finally {
       this.summaryLoading = false;
     }
@@ -529,6 +594,9 @@ export class EventsStageDataComponent {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       const todayStart = now.getTime();
+      const eightAgo = new Date(todayStart);
+      eightAgo.setMonth(eightAgo.getMonth() - 8);
+      const eightMonthsAgo = eightAgo.getTime();
 
       const qSnap = await getDocs(query(
         collection(this.firestore, 'queue generation'), orderBy('queueenddate', 'desc')));
@@ -540,15 +608,17 @@ export class EventsStageDataComponent {
         const end = this.toMillis(q['queueenddate']);
         const mapped = (q['arenaeventidlist'] ?? []).includes(row.docid);
         const isLive = !end || end >= todayStart;
-        if (!isLive && !mapped) return;
+        const recentlyEnded = !!end && end >= eightMonthsAgo;
+        if (!isLive && !mapped && !recentlyEnded) return;
         queues.push({
           id: d.id, name: q['queuename'] ?? 'Queue', ref: d.ref,
           stages: Array.isArray(q['stages']) ? q['stages'] : [],
-          mapped, endValue: end, variations: {}
+          mapped, endValue: end, live: isLive, variations: {}
         });
       });
       queues.sort((a, b) => (Number(b.mapped) - Number(a.mapped)) || (b.endValue - a.endValue));
       this.queues = queues;
+      this.queueLimit = 5;   // reset the "show 5" window for the new arena's queues
       // Pre-select the mapped queue(s) so the relevant one(s) load by default.
       this.selectedQueueIds = queues.filter(q => q.mapped).map(q => q.id);
       if (this.selectedQueueIds.length) await this.loadSelectedTokens();
@@ -561,6 +631,14 @@ export class EventsStageDataComponent {
 
   // ---- Queue multi-select ----
   isQueueSelected(id: string): boolean { return this.selectedQueueIds.includes(id); }
+  // Step 3 shows queues in batches of 5; "Load more" grows queueLimit.
+  get visibleQueues(): QueueOption[] { return this.queues.slice(0, this.queueLimit); }
+  loadMoreQueues() { this.queueLimit += 5; }
+  // "Ended" pill label for a queue, e.g. "Oct 2025" (empty if no end date).
+  queueEndLabel(q: QueueOption): string {
+    if (!q.endValue) return '';
+    return new Date(q.endValue).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
   async toggleQueue(id: string, checked: boolean) {
     this.selectedQueueIds = checked
       ? [...this.selectedQueueIds, id]
@@ -568,21 +646,29 @@ export class EventsStageDataComponent {
     await this.loadSelectedTokens();
   }
 
-  // Merge the stages of all selected queues, then load their tokens onto the rows.
+  // Load the selected queues' tokens AND union in every active queue member as a participant,
+  // so the table + "Total in queue" reflect the whole queue — not just this arena's cohort.
   private async loadSelectedTokens() {
     this.buildMergedStages();
-    // Clear tokens for queues no longer selected.
     const selected = new Set(this.selectedQueueIds);
+    // Clear tokens for deselected queues and forget those queues.
     this.stageRows.forEach(r => {
       Object.keys(r.tokens).forEach(qid => { if (!selected.has(qid)) delete r.tokens[qid]; });
     });
-    if (!this.selectedQueueIds.length) return;
+    [...this.loadedTokenQueues].forEach(qid => { if (!selected.has(qid)) this.loadedTokenQueues.delete(qid); });
+    // Drop queue-only members (no arena request/approval) who are no longer in any selected queue.
+    this.stageRows = this.stageRows.filter(r => !!r.status || Object.keys(r.tokens).length > 0);
+    if (!this.selectedQueueIds.length) {
+      this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
+      return;
+    }
     this.loadingQueue = true;
     try {
-      await Promise.all(this.selectedQueueIds.map(async qid => {
+      // 1) Load each not-yet-loaded queue's tokens / stage log / variations.
+      const toLoad = this.selectedQueueIds.filter(qid => !this.loadedTokenQueues.has(qid));
+      const loaded = (await Promise.all(toLoad.map(async qid => {
         const q = this.queues.find(x => x.id === qid);
-        if (!q || this.stageRows.some(r => r.tokens[qid])) return;   // already loaded
-        // Token (current stage + slots), stage log (completion dates), and variations in parallel.
+        if (!q) return null;
         const [tokSnap, logSnap, varSnap] = await Promise.all([
           getDocs(query(collection(this.firestore, 'queue_token'), where('queueref', '==', q.ref))),
           getDocs(query(collection(this.firestore, 'queue stage log'), where('queueref', '==', q.ref))),
@@ -591,22 +677,18 @@ export class EventsStageDataComponent {
         const vmap: Record<string, string> = {};
         varSnap.docs.forEach(d => { vmap[d.id] = d.data()['variationname'] ?? d.id; });
         q.variations = vmap;
-        // Token: keep the LATEST one per profile (by logdate) — for the slot bookings.
+        // Active tokens → the queue membership; keep the latest per profile (for slot bookings).
         const byPid = new Map<string, { ms: number; currentstage: string; selectedstageslot: any }>();
         tokSnap.docs.forEach(d => {
           const x = d.data();
           if (x['delete'] === true) return;
-          if (x['tokenstatus'] !== 'Active') return;   // only active tokens
+          if (x['tokenstatus'] !== 'Active') return;
           const pid = x['profile_id'] ?? x['profileid'];
           if (!pid) return;
           const ms = this.toMillis(x['logdate']);
           const prev = byPid.get(pid);
-          if (!prev || ms >= prev.ms) {
-            byPid.set(pid, { ms, currentstage: x['currentstage'] ?? '', selectedstageslot: x['selectedstageslot'] ?? {} });
-          }
+          if (!prev || ms >= prev.ms) byPid.set(pid, { ms, currentstage: x['currentstage'] ?? '', selectedstageslot: x['selectedstageslot'] ?? {} });
         });
-        // Stage log per profile: current stage = the LATEST entry's `currentstage`; and
-        // completion date per stage = latest logdate of the doc that moved them OUT (`previousstage`).
         const latestByPid = new Map<string, { ms: number; currentstage: string }>();
         const completedByPid = new Map<string, Record<string, number>>();
         logSnap.docs.forEach(d => {
@@ -624,27 +706,37 @@ export class EventsStageDataComponent {
             completedByPid.set(pid, rec);
           }
         });
+        return { qid, byPid, latestByPid, completedByPid };
+      }))).filter(Boolean) as { qid: string; byPid: Map<string, { ms: number; currentstage: string; selectedstageslot: any }>; latestByPid: Map<string, { ms: number; currentstage: string }>; completedByPid: Map<string, Record<string, number>> }[];
+
+      // 2) Union in active queue members who aren't already participants (fetch their metadata; status '').
+      const knownPids = new Set(this.stageRows.map(r => r.profileid));
+      const newPids = new Set<string>();
+      loaded.forEach(pq => pq.byPid.forEach((_v, pid) => { if (!knownPids.has(pid)) newPids.add(pid); }));
+      if (newPids.size) {
+        const newRows = await Promise.all([...newPids].map(pid => this.buildRowFromMeta(pid, '')));
+        this.stageRows = [...this.stageRows, ...newRows];
+      }
+
+      // 3) Assign tokens to every participant for the freshly-loaded queues.
+      loaded.forEach(({ qid, byPid, latestByPid, completedByPid }) => {
         this.stageRows.forEach(r => {
           const t = byPid.get(r.profileid);
           const latest = latestByPid.get(r.profileid);
           const completedAt = completedByPid.get(r.profileid) ?? {};
           if (t || latest || Object.keys(completedAt).length) {
-            r.tokens[qid] = {
-              // Current stage from the latest stage-log entry; fall back to the token.
-              currentstage: latest?.currentstage ?? t?.currentstage ?? '',
-              selectedstageslot: t?.selectedstageslot ?? {},
-              completedAt
-            };
+            r.tokens[qid] = { currentstage: latest?.currentstage ?? t?.currentstage ?? '', selectedstageslot: t?.selectedstageslot ?? {}, completedAt };
           }
         });
-      }));
+        this.loadedTokenQueues.add(qid);
+      });
+      this.stageRows = [...this.stageRows].sort((a, b) => (a.name || 'zzz').localeCompare(b.name || 'zzz'));
     } catch (e) {
       console.log('queue token load failed', e);
     } finally {
       this.loadingQueue = false;
     }
-    // In step 3 with a cohort loaded, recompute Total-in-queue / Ready when queues toggle.
-    if (this.summaryLoaded) this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
+    this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
   }
 
   // ---- Merged stage columns ----
@@ -686,13 +778,68 @@ export class EventsStageDataComponent {
   addAllCols() { this.addedCols = [...this.mergedStages]; }
   clearCols() { this.addedCols = []; this.syncCompletedStage(); }
 
+  // ---- Step 4: combined stage-column builder ----
+  ssStagesFor(qid: string): SsOption[] {
+    const q = this.queues.find(x => x.id === qid);
+    return this.ssFrom(q?.stages ?? [], 'Any stage');
+  }
+  setBuilderStage(qid: string, stage: string) { this.builderSel[qid] = stage; }
+  get builderCanAdd(): boolean {
+    return !!this.builderName.trim() && this.selectedQueueIds.some(qid => !!this.builderSel[qid]);
+  }
+  addCombinedCol() {
+    if (!this.builderCanAdd) return;
+    const byQueue: Record<string, string> = {};
+    this.selectedQueueIds.forEach(qid => { if (this.builderSel[qid]) byQueue[qid] = this.builderSel[qid]; });
+    this.combinedCols.push({ id: 'cc' + (++this.combinedSeq), name: this.builderName.trim(), byQueue });
+    this.builderName = '';
+    this.builderSel = {};
+    this.syncCompletedStage();
+  }
+  removeCombinedCol(id: string) {
+    this.combinedCols = this.combinedCols.filter(c => c.id !== id);
+    this.syncCompletedStage();
+  }
+  // Mapping summary for a combined column, e.g. [{queueName:'MIG', stage:'Diagnostics'}].
+  combinedColTags(cc: CombinedCol): { queueName: string; stage: string }[] {
+    return this.selectedQueueIds
+      .filter(qid => cc.byQueue[qid])
+      .map(qid => ({ queueName: this.queues.find(q => q.id === qid)?.name ?? '', stage: cc.byQueue[qid] }));
+  }
+  // Resolve a combined column to the single (queue, stage) to display for THIS participant:
+  // prefer a mapped queue they are in AND have crossed; else booked; else first present; else null.
+  private resolveCombined(r: StageRow, cc: CombinedCol): StageCol | null {
+    const present = this.selectedQueueIds.filter(qid => cc.byQueue[qid] && r.tokens[qid]);
+    if (!present.length) return null;
+    const toCol = (qid: string): StageCol => ({
+      queueId: qid, queueName: this.queues.find(q => q.id === qid)?.name ?? '',
+      stage: cc.byQueue[qid], key: qid + '|' + cc.byQueue[qid], label: cc.name
+    });
+    const crossed = present.find(qid => this.crossedStage(r, toCol(qid)));
+    if (crossed) return toCol(crossed);
+    const booked = present.find(qid => this.isBooked(r, toCol(qid)));
+    return toCol(booked ?? present[0]);
+  }
+  combinedCrossed(r: StageRow, cc: CombinedCol): boolean {
+    const col = this.resolveCombined(r, cc); return col ? this.crossedStage(r, col) : false;
+  }
+  combinedCompletedLabel(r: StageRow, cc: CombinedCol): string {
+    const col = this.resolveCombined(r, cc); return col ? this.completedLabel(r, col) : '';
+  }
+  combinedSlotCell(r: StageRow, cc: CombinedCol): string {
+    const col = this.resolveCombined(r, cc); return col ? this.slotCell(r, col) : '';
+  }
+  combinedSlotKind(r: StageRow, cc: CombinedCol): 'done' | 'booked' | 'none' {
+    const col = this.resolveCombined(r, cc); return col ? this.slotKind(r, col) : 'none';
+  }
+
   // Stages available to the "Completed date" stage picker = only the added table columns.
   get completedStageOptions(): string[] {
     return [...new Set(this.addedCols.map(c => c.stage))];
   }
   // Drop the completed-date stage selection if its column is no longer in the table.
   private syncCompletedStage() {
-    if (this.completedStage && !this.addedCols.some(c => c.stage === this.completedStage)) this.completedStage = '';
+    if (this.completedStage && !this.combinedCols.some(c => c.id === this.completedStage)) this.completedStage = '';
   }
 
   // ---- Per (queue, stage) computations ----
@@ -747,14 +894,15 @@ export class EventsStageDataComponent {
   // Per-added-stage summary over the CURRENTLY FILTERED rows (the dashboard "pivot").
   get stageSummaries(): { label: string; completed: number; notCompleted: number; booked: number; notBooked: number }[] {
     const rows = this.filteredStageRows;
-    return this.addedCols.map(c => {
+    return this.combinedCols.map(cc => {
       let completed = 0, booked = 0, notBooked = 0;
       rows.forEach(r => {
-        if (this.crossedStage(r, c)) completed++;
-        else if (this.isBooked(r, c)) booked++;
+        const col = this.resolveCombined(r, cc);
+        if (col && this.crossedStage(r, col)) completed++;
+        else if (col && this.isBooked(r, col)) booked++;
         else notBooked++;
       });
-      return { label: c.label, completed, notCompleted: booked + notBooked, booked, notBooked };
+      return { label: cc.name, completed, notCompleted: booked + notBooked, booked, notBooked };
     });
   }
 
@@ -762,7 +910,8 @@ export class EventsStageDataComponent {
   // Checked across the added stage columns (or all merged stages if none added yet).
   private notBookedCols(): StageCol[] { return this.addedCols.length ? this.addedCols : this.mergedStages; }
   isNotBooked(r: StageRow): boolean {
-    return this.notBookedCols().some(c => !this.crossedStage(r, c) && !this.isBooked(r, c));
+    if (!this.combinedCols.length) return this.notBookedCols().some(c => !this.crossedStage(r, c) && !this.isBooked(r, c));
+    return this.combinedCols.some(cc => { const col = this.resolveCombined(r, cc); return !!col && !this.crossedStage(r, col) && !this.isBooked(r, col); });
   }
 
   // A participant's current stage(s) across the selected queues.
@@ -795,6 +944,15 @@ export class EventsStageDataComponent {
   currentStageFor(r: StageRow, qid: string): string {
     return r.tokens[qid]?.currentstage ?? '';
   }
+  // One "Current stage" cell across all selected queues: stage (main) + queue name (sub-text).
+  currentStagePairs(r: StageRow): { stage: string; queueName: string }[] {
+    const out: { stage: string; queueName: string }[] = [];
+    this.selectedQueueIds.forEach(qid => {
+      const st = r.tokens[qid]?.currentstage;
+      if (st) out.push({ stage: st, queueName: this.queues.find(x => x.id === qid)?.name ?? '' });
+    });
+    return out;
+  }
 
   // ---- Journey (customerstatus-driven) + Segments displays ----
   journeyDisplay(r: StageRow): string {
@@ -811,6 +969,12 @@ export class EventsStageDataComponent {
   get segmentOptions(): string[] {
     const set = new Set<string>();
     this.stageRows.forEach(r => this.rowSegments(r).forEach(s => set.add(s)));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }
+  // Journeys that actually appear among the loaded participants.
+  get journeyOptions(): string[] {
+    const set = new Set<string>();
+    this.stageRows.forEach(r => { const j = this.journeyDisplay(r); if (j) set.add(j); });
     return [...set].sort((a, b) => a.localeCompare(b));
   }
 
@@ -839,7 +1003,10 @@ export class EventsStageDataComponent {
   get ssCustomerOpts(): SsOption[] { return this.ssFrom(this.customerStatusOptions, 'All'); }
   get ssVariationOpts(): SsOption[] { return this.ssFrom(this.variationOptions, 'All', { value: '__none', label: 'No variation' }); }
   get ssSegmentOpts(): SsOption[] { return this.ssFrom(this.segmentOptions, 'All'); }
-  get ssCompletedStageOpts(): SsOption[] { return this.ssFrom(this.completedStageOptions, 'Any stage'); }
+  get ssJourneyOpts(): SsOption[] { return this.ssFrom(this.journeyOptions, 'All'); }
+  get ssCompletedStageOpts(): SsOption[] {
+    return [{ value: '', label: 'Any stage' }, ...this.combinedCols.map(c => ({ value: c.id, label: c.name }))];
+  }
   get ssProductOpts(): SsOption[] {
     return [{ value: '', label: 'Any' }, ...this.productOptions.map(p => ({ value: p.id, label: p.name }))];
   }
@@ -891,6 +1058,16 @@ export class EventsStageDataComponent {
     this.stageRows = [];
     this.summaryLoaded = false;
   }
+  // Step 3 — back to the queue picker; keeps the current selection and loaded data.
+  goToQueues() {
+    if (!this.selectedArena) return this.goToArenas();
+    this.step = 'queues';
+  }
+  // Step 4 — the plan for the selected queues (only meaningful with ≥1 queue).
+  goToPlan() {
+    if (!this.selectedQueueIds.length) return;
+    this.step = 'plan';
+  }
 
   // ===========================================================================
   // Filtering / paging
@@ -919,10 +1096,13 @@ export class EventsStageDataComponent {
   // stages the participant has genuinely crossed — so the filter agrees with the visible
   // "Completed" pills instead of matching on stages that aren't displayed.
   private allCompletedMs(r: StageRow): number[] {
-    return this.notBookedCols()
-      .filter(c => (!this.completedStage || c.stage === this.completedStage) && this.crossedStage(r, c))
-      .map(c => this.completedMs(r, c))
-      .filter(ms => ms > 0);
+    if (!this.combinedCols.length) {
+      return this.mergedStages.filter(c => this.crossedStage(r, c)).map(c => this.completedMs(r, c)).filter(ms => ms > 0);
+    }
+    const cols = this.completedStage ? this.combinedCols.filter(c => c.id === this.completedStage) : this.combinedCols;
+    const out: number[] = [];
+    cols.forEach(cc => { const col = this.resolveCombined(r, cc); if (col && this.crossedStage(r, col)) { const ms = this.completedMs(r, col); if (ms > 0) out.push(ms); } });
+    return out;
   }
   private allSlotStartMs(r: StageRow): number[] {
     const out: number[] = [];
@@ -943,6 +1123,11 @@ export class EventsStageDataComponent {
     const compActive = !!this.completedFrom || !!this.completedTo;
     const slotActive = !!this.slotFrom || !!this.slotTo;
     return this.stageRows.filter(r => {
+      if (this.cardFilter === 'inqueue' && !this.inSelectedQueue(r)) return false;
+      if (this.cardFilter === 'requested' && r.status !== 'requested') return false;
+      if (this.cardFilter === 'approved' && r.status !== 'approved') return false;
+      if (this.cardFilter === 'approved-nq' && !(r.status === 'approved' && !this.inSelectedQueue(r))) return false;
+      if (this.cardFilter === 'ready' && !this.isReady(r)) return false;
       if (this.requestFilter && r.status !== this.requestFilter) return false;
       const cs = this.rowCurrentStages(r);
       if (this.stageFilter === '__none') { if (cs.length) return false; }
@@ -954,6 +1139,7 @@ export class EventsStageDataComponent {
         else if (!vs.includes(this.variationFilter)) return false;
       }
       if (this.segmentFilter && !this.rowSegments(r).includes(this.segmentFilter)) return false;
+      if (this.journeyFilters.length && !this.journeyFilters.includes(this.journeyDisplay(r))) return false;
       if (this.productFilter) {
         const has = r.unconsumedProducts.includes(this.productFilter);
         if (this.productMode === 'only' && !has) return false;   // keep only those who have it unconsumed
@@ -974,20 +1160,47 @@ export class EventsStageDataComponent {
     const start = this.stagePageIndex * this.stagePageSize;
     return this.filteredStageRows.slice(start, start + this.stagePageSize);
   }
+  // Active filters as removable chips (excludes the free-text search, which has its own field).
+  get activeFilters(): { label: string; clear: () => void }[] {
+    const out: { label: string; clear: () => void }[] = [];
+    const clr = (fn: () => void) => { fn(); this.onFilterChange(); };
+    if (this.requestFilter) out.push({ label: this.requestFilter, clear: () => clr(() => this.requestFilter = '') });
+    if (this.stageFilter) out.push({ label: 'Stage: ' + (this.stageFilter === '__none' ? 'Not in queue' : this.stageFilter), clear: () => clr(() => this.stageFilter = '') });
+    if (this.customerFilter) out.push({ label: this.customerFilter, clear: () => clr(() => this.customerFilter = '') });
+    if (this.variationFilter) out.push({ label: 'Variation: ' + (this.variationFilter === '__none' ? 'None' : this.variationFilter), clear: () => clr(() => this.variationFilter = '') });
+    if (this.segmentFilter) out.push({ label: 'Segment: ' + this.segmentFilter, clear: () => clr(() => this.segmentFilter = '') });
+    this.journeyFilters.forEach(j => out.push({ label: 'Journey: ' + j, clear: () => clr(() => this.journeyFilters = this.journeyFilters.filter(x => x !== j)) }));
+    if (this.productFilter) out.push({ label: 'Product: ' + this.productFilter, clear: () => clr(() => { this.productFilter = ''; this.productMode = 'only'; }) });
+    if (this.completedFrom || this.completedTo) out.push({ label: 'Completed ' + (this.completedFrom || '…') + ' – ' + (this.completedTo || '…'), clear: () => clr(() => { this.completedFrom = ''; this.completedTo = ''; this.completedStage = ''; }) });
+    if (this.slotFrom || this.slotTo) out.push({ label: 'Slot ' + (this.slotFrom || '…') + ' – ' + (this.slotTo || '…'), clear: () => clr(() => { this.slotFrom = ''; this.slotTo = ''; }) });
+    if (this.notBookedOnly) out.push({ label: 'Not booked', clear: () => clr(() => this.notBookedOnly = false) });
+    return out;
+  }
+  get activeFilterCount(): number { return this.activeFilters.length; }
   get isStageFiltered(): boolean {
     return this.searchStage.trim().length > 0 || !!this.requestFilter || !!this.stageFilter || !!this.customerFilter
-      || !!this.variationFilter || !!this.segmentFilter || !!this.productFilter
+      || !!this.variationFilter || !!this.segmentFilter || this.journeyFilters.length > 0 || !!this.productFilter
       || !!this.completedFrom || !!this.completedTo || !!this.slotFrom || !!this.slotTo || this.notBookedOnly;
   }
   onStagePage(e: PageEvent) { this.stagePageIndex = e.pageIndex; this.stagePageSize = e.pageSize; }
   onStageSearch() { this.stagePageIndex = 0; }
   onFilterChange() { this.stagePageIndex = 0; }
+  // Clicking a cohort card quick-filters the table to that subset (click the active card again to clear).
+  toggleCardFilter(key: string) { this.cardFilter = this.cardFilter === key ? '' : key; this.stagePageIndex = 0; }
+  toggleJourneyFilter(j: string) {
+    this.journeyFilters = this.journeyFilters.includes(j) ? this.journeyFilters.filter(x => x !== j) : [...this.journeyFilters, j];
+    this.onFilterChange();
+  }
+  isJourneyFiltered(j: string): boolean { return this.journeyFilters.includes(j); }
+  openParticipant(r: StageRow) { this.selectedParticipant = r; }
+  closeParticipant() { this.selectedParticipant = null; }
   clearFilters() {
     this.searchStage = ''; this.requestFilter = ''; this.stageFilter = ''; this.customerFilter = '';
-    this.variationFilter = ''; this.segmentFilter = ''; this.productFilter = ''; this.productMode = 'only';
+    this.variationFilter = ''; this.segmentFilter = ''; this.journeyFilters = []; this.productFilter = ''; this.productMode = 'only';
     this.completedFrom = ''; this.completedTo = ''; this.completedStage = '';
     this.slotFrom = ''; this.slotTo = '';
     this.notBookedOnly = false;
+    this.cardFilter = '';
     this.stagePageIndex = 0;
   }
 
@@ -1001,14 +1214,14 @@ export class EventsStageDataComponent {
     const multiQ = this.selectedQueues.length > 1;
     const header = ['Name', 'Email', 'Phone', 'Customer status', 'Journey', 'Segments', 'Request', 'Variation'];
     this.selectedQueues.forEach(q => header.push(multiQ ? `Current stage · ${q.name}` : 'Current stage'));
-    this.addedCols.forEach(c => header.push(`${c.label} - Completed`, `${c.label} - Slot booking`));
+    this.combinedCols.forEach(cc => header.push(`${cc.name} - Completed`, `${cc.name} - Slot booking`));
     const lines = [header.map(esc).join(',')];
     this.filteredStageRows.forEach(r => {
       const cells = [r.name, r.email, r.phone, r.customerStatus, this.journeyDisplay(r), this.segmentsDisplay(r), r.status, this.variationsDisplay(r)];
       this.selectedQueues.forEach(q => cells.push(this.currentStageFor(r, q.id)));
-      this.addedCols.forEach(c => {
-        cells.push(this.completedLabel(r, c));
-        cells.push(this.slotCell(r, c));
+      this.combinedCols.forEach(cc => {
+        cells.push(this.combinedCompletedLabel(r, cc));
+        cells.push(this.combinedSlotCell(r, cc));
       });
       lines.push(cells.map(esc).join(','));
     });
