@@ -457,13 +457,21 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.adaptiveQuality.startMonitoring(room);
 
       // Publish the mic (LiveKit-managed), then apply the DeepFilterNet3 TrackProcessor —
-      // the exact videoconference architecture. applyDfnProcessor() also sets the input
-      // constraints (raw input / voiceIsolation off while DFN is on). LiveKit owns the
-      // track lifecycle (mute / device-switch), so no separate raw-stream handling needed.
+      // the exact videoconference architecture. LiveKit owns the track lifecycle
+      // (mute / device-switch), so no separate raw-stream handling needed.
+      //
+      // CAPTURE CONSTRAINTS — the fix (proven 2026-07-06): DFN must receive RAW mic audio.
+      // Chrome's noiseSuppression + AGC pre-GATE the signal (measured: 12% of frames gated to
+      // near-silence, 196 dB quiet-spread) before DFN sees it; DFN then chokes on the pre-gated
+      // signal and deletes speech → the "choppy" voice. Feeding DFN raw audio (as captured by the
+      // offline oracle) is clean. So when DFN is ON, capture with NS/EC/AGC OFF and let DFN be the
+      // sole noise processor; when DFN is OFF, use Chrome's own processing for a clean bare mic.
+      // These constraints must be set at CAPTURE — applyConstraints() on a live track is ignored
+      // by Chrome for NS/EC/AGC.
       await room.localParticipant.setMicrophoneEnabled(true, {
-        noiseSuppression: true,
-        echoCancellation: true,
-        autoGainControl: true,
+        noiseSuppression: !this.dfnEnabled,
+        echoCancellation: !this.dfnEnabled,
+        autoGainControl: !this.dfnEnabled,
       });
       await this.applyDfnProcessor();
       this.startDfnBroadcast();
@@ -656,18 +664,22 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         await micTrack.stopProcessor();
       }
 
-      // Input constraints: when DFN is ON keep the input raw (voiceIsolation off) so we
-      // don't double-process; when OFF, enable Chrome's own NS/EC/AGC + voiceIsolation.
+      // Input constraints: when DFN is ON keep the input RAW (all of Chrome's NS/EC/AGC +
+      // voiceIsolation OFF) so DFN is the sole noise processor and never sees pre-gated audio;
+      // when OFF, enable Chrome's own NS/EC/AGC + voiceIsolation for a clean bare mic.
+      // NOTE: NS/EC/AGC are honoured at CAPTURE (setMicrophoneEnabled above) — Chrome ignores them
+      // via applyConstraints on a live track. This call still carries voiceIsolation, and keeps the
+      // toggle state coherent; the reliable switch is the capture constraints on (re)publish.
       try {
         const mst = micTrack.mediaStreamTrack;
         if (mst) {
           const constraints = this.dfnEnabled
-            ? { voiceIsolation: false }
+            ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, voiceIsolation: false }
             : { echoCancellation: true, noiseSuppression: true, autoGainControl: true, voiceIsolation: true };
           await mst.applyConstraints(constraints as unknown as MediaTrackConstraints);
         }
       } catch (ce) {
-        console.warn('DFN applyConstraints (voiceIsolation) not supported', ce);
+        console.warn('DFN applyConstraints (raw input) not supported', ce);
       }
     } catch (e) {
       console.error('DFN control error', e);
