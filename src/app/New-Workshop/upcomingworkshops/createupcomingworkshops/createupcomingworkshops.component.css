@@ -31,6 +31,10 @@
   width: 100%;
 }
 
+.grid .full-span {
+  grid-column: 1 / -1;
+}
+
 .toggles {
   margin-top: 8px;
   display: flex;
