@@ -2,6 +2,14 @@
     <mat-progress-bar mode="indeterminate"></mat-progress-bar>
   </div>
 <div *ngIf="!loading" style="padding: 20px;">
+    <button mat-icon-button
+            (click)="closeDialog()"
+            [disabled]="disableButton"
+            matTooltip="Close"
+            aria-label="close dialog"
+            style="position: absolute; top: 8px; right: 8px;">
+        <mat-icon>close</mat-icon>
+    </button>
     <h4> {{mapProfile[profileid]}}'s Live Evolution Mapping</h4>
     <br>
     <div style="display: flex; align-items: center; gap: 20px;">

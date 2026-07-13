@@ -26,6 +26,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTabsModule } from '@angular/material/tabs';
 import { AuthguardService } from '../../authguard.service';
 import { Observable, startWith, map, Subscription, combineLatest, forkJoin, from } from 'rxjs';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 // Interface for email log entry
 interface EmailLog {
@@ -106,7 +107,8 @@ interface StatusCounts {
     MatAutocompleteModule,
     MatCheckboxModule,
     MatTabsModule,
-    FormsModule
+    FormsModule,
+    NgxMatSelectSearchModule
   ],
   templateUrl: './email-record.component.html',
   styleUrls: ['./email-record.component.css']
@@ -126,6 +128,11 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
   private emailArchiveSubscription?: Subscription;
   private profileSubscription?: Subscription;
   private filterSubscription?: Subscription;
+
+  // category map
+  private templateCategoryMap = new Map<string, string>();
+  private templateSubCategoryMap = new Map<string, string>();
+  private categorySubCategoriesMap = new Map<string, Set<string>>();
 
   // Data sources
   dataSource = new MatTableDataSource<any>([]);
@@ -183,6 +190,24 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
     total: 0
   };
 
+  // Category / Sub-Category filter 
+  categoryOptions: string[] = [];
+  selectedCategory: string = 'All Categories';
+  selectedSubCategory: string = 'All Sub-Categories';
+  categorySearchTerm = '';
+  subCategorySearchTerm = '';
+  showCategoryDialog = false;
+  categoryParticipants: any[] = [];
+  filteredCategoryParticipants: any[] = [];
+  categoryParticipantSearch = '';
+  isCategoryLoading = false;
+
+  // Pagination
+  categoryPageSize = 30;
+  categoryCurrentPage = 0;
+  categoryDisplayedParticipants: any[] = [];
+  categorySidebarColumns: string[] = ['email', 'templatename', 'sent', 'open', 'failed'];
+
   constructor(private authguard: AuthguardService) {
     this.filterForm = this.fb.group({
       search: [''],
@@ -199,6 +224,7 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
     this.initializeProfileData();
     this.setupFilterSubscriptions();
     this.loadInitialData();
+    this.loadAllCategories(); 
   }
 
   ngAfterViewInit(): void {
@@ -285,6 +311,29 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  get filteredCategoryOptionsForDropdown(): string[] {
+    const term = this.categorySearchTerm.toLowerCase().trim();
+    const withAll = ['All Categories', ...this.categoryOptions];
+    if (!term) return withAll;
+    return withAll.filter(c => c.toLowerCase().includes(term));
+  }
+
+  get filteredSubCategoryOptionsForDropdown(): string[] {
+    const term = this.subCategorySearchTerm.toLowerCase().trim();
+    const all = new Set<string>();
+
+    if (this.selectedCategory === 'All Categories') {
+      this.categorySubCategoriesMap.forEach(subs => subs.forEach(s => all.add(s)));
+    } else {
+      const subs = this.categorySubCategoriesMap.get(this.selectedCategory);
+      if (subs) subs.forEach(s => all.add(s));
+    }
+
+    const withAll = ['All Sub-Categories', ...Array.from(all).sort()];
+    if (!term) return withAll;
+    return withAll.filter(s => s.toLowerCase().includes(term));
+  }
+
   private setupProfileOptions(): void {
     this.profileOptions = [];
     Object.keys(this.mapProfile).forEach(profileId => {
@@ -296,6 +345,57 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     });
     this.profileOptions.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private async loadAllCategories(): Promise<void> {
+    try {
+      const templatesSnapshot = await getDocs(
+        collection(this.firestore, 'email templates')
+      );
+
+      const uniqueCategories = new Set<string>();
+      this.templateCategoryMap.clear();
+      this.templateSubCategoryMap.clear();
+      this.categorySubCategoriesMap.clear();
+
+      templatesSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const category = data['category'];
+        const subcategory = data['subcategory'];
+
+        if (category) {
+          uniqueCategories.add(category);
+          this.templateCategoryMap.set(doc.id, category);
+          if (data['templateid']) {
+            this.templateCategoryMap.set(data['templateid'], category);
+          }
+          if (data['templatealias']) {
+            this.templateCategoryMap.set(data['templatealias'], category);
+          }
+
+          if (subcategory) {
+            if (!this.categorySubCategoriesMap.has(category)) {
+              this.categorySubCategoriesMap.set(category, new Set<string>());
+            }
+            this.categorySubCategoriesMap.get(category)!.add(subcategory);
+          }
+        }
+
+        if (subcategory) {
+          this.templateSubCategoryMap.set(doc.id, subcategory);
+          if (data['templateid']) {
+            this.templateSubCategoryMap.set(data['templateid'], subcategory);
+          }
+          if (data['templatealias']) {
+            this.templateSubCategoryMap.set(data['templatealias'], subcategory);
+          }
+        }
+      });
+
+      this.categoryOptions = Array.from(uniqueCategories).sort();
+    } catch (error) {
+      console.error('Error loading template categories:', error);
+    }
   }
 
   private setupProfileAutocomplete(): void {
@@ -616,6 +716,30 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!statusMatch) return false;
     }
 
+    if (filterObj.category && filterObj.category !== 'All Categories') {
+      const selectedCat = filterObj.category;
+
+      const catMatch =
+        data.category === selectedCat ||
+        (data.templatedocid && this.templateCategoryMap.get(data.templatedocid) === selectedCat) ||
+        (data.templateid && this.templateCategoryMap.get(data.templateid) === selectedCat) ||
+        (data.templatealias && this.templateCategoryMap.get(data.templatealias) === selectedCat);
+
+      if (!catMatch) return false;
+    }
+
+    if (filterObj.subCategory && filterObj.subCategory !== 'All Sub-Categories') {
+      const selectedSub = filterObj.subCategory;
+
+      const subMatch =
+        data.subcategory === selectedSub ||
+        (data.templatedocid && this.templateSubCategoryMap.get(data.templatedocid) === selectedSub) ||
+        (data.templateid && this.templateSubCategoryMap.get(data.templateid) === selectedSub) ||
+        (data.templatealias && this.templateSubCategoryMap.get(data.templatealias) === selectedSub);
+
+      if (!subMatch) return false;
+    }
+
     return true;
   }
 
@@ -626,17 +750,318 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       emailSearch: this.filterForm.get('emailSearch')?.value || '',
       profileSearch: this.filterForm.get('profileSearch')?.value || '',
       profileFilter: profileFilterValue || null,
-      status: this.filterForm.get('status')?.value || 'All Statuses'
+      status: this.filterForm.get('status')?.value || 'All Statuses',
+      category: this.selectedCategory,
+      subCategory: this.selectedSubCategory
     });
 
     this.dataSource.filter = filterValue;
-
-    if (this.dataSource.paginator) {
-      this.dataSource.paginator.firstPage();
-    }
-
+    if (this.dataSource.paginator) this.dataSource.paginator.firstPage();
     this.calculateStats();
   }
+
+  openCategorySidebar(category: string, subCategory: string): void {
+    const hasCategory = category && category !== 'All Categories';
+    const hasSubCategory = subCategory && subCategory !== 'All Sub-Categories';
+    if (!hasCategory && !hasSubCategory) return;
+
+    const categories = hasCategory ? [category] : [];
+    const subCategories = hasSubCategory ? [subCategory] : [];
+    this.categoryParticipantSearch = '';
+    this.isCategoryLoading = true;
+    this.showCategoryDialog = true;
+    this.categoryCurrentPage = 0;
+    this.buildCategoryParticipants(categories, subCategories);
+  }
+
+  private buildCategoryParticipants(categories: string[], subCategories: string[] = []): void {
+  const matchingRecords = this.dataSource.data.filter((r: any) => {
+    const catMatches = categories.length === 0 || categories.some(category =>
+      r.category === category ||
+      (r.templatedocid && this.templateCategoryMap.get(r.templatedocid) === category) ||
+      (r.templateid && this.templateCategoryMap.get(r.templateid) === category) ||
+      (r.templatealias && this.templateCategoryMap.get(r.templatealias) === category)
+    );
+
+    if (!catMatches) return false;
+    if (subCategories.length === 0) return true;
+
+    return subCategories.some(subCategory =>
+      r.subcategory === subCategory ||
+      (r.templatedocid && this.templateSubCategoryMap.get(r.templatedocid) === subCategory) ||
+      (r.templateid && this.templateSubCategoryMap.get(r.templateid) === subCategory) ||
+      (r.templatealias && this.templateSubCategoryMap.get(r.templatealias) === subCategory)
+    );
+  });
+
+  const participantMap = new Map<string, {
+    email: string;
+    name: string;
+    profileid: string;
+    templates: Set<string>;
+    sent: boolean;
+    open: boolean;
+    failed: boolean;
+    notSent: boolean;
+  }>();
+
+  matchingRecords.forEach((record: any) => {
+    const templateName = record.templateid || record.templatename || 'No Template';
+    const logs: EmailLog[] = record.logs || [];
+    const allRecipients: string[] = record.emailid || [];
+
+    const sentSet = new Set<string>();
+    const openSet = new Set<string>();
+    const failedSet = new Set<string>();
+
+    logs.forEach(log => {
+      const email = log.email?.toLowerCase();
+      if (!email) return;
+      const s = log.msgstatus?.toLowerCase();
+      if (s === 'sent') sentSet.add(email);
+      if (s === 'open' || s === 'opened') openSet.add(email);
+      if (s === 'failed' || s === 'error') failedSet.add(email);
+    });
+
+    allRecipients.forEach((rawEmail: string) => {
+      const emailKey = rawEmail.toLowerCase();
+      const profileId = record.emailmap?.[rawEmail] || record.emailmap?.[emailKey] || '';
+      const profile = profileId
+        ? this.mapProfile[profileId]
+        : this.findProfileByEmail(emailKey);
+
+      if (!participantMap.has(emailKey)) {
+        participantMap.set(emailKey, {
+          email: rawEmail,
+          name: profile?.name || 'Unknown',
+          profileid: profileId || profile?.id || '',
+          templates: new Set<string>(),
+          sent: false,
+          open: false,
+          failed: false,
+          notSent: false
+        });
+      }
+
+      const entry = participantMap.get(emailKey)!;
+      entry.templates.add(templateName);
+      if (sentSet.has(emailKey)) entry.sent = true;
+      if (openSet.has(emailKey)) entry.open = true;
+      if (failedSet.has(emailKey)) entry.failed = true;
+      if (!sentSet.has(emailKey)) entry.notSent = true;
+    });
+  });
+
+ this.categoryParticipants = Array.from(participantMap.values()).map(p => ({
+    ...p,
+    templateNames: Array.from(p.templates).join(', '),
+    templateList: Array.from(p.templates)  
+  }));
+
+  this.enrichParticipantsWithTemplateStatus(this.categoryParticipants, categories, subCategories);
+
+  this.filterCategoryParticipants();
+  this.isCategoryLoading = false;
+}
+
+get isCategoriesIndeterminate(): boolean {
+  const options = this.filteredCategoryOptionsForDropdown;
+  const selectedCount = options.filter(c => this.selectedCategory.includes(c)).length;
+  return selectedCount > 0 && selectedCount < options.length;
+}
+
+onCategorySelectionChange(): void {
+  this.pruneInvalidSubCategorySelections();
+  this.applyFilters();
+}
+
+onSubCategorySelectionChange(): void {
+  this.applyFilters();
+}
+
+private pruneInvalidSubCategorySelections(): void {
+  if (this.selectedCategory === 'All Categories') return;
+  const validSubs = this.categorySubCategoriesMap.get(this.selectedCategory);
+  if (!validSubs || !validSubs.has(this.selectedSubCategory)) {
+    this.selectedSubCategory = 'All Sub-Categories';
+  }
+}
+
+fetchSentCount(p: any): number {
+  return (p.templateStatuses || []).filter((ts: any) => ts.sent && !ts.failed).length;
+}
+fetchOpenCount(p: any): number {
+  return (p.templateStatuses || []).filter((ts: any) => ts.open).length;
+}
+fetchFailedCount(p: any): number {
+  return (p.templateStatuses || []).filter((ts: any) => ts.failed).length;
+}
+
+private enrichParticipantsWithTemplateStatus(participants: any[], categories: string[], subCategories: string[] = []): void {
+  const matchingRecords = this.dataSource.data.filter((r: any) => {
+    const catMatches = categories.length === 0 || categories.some(category =>
+      r.category === category ||
+      (r.templatedocid && this.templateCategoryMap.get(r.templatedocid) === category) ||
+      (r.templateid && this.templateCategoryMap.get(r.templateid) === category) ||
+      (r.templatealias && this.templateCategoryMap.get(r.templatealias) === category)
+    );
+
+    if (!catMatches) return false;
+    if (subCategories.length === 0) return true;
+
+    return subCategories.some(subCategory =>
+      r.subcategory === subCategory ||
+      (r.templatedocid && this.templateSubCategoryMap.get(r.templatedocid) === subCategory) ||
+      (r.templateid && this.templateSubCategoryMap.get(r.templateid) === subCategory) ||
+      (r.templatealias && this.templateSubCategoryMap.get(r.templatealias) === subCategory)
+    );
+  });
+
+  const emailTemplateMap = new Map<string, Map<string, { sent: boolean; open: boolean; failed: boolean }>>();
+
+  matchingRecords.forEach((record: any) => {
+    const templateName = record.templateid || record.templatename || 'No Template';
+    const logs: EmailLog[] = record.logs || [];
+    const recordRecipients = new Set<string>(
+      (record.emailid || []).map((e: string) => e.toLowerCase())
+    );
+
+    if (recordRecipients.size === 0) return;
+
+    const sentSet = new Set<string>();
+    const openSet = new Set<string>();
+    const failedSet = new Set<string>();
+
+    logs.forEach((log: EmailLog) => {
+      const email = log.email?.toLowerCase();
+      if (!email) return;
+      const s = log.msgstatus?.toLowerCase();
+      if (s === 'sent') sentSet.add(email);
+      if (s === 'open' || s === 'opened') openSet.add(email);
+      if (s === 'failed' || s === 'error') failedSet.add(email);
+    });
+
+    recordRecipients.forEach((emailKey: string) => {
+      if (!emailTemplateMap.has(emailKey)) {
+        emailTemplateMap.set(emailKey, new Map());
+      }
+      const tMap = emailTemplateMap.get(emailKey)!;
+
+      const wasSent = sentSet.has(emailKey);
+      const wasFailed = failedSet.has(emailKey);
+      const wasOpened = openSet.has(emailKey);
+
+      if (wasSent || wasFailed || wasOpened) {
+        tMap.set(templateName, {
+          sent: wasSent,
+          open: wasOpened,
+          failed: wasFailed
+        });
+      }
+    });
+  });
+
+  participants.forEach(p => {
+    const emailKey = p.email.toLowerCase();
+    const tMap = emailTemplateMap.get(emailKey);
+    p.templateStatuses = tMap
+      ? Array.from(tMap.entries()).map(([name, flags]) => ({
+          templateName: name,
+          sent: flags.sent,
+          open: flags.open,
+          failed: flags.failed
+        }))
+      : [];
+  });
+}
+
+filterCategoryParticipants(): void {
+  const search = this.categoryParticipantSearch.toLowerCase().trim();
+  const base = !search
+    ? [...this.categoryParticipants]
+    : this.categoryParticipants.filter(p =>
+        p.email.toLowerCase().includes(search) ||
+        p.name.toLowerCase().includes(search) ||
+        p.profileid.toLowerCase().includes(search) ||
+        p.templateNames.toLowerCase().includes(search)
+      );
+  this.filteredCategoryParticipants = base;
+  this.categoryCurrentPage = 0;
+  this.updateCategoryPage();
+}
+
+updateCategoryPage(): void {
+  const start = this.categoryCurrentPage * this.categoryPageSize;
+  this.categoryDisplayedParticipants = this.filteredCategoryParticipants.slice(start, start + this.categoryPageSize);
+}
+
+get categoryTotalPages(): number {
+  return Math.ceil(this.filteredCategoryParticipants.length / this.categoryPageSize);
+}
+
+categoryNextPage(): void {
+  if (this.categoryCurrentPage < this.categoryTotalPages - 1) {
+    this.categoryCurrentPage++;
+    this.updateCategoryPage();
+  }
+}
+
+categoryPrevPage(): void {
+  if (this.categoryCurrentPage > 0) {
+    this.categoryCurrentPage--;
+    this.updateCategoryPage();
+  }
+}
+
+onCategoryParticipantSearchChange(): void {
+  this.filterCategoryParticipants();
+}
+
+closeCategorySidebar(): void {
+  this.showCategoryDialog = false;
+  this.categoryParticipants = [];
+  this.filteredCategoryParticipants = [];
+  this.categoryDisplayedParticipants = [];
+  this.categoryParticipantSearch = '';
+}
+
+get categorySidebarSentCount(): number {
+  return this.categoryParticipants.filter(p => p.sent).length;
+}
+get categorySidebarOpenCount(): number {
+  return this.categoryParticipants.filter(p => p.open).length;
+}
+get categorySidebarFailedCount(): number {
+  return this.categoryParticipants.filter(p => p.failed).length;
+}
+
+exportCategoryParticipants(): void {
+  if (!this.filteredCategoryParticipants.length) {
+    this.showSnackBar('No participants to export');
+    return;
+  }
+  const headers = ['Email', 'Name', 'Profile ID', 'Templates', 'Sent', 'Opened', 'Failed'];
+  const rows = [headers.join(',')];
+  this.filteredCategoryParticipants.forEach(p => {
+    rows.push([
+      `"${p.email}"`,
+      `"${p.name}"`,
+      `"${p.profileid}"`,
+      `"${p.templateNames}"`,
+      p.sent ? 'Yes' : 'No',
+      p.open ? 'Yes' : 'No',
+      p.failed ? 'Yes' : 'No'
+    ].join(','));
+  });
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `category-${this.selectedCategory}-participants.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+  this.showSnackBar('Exported successfully');
+}
 
   calculateStats(): void {
     const records = this.dataSource.filteredData || this.dataSource.data;
@@ -699,6 +1124,8 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       profileSearch: '',
       profileFilter: ''
     });
+    this.selectedCategory = 'All Categories';
+    this.selectedSubCategory = 'All Sub-Categories';
     this.applyDateFilter();
   }
 
