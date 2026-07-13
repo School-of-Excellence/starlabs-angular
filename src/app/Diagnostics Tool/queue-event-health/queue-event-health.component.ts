@@ -71,6 +71,16 @@ export class QueueEventHealthComponent {
   queueStartDate: Date | null = null;
   queueEndDate: Date | null = null;
   arenaEventMap: Map<string, string> = new Map();
+  atcGivenCount = 0;
+  atcNotGivenCount = 0;
+  atcGivenNames: any[] = [];
+  atcNotGivenNames: any[] = [];
+  showAtcNameList = false;
+  activeAtcListType: 'given' | 'not_given' | 'no_queue' | null = null;
+  atcNoQueueCount = 0;
+  atcNoQueueNames: any[] = [];
+  authorNameMap: Map<string, string> = new Map();
+  profileAtcDetailsMap: Map<string, any[]> = new Map();
 
   /* ================= FILTERS ================= */
 
@@ -348,6 +358,28 @@ export class QueueEventHealthComponent {
     this.initiatedNotInQueueRecords = [];
     this.initiatedNotInQueueDocs = [];
     this.activeView = 'main';
+    this.atcGivenCount = 0;
+    this.atcNotGivenCount = 0;
+    this.atcGivenNames = [];
+    this.atcNotGivenNames = [];
+    this.showAtcNameList = false;
+    this.activeAtcListType = null;
+    this.atcNoQueueCount = 0;
+    this.atcNoQueueNames = [];
+    // this.selectedProfileId = null;
+    // this.selectedProfileAtcList = [];
+    this.profileAtcDetailsMap = new Map();
+    this.atcValidateRecords = [];
+
+    if (this.atcAlphaUnsub) {
+      this.atcAlphaUnsub();
+      this.atcAlphaUnsub = null;
+    }
+
+    if (this.atcValidateUnsub) {
+      this.atcValidateUnsub();
+      this.atcValidateUnsub = null;
+    }
 
     if (this.initiatedNotInQueuePpUnsub) {
       this.initiatedNotInQueuePpUnsub();
@@ -802,6 +834,46 @@ export class QueueEventHealthComponent {
     if (this.tokenUnsub) this.tokenUnsub();
     if (this.ppUnsub) this.ppUnsub();
 
+    const firestoreAtc = getFirestore("firestore-atc");
+    if (this.atcAlphaUnsub) this.atcAlphaUnsub();
+    this.atcAlphaUnsub = onSnapshot(
+      query(
+        collection(firestoreAtc, 'atc_alpha'),
+        where('isdelete', '==', false)
+      ),
+      (snap) => {
+        this.atcAlphaRecords = snap.docs.map(d => ({
+          id: d.id,
+          profileid: d.data()['profileid'],
+          prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
+          queueid: d.data()['queueid'] ?? null,
+          author: d.data()['author'] ?? [],
+          source: 'atc_alpha'
+        }));
+        this.calculateAtcGivenCounts();
+        this.calculateAtcNoQueueCounts();
+      }
+    );
+
+    if (this.atcValidateUnsub) this.atcValidateUnsub();
+    this.atcValidateUnsub = onSnapshot(
+      query(
+        collection(firestoreAtc, 'atc_to_validate'),
+        where('isdelete', '==', false)
+      ),
+      (snap) => {
+        this.atcValidateRecords = snap.docs.map(d => ({
+          id: d.id,
+          profileid: d.data()['profileid'],
+          prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
+          queueid: d.data()['queueid'] ?? null,
+          author: d.data()['author'] ?? [],
+          status: d.data()['status'] ?? null,
+          source: 'atc_to_validate'
+        }));
+      }
+    );
+
     try {
       const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
       // ATC ALPHA (VALID)
@@ -899,6 +971,111 @@ export class QueueEventHealthComponent {
   }
 
 
+  calculateAtcGivenCounts() {
+    const givenProfileIds = new Set<string>();
+
+    for (const a of this.atcAlphaRecords) {
+      if (a.profileid && this.isWithinQueueDate(a.prescriptionDate)) {
+        givenProfileIds.add(a.profileid);
+      }
+    }
+
+    // PER TOKEN (counts every token, duplicates possible)
+    // this.atcGivenNames = this.allRecords.filter(r => givenProfileIds.has(r.profileid));
+    // this.atcNotGivenNames = this.allRecords.filter(r => !givenProfileIds.has(r.profileid));
+
+    // PER PERSON (unique profileid only, no duplicates)
+    const seenGiven = new Set<string>();
+    this.atcGivenNames = this.allRecords.filter(r => {
+      if (!givenProfileIds.has(r.profileid)) return false;
+      if (seenGiven.has(r.profileid)) return false;
+      seenGiven.add(r.profileid);
+      return true;
+    });
+
+    const seenNotGiven = new Set<string>();
+    this.atcNotGivenNames = this.allRecords.filter(r => {
+      if (givenProfileIds.has(r.profileid)) return false;
+      if (seenNotGiven.has(r.profileid)) return false;
+      seenNotGiven.add(r.profileid);
+      return true;
+    });
+
+    this.atcGivenCount = this.atcGivenNames.length;
+    this.atcNotGivenCount = this.atcNotGivenNames.length;
+  }
+
+  calculateAtcNoQueueCounts() {
+    const noQueueProfileIds = new Set<string>();
+
+    for (const a of this.atcAlphaRecords) {
+      const hasNoQueue = a.queueid === null || a.queueid === undefined || String(a.queueid).trim() === '';
+      if (a.profileid && hasNoQueue && this.isWithinQueueDate(a.prescriptionDate)) {
+        noQueueProfileIds.add(a.profileid);
+      }
+    }
+
+    // PER TOKEN (counts every token, duplicates possible)
+    // this.atcNoQueueNames = this.allRecords.filter(r => noQueueProfileIds.has(r.profileid));
+
+    // PER PERSON (unique profileid only, no duplicates)
+    const seenNoQueue = new Set<string>();
+    this.atcNoQueueNames = this.allRecords.filter(r => {
+      if (!noQueueProfileIds.has(r.profileid)) return false;
+      if (seenNoQueue.has(r.profileid)) return false;
+      seenNoQueue.add(r.profileid);
+      return true;
+    });
+
+    this.atcNoQueueCount = this.atcNoQueueNames.length;
+  }
+
+  async resolveAuthorNames(authorRefs: any[]): Promise<string> {
+    if (!authorRefs || authorRefs.length === 0) return '-';
+    const names = await Promise.all(authorRefs.map(async (ref) => {
+      const id = ref?.id;
+      if (!id) return null;
+      if (this.authorNameMap.has(id)) return this.authorNameMap.get(id);
+      try {
+        const snap = await getDoc(doc(this.firestoreDefault, 'profile_data', id));
+        const name = snap.exists() ? (snap.data()['name'] ?? id) : id;
+        this.authorNameMap.set(id, name);
+        return name;
+      } catch {
+        return id;
+      }
+    }));
+    return names.filter(Boolean).join(', ');
+  }
+
+  async buildAllProfileAtcDetails() {
+    const allProfileIds = new Set<string>([
+      ...this.atcGivenNames.map(r => r.profileid),
+      ...this.atcNotGivenNames.map(r => r.profileid),
+      ...this.atcNoQueueNames.map(r => r.profileid)
+    ]);
+
+    for (const profileid of allProfileIds) {
+      const allAtcs = [...this.atcAlphaRecords, ...this.atcValidateRecords]
+        .filter((a: any) => a.profileid === profileid);
+
+      const resolved = await Promise.all(allAtcs.map(async (a: any) => {
+        const authorNames = await this.resolveAuthorNames(a.author);
+        const isValidated = a.source === 'atc_alpha' ? true : (a.status !== 'atc given');
+        const noQueue = a.queueid === null || a.queueid === undefined || String(a.queueid).trim() === '';
+        return {
+          prescriptionDate: a.prescriptionDate,
+          authorNames,
+          isValidated,
+          noQueue
+        };
+      }));
+
+      resolved.sort((x, y) => (y.prescriptionDate?.getTime() ?? 0) - (x.prescriptionDate?.getTime() ?? 0));
+
+      this.profileAtcDetailsMap.set(profileid, resolved);
+    }
+  }
 
   buildLiveReport() {
     this.allRecords = [];
@@ -1115,6 +1292,8 @@ export class QueueEventHealthComponent {
     this.reportLoaded = true;
     this.loading = false;
     this.calculateInvalidKpiCounts();
+    this.calculateAtcGivenCounts();
+    this.calculateAtcNoQueueCounts();
   }
 
   get selectedCount(): number {
@@ -1203,9 +1382,20 @@ export class QueueEventHealthComponent {
 
   /* ================= KPI CLICK ================= */
 
+  onAtcCountClick(type: 'given' | 'not_given' | 'no_queue') {
+    this.activeAtcListType = this.activeAtcListType === type ? null : type;
+    this.showAtcNameList = this.activeAtcListType !== null;
+
+    if (this.showAtcNameList) {
+      this.buildAllProfileAtcDetails();
+    }
+  }
+
   onKpiClick(
     type: 'completed' | 'initiated' | 'active' | 'inactive' | 'shifted' | 'ongoing' | 'cancelled' | 'valid' | 'invalid' | 'invalid_reason' | 'invalid_product' | 'invalid_event_status' | 'initiated_not_in_queue'
   ) {
+    this.showAtcNameList = false;
+    this.activeAtcListType = null;
     if (type === 'initiated_not_in_queue') {
       this.activeView =
         this.activeView === 'initiated_not_in_queue' ? 'main' : 'initiated_not_in_queue';

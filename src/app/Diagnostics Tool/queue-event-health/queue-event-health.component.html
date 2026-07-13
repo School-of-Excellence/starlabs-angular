@@ -99,6 +99,27 @@
       <div class="kpi-value">{{ dashboard.initiatedNotInQueue }}</div>
       <div class="kpi-label">Initiated — Not In Queue</div>
     </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('given')"
+        [class.active]="activeAtcListType==='given'">
+      <div class="kpi-value">{{ atcGivenCount }}</div>
+      <div class="kpi-label">ATC Given</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('not_given')"
+        [class.active]="activeAtcListType==='not_given'">
+      <div class="kpi-value">{{ atcNotGivenCount }}</div>
+      <div class="kpi-label">ATC Not Given</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('no_queue')"
+        [class.active]="activeAtcListType==='no_queue'">
+      <div class="kpi-value">{{ atcNoQueueCount }}</div>
+      <div class="kpi-label">ATC — No Queue ID</div>
+    </div>
   </div>
 
   <!-- ACTION ROW -->
@@ -155,7 +176,7 @@
   </button>
 
 <!-- ALL TOKENS TABLE -->
-  <div class="table-wrapper" *ngIf="reportLoaded && paginatedRecords.length > 0 && activeView === 'main'">
+  <div class="table-wrapper" *ngIf="reportLoaded && paginatedRecords.length > 0 && activeView === 'main' && !showAtcNameList">
     <table>
       <thead>
         <tr>
@@ -232,7 +253,7 @@
   </div>
 
   <!-- INITIATED NOT IN QUEUE TABLE -->
-  <div *ngIf="activeView === 'initiated_not_in_queue' && reportLoaded">
+  <div *ngIf="activeView === 'initiated_not_in_queue' && reportLoaded && !showAtcNameList">
 
     <ng-container *ngIf="initiatedNotInQueueRecords.length > 0">
       <table>
@@ -265,6 +286,78 @@
         </tbody>
       </table>
     </ng-container>
+  </div>
+
+  <!-- ATC NAMELIST TABLE -->
+  <div class="table-wrapper" *ngIf="showAtcNameList">
+    <h3>
+      {{ activeAtcListType === 'given' ? 'ATC Given'
+        : activeAtcListType === 'not_given' ? 'ATC Not Given'
+        : 'ATC — No Queue ID' }}
+    </h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Participant Name</th>
+          <th>Product Name</th>
+          <th>Token Number</th>
+          <th>Current Stage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let r of (
+              activeAtcListType === 'given' ? atcGivenNames :
+              activeAtcListType === 'not_given' ? atcNotGivenNames :
+              atcNoQueueNames
+            )">
+          <tr>
+            <td>{{ r.participantName }}</td>
+            <td>{{ r.productName }}</td>
+            <td>{{ r.TokenID }}</td>
+            <td>{{ r.tokenStage }}</td>
+          </tr>
+          <tr>
+            <td colspan="4" style="background:#f8f9fb; padding: 10px 20px;">
+              <table style="width:100%; border-collapse:collapse;">
+                <tbody>
+                  <tr *ngFor="let a of profileAtcDetailsMap.get(r.profileid)"
+                      [style.background]="a.noQueue ? '#fdecea' : 'transparent'">
+                    <td style="padding:6px 10px;">
+                      {{ a.prescriptionDate | date:'medium' }} by {{ a.authorNames }}
+                      ({{ a.isValidated ? 'validated' : 'not_validated' }})
+                      <span *ngIf="a.noQueue">— ATC not mapped to any queue</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ATC DETAIL DRILLDOWN -->
+  <div class="table-wrapper" *ngIf="showAtcDetailModal">
+    <button (click)="showAtcDetailModal = false">Close</button>
+    <table>
+      <thead>
+        <tr>
+          <th>Prescription Date</th>
+          <th>Specialist</th>
+          <th>Validation</th>
+          <th>Queue Mapping</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let a of selectedProfileAtcList">
+          <td>{{ a.prescriptionDate | date:'medium' }}</td>
+          <td>{{ a.authorNames }}</td>
+          <td>{{ a.isValidated ? 'Validated' : 'Not Validated' }}</td>
+          <td>{{ a.noQueue ? 'Not mapped to queue' : 'Mapped' }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- PAGINATION — shared for both views -->
