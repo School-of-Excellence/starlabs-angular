@@ -1,0 +1,246 @@
+<div class="page">
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>New Users</h1>
+    </div>
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    <mat-spinner diameter="36"></mat-spinner>
+  </div>
+
+  <div class="empty-state" *ngIf="!loading && dataSource.data.length === 0">
+    <mat-icon>group_off</mat-icon>
+    <h3>No users yet</h3>
+    <p>New users will appear here.</p>
+  </div>
+
+  <div class="content-row" *ngIf="!loading && dataSource.data.length > 0"
+    [class.with-panel]="selection.hasValue()">
+  <div class="content-main">
+  <div class="table-card">
+    <div class="table-toolbar">
+      <button mat-stroked-button class="tag-select-btn" [class.active]="selectByTagIds.size > 0"
+        [matMenuTriggerFor]="tagSelectMenu">
+        <mat-icon>sell</mat-icon>
+        Select by tags
+        <span class="tag-badge" *ngIf="selectByTagIds.size > 0">{{ selectByTagIds.size }}</span>
+        <mat-icon class="trail">arrow_drop_down</mat-icon>
+      </button>
+
+      <mat-menu #tagSelectMenu="matMenu" class="tag-filter-menu" xPosition="after">
+        <div class="tfm" (click)="$event.stopPropagation()" (keydown.tab)="$event.stopPropagation()">
+          <div class="tfm-head">
+            <span class="tfm-title">Filter by tags</span>
+            <button type="button" class="tfm-clear" *ngIf="selectByTagIds.size > 0" (click)="clearTagFilter()">
+              Clear
+            </button>
+          </div>
+
+          <div class="tfm-modes">
+            <button type="button" class="tfm-mode" [class.on]="selectByTagMode === 'all'" (click)="setTagMode('all')">
+              <mat-icon>done_all</mat-icon> Match all
+            </button>
+            <button type="button" class="tfm-mode" [class.on]="selectByTagMode === 'any'" (click)="setTagMode('any')">
+              <mat-icon>done</mat-icon> Match any
+            </button>
+          </div>
+
+          <div class="tfm-list">
+            <button type="button" class="tfm-item" *ngFor="let t of allTags"
+              [class.sel]="selectByTagIds.has(t.id)" (click)="toggleTagSelect(t.id)">
+              <mat-icon class="tfm-check">
+                {{ selectByTagIds.has(t.id) ? 'check_box' : 'check_box_outline_blank' }}
+              </mat-icon>
+              <span class="tfm-name">{{ t.name }}</span>
+            </button>
+            <div class="tfm-empty" *ngIf="allTags.length === 0">No tags available</div>
+          </div>
+
+          <div class="tfm-foot">
+            <mat-icon>filter_alt</mat-icon>
+            <span>{{ matchCount() }} profile(s) shown</span>
+          </div>
+        </div>
+      </mat-menu>
+
+      <div class="date-filter-wrap">
+        <button mat-stroked-button type="button" class="tag-select-btn date-filter-btn"
+          [class.active]="hasDateFilter" (click)="createdPicker.open()">
+          <mat-icon>event</mat-icon>
+          <span class="df-label" *ngIf="!hasDateFilter">Created date</span>
+          <span class="df-label" *ngIf="hasDateFilter">
+            {{ startDate ? (startDate | date: 'MMM d, y') : '…' }} – {{ endDate ? (endDate | date: 'MMM d, y') : '…' }}
+          </span>
+          <mat-icon *ngIf="hasDateFilter" class="df-clear" matTooltip="Clear dates"
+            (click)="$event.stopPropagation(); clearDates()">close</mat-icon>
+        </button>
+
+        <mat-form-field class="date-hidden" appearance="outline" subscriptSizing="dynamic">
+          <mat-date-range-input [rangePicker]="createdPicker">
+            <input matStartDate [(ngModel)]="startDate" [ngModelOptions]="{ standalone: true }"
+              (dateChange)="onDateChange()" />
+            <input matEndDate [(ngModel)]="endDate" [ngModelOptions]="{ standalone: true }"
+              (dateChange)="onDateChange()" />
+          </mat-date-range-input>
+          <mat-date-range-picker #createdPicker></mat-date-range-picker>
+        </mat-form-field>
+      </div>
+
+      <button mat-button type="button" class="clear-filters-btn" *ngIf="hasAnyFilter"
+        (click)="clearAllFilters()" matTooltip="Clear all filters">
+        <mat-icon>filter_alt_off</mat-icon>
+        Clear
+      </button>
+
+      <mat-form-field appearance="outline" class="search-field" subscriptSizing="dynamic">
+        <mat-icon matPrefix>search</mat-icon>
+        <input matInput [value]="searchText" (keyup)="applyFilter($event)" placeholder="Search users" />
+      </mat-form-field>
+    </div>
+
+    <div class="table-scroll">
+      <table mat-table [dataSource]="dataSource" matSort class="users-table">
+
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef class="select-col">
+            <mat-checkbox (change)="masterToggle()"
+              [checked]="isAllSelected()"
+              [indeterminate]="someSelected()"
+              matTooltip="Select all">
+            </mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let u" class="select-col">
+            <mat-checkbox (change)="selection.toggle(rowId(u))"
+              [checked]="selection.isSelected(rowId(u))">
+            </mat-checkbox>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let u"><div class="cell-strong">{{ u.name || '—' }}</div></td>
+        </ng-container>
+
+        <ng-container matColumnDef="phonenumber">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Phone</th>
+          <td mat-cell *matCellDef="let u">
+            {{ (u.countryCode || u.phonenumber)
+                ? ((u.countryCode ? u.countryCode + ' ' : '') + (u.phonenumber || '')) : '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
+          <td mat-cell *matCellDef="let u" class="email-cell">{{ u.email || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="created">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Created</th>
+          <td mat-cell *matCellDef="let u">{{ toDate(u.created) ? (toDate(u.created) | date: 'medium') : '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="enable">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let u">
+            <span class="chip" [class.chip-on]="u.enable" [class.chip-off]="!u.enable">
+              {{ u.enable ? 'Enabled' : 'Disabled' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="referredby">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Referred by</th>
+          <td mat-cell *matCellDef="let u">
+            <span *ngIf="isSubscriber(u)" class="chip chip-sub">Subscriber</span>
+            <span *ngIf="!isSubscriber(u) && referredBy(u)">{{ referredBy(u) }}</span>
+            <span *ngIf="!isSubscriber(u) && !referredBy(u)">—</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="tags">
+          <th mat-header-cell *matHeaderCellDef>Tags</th>
+          <td mat-cell *matCellDef="let u">
+            <div class="tags-cell">
+              <span class="tag-pill" *ngFor="let name of tagNames(u)">{{ name }}</span>
+              <button type="button" class="tag-edit-btn" (click)="openTags(u)"
+                [matTooltip]="tagNames(u).length ? 'Edit tags' : 'Add tags'">
+                <mat-icon>{{ tagNames(u).length ? 'edit' : 'add' }}</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+
+        <tr class="no-match-row" *matNoDataRow>
+          <td class="no-match-cell" [attr.colspan]="displayedColumns.length">No users match your search.</td>
+        </tr>
+      </table>
+    </div>
+
+    <mat-paginator [pageSize]="20" [pageSizeOptions]="[20, 50, 100]" showFirstLastButtons></mat-paginator>
+  </div>
+  </div>
+
+  <aside class="side-panel" *ngIf="selection.hasValue()">
+    <div class="sp-head">
+      <div class="sp-count">
+        <span class="sp-num">{{ selection.selected.length }}</span>
+        <span>selected</span>
+      </div>
+      <button type="button" class="sp-clear" (click)="clearSelection()" matTooltip="Clear selection">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <button mat-flat-button color="primary" class="sp-action" (click)="openBulkTags()" [disabled]="applyingBulk">
+      <mat-spinner *ngIf="applyingBulk" diameter="18"></mat-spinner>
+      <ng-container *ngIf="!applyingBulk"><mat-icon>sell</mat-icon> Edit tags</ng-container>
+    </button>
+
+    <button mat-stroked-button class="sp-action sp-export-toggle" (click)="toggleExport()">
+      <mat-icon>file_download</mat-icon> Export
+      <mat-icon class="sp-caret">{{ showExport ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+
+    <div class="export-panel" *ngIf="showExport">
+      <div class="export-head">
+        <span class="export-label">Columns</span>
+        <button type="button" class="export-all" (click)="selectAllExportColumns()">Select all</button>
+      </div>
+
+      <mat-chip-listbox multiple [(ngModel)]="selectedExportKeys" class="export-chips">
+        <mat-chip-option *ngFor="let c of exportColumns" [value]="c.key">{{ c.label }}</mat-chip-option>
+      </mat-chip-listbox>
+
+      <button mat-flat-button color="primary" class="download-btn" (click)="exportExcel()"
+        [disabled]="selectedExportKeys.length === 0">
+        <mat-icon>download</mat-icon> Download Excel
+      </button>
+      <p class="export-hint">Exports the {{ selection.selected.length }} selected profile(s).</p>
+    </div>
+
+    <button mat-stroked-button class="sp-action sp-export-toggle" (click)="toggleComm()">
+      <mat-icon>campaign</mat-icon> Send communication
+      <mat-icon class="sp-caret">{{ showComm ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+
+    <div class="comm-panel" *ngIf="showComm">
+      <div class="comm-bar">
+        <button type="button" class="comm-btn" (click)="sendMail()" matTooltip="Email">
+          <i class="fa-solid fa-envelope"></i>
+        </button>
+        <button type="button" class="comm-btn" (click)="sendWatti()" matTooltip="WhatsApp">
+          <i class="fa-brands fa-whatsapp"></i>
+        </button>
+        <button type="button" class="comm-btn" (click)="sendNotificationinBreakthrough()" matTooltip="Notification">
+          <mat-icon>notifications_active</mat-icon>
+        </button>
+      </div>
+      <p class="export-hint">Send to the {{ selection.selected.length }} selected profile(s).</p>
+    </div>
+  </aside>
+</div>
+</div>

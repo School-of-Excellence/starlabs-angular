@@ -6,7 +6,7 @@ import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
 import { Observable, Subject } from 'rxjs';
 import { map, startWith, takeUntil } from 'rxjs/operators';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
-import { collectionData, Firestore, collection, doc , setDoc} from '@angular/fire/firestore';
+import { collectionData, Firestore, collection, doc, setDoc, query, where } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
@@ -115,7 +115,7 @@ export class QueueNotesComponent {
   // Load all existing tags from Firestore
   loadTagsFromFirestore(): void {
     this.loading = true;
-    collectionData(collection(this.firestore, 'queue tags'))
+    collectionData(query(collection(this.firestore, 'queue tags'),where('isDelete', '==', false)))
     .pipe(takeUntil(this.subscriptionHandle))
     .subscribe({
       next: (tagsData: any[]) => {
@@ -149,7 +149,8 @@ export class QueueNotesComponent {
     setDoc(doc(this.firestore,'queue tags',tagId),{
       id: tagId,
       name: tagName,
-      createdAt: new Date()
+      createdAt: new Date(),
+      isDelete: false
     })
     .then(() => {
       console.log('Tag added to Firestore:', tagName);

@@ -338,15 +338,18 @@ export class BigCohortClone2Component {
     // Load saved selections from localStorage
     this.loadSavedSelections();
 
-    getDocs(collection(this.firestore, "big cohorts")).then(snap => {
-      this.cohortsList = snap.docs.map(e => {
-        let element: any = e.data()
-        element['contentview'] = 'participants'
-        return element
+    collectionSnapshots(collection(this.firestore, "big cohorts"))
+      .pipe(takeUntil(this.subscription))
+      .subscribe(snapData => {
+        this.cohortsList = snapData.map(d => {
+          let element: any = d.data()
+          const existing = this.cohortsList?.find((c: any) => c.docid === element.docid)
+          element['contentview'] = existing?.['contentview'] ?? 'participants'
+          return element
+        })
+        this.filteredCohortsList = this.cohortsList
+        this.toRunFilterFunctions()
       })
-      this.filteredCohortsList = this.cohortsList
-      this.toRunFilterFunctions()
-    })
     getDocs(query(collection(this.firestore, "big marathon"), orderBy("startdate", "asc"))).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const element: any = snap.docs[i].data();
@@ -2003,16 +2006,7 @@ export class BigCohortClone2Component {
     });
 
     dialogRef.afterClosed().subscribe((result) => {
-      if (result) {
-        getDocs(collection(this.firestore, "big cohorts")).then(snap => {
-          this.cohortsList = snap.docs.map(e => {
-            let element: any = e.data()
-            element['contentview'] = 'activities'
-            return element
-          })
-          this.toRunFilterFunctions()
-        })
-      }
+      // cohort list updates automatically via the live "big cohorts" listener
     });
   }
 
