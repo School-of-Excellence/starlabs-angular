@@ -2,7 +2,7 @@ import { Component , HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, onSnapshot, collection, getDocs, query, where, doc, updateDoc, serverTimestamp,getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { getFirestore, onSnapshot, collection, getDocs, query, where, doc, updateDoc, serverTimestamp,getDoc, setDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
@@ -81,6 +81,7 @@ export class QueueEventHealthComponent {
   atcNoQueueNames: any[] = [];
   authorNameMap: Map<string, string> = new Map();
   profileAtcDetailsMap: Map<string, any[]> = new Map();
+  atcModelsForQueue: string[] = [];
 
   /* ================= FILTERS ================= */
 
@@ -625,6 +626,60 @@ export class QueueEventHealthComponent {
       );
     }
 
+    startAtcListeners(queueRef: any) {
+      if (this.atcModelsForQueue.length === 0) return;
+
+      const firestoreAtc = getFirestore("firestore-atc");
+      const startTimestamp = Timestamp.fromDate(this.queueStartDate as Date);
+      const endTimestamp = Timestamp.fromDate(this.queueEndDate as Date);
+
+      if (this.atcAlphaUnsub) this.atcAlphaUnsub();
+      this.atcAlphaUnsub = onSnapshot(
+        query(
+          collection(firestoreAtc, 'atc_alpha'),
+          where('isdelete', '==', false),
+          // where('product', 'in', this.atcModelsForQueue),
+          where('prescription_date', '>=', startTimestamp),
+          where('prescription_date', '<=', endTimestamp)
+        ),
+        (snap) => {
+          this.atcAlphaRecords = snap.docs.map(d => ({
+            id: d.id,
+            profileid: d.data()['profileid'],
+            prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
+            queueid: d.data()['queueid'] ?? null,
+            author: d.data()['author'] ?? [],
+            source: 'atc_alpha'
+          }));
+          this.calculateAtcGivenCounts();
+          this.calculateAtcNoQueueCounts();
+        }
+      );
+
+      if (this.atcValidateUnsub) this.atcValidateUnsub();
+      this.atcValidateUnsub = onSnapshot(
+        query(
+          collection(firestoreAtc, 'atc_to_validate'),
+          where('isdelete', '==', false),
+          where('status', '==', 'atc given'),
+          where('product', 'in', this.atcModelsForQueue),
+          where('prescription_date', '>=', startTimestamp),
+          where('prescription_date', '<=', endTimestamp)
+        ),
+        (snap) => {
+          this.atcValidateRecords = snap.docs.map(d => ({
+            id: d.id,
+            profileid: d.data()['profileid'],
+            prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
+            queueid: d.data()['queueid'] ?? null,
+            author: d.data()['author'] ?? [],
+            status: d.data()['status'] ?? null,
+            source: 'atc_to_validate'
+          }));
+        }
+      );
+    }
+
   /* ================= LOAD QUEUES ================= */
 
   async loadQueues() {
@@ -792,11 +847,12 @@ export class QueueEventHealthComponent {
     this.resetReport();
     // ---- INITIATED NOT IN QUEUE LISTENER ----
     if (this.initiatedNotInQueuePpUnsub) this.initiatedNotInQueuePpUnsub();
-
+    const queueRef = doc(this.firestoreDefault,'queue generation',queueId);
     this.initiatedNotInQueuePpUnsub = onSnapshot(
       query(
         collection(this.firestoreDefault, 'participantsproduct'),
-        where('status', '==', 'initiated')
+        where('status', '==', 'initiated'),
+        where('eventref','==', queueRef)
       ),
       (snap) => {
         this.initiatedNotInQueueDocs = snap.docs.map(d => ({
@@ -807,15 +863,16 @@ export class QueueEventHealthComponent {
       }
     );
 
-    const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
+      // const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
       onSnapshot(
         query(
           collection(this.firestoreDefault, 'arena events'),
           where('eventref', '==', queueRef),
           where('delete', '==', false)
         ),
-        (snap) => {
+        async (snap) => {
           this.arenaEventMap.clear();
+          var productRefsForQueue: any[] = [];
 
           snap.docs.forEach(d => {
             const data = d.data();
@@ -825,8 +882,24 @@ export class QueueEventHealthComponent {
             if (productRef?.id && arenaEventId) {
               const key = `${productRef.id}`;
               this.arenaEventMap.set(key, arenaEventId);
+              productRefsForQueue.push(productRef);
             }
           });
+
+          // get atcmodel from each product doc, same getDoc pattern
+          // used in buildInitiatedNotInQueueRecords
+          this.atcModelsForQueue = [];
+          for (let i = 0; i < productRefsForQueue.length; i++) {
+            const productSnap = await getDoc(productRefsForQueue[i]);
+            if (productSnap.exists()) {
+              const atcmodel = productSnap.data()['atcmodel'];
+              if (atcmodel && !this.atcModelsForQueue.includes(atcmodel)) {
+                this.atcModelsForQueue.push(atcmodel);
+              }
+            }
+          }
+
+          this.startAtcListeners(queueRef);
         }
       );
 
@@ -834,48 +907,8 @@ export class QueueEventHealthComponent {
     if (this.tokenUnsub) this.tokenUnsub();
     if (this.ppUnsub) this.ppUnsub();
 
-    const firestoreAtc = getFirestore("firestore-atc");
-    if (this.atcAlphaUnsub) this.atcAlphaUnsub();
-    this.atcAlphaUnsub = onSnapshot(
-      query(
-        collection(firestoreAtc, 'atc_alpha'),
-        where('isdelete', '==', false)
-      ),
-      (snap) => {
-        this.atcAlphaRecords = snap.docs.map(d => ({
-          id: d.id,
-          profileid: d.data()['profileid'],
-          prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
-          queueid: d.data()['queueid'] ?? null,
-          author: d.data()['author'] ?? [],
-          source: 'atc_alpha'
-        }));
-        this.calculateAtcGivenCounts();
-        this.calculateAtcNoQueueCounts();
-      }
-    );
-
-    if (this.atcValidateUnsub) this.atcValidateUnsub();
-    this.atcValidateUnsub = onSnapshot(
-      query(
-        collection(firestoreAtc, 'atc_to_validate'),
-        where('isdelete', '==', false)
-      ),
-      (snap) => {
-        this.atcValidateRecords = snap.docs.map(d => ({
-          id: d.id,
-          profileid: d.data()['profileid'],
-          prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
-          queueid: d.data()['queueid'] ?? null,
-          author: d.data()['author'] ?? [],
-          status: d.data()['status'] ?? null,
-          source: 'atc_to_validate'
-        }));
-      }
-    );
-
     try {
-      const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
+      // const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
       // ATC ALPHA (VALID)
       // const firestoreATC = getFirestore("firestore-atc")
       // if (this.atcAlphaUnsub) this.atcAlphaUnsub();
