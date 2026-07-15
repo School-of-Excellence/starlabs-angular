@@ -5,7 +5,11 @@
 /tmp
 /out-tsc
 /bazel-out
-/specs
+# specs/ is mostly local (spec docs, *-evidence, diagrams, data). But journals + plans
+# ARE tracked (per CLAUDE.md's Journal/Plan rules) — keep only those two under version control.
+/specs/*
+!/specs/journals/
+!/specs/plans/
 /graphify-out
 
 # Node

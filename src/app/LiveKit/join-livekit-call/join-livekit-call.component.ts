@@ -75,6 +75,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   roomDetail: RoomInfo | undefined | null;
   roomSubscription = new Subject<void>();
 
+  // Media backend provider for this room: 'aws' (default/current) | 'do' | 'oci'.
+  // Resolved from the ?provider= query param (manual testing) or the Firestore room field.
+  provider: 'aws' | 'do' | 'oci' = 'aws';
+
   // Server Subscription
   serverSubscription = new Subject<void>();
 
@@ -160,8 +164,23 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         ).subscribe(data =>{
           if(data && data["active"]){
 
-            // Prepare Call - Only when screen launched first time
-            if(this.roomDetail.title == "") this.checkServer()
+            // Resolve which media backend (cloud) hosts this room's OpenVidu Elastic cluster.
+            // NB: the existing `provider` field means system (openvidu vs livekit-cloud) and is
+            // rewritten to "openvidu" by createOpenViduToken — so the cloud selector uses a SEPARATE
+            // `mediaProvider` field. Priority: ?provider= query param (manual A/B) → mediaProvider → 'aws'.
+            const requestedProvider = (this.route.snapshot.queryParamMap.get("provider") || data["mediaProvider"] || "aws").toString().toLowerCase()
+            this.provider = requestedProvider === "do" ? "do" : requestedProvider === "oci" ? "oci" : "aws"
+
+            console.log("Provider", this.provider)
+
+            // Prepare Call - Only when screen launched first time.
+            // checkServer() reads AWS_System/instance_status — it only gates the AWS OpenVidu cluster.
+            // DO/OCI media nodes are provisioned by their own controller, so skip the AWS gate and
+            // prepare directly; capacity is still handled by the 503 retry in getTokenWithRetry().
+            if(this.roomDetail.title == ""){
+              if(this.provider === "aws") this.checkServer()
+              else this.prepareParticipant()
+            }
 
             this.roomDetail = {
               roomId: id,
@@ -511,7 +530,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           this.httpClient.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
             roomName,
             participantName,
-            participantId
+            participantId,
+            provider: this.provider
           })
         );
       } catch (error: any) {
