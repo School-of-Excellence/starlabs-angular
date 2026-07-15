@@ -427,7 +427,7 @@ export class QueueEventHealthComponent {
         return;
       }
 
-      const key = `${productRef.id}_${this.selectedQueueId}`;
+      const key = `${productRef.id}`;
       const arenaeventid = this.arenaEventMap.get(key);
 
       if (!arenaeventid) {
