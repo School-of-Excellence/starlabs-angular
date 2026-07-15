@@ -162,13 +162,19 @@ export class CreateWatsonProfileComponent {
           await getDocs(query(collection(this.firestore, "new_user_data"), where("email", "==", this.saleData["email"]))).then(async (newUserData) => {
             if (newUserData.docs.length != 0) {
               const newUserDoc = newUserData.docs[0];
-              await setDoc(doc(this.firestore, "profile_data", newUserDoc.id), newUserDoc.data());
-              this.selectedProfile = newUserDoc.data();
-              this.selectedProfileEmail = newUserDoc.data()['email'];
-              this.selectedProfileID = newUserDoc.data()['profileid'];
-              console.log("new to profile_data", newUserDoc.id);
               const newUser = newUserDoc.data();
               const userDataRef = doc(this.firestore, "user_data", newUser['uid']);
+              const profileData = { ...newUser };
+              profileData['countrycode'] = newUser['countryCode'];
+              profileData['number'] = newUser['phonenumber'];
+              profileData['user_ref'] = userDataRef;
+              delete profileData['countryCode'];
+              delete profileData['phonenumber'];
+              await setDoc(doc(this.firestore, "profile_data", newUserDoc.id), profileData);
+              this.selectedProfile = newUser;
+              this.selectedProfileEmail = newUser['email'];
+              this.selectedProfileID = newUser['profileid'];
+              console.log("new to profile_data", newUserDoc.id);
               const userDataSnap = await getDoc(userDataRef);
               if (!userDataSnap.exists()) {
                 await setDoc(userDataRef, {
