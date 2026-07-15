@@ -221,16 +221,16 @@ export class CohortDetailComponent implements OnDestroy {
         this.dialogData.eventParticipationList || [];
       this.searchableQueueList = this.dialogData.searchableQueueList ?? [];
       this.mapQueueName = this.dialogData.mapQueueName ?? {};
-      this.selectedQueue = this.isStudioCohort() ? this.dialogData.cohort['queueref']?.id ?? null : null;
       this.contentTab = this.dialogData.viewType ?? 'participants'
-      console.log('queueid', this.dialogData.cohort['queueref']?.id);
       this.peopleCount = this.cohort?.['participantidlist']?.length || 0;
       this.selectedMentors = this.cohort?.['mentors'] ?? [];
       // this.computeStats();
       this.computeActivitiesFromInjectedMaps();
       this.computeOwners();
       this.rebuildParticipantRows();
-      console.log('selected queue',this.selectedQueue)
+      
+      this.selectedQueue = this.isStudioCohort() && this.searchableQueueList.length === 1 ? this.searchableQueueList[0]?.docid : null;
+      
       if(this.selectedQueue)  this.loadLiveAssignments();
       this.loadMentors();
       return;
@@ -464,7 +464,6 @@ export class CohortDetailComponent implements OnDestroy {
 
   /** Participants in cohort but NOT in any studio (for Unassigned-to-Studio panel). */
   getUnassignedToStudio(): string[] {
-    console.log('message from uassign studio')
     const cohortParticipants: string[] =
       this.cohort?.['participantidlist'] || [];
     const inAnyStudio = new Set<string>();
@@ -494,7 +493,6 @@ export class CohortDetailComponent implements OnDestroy {
     const newStudioPairingPID = this.newStudioPairing.map((studio)=>studio['participants'] ?? []).flatMap((studio)=>studio)
     const result = cohortParticipants.filter((pid) => !inAnyStudio.has(pid) && !newStudioPairingPID.includes(pid));
 
-    console.log('result' , this.getCohortStudios())
     this.unassignedParticipants = [...result];
     this.filterUnassignedParticipants = [...result];
     this.applyUnassignedFilter();
@@ -985,7 +983,6 @@ export class CohortDetailComponent implements OnDestroy {
   }
 
   toggleCheckin(studio) {
-    // console.log(studio["checkin"],!studio["checkin"]);
     const isLiveStudio  = this.mapLiveAssignmentByStudio[studio['docid']];
     const isEnabled = studio['studioin'];
 
@@ -1600,7 +1597,7 @@ createStudioCombination() {
 
   showQueueSelection() {
     return (
-      this.isStudioCohort() && !this.cohort['queueref']?.id && this.searchableQueueList.length > 0
+      this.isStudioCohort() && this.searchableQueueList.length > 0
     );
   }
 

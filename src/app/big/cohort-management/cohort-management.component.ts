@@ -117,6 +117,7 @@ export class CohortManagementComponent {
   mapAcceleratorEvent: any = {}
   mapBigCohortsToAssignment: any = {};
   mapZoneEvent: any = {};
+  mapEventQueue : any = {};
 
   mapBigAssignment: any = {}
   private subscription = new Subject<void>();
@@ -317,6 +318,13 @@ export class CohortManagementComponent {
     getDocs(collection(this.firestore, "queue generation")).then(queue => {
       const queueData = queue.docs.map((doc) => {
         const data = doc.data();
+        this.mapQueueName[doc.id] = data['queuename'];
+        
+        const events = data['eventid'] ? Array.isArray(data['eventid']) ? data['eventid'] : [data['eventid']] : [];
+        events.forEach((eventId)=>{
+          this.mapEventQueue[eventId] = this.mapEventQueue[eventId] ?? [];
+          this.mapEventQueue[eventId].push(doc.id)
+        })
         return {
           id: doc.id,
           docid: doc.id,
@@ -329,10 +337,6 @@ export class CohortManagementComponent {
 
       this.searchableQueueList = [...sortedQueueData];
       this.filteredQueueList = [...sortedQueueData];
-
-      queue.docs.forEach((doc) => {
-        this.mapQueueName[doc.id] = doc.data()['queuename'];
-      });
 
       // Patch saved queue selections
       this.patchSavedQueueSelections();
@@ -750,9 +754,12 @@ export class CohortManagementComponent {
   }
 
   // function to get the list of active studios a participant has
-  getParticipantStudioInList(queueId : string , participantId: string): any[] {
-    const studios = this.mapParticipantStudios[queueId]?.[participantId] || [];
-    return studios.filter(s => s.studioin === true);
+  getParticipantStudioInList(queueId : string[] , participantId: string , bigactivity : string): any[] {
+    const studios = queueId.map((q)=>{ return this.mapParticipantStudios[q]?.[participantId] || []}).flat();
+    return studios.filter(s => {
+      const activities = Object.values(s.studioData['participantsactivity'] ?? {})
+      return s.studioId && s.studioin === true && s.studioData['participantsactivity'] && activities.includes(bigactivity);
+    });
   }
 
   // get participant live assignment stats
@@ -795,9 +802,12 @@ export class CohortManagementComponent {
   }
 
   // function to get list of participant checked in studios list
-  getParticipantCheckedInCount(queueId : string , participantId: string): any[] {
-    const studios = this.mapParticipantStudios[queueId]?.[participantId] || [];
-    return studios.filter(s => s.checkin === true);
+  getParticipantCheckedInCount(queueId : string[] , participantId: string , bigactivity : string): any[] {
+    const studios = queueId.map((q) => { return this.mapParticipantStudios[q]?.[participantId] || [] }).flat();
+    return studios.filter(s => {
+      const activities = Object.values(s.studioData['participantsactivity'] ?? {})
+      return s.studioId && s.checkin === true && s.studioData['participantsactivity'] && activities.includes(bigactivity);
+    });
   }
 
   // function to move participant from unassign list to cohort
@@ -1307,39 +1317,73 @@ export class CohortManagementComponent {
   // }
 
   // function to get cohorts total studio count
+  // getCohortTotalStudiosCount(cohort: any): number {
+  //   const participants = cohort['participantidlist'] || [];
+  //   const queueId = cohort['queueref']?.id ?? null;
+  //   const studioSet = new Set();
+    
+  //   if(queueId){
+  //     participants.forEach((pid: string) => {
+  //       this.getParticipantStudioInList(queueId, pid).forEach(({ studioId }) => {
+  //         if (studioId) {
+  //           studioSet.add(studioId);
+  //         }
+  //       })
+  //   });
+  //   }
+  //   return studioSet.size;
+  // }
+  
+  // function to get cohorts total studio count
   getCohortTotalStudiosCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
-    const queueId = cohort['queueref']?.id ?? null;
+    const cohortActivity = cohort['bigactivity'] ?? null;
     const studioSet = new Set();
-    
-    if(queueId){
-      participants.forEach((pid: string) => {
-        this.getParticipantStudioInList(queueId, pid).forEach(({ studioId }) => {
-          if (studioId) {
-            studioSet.add(studioId);
-          }
+    const eventId = cohort['eventref']?.id;
+    if (eventId) {
+      const mappedQueues = this.mapEventQueue[eventId] || [];
+      mappedQueues.forEach((queueId)=>{
+        
+        participants.forEach((pId)=>{
+          const studios = this.mapParticipantStudios[queueId]?.[pId] || [];
+          studios.forEach(s => {
+            const activities = Object.values(s.studioData['participantsactivity'] ?? {})
+            if(s.studioId && s.studioin === true && s.studioData['participantsactivity'] && activities.includes(cohortActivity)){
+              studioSet.add(s.studioId);
+            }
+          });
         })
-    });
+      
+      })
     }
+    
     return studioSet.size;
   }
+
 
   // function to get total checked in studio count for an cohort
   getCohortTotalCheckedStudiosCount(cohort: any): number {
     const participants = cohort['participantidlist'] || [];
-    const queueId = cohort['queueref']?.id ?? null;
+    const cohortActivity = cohort['bigactivity'] ?? null;
     const studioSet = new Set();
-    
-    if(queueId){
-      participants.forEach((pid: string) => {
-        this.getParticipantCheckedInCount(queueId, pid).forEach(({ studioId }) => {
-          if (studioId) {
-            studioSet.add(studioId);
-          }
+    const eventId = cohort['eventref']?.id;
+    if (eventId) {
+      const mappedQueues = this.mapEventQueue[eventId] || [];
+      mappedQueues.forEach((queueId) => {
+
+        participants.forEach((pId) => {
+          const studios = this.mapParticipantStudios[queueId]?.[pId] || [];
+          studios.forEach(s => {
+            const activities = Object.values(s.studioData['participantsactivity'] ?? {})
+            if (s.studioId && s.checkin === true && s.studioData['participantsactivity'] && activities.includes(cohortActivity)) {
+              studioSet.add(s.studioId);
+            }
+          });
         })
-    });
+
+      })
     }
-    
+
     return studioSet.size;
   }
 
@@ -1898,7 +1942,6 @@ export class CohortManagementComponent {
 
     const queues = this.searchableQueueList.filter((queue)=>{
       const eventId = queue['eventid'];
-      console.log(eventId , cohorts['docid'] )
       return eventId?.includes(cohorts['eventref']?.id);
     })
     const { CohortDetailComponent } = await import('../cohort-detail/cohort-detail.component');
@@ -2119,7 +2162,9 @@ export class CohortManagementComponent {
 
     this.filteredCohortsList.forEach(cohort => {
       const participants = cohort['participantidlist'] || [];
-      const queueId = cohort['queueref']?.id;
+      const eventId = cohort['eventref']?.id;
+      const queueId = this.mapEventQueue[eventId] ?? [];
+      const bigactivity = cohort['bigactivity'] ?? '';
 
       if (participants.length === 0) {
         exportData.push({
@@ -2142,8 +2187,8 @@ export class CohortManagementComponent {
         });
       } else {
         participants.forEach((participantId: string, index: number) => {
-          const studioInList = this.getParticipantStudioInList(queueId,participantId);
-          const checkedInCount = this.getParticipantCheckedInCount(queueId , participantId);
+          const studioInList = this.getParticipantStudioInList(queueId , participantId , bigactivity);
+          const checkedInCount = this.getParticipantCheckedInCount(queueId , participantId , bigactivity);
           const liveAssignmentStats = this.getParticipantLiveAssignmentStats(participantId);
           
           exportData.push({
@@ -2908,17 +2953,17 @@ export class CohortManagementComponent {
 
   // function to check active studio for an participant
   async checkForActiveParticipantStuidosInCohort(cohort : any , participantId : string){
-    const queueId = cohort['queueref'];
+    const eventId = cohort.eventref?.id;
     const activity = cohort['bigactivity'] ?? '';
-    if(queueId){
-      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'==',queueId), where('participants' , 'array-contains' , participantId));
+    if(eventId){
+      const queueId = (this.mapEventQueue[eventId] ?? []).map( q =>doc(this.firestore , 'queue generation' , q));
+      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'in', queueId), where('participants' , 'array-contains' , participantId));
       const studios = (await getDocs(q)).docs.map((doc)=>doc.data()).filter((st)=>Object.values(st['participantsactivity'] ?? {}).includes(activity));
 
       if(studios.length > 0){
         const enabledStudios = studios.filter((studio)=>studio['studioin']);
 
       if(enabledStudios.length > 0){
-        console.log(enabledStudios)
         return true;
       }
       const studioIds = studios.map((studio)=>studio['docid']);
@@ -2965,6 +3010,20 @@ export class CohortManagementComponent {
     ) {
       event.preventDefault();
       this.cohortSearch.nativeElement.focus();
+    } else if (
+      event.ctrlKey &&
+      event.shiftKey &&
+      event.key.toLowerCase() === 'u'
+    ) {
+      event.preventDefault();
+      this.toggleSidebarCollapse();
+    } else if (
+      event.ctrlKey &&
+      event.shiftKey &&
+      event.key.toLowerCase() === 'l'
+    ) {
+      event.preventDefault();
+      this.toggleActivitySidenav();
     }
   }
   
@@ -3209,7 +3268,6 @@ export class CohortManagementComponent {
     const palette = ['purple', 'blue', 'green', 'amber', 'rose']
     if (!key) return palette[0]
     let h = 0
-    // console.log(key)
     for (let i = 0; i < key.length; i++) { h = ((h << 5) - h + key.charCodeAt(i)) | 0 }
     return palette[Math.abs(h) % palette.length]
   }

@@ -155,7 +155,6 @@ export class ManageCohertsComponent {
       team: [[]],
       bigactivity: [null],
       description: [''],
-      queueref : [null],
       chatmembers : [[]]
     });
 
@@ -192,7 +191,6 @@ export class ManageCohertsComponent {
           name : this.data?.cohortname ?? '',
           cohortType : this.data?.cohortType || 'general',
           eventref : this.data?.selectedEvent || null,
-          queueref : this.data?.selectedQueue ?? null
         });
       }
       if (this.data.type == "edit") {
@@ -224,7 +222,6 @@ export class ManageCohertsComponent {
           team: this.data.doc['team'] || [],
           bigactivity: this.data.doc['bigactivity'] || null,
           description: this.data.doc['description'] || null,
-          queueref : this.data.doc['queueref']?.id || null
         });
         
         this.selectedTags = this.data.doc['tags'] || [];
@@ -595,13 +592,21 @@ export class ManageCohertsComponent {
   }
 
    async checkForActiveParticipantStuidosInCohort(cohort : any , participantId : string){
-    console.log(cohort , participantId)
-    const queueId = cohort['queueref'];
+    const eventId = cohort.eventref?.id;
     const activity = cohort['bigactivity'] ?? '';
-    if(queueId){
-      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'==',queueId) , where('studioin' , '==' , true) , where('participants' , 'array-contains' , participantId));
-      const studios = await getDocs(q); 
-      return studios.docs.filter((st)=>Object.values(st.data()['participantsactivity'] ?? {}).includes(activity)).length > 0;
+    if(cohort.cohortCategory === 'studio' && ![null , undefined , ''].includes(eventId)){
+      const queueId = [];
+      const queue = await getDocs(query(collection(this.firestore, 'queue generation') , where('eventid','array-contains',eventId)));
+      queue.docs.forEach((q)=>{
+        const qId = q.id;
+        queueId.push(doc(this.firestore , 'queue generation' , qId));
+      })
+      console.log('queues list' , queueId)
+      if (queueId) {
+        const q = query(collection(this.firestore, 'queue studio pairing'), where('queueref', 'in' , queueId), where('studioin', '==', true), where('participants', 'array-contains', participantId));
+        const studios = await getDocs(q);
+        return studios.docs.filter((st) => Object.values(st.data()['participantsactivity'] ?? {}).includes(activity)).length > 0;
+      }
     }
     return false
   }
@@ -1311,7 +1316,7 @@ export class ManageCohertsComponent {
       if(check){
         // participantidlist already contains all selected participants (including existing ones)
         // The selectedParticipants array includes both dropdown selections and existing participants
-        formValue['queueref'] = ![null , undefined , ''].includes( formValue['queueref']) ? doc(this.firestore , 'queue generation'  , formValue['queueref']) : null;
+        // formValue['queueref'] = ![null , undefined , ''].includes( formValue['queueref']) ? doc(this.firestore , 'queue generation'  , formValue['queueref']) : null;
         // Save cohort document
         await setDoc(doc(this.firestore, "big cohorts", formValue['docid']), formValue, { merge: true });
         
