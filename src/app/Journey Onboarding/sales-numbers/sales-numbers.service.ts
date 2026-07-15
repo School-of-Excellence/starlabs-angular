@@ -1,10 +1,10 @@
 import { Injectable } from '@angular/core';
 import {
-  Firestore, collection, query, where, getDocs, Timestamp,
+  Firestore, collection, query, where, getDocs, getDoc, Timestamp,
   doc, setDoc, updateDoc, deleteDoc,
 } from '@angular/fire/firestore';
 import {
-  SaleLead, SalesTeam, SalesGroupMetric, SalespersonRef,
+  SaleLead, SalesTeam, SalesGroupMetric, SalespersonRef, SourceOption,
   MonthlyPoint, DashboardData,
 } from './sales-numbers.models';
 
@@ -66,6 +66,44 @@ export class SalesNumbersService {
       const v = d.data() as any;
       return { roleDocId: d.id, profileid: v['profile_ref']?.id ?? d.id, name: v['name'] ?? '' } as SalespersonRef;
     }).filter((r) => r.name);
+  }
+
+  // Configurable lead sources (classify/source_options -> { sources: [{id, name}] }).
+  async loadSourceOptions(): Promise<SourceOption[]> {
+    const snap = await getDoc(doc(this.firestore, 'classify', 'source_options'));
+    const list = (snap.exists() ? (snap.data() as any)['sources'] : null);
+    return Array.isArray(list)
+      ? list.filter((s) => s && s.id).map((s) => ({ id: String(s.id), name: String(s.name ?? s.id) }))
+      : [];
+  }
+
+  // Resolve salesperson display names -> profileid via users_roles.
+  // salesleads carries short names ("Harish") while users_roles holds full names ("Harish R"),
+  // so we match exact OR unique first-name prefix: a name links only when EXACTLY one profile
+  // matches (`name` itself, or a `name `-prefixed full name). Ambiguous names (two real "Meena"s)
+  // and junk stay unresolved by design. One bounded prefix-range query per distinct name.
+  async loadProfileIdsForNames(names: string[]): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const uniq = [...new Set(names.map((n) => (n ?? '').trim()).filter(Boolean))];
+    await Promise.all(uniq.map(async (name) => {
+      const n = norm(name);
+      // case-sensitive prefix range on the stored name (single-field index, no composite needed)
+      const snap = await getDocs(query(
+        collection(this.firestore, 'users_roles'),
+        where('name', '>=', name),
+        where('name', '<=', name + ''),
+      ));
+      const candidatePids = new Set<string>();
+      for (const d of snap.docs) {
+        const v = d.data() as any;
+        const rn = norm((v['name'] ?? '').toString());
+        const pid = v['profile_ref']?.id;
+        if (pid && (rn === n || rn.startsWith(n + ' '))) candidatePids.add(pid);
+      }
+      if (candidatePids.size === 1) map.set(name, [...candidatePids][0]); // unique match only
+    }));
+    return map;
   }
 
   // Find users_roles docs matching a display name (for the in-screen flag helper).
@@ -155,8 +193,10 @@ export class SalesNumbersService {
 
   private mapLead(id: string, v: any): SaleLead {
     const journey = v['journey'] ?? '';
+    const participantName = (v['name'] ?? `${v['firstname'] ?? ''} ${v['lastname'] ?? ''}`).trim();
     return {
       docid: v['docid'] ?? id,
+      participantName: participantName || '(unnamed)',
       salespersonname: v['salespersonname'] ?? 'Unknown',
       presalespersonname: v['presalespersonname'] ?? 'Unknown',
       journey,
@@ -206,6 +246,7 @@ export class SalesNumbersService {
     start: Date,
     end: Date,
     nameToProfileId: Map<string, string>,
+    sourceIdToName: Map<string, string>,
   ): DashboardData {
     const asv = metric === 'asv';
     // teams store profileids; resolve a sale's salespersonname -> profileid -> team
@@ -228,8 +269,9 @@ export class SalesNumbersService {
     const aValue = (m: SalesGroupMetric) => (asv ? m.asv : m.gsv);
     const byActive = (a: SalesGroupMetric, b: SalesGroupMetric) => aValue(b) - aValue(a);
 
+    const sourceLabel = (l: SaleLead) => (l.source ? (sourceIdToName.get(l.source) ?? l.source) : 'Unspecified');
     const groups = [...this.accumulate(filtered, groupKey, start, end).values()].sort(byActive);
-    const bySource = [...this.accumulate(sales.filter(passesExceptSource), (l) => l.source || 'Unspecified', start, end).values()].sort(byActive);
+    const bySource = [...this.accumulate(sales.filter(passesExceptSource), sourceLabel, start, end).values()].sort(byActive);
 
     const segMap = this.accumulate(filtered, (l) => (SEGMENT_ORDER.includes(l.category) ? l.category : 'Other'), start, end);
     const segments = SEGMENT_ORDER.map((key) => segMap.get(key) ?? this.zeroMetric(key));
