@@ -19,7 +19,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { NgApexchartsModule } from 'ng-apexcharts';
 
 import { SalesNumbersService, SalesFilters } from './sales-numbers.service';
-import { DashboardData, SaleLead, SalesTeam, SalesGroupMetric, SalespersonRef, Timeframe } from './sales-numbers.models';
+import { DashboardData, SaleLead, SalesTeam, SalesGroupMetric, SourceOption, Timeframe } from './sales-numbers.models';
 
 interface FlagRow { name: string; flagged: boolean; roleDocId: string; matched: boolean; }
 
@@ -53,9 +53,9 @@ export class SalesNumbersComponent implements OnInit {
 
   // teams view state
   teams: SalesTeam[] = [];
-  salespersonRoster: SalespersonRef[] = [];        // flagged salespeople (name + profileid)
-  private nameToProfileId = new Map<string, string>();
-  private profileIdToName = new Map<string, string>();
+  teamSalespeople: string[] = [];                       // all salespeople seen in sales (assignable)
+  private nameToProfileId = new Map<string, string>();  // salespersonname -> profileid (users_roles)
+  private profileIdToName = new Map<string, string>();  // reverse, for member-chip display
   newTeamName = '';
   saving = false;
 
@@ -65,8 +65,9 @@ export class SalesNumbersComponent implements OnInit {
   private flagsLoaded = false;
   savingFlag = '';
 
-  // assign-source view state
-  readonly SOURCE_OPTIONS = ['Ads', 'Organic', 'Campaigns', 'Referral', 'DFU', 'Revival', 'Workshop', 'Event', 'Lead Magnet'];
+  // assign-source view state — sources are configurable via classify/source_options (Firestore-only)
+  sourceOptions: SourceOption[] = [];
+  private sourceIdToName = new Map<string, string>();
   sourceRows: SaleLead[] = [];
   sourceLoading = false;
   private sourcesLoaded = false;
@@ -78,7 +79,7 @@ export class SalesNumbersComponent implements OnInit {
 
   data: DashboardData | null = null;
   groupColumns = ['group', 'sales', 'cancelled', 'net'];
-  sourceColumns = ['product', 'person', 'date', 'source'];
+  sourceColumns = ['participant', 'product', 'person', 'date', 'source'];
 
   // chart inputs (ng-apexcharts) — Sales vs Cancellations per month
   chartSeries: any[] = [];
@@ -93,6 +94,8 @@ export class SalesNumbersComponent implements OnInit {
   constructor(private svc: SalesNumbersService, private snack: MatSnackBar) {}
 
   async ngOnInit(): Promise<void> {
+    this.sourceOptions = await this.svc.loadSourceOptions();
+    this.sourceIdToName = new Map(this.sourceOptions.map((o) => [o.id, o.name]));
     await this.loadTeamsData();
     await this.reload();
   }
@@ -140,7 +143,7 @@ export class SalesNumbersComponent implements OnInit {
     const { start, end } = this.computeRange();
     this.data = this.svc.aggregate(
       this.salesCache, this.teams, this.monthlySalesCache, this.cancellationsCache,
-      this.filters, this.view, this.metric, start, end, this.nameToProfileId,
+      this.filters, this.view, this.metric, start, end, this.nameToProfileId, this.sourceIdToName,
     );
     this.buildChart();
   }
@@ -150,24 +153,52 @@ export class SalesNumbersComponent implements OnInit {
   onViewChange(v: 'person' | 'team'): void { this.view = v; this.recompute(); }
   onFilterChange(): void { this.recompute(); }
 
-  // ---- teams (profileid-keyed; #2 + #6) ----
+  // ---- teams (profileid-keyed; assign any salesperson by name -> profileid) ----
   private async loadTeamsData(): Promise<void> {
-    [this.teams, this.salespersonRoster] = await Promise.all([
+    const [teams, salespeople] = await Promise.all([
       this.svc.loadTeams(),
-      this.svc.loadSalespersonRoster(),
+      this.svc.loadAllSalespeople(), // distinct names seen in real sales (12 mo)
     ]);
-    this.teams.sort((a, b) => a.team.localeCompare(b.team));
-    this.salespersonRoster.sort((a, b) => a.name.localeCompare(b.name));
-    // build name <-> profileid maps used for grouping and member display
-    this.nameToProfileId = new Map(this.salespersonRoster.map((r) => [r.name, r.profileid]));
-    this.profileIdToName = new Map(this.salespersonRoster.map((r) => [r.profileid, r.name]));
+    // resolve every salesperson name -> profileid via users_roles (bounded chunked read)
+    this.nameToProfileId = await this.svc.loadProfileIdsForNames(salespeople);
+    this.profileIdToName = new Map([...this.nameToProfileId].map(([name, pid]) => [pid, name]));
+    this.teamSalespeople = salespeople.sort((a, b) => a.localeCompare(b));
+
+    // auto-heal legacy text members -> profileids (one-time; only persists what it can resolve)
+    const heals: Promise<void>[] = [];
+    for (const t of teams) {
+      const healed = t.members.map((m) => this.nameToProfileId.get(m) ?? m);
+      if (healed.some((v, i) => v !== t.members[i])) {
+        t.members = healed;
+        heals.push(this.svc.saveTeamMembers(t.id, healed));
+      }
+    }
+    await Promise.all(heals);
+
+    this.teams = teams.sort((a, b) => a.team.localeCompare(b.team));
   }
 
   nameForId(profileid: string): string { return this.profileIdToName.get(profileid) ?? profileid; }
+  resolvable(name: string): boolean { return this.nameToProfileId.has(name); }
 
   // team id a profileid currently belongs to ('' = unassigned)
   teamIdOf(profileid: string): string {
     return this.teams.find((t) => t.members.includes(profileid))?.id ?? '';
+  }
+
+  // team a salesperson (by name) currently belongs to; '' when unresolved or unassigned
+  teamIdOfName(name: string): string {
+    const pid = this.nameToProfileId.get(name);
+    return pid ? this.teamIdOf(pid) : '';
+  }
+
+  async assignTeamByName(name: string, newTeamId: string): Promise<void> {
+    const pid = this.nameToProfileId.get(name);
+    if (!pid) {
+      this.snack.open(`No user record for "${name}" — can't store a profile id.`, 'OK', { duration: 3500 });
+      return;
+    }
+    await this.assignTeam(pid, newTeamId);
   }
 
   async assignTeam(profileid: string, newTeamId: string): Promise<void> {
