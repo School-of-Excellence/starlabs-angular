@@ -242,7 +242,8 @@ export class QueuePlanningReviewComponent implements OnInit, OnDestroy, AfterVie
   overallSlotRevertHistory: { profileId: string; stageName: string; log: any }[] = [];
   revertHistoryLoading: boolean = false;
   revertHistorySearchTerm: string = '';
-  revertHistoryAllEntries: { profileId: string; stageName: string; log: any }[] = [];
+  revertHistoryAllEntries: { profileId: string; stageName: string; type: string; log: any }[] = [];
+  activeHistoryTab: 'reverted' | 'booked' = 'reverted';
 
   slotPlannerFilter = {
     startDate: null,
@@ -5716,6 +5717,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
     this.overallSlotRevertHistory = [];
     this.revertHistoryAllEntries = [];
     this.revertHistorySearchTerm = '';
+    this.activeHistoryTab = 'reverted';
     this.revertHistoryLoading = true;
     this.showOverallSlotRevertHistory = true;
 
@@ -5724,26 +5726,53 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       where('queueid', '==', this.selectedQueue['docid']),
       orderBy('createdon', 'desc')
     ));
-
-    this.revertHistoryAllEntries = snap.docs.map(d => ({
+    const revertedEntries = snap.docs.map(d => ({
       profileId: d.data()['profileid'],
       stageName: d.data()['stagename'],
+      type:      'reverted',
       log:       d.data()
     }));
+    const bookedEntries: any[] = [];
+    (this.queueTokenList || []).forEach((t: any) => {
+      const pid = t.profile_id || t.profileid;
+      Object.entries(t.selectedstageslot || {}).forEach(([stageName, slot]: [string, any]) => {
+        if (!slot.slotconfirmation) return;
+        bookedEntries.push({
+          profileId: pid,
+          stageName,
+          type:      'booked',
+          log: {
+            ...slot,
+            profileid: pid,
+            stagename: stageName,
+            type:      'booked',
+            createdon: slot.slotconfirmation,
+            segmentName: this.segmentList.find((s: any) => s.docid === slot.segmentid)?.segmentname || 'N/A'
+          }
+        });
+      });
+    });
 
-    this.overallSlotRevertHistory = [...this.revertHistoryAllEntries];
+    this.revertHistoryAllEntries = [...revertedEntries, ...bookedEntries];
     this.revertHistoryLoading = false;
+    this.filterRevertHistory();
   }
+
   filterRevertHistory() {
-    if (!this.revertHistorySearchTerm.trim()) {
-      this.overallSlotRevertHistory = [...this.revertHistoryAllEntries];
-      return;
-    }
     const term = this.revertHistorySearchTerm.toLowerCase().trim();
-    this.overallSlotRevertHistory = this.revertHistoryAllEntries.filter(entry =>
-      this.getProfileName(entry.profileId).toLowerCase().includes(term) ||
-      entry.stageName.toLowerCase().includes(term)
-    );
+    this.overallSlotRevertHistory = this.revertHistoryAllEntries.filter(entry => {
+      const matchesTab = entry.type === this.activeHistoryTab;
+      if (!term) return matchesTab;
+      return matchesTab && (
+        this.getProfileName(entry.profileId).toLowerCase().includes(term) ||
+        entry.stageName.toLowerCase().includes(term)
+      );
+    });
+  }
+  
+  switchHistoryTab(tab: 'reverted' | 'booked') {
+    this.activeHistoryTab = tab;
+    this.filterRevertHistory();
   }
 
   async loadEventParticipationList() {
