@@ -167,6 +167,20 @@ export class CreateWatsonProfileComponent {
               this.selectedProfileEmail = newUserDoc.data()['email'];
               this.selectedProfileID = newUserDoc.data()['profileid'];
               console.log("new to profile_data", newUserDoc.id);
+              const newUser = newUserDoc.data();
+              const userDataRef = doc(this.firestore, "user_data", newUser['uid']);
+              const userDataSnap = await getDoc(userDataRef);
+              if (!userDataSnap.exists()) {
+                await setDoc(userDataRef, {
+                  countrycode: newUser['countryCode'],
+                  email: newUser['email'],
+                  name: newUser['name'],
+                  number: newUser['phonenumber'],
+                });
+                console.log("new to user_data", newUser['uid']);
+              } else {
+                console.log("user_data already exists", newUser['uid']);
+              }
             } else {
               console.log("new_user_data Not Exists");
             }
