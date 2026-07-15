@@ -157,6 +157,20 @@ export class CreateWatsonProfileComponent {
 
       await getDocs(query(collection(this.firestore, "profile_data"), where("email", "==", this.saleData["email"]))).then(async (profile) => {
         if (profile.docs.length == 0) {
+          // New profile
+          // exist -> New profile Data -> profile_data (Copy)
+          await getDocs(query(collection(this.firestore, "new_user_data"), where("email", "==", this.saleData["email"]))).then(async (newUserData) => {
+            if (newUserData.docs.length != 0) {
+              const newUserDoc = newUserData.docs[0];
+              await setDoc(doc(this.firestore, "profile_data", newUserDoc.id), newUserDoc.data());
+              this.selectedProfile = newUserDoc.data();
+              this.selectedProfileEmail = newUserDoc.data()['email'];
+              this.selectedProfileID = newUserDoc.data()['profileid'];
+              console.log("new to profile_data", newUserDoc.id);
+            } else {
+              console.log("new_user_data Not Exists");
+            }
+          });
           console.log("Profile Not Exists");
           this.selectedProfileEmail = this.saleData['email'];
           this.selectedProfileID = this.saleData['profileid'];
