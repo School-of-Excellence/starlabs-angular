@@ -1,0 +1,224 @@
+.config-wrap {
+  width: 100%;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+.config-card {
+  background: #ffffff;
+  border: 1px solid #eceff4;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+  padding: 18px 18px 6px 18px;
+  margin-bottom: 16px;
+}
+
+.config-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.config-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.config-head p {
+  margin: 4px 0 0 0;
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+
+.save-btn {
+  border-radius: 10px;
+  height: 42px;
+  font-weight: 600;
+}
+
+.save-btn mat-icon {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.select-field {
+  width: 100%;
+}
+
+/* ---- item cards ---- */
+.items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item-card {
+  background: #ffffff;
+  border: 1px solid #e6e8ee;
+  border-radius: 12px;
+  padding: 10px 14px 2px 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+}
+
+.item-card.cdk-drag-preview {
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.18);
+}
+
+.item-card.cdk-drag-placeholder {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.cdk-drop-list-dragging .item-card:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.item-drag-preview {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #4f46e5;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.24);
+}
+
+.item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.drag-btn {
+  cursor: grab;
+  color: #9aa2b1;
+}
+
+.drag-btn:active {
+  cursor: grabbing;
+}
+
+.item-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.item-name-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-name {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-tag {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: #eef2f7;
+  color: #475569;
+}
+
+.tag-comingsoon {
+  background: #e7f6ee;
+  color: #1a8f5b;
+}
+
+.tag-ads {
+  background: #fef3e7;
+  color: #c07817;
+}
+
+.tag-masterclass {
+  background: #fdeaf3;
+  color: #b33f83;
+}
+
+.tag-homeseries {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.remove-btn {
+  color: #d76060;
+}
+
+.item-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 220px;
+  gap: 2px 14px;
+}
+
+.item-grid mat-form-field {
+  width: 100%;
+}
+
+.items-empty {
+  text-align: center;
+  padding: 48px 20px;
+  border: 1px dashed #dbe0ea;
+  border-radius: 12px;
+  color: #6b7280;
+  background: #ffffff;
+}
+
+.items-empty mat-icon {
+  font-size: 42px;
+  height: 42px;
+  width: 42px;
+  color: #c4cbd7;
+}
+
+.items-empty h3 {
+  margin: 10px 0 4px 0;
+  color: #374151;
+  font-weight: 600;
+}
+
+.items-empty p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 780px) {
+  .item-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .save-btn {
+    width: 100%;
+  }
+}

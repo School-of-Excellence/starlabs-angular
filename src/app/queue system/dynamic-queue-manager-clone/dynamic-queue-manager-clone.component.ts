@@ -44,6 +44,7 @@ import { TagParticipantsComponent } from '../../Participants Profile Management/
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AddQueueTagComponent } from '../../Participants Profile Management/participants-analytics/add-queue-tag/add-queue-tag.component';
 
 interface SearchMatch {
   tokenId: string;
@@ -262,6 +263,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   selectedTimeSlots: string[] = [];
   stageCountCards: any[] = [];
   reminders: any[] = [];
+
+  // queuetags
+  availableQueueTags: any[] = [];
+  selectedQueueTags: string[] = []; 
+  mapQueueTagsName = {};
+  queueTagsSubscription: Subscription;
+  queueTagDropdownOpen: boolean = false;
+  queueTagSearchTerm: string = '';
+  filteredQueueTags: any[] = [];
 
   selectedStageSlots: string[] = [];
   dateRangeStart: Date | null = null;
@@ -505,6 +515,18 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
     if (!target.closest('.stage-count-chips-row')) {
       this.showStageCountDropdown = false;
+    }
+    if (!target.closest('.filter-sidenav-body') && 
+      !target.closest('.cdk-overlay-container')) { 
+      this.segmentDropdownOpen = false;
+      this.tagDropdownOpen = false;
+      this.queueTagDropdownOpen = false;
+      this.preassignedDropdownOpen = false;
+      this.stageSlotDropdownOpen = false;
+      this.customerSupportDropdownOpen = false;
+      this.eventParticipationDropdownOpen = false;
+      this.arenaEventDropdownOpen = false;
+      this.atcDropdownOpen = false;
     }
   }
   @HostListener('window:scroll')
@@ -955,6 +977,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.processTokensIntoStages(this.allTokensData);
     this.selectedVariations = [];
     this.variationDropdownOpen = false;
+    this.selectedQueueTags = [];
+    this.queueTagDropdownOpen = false;
   }
 
   areAllSelected(): boolean {
@@ -1680,6 +1704,14 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         this.mapTagsMetaData[e['id']] = e;
       }
     });
+    this.queueTagsSubscription = collectionData(query(collection(this.firestore, "queue tags"),where("isDelete", "==", false),orderBy("createdAt", "desc"))).pipe(takeUntil(this.subscriptionHandle)).subscribe(tags => {
+      this.availableQueueTags = tags;
+      this.mapQueueTagsName = {};
+      this.filteredQueueTags = [...tags];
+      tags.forEach(t => {
+        this.mapQueueTagsName[t['id']] = t['name'];
+      });
+    });
     const drawerContent = document.querySelector('mat-drawer-content');
       if (drawerContent) {
         drawerContent.addEventListener('scroll', () => {
@@ -1741,6 +1773,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.participantSubscription.unsubscribe();
     if (this.docsSubscription) {
       this.docsSubscription.unsubscribe();
+    }
+    if (this.queueTagsSubscription) {
+      this.queueTagsSubscription.unsubscribe();
     }
     if (this.stageCountSubscription) {
       this.stageCountSubscription.unsubscribe();
@@ -2000,6 +2035,66 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
   }
 
+  isQueueTagSelected(tagId: string): boolean {
+    return this.selectedQueueTags.includes(tagId);
+  }
+
+  toggleQueueTagSelection(tagId: string) {
+    const index = this.selectedQueueTags.indexOf(tagId);
+    if (index > -1) {
+      this.selectedQueueTags.splice(index, 1);
+    } else {
+      this.selectedQueueTags.push(tagId);
+    }
+    this.onQueueTagFilterChange();
+  }
+
+  removeQueueTag(tagId: string) {
+    this.selectedQueueTags = this.selectedQueueTags.filter(t => t !== tagId);
+    this.onQueueTagFilterChange();
+  }
+
+  getQueueTagName(tagId: string): string {
+    return this.mapQueueTagsName[tagId] || tagId;
+  }
+
+  onQueueTagFilterChange() {
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
+  filterQueueTags() {
+    if (!this.queueTagSearchTerm || this.queueTagSearchTerm.trim() === '') {
+      this.filteredQueueTags = [...this.availableQueueTags];
+    } else {
+      const searchTerm = this.queueTagSearchTerm.toLowerCase().trim();
+      this.filteredQueueTags = this.availableQueueTags.filter(tag => {
+        const name = (tag.name || '').toLowerCase();
+        return name.includes(searchTerm);
+      });
+    }
+  }
+
+  clearQueueTagSearch() {
+    this.queueTagSearchTerm = '';
+    this.filteredQueueTags = [...this.availableQueueTags];
+  }
+
+  onQueueTagDropdownOpen() {
+    this.filteredQueueTags = [...this.availableQueueTags];
+    this.queueTagSearchTerm = '';
+  }
+
+  toggleQueueTagDropdown() {
+    if (this.dfuFilterActive || !!this.selectedStageSlots) return;
+    this.queueTagDropdownOpen = !this.queueTagDropdownOpen;
+    this.segmentDropdownOpen = false;
+    this.tagDropdownOpen = false;
+    this.preassignedDropdownOpen = false;
+    this.stageSlotDropdownOpen = false;
+    this.approvedDropdownOpen = false;
+    if (this.queueTagDropdownOpen) this.onQueueTagDropdownOpen();
+  }
+
   processTokensIntoStages(token: any[]) {
     var stages = []
     let queryData = token
@@ -2150,6 +2245,14 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
         const profileTags = metadata['profiletags'] || [];
         return this.selectedTags.some(tagId => profileTags.includes(tagId));
+      });
+    }
+
+    // Queue Tag filter
+    if (this.selectedQueueTags.length > 0) {
+      filteredTokens = filteredTokens.filter(token => {
+        const tokenTags: string[] = token['tags'] || [];
+        return this.selectedQueueTags.some(tagId => tokenTags.includes(this.mapQueueTagsName[tagId]));
       });
     }
 
@@ -2430,6 +2533,25 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     //   //   this.addTagToParticipants(selectedParticipants, newTagId);
     //   // });
     // }
+  }
+
+  addBulkQueueTags() {
+    const selectedParticipants = this.getSelectedTokens().map(e => ({
+      docid: e['docid'],
+      profileid: e['profile_id'],
+      name: this.mapProfileData[e['profile_id']]['name'],
+      email: this.mapProfileData[e['profile_id']]['email'],
+      tags: Array.isArray(e['tags']) ? e['tags'] : []  
+    }));
+
+    this.dialog.open(AddQueueTagComponent, {
+      data: {
+        data: selectedParticipants,
+        tagList: [],
+        mapfilter: {},
+        loggedInprofileid: this.profileid
+      }
+    })
   }
 
   // async addTagToParticipants(profileIds: string[], tagId: string) {
@@ -5048,6 +5170,7 @@ toggleSegmentDropdown() {
     this.preassignedDropdownOpen = !this.preassignedDropdownOpen;
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
+    this.queueTagDropdownOpen = false;
     this.stageSlotDropdownOpen = false;
     this.approvedDropdownOpen = false;
   }
@@ -5057,6 +5180,7 @@ toggleSegmentDropdown() {
     this.approvedDropdownOpen = !this.approvedDropdownOpen;
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
+    this.queueTagDropdownOpen = false;
     this.stageSlotDropdownOpen = false;
     this.preassignedDropdownOpen = false;
   }
@@ -5065,6 +5189,7 @@ toggleSegmentDropdown() {
     this.stageSlotDropdownOpen = !this.stageSlotDropdownOpen;
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
+    this.queueTagDropdownOpen = false;
     this.preassignedDropdownOpen = false;
   }
 
@@ -5287,6 +5412,7 @@ toggleSegmentDropdown() {
     if (this.searchFilter) count++;
     count += this.selectedSegments.length;
     count += this.selectedTags.length;
+    count += this.selectedQueueTags.length;
     if (this.preassignedFilter !== 'all') count++;
     if (this.approvedFilter !== 'all') count++;
     if (this.isStageSlotFilterActive) count++;
