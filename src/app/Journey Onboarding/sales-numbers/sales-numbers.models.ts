@@ -9,6 +9,7 @@ export type Timeframe = 'last7' | 'last30' | 'last90' | 'month';
 // enriched with `category` / `productName` resolved from the journey collection.
 export interface SaleLead {
   docid: string;
+  participantName: string;      // customer/participant name (salesleads.name)
   salespersonname: string;
   presalespersonname: string;
   journey: string;              // journey doc id
@@ -16,7 +17,7 @@ export interface SaleLead {
   status: string;               // '', 'Approved', 'Rejected', ...
   email: string;
   paymentplan: string;          // non-empty => assured
-  source: string;               // lead source (may be empty; set via the Assign Source view)
+  source: string;               // lead source: the id of a classify/source_options entry (empty until assigned)
   category: string;             // derived: Ecosystem | DFU | FTO + Gift | Other
   productName: string;          // derived: the journey name
   totalpurchasevalue: number;
@@ -38,6 +39,13 @@ export interface SalespersonRef {
   roleDocId: string;            // the users_roles doc id
   profileid: string;            // profile_ref.id
   name: string;                 // users_roles.name (firstname + ' ' + lastname)
+}
+
+// A configurable lead source, stored in classify/source_options ({ sources: [{id, name}] }).
+// Leads carry the `id`; the UI maps it back to `name` for display.
+export interface SourceOption {
+  id: string;
+  name: string;
 }
 
 // Aggregated metrics for one group (salesperson / team / product-segment).

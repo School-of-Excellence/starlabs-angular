@@ -486,6 +486,11 @@
 }
 .st-roster-row:last-child { border-bottom: none; }
 .st-person { font-size: 15px; font-weight: 500; color: var(--ios-label); }
+.st-nolink {
+  margin-right: auto; font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--ios-red, #FF3B30); background: rgba(255,59,48,0.10);
+  padding: 2px 8px; border-radius: 999px;
+}
 .st-assign { width: 220px; }
 
 /* assign source */
