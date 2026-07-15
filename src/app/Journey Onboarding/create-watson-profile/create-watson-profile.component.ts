@@ -159,6 +159,7 @@ export class CreateWatsonProfileComponent {
         if (profile.docs.length == 0) {
           // New profile
           // exist -> New profile Data -> profile_data (Copy)
+          //
           await getDocs(query(collection(this.firestore, "new_user_data"), where("email", "==", this.saleData["email"]))).then(async (newUserData) => {
             if (newUserData.docs.length != 0) {
               const newUserDoc = newUserData.docs[0];
