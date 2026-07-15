@@ -17,6 +17,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { AppointmentBookingService } from '../../appointment-booking.service';
 
 @Component({
   selector: 'app-book-appointment',
@@ -89,7 +90,8 @@ export class BookAppointmentComponent implements OnInit {
     private matDialog: MatDialog,
     private router: Router,
     private route: ActivatedRoute,
-    private location: Location
+    private location: Location,
+    private bookingService: AppointmentBookingService 
   ) {
     this.clientJourney = []
     this.userAvailableSlots = []
@@ -296,372 +298,35 @@ export class BookAppointmentComponent implements OnInit {
   }
 
   async onDateSelect() {
-    this.userAvailableSlots = []
-    // this.displaySlot = []
-    this.selectedSlot = null
-    var minimumDate = new Date(new Date(this.mindate).setHours(0, 0, 0))
-    if (this.selectedDate >= minimumDate) {
-      this.matDialog.open(LoadingProgressComponent, { disableClose: true, data: { type: "spinner", msg: "Getting Your Slots..." } })
-      var startDate: Date;
-      var endDate: Date;
-      if (this.superRole) {
-        startDate = this.selectedDate
-      }
-      else {
-        var currentDateTime = new Date()
-        var selectedDateTime = new Date(new Date(this.selectedDate).setHours(new Date().getHours(), new Date().getMinutes(), 0))
-        var hours = Math.floor((Math.abs(selectedDateTime.getTime() - currentDateTime.getTime())) / 1000 / 3600);
-        if (hours > 24) {
-          startDate = this.selectedDate
-        }
-        else {
-          startDate = selectedDateTime
-        }
-        console.log(selectedDateTime);
-      }
-      console.log(this.selectedDate);
-      endDate = new Date(new Date(startDate).setHours(23, 59, 59))
-
-      var slotsOfEIS = []
-      for (let i = 0; i < this.appointmentRoles.length; i++) {
-        const roleOfAppointment = this.appointmentRoles[i];
-        for (let j = 0; j < this.rolePersons[roleOfAppointment].length; j++) {
-          const eisProfile = this.rolePersons[roleOfAppointment][j];
-          var availabilityCollection = collection(this.firestore, "availability")
-          var availabilityQuery = query(availabilityCollection, where("profileref", "==", doc(this.firestore, eisProfile)), where("appointments", "array-contains", doc(this.firestore, "appointmenttype/" + this.selectedAppointment.id)), where("starttime", ">=", startDate), where("starttime", "<=", endDate))
-          await getDocs(availabilityQuery).then(availabilty => {
-            console.log(eisProfile, " - ", availabilty.size)
-            availabilty.forEach(slots => {
-              var localSlot = slots.data()[this.selectedAppointment.id]
-              console.log(localSlot);
-              if (localSlot != undefined && localSlot != null && localSlot.length != 0) {
-                for (let a = 0; a < localSlot.length; a++) {
-                  var data = localSlot[a]
-                  if (data.booked == false && data.available == true) {
-                    slotsOfEIS.push({
-                      slotstart: data.slotstart.toDate(),
-                      slotend: data.slotend.toDate(),
-                      docid: slots.id,
-                      index: a,
-                      eisprofile: eisProfile,
-                      appointmentrole: roleOfAppointment
-                    })
-                  }
-                }
-              }
-            })
-          })
-        }
-      }
-      slotsOfEIS.sort((a, b) => a.slotstart - b.slotstart)
-      console.log(slotsOfEIS)
-
-      var slotByRoles = []
-      for (let i = 0; i < this.appointmentRoles.length; i++) {
-        var data = {}
-        var totalEIS = slotsOfEIS.filter(e => e.appointmentrole == this.appointmentRoles[i])
-        if (totalEIS.length != 0) {
-          data[this.appointmentRoles[i]] = totalEIS
-          slotByRoles.push(data)
-        }
-      }
-      console.log(slotByRoles)
-
-      console.log("slot leng", slotByRoles.length);
-      console.log("apoint lenght", this.appointmentRoles.length);
-
-
-      if (slotByRoles.length != this.appointmentRoles.length) {
-        alert("EIS Slots not available for the selected date. Try again!")
-      }
-      else {
-        this.mergeEISslots(slotByRoles)
-      }
-      this.matDialog.closeAll()
-    }
-  }
-
-  mergeEISslots(slots: Array<any>) {
-    var mergedSlots = [{
-      docdata: [{
-        id: "",
-        index: 0
-      }],
-      start: "",
-      end: "",
-      specialist: "",
-    }]
-    mergedSlots = []
-    if (slots.length == 0) {
-      alert("No slots available")
-      return
-    }
-    else if (slots.length == 1) {
-      var roleSlot1 = slots[0][this.appointmentRoles[0]]
-      for (let i = 0; i < roleSlot1.length; i++) {
-        const slot1 = roleSlot1[i];
-        mergedSlots.push({
-          start: slot1.slotstart,
-          end: slot1.slotend,
-          specialist: this.mapProfile[doc(this.firestore, slot1.eisprofile).id],
-          docdata: [{
-            id: slot1.docid,
-            index: slot1.index
-          }],
-        })
-      }
-    }
-    else if (slots.length == 2) {
-      var roleSlot1 = slots[0][this.appointmentRoles[0]]
-      var roleSlot2 = slots[1][this.appointmentRoles[1]]
-
-      for (let i = 0; i < roleSlot1.length; i++) {
-        const slot1 = roleSlot1[i];
-        for (let j = 0; j < roleSlot2.length; j++) {
-          const slot2 = roleSlot2[j];
-          if (this.datepipe.transform(slot1.slotstart, "short") == this.datepipe.transform(slot2.slotstart, "short") && slot1.eisprofile != slot2.eisprofile) {
-            mergedSlots.push({
-              start: slot1.slotstart,
-              end: slot1.slotend,
-              specialist: this.mapProfile[doc(this.firestore, slot1.eisprofile).id] + ", " + this.mapProfile[doc(this.firestore, slot2.eisprofile).id],
-              docdata: [
-                { id: slot1.docid, index: slot1.index },
-                { id: slot2.docid, index: slot2.index },
-              ],
-            })
-          }
-        }
-      }
-    }
-    else if (slots.length == 3) {
-      var roleSlot1 = slots[0][this.appointmentRoles[0]]
-      var roleSlot2 = slots[1][this.appointmentRoles[1]]
-      var roleSlot3 = slots[2][this.appointmentRoles[2]]
-      for (let i = 0; i < roleSlot1.length; i++) {
-        const slot1 = roleSlot1[i];
-        for (let j = 0; j < roleSlot2.length; j++) {
-          const slot2 = roleSlot2[j];
-          for (let k = 0; k < roleSlot3.length; k++) {
-            const slot3 = roleSlot3[k];
-            if (
-              this.datepipe.transform(slot1.slotstart, "short") == this.datepipe.transform(slot2.slotstart, "short") &&
-              this.datepipe.transform(slot2.slotstart, "short") == this.datepipe.transform(slot3.slotstart, "short") &&
-              this.datepipe.transform(slot3.slotstart, "short") == this.datepipe.transform(slot1.slotstart, "short") &&
-              slot1.eisprofile != slot2.eisprofile && slot2.eisprofile != slot3.eisprofile && slot3.eisprofile != slot1.eisprofile
-            ) {
-              mergedSlots.push({
-                start: slot1.slotstart,
-                end: slot1.slotend,
-                specialist: this.mapProfile[doc(this.firestore, slot1.eisprofile).id] + ", " + this.mapProfile[doc(this.firestore, slot2.eisprofile).id] + ", " + this.mapProfile[doc(this.firestore, slot3.eisprofile).id],
-                docdata: [
-                  { id: slot1.docid, index: slot1.index },
-                  { id: slot2.docid, index: slot2.index },
-                  { id: slot3.docid, index: slot3.index },
-                ],
-              })
-            }
-          }
-        }
-      }
-    }
-
-    this.userAvailableSlots = mergedSlots
-    console.log(this.userAvailableSlots)
-    if (this.userAvailableSlots.length == 0) {
-      alert("No Slots available on the selected date")
-    }
+    this.userAvailableSlots = await this.bookingService.onDateSelect({
+      mindate: this.mindate,
+      selectedDate: this.selectedDate,
+      superRole: this.superRole,
+      appointmentRoles: this.appointmentRoles,
+      rolePersons: this.rolePersons,
+      selectedAppointment: this.selectedAppointment,
+      selectedUserProfileMap: this.mapProfile
+    });
+    this.selectedSlot = null;
   }
 
   async confirmSlot() {
-    var batch = writeBatch(this.firestore)
-    var selectedSlot = this.userAvailableSlots[this.selectedSlot]
-    console.log(selectedSlot)
-    if (!selectedSlot) {
-      alert("Select a Slot to Book!")
-      return
+    const success = await this.bookingService.confirmSlot({
+      userAvailableSlots: this.userAvailableSlots,
+      selectedSlotIndex: this.selectedSlot,
+      appointmentRoles: this.appointmentRoles,
+      rolePersons: this.rolePersons,
+      selectedAppointment: this.selectedAppointment,
+      selectedUser: this.selectedUser,
+      loggedinPID: this.loggedinPID
+    });
+    if (success) {
+      this.selectedAppointment = null;
+      this.selectedDate = null;
+      this.userAvailableSlots = [];
+      alert("Appointment Booked Successfully");
+      if (this.goback) this.location.back();
+      this.onProfileSelect();
     }
-
-    var selectedDate = this.datepipe.transform(selectedSlot.start, "fullDate")
-    var starttime = this.datepipe.transform(selectedSlot.start, "shortTime")
-
-    var requiredRoles = []
-    for (let i = 0; i < this.appointmentRoles.length; i++) {
-      const element = this.appointmentRoles[i];
-      requiredRoles.push(doc(this.firestore, element))
-    }
-    var hosts = []
-    var hostRole = {}
-
-    var mapSelectedSlot = {}
-
-    if (confirm("Confirm your appointment on " + selectedDate + " at " + starttime)) {
-      this.matDialog.open(LoadingProgressComponent, { disableClose: true, data: { type: "spinner", msg: "Booking Your Slots..." } })
-      var availablility = []
-      for (let i = 0; i < selectedSlot.docdata.length; i++) {
-        const slotDoc = selectedSlot.docdata[i];
-        var availabilityDoc = doc(this.firestore, "availability/" + slotDoc.id)
-        await getDoc(availabilityDoc).then(available => {
-          var availableData = available.data()
-          mapSelectedSlot[available.id] = availableData
-          if (availableData[this.selectedAppointment.id] != null) {
-            hosts.push(availableData['profileref']['path'])
-            availablility.push(availableData[this.selectedAppointment.id][slotDoc.index].booked == false && availableData[this.selectedAppointment.id][slotDoc.index].available == true)
-          }
-        })
-      }
-      console.log(availablility)
-      if (!availablility.includes(false)) {
-        for (let i = 0; i < this.appointmentRoles.length; i++) {
-          const element1 = this.appointmentRoles[i];
-          for (let j = 0; j < hosts.length; j++) {
-            const element2 = hosts[j];
-            console.log(this.rolePersons[element1])
-            if (this.rolePersons[element1].includes(element2)) {
-              if (hostRole[element1] == undefined || hostRole[element1] == null) {
-                hostRole[element1] = []
-              }
-              if (!hostRole[element1].includes(element2)) {
-                hostRole[element1].push(element2)
-              }
-            }
-          }
-        }
-        console.log("start time", selectedSlot.start)
-        console.log("end time", selectedSlot.end)
-        console.log("Appointment", this.selectedAppointment.id)
-        console.log("Hosts", hosts)
-        console.log("Required", requiredRoles)
-        console.log("Host Roles", hostRole)
-        console.log("Slot Data", selectedSlot.docdata)
-        var selectedAppointment = this.selectedAppointment.id
-        for (let i = 0; i < selectedSlot.docdata.length; i++) {
-          const slotDoc = selectedSlot.docdata[i];
-          // var availabilityDoc = doc(this.firestore, "availability/"+slotDoc.id)
-          // getDoc(availabilityDoc).then(available=>{
-          //   var chosenAppointment = available.data()
-          var chosenAppointment = mapSelectedSlot[slotDoc.id]
-          for (let j = 0; j < chosenAppointment["appointments"].length; j++) {
-            const chosenelement = chosenAppointment["appointments"][j];
-            var computedSlots = chosenAppointment[chosenelement.id]
-            if (computedSlots != null || computedSlots != undefined) {
-              for (let k = 0; k < computedSlots.length; k++) {
-                const slotelement = computedSlots[k];
-                var slotStart: any = new Date(slotelement.slotstart.toDate())
-                var slotEnd: any = new Date(slotelement.slotend.toDate())
-                if ((slotStart >= selectedSlot.start && slotStart < selectedSlot.end) || (slotEnd > selectedSlot.start && slotEnd < selectedSlot.end) || (selectedSlot.start >= slotStart && selectedSlot.start < slotEnd)) {
-                  if (!slotelement.booked) {
-                    slotelement.available = false
-                  }
-                  if (chosenelement.id == selectedAppointment && slotDoc.index == k && this.datepipe.transform(slotStart, "short") == this.datepipe.transform(selectedSlot.start, "short") && this.datepipe.transform(slotEnd, "short") == this.datepipe.transform(selectedSlot.end, "short")) {
-                    slotelement.booked = true
-                  }
-                }
-              }
-            }
-          }
-          var availabilityDoc = doc(this.firestore, "availability/" + slotDoc.id)
-          batch.update(availabilityDoc, chosenAppointment)
-          // }).catch(err=>{
-          //   console.log(err)
-          // })
-        }
-
-        var hostRef = []
-        hosts.forEach(data => {
-          hostRef.push(doc(this.firestore, data))
-        })
-        console.log("Host Ref", hostRef)
-
-        for (let i = 0; i < this.appointmentRoles.length; i++) {
-          const element1 = this.appointmentRoles[i];
-          var list = []
-          hostRole[element1].forEach(people => {
-            list.push(doc(this.firestore, people))
-          })
-          hostRole[element1] = list
-        }
-        console.log("hostRole", hostRole)
-        var docid = doc(collection(this.firestore, "appointments")).id
-        var appointmentDoc = doc(this.firestore, "appointments/" + docid)
-        var appointmentData = {
-          docid: docid,
-          starttime: selectedSlot.start,
-          endtime: selectedSlot.end,
-          appointment: doc(this.firestore, "appointmenttype/" + this.selectedAppointment.id),
-          appointmentrole: requiredRoles,
-          bookedby: doc(this.firestore, "profile_data/" + this.selectedUser),
-          hosts: hostRef,
-          hostRole,
-          slotdata: selectedSlot.docdata,
-          attended: false,
-          cancelled: false,
-          created: serverTimestamp(),
-          loggedid: this.loggedinPID,
-          productid: this.selectedAppointment.productid,
-          // participantproductid: this.selectedUser
-        }
-        batch.set(appointmentDoc, appointmentData)
-        await batch.commit().then(async (doc) => {
-          await this.createJourneyRecord(appointmentDoc.path)
-          this.matDialog.closeAll()
-          this.selectedAppointment = null
-          this.selectedDate = null
-          this.userAvailableSlots = []
-          alert("Appointment Booked Successfully")
-          if (this.goback) {
-            this.location.back()
-          }
-          this.onProfileSelect()
-        }).catch(err => {
-          this.matDialog.closeAll()
-          console.log(err)
-        })
-        this.matDialog.closeAll()
-      }
-      else {
-        alert("Oop! The selected slot is no longer available. Try again")
-      }
-    }
-  }
-
-  async createJourneyRecord(apptPath: string) {
-    var productstatus = null
-    var deliverySequence = []
-    for (let i = 0; i < this.selectedAppointment.participantdelivery.products.length; i++) {
-      const product = this.selectedAppointment.participantdelivery.products[i];
-      for (let j = 0; j < product.delivery.length; j++) {
-        const delivery = product.delivery[j];
-        if (delivery.sequenceref.path == this.selectedAppointment.deliverypath) {
-          productstatus = product.status ?? "ongoing"
-          delivery.status = "ongoing"
-          var participantProductDoc = doc(this.firestore, "participantsproduct/" + product["participantproductid"]);
-          const docSnap = await getDoc(participantProductDoc);
-          const participantProductData = docSnap.data();
-
-          let updateData: any = {
-            status: productstatus
-          };
-          if (participantProductData['status'] === 'initiated') {
-            updateData[`statusdate.${productstatus}`] = serverTimestamp();
-          }
-          await updateDoc(participantProductDoc, updateData);
-        }
-      }
-      deliverySequence.push({
-        delivery: product.delivery,
-        productref: product.productref,
-        participantproductid: product.participantproductid
-      })
-    }
-    // await this.firestore.collection("participantJourneySequence").doc(this.selectedAppointment.participantdelivery["profileid"]).update(this.selectedAppointment.journeyData)
-    var sequenecDoc = doc(this.firestore, "participantdeliverysequence/" + this.selectedAppointment.participantdelivery["profileid"])
-    await updateDoc(sequenecDoc, {
-      products: deliverySequence
-    })
-    var deliveryDoc = doc(this.firestore, this.selectedAppointment.deliverypath)
-    await updateDoc(deliveryDoc, {
-      fileref: arrayUnion(doc(this.firestore, apptPath)),
-      status: "ongoing"
-    })
   }
 }
