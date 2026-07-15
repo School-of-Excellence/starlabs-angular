@@ -1,0 +1,69 @@
+<div class="tags-wrap">
+  <div class="tags-head">
+    <div class="tags-head-text">
+      <div class="avatar">
+        <mat-icon *ngIf="mode === 'bulk'">sell</mat-icon>
+        <ng-container *ngIf="mode === 'single'">{{ (userName || 'U').charAt(0) | uppercase }}</ng-container>
+      </div>
+      <div>
+        <h2>{{ mode === 'bulk' ? 'Manage Tags' : 'Assign Tags' }}</h2>
+        <p>{{ mode === 'bulk' ? (bulkCount + ' user' + (bulkCount === 1 ? '' : 's') + ' selected') : userName }}</p>
+      </div>
+    </div>
+    <button mat-icon-button type="button" (click)="cancel()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-dialog-content class="tags-body">
+    <div class="loading" *ngIf="loading">
+      <mat-spinner diameter="30"></mat-spinner>
+    </div>
+
+    <ng-container *ngIf="!loading">
+      <div class="search-box">
+        <mat-icon>search</mat-icon>
+        <input [(ngModel)]="search" placeholder="Search or create a tag…"
+          (keyup.enter)="canCreate() && createTag()" />
+        <button *ngIf="search" class="clear-search" type="button" (click)="search = ''" aria-label="Clear">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <button class="create-chip" type="button" *ngIf="canCreate()" (click)="createTag()" [disabled]="isCreating">
+        <mat-icon>add</mat-icon>
+        <span>Create <strong>"{{ search.trim() }}"</strong></span>
+        <mat-spinner *ngIf="isCreating" diameter="16"></mat-spinner>
+      </button>
+
+      <div class="section-label" *ngIf="filteredTags().length > 0">
+        Tags <span class="muted">· tap to {{ selected.size ? 'toggle' : 'add' }}</span>
+      </div>
+
+      <div class="chip-cloud">
+        <button type="button" class="chip" *ngFor="let t of filteredTags()"
+          [class.selected]="isSelected(t.id)" (click)="toggle(t.id)">
+          <mat-icon class="chip-ic">{{ isSelected(t.id) ? 'check' : 'add' }}</mat-icon>
+          <span class="chip-name">{{ t.name }}</span>
+        </button>
+      </div>
+
+      <div class="cloud-empty" *ngIf="filteredTags().length === 0 && !canCreate()">
+        <mat-icon>sell</mat-icon>
+        <p>No tags yet — type a name above to create your first one.</p>
+      </div>
+    </ng-container>
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="tags-actions">
+    <span class="count" *ngIf="!loading">
+      <mat-icon>sell</mat-icon>{{ selected.size }} selected
+    </span>
+    <span class="spacer"></span>
+    <button mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
+    <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="isSaving">
+      <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
+      <span *ngIf="!isSaving">{{ mode === 'bulk' ? 'Apply' : 'Save' }}</span>
+    </button>
+  </mat-dialog-actions>
+</div>
