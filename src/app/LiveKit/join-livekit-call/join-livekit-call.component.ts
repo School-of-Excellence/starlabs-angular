@@ -537,10 +537,13 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       } catch (error: any) {
         if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {
           retryCount++;
-          if (retryCount > 3) throw new Error('System at capacity');
+          // Surface the server's actual reason (differs per provider/failure: AWS capacity
+          // gate vs "Media node not ready") instead of a blanket capacity message.
+          const serverMessage = error.error?.message || 'System at capacity';
+          if (retryCount > 3) throw new Error(serverMessage);
 
           const wait = error.error?.retryAfter || 60;
-          console.log(`Scaling... retry in ${wait}s`);
+          console.log(`Token 503 (${this.provider}): ${serverMessage} — retry in ${wait}s`);
           await new Promise(r => setTimeout(r, wait * 1000));
         } else {
           throw error;
@@ -920,7 +923,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       var roomId = this.roomDetail["roomId"]
       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStartRecording`;
       const response = await lastValueFrom(
-        this.httpClient.post(url, { roomId })
+        this.httpClient.post(url, { roomId, provider: this.provider })
       );
       console.log(response)
     } catch (error) {
@@ -938,7 +941,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       if(egressId){
         const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStopRecording`;
         const response = await lastValueFrom(
-          this.httpClient.post(url, { egressId: egressId, roomId: this.roomDetail.roomId })
+          this.httpClient.post(url, { egressId: egressId, roomId: this.roomDetail.roomId, provider: this.provider })
         );
         console.log(response)
       }
