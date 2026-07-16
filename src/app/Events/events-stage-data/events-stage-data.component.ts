@@ -854,13 +854,14 @@ export class EventsStageDataComponent {
 
   // ---- Per (queue, stage) computations ----
   private token(r: StageRow, col: StageCol) { return r.tokens[col.queueId]; }
+  // A stage is COMPLETED only when the participant's activity history records a transition OUT
+  // of that specific stage (`completedAt[stage]`, built from `queue stage log` previousstage
+  // entries in loadSelectedTokens). This is activity-based, NOT queue-position-based: if a
+  // participant skipped a stage (no log entry for it) and moved to a later one, the skipped
+  // stage is not completed. The position concept ("reached or passed a point") is a different
+  // thing and lives separately in `isReady` — do not route it through here.
   crossedStage(r: StageRow, col: StageCol): boolean {
-    const q = this.queues.find(x => x.id === col.queueId);
-    const t = this.token(r, col);
-    if (!q || !t) return false;
-    const ci = q.stages.indexOf(t.currentstage);
-    const si = q.stages.indexOf(col.stage);
-    return ci > -1 && si > -1 && ci > si;
+    return this.completedMs(r, col) > 0;
   }
   completedLabel(r: StageRow, col: StageCol): string {
     return this.crossedStage(r, col) ? 'Completed' : 'Not completed';
