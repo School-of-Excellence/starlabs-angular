@@ -1944,15 +1944,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // Default view is ACTIVE participants; other segments (All / Non-active / Discontinued) are opt-in.
   // Switching between them only re-slices the already-loaded allRows — never a new fetch.
   sumLifecycle = signal<'all' | 'active' | 'nonactive' | 'discontinued'>('active');
-  sumJourney = signal<{ label: string; group: boolean; journeys: string[] } | null>(null);
+  // Multi-select By-journey: a set of the selected journey NAMES (union). A group contributes all of
+  // its journeys; individual chips contribute one. Empty = all journeys (the default).
+  sumJourneys = signal<Set<string>>(new Set());
   journeyMenuOpen = false;
 
   private summaryJourneyName(r: { journeyname?: string }): string {
     return (r.journeyname && r.journeyname !== '-') ? r.journeyname : 'Unknown';
   }
   private matchesSummaryJourney(r: PortfolioRow): boolean {
-    const j = this.sumJourney();
-    return !j || j.journeys.includes(this.summaryJourneyName(r));
+    const s = this.sumJourneys();
+    return s.size === 0 || s.has(this.summaryJourneyName(r));
   }
   private matchesSummaryLifecycle(r: PortfolioRow): boolean {
     switch (this.sumLifecycle()) {
@@ -1979,10 +1981,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private indexReady = signal(0);
   /** Same journey predicate as matchesSummaryJourney, over a lite index row (base-wide). */
   private matchesSummaryJourneyLite(l: LiteIndexRow): boolean {
-    const j = this.sumJourney();
-    if (!j) return true;
+    const s = this.sumJourneys();
+    if (s.size === 0) return true;
     const name = (l.journeyname && l.journeyname !== '-') ? l.journeyname : 'Unknown';
-    return j.journeys.includes(name);
+    return s.has(name);
   }
   /** Same lifecycle predicate as matchesSummaryLifecycle, over a lite index row (base-wide). */
   private matchesSummaryLifecycleLite(l: LiteIndexRow): boolean {
@@ -1998,14 +2000,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   get summaryScopeTotal(): number { return this.pagedMode ? this.fullIndex.length : this.allRows().length; }
 
   /** Default is Active; a filter is "active" (Clear appears) only when it differs from that default. */
-  get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'active' || this.sumJourney() !== null; }
+  get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'active' || this.sumJourneys().size > 0; }
   /** Highlighted lifecycle segment — the filter now applies in both the coach and All views. */
   get shownLifecycle(): 'all' | 'active' | 'nonactive' | 'discontinued' { return this.sumLifecycle(); }
-  get summaryJourneyLabel(): string { return this.sumJourney()?.label ?? 'All journeys'; }
+  /** Pill label: 'All journeys' → the single chip's name → 'N journeys' for a multi-select. */
+  get summaryJourneyLabel(): string {
+    const s = this.sumJourneys();
+    if (s.size === 0) return 'All journeys';
+    const on = this.journeyView().filter(j => this.isSummaryJourneyOn(j));
+    return on.length === 1 ? on[0].name : `${s.size} journeys`;
+  }
+  /** A chip (journey or group) is on when every journey it represents is selected. */
   isSummaryJourneyOn(item: { name: string; group: boolean; journeys: string[] }): boolean {
-    const cur = this.sumJourney();
-    return !!cur && cur.group === item.group && cur.journeys.length === item.journeys.length
-      && item.journeys.every(j => cur.journeys.includes(j));
+    const s = this.sumJourneys();
+    return item.journeys.length > 0 && item.journeys.every(j => s.has(j));
   }
 
   /** Status-band tile / segmented control → set the lifecycle filter in place. 'all' resets the
@@ -2022,18 +2030,26 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.journeyMenuOpen = false;
     this.recomputeSummary();
   }
-  /** Journey chip / dropdown → set the journey-or-group filter in place (null clears; re-pick toggles). */
+  /** Journey chip / dropdown item → toggle its journey(s) in the multi-select set. `null` clears all.
+   *  Multi-select: the dropdown stays open so several can be picked; the By-journey chips toggle too. */
   setSumJourney(item: { name: string; group: boolean; journeys: string[] } | null): void {
     if (!this.summaryFilterReady) return;
-    if (!item) this.sumJourney.set(null);
-    else this.sumJourney.set(this.isSummaryJourneyOn(item) ? null : { label: item.name, group: item.group, journeys: item.journeys });
-    this.journeyMenuOpen = false;
+    const next = new Set(this.sumJourneys());
+    if (!item) {
+      next.clear();
+    } else if (this.isSummaryJourneyOn(item)) {
+      for (const j of item.journeys) next.delete(j);   // all present → turn the chip off
+    } else {
+      for (const j of item.journeys) next.add(j);       // turn the chip on (whole group at once)
+    }
+    this.sumJourneys.set(next);
     this.recomputeSummary();
   }
   toggleJourneyMenu(): void { if (this.summaryFilterReady) this.journeyMenuOpen = !this.journeyMenuOpen; }
+  closeJourneyMenu(): void { this.journeyMenuOpen = false; }
   clearSummaryFilter(): void {
     this.sumLifecycle.set('active');   // reset to the default view, not to 'all'
-    this.sumJourney.set(null);
+    this.sumJourneys.set(new Set());
     this.journeyMenuOpen = false;
     this.recomputeSummary();
   }
@@ -2147,10 +2163,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Summary-card click → switch to the Participants tab AND apply the matching lever (no drawer).
    *  Each Summary category maps to the lever that reproduces exactly that set on the Participants
    *  table. 'paymentsLocked' has no lever — it uses the existing finance filter instead. */
+  /** Carry the summary filter (lifecycle + selected journeys) onto the Participants table so a KPI
+   *  click lands on the already-scoped list — no re-filtering. Reuses the existing base-list filters
+   *  (journeyGroupFilter already matches an arbitrary set of journey names). */
+  private carrySummaryFilterToBase(): void {
+    const lc = this.sumLifecycle();
+    this.lifecycleFilter = lc === 'all' ? '' : lc;
+    this.journeyFilter = '';
+    this.journeyGroupFilter = [...this.sumJourneys()];
+  }
+
   goToParticipantsWithLever(lever: Lever): void {
     this.statusFilter = '';
     this.financeFilters = [];
-    this.lifecycleFilter = '';
+    this.carrySummaryFilterToBase();   // keep the current summary filter on the list
     this.view = 'base';
     this.setLever(lever);
   }
@@ -2178,6 +2204,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   goToPaymentsLocked(): void {
     this.statusFilter = '';
     this.activeLever = 'all';
+    this.carrySummaryFilterToBase();   // keep the current summary filter on the list
     this.view = 'base';
     this.financeFilters = ['locked'];
     this.applyFilters();
@@ -2379,7 +2406,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.assignTargetCoachId = '';
     // scope changed → reset the summary filter to its default (Active, no journey).
     this.sumLifecycle.set('active');
-    this.sumJourney.set(null);
+    this.sumJourneys.set(new Set());
     this.journeyMenuOpen = false;
     this.pagedMode = this.isPagedView(id);
     this.applyPaginatorBinding();

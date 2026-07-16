@@ -2132,6 +2132,12 @@ td.mat-mdc-cell span {
 .fb-mcount { color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .fb-mitem.on .fb-mcount { color: #007aff; }
 .fb-mgico { font-size: 15px; width: 15px; height: 15px; }
+.fb-mcheck { font-size: 16px; width: 16px; height: 16px; line-height: 16px; color: #007aff; flex: 0 0 16px; }
+.fb-menu-backdrop { position: fixed; inset: 0; z-index: 19; background: transparent; }
+.fb-menu { z-index: 20; }
+.fb-mdone { width: 100%; text-align: center; border: none; background: transparent; font: inherit; font-size: 13px; font-weight: 600;
+  color: #007aff; padding: 8px; border-radius: 8px; cursor: pointer; margin-top: 4px; border-top: 0.5px solid #f0f0f2; }
+.fb-mdone:hover { background: #f2f2f7; }
 
 .fb-clear { display: inline-flex; align-items: center; gap: 3px; font: inherit; font-size: 12px; color: var(--ink-2);
   background: transparent; border: 0.5px solid #e5e5ea; border-radius: 999px; padding: 5px 10px 5px 8px; cursor: pointer; }

@@ -78,15 +78,21 @@
           <button type="button" [class.on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">Discontinued</button>
         </div>
         <div class="fb-journey">
-          <button type="button" class="fb-jbtn" [class.on]="!!sumJourney()" (click)="toggleJourneyMenu()">
-            <mat-icon *ngIf="sumJourney()?.group" class="fb-jgico">folder</mat-icon>{{ summaryJourneyLabel }}<mat-icon class="fb-jchev">expand_more</mat-icon>
+          <button type="button" class="fb-jbtn" [class.on]="sumJourneys().size > 0" (click)="toggleJourneyMenu()">
+            {{ summaryJourneyLabel }}<mat-icon class="fb-jchev">expand_more</mat-icon>
           </button>
+          <div class="fb-menu-backdrop" *ngIf="journeyMenuOpen" (click)="closeJourneyMenu()"></div>
           <div class="fb-menu" *ngIf="journeyMenuOpen">
-            <button type="button" class="fb-mitem" [class.on]="!sumJourney()" (click)="setSumJourney(null)">All journeys</button>
+            <button type="button" class="fb-mitem" [class.on]="sumJourneys().size === 0" (click)="setSumJourney(null)">
+              <mat-icon class="fb-mcheck">{{ sumJourneys().size === 0 ? 'check' : '' }}</mat-icon>
+              <span class="fb-mname">All journeys</span>
+            </button>
             <button type="button" class="fb-mitem" *ngFor="let j of journeyView()" [class.on]="isSummaryJourneyOn(j)" (click)="setSumJourney(j)">
+              <mat-icon class="fb-mcheck">{{ isSummaryJourneyOn(j) ? 'check' : '' }}</mat-icon>
               <mat-icon *ngIf="j.group" class="fb-mgico">folder</mat-icon>
               <span class="fb-mname">{{ j.name }}</span><span class="fb-mcount">{{ j.count }}</span>
             </button>
+            <button type="button" class="fb-mdone" (click)="closeJourneyMenu()">Done</button>
           </div>
         </div>
         <button type="button" class="fb-clear" *ngIf="summaryFilterActive" (click)="clearSummaryFilter()"><mat-icon>close</mat-icon>Clear</button>
