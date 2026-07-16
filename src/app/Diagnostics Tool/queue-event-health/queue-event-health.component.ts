@@ -2,7 +2,7 @@ import { Component , HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, onSnapshot, collection, getDocs, query, where, doc, updateDoc, serverTimestamp,getDoc, setDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { getFirestore, onSnapshot, collection, getDocs, query, where, doc, updateDoc, serverTimestamp,getDoc, setDoc, writeBatch, Timestamp ,orderBy } from 'firebase/firestore';
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
@@ -84,6 +84,7 @@ export class QueueEventHealthComponent {
   atcModelsForQueue: string[] = [];
   atcPendingValidationCount = 0;
   atcPendingValidationNames: any[] = [];
+  fixingNoQueueAtcs = false;
 
   /* ================= FILTERS ================= */
 
@@ -640,9 +641,11 @@ export class QueueEventHealthComponent {
         query(
           collection(firestoreAtc, 'atc_alpha'),
           where('isdelete', '==', false),
-          // where('product', 'in', this.atcModelsForQueue),
+          where('product', 'in', this.atcModelsForQueue),
+          where('type','==','online'),
           where('prescription_date', '>=', startTimestamp),
-          where('prescription_date', '<=', endTimestamp)
+          where('prescription_date', '<=', endTimestamp),
+          orderBy('prescription_date','desc')
         ),
         (snap) => {
           this.atcAlphaRecords = snap.docs.map(d => ({
@@ -655,6 +658,7 @@ export class QueueEventHealthComponent {
           }));
           this.calculateAtcGivenCounts();
           this.calculateAtcNoQueueCounts();
+          // console.log("ATC MODELS(ATC_ALPHA)",this.atcModelsForQueue);
         }
       );
 
@@ -665,8 +669,10 @@ export class QueueEventHealthComponent {
           where('isdelete', '==', false),
           where('status', '==', 'atc given'),
           where('product', 'in', this.atcModelsForQueue),
+          where('type', '==', 'online'),
           where('prescription_date', '>=', startTimestamp),
-          where('prescription_date', '<=', endTimestamp)
+          where('prescription_date', '<=', endTimestamp),
+          orderBy('prescription_date', 'desc')
         ),
         (snap) => {
           this.atcValidateRecords = snap.docs.map(d => ({
@@ -678,6 +684,9 @@ export class QueueEventHealthComponent {
             status: d.data()['status'] ?? null,
             source: 'atc_to_validate'
           }));
+          this.calculateAtcGivenCounts();
+          this.calculateAtcNoQueueCounts();
+          // console.log("ATC MODEL (ATC_TO_VALIDATE) :", this.atcModelsForQueue);
         }
       );
     }
@@ -711,6 +720,12 @@ export class QueueEventHealthComponent {
         return productRefId && queueProductRefIds.has(productRefId);
       })
       .filter(pp => !tokenPpIds.has(pp.id));
+
+      // console.log('initiatedNotInQueueDocs count:', this.initiatedNotInQueueDocs.length);
+      // console.log('arenaEventMap keys:', [...this.arenaEventMap.keys()]);
+      // console.log('queueProductRefIds:', Array.from(queueProductRefIds));
+      // console.log('tokenPpIds size:', tokenPpIds.size);
+      // console.log('filtered (before resolve):', filtered.length);
 
     const resolved = await Promise.all(
       filtered.map(async (pp) => {
@@ -1024,40 +1039,49 @@ export class QueueEventHealthComponent {
       }
     }
 
+    // ONLY ACTIVE TOKENS
+    const activeRecords = this.allRecords.filter(
+      r => String(r.tokenStatus).trim().toLowerCase() === 'active'
+    );
+
+    // GIVEN (per person, active tokens only)
     const seenGiven = new Set<string>();
-    this.atcGivenNames = this.allRecords.filter(r => {
+    this.atcGivenNames = activeRecords.filter(r => {
       if (!givenProfileIds.has(r.profileid)) return false;
       if (seenGiven.has(r.profileid)) return false;
       seenGiven.add(r.profileid);
       return true;
     });
     this.atcGivenCount = this.atcGivenNames.length;
+    // console.log('ATC GIVEN names:', this.atcGivenNames.map(r => r.participantName));
 
-    // ---- PENDING VALIDATION (per person) ----
+    // PENDING VALIDATION (per person, active tokens only)
     const seenPending = new Set<string>();
-    this.atcPendingValidationNames = this.allRecords.filter(r => {
+    this.atcPendingValidationNames = activeRecords.filter(r => {
+      if (givenProfileIds.has(r.profileid)) return false;
       if (!pendingProfileIds.has(r.profileid)) return false;
       if (seenPending.has(r.profileid)) return false;
       seenPending.add(r.profileid);
       return true;
     });
     this.atcPendingValidationCount = this.atcPendingValidationNames.length;
+    // console.log('ATC PENDING VALIDATION names:', this.atcPendingValidationNames.map(r => r.participantName));
 
-    // ---- NOT GIVEN → absent from BOTH atc_alpha AND atc_to_validate ----
+    // NOT GIVEN (per person, active tokens only)
     const seenNotGiven = new Set<string>();
-    this.atcNotGivenNames = this.allRecords.filter(r => {
+    this.atcNotGivenNames = activeRecords.filter(r => {
       if (givenProfileIds.has(r.profileid) || pendingProfileIds.has(r.profileid)) return false;
       if (seenNotGiven.has(r.profileid)) return false;
       seenNotGiven.add(r.profileid);
       return true;
     });
     this.atcNotGivenCount = this.atcNotGivenNames.length;
+    // console.log('ATC NOT GIVEN names:', this.atcNotGivenNames.map(r => r.participantName));
   }
 
   calculateAtcNoQueueCounts() {
     const noQueueProfileIds = new Set<string>();
 
-    // Check BOTH atc_alpha (Given) and atc_to_validate (Pending Validation)
     for (const a of [...this.atcAlphaRecords, ...this.atcValidateRecords]) {
       const hasNoQueue = a.queueid === null || a.queueid === undefined || String(a.queueid).trim() === '';
       if (a.profileid && hasNoQueue && this.isWithinQueueDate(a.prescriptionDate)) {
@@ -1065,8 +1089,13 @@ export class QueueEventHealthComponent {
       }
     }
 
+    // ONLY ACTIVE TOKENS
+    const activeRecords = this.allRecords.filter(
+      r => String(r.tokenStatus).trim().toLowerCase() === 'active'
+    );
+
     const seenNoQueue = new Set<string>();
-    this.atcNoQueueNames = this.allRecords.filter(r => {
+    this.atcNoQueueNames = activeRecords.filter(r => {
       if (!noQueueProfileIds.has(r.profileid)) return false;
       if (seenNoQueue.has(r.profileid)) return false;
       seenNoQueue.add(r.profileid);
@@ -1074,6 +1103,81 @@ export class QueueEventHealthComponent {
     });
 
     this.atcNoQueueCount = this.atcNoQueueNames.length;
+  }
+
+  toggleSelectAllNoQueueAtcs(event: any) {
+    const checked = event.target.checked;
+    for (const entries of this.profileAtcDetailsMap.values()) {
+      for (const a of entries) {
+        if (a.noQueue) {
+          a.selected = checked;
+        }
+      }
+    }
+  }
+
+  async fixSelectedNoQueueAtcs() {
+    if (!this.selectedQueueId) {
+      alert('No queue selected');
+      return;
+    }
+
+    const selectedEntries: { id: string; source: string }[] = [];
+
+    for (const entries of this.profileAtcDetailsMap.values()) {
+      for (const a of entries) {
+        if (a.selected && a.noQueue) {
+          selectedEntries.push({ id: a.id, source: a.source });
+        }
+      }
+    }
+
+    if (selectedEntries.length === 0) {
+      alert('No ATCs selected');
+      return;
+    }
+
+    const confirmAction = confirm(
+      `Map ${selectedEntries.length} selected ATC record(s) to the current queue?`
+    );
+    if (!confirmAction) return;
+
+    this.fixingNoQueueAtcs = true;
+
+    try {
+      const firestoreAtc = getFirestore('firestore-atc');
+      const batch = writeBatch(firestoreAtc);
+
+      for (const entry of selectedEntries) {
+        const collectionName = entry.source === 'atc_alpha' ? 'atc_alpha' : 'atc_to_validate';
+        const ref = doc(firestoreAtc, collectionName, entry.id);
+        batch.update(ref, { queueid: this.selectedQueueId });
+      }
+
+      await batch.commit();
+
+      const idSet = new Set(selectedEntries.map(e => e.id));
+
+      this.atcAlphaRecords = this.atcAlphaRecords.map(a =>
+        idSet.has(a.id) ? { ...a, queueid: this.selectedQueueId } : a
+      );
+
+      this.atcValidateRecords = this.atcValidateRecords.map(a =>
+        idSet.has(a.id) ? { ...a, queueid: this.selectedQueueId } : a
+      );
+
+      this.atcQueueRecords = [...this.atcAlphaRecords, ...this.atcValidateRecords];
+
+      this.calculateAtcNoQueueCounts();
+      this.calculateAtcGivenCounts();
+      await this.buildAllProfileAtcDetails();
+
+    } catch (e) {
+      console.error('Failed to fix ATC queue mapping', e);
+      alert('Failed to update selected ATC records. Please try again.');
+    } finally {
+      this.fixingNoQueueAtcs = false;
+    }
   }
 
   async resolveAuthorNames(authorRefs: any[]): Promise<string> {
@@ -1111,10 +1215,13 @@ export class QueueEventHealthComponent {
         const isValidated = a.source === 'atc_alpha' ? true : (a.status !== 'atc given');
         const noQueue = a.queueid === null || a.queueid === undefined || String(a.queueid).trim() === '';
         return {
+          id: a.id,
+          source: a.source,
           prescriptionDate: a.prescriptionDate,
           authorNames,
           isValidated,
-          noQueue
+          noQueue,
+          selected: false
         };
       }));
 

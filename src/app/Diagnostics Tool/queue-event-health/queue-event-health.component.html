@@ -37,12 +37,12 @@
       <div class="kpi-label">Completed</div>
     </div>
 
-    <!-- <div class="kpi"
+    <div class="kpi"
          (click)="onKpiClick('initiated')"
          [class.active]="activeKpiFilter==='initiated'">
       <div class="kpi-value">{{ dashboard.initiated }}</div>
       <div class="kpi-label">Initiated</div>
-    </div> -->
+    </div>
 
     <div class="kpi"
          (click)="onKpiClick('ongoing')"
@@ -132,7 +132,15 @@
         (click)="onAtcCountClick('no_queue')"
         [class.active]="activeAtcListType==='no_queue'">
       <div class="kpi-value">{{ atcNoQueueCount }}</div>
-      <div class="kpi-label">ATC — No Queue ID</div>
+      <div class="kpi-label">ATC — No Queue ID
+        <button
+          class="btn-fix-all"
+          *ngIf="activeAtcListType === 'no_queue'"
+          (click)="$event.stopPropagation(); fixSelectedNoQueueAtcs()"
+          [disabled]="fixingNoQueueAtcs">
+          {{ fixingNoQueueAtcs ? 'Fixing...' : 'Fix All' }}
+        </button>
+      </div>
     </div>
   </div>
 
@@ -310,6 +318,13 @@
         : activeAtcListType === 'pending_validation' ? 'ATC Pending Validation'
         : 'ATC — No Queue ID' }}
     </h3>
+
+    <div *ngIf="activeAtcListType === 'no_queue'" style="margin-bottom:10px;">
+      <label>
+        <input type="checkbox" (change)="toggleSelectAllNoQueueAtcs($event)" />
+        Select All
+      </label>
+    </div>
     <table>
       <thead>
         <tr>
@@ -338,6 +353,9 @@
                 <tbody>
                   <tr *ngFor="let a of profileAtcDetailsMap.get(r.profileid)"
                       [style.background]="a.noQueue ? '#fdecea' : 'transparent'">
+                    <td style="padding:6px 10px; width:30px;" *ngIf="activeAtcListType === 'no_queue'">
+                      <input type="checkbox" *ngIf="a.noQueue" [(ngModel)]="a.selected" />
+                    </td>
                     <td style="padding:6px 10px;">
                       {{ a.prescriptionDate | date:'medium' }} by {{ a.authorNames }}
                       ({{ a.isValidated ? 'validated' : 'not_validated' }})
