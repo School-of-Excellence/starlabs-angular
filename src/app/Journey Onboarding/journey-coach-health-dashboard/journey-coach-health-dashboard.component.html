@@ -69,7 +69,7 @@
 
       <!-- Global summary filter: lifecycle + journey/group. Rescopes every metric below.
            Active only when the full base is loaded; disabled in the paged/All view (honest). -->
-      <div class="ios2-filter" [class.is-disabled]="pagedMode">
+      <div class="ios2-filter" [class.is-disabled]="!summaryFilterReady">
         <span class="fb-label"><mat-icon>tune</mat-icon>Filter</span>
         <div class="fb-seg" role="group" aria-label="Lifecycle">
           <button type="button" [class.on]="shownLifecycle==='all'" (click)="setSumLifecycle('all')">All</button>
@@ -90,8 +90,8 @@
           </div>
         </div>
         <button type="button" class="fb-clear" *ngIf="summaryFilterActive" (click)="clearSummaryFilter()"><mat-icon>close</mat-icon>Clear</button>
-        <span class="fb-count" *ngIf="!pagedMode">{{ filteredRows().length }} of {{ allRows().length }}</span>
-        <span class="fb-hint" *ngIf="pagedMode">Available in a coach view</span>
+        <span class="fb-count" *ngIf="summaryFilterReady">{{ summaryShownCount }} of {{ summaryScopeTotal }}</span>
+        <span class="fb-hint" *ngIf="!summaryFilterReady">Loading base…</span>
       </div>
 
       <!-- Row 1: Needs attention (who needs you) + Your base (lifecycle split) -->
