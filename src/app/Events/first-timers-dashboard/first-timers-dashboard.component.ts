@@ -32,7 +32,10 @@ const EXCLUDED_PRODUCT_ID = getExcludedProductId();
   selector: 'app-first-timers-dashboard',
   imports: [CommonModule, MatInputModule, ReactiveFormsModule, FormsModule, ProfilePictureComponent],
   templateUrl: './first-timers-dashboard.component.html',
-  styleUrl: './first-timers-dashboard.component.css'
+  styleUrl: './first-timers-dashboard.component.css',
+  // Escape closes the drawer (prototype behaviour). Wires the global key to the
+  // existing closeSidePanel() — no new logic.
+  host: { '(document:keydown.escape)': 'closeSidePanel()' }
 })
 export class FirstTimersDashboardComponent implements OnDestroy {
   @ViewChild('searchInput') searchInput!: ElementRef;
@@ -89,6 +92,11 @@ export class FirstTimersDashboardComponent implements OnDestroy {
   liveChangeworkTotal: number = 0;
 
   participantFilter: 'all' | 'firstTimers' = 'firstTimers';
+
+  // Prototype-added UI state (presentation only)
+  sortMode: 'live' | 'name' = 'live';
+  toastMessage: string = '';
+  private toastTimer: any = null;
 
   eventDays: Array<{ day: string; dateObj: Date; displayText: string }> = [];
   currentFilter: string = 'all';
@@ -319,7 +327,7 @@ export class FirstTimersDashboardComponent implements OnDestroy {
           seenProfileIds.add(profileId);
         });
         this.eventParticipantProfileIds = [...seenProfileIds];
-        
+
         this.doerTotal = this.eventParticipantProfileIds.length;
         if (this.liveChangeWorkData.length > 0 || this.beneficierProfileIds.length > 0) { this.calculateProcedureData(); }
       });
@@ -406,6 +414,11 @@ export class FirstTimersDashboardComponent implements OnDestroy {
       next: (docs) => {
         console.log("Total ATC", docs.length)
         console.log("Models :",this.atcModels)
+        // TEMP DEBUG — inspect ATC adjustment structure
+        if (docs.length > 0) {
+          console.log("[TEMP] ATC doc keys:", Object.keys(docs[0]));
+          console.log("[TEMP] ATC doc sample:", docs[0]);
+        }
         this.atcDocs = docs;
         this.profileAtcMap = {};
         docs.forEach((doc: any) => {
@@ -687,10 +700,20 @@ export class FirstTimersDashboardComponent implements OnDestroy {
       const pendingSet = beneficierPendingMap[procedureId] || new Set<string>();
       const completedFromAtc = beneficierCompletedFromAtcMap[procedureId] || new Set<string>();
       const completedFromLive = new Set(beneficierCompletedData.keys());
-      const beneficierNotStartedArray = [...pendingSet].filter(id => !completedFromAtc.has(id) && !completedFromLive.has(id));
+      const beneficierNotStartedArray = [...pendingSet].filter(id => !completedFromLive.has(id));
 
       tempMap[procedureId].beneficierNotStarted.count = beneficierNotStartedArray.length;
       tempMap[procedureId].beneficierNotStarted.data = beneficierNotStartedArray;
+      // TEMP DEBUG — beneficiary set breakdown
+      if (pendingSet.size > 0) {
+        const nameOf = (id: string) => `${this.participantMetadataMap[id]?.['name'] || 'Unknown'}[${id}]`;
+        console.log(`[TEMP] BENE | ${this.mapProcedureNames[procedureId] || procedureId}`,
+          `\n  pending(${pendingSet.size}):`, [...pendingSet].map(nameOf),
+          `\n  completedFromAtc(${completedFromAtc.size}):`, [...completedFromAtc].map(nameOf),
+          `\n  completedFromLive(${completedFromLive.size}):`, [...completedFromLive].map(nameOf),
+          `\n  notStarted(${beneficierNotStartedArray.length}):`, beneficierNotStartedArray.map(nameOf),
+          `\n  badge(unique pending):`, this.getUniqueParticipants(tempMap[procedureId].totalOpportunities.data));
+      }
 
       // Live changework stats
       const liveData = liveChangeworkMap[procedureId] || [];
@@ -699,13 +722,12 @@ export class FirstTimersDashboardComponent implements OnDestroy {
       totalLiveCount += liveData.length;
     });
 
+    this.liveChangeworkTotal = totalLiveCount;
     this.mapProcedureData = { ...tempMap };
     this.cdr.detectChanges();
 
-    // Sort procedures by completed count (doerCompleted + beneficierCompleted) descending
-    this.sortedProcedureIds = Object.keys(tempMap).sort((a, b) =>
-      tempMap[b].totalOpportunities.count - tempMap[a].totalOpportunities.count
-    );
+    // Re-apply the chosen sort so live updates preserve the operator's ordering.
+    this.applySort();
   }
 
   // Update queue date range
@@ -865,9 +887,92 @@ export class FirstTimersDashboardComponent implements OnDestroy {
   toggleParticipant(participant: Participant): void { participant.selected = !participant.selected; }
   getSelectedCount(): number { return this.selectedParticipants.filter(p => p.selected).length; }
 
-  sendNotification(): void { const count = this.getSelectedCount(); alert(count > 0 ? `🔔 Notification sent to ${count} selected participants` : '🔔 Please select participants first'); }
-  initiateCalling(): void { const count = this.getSelectedCount(); alert(count > 0 ? `📞 Calling list generated for ${count} selected participants` : '📞 Please select participants first'); }
-  sendToWall(): void { const count = this.getSelectedCount(); alert(count > 0 ? `📺 ${count} names sent to B!G Wall display` : '📺 Please select participants first'); }
+  sendNotification(): void { const count = this.getSelectedCount(); this.showToast(count > 0 ? `🔔 Notification sent to ${count} selected participants` : '🔔 Please select participants first'); }
+  initiateCalling(): void { const count = this.getSelectedCount(); this.showToast(count > 0 ? `📞 Calling list generated for ${count} selected participants` : '📞 Please select participants first'); }
+  sendToWall(): void { const count = this.getSelectedCount(); this.showToast(count > 0 ? `📺 ${count} names sent to B!G Wall display` : '📺 Please select participants first'); }
+
+  // ---- Prototype-added helpers (presentation/derived values only) ----------
+
+  // Toast: replaces the drawer-action alert()s. Auto-hides after 1900ms.
+  showToast(message: string): void {
+    this.toastMessage = message;
+    if (this.toastTimer) { clearTimeout(this.toastTimer); }
+    this.toastTimer = setTimeout(() => { this.toastMessage = ''; this.cdr.detectChanges(); }, 1900);
+    this.cdr.detectChanges();
+  }
+
+  // Change the table sort mode and re-order the already-computed rows.
+  setSortMode(mode: 'live' | 'name'): void {
+    if (this.sortMode === mode) { return; }
+    this.sortMode = mode;
+    this.applySort();
+    this.cdr.detectChanges();
+  }
+
+  // Sort sortedProcedureIds: 'live' = live count desc, tie-break completion % desc;
+  // 'name' = procedure name asc. Pure re-ordering of existing data.
+  private applySort(): void {
+    const ids = Object.keys(this.mapProcedureData);
+    if (this.sortMode === 'name') {
+      ids.sort((a, b) => (this.mapProcedureNames[a] || '').localeCompare(this.mapProcedureNames[b] || ''));
+    } else {
+      ids.sort((a, b) => {
+        const live = this.mapProcedureData[b].liveChangework.count - this.mapProcedureData[a].liveChangework.count;
+        if (live !== 0) { return live; }
+        return this.completionPct(b) - this.completionPct(a);
+      });
+    }
+    this.sortedProcedureIds = ids;
+  }
+
+  // Execution-based completion % for one procedure. procedurependinglist is
+  // "still to do" (disjoint from procedurecompletedlist — see ATC.js), so the
+  // denominator is prescribed = pending + completed. Guarded; never > 100%.
+  completionPct(procedureId: string): number {
+    const d = this.mapProcedureData[procedureId];
+    if (!d) { return 0; }
+    const numerator = d.totalCompleted.count;
+    const denominator = d.totalOpportunities.count + d.totalCompleted.count;
+    if (denominator === 0) { return 0; }
+    return Math.min(100, Math.round((numerator / denominator) * 100));
+  }
+
+  barColor(pct: number): string { return pct > 0 ? 'var(--green)' : '#d3d9e1'; }
+  pctColor(pct: number): string { return pct > 0 ? 'var(--ink)' : '#9aa4b2'; }
+
+  // Overall progress KPI: sum of numerators / sum of denominators across rows
+  // (NOT the average of row percentages). Same execution basis as completionPct.
+  get overallProgressPct(): number {
+    let numerator = 0;
+    let denominator = 0;
+    for (const id of this.sortedProcedureIds) {
+      const d = this.mapProcedureData[id];
+      if (!d) { continue; }
+      numerator += d.totalCompleted.count;
+      denominator += d.totalOpportunities.count + d.totalCompleted.count;
+    }
+    if (denominator === 0) { return 0; }
+    return Math.min(100, Math.round((numerator / denominator) * 100));
+  }
+
+  // "Completed" KPI: unique beneficiaries who completed changework in the
+  // currently-scoped range (liveChangeWorkData is already procedurestatus ==
+  // 'completed' and date-filtered). Counts PEOPLE, not executions.
+  get completedCount(): number {
+    const ids = new Set<string>();
+    this.liveChangeWorkData.forEach((d: any) => { const id = d['beneficiaryid']; if (id) { ids.add(id); } });
+    return ids.size;
+  }
+
+  // Label the "Completed" KPI to reflect the active day filter rather than
+  // hardcoding "today".
+  get completedKpiLabel(): string {
+    if (this.currentFilter === 'all') { return 'Completed (all days)'; }
+    const day = this.eventDays.find(d => d.day === this.currentFilter);
+    if (day && this.isToday(day.dateObj)) { return 'Completed today'; }
+    if (day) { return 'Completed · D' + day.day.replace('day', ''); }
+    return 'Completed';
+  }
 
   // Export to Excel
   exportToExcel(): void {
