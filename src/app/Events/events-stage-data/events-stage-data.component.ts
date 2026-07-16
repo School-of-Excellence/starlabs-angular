@@ -39,6 +39,8 @@ interface QueueOption {
   endValue: number;
   live: boolean;          // true if the queue is live (no end date or end date >= today)
   variations: Record<string, string>;   // variationId → variationname (from `queue variation`)
+  arenaeventidlist: string[];  // arena docids this queue serves (→ products, via `arena events`)
+  productIds: string[];        // product ids this queue is mapped to (resolved from arenaeventidlist)
 }
 
 // A stage column = one stage of one selected queue (merged across all selected queues).
@@ -66,8 +68,10 @@ interface StageRow {
   status: string;
   journeyId: string;             // journey chosen by customerstatus (active/non active/other)
   unconsumedProducts: string[];  // product ids still unconsumed (participant metadata)
-  // by queueId: current stage, slot bookings, and completion dates (previousstage → logdate ms)
-  tokens: Record<string, { currentstage: string; selectedstageslot: any; completedAt: Record<string, number> }>;
+  activeProducts: string[];      // product ids currently being consumed (participant metadata: activeproduct)
+  // by queueId: current stage, slot bookings, completion dates (previousstage → logdate ms), and
+  // lastMs = most recent token/stage-log activity time in that queue (for "most recent" picks).
+  tokens: Record<string, { currentstage: string; selectedstageslot: any; completedAt: Record<string, number>; lastMs: number }>;
   metaMissing: boolean;
 }
 
@@ -379,10 +383,11 @@ export class EventsStageDataComponent {
         customerStatus: m?.['customerstatus'] ?? '',
         journeyId: this.pickJourneyId(m),
         unconsumedProducts: Array.isArray(m?.['unconsumedproducts']) ? m['unconsumedproducts'].map((p: any) => (p ?? '').toString()) : [],
+        activeProducts: Array.isArray(m?.['activeproduct']) ? m['activeproduct'].map((p: any) => (p ?? '').toString()) : [],
         status, tokens: {}, metaMissing: !m
       } as StageRow;
     } catch {
-      return { profileid: pid, name: '', email: '', phone: '', customerStatus: '', journeyId: '', unconsumedProducts: [], status, tokens: {}, metaMissing: true } as StageRow;
+      return { profileid: pid, name: '', email: '', phone: '', customerStatus: '', journeyId: '', unconsumedProducts: [], activeProducts: [], status, tokens: {}, metaMissing: true } as StageRow;
     }
   }
 
@@ -616,14 +621,16 @@ export class EventsStageDataComponent {
         const q = d.data();
         if (q['delete'] == true) return;
         const end = this.toMillis(q['queueenddate']);
-        const mapped = (q['arenaeventidlist'] ?? []).includes(row.docid);
+        const arenaList: string[] = Array.isArray(q['arenaeventidlist']) ? q['arenaeventidlist'] : [];
+        const mapped = arenaList.includes(row.docid);
         const isLive = !end || end >= todayStart;
         const recentlyEnded = !!end && end >= eightMonthsAgo;
         if (!isLive && !mapped && !recentlyEnded) return;
         queues.push({
           id: d.id, name: q['queuename'] ?? 'Queue', ref: d.ref,
           stages: Array.isArray(q['stages']) ? q['stages'] : [],
-          mapped, endValue: end, live: isLive, variations: {}
+          mapped, endValue: end, live: isLive, variations: {},
+          arenaeventidlist: arenaList, productIds: []
         });
       });
       queues.sort((a, b) => (Number(b.mapped) - Number(a.mapped)) || (b.endValue - a.endValue));
@@ -682,7 +689,8 @@ export class EventsStageDataComponent {
         const [tokSnap, logSnap, varSnap] = await Promise.all([
           getDocs(query(collection(this.firestore, 'queue_token'), where('queueref', '==', q.ref))),
           getDocs(query(collection(this.firestore, 'queue stage log'), where('queueref', '==', q.ref))),
-          getDocs(query(collection(this.firestore, 'queue variation'), where('queueref', '==', q.ref)))
+          getDocs(query(collection(this.firestore, 'queue variation'), where('queueref', '==', q.ref))),
+          this.resolveQueueProducts(q)   // #8/#5: which product(s) this queue is mapped to
         ]);
         const vmap: Record<string, string> = {};
         varSnap.docs.forEach(d => { vmap[d.id] = d.data()['variationname'] ?? d.id; });
@@ -735,7 +743,7 @@ export class EventsStageDataComponent {
           const latest = latestByPid.get(r.profileid);
           const completedAt = completedByPid.get(r.profileid) ?? {};
           if (t || latest || Object.keys(completedAt).length) {
-            r.tokens[qid] = { currentstage: latest?.currentstage ?? t?.currentstage ?? '', selectedstageslot: t?.selectedstageslot ?? {}, completedAt };
+            r.tokens[qid] = { currentstage: latest?.currentstage ?? t?.currentstage ?? '', selectedstageslot: t?.selectedstageslot ?? {}, completedAt, lastMs: Math.max(latest?.ms ?? 0, t?.ms ?? 0) };
           }
         });
         this.loadedTokenQueues.add(qid);
@@ -747,6 +755,22 @@ export class EventsStageDataComponent {
       this.loadingQueue = false;
     }
     this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
+  }
+
+  // Resolve a queue's product ids once, from its arena events (docid ∈ arenaeventidlist).
+  // Chunked to respect Firestore's `in` limit. Drives #8 (current stage) and #5 (DFU ongoing).
+  private async resolveQueueProducts(q: QueueOption): Promise<void> {
+    if (q.productIds.length || !q.arenaeventidlist.length) return;
+    const prods = new Set<string>();
+    try {
+      for (let i = 0; i < q.arenaeventidlist.length; i += 30) {
+        const chunk = q.arenaeventidlist.slice(i, i + 30).filter(Boolean);
+        if (!chunk.length) continue;
+        const snap = await getDocs(query(collection(this.firestore, 'arena events'), where('docid', 'in', chunk)));
+        snap.docs.forEach(d => { const pid = (d.data() as any)['productref']?.id; if (pid) prods.add(pid); });
+      }
+      q.productIds = [...prods];
+    } catch (e) { console.log('resolve queue products failed', e); }
   }
 
   // ---- Merged stage columns ----
@@ -966,14 +990,23 @@ export class EventsStageDataComponent {
   currentStageFor(r: StageRow, qid: string): string {
     return r.tokens[qid]?.currentstage ?? '';
   }
-  // One "Current stage" cell across all selected queues: stage (main) + queue name (sub-text).
+  // #8 — a queue is "active" for a participant when its mapped product(s) include one of the
+  // participant's currently-active products (metadata activeproduct).
+  private queueMatchesActiveProduct(r: StageRow, qid: string): boolean {
+    if (!r.activeProducts.length) return false;
+    const prods = this.queues.find(q => q.id === qid)?.productIds ?? [];
+    return prods.some(p => r.activeProducts.includes(p));
+  }
+  // One "Current stage" cell: the stage of the queue mapped to the participant's currently active
+  // product; when several apply, the most recently active one (latest token/log activity). Falls
+  // back to the most-recent selected-queue stage when no active-product mapping is available.
   currentStagePairs(r: StageRow): { stage: string; queueName: string }[] {
-    const out: { stage: string; queueName: string }[] = [];
-    this.selectedQueueIds.forEach(qid => {
-      const st = r.tokens[qid]?.currentstage;
-      if (st) out.push({ stage: st, queueName: this.queues.find(x => x.id === qid)?.name ?? '' });
-    });
-    return out;
+    const withStage = this.selectedQueueIds.filter(qid => r.tokens[qid]?.currentstage);
+    if (!withStage.length) return [];
+    const active = withStage.filter(qid => this.queueMatchesActiveProduct(r, qid));
+    const pick = (active.length ? active : withStage)
+      .reduce((best, qid) => (r.tokens[qid].lastMs >= (r.tokens[best]?.lastMs ?? -1) ? qid : best));
+    return [{ stage: r.tokens[pick].currentstage, queueName: this.queues.find(x => x.id === pick)?.name ?? '' }];
   }
 
   // ---- Journey (customerstatus-driven) + Segments displays ----
