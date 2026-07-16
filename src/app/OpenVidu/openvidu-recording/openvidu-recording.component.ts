@@ -35,6 +35,9 @@ interface EgressFile {
 
 interface OpenViduEvent {
   docid: string
+  // Cloud that produced the recording (stamped by the webhook since multi-provider).
+  // Absent on historical events = recorded on AWS.
+  mediaProvider?: 'aws' | 'oci' | 'do';
   payload: {
     egressInfo: {
       roomId: string;
@@ -191,7 +194,9 @@ export class OpenviduRecordingComponent {
       }
     })
     const videoKey = event.payload.egressInfo.file.filename
-    const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/getSignedUrlAWS`;
+    // Presign against the storage of the cloud that made the recording.
+    const signFn = event.mediaProvider === 'oci' ? 'getSignedUrlOci' : 'getSignedUrlAWS';
+    const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/${signFn}`;
     const response = await lastValueFrom(
       this.httpClient.post(url, { videoKey })
     );

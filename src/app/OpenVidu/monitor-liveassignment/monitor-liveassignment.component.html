@@ -111,7 +111,7 @@
     </div>
   </div>
 
-  <div class="infra-status-section" *ngIf="infraStatus">
+  <div class="infra-status-section" *ngIf="infraStatus || ociInfraStatus">
   
     <!-- Error/Success Messages -->
     <div *ngIf="infraError" class="infra-alert infra-error">
@@ -211,19 +211,115 @@
         </div>
 
         <div class="infra-card-actions">
-          <button 
-            (click)="scaleMediaUp()" 
+          <button
+            (click)="scaleMediaUp()"
             [disabled]="!canScaleUp()"
             class="infra-btn btn-scale">
             <span *ngIf="!infraActionInProgress">➕ Scale Up</span>
             <span *ngIf="infraActionInProgress">⏳</span>
           </button>
-          <button 
-            (click)="scaleMediaDown()" 
+          <button
+            (click)="scaleMediaDown()"
             [disabled]="!canScaleDown()"
             class="infra-btn btn-scale">
             <span *ngIf="!infraActionInProgress">➖ Scale Down</span>
             <span *ngIf="infraActionInProgress">⏳</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- OCI Master Node Card -->
+      <div class="infra-card" *ngIf="ociInfraStatus">
+        <div class="infra-card-header">
+          <div class="header-content">
+            <h3>OCI Master Node</h3>
+            <span class="status-badge" [ngClass]="getOciMasterStateClass()">
+              {{ getOciMasterState() }}
+            </span>
+          </div>
+        </div>
+
+        <div class="infra-card-body">
+          <div class="info-row">
+            <span class="label">Instance</span>
+            <code class="value">{{ ociInfraStatus['master']['instanceId'] | slice:-12 }}</code>
+          </div>
+          <div class="info-row" *ngIf="ociInfraStatus['master']['publicIp']">
+            <span class="label">Public IP</span>
+            <code class="value">{{ ociInfraStatus['master']['publicIp'] }}</code>
+          </div>
+          <div class="info-row" *ngIf="ociInfraStatus['master']['instanceType']">
+            <span class="label">Shape</span>
+            <span class="value">{{ ociInfraStatus['master']['instanceType'] }}</span>
+          </div>
+        </div>
+
+        <div class="infra-card-actions">
+          <button
+            (click)="startOciMasterNode()"
+            [disabled]="!canStartOciMaster()"
+            class="infra-btn btn-start">
+            <span *ngIf="!ociActionInProgress">▶️ Start</span>
+            <span *ngIf="ociActionInProgress">⏳</span>
+          </button>
+          <button
+            (click)="stopOciMasterNode()"
+            [disabled]="!canStopOciMaster()"
+            class="infra-btn btn-stop">
+            <span *ngIf="!ociActionInProgress">⏹️ Stop</span>
+            <span *ngIf="ociActionInProgress">⏳</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- OCI Media Nodes Card (instance pool) -->
+      <div class="infra-card" *ngIf="ociInfraStatus">
+        <div class="infra-card-header">
+          <div class="header-content">
+            <h3>OCI Media Nodes</h3>
+            <span class="status-badge" [ngClass]="getOciMediaStateClass()">
+              {{ ociInfraStatus['media']['instanceStates']['healthy'] }} / {{ ociInfraStatus['media']['desiredCapacity'] }}
+            </span>
+          </div>
+        </div>
+
+        <div class="infra-card-body">
+          <div class="info-row">
+            <span class="label">Pool Size</span>
+            <span class="value">{{ ociInfraStatus['media']['desiredCapacity'] }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Healthy</span>
+            <span class="value healthy">{{ ociInfraStatus['media']['instanceStates']['healthy'] }}</span>
+          </div>
+          <div class="info-row" *ngIf="ociInfraStatus['media']['instanceStates']['pending'] > 0">
+            <span class="label">Starting</span>
+            <span class="value pending">{{ ociInfraStatus['media']['instanceStates']['pending'] }}</span>
+          </div>
+          <div class="info-row" *ngIf="ociInfraStatus['media']['instanceStates']['terminating'] > 0">
+            <span class="label">Terminating</span>
+            <span class="value terminating">{{ ociInfraStatus['media']['instanceStates']['terminating'] }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Range</span>
+            <span class="value">{{ ociInfraStatus['media']['minSize'] }} - {{ ociInfraStatus['media']['maxSize'] }}</span>
+          </div>
+        </div>
+
+        <div class="infra-card-actions">
+          <button
+            (click)="scaleOciMediaUp()"
+            [disabled]="!canScaleOciUp()"
+            class="infra-btn btn-scale">
+            <span *ngIf="!ociActionInProgress">➕ Scale Up</span>
+            <span *ngIf="ociActionInProgress">⏳</span>
+          </button>
+          <button
+            (click)="scaleOciMediaDown()"
+            [disabled]="!canScaleOciDown()"
+            class="infra-btn btn-scale">
+            <span *ngIf="!ociActionInProgress">➖ Scale Down</span>
+            <span *ngIf="ociActionInProgress">⏳</span>
           </button>
         </div>
       </div>

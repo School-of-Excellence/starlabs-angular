@@ -65,6 +65,14 @@ export class InstanceStatusService {
     const statusDoc = doc(this.firestore, 'AWS_System/instance_status');
     return docData(statusDoc) as Observable<InfrastructureStatus | undefined>;
   }
+
+  // OCI twin — same document shape (asgName carries the instance-pool name), separate
+  // collection and functions so the AWS and OCI paths never conflict. Written by the
+  // CheckOciNodeStatus poller every 5 min.
+  getOciStatus(): Observable<InfrastructureStatus | undefined> {
+    const statusDoc = doc(this.firestore, 'OCI_System/instance_status');
+    return docData(statusDoc) as Observable<InfrastructureStatus | undefined>;
+  }
   
 
   //  Start master node
@@ -88,8 +96,30 @@ export class InstanceStatusService {
 
   // Scale media nodes down by 1
   scaleDown(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/scaleMediaNodes`, { 
-      action: 'scale-down' 
+    return this.http.post(`${this.baseUrl}/scaleMediaNodes`, {
+      action: 'scale-down'
+    });
+  }
+
+  // ---- OCI twins (separate functions — same contracts as the AWS ones) ----
+
+  startOciMaster(): Observable<any> {
+    return this.http.post(`${this.baseUrl}/startOciMasterHTTP`, {});
+  }
+
+  stopOciMaster(): Observable<any> {
+    return this.http.post(`${this.baseUrl}/stopOciMasterHTTP`, {});
+  }
+
+  scaleOciUp(): Observable<any> {
+    return this.http.post(`${this.baseUrl}/scaleOciMediaNodes`, {
+      action: 'scale-up'
+    });
+  }
+
+  scaleOciDown(): Observable<any> {
+    return this.http.post(`${this.baseUrl}/scaleOciMediaNodes`, {
+      action: 'scale-down'
     });
   }
 

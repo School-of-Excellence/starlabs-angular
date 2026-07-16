@@ -56,7 +56,11 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   roomConnecting = signal<Map<string, boolean>>(new Map());
 
   infraStatus: InfrastructureStatus | null = null;
+  // OCI twin of infraStatus — separate doc (OCI_System/instance_status), same shape.
+  ociInfraStatus: InfrastructureStatus | null = null;
   infraActionInProgress = false;
+  // Separate in-progress flag so OCI clicks don't disable AWS buttons (and vice versa).
+  ociActionInProgress = false;
   infraError: string | null = null;
   infraSuccess: string | null = null;
   private destroy$ = new Subject<void>();
@@ -95,7 +99,10 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
         }
       })
 
-      if(roles["developer"]) this.loadInfrastructureStatus();
+      if(roles["developer"]) {
+        this.loadInfrastructureStatus();
+        this.loadOciInfrastructureStatus();
+      }
     })
   }
 
@@ -430,6 +437,137 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
           console.error('Infrastructure status error:', err);
         }
       });
+  }
+
+  loadOciInfrastructureStatus() {
+    this.infraService.getOciStatus()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (status) => {
+          if (status) {
+            this.ociInfraStatus = status;
+          }
+        },
+        error: (err) => {
+          console.error('OCI infrastructure status error:', err);
+        }
+      });
+  }
+
+  getOciMasterState(): string {
+    return this.ociInfraStatus?.master?.state || 'unknown';
+  }
+
+  getOciMasterStateClass(): string {
+    const state = this.ociInfraStatus?.master?.state;
+    if (state === 'running') return 'state-running';
+    if (state === 'stopped') return 'state-stopped';
+    if (state === 'starting' || state === 'stopping') return 'state-transitioning';
+    return 'state-unknown';
+  }
+
+  getOciMediaStateClass(): string {
+    const status = this.ociInfraStatus?.media?.scalingStatus;
+    if (status === 'stable') return 'state-stable';
+    if (status === 'scaling-up' || status === 'scaling-down') return 'state-transitioning';
+    return 'state-unknown';
+  }
+
+  // ---- OCI manual controls (twins of the AWS handlers below; shared alert strip) ----
+
+  startOciMasterNode() {
+    if (!confirm('Start OCI master node?')) return;
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.startOciMaster()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI master node starting...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to start OCI master';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  stopOciMasterNode() {
+    if (!confirm('Stop OCI master node?')) return;
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.stopOciMaster()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI master node stopping...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to stop OCI master';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  scaleOciMediaUp() {
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.scaleOciUp()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI media scaling up...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to scale OCI media up';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  scaleOciMediaDown() {
+    if (!confirm('Scale down OCI media nodes?')) return;
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.scaleOciDown()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI media scaling down...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to scale OCI media down';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  canStartOciMaster(): boolean {
+    return this.ociInfraStatus?.master?.state === 'stopped' && !this.ociActionInProgress;
+  }
+
+  canStopOciMaster(): boolean {
+    return this.ociInfraStatus?.master?.state === 'running' && !this.ociActionInProgress;
+  }
+
+  canScaleOciUp(): boolean {
+    return !this.ociActionInProgress &&
+           !!this.ociInfraStatus?.media &&
+           this.ociInfraStatus.media.desiredCapacity < this.ociInfraStatus.media.maxSize;
+  }
+
+  canScaleOciDown(): boolean {
+    return !this.ociActionInProgress &&
+           !!this.ociInfraStatus?.media &&
+           this.ociInfraStatus.media.desiredCapacity > this.ociInfraStatus.media.minSize;
   }
 
   startMasterNode() {
