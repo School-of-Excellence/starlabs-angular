@@ -174,6 +174,8 @@ export class AccessScreenComponent {
 
    openDialog(){
     this.dialog.open(AddTierComponent,{
+      width: '920px',
+      maxWidth: '95vw',
       data : {
         add : true
       }
@@ -183,6 +185,8 @@ export class AccessScreenComponent {
     onEditDialog(id:any, tier:any) {
       console.log(id,tier,'testasdasdas')
       this.dialog.open(AddTierComponent,{
+        width: '920px',
+        maxWidth: '95vw',
         data: {
           edit : true,
           id : id,

@@ -148,13 +148,19 @@ export class WorkshopsComponent implements OnInit {
   async openNewUserDialog() {
     this.dialog.open(NewusersComponent, {
       data: { mapProfile: this.mapProfileNew, mapProfileold: this.mapProfile },
-      width: '100vw', 
-      height: '100vh', 
-      maxWidth: '100vw', 
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
       maxHeight: '100vh',
-      autoFocus: false, 
+      autoFocus: false,
       panelClass: 'new-users-dialog'
     });
+  }
+
+  // Open the New Users profile page in a new browser tab.
+  openNewUsersTab() {
+    const url = this.router.serializeUrl(this.router.createUrlTree(['/newusersprofile']));
+    window.open(url, '_blank');
   }
 
   ngOnDestroy() {
