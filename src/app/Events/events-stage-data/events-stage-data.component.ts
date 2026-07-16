@@ -866,9 +866,20 @@ export class EventsStageDataComponent {
   completedLabel(r: StageRow, col: StageCol): string {
     return this.crossedStage(r, col) ? 'Completed' : 'Not completed';
   }
+  // A slot counts as "booked" only if it is LIVE or UPCOMING — a fully-past appointment
+  // (enddate before now; or, with no enddate, a start before today) is not an active booking,
+  // so it reads as "Not booked" and surfaces the participant for rebooking.
   isBooked(r: StageRow, col: StageCol): boolean {
-    const t = this.token(r, col);
-    return !!(t && t.selectedstageslot && t.selectedstageslot[col.stage]);
+    const slot = this.token(r, col)?.selectedstageslot?.[col.stage];
+    return !!slot && this.slotIsActive(slot);
+  }
+  // Live (end at/after now) or upcoming; a dateless slot stays counted (cannot classify it).
+  private slotIsActive(slot: any): boolean {
+    const end = this.toMillis(slot['enddate']);
+    if (end) return end >= Date.now();
+    const start = this.toMillis(slot['startdate']);
+    if (start) { const t = new Date(); t.setHours(0, 0, 0, 0); return start >= t.getTime(); }
+    return true;
   }
   private slotStartMs(r: StageRow, col: StageCol): number {
     return this.toMillis(this.token(r, col)?.selectedstageslot?.[col.stage]?.['startdate']);
