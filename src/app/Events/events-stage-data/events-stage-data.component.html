@@ -210,6 +210,15 @@
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryDfu.active }}</span><span class="cs-lg-n">Non-active {{ summaryDfu.nonactive }}</span></div>
         </div>
       </div>
+      <!-- #4: one clickable card per configured "Yet to complete <stage>" definition -->
+      <div class="cs-stats" *ngIf="stageDefCards.length">
+        <div class="cs-stat" *ngFor="let c of stageDefCards" [class.active]="cardFilter==='sd:'+c.id" (click)="toggleCardFilter('sd:'+c.id)">
+          <div class="cs-label">Yet to complete {{ c.label }}</div>
+          <div class="cs-total">{{ c.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(c.active, c.total)"></span><span class="cs-n" [style.width.%]="100 - pct(c.active, c.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ c.active }}</span><span class="cs-lg-n">Non-active {{ c.nonactive }}</span></div>
+        </div>
+      </div>
 
       <!-- Ready-for-the-event: collapsible per-queue stage picker (collapsed to save space) -->
       <div class="cs-readycfg" *ngIf="selectedQueues.length">
@@ -247,6 +256,19 @@
             <app-searchable-select [options]="ssEligibleAddOpts(q.id)" [value]="''"
               (valueChange)="$event && toggleEligibleProduct(q.id, $event)" placeholder="+ Add product" searchPlaceholder="Search product…"></app-searchable-select>
           </div>
+        </div>
+        <div class="cs-config-sec cs-sd-sec" *ngIf="selectedQueues.length">
+          <span class="cs-config-lbl">Yet-to-complete stages</span>
+          <div class="cs-sd" *ngFor="let sd of stageDefs">
+            <input class="cs-grp-name cs-sd-name" type="text" [(ngModel)]="sd.label" (blur)="saveStageDefs()" placeholder="Label (e.g. SE)">
+            <span class="cs-sd-q" *ngFor="let q of selectedQueues">
+              <span class="cs-sd-qn">{{ q.name }}</span>
+              <app-searchable-select [options]="ssStagesFor(q.id)" [value]="sd.byQueue[q.id] || ''"
+                (valueChange)="setStageDefStage(sd, q.id, $event)" placeholder="Any stage" searchPlaceholder="Search stage…"></app-searchable-select>
+            </span>
+            <button type="button" class="cs-grp-x" (click)="removeStageDef(sd.id)" aria-label="Remove">&times;</button>
+          </div>
+          <button type="button" class="cs-grp-add" (click)="addStageDef()">+ Add stage</button>
         </div>
         <span class="cs-config-hint" *ngIf="!selectedQueueIds.length">Pick a queue above to choose its ready stages.</span>
       </div>

@@ -911,6 +911,42 @@ export class EventsStageDataComponent {
     const col = this.resolveCombined(r, cc); return col ? this.slotKind(r, col) : 'none';
   }
 
+  // ---- #4/#6: persisted "Yet to complete <stage>" definitions ----
+  // A stageDef is a labelled cross-queue stage (same shape as a combined column, but saved).
+  private sdAsCol(sd: { id: string; label: string; byQueue: Record<string, string> }): CombinedCol {
+    return { id: sd.id, name: sd.label, byQueue: sd.byQueue };
+  }
+  // Yet to complete = the participant is in a mapped queue but has not completed the mapped stage.
+  isYetToComplete(r: StageRow, sd: { id: string; label: string; byQueue: Record<string, string> }): boolean {
+    const col = this.resolveCombined(r, this.sdAsCol(sd));
+    return !!col && !this.crossedStage(r, col);
+  }
+  // #6 "Diagnostics Pending" flavour — booked (live/upcoming) for the mapped stage but not completed.
+  isStagePending(r: StageRow, sd: { id: string; label: string; byQueue: Record<string, string> }): boolean {
+    const col = this.resolveCombined(r, this.sdAsCol(sd));
+    return !!col && !this.crossedStage(r, col) && this.isBooked(r, col);
+  }
+  // Config editor.
+  addStageDef(): void { this.stageDefs = [...this.stageDefs, { id: 'sd' + (++this.stageDefSeq), label: '', byQueue: {} }]; }
+  removeStageDef(id: string): void { this.stageDefs = this.stageDefs.filter(s => s.id !== id); this.saveStageDefs(); }
+  setStageDefStage(sd: { byQueue: Record<string, string> }, qid: string, stage: string): void {
+    if (stage) sd.byQueue[qid] = stage; else delete sd.byQueue[qid];
+    this.saveStageDefs();
+  }
+  saveStageDefs(): void {
+    this.saveArenaConfig().catch(e => console.error('save stagedefs failed', e));
+    this.computeCohortSummary().catch(() => {});
+  }
+  // Cohort cards: per stageDef, the count of participants yet to complete it (Active/Non-active).
+  get stageDefCards(): { id: string; label: string; active: number; nonactive: number; total: number }[] {
+    const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+    return this.stageDefs.filter(s => (s.label || '').trim()).map(sd => {
+      let a = 0, n = 0;
+      (this.stageRows || []).forEach(r => { if (this.isYetToComplete(r, sd)) (isActive(r) ? a++ : n++); });
+      return { id: sd.id, label: sd.label, active: a, nonactive: n, total: a + n };
+    });
+  }
+
   // Stages available to the "Completed date" stage picker = only the added table columns.
   get completedStageOptions(): string[] {
     return [...new Set(this.addedCols.map(c => c.stage))];
@@ -1239,6 +1275,7 @@ export class EventsStageDataComponent {
       if (this.cardFilter === 'approved-nq' && !(r.status === 'approved' && !this.inSelectedQueue(r))) return false;
       if (this.cardFilter === 'ready' && !this.isReady(r)) return false;
       if (this.cardFilter === 'dfu' && !this.isDfuOngoing(r)) return false;
+      if (this.cardFilter.startsWith('sd:')) { const sd = this.stageDefs.find(s => s.id === this.cardFilter.slice(3)); if (sd && !this.isYetToComplete(r, sd)) return false; }
       if (this.requestFilter && r.status !== this.requestFilter) return false;
       const cs = this.rowCurrentStages(r);
       if (this.stageFilter === '__none') { if (cs.length) return false; }
