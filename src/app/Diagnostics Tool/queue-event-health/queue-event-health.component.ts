@@ -76,12 +76,14 @@ export class QueueEventHealthComponent {
   atcGivenNames: any[] = [];
   atcNotGivenNames: any[] = [];
   showAtcNameList = false;
-  activeAtcListType: 'given' | 'not_given' | 'no_queue' | null = null;
+  activeAtcListType: 'given' | 'not_given' | 'no_queue' | 'pending_validation' | null = null;
   atcNoQueueCount = 0;
   atcNoQueueNames: any[] = [];
   authorNameMap: Map<string, string> = new Map();
   profileAtcDetailsMap: Map<string, any[]> = new Map();
   atcModelsForQueue: string[] = [];
+  atcPendingValidationCount = 0;
+  atcPendingValidationNames: any[] = [];
 
   /* ================= FILTERS ================= */
 
@@ -1006,18 +1008,22 @@ export class QueueEventHealthComponent {
 
   calculateAtcGivenCounts() {
     const givenProfileIds = new Set<string>();
+    const pendingProfileIds = new Set<string>();
 
+    // 1. ATC Given → present in atc_alpha
     for (const a of this.atcAlphaRecords) {
       if (a.profileid && this.isWithinQueueDate(a.prescriptionDate)) {
         givenProfileIds.add(a.profileid);
       }
     }
 
-    // PER TOKEN (counts every token, duplicates possible)
-    // this.atcGivenNames = this.allRecords.filter(r => givenProfileIds.has(r.profileid));
-    // this.atcNotGivenNames = this.allRecords.filter(r => !givenProfileIds.has(r.profileid));
+    // 2. ATC Pending Validation → present in atc_to_validate (status: 'atc given')
+    for (const a of this.atcValidateRecords) {
+      if (a.profileid && this.isWithinQueueDate(a.prescriptionDate)) {
+        pendingProfileIds.add(a.profileid);
+      }
+    }
 
-    // PER PERSON (unique profileid only, no duplicates)
     const seenGiven = new Set<string>();
     this.atcGivenNames = this.allRecords.filter(r => {
       if (!givenProfileIds.has(r.profileid)) return false;
@@ -1025,33 +1031,40 @@ export class QueueEventHealthComponent {
       seenGiven.add(r.profileid);
       return true;
     });
+    this.atcGivenCount = this.atcGivenNames.length;
 
+    // ---- PENDING VALIDATION (per person) ----
+    const seenPending = new Set<string>();
+    this.atcPendingValidationNames = this.allRecords.filter(r => {
+      if (!pendingProfileIds.has(r.profileid)) return false;
+      if (seenPending.has(r.profileid)) return false;
+      seenPending.add(r.profileid);
+      return true;
+    });
+    this.atcPendingValidationCount = this.atcPendingValidationNames.length;
+
+    // ---- NOT GIVEN → absent from BOTH atc_alpha AND atc_to_validate ----
     const seenNotGiven = new Set<string>();
     this.atcNotGivenNames = this.allRecords.filter(r => {
-      if (givenProfileIds.has(r.profileid)) return false;
+      if (givenProfileIds.has(r.profileid) || pendingProfileIds.has(r.profileid)) return false;
       if (seenNotGiven.has(r.profileid)) return false;
       seenNotGiven.add(r.profileid);
       return true;
     });
-
-    this.atcGivenCount = this.atcGivenNames.length;
     this.atcNotGivenCount = this.atcNotGivenNames.length;
   }
 
   calculateAtcNoQueueCounts() {
     const noQueueProfileIds = new Set<string>();
 
-    for (const a of this.atcAlphaRecords) {
+    // Check BOTH atc_alpha (Given) and atc_to_validate (Pending Validation)
+    for (const a of [...this.atcAlphaRecords, ...this.atcValidateRecords]) {
       const hasNoQueue = a.queueid === null || a.queueid === undefined || String(a.queueid).trim() === '';
       if (a.profileid && hasNoQueue && this.isWithinQueueDate(a.prescriptionDate)) {
         noQueueProfileIds.add(a.profileid);
       }
     }
 
-    // PER TOKEN (counts every token, duplicates possible)
-    // this.atcNoQueueNames = this.allRecords.filter(r => noQueueProfileIds.has(r.profileid));
-
-    // PER PERSON (unique profileid only, no duplicates)
     const seenNoQueue = new Set<string>();
     this.atcNoQueueNames = this.allRecords.filter(r => {
       if (!noQueueProfileIds.has(r.profileid)) return false;
@@ -1085,7 +1098,8 @@ export class QueueEventHealthComponent {
     const allProfileIds = new Set<string>([
       ...this.atcGivenNames.map(r => r.profileid),
       ...this.atcNotGivenNames.map(r => r.profileid),
-      ...this.atcNoQueueNames.map(r => r.profileid)
+      ...this.atcNoQueueNames.map(r => r.profileid),
+      ...this.atcPendingValidationNames.map(r => r.profileid)
     ]);
 
     for (const profileid of allProfileIds) {
