@@ -231,6 +231,8 @@ export class ViewparticipantTierAccessComponent {
   }
   openDialog(){
     this.dialog.open(AddTierComponent,{
+      width: '920px',
+      maxWidth: '95vw',
       data : {
         add : true
       }
@@ -238,7 +240,8 @@ export class ViewparticipantTierAccessComponent {
   }
   onEditDialog(id:any) {
     this.dialog.open(AddTierComponent,{
-      width: '400px',
+      width: '920px',
+      maxWidth: '95vw',
       data: {
         edit : true,
         id : id
