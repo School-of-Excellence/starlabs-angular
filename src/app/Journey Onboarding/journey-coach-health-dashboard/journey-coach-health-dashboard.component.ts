@@ -290,17 +290,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   // ---- Intelligent filter panel (client-side, applied over the FULL base) ----
   filtersExpanded = false;                         // collapsible panel state
-  // Product type defaults to ECOSYSTEM so the board opens scoped to ecosystem participants.
-  productTypeFilters: ProductType[] = ['ecosystem'];
-  tierFilters: string[] = [];                      // atcmodel: B!G / LYL / uP! / CPM (multi)
+  // No product-type default: the board opens showing all journeys (matches the summary, which counts
+  // all product types). The Journey filter (journeyGroupFilter, multi) is the scoping axis instead.
+  productTypeFilters: ProductType[] = [];
+  tierFilters: string[] = [];                      // atcmodel: B!G / LYL / uP! / CPM (multi, hidden)
   bandFilters: Array<'High' | 'Medium' | 'Low'> = []; // priority band (multi)
-  healthFilters: CoachHealthState[] = [];          // coach-set health state (multi)
+  // 'UNASSESSED' = participant has no fresh coach-set health state (the "Not assessed" filter option).
+  healthFilters: Array<CoachHealthState | 'UNASSESSED'> = [];
   financeFilters: string[] = [];                   // financialstatus values (multi)
   renewalWindowOnly = false;                        // renewal window (yes)
   goingQuietOnly = false;                           // going quiet (yes)
   noEventRequestOnly = false;                       // no recent event request (null)
   readonly tierOptions = ['B!G', 'LYL', 'uP!', 'CPM'];
   readonly healthOptions: CoachHealthState[] = COACH_HEALTH_OPTIONS;
+  readonly healthFilterOptions: Array<CoachHealthState | 'UNASSESSED'> = [...COACH_HEALTH_OPTIONS, 'UNASSESSED'];
   financeOptions: string[] = [];                    // discovered from the loaded base
 
   // Set of profileids that pass the lightweight full-base filters (paged mode only). When non-null,
@@ -1660,6 +1663,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   healthLabel(s: CoachHealthState | null | undefined): string {
     return coachHealthLabel(s);
   }
+  /** Label for the Coach-health filter options, including the synthetic 'Not assessed' bucket. */
+  healthFilterLabel(h: CoachHealthState | 'UNASSESSED'): string {
+    return h === 'UNASSESSED' ? 'Not assessed' : this.healthLabel(h);
+  }
 
   /** A coach-set health tag is valid for HEALTH_TTL_DAYS; a null/undated or older tag is expired. */
   private isHealthFresh(date: Date | null | undefined): boolean {
@@ -2768,7 +2775,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(r.productType)) return false;
     if (this.tierFilters.length && !this.tierFilters.includes(r.atcmodel ?? '')) return false;
     if (this.bandFilters.length && !this.bandFilters.includes(r.priorityBand)) return false;
-    if (this.healthFilters.length && !this.healthFilters.includes(r.coachHealthState?.state as CoachHealthState)) return false;
+    if (this.healthFilters.length) {
+      const st = r.coachHealthState?.state;
+      // a row matches if its state is selected, or 'Not assessed' is selected and it has no fresh state
+      if (!(st ? this.healthFilters.includes(st) : this.healthFilters.includes('UNASSESSED'))) return false;
+    }
     if (this.financeFilters.length && !this.financeFilters.includes(r.financialstatus ?? '')) return false;
     if (this.renewalWindowOnly && !r.renewalWindow) return false;
     if (this.goingQuietOnly && !r.goingQuiet) return false;
@@ -2946,8 +2957,30 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.applyFilters();
   }
 
-  /** Clear every filter affordance (panel + journey/status/search + lever) and reset to defaults.
-   *  Product type returns to its ECOSYSTEM default — the intended opening scope of the board. */
+  // ---- Panel "Journey" multi-select (chips): groups + individual journeys, toggled into
+  //      journeyGroupFilter (the base-list multi-journey filter, honored in both views). ----
+  /** A chip (journey or group) is on when every journey it represents is in the base-list filter. */
+  baseJourneyOn(item: { journeys: string[] }): boolean {
+    return item.journeys.length > 0 && item.journeys.every(j => this.journeyGroupFilter.includes(j));
+  }
+  /** Toggle a chip's journey(s) in the base-list journey filter. `null` clears them. Clears the
+   *  search-bar single-select Journey so the two controls never intersect into an empty list. */
+  toggleBaseJourney(item: { journeys: string[] } | null): void {
+    let next = [...this.journeyGroupFilter];
+    if (!item) next = [];
+    else if (this.baseJourneyOn(item)) next = next.filter(j => !item.journeys.includes(j));
+    else next = [...new Set([...next, ...item.journeys])];
+    this.journeyGroupFilter = next;
+    this.journeyFilter = '';   // guard: the panel multi-select wins over the search-bar single-select
+    this.applyFilters();
+  }
+  /** Search-bar single-select Journey changed → clear the panel multi-select (guard the intersection). */
+  onTopJourneyChange(): void {
+    if (this.journeyFilter) this.journeyGroupFilter = [];
+    this.applyFilters();
+  }
+
+  /** Clear every filter affordance (panel + journey/status/search + lever) and reset to defaults. */
   clearFilters(): void {
     this.search = '';
     this.journeyFilter = '';
@@ -2955,7 +2988,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.statusFilter = '';
     this.lifecycleFilter = '';
     this.activeLever = 'all';
-    this.productTypeFilters = ['ecosystem'];
+    this.productTypeFilters = [];
     this.tierFilters = [];
     this.bandFilters = [];
     this.healthFilters = [];
@@ -2969,7 +3002,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** True when any filter differs from its default (drives the "Clear filters" affordance). */
   get hasActiveFilters(): boolean {
     return !!this.search || !!this.journeyFilter || this.journeyGroupFilter.length > 0 || !!this.statusFilter || !!this.lifecycleFilter || this.activeLever !== 'all'
-      || !(this.productTypeFilters.length === 1 && this.productTypeFilters[0] === 'ecosystem') || this.tierFilters.length > 0 || this.bandFilters.length > 0
+      || this.productTypeFilters.length > 0 || this.tierFilters.length > 0 || this.bandFilters.length > 0
       || this.healthFilters.length > 0 || this.financeFilters.length > 0
       || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
   }
