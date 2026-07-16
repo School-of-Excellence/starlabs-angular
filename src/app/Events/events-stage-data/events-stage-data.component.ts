@@ -152,6 +152,13 @@ export class EventsStageDataComponent {
   readyStageByQueue: Record<string, string> = {};   // queueId -> the stage that marks "ready for the event"
   readyCfgOpen = false;                              // collapsed by default to save space
 
+  // ---- Configurable definitions (persisted in the SAME per-arena config doc, Alt A) ----
+  stageDefs: { id: string; label: string; byQueue: Record<string, string> }[] = [];  // #4/#6 named "Yet to Complete <stage>"
+  queueEligibility: Record<string, string[]> = {};   // #3 per-queue eligible unconsumed-product group
+  dfuProductIds: string[] = [];                      // #5 optional narrowing of DFU-ongoing to a product set
+  private stageDefSeq = 0;
+  eligibilityFilter = '';                            // #3 filter: show only participants eligible for this queueId
+
   // Filters
   requestFilter = '';    // '' | 'requested' | 'approved'
   stageFilter = '';      // '' | a stage name | '__none' (not in any selected queue)
@@ -298,7 +305,7 @@ export class EventsStageDataComponent {
     this.variationFilter = '';
     this.segmentFilter = '';
     this.journeyFilters = [];
-    this.productFilter = ''; this.productMode = 'only';
+    this.productFilter = ''; this.productMode = 'only'; this.eligibilityFilter = '';
     this.completedFrom = ''; this.completedTo = ''; this.completedStage = '';
     this.slotFrom = ''; this.slotTo = '';
     this.notBookedOnly = false;
@@ -441,6 +448,7 @@ export class EventsStageDataComponent {
   // Per-arena journey group config, persisted in `stage opportunity count` (kind='journeygroups').
   private async loadJourneyGroups(arenaeventid: string): Promise<void> {
     this.journeyGroups = []; this.groupsDocId = null; this.readyStages = [];
+    this.stageDefs = []; this.queueEligibility = {}; this.dfuProductIds = [];
     try {
       const snap = await getDocs(query(collection(this.firestore, 'stage opportunity count'),
         where('kind', '==', 'journeygroups'), where('arenaeventid', '==', arenaeventid)));
@@ -452,6 +460,9 @@ export class EventsStageDataComponent {
         const data = d.data() as any;
         this.journeyGroups = (data['groups'] || []).map((g: any) => ({ name: g.name || '', journeyIds: g.journeyIds || [] }));
         this.readyStages = (data['readyStages'] || []);
+        this.stageDefs = (data['stageDefs'] || []).map((s: any) => ({ id: s.id || ('sd' + (++this.stageDefSeq)), label: s.label || '', byQueue: s.byQueue || {} }));
+        this.queueEligibility = data['queueEligibility'] || {};
+        this.dfuProductIds = data['dfuProductIds'] || [];
       }
     } catch (e) { console.error('load journey groups failed', e); }
   }
@@ -460,11 +471,15 @@ export class EventsStageDataComponent {
     const arenaeventid = this.selectedArena?.docid; if (!arenaeventid) return;
     const groups = this.journeyGroups.filter(g => (g.name || '').trim()).map(g => ({ name: g.name.trim(), journeyIds: g.journeyIds || [] }));
     const readyStages = this.readyStages;
+    const stageDefs = this.stageDefs.filter(s => (s.label || '').trim()).map(s => ({ id: s.id, label: s.label.trim(), byQueue: s.byQueue || {} }));
+    const queueEligibility = this.queueEligibility;
+    const dfuProductIds = this.dfuProductIds;
+    const payload: any = { groups, readyStages, stageDefs, queueEligibility, dfuProductIds, updated: new Date() };
     if (this.groupsDocId) {
-      await updateDoc(doc(this.firestore, 'stage opportunity count', this.groupsDocId), { groups, readyStages, updated: new Date() });
+      await updateDoc(doc(this.firestore, 'stage opportunity count', this.groupsDocId), payload);
     } else {
       const id = doc(collection(this.firestore, 'stage opportunity count')).id;
-      await setDoc(doc(this.firestore, 'stage opportunity count', id), { kind: 'journeygroups', arenaeventid, groups, readyStages, updated: new Date() });
+      await setDoc(doc(this.firestore, 'stage opportunity count', id), { kind: 'journeygroups', arenaeventid, ...payload });
       this.groupsDocId = id;
     }
   }
@@ -571,6 +586,20 @@ export class EventsStageDataComponent {
     if (!r.activeProducts.length) return false;
     const covered = this.selectedQueueProductIds();
     return r.activeProducts.some(p => !covered.has(p));
+  }
+  // #3 — a participant is "eligible" for a queue when they still hold (unconsumed) at least one of
+  // that queue's configured eligible products. Several products can be grouped under one queue;
+  // adding a product to the group needs no code change.
+  isEligibleFor(r: StageRow, qid: string): boolean {
+    return (this.queueEligibility[qid] || []).some(p => r.unconsumedProducts.includes(p));
+  }
+  isEligibleProduct(qid: string, productId: string): boolean {
+    return (this.queueEligibility[qid] || []).includes(productId);
+  }
+  toggleEligibleProduct(qid: string, productId: string): void {
+    const cur = this.queueEligibility[qid] || [];
+    this.queueEligibility[qid] = cur.includes(productId) ? cur.filter(p => p !== productId) : [...cur, productId];
+    this.saveArenaConfig().catch(e => console.error('save eligibility failed', e));
   }
   // Ready for the event = approved AND, in some selected queue, their current stage is at or
   // past the operator-picked "ready" stage for that queue (using the queue's ordered stage list).
@@ -1054,6 +1083,17 @@ export class EventsStageDataComponent {
       .map(([id, name]) => ({ id, name: name || id }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+  productName(pid: string): string { return this.mapProduct[pid] || pid; }
+  // #3 config: products not yet in a queue's eligible group (for the "+ Add product" picker).
+  ssEligibleAddOpts(qid: string): SsOption[] {
+    const chosen = new Set(this.queueEligibility[qid] || []);
+    return [{ value: '', label: '+ Add product' }, ...this.productOptions.filter(p => !chosen.has(p.id)).map(p => ({ value: p.id, label: p.name }))];
+  }
+  // #3 filter: only queues that actually have an eligible-product group configured.
+  get ssEligibilityOpts(): SsOption[] {
+    const qs = this.selectedQueues.filter(q => (this.queueEligibility[q.id] || []).length);
+    return [{ value: '', label: 'Any' }, ...qs.map(q => ({ value: q.id, label: q.name }))];
+  }
 
   // ---- Searchable-dropdown option lists (SsOption = {value,label}) ----
   private ssFrom(values: string[], allLabel?: string, tail?: { value: string; label: string }): SsOption[] {
@@ -1216,6 +1256,7 @@ export class EventsStageDataComponent {
         if (this.productMode === 'only' && !has) return false;   // keep only those who have it unconsumed
         if (this.productMode === 'exclude' && has) return false;  // remove those who have it unconsumed
       }
+      if (this.eligibilityFilter && !this.isEligibleFor(r, this.eligibilityFilter)) return false;
       if (this.notBookedOnly && !this.isNotBooked(r)) return false;
       if (compActive && !this.allCompletedMs(r).some(ms => this.inDateRange(ms, this.completedFrom, this.completedTo))) return false;
       if (slotActive && !this.allSlotStartMs(r).some(ms => this.inDateRange(ms, this.slotFrom, this.slotTo))) return false;
@@ -1242,6 +1283,7 @@ export class EventsStageDataComponent {
     if (this.segmentFilter) out.push({ label: 'Segment: ' + this.segmentFilter, clear: () => clr(() => this.segmentFilter = '') });
     this.journeyFilters.forEach(j => out.push({ label: 'Journey: ' + j, clear: () => clr(() => this.journeyFilters = this.journeyFilters.filter(x => x !== j)) }));
     if (this.productFilter) out.push({ label: 'Product: ' + this.productFilter, clear: () => clr(() => { this.productFilter = ''; this.productMode = 'only'; }) });
+    if (this.eligibilityFilter) out.push({ label: 'Eligible: ' + (this.queues.find(q => q.id === this.eligibilityFilter)?.name ?? ''), clear: () => clr(() => this.eligibilityFilter = '') });
     if (this.completedFrom || this.completedTo) out.push({ label: 'Completed ' + (this.completedFrom || '…') + ' – ' + (this.completedTo || '…'), clear: () => clr(() => { this.completedFrom = ''; this.completedTo = ''; this.completedStage = ''; }) });
     if (this.slotFrom || this.slotTo) out.push({ label: 'Slot ' + (this.slotFrom || '…') + ' – ' + (this.slotTo || '…'), clear: () => clr(() => { this.slotFrom = ''; this.slotTo = ''; }) });
     if (this.notBookedOnly) out.push({ label: 'Not booked', clear: () => clr(() => this.notBookedOnly = false) });
@@ -1251,7 +1293,7 @@ export class EventsStageDataComponent {
   get isStageFiltered(): boolean {
     return this.searchStage.trim().length > 0 || !!this.requestFilter || !!this.stageFilter || !!this.customerFilter
       || !!this.variationFilter || !!this.segmentFilter || this.journeyFilters.length > 0 || !!this.productFilter
-      || !!this.completedFrom || !!this.completedTo || !!this.slotFrom || !!this.slotTo || this.notBookedOnly;
+      || !!this.completedFrom || !!this.completedTo || !!this.slotFrom || !!this.slotTo || this.notBookedOnly || !!this.eligibilityFilter;
   }
   onStagePage(e: PageEvent) { this.stagePageIndex = e.pageIndex; this.stagePageSize = e.pageSize; }
   onStageSearch() { this.stagePageIndex = 0; }
@@ -1267,7 +1309,7 @@ export class EventsStageDataComponent {
   closeParticipant() { this.selectedParticipant = null; }
   clearFilters() {
     this.searchStage = ''; this.requestFilter = ''; this.stageFilter = ''; this.customerFilter = '';
-    this.variationFilter = ''; this.segmentFilter = ''; this.journeyFilters = []; this.productFilter = ''; this.productMode = 'only';
+    this.variationFilter = ''; this.segmentFilter = ''; this.journeyFilters = []; this.productFilter = ''; this.productMode = 'only'; this.eligibilityFilter = '';
     this.completedFrom = ''; this.completedTo = ''; this.completedStage = '';
     this.slotFrom = ''; this.slotTo = '';
     this.notBookedOnly = false;

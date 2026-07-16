@@ -139,6 +139,10 @@
           <app-searchable-select *ngIf="productFilter" [options]="ssProductModeOpts" [value]="productMode"
             (valueChange)="productMode=$any($event); onFilterChange()" placeholder="Show only"></app-searchable-select>
         </label>
+        <label *ngIf="ssEligibilityOpts.length > 1">Eligible for:
+          <app-searchable-select [options]="ssEligibilityOpts" [value]="eligibilityFilter"
+            (valueChange)="eligibilityFilter=$event; onFilterChange()" placeholder="Any" searchPlaceholder="Search queue…"></app-searchable-select>
+        </label>
         <label>Completed date:
           <input type="date" [(ngModel)]="completedFrom" (ngModelChange)="onFilterChange()">
           <span>–</span>
@@ -234,6 +238,15 @@
         <div class="cs-config-sec" *ngIf="readyStageOptions.length">
           <span class="cs-config-lbl">Ready when current stage is</span>
           <button type="button" class="cs-cfg-chip" *ngFor="let s of readyStageOptions" [class.on]="isReadyStage(s)" (click)="toggleReadyStage(s)">{{ s }}</button>
+        </div>
+        <div class="cs-config-sec" *ngIf="selectedQueues.length">
+          <span class="cs-config-lbl">Eligible products per queue (unconsumed)</span>
+          <div class="cs-elig-q" *ngFor="let q of selectedQueues">
+            <span class="cs-elig-qn">{{ q.name }}</span>
+            <button type="button" class="cs-cfg-chip on" *ngFor="let pid of (queueEligibility[q.id] || [])" (click)="toggleEligibleProduct(q.id, pid)">{{ productName(pid) }} &times;</button>
+            <app-searchable-select [options]="ssEligibleAddOpts(q.id)" [value]="''"
+              (valueChange)="$event && toggleEligibleProduct(q.id, $event)" placeholder="+ Add product" searchPlaceholder="Search product…"></app-searchable-select>
+          </div>
         </div>
         <span class="cs-config-hint" *ngIf="!selectedQueueIds.length">Pick a queue above to choose its ready stages.</span>
       </div>
