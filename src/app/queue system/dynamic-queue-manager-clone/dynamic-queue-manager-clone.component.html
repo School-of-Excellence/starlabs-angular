@@ -629,8 +629,30 @@
               </mat-form-field>
             </div>
 
+            <!-- Booking status -->
+            <div class="fsb-row fsb-row-sub fsb-row-label-only">
+              <mat-icon class="fsb-icon">event_available</mat-icon>
+              <span class="fsb-label">Booking status</span>
+            </div>
+            <div class="fsb-timeslot-list">
+              <div class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'booked'"
+                (click)="selectBookingStatus('booked')">
+                <mat-icon class="fsb-option-check">
+                  {{stageSlotBookingFilter === 'booked' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                </mat-icon>
+                <span>Booked</span>
+              </div>
+              <div class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'notbooked'"
+                (click)="selectBookingStatus('notbooked')">
+                <mat-icon class="fsb-option-check">
+                  {{stageSlotBookingFilter === 'notbooked' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                </mat-icon>
+                <span>Not booked ({{notBookedSlotCountCached}})</span>
+              </div>
+            </div>
+
             <!-- Time slots -->
-            <ng-container *ngIf="availableTimeSlots.length > 0">
+            <ng-container *ngIf="stageSlotBookingFilter === 'booked' && availableTimeSlots.length > 0">
               <div class="fsb-row fsb-row-sub fsb-row-label-only">
                 <mat-icon class="fsb-icon">schedule</mat-icon>
                 <span class="fsb-label">Time slot</span>
@@ -644,10 +666,10 @@
                   <span>All times ({{getTotalSlotCount()}})</span>
                 </div>
                 <div class="fsb-option" *ngFor="let slot of availableTimeSlots"
-                  [class.fsb-option-selected]="selectedTimeSlots.includes(slot.timeRange)"
-                  (click)="selectTimeSlot(slot.timeRange)">
+                  [class.fsb-option-selected]="selectedTimeSlots.includes(slot.slotKey)"
+                  (click)="selectTimeSlot(slot.slotKey)">
                   <mat-icon class="fsb-option-check">
-                    {{selectedTimeSlots.includes(slot.timeRange) ? 'check_box' : 'check_box_outline_blank'}}
+                    {{selectedTimeSlots.includes(slot.slotKey) ? 'check_box' : 'check_box_outline_blank'}}
                   </mat-icon>
                   <span>
                     <span *ngIf="slot.title" style="font-weight:600; color:#234C58;">{{slot.title}} · </span>
@@ -656,19 +678,6 @@
                 </div>
               </div>
             </ng-container>
-          </div>
-        </div>
-
-        <!-- SLOTS NOT BOOKED ROW -->
-        <div class="fsb-row fsb-toggle-row" *ngIf="availableStagesFromSlot.length > 0"
-          [class.fsb-row-active]="slotsNotBookedFilterActive"
-          [class.fsb-row-disabled]="isStageSlotFilterActive"
-          (click)="!isStageSlotFilterActive && toggleSlotsNotBookedFilter()">
-          <mat-icon class="fsb-icon">event_busy</mat-icon>
-          <span class="fsb-label">Slots not booked</span>
-          <span class="fsb-count" *ngIf="slotsNotBookedCount > 0">{{slotsNotBookedCount}}</span>
-          <div class="fsb-toggle" [class.fsb-toggle-on]="slotsNotBookedFilterActive">
-            <div class="fsb-toggle-knob"></div>
           </div>
         </div>
 
@@ -1196,7 +1205,7 @@
           <input #searchBox
             style="border:none; background:transparent; outline:none; flex:1; font-size:14px; color:#333;"
             [(ngModel)]="searchFilter" (ngModelChange)="onSearchChange()" placeholder="Search participants..."
-            [disabled]="dfuFilterActive || isStageSlotFilterActive">
+            [disabled]="dfuFilterActive">
           <span style="font-size:12px; color:#1976d2; font-weight:500;"
             *ngIf="searchFilter && searchMatches.length > 0">
             {{getMatchPositionText()}}
@@ -1231,13 +1240,10 @@
             <mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="isStageSlotFilterActive" (removed)="clearStageSlotFilter()">
-            Stage: {{getStageSlotDisplayLabel()}}<mat-icon matChipRemove>cancel</mat-icon>
+            Stage: {{getStageSlotDisplayLabel()}}{{stageSlotBookingFilter === 'notbooked' ? ' — Not booked' : ''}}<mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
             DFU only<mat-icon matChipRemove>cancel</mat-icon>
-          </mat-chip>
-          <mat-chip *ngIf="slotsNotBookedFilterActive" (removed)="toggleSlotsNotBookedFilter()">
-            Slots not booked<mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="selectedArenaEventId"
             (removed)="selectedArenaEventId=null; selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; processTokensIntoStages(allTokensData)">

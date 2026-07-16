@@ -257,7 +257,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   
   //dharshan
   availableStagesFromSlot: string[] = [];
-  availableTimeSlots: { timeRange: string; count: number; title?: string }[] = [];
+  availableTimeSlots: { timeRange: string; count: number; title?: string; slotKey: string }[] = [];
   quickLinks: Array<{ screenName: string; url: string; isInternal: boolean }> = [];
   activeStageCountFilter: string[] = []; 
   selectedTimeSlots: string[] = [];
@@ -275,9 +275,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   selectedStageSlots: string[] = [];
   dateRangeStart: Date | null = null;
-  slotsNotBookedFilterActive: boolean = false;
-  slotsNotBookedCount: number = 0;
+  stageSlotBookingFilter: 'booked' | 'notbooked' = 'booked';
+  notBookedSlotCountCached: number = 0;
   dateRangeEnd: Date | null = null;
+  cachedPlanningData: any = null;
   editingReminderDate: Date | null = null;
   editingReminderId: string | null = null;
   newReminderDate: Date | null = null;
@@ -948,7 +949,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.reminderTodayFilterActive = false;
     this.selectedStageSlots = [];
     this.dateRangeStart = null;
-    this.slotsNotBookedFilterActive = false;
+    this.stageSlotBookingFilter = 'booked';
     this.dateRangeEnd = null;
     this.showDateRangePicker = false;
     this.availableTimeSlots = [];
@@ -1246,6 +1247,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.availableTimeSlots = [];
       this.selectedTimeSlots = [];
       this.showTimeSlotPicker = false;
+      this.stageSlotBookingFilter = 'booked';
+    }
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
+  selectBookingStatus(status: 'booked' | 'notbooked') {
+    this.stageSlotBookingFilter = status;
+    if (status === 'notbooked') {
+      this.selectedTimeSlots = [];
     }
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -1268,14 +1278,10 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.selectedTimeSlots = [];
     this.showTimeSlotPicker = false;
     this.showTimeDropdown = false;
+    this.stageSlotBookingFilter = 'booked';
     this.processTokensIntoStages(this.allTokensData);
   }
 
-  toggleSlotsNotBookedFilter() {
-      this.slotsNotBookedFilterActive = !this.slotsNotBookedFilterActive;
-      this.processTokensIntoStages(this.allTokensData);
-  }
- 
   //dharshan
   extractUniqueTimeSlots() {
   if (!this.dateRangeStart || !this.dateRangeEnd || this.selectedStageSlots.length === 0) {
@@ -1284,7 +1290,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.showTimeSlotPicker = false;
     return;
   }
-  const timeMap = new Map<string, { count: number; title?: string }>();
+  const timeMap = new Map<string, { count: number; title?: string; timeRange: string; sortTime: number }>();
   this.allTokensData.forEach(token => {
     const slotData = token.selectedstageslot;
     if (!slotData) return;
@@ -1323,36 +1329,36 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
           hour12: true
         });
 
-        const key = `${startTime} – ${endTime}`;
-        const existing = timeMap.get(key);
+      const slotKey = `${startDate.getTime()}_${endDate.getTime()}`;
+        const existing = timeMap.get(slotKey);
         const titleKey = `${slot.stagename}_${startDate.getTime()}_${endDate.getTime()}`;
         const title = this.slotTitleMap[titleKey] || '';
-        timeMap.set(key, { count: (existing?.count || 0) + 1, title });
+        timeMap.set(slotKey, {
+          count: (existing?.count || 0) + 1,
+          title,
+          timeRange: `${startTime} – ${endTime}`,
+          sortTime: startDate.getTime()
+        });
       }
     });
   });
 
    this.availableTimeSlots = Array.from(timeMap.entries())
-    .sort((a, b) => {
-      const timeA = new Date(`1970/01/01 ${a[0].split(' – ')[0]}`).getTime();
-      const timeB = new Date(`1970/01/01 ${b[0].split(' – ')[0]}`).getTime();
-      return timeA - timeB;
-    })
-    .map(([timeRange, data]) => ({ timeRange, count: data.count, title: data.title }));
+    .sort((a, b) => a[1].sortTime - b[1].sortTime)
+    .map(([slotKey, data]) => ({ slotKey, timeRange: data.timeRange, count: data.count, title: data.title }));
 
   this.showTimeSlotPicker = this.availableTimeSlots.length > 0;
 }
 
-  selectTimeSlot(time: string | null) { 
-    if (time === null) {
-      // Clicking "All" clears all selections
+  selectTimeSlot(slotKey: string | null) { 
+    if (slotKey === null) {
       this.selectedTimeSlots = [];
     } else {
-      const index = this.selectedTimeSlots.indexOf(time);
+      const index = this.selectedTimeSlots.indexOf(slotKey);
       if (index > -1) {
         this.selectedTimeSlots.splice(index, 1);
       } else {
-        this.selectedTimeSlots.push(time);
+        this.selectedTimeSlots.push(slotKey);
       }
     }
     this.processTokensIntoStages(this.allTokensData);
@@ -2191,9 +2197,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     this.totalParticipants = this.stageQueue.filter(stage => stage.stagename !== "Unattended Participants").reduce(function (sum, stage) {
       return sum + stage.allTokens.length;
-    }, 0);
-    this.slotsNotBookedCount = this.stageQueue.filter(stage => stage.stagename !== "Unattended Participants").reduce((sum, stage) => sum + (stage.allTokens || []).filter((t: any) => this.hasNoBookedSlot(t)).length, 0);
-  }
+    }, 0); 
+    }
 
   applyFilters(tokens: any[]): any[] {
     let filteredTokens = [...tokens];
@@ -2277,75 +2282,68 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
     //dharshan
     if (this.isStageSlotFilterActive) {
-      filteredTokens = filteredTokens.filter(token => {
-        if (!token.selectedstageslot) return false;
+      this.notBookedSlotCountCached = filteredTokens.filter(
+        (t: any) => t.tokenstatus === 'Active' && this.hasNoBookedSlot(t)
+      ).length;
 
-        let hasStage = false;
-        let matchesDateRange = false;
-        let matchesTimeSlot = false;
+      if (this.stageSlotBookingFilter === 'notbooked') {
+        filteredTokens = filteredTokens.filter(token => this.hasNoBookedSlot(token));
+      } else {
+        filteredTokens = filteredTokens.filter(token => {
+          if (!token.selectedstageslot) return false;
 
-        Object.values(token.selectedstageslot).forEach((slot: any) => {
-          if (slot && this.stageSlotMatches(slot.stagename)) {
-            hasStage = true;
+          let hasStage = false;
+          let matchesDateRange = false;
+          let matchesTimeSlot = false;
 
-            if (slot.startdate) {
-              let tokenStartDate: Date;
-              if (slot.startdate.toDate && typeof slot.startdate.toDate === 'function') {
-                tokenStartDate = slot.startdate.toDate();
-              } else if (slot.startdate instanceof Date) {
-                tokenStartDate = slot.startdate;
-              } else return;
+          Object.values(token.selectedstageslot).forEach((slot: any) => {
+            if (slot && this.stageSlotMatches(slot.stagename)) {
+              hasStage = true;
 
-              if (this.dateRangeStart && this.dateRangeEnd) {
-                const endOfDay = new Date(this.dateRangeEnd);
-                endOfDay.setHours(23, 59, 59, 999);
+              if (slot.startdate) {
+                let tokenStartDate: Date;
+                if (slot.startdate.toDate && typeof slot.startdate.toDate === 'function') {
+                  tokenStartDate = slot.startdate.toDate();
+                } else if (slot.startdate instanceof Date) {
+                  tokenStartDate = slot.startdate;
+                } else return;
 
-                if (tokenStartDate >= this.dateRangeStart && tokenStartDate <= endOfDay) {
-                  matchesDateRange = true;
-                  if (this.selectedTimeSlots.length > 0) {
-                    let endDate: Date | null = null;
+                if (this.dateRangeStart && this.dateRangeEnd) {
+                  const endOfDay = new Date(this.dateRangeEnd);
+                  endOfDay.setHours(23, 59, 59, 999);
 
-                    if (slot.enddate?.toDate) {
-                      endDate = slot.enddate.toDate();
-                    } else if (slot.enddate instanceof Date) {
-                      endDate = slot.enddate;
-                    }
+                  if (tokenStartDate >= this.dateRangeStart && tokenStartDate <= endOfDay) {
+                    matchesDateRange = true;
+                    if (this.selectedTimeSlots.length > 0) {
+                      let endDate: Date | null = null;
 
-                    const startTime = tokenStartDate.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    });
+                      if (slot.enddate?.toDate) {
+                        endDate = slot.enddate.toDate();
+                      } else if (slot.enddate instanceof Date) {
+                        endDate = slot.enddate;
+                      }
 
-                    const endTime = endDate ? endDate.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    }) : '';
+                      const tokenSlotKey = `${tokenStartDate.getTime()}_${endDate ? endDate.getTime() : ''}`;
 
-                    const tokenTimeRange = endTime
-                      ? `${startTime} – ${endTime}`
-                      : startTime;
-
-                    if (this.selectedTimeSlots.includes(tokenTimeRange)) {
+                      if (this.selectedTimeSlots.includes(tokenSlotKey)) {
+                        matchesTimeSlot = true;
+                      }
+                    } else {
                       matchesTimeSlot = true;
                     }
-                  } else {
-                    matchesTimeSlot = true;
                   }
+                } else {
+                  matchesDateRange = true;
+                  matchesTimeSlot = true;
                 }
-              } else {
-                matchesDateRange = true;
-                matchesTimeSlot = true;
               }
             }
-          }
+          });
+          return hasStage && matchesDateRange && matchesTimeSlot;
         });
-        return hasStage && matchesDateRange && matchesTimeSlot;
-      });
-    }
-    if (this.slotsNotBookedFilterActive) {
-      filteredTokens = filteredTokens.filter(token => this.hasNoBookedSlot(token));
+      }
+    } else {
+      this.notBookedSlotCountCached = 0;
     }
     if (this.dfuFilterActive) {
       filteredTokens = filteredTokens.filter(
@@ -2590,6 +2588,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.slotTitleMap = {};
       if (!queuePlanningSnap.empty) {
         const queuePlanningDoc = queuePlanningSnap.docs[0].data();
+        this.cachedPlanningData = queuePlanningDoc;
         this.queuePlanningSegments = queuePlanningDoc['segmentlist'] || [];
 
         const planning = queuePlanningDoc['planning'] || [];
@@ -2732,9 +2731,72 @@ getBookedSlotTitle(token: any): string {
 
     return { start, end: end as Date, stagename: matchedSlot.stagename };
   }
-  private hasNoBookedSlot(token: any): boolean {
-    return !token?.selectedstageslot || Object.keys(token.selectedstageslot).length === 0;
+
+  private getStageConfigForVariationSegment(variationId: string, segmentId: string): { stageName: string; slotConfigured: boolean }[] {
+    const stageConfig = (this.selectedQueue.stages as string[]).map(stageName => ({ stageName, slotConfigured: false }));
+    if (!this.cachedPlanningData || !this.cachedPlanningData.planning) return stageConfig;
+
+    for (const variationPlanning of this.cachedPlanningData.planning) {
+      if (variationPlanning.variationid !== variationId) continue;
+      for (const segmentData of (variationPlanning.segments || [])) {
+        if (segmentData.segmentid !== segmentId) continue;
+        for (const slot of (segmentData.slots || [])) {
+          const idx = stageConfig.findIndex(s => s.stageName === slot.stagename);
+          if (idx >= 0) stageConfig[idx].slotConfigured = true;
+        }
+      }
+    }
+    return stageConfig;
   }
+
+  private findLastPreviousStageWithSlot(currentIdx: number, stageConfig: { slotConfigured: boolean; stageName: string }[]) {
+    for (let i = currentIdx - 1; i >= 0; i--) {
+      if (stageConfig[i].slotConfigured) return { index: i, stageName: stageConfig[i].stageName };
+    }
+    return { index: -1, stageName: null };
+  }
+  
+  private hasNoBookedSlot(token: any): boolean {
+    const queueStages: string[] = this.selectedQueue.stages;
+    const profileId = token.profile_id || token.profileid;
+    const candidateSegmentIds = this.availableSegments
+      .filter(segment =>
+        (this.participantListMap[profileId] || []).some(plId =>
+          (this.segmentParticipantListMap[segment.id] || []).includes(plId)
+        )
+      )
+      .map(segment => segment.id);
+    if (candidateSegmentIds.length === 0) return false;
+    if (!this.cachedPlanningData?.planning) return false;
+
+    return this.selectedStageSlots.some(stagename => {
+      const currentStageIndex = queueStages.indexOf(stagename);
+      if (currentStageIndex === -1) return false;
+
+      const stageConfig = this.cachedPlanningData.planning
+        .filter((variationPlanning: any) =>
+          (variationPlanning.segments || []).some((s: any) => candidateSegmentIds.includes(s.segmentid))
+        )
+        .map((variationPlanning: any) => {
+          const segmentId = variationPlanning.segments.find((s: any) => candidateSegmentIds.includes(s.segmentid))?.segmentid;
+          return this.getStageConfigForVariationSegment(variationPlanning.variationid, segmentId);
+        })
+        .find((config: any[]) => config[currentStageIndex]?.slotConfigured);
+      if (!stageConfig) return false;
+
+      const lastPrev = this.findLastPreviousStageWithSlot(currentStageIndex, stageConfig);
+      const checkFromStageIndex = lastPrev.index >= 0 ? lastPrev.index + 1 : 0;
+
+      const tokenStageIndex = queueStages.indexOf(token.currentstage);
+      if (tokenStageIndex === -1) return false;
+      if (tokenStageIndex > currentStageIndex) return false;
+      if (tokenStageIndex < checkFromStageIndex) return false;
+
+      const hasConfirmedThisStage = (token.selectedstageslot || {})[stagename] != null;
+      return !hasConfirmedThisStage;
+    });
+  }
+
   removeSegment(segId) {
     return this.selectedSegments = this.selectedSegments.filter(s => s !== segId)
   }
@@ -5417,6 +5479,7 @@ toggleSegmentDropdown() {
     if (this.approvedFilter !== 'all') count++;
     if (this.isStageSlotFilterActive) count++;
     if (this.dateRangeStart && this.dateRangeEnd) count++;
+    if (this.stageSlotBookingFilter === 'notbooked') count++;
     if (this.selectedTimeSlots?.length > 0) count++;
     if (this.dfuFilterActive) count++;
     if (this.reminderTodayFilterActive) count++;
@@ -5426,7 +5489,6 @@ toggleSegmentDropdown() {
     count += this.selectedVariations.length;
     if (this.selectedArenaEventId) count++;
     if (this.evolutionMappingLiveFilter !== 'all') count++;
-    if (this.slotsNotBookedFilterActive) count++;
     return count;
   }
 
