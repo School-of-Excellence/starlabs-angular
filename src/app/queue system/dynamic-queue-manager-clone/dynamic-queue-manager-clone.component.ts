@@ -1672,11 +1672,12 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
         this.mapTagsMetaData[e['id']] = e;
       }
     });
-    this.queueTagsSubscription = collectionData(query(collection(this.firestore, "queue tags"),where("isDelete", "==", false),orderBy("createdAt", "desc"))).pipe(takeUntil(this.subscriptionHandle)).subscribe(tags => {
-      this.availableQueueTags = tags;
+    this.queueTagsSubscription = collectionData(query(collection(this.firestore, "queue tags"),orderBy("createdAt", "desc"))).pipe(takeUntil(this.subscriptionHandle)).subscribe(tags => {
+      const activeTags = tags.filter(t => t['isDelete'] !== true);
+      this.availableQueueTags = activeTags;
       this.mapQueueTagsName = {};
-      this.filteredQueueTags = [...tags];
-      tags.forEach(t => {
+      this.filteredQueueTags = [...activeTags];
+      activeTags.forEach(t => {
         this.mapQueueTagsName[t['id']] = t['name'];
       });
     });

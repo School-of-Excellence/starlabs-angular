@@ -115,11 +115,11 @@ export class QueueNotesComponent {
   // Load all existing tags from Firestore
   loadTagsFromFirestore(): void {
     this.loading = true;
-    collectionData(query(collection(this.firestore, 'queue tags'),where('isDelete', '==', false)))
+    collectionData(query(collection(this.firestore, 'queue tags')))
     .pipe(takeUntil(this.subscriptionHandle))
     .subscribe({
       next: (tagsData: any[]) => {
-        this.allTags = tagsData.map(t => t.name);
+        this.allTags = tagsData.filter(t => t.isDelete !== true).map(t => t.name);
         this.loading = false;
       },
       error: (error) => {

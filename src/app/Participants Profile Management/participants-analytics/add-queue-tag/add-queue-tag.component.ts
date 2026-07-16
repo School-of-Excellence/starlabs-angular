@@ -77,11 +77,10 @@ export class AddQueueTagComponent {
     collectionData(
       query(
         collection(this.firestore, "queue tags"),
-        where("isDelete", "==", false),
         orderBy("createdAt", "desc")
       )
     ).subscribe((tag) => {
-      this.allTags = tag || [];
+      this.allTags = (tag || []).filter(t => t['isDelete'] !== true);
       this.mapTagID = {};
       this.allTags.forEach(t => {
         this.mapTagID[t['id']] = t['name'];
