@@ -199,6 +199,12 @@
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryReady.active, summaryReady.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryReady.active, summaryReady.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryReady.active }}</span><span class="cs-lg-n">Non-active {{ summaryReady.nonactive }}</span></div>
         </div>
+        <div class="cs-stat" [class.active]="cardFilter==='dfu'" (click)="toggleCardFilter('dfu')">
+          <div class="cs-label">DFU Ongoing</div>
+          <div class="cs-total">{{ summaryDfu.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryDfu.active, summaryDfu.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryDfu.active, summaryDfu.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryDfu.active }}</span><span class="cs-lg-n">Non-active {{ summaryDfu.nonactive }}</span></div>
+        </div>
       </div>
 
       <!-- Ready-for-the-event: collapsible per-queue stage picker (collapsed to save space) -->

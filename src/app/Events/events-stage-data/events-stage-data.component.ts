@@ -139,6 +139,7 @@ export class EventsStageDataComponent {
   cardFilter = '';   // quick-filter the table by a clicked cohort card ('inqueue'|'requested'|'approved'|'approved-nq'|'ready')
   selectedParticipant: StageRow | null = null;   // row opened in the detail side panel
   summaryReady = { active: 0, nonactive: 0, total: 0 };
+  summaryDfu = { active: 0, nonactive: 0, total: 0 };   // #5 DFU Ongoing (active product outside the selected queues)
 
   // ---- Per-arena journey group config ----
   journeyGroups: { name: string; journeyIds: string[] }[] = [];
@@ -558,6 +559,19 @@ export class EventsStageDataComponent {
       return !!t && !this.isUnattendedStage(t.currentstage);
     });
   }
+  // #5 DFU Ongoing — the participant is actively consuming a product OUTSIDE the selected
+  // queue(s): an activeproduct that no selected queue is mapped to. These people are available
+  // for planning / follow-up. Relies on the queue→product mapping resolved in loadSelectedTokens.
+  private selectedQueueProductIds(): Set<string> {
+    const s = new Set<string>();
+    this.selectedQueueIds.forEach(qid => (this.queues.find(q => q.id === qid)?.productIds ?? []).forEach(p => s.add(p)));
+    return s;
+  }
+  isDfuOngoing(r: StageRow): boolean {
+    if (!r.activeProducts.length) return false;
+    const covered = this.selectedQueueProductIds();
+    return r.activeProducts.some(p => !covered.has(p));
+  }
   // Ready for the event = approved AND, in some selected queue, their current stage is at or
   // past the operator-picked "ready" stage for that queue (using the queue's ordered stage list).
   private isReady(r: any): boolean {
@@ -596,6 +610,7 @@ export class EventsStageDataComponent {
       this.summaryInQueue = seg(r => this.inSelectedQueue(r));
       this.summaryReady = seg(r => this.isReady(r));
       this.summaryApprovedNotQueued = seg(r => r.status === 'approved' && !this.inSelectedQueue(r));
+      this.summaryDfu = seg(r => this.isDfuOngoing(r));
       this.summaryLoaded = true;   // summaryJourneyRows is a reactive getter (grouping updates live)
     } finally {
       this.summaryLoading = false;
@@ -1183,6 +1198,7 @@ export class EventsStageDataComponent {
       if (this.cardFilter === 'approved' && r.status !== 'approved') return false;
       if (this.cardFilter === 'approved-nq' && !(r.status === 'approved' && !this.inSelectedQueue(r))) return false;
       if (this.cardFilter === 'ready' && !this.isReady(r)) return false;
+      if (this.cardFilter === 'dfu' && !this.isDfuOngoing(r)) return false;
       if (this.requestFilter && r.status !== this.requestFilter) return false;
       const cs = this.rowCurrentStages(r);
       if (this.stageFilter === '__none') { if (cs.length) return false; }
