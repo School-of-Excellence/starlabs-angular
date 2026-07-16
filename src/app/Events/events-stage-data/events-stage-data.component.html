@@ -299,7 +299,13 @@
       <div class="cs-jwrap">
         <table class="cs-jtbl">
           <thead>
-            <tr><th class="jl">Journey</th><th>Requested</th><th>Approved</th><th>Ready</th></tr>
+            <tr>
+              <th class="jl">Journey</th><th>Requested</th><th>Approved</th><th>Ready</th>
+              <ng-container *ngFor="let sd of splitDefs">
+                <th>Yet to complete {{ sd.label }}</th>
+                <th>{{ sd.label }} pending</th>
+              </ng-container>
+            </tr>
           </thead>
           <tbody>
             <tr *ngFor="let r of summaryJourneyRows" [class.other]="r.key==='Other'">
@@ -307,12 +313,20 @@
               <td><span class="jnum" [class.z]="r.reqA + r.reqNA === 0">{{ r.reqA + r.reqNA }}</span><span class="jsub">Active {{ r.reqA }} · Non-active {{ r.reqNA }}</span></td>
               <td><span class="jnum" [class.z]="r.appA + r.appNA === 0">{{ r.appA + r.appNA }}</span><span class="jsub">Active {{ r.appA }} · Non-active {{ r.appNA }}</span></td>
               <td><span class="jnum" [class.z]="r.readyA + r.readyNA === 0">{{ r.readyA + r.readyNA }}</span><span class="jsub">Active {{ r.readyA }} · Non-active {{ r.readyNA }}</span></td>
+              <ng-container *ngFor="let sd of splitDefs">
+                <td><span class="jnum" [class.z]="r.defs[sd.id].ytcA + r.defs[sd.id].ytcNA === 0">{{ r.defs[sd.id].ytcA + r.defs[sd.id].ytcNA }}</span><span class="jsub">Active {{ r.defs[sd.id].ytcA }} · Non-active {{ r.defs[sd.id].ytcNA }}</span></td>
+                <td><span class="jnum" [class.z]="r.defs[sd.id].penA + r.defs[sd.id].penNA === 0">{{ r.defs[sd.id].penA + r.defs[sd.id].penNA }}</span><span class="jsub">Active {{ r.defs[sd.id].penA }} · Non-active {{ r.defs[sd.id].penNA }}</span></td>
+              </ng-container>
             </tr>
             <tr class="jtot">
               <td class="jl">All journeys</td>
               <td><span class="jnum">{{ summaryRequested.total }}</span><span class="jsub">Active {{ summaryRequested.active }} · Non-active {{ summaryRequested.nonactive }}</span></td>
               <td><span class="jnum">{{ summaryApproved.total }}</span><span class="jsub">Active {{ summaryApproved.active }} · Non-active {{ summaryApproved.nonactive }}</span></td>
               <td><span class="jnum">{{ summaryReady.total }}</span><span class="jsub">Active {{ summaryReady.active }} · Non-active {{ summaryReady.nonactive }}</span></td>
+              <ng-container *ngFor="let sd of splitDefs">
+                <td><span class="jnum">{{ splitTotals[sd.id].ytcA + splitTotals[sd.id].ytcNA }}</span><span class="jsub">Active {{ splitTotals[sd.id].ytcA }} · Non-active {{ splitTotals[sd.id].ytcNA }}</span></td>
+                <td><span class="jnum">{{ splitTotals[sd.id].penA + splitTotals[sd.id].penNA }}</span><span class="jsub">Active {{ splitTotals[sd.id].penA }} · Non-active {{ splitTotals[sd.id].penNA }}</span></td>
+              </ng-container>
             </tr>
           </tbody>
         </table>
@@ -362,9 +376,9 @@
           <span class="seg seg-none" [style.flex]="s.notBooked || 0"></span>
         </div>
         <div class="t-legend">
-          <span><i class="dot d-done"></i>{{ s.completed }} done</span>
-          <span><i class="dot d-book"></i>{{ s.booked }} booked</span>
-          <span><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
+          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':completed'" (click)="toggleCardFilter('cc:'+s.id+':completed')"><i class="dot d-done"></i>{{ s.completed }} done</span>
+          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':booked'" (click)="toggleCardFilter('cc:'+s.id+':booked')"><i class="dot d-book"></i>{{ s.booked }} booked</span>
+          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':notbooked'" (click)="toggleCardFilter('cc:'+s.id+':notbooked')"><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
         </div>
       </div>
       <div class="tile tile-hint" *ngIf="!combinedCols.length">

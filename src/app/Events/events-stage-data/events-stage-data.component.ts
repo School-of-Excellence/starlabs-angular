@@ -527,9 +527,15 @@ export class EventsStageDataComponent {
     return [...m.entries()].map(([id, count]) => ({ id, name: this.journeyMap[id] || id, count })).sort((a, b) => b.count - a.count);
   }
 
-  // Journey-wise split: every journey is its own row; a named local group collapses its journeys into one row.
-  get summaryJourneyRows(): { key: string; label: string; reqA: number; reqNA: number; appA: number; appNA: number; readyA: number; readyNA: number }[] {
+  // Configured stage definitions that have a label — the journey-split's dynamic columns (#6).
+  get splitDefs(): { id: string; label: string; byQueue: Record<string, string> }[] {
+    return this.stageDefs.filter(s => (s.label || '').trim());
+  }
+  // Journey-wise split: every journey is its own row; a named local group collapses its journeys
+  // into one row. Each row also carries per-stageDef "yet to complete" + "pending" counts (#6).
+  get summaryJourneyRows(): any[] {
     const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+    const defs = this.splitDefs;
     const groupNames = this.journeyGroups.map(g => (g.name || '').trim()).filter(Boolean);
     const keyOf = (pid: string): string => {
       const jid = this.journeyIdByPid.get(pid);
@@ -540,19 +546,38 @@ export class EventsStageDataComponent {
       }
       return 'Other';
     };
+    const mkDefs = () => { const d: any = {}; defs.forEach(sd => d[sd.id] = { ytcA: 0, ytcNA: 0, penA: 0, penNA: 0 }); return d; };
     const jr: Record<string, any> = {};
     (this.stageRows || []).forEach(r => {
       const k = keyOf(r.profileid);
-      const b = jr[k] ??= { key: k, label: k, reqA: 0, reqNA: 0, appA: 0, appNA: 0, readyA: 0, readyNA: 0 };
+      const b = jr[k] ??= { key: k, label: k, reqA: 0, reqNA: 0, appA: 0, appNA: 0, readyA: 0, readyNA: 0, defs: mkDefs() };
       const act = isActive(r);
       if (r.status === 'requested') act ? b.reqA++ : b.reqNA++;
       else if (r.status === 'approved') act ? b.appA++ : b.appNA++;
       if (this.isReady(r)) act ? b.readyA++ : b.readyNA++;
+      defs.forEach(sd => {
+        if (this.isYetToComplete(r, sd)) act ? b.defs[sd.id].ytcA++ : b.defs[sd.id].ytcNA++;
+        if (this.isStagePending(r, sd)) act ? b.defs[sd.id].penA++ : b.defs[sd.id].penNA++;
+      });
     });
     const groups = groupNames.filter(n => jr[n]).map(n => jr[n]);
     const rest = Object.keys(jr).filter(k => !groupNames.includes(k))
       .sort((a, b) => a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b)).map(k => jr[k]);
     return [...groups, ...rest];
+  }
+  // Totals row for the per-stageDef journey-split columns.
+  get splitTotals(): Record<string, { ytcA: number; ytcNA: number; penA: number; penNA: number }> {
+    const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+    const out: any = {};
+    this.splitDefs.forEach(sd => out[sd.id] = { ytcA: 0, ytcNA: 0, penA: 0, penNA: 0 });
+    (this.stageRows || []).forEach(r => {
+      const act = isActive(r);
+      this.splitDefs.forEach(sd => {
+        if (this.isYetToComplete(r, sd)) act ? out[sd.id].ytcA++ : out[sd.id].ytcNA++;
+        if (this.isStagePending(r, sd)) act ? out[sd.id].penA++ : out[sd.id].penNA++;
+      });
+    });
+    return out;
   }
 
   pct(n: number, total: number): number { return total > 0 ? Math.round(n / total * 100) : 0; }
@@ -1028,7 +1053,7 @@ export class EventsStageDataComponent {
         else if (col && this.isBooked(r, col)) booked++;
         else notBooked++;
       });
-      return { label: cc.name, completed, notCompleted: booked + notBooked, booked, notBooked };
+      return { id: cc.id, label: cc.name, completed, notCompleted: booked + notBooked, booked, notBooked };
     });
   }
 
@@ -1276,6 +1301,18 @@ export class EventsStageDataComponent {
       if (this.cardFilter === 'ready' && !this.isReady(r)) return false;
       if (this.cardFilter === 'dfu' && !this.isDfuOngoing(r)) return false;
       if (this.cardFilter.startsWith('sd:')) { const sd = this.stageDefs.find(s => s.id === this.cardFilter.slice(3)); if (sd && !this.isYetToComplete(r, sd)) return false; }
+      if (this.cardFilter.startsWith('cc:')) {
+        const [, id, state] = this.cardFilter.split(':');
+        const cc = this.combinedCols.find(c => c.id === id);
+        if (cc) {
+          const col = this.resolveCombined(r, cc);
+          const done = !!col && this.crossedStage(r, col);
+          const booked = !!col && !done && this.isBooked(r, col);
+          if (state === 'completed' && !done) return false;
+          if (state === 'booked' && !booked) return false;
+          if (state === 'notbooked' && (done || booked)) return false;
+        }
+      }
       if (this.requestFilter && r.status !== this.requestFilter) return false;
       const cs = this.rowCurrentStages(r);
       if (this.stageFilter === '__none') { if (cs.length) return false; }

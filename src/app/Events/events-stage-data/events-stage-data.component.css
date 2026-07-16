@@ -71,6 +71,9 @@ input[type="radio"], input[type="checkbox"] { accent-color: #007aff; }
 .seg-none { background: rgba(60,60,67,.22); }
 .t-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: rgba(60,60,67,.7); }
 .t-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 0px; }
+.t-legend .t-clk { cursor: pointer; border-radius: 6px; padding: 1px 5px; margin: -1px -1px; transition: background .12s; }
+.t-legend .t-clk:hover { background: rgba(60,60,67,.08); }
+.t-legend .t-clk.on { background: rgba(0,122,255,.14); color: #0a63c9; font-weight: 600; }
 .d-done { background: #34c759; } .d-book { background: #007aff; } .d-none { background: rgba(60,60,67,.3); }
 .tile-hint { display: flex; align-items: center; gap: 8px; color: rgba(60,60,67,.5); font-size: 13px; font-style: italic;
   border-style: dashed; }
