@@ -139,6 +139,10 @@
           <app-searchable-select *ngIf="productFilter" [options]="ssProductModeOpts" [value]="productMode"
             (valueChange)="productMode=$any($event); onFilterChange()" placeholder="Show only"></app-searchable-select>
         </label>
+        <label *ngIf="ssEligibilityOpts.length > 1">Eligible for:
+          <app-searchable-select [options]="ssEligibilityOpts" [value]="eligibilityFilter"
+            (valueChange)="eligibilityFilter=$event; onFilterChange()" placeholder="Any" searchPlaceholder="Search queue…"></app-searchable-select>
+        </label>
         <label>Completed date:
           <input type="date" [(ngModel)]="completedFrom" (ngModelChange)="onFilterChange()">
           <span>–</span>
@@ -165,7 +169,7 @@
     <!-- Cohort summary: requested/approved × active/non-active, with per-journey split -->
     <div class="cohort-summary" *ngIf="summaryLoaded">
       <div class="cs-head"><span>Cohort summary <span class="cs-updating" *ngIf="summaryLoading">· updating…</span></span>
-        <!-- Config disabled: keeps the cohort card read-only. When enabled, journey-group config persists to localStorage (esd_journeygroups_<arenaeventid>).
+        <!-- Config disabled: keeps the cohort card read-only (no writes to 'stage opportunity count').
         <button type="button" class="cs-config-btn" (click)="configOpen = !configOpen">{{ configOpen ? 'Done' : 'Config' }}</button>
         --></div>
       <div class="cs-stats">
@@ -199,6 +203,21 @@
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryReady.active, summaryReady.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryReady.active, summaryReady.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryReady.active }}</span><span class="cs-lg-n">Non-active {{ summaryReady.nonactive }}</span></div>
         </div>
+        <div class="cs-stat" [class.active]="cardFilter==='dfu'" (click)="toggleCardFilter('dfu')">
+          <div class="cs-label">DFU Ongoing</div>
+          <div class="cs-total">{{ summaryDfu.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryDfu.active, summaryDfu.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryDfu.active, summaryDfu.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryDfu.active }}</span><span class="cs-lg-n">Non-active {{ summaryDfu.nonactive }}</span></div>
+        </div>
+      </div>
+      <!-- #4: one clickable card per configured "Yet to complete <stage>" definition -->
+      <div class="cs-stats" *ngIf="stageDefCards.length">
+        <div class="cs-stat" *ngFor="let c of stageDefCards" [class.active]="cardFilter==='sd:'+c.id" (click)="toggleCardFilter('sd:'+c.id)">
+          <div class="cs-label">Yet to complete {{ c.label }}</div>
+          <div class="cs-total">{{ c.total }}</div>
+          <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(c.active, c.total)"></span><span class="cs-n" [style.width.%]="100 - pct(c.active, c.total)"></span></div>
+          <div class="cs-legend"><span class="cs-lg-a">Active {{ c.active }}</span><span class="cs-lg-n">Non-active {{ c.nonactive }}</span></div>
+        </div>
       </div>
 
       <!-- Ready-for-the-event: collapsible per-queue stage picker (collapsed to save space) -->
@@ -229,6 +248,28 @@
           <span class="cs-config-lbl">Ready when current stage is</span>
           <button type="button" class="cs-cfg-chip" *ngFor="let s of readyStageOptions" [class.on]="isReadyStage(s)" (click)="toggleReadyStage(s)">{{ s }}</button>
         </div>
+        <div class="cs-config-sec" *ngIf="selectedQueues.length">
+          <span class="cs-config-lbl">Eligible products per queue (unconsumed)</span>
+          <div class="cs-elig-q" *ngFor="let q of selectedQueues">
+            <span class="cs-elig-qn">{{ q.name }}</span>
+            <button type="button" class="cs-cfg-chip on" *ngFor="let pid of (queueEligibility[q.id] || [])" (click)="toggleEligibleProduct(q.id, pid)">{{ productName(pid) }} &times;</button>
+            <app-searchable-select [options]="ssEligibleAddOpts(q.id)" [value]="''"
+              (valueChange)="$event && toggleEligibleProduct(q.id, $event)" placeholder="+ Add product" searchPlaceholder="Search product…"></app-searchable-select>
+          </div>
+        </div>
+        <div class="cs-config-sec cs-sd-sec" *ngIf="selectedQueues.length">
+          <span class="cs-config-lbl">Yet-to-complete stages</span>
+          <div class="cs-sd" *ngFor="let sd of stageDefs">
+            <input class="cs-grp-name cs-sd-name" type="text" [(ngModel)]="sd.label" (blur)="saveStageDefs()" placeholder="Label (e.g. SE)">
+            <span class="cs-sd-q" *ngFor="let q of selectedQueues">
+              <span class="cs-sd-qn">{{ q.name }}</span>
+              <app-searchable-select [options]="ssStagesFor(q.id)" [value]="sd.byQueue[q.id] || ''"
+                (valueChange)="setStageDefStage(sd, q.id, $event)" placeholder="Any stage" searchPlaceholder="Search stage…"></app-searchable-select>
+            </span>
+            <button type="button" class="cs-grp-x" (click)="removeStageDef(sd.id)" aria-label="Remove">&times;</button>
+          </div>
+          <button type="button" class="cs-grp-add" (click)="addStageDef()">+ Add stage</button>
+        </div>
         <span class="cs-config-hint" *ngIf="!selectedQueueIds.length">Pick a queue above to choose its ready stages.</span>
       </div>
       <div class="cs-jhead">
@@ -258,7 +299,13 @@
       <div class="cs-jwrap">
         <table class="cs-jtbl">
           <thead>
-            <tr><th class="jl">Journey</th><th>Requested</th><th>Approved</th><th>Ready</th></tr>
+            <tr>
+              <th class="jl">Journey</th><th>Requested</th><th>Approved</th><th>Ready</th>
+              <ng-container *ngFor="let sd of splitDefs">
+                <th>Yet to complete {{ sd.label }}</th>
+                <th>{{ sd.label }} pending</th>
+              </ng-container>
+            </tr>
           </thead>
           <tbody>
             <tr *ngFor="let r of summaryJourneyRows" [class.other]="r.key==='Other'">
@@ -266,12 +313,20 @@
               <td><span class="jnum" [class.z]="r.reqA + r.reqNA === 0">{{ r.reqA + r.reqNA }}</span><span class="jsub">Active {{ r.reqA }} · Non-active {{ r.reqNA }}</span></td>
               <td><span class="jnum" [class.z]="r.appA + r.appNA === 0">{{ r.appA + r.appNA }}</span><span class="jsub">Active {{ r.appA }} · Non-active {{ r.appNA }}</span></td>
               <td><span class="jnum" [class.z]="r.readyA + r.readyNA === 0">{{ r.readyA + r.readyNA }}</span><span class="jsub">Active {{ r.readyA }} · Non-active {{ r.readyNA }}</span></td>
+              <ng-container *ngFor="let sd of splitDefs">
+                <td><span class="jnum" [class.z]="r.defs[sd.id].ytcA + r.defs[sd.id].ytcNA === 0">{{ r.defs[sd.id].ytcA + r.defs[sd.id].ytcNA }}</span><span class="jsub">Active {{ r.defs[sd.id].ytcA }} · Non-active {{ r.defs[sd.id].ytcNA }}</span></td>
+                <td><span class="jnum" [class.z]="r.defs[sd.id].penA + r.defs[sd.id].penNA === 0">{{ r.defs[sd.id].penA + r.defs[sd.id].penNA }}</span><span class="jsub">Active {{ r.defs[sd.id].penA }} · Non-active {{ r.defs[sd.id].penNA }}</span></td>
+              </ng-container>
             </tr>
             <tr class="jtot">
               <td class="jl">All journeys</td>
               <td><span class="jnum">{{ summaryRequested.total }}</span><span class="jsub">Active {{ summaryRequested.active }} · Non-active {{ summaryRequested.nonactive }}</span></td>
               <td><span class="jnum">{{ summaryApproved.total }}</span><span class="jsub">Active {{ summaryApproved.active }} · Non-active {{ summaryApproved.nonactive }}</span></td>
               <td><span class="jnum">{{ summaryReady.total }}</span><span class="jsub">Active {{ summaryReady.active }} · Non-active {{ summaryReady.nonactive }}</span></td>
+              <ng-container *ngFor="let sd of splitDefs">
+                <td><span class="jnum">{{ splitTotals[sd.id].ytcA + splitTotals[sd.id].ytcNA }}</span><span class="jsub">Active {{ splitTotals[sd.id].ytcA }} · Non-active {{ splitTotals[sd.id].ytcNA }}</span></td>
+                <td><span class="jnum">{{ splitTotals[sd.id].penA + splitTotals[sd.id].penNA }}</span><span class="jsub">Active {{ splitTotals[sd.id].penA }} · Non-active {{ splitTotals[sd.id].penNA }}</span></td>
+              </ng-container>
             </tr>
           </tbody>
         </table>
@@ -321,9 +376,9 @@
           <span class="seg seg-none" [style.flex]="s.notBooked || 0"></span>
         </div>
         <div class="t-legend">
-          <span><i class="dot d-done"></i>{{ s.completed }} done</span>
-          <span><i class="dot d-book"></i>{{ s.booked }} booked</span>
-          <span><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
+          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':completed'" (click)="toggleCardFilter('cc:'+s.id+':completed')"><i class="dot d-done"></i>{{ s.completed }} done</span>
+          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':booked'" (click)="toggleCardFilter('cc:'+s.id+':booked')"><i class="dot d-book"></i>{{ s.booked }} booked</span>
+          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':notbooked'" (click)="toggleCardFilter('cc:'+s.id+':notbooked')"><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
         </div>
       </div>
       <div class="tile tile-hint" *ngIf="!combinedCols.length">
