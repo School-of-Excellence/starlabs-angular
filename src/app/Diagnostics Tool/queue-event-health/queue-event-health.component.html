@@ -94,7 +94,8 @@
         <button
           class="btn-fix-all"
           *ngIf="activeKpiFilter === 'invalid_event_status'"
-          (click)="fixAllInvalidEventStatus()">
+          (click)="fixAllInvalidEventStatus()"
+          [disabled]="selectedCount === 0">
           Fix All
         </button>
       </div>
@@ -115,10 +116,17 @@
     </div>
 
     <div class="kpi"
-        (click)="onAtcCountClick('pending_validation')"
-        [class.active]="activeAtcListType==='pending_validation'">
-      <div class="kpi-value">{{ atcPendingValidationCount }}</div>
-      <div class="kpi-label">ATC Pending Validation</div>
+        (click)="onAtcCountClick('partially_unvalidated')"
+        [class.active]="activeAtcListType==='partially_unvalidated'">
+      <div class="kpi-value">{{ atcPartiallyUnvalidatedCount }}</div>
+      <div class="kpi-label">ATC Partially Unvalidated</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('fully_unvalidated')"
+        [class.active]="activeAtcListType==='fully_unvalidated'">
+      <div class="kpi-value">{{ atcFullyUnvalidatedCount }}</div>
+      <div class="kpi-label">ATC Fully Unvalidated</div>
     </div>
 
     <div class="kpi"
@@ -137,7 +145,7 @@
           class="btn-fix-all"
           *ngIf="activeAtcListType === 'no_queue'"
           (click)="$event.stopPropagation(); fixSelectedNoQueueAtcs()"
-          [disabled]="fixingNoQueueAtcs">
+          [disabled]="fixingNoQueueAtcs || !hasSelectedNoQueueAtcs">
           {{ fixingNoQueueAtcs ? 'Fixing...' : 'Fix All' }}
         </button>
       </div>
@@ -184,7 +192,7 @@
     </div>
 
     <!-- Right side button -->
-    <button class="btn-primary" (click)="exportCSV()">
+    <button class="btn-primary" (click)="exportCSV()" [disabled]="showAtcNameList">
       Export CSV
     </button>
 
@@ -193,6 +201,7 @@
   <button
     *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
     (click)="bulkMarkUnattended()"
+    [disabled]="selectedCount === 0"
     class="bulk-btn">
     Mark As Unattended ({{ selectedCount }})
   </button>
@@ -312,12 +321,18 @@
 
   <!-- ATC NAMELIST TABLE -->
   <div class="table-wrapper" *ngIf="showAtcNameList">
-    <h3>
-      {{ activeAtcListType === 'given' ? 'ATC Given'
-        : activeAtcListType === 'not_given' ? 'ATC Not Given'
-        : activeAtcListType === 'pending_validation' ? 'ATC Pending Validation'
-        : 'ATC — No Queue ID' }}
-    </h3>
+    <div class="atc-list-header">
+      <h3>
+        {{ activeAtcListType === 'given' ? 'ATC Given'
+          : activeAtcListType === 'not_given' ? 'ATC Not Given'
+          : activeAtcListType === 'partially_unvalidated' ? 'ATC Partially Unvalidated'
+          : activeAtcListType === 'fully_unvalidated' ? 'ATC Fully Unvalidated'
+          : 'ATC — No Queue ID' }}
+      </h3>
+      <button class="btn-primary" (click)="exportAtcListCSV()">
+        Export CSV
+      </button>
+    </div>
 
     <div *ngIf="activeAtcListType === 'no_queue'" style="margin-bottom:10px;">
       <label>
@@ -335,12 +350,7 @@
         </tr>
       </thead>
       <tbody>
-        <ng-container *ngFor="let r of (
-              activeAtcListType === 'given' ? atcGivenNames :
-              activeAtcListType === 'not_given' ? atcNotGivenNames :
-              activeAtcListType === 'pending_validation' ? atcPendingValidationNames :
-              atcNoQueueNames
-            )">
+        <ng-container *ngFor="let r of paginatedAtcList">
           <tr>
             <td>{{ r.participantName }}</td>
             <td>{{ r.productName }}</td>
@@ -369,6 +379,12 @@
         </ng-container>
       </tbody>
     </table>
+
+    <div class="pagination" *ngIf="atcListTotalPages > 1">
+      <button (click)="prevAtcListPage()" [disabled]="atcListCurrentPage === 1">Prev</button>
+      Page {{ atcListCurrentPage }} / {{ atcListTotalPages }}
+      <button (click)="nextAtcListPage()" [disabled]="atcListCurrentPage === atcListTotalPages">Next</button>
+    </div>
   </div>
 
   <!-- ATC DETAIL DRILLDOWN -->
@@ -395,7 +411,7 @@
   </div>
 
   <!-- PAGINATION — shared for both views -->
-  <div class="pagination" *ngIf="reportLoaded && totalPages > 1">
+  <div class="pagination" *ngIf="reportLoaded && totalPages > 1 && !showAtcNameList">
     <button (click)="prevPage()" [disabled]="currentPage === 1">Prev</button>
     Page {{ currentPage }} / {{ totalPages }}
     <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>

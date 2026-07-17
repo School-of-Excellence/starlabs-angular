@@ -76,15 +76,19 @@ export class QueueEventHealthComponent {
   atcGivenNames: any[] = [];
   atcNotGivenNames: any[] = [];
   showAtcNameList = false;
-  activeAtcListType: 'given' | 'not_given' | 'no_queue' | 'pending_validation' | null = null;
+  activeAtcListType: 'given' | 'not_given' | 'no_queue' | 'partially_unvalidated' | 'fully_unvalidated' | null = null;
   atcNoQueueCount = 0;
   atcNoQueueNames: any[] = [];
   authorNameMap: Map<string, string> = new Map();
   profileAtcDetailsMap: Map<string, any[]> = new Map();
   atcModelsForQueue: string[] = [];
-  atcPendingValidationCount = 0;
-  atcPendingValidationNames: any[] = [];
+  atcPartiallyUnvalidatedCount = 0;
+  atcPartiallyUnvalidatedNames: any[] = [];
+  atcFullyUnvalidatedCount = 0;
+  atcFullyUnvalidatedNames: any[] = [];
   fixingNoQueueAtcs = false;
+  atcListPageSize = 10;
+  atcListCurrentPage = 1;
 
   /* ================= FILTERS ================= */
 
@@ -1020,63 +1024,73 @@ export class QueueEventHealthComponent {
     }
   }
 
-
   calculateAtcGivenCounts() {
-    const givenProfileIds = new Set<string>();
-    const pendingProfileIds = new Set<string>();
+    const alphaProfileIds = new Set<string>();
+    const validateProfileIds = new Set<string>();
 
-    // 1. ATC Given → present in atc_alpha
     for (const a of this.atcAlphaRecords) {
       if (a.profileid && this.isWithinQueueDate(a.prescriptionDate)) {
-        givenProfileIds.add(a.profileid);
+        alphaProfileIds.add(a.profileid);
       }
     }
 
-    // 2. ATC Pending Validation → present in atc_to_validate (status: 'atc given')
     for (const a of this.atcValidateRecords) {
       if (a.profileid && this.isWithinQueueDate(a.prescriptionDate)) {
-        pendingProfileIds.add(a.profileid);
+        validateProfileIds.add(a.profileid);
       }
     }
 
-    // ONLY ACTIVE TOKENS
     const activeRecords = this.allRecords.filter(
       r => String(r.tokenStatus).trim().toLowerCase() === 'active'
     );
 
-    // GIVEN (per person, active tokens only)
+    // 1. ATC GIVEN — fetch all ATC's from atc_alpha
     const seenGiven = new Set<string>();
     this.atcGivenNames = activeRecords.filter(r => {
-      if (!givenProfileIds.has(r.profileid)) return false;
-      if (seenGiven.has(r.profileid)) return false;
-      seenGiven.add(r.profileid);
-      return true;
+      if (alphaProfileIds.has(r.profileid) && !seenGiven.has(r.profileid)) {
+        seenGiven.add(r.profileid);
+        return true;
+      } else {
+        return false;
+      }
     });
     this.atcGivenCount = this.atcGivenNames.length;
-    // console.log('ATC GIVEN names:', this.atcGivenNames.map(r => r.participantName));
 
-    // PENDING VALIDATION (per person, active tokens only)
-    const seenPending = new Set<string>();
-    this.atcPendingValidationNames = activeRecords.filter(r => {
-      if (givenProfileIds.has(r.profileid)) return false;
-      if (!pendingProfileIds.has(r.profileid)) return false;
-      if (seenPending.has(r.profileid)) return false;
-      seenPending.add(r.profileid);
-      return true;
+    // 2. ATC PARTIALLY UNVALIDATED — check any atc is validated
+    const seenPartial = new Set<string>();
+    this.atcPartiallyUnvalidatedNames = activeRecords.filter(r => {
+      if (validateProfileIds.has(r.profileid) && alphaProfileIds.has(r.profileid) && !seenPartial.has(r.profileid)) {
+        seenPartial.add(r.profileid);
+        return true;
+      } else {
+        return false;
+      }
     });
-    this.atcPendingValidationCount = this.atcPendingValidationNames.length;
-    // console.log('ATC PENDING VALIDATION names:', this.atcPendingValidationNames.map(r => r.participantName));
+    this.atcPartiallyUnvalidatedCount = this.atcPartiallyUnvalidatedNames.length;
 
-    // NOT GIVEN (per person, active tokens only)
+    // 3. ATC FULLY UNVALIDATED — ATC only fetched from atc_to_validate
+    const seenFullyUnval = new Set<string>();
+    this.atcFullyUnvalidatedNames = activeRecords.filter(r => {
+      if (validateProfileIds.has(r.profileid) && !alphaProfileIds.has(r.profileid) && !seenFullyUnval.has(r.profileid)) {
+        seenFullyUnval.add(r.profileid);
+        return true;
+      } else {
+        return false;
+      }
+    });
+    this.atcFullyUnvalidatedCount = this.atcFullyUnvalidatedNames.length;
+
+    // 4. ATC NOT GIVEN — no ATC doc found in both collections
     const seenNotGiven = new Set<string>();
     this.atcNotGivenNames = activeRecords.filter(r => {
-      if (givenProfileIds.has(r.profileid) || pendingProfileIds.has(r.profileid)) return false;
-      if (seenNotGiven.has(r.profileid)) return false;
-      seenNotGiven.add(r.profileid);
-      return true;
+      if (!alphaProfileIds.has(r.profileid) && !validateProfileIds.has(r.profileid) && !seenNotGiven.has(r.profileid)) {
+        seenNotGiven.add(r.profileid);
+        return true;
+      } else {
+        return false;
+      }
     });
     this.atcNotGivenCount = this.atcNotGivenNames.length;
-    // console.log('ATC NOT GIVEN names:', this.atcNotGivenNames.map(r => r.participantName));
   }
 
   calculateAtcNoQueueCounts() {
@@ -1180,6 +1194,66 @@ export class QueueEventHealthComponent {
     }
   }
 
+  get currentAtcList(): any[] {
+    switch (this.activeAtcListType) {
+      case 'given': return this.atcGivenNames;
+      case 'not_given': return this.atcNotGivenNames;
+      case 'partially_unvalidated': return this.atcPartiallyUnvalidatedNames;
+      case 'fully_unvalidated': return this.atcFullyUnvalidatedNames;
+      case 'no_queue': return this.atcNoQueueNames;
+      default: return [];
+    }
+  }
+
+  get atcListTotalPages(): number {
+    return Math.max(1, Math.ceil(this.currentAtcList.length / this.atcListPageSize));
+  }
+
+  get paginatedAtcList(): any[] {
+    const start = (this.atcListCurrentPage - 1) * this.atcListPageSize;
+    return this.currentAtcList.slice(start, start + this.atcListPageSize);
+  }
+
+  prevAtcListPage() {
+    if (this.atcListCurrentPage > 1) {
+      this.atcListCurrentPage--;
+    }
+  }
+
+  nextAtcListPage() {
+    if (this.atcListCurrentPage < this.atcListTotalPages) {
+      this.atcListCurrentPage++;
+    }
+  }
+
+  exportAtcListCSV() {
+    const rows = this.currentAtcList.map(r =>
+      `${r.participantName},${r.productName},${r.TokenID},${r.tokenStage}`
+    );
+
+    const csv = [
+      'Participant,Product,Token Number,Current Stage',
+      ...rows
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `atc_${this.activeAtcListType}_report.csv`;
+    a.click();
+  }
+
+  get hasSelectedNoQueueAtcs(): boolean {
+    for (const entries of this.profileAtcDetailsMap.values()) {
+      for (const a of entries) {
+        if (a.selected && a.noQueue) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   async resolveAuthorNames(authorRefs: any[]): Promise<string> {
     if (!authorRefs || authorRefs.length === 0) return '-';
     const names = await Promise.all(authorRefs.map(async (ref) => {
@@ -1203,7 +1277,8 @@ export class QueueEventHealthComponent {
       ...this.atcGivenNames.map(r => r.profileid),
       ...this.atcNotGivenNames.map(r => r.profileid),
       ...this.atcNoQueueNames.map(r => r.profileid),
-      ...this.atcPendingValidationNames.map(r => r.profileid)
+      ...this.atcPartiallyUnvalidatedNames.map(r => r.profileid),
+      ...this.atcFullyUnvalidatedNames.map(r => r.profileid)
     ]);
 
     for (const profileid of allProfileIds) {
@@ -1536,9 +1611,10 @@ export class QueueEventHealthComponent {
 
   /* ================= KPI CLICK ================= */
 
-  onAtcCountClick(type: 'given' | 'not_given' | 'no_queue') {
+  onAtcCountClick(type: 'given' | 'not_given' | 'no_queue' | 'partially_unvalidated' | 'fully_unvalidated') {
     this.activeAtcListType = this.activeAtcListType === type ? null : type;
     this.showAtcNameList = this.activeAtcListType !== null;
+    this.atcListCurrentPage = 1;
 
     if (this.showAtcNameList) {
       this.buildAllProfileAtcDetails();
