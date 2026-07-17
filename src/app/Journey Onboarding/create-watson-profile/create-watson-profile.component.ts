@@ -157,6 +157,41 @@ export class CreateWatsonProfileComponent {
 
       await getDocs(query(collection(this.firestore, "profile_data"), where("email", "==", this.saleData["email"]))).then(async (profile) => {
         if (profile.docs.length == 0) {
+          // New profile
+          // exist -> New profile Data -> profile_data (Copy)
+          //
+          await getDocs(query(collection(this.firestore, "new_user_data"), where("email", "==", this.saleData["email"]))).then(async (newUserData) => {
+            if (newUserData.docs.length != 0) {
+              const newUserDoc = newUserData.docs[0];
+              const newUser = newUserDoc.data();
+              const userDataRef = doc(this.firestore, "user_data", newUser['uid']);
+              const profileData = { ...newUser };
+              profileData['countrycode'] = newUser['countryCode'];
+              profileData['number'] = newUser['phonenumber'];
+              profileData['user_ref'] = userDataRef;
+              delete profileData['countryCode'];
+              delete profileData['phonenumber'];
+              await setDoc(doc(this.firestore, "profile_data", newUserDoc.id), profileData);
+              this.selectedProfile = newUser;
+              this.selectedProfileEmail = newUser['email'];
+              this.selectedProfileID = newUser['profileid'];
+              console.log("new to profile_data", newUserDoc.id);
+              const userDataSnap = await getDoc(userDataRef);
+              if (!userDataSnap.exists()) {
+                await setDoc(userDataRef, {
+                  countrycode: newUser['countryCode'],
+                  email: newUser['email'],
+                  name: newUser['name'],
+                  number: newUser['phonenumber'],
+                });
+                console.log("new to user_data", newUser['uid']);
+              } else {
+                console.log("user_data already exists", newUser['uid']);
+              }
+            } else {
+              console.log("new_user_data Not Exists");
+            }
+          });
           console.log("Profile Not Exists");
           this.selectedProfileEmail = this.saleData['email'];
           this.selectedProfileID = this.saleData['profileid'];

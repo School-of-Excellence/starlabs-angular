@@ -290,17 +290,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   // ---- Intelligent filter panel (client-side, applied over the FULL base) ----
   filtersExpanded = false;                         // collapsible panel state
-  // Product type defaults to ECOSYSTEM so the board opens scoped to ecosystem participants.
-  productTypeFilters: ProductType[] = ['ecosystem'];
-  tierFilters: string[] = [];                      // atcmodel: B!G / LYL / uP! / CPM (multi)
+  // No product-type default: the board opens showing all journeys (matches the summary, which counts
+  // all product types). The Journey filter (journeyGroupFilter, multi) is the scoping axis instead.
+  productTypeFilters: ProductType[] = [];
+  tierFilters: string[] = [];                      // atcmodel: B!G / LYL / uP! / CPM (multi, hidden)
   bandFilters: Array<'High' | 'Medium' | 'Low'> = []; // priority band (multi)
-  healthFilters: CoachHealthState[] = [];          // coach-set health state (multi)
+  // 'UNASSESSED' = participant has no fresh coach-set health state (the "Not assessed" filter option).
+  healthFilters: Array<CoachHealthState | 'UNASSESSED'> = [];
   financeFilters: string[] = [];                   // financialstatus values (multi)
   renewalWindowOnly = false;                        // renewal window (yes)
   goingQuietOnly = false;                           // going quiet (yes)
   noEventRequestOnly = false;                       // no recent event request (null)
   readonly tierOptions = ['B!G', 'LYL', 'uP!', 'CPM'];
   readonly healthOptions: CoachHealthState[] = COACH_HEALTH_OPTIONS;
+  readonly healthFilterOptions: Array<CoachHealthState | 'UNASSESSED'> = [...COACH_HEALTH_OPTIONS, 'UNASSESSED'];
   financeOptions: string[] = [];                    // discovered from the loaded base
 
   // Set of profileids that pass the lightweight full-base filters (paged mode only). When non-null,
@@ -525,6 +528,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  then re-apply filters. Guarded so a scope change mid-build doesn't clobber the new view. */
   private onFullIndexReady(): void {
     if (!this.pagedMode) return;
+    this.indexReady.update(v => v + 1);   // trigger journeyMix + any base-wide computeds to recompute
     this.accumulatePagedSummary();   // now uses fullIndexBuilt for base-wide totals
     this.applyFilters();             // recomputes fullBaseMatchIds + dataSource
     this.setProgress(85, 'Indexed full base · loading activity…');
@@ -798,16 +802,43 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // (both wrong: total counted records, inactive read an empty field). notStarted still uses the
     // server count (a pjp-field query) where available.
     if (this.fullIndexBuilt) {
-      this.summary.total = this.fullIndex.length;                                   // distinct participants
-      this.summary.active = this.fullIndex.reduce((n, l) => n + (l.subActive ? 1 : 0), 0);
-      this.summary.inactive = this.fullIndex.reduce((n, l) => n + (l.subActive ? 0 : 1), 0);
-      // base-wide 3-way lifecycle split (discontinued wins) for the status band in the All view
-      this.summary.discontinued = this.fullIndex.reduce((n, l) => n + (this.isInactiveStatus(l.customerstatus) ? 1 : 0), 0);
-      this.summary.nonActive = this.fullIndex.reduce((n, l) => n + (!l.subActive && !this.isInactiveStatus(l.customerstatus) ? 1 : 0), 0);
-      this.summary.renewalsSoon = this.fullIndex.reduce((n, l) => n + (l.renewalWindow ? 1 : 0), 0);
-      // Payments locked is base-wide from the lite index (financialstatus is carried there).
-      this.summary.paymentsLocked = this.fullIndex.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'locked' ? 1 : 0), 0);
-      if (this.serverCountsReady) this.summary.notStarted = this.serverCounts.notStarted;
+      // Base-wide summary scoped by the global summary filter. The lite index carries every
+      // per-participant flag, so All-view filtering is exact. Band counts (total / lifecycle split)
+      // reflect the JOURNEY filter only — so the segments stay visible and switchable — while the
+      // lever counts reflect BOTH filters. journeyIdx ⊇ filteredIdx.
+      const journeyIdx = this.fullIndex.filter(l => this.matchesSummaryJourneyLite(l));
+      const filteredIdx = journeyIdx.filter(l => this.matchesSummaryLifecycleLite(l));
+      this.summary.total = journeyIdx.length;                                       // distinct participants
+      this.summary.active = journeyIdx.reduce((n, l) => n + (l.subActive ? 1 : 0), 0);
+      this.summary.inactive = journeyIdx.reduce((n, l) => n + (l.subActive ? 0 : 1), 0);
+      this.summary.discontinued = journeyIdx.reduce((n, l) => n + (this.isInactiveStatus(l.customerstatus) ? 1 : 0), 0);
+      this.summary.nonActive = journeyIdx.reduce((n, l) => n + (!l.subActive && !this.isInactiveStatus(l.customerstatus) ? 1 : 0), 0);
+      this.summary.renewalsSoon = filteredIdx.reduce((n, l) => n + (l.renewalWindow ? 1 : 0), 0);
+      this.summary.paymentsLocked = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'locked' ? 1 : 0), 0);
+      this.summary.withOpenTickets = filteredIdx.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
+      this.summary.notStarted = filteredIdx.reduce((n, l) => n + (l.notStarted ? 1 : 0), 0);
+      this.summary.lapsed = filteredIdx.reduce((n, l) => n + (l.lapsed ? 1 : 0), 0);
+      // going-quiet flags land on the lite rows only once contact data loads (computeBaseWideAttention);
+      // until then keep the earlier fallback rather than flash 0.
+      if (this.contactDataLoaded()) this.summary.goingQuiet = filteredIdx.reduce((n, l) => n + (l.goingQuiet ? 1 : 0), 0);
+      // base-wide needs-attention / flagged / shown-count / health — all scoped to the filtered set
+      this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + ((l.goingQuiet || l.lapsed || l.notStarted || l.renewalWindow || l.openTickets > 0) ? 1 : 0), 0));
+      this.pagedFilteredCount.set(filteredIdx.length);
+      const flags = this.flaggedIds();
+      this.pagedFlagged.set(filteredIdx.reduce((n, l) => n + (flags.has(l.profileid) ? 1 : 0), 0));
+      const h = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
+      for (const l of filteredIdx) {
+        h.total++;
+        switch (this.freshHealth(this.coachHealthByProfile[l.profileid])?.state) {
+          case 'HAPPY': h.happy++; break;
+          case 'NEUTRAL': h.neutral++; break;
+          case 'UNHAPPY': h.unhappy++; break;
+          case 'AT_RISK': h.atRisk++; break;
+          case 'CRITICAL': h.critical++; break;
+          default: h.notAssessed++; break;
+        }
+      }
+      this.pagedHealth.set(h);
     } else if (this.serverCountsReady) {
       // index not built yet — only notStarted is a reliable pjp-field server count; total/active/
       // inactive/renewalsSoon stay on the page-accumulated values until the index lands.
@@ -1632,6 +1663,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   healthLabel(s: CoachHealthState | null | undefined): string {
     return coachHealthLabel(s);
   }
+  /** Label for the Coach-health filter options, including the synthetic 'Not assessed' bucket. */
+  healthFilterLabel(h: CoachHealthState | 'UNASSESSED'): string {
+    return h === 'UNASSESSED' ? 'Not assessed' : this.healthLabel(h);
+  }
 
   /** A coach-set health tag is valid for HEALTH_TTL_DAYS; a null/undated or older tag is expired. */
   private isHealthFresh(date: Date | null | undefined): boolean {
@@ -1842,13 +1877,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  (selectedCoachId is read as a plain field — it co-changes with an allRows rebuild on scope
    *  switch, and flaggedIds is a signal, so the memoized count stays correct.) */
   flaggedCount = computed<number>(() =>
-    this.pagedMode ? this.flaggedIds().size : this.flaggedRows().length);
+    this.pagedMode ? (this.fullIndexBuilt ? this.pagedFlagged() : this.flaggedIds().size) : this.flaggedRows().length);
 
   /** Coach-set health distribution across the CURRENT scope's loaded rows (allRows). Honest: it
    *  reflects only KNOWN/loaded states — every row without a coach assessment is Not assessed (no
    *  fabrication). Counts per state come from the row's coachHealthState (built from
    *  coachHealthByProfile in computeRows). */
   healthDistribution = computed<{ happy: number; neutral: number; unhappy: number; atRisk: number; critical: number; notAssessed: number; total: number }>(() => {
+    // All view: base-wide + filtered from the lite index against the (base-wide) coach-health map.
+    if (this.pagedMode && this.fullIndexBuilt) return this.pagedHealth();
     const d = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
     for (const r of this.filteredRows()) {
       d.total++;
@@ -1874,7 +1911,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  journey name yet). */
   journeyMix = computed<{ name: string; count: number }[]>(() => {
     const m = new Map<string, number>();
-    for (const r of this.allRows()) {
+    this.indexReady();   // recompute when the lite index finishes building (paged mode)
+    // Paged/All view: count the WHOLE base from the lite index (allRows is only the loaded page);
+    // coach view: allRows is the full base. journeyname is carried on both.
+    const src: { journeyname?: string }[] = (this.pagedMode && this.fullIndexBuilt) ? this.fullIndex : this.allRows();
+    for (const r of src) {
       const j = (r.journeyname && r.journeyname !== '-') ? r.journeyname : 'Unknown';
       m.set(j, (m.get(j) ?? 0) + 1);
     }
@@ -1910,15 +1951,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // Default view is ACTIVE participants; other segments (All / Non-active / Discontinued) are opt-in.
   // Switching between them only re-slices the already-loaded allRows — never a new fetch.
   sumLifecycle = signal<'all' | 'active' | 'nonactive' | 'discontinued'>('active');
-  sumJourney = signal<{ label: string; group: boolean; journeys: string[] } | null>(null);
+  // Multi-select By-journey: a set of the selected journey NAMES (union). A group contributes all of
+  // its journeys; individual chips contribute one. Empty = all journeys (the default).
+  sumJourneys = signal<Set<string>>(new Set());
   journeyMenuOpen = false;
 
   private summaryJourneyName(r: { journeyname?: string }): string {
     return (r.journeyname && r.journeyname !== '-') ? r.journeyname : 'Unknown';
   }
   private matchesSummaryJourney(r: PortfolioRow): boolean {
-    const j = this.sumJourney();
-    return !j || j.journeys.includes(this.summaryJourneyName(r));
+    const s = this.sumJourneys();
+    return s.size === 0 || s.has(this.summaryJourneyName(r));
   }
   private matchesSummaryLifecycle(r: PortfolioRow): boolean {
     switch (this.sumLifecycle()) {
@@ -1933,40 +1976,89 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** allRows scoped by BOTH filters — the source for every KPI / needs-attention / health count. */
   filteredRows = computed<PortfolioRow[]>(() => this.journeyFilteredRows().filter(r => this.matchesSummaryLifecycle(r)));
 
+  // Paged/All-view: the summary is computed base-wide from the lite index (accumulatePagedSummary),
+  // so the filtered needs-attention / flagged / health / shown-count live in these signals (set there)
+  // and are read by the corresponding computeds — keeping the All view reactive to filter changes.
+  private pagedHealth = signal<{ happy: number; neutral: number; unhappy: number; atRisk: number; critical: number; notAssessed: number; total: number }>(
+    { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 });
+  private pagedFlagged = signal(0);
+  private pagedFilteredCount = signal(0);
+  // Bumped when the lite index finishes building, so journeyMix (which reads the plain fullIndex
+  // array in paged mode) recomputes to the base-wide counts instead of the page-local ones.
+  private indexReady = signal(0);
+  /** Same journey predicate as matchesSummaryJourney, over a lite index row (base-wide). */
+  private matchesSummaryJourneyLite(l: LiteIndexRow): boolean {
+    const s = this.sumJourneys();
+    if (s.size === 0) return true;
+    const name = (l.journeyname && l.journeyname !== '-') ? l.journeyname : 'Unknown';
+    return s.has(name);
+  }
+  /** Same lifecycle predicate as matchesSummaryLifecycle, over a lite index row (base-wide). */
+  private matchesSummaryLifecycleLite(l: LiteIndexRow): boolean {
+    switch (this.sumLifecycle()) {
+      case 'active': return l.subActive && !this.isInactiveStatus(l.customerstatus);
+      case 'nonactive': return !l.subActive && !this.isInactiveStatus(l.customerstatus);
+      case 'discontinued': return this.isInactiveStatus(l.customerstatus);
+      default: return true;
+    }
+  }
+  /** Base-wide count matching the applied filter — paged from the lite index, else the loaded rows. */
+  get summaryShownCount(): number { return this.pagedMode ? this.pagedFilteredCount() : this.filteredRows().length; }
+  get summaryScopeTotal(): number { return this.pagedMode ? this.fullIndex.length : this.allRows().length; }
+
   /** Default is Active; a filter is "active" (Clear appears) only when it differs from that default. */
-  get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'active' || this.sumJourney() !== null; }
-  /** Highlighted lifecycle segment. In the paged/All view the filter isn't applied, so show 'all'
-   *  (matching the base-wide numbers on screen) instead of the underlying default. */
-  get shownLifecycle(): 'all' | 'active' | 'nonactive' | 'discontinued' { return this.pagedMode ? 'all' : this.sumLifecycle(); }
-  get summaryJourneyLabel(): string { return this.sumJourney()?.label ?? 'All journeys'; }
+  get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'active' || this.sumJourneys().size > 0; }
+  /** Highlighted lifecycle segment — the filter now applies in both the coach and All views. */
+  get shownLifecycle(): 'all' | 'active' | 'nonactive' | 'discontinued' { return this.sumLifecycle(); }
+  /** Pill label: 'All journeys' → the single chip's name → 'N journeys' for a multi-select. */
+  get summaryJourneyLabel(): string {
+    const s = this.sumJourneys();
+    if (s.size === 0) return 'All journeys';
+    const on = this.journeyView().filter(j => this.isSummaryJourneyOn(j));
+    return on.length === 1 ? on[0].name : `${s.size} journeys`;
+  }
+  /** A chip (journey or group) is on when every journey it represents is selected. */
   isSummaryJourneyOn(item: { name: string; group: boolean; journeys: string[] }): boolean {
-    const cur = this.sumJourney();
-    return !!cur && cur.group === item.group && cur.journeys.length === item.journeys.length
-      && item.journeys.every(j => cur.journeys.includes(j));
+    const s = this.sumJourneys();
+    return item.journeys.length > 0 && item.journeys.every(j => s.has(j));
   }
 
   /** Status-band tile / segmented control → set the lifecycle filter in place. 'all' resets the
    *  lifecycle (keeps the journey); a repeated segment toggles back to 'all'. */
+  /** The filter is usable once the data backing it is present: the coach view has full rows; the
+   *  paged/All view needs the lite index built (that's when the base-wide counts become filterable). */
+  get summaryFilterReady(): boolean { return !this.pagedMode || this.fullIndexBuilt; }
+  /** Recompute the summary through the active filter — base-wide from the lite index when paged. */
+  private recomputeSummary(): void { if (this.pagedMode) this.accumulatePagedSummary(); else this.computeSummary(); }
+
   setSumLifecycle(kind: 'all' | 'active' | 'nonactive' | 'discontinued'): void {
-    if (this.pagedMode) return;
+    if (!this.summaryFilterReady) return;
     this.sumLifecycle.set(kind);   // plain selector — pick one, no toggle back to 'all'
     this.journeyMenuOpen = false;
-    this.computeSummary();
+    this.recomputeSummary();
   }
-  /** Journey chip / dropdown → set the journey-or-group filter in place (null clears; re-pick toggles). */
+  /** Journey chip / dropdown item → toggle its journey(s) in the multi-select set. `null` clears all.
+   *  Multi-select: the dropdown stays open so several can be picked; the By-journey chips toggle too. */
   setSumJourney(item: { name: string; group: boolean; journeys: string[] } | null): void {
-    if (this.pagedMode) return;
-    if (!item) this.sumJourney.set(null);
-    else this.sumJourney.set(this.isSummaryJourneyOn(item) ? null : { label: item.name, group: item.group, journeys: item.journeys });
-    this.journeyMenuOpen = false;
-    this.computeSummary();
+    if (!this.summaryFilterReady) return;
+    const next = new Set(this.sumJourneys());
+    if (!item) {
+      next.clear();
+    } else if (this.isSummaryJourneyOn(item)) {
+      for (const j of item.journeys) next.delete(j);   // all present → turn the chip off
+    } else {
+      for (const j of item.journeys) next.add(j);       // turn the chip on (whole group at once)
+    }
+    this.sumJourneys.set(next);
+    this.recomputeSummary();
   }
-  toggleJourneyMenu(): void { if (!this.pagedMode) this.journeyMenuOpen = !this.journeyMenuOpen; }
+  toggleJourneyMenu(): void { if (this.summaryFilterReady) this.journeyMenuOpen = !this.journeyMenuOpen; }
+  closeJourneyMenu(): void { this.journeyMenuOpen = false; }
   clearSummaryFilter(): void {
     this.sumLifecycle.set('active');   // reset to the default view, not to 'all'
-    this.sumJourney.set(null);
+    this.sumJourneys.set(new Set());
     this.journeyMenuOpen = false;
-    this.computeSummary();
+    this.recomputeSummary();
   }
 
   /** Personal groups for the logged-in coach — stored locally (per-coach, this browser only).
@@ -2078,10 +2170,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Summary-card click → switch to the Participants tab AND apply the matching lever (no drawer).
    *  Each Summary category maps to the lever that reproduces exactly that set on the Participants
    *  table. 'paymentsLocked' has no lever — it uses the existing finance filter instead. */
+  /** Carry the summary filter (lifecycle + selected journeys) onto the Participants table so a KPI
+   *  click lands on the already-scoped list — no re-filtering. Reuses the existing base-list filters
+   *  (journeyGroupFilter already matches an arbitrary set of journey names). */
+  private carrySummaryFilterToBase(): void {
+    const lc = this.sumLifecycle();
+    this.lifecycleFilter = lc === 'all' ? '' : lc;
+    this.journeyFilter = '';
+    this.journeyGroupFilter = [...this.sumJourneys()];
+  }
+
   goToParticipantsWithLever(lever: Lever): void {
     this.statusFilter = '';
     this.financeFilters = [];
-    this.lifecycleFilter = '';
+    this.carrySummaryFilterToBase();   // keep the current summary filter on the list
     this.view = 'base';
     this.setLever(lever);
   }
@@ -2109,6 +2211,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   goToPaymentsLocked(): void {
     this.statusFilter = '';
     this.activeLever = 'all';
+    this.carrySummaryFilterToBase();   // keep the current summary filter on the list
     this.view = 'base';
     this.financeFilters = ['locked'];
     this.applyFilters();
@@ -2310,7 +2413,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.assignTargetCoachId = '';
     // scope changed → reset the summary filter to its default (Active, no journey).
     this.sumLifecycle.set('active');
-    this.sumJourney.set(null);
+    this.sumJourneys.set(new Set());
     this.journeyMenuOpen = false;
     this.pagedMode = this.isPagedView(id);
     this.applyPaginatorBinding();
@@ -2672,7 +2775,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(r.productType)) return false;
     if (this.tierFilters.length && !this.tierFilters.includes(r.atcmodel ?? '')) return false;
     if (this.bandFilters.length && !this.bandFilters.includes(r.priorityBand)) return false;
-    if (this.healthFilters.length && !this.healthFilters.includes(r.coachHealthState?.state as CoachHealthState)) return false;
+    if (this.healthFilters.length) {
+      const st = r.coachHealthState?.state;
+      // a row matches if its state is selected, or 'Not assessed' is selected and it has no fresh state
+      if (!(st ? this.healthFilters.includes(st) : this.healthFilters.includes('UNASSESSED'))) return false;
+    }
     if (this.financeFilters.length && !this.financeFilters.includes(r.financialstatus ?? '')) return false;
     if (this.renewalWindowOnly && !r.renewalWindow) return false;
     if (this.goingQuietOnly && !r.goingQuiet) return false;
@@ -2850,8 +2957,30 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.applyFilters();
   }
 
-  /** Clear every filter affordance (panel + journey/status/search + lever) and reset to defaults.
-   *  Product type returns to its ECOSYSTEM default — the intended opening scope of the board. */
+  // ---- Panel "Journey" multi-select (chips): groups + individual journeys, toggled into
+  //      journeyGroupFilter (the base-list multi-journey filter, honored in both views). ----
+  /** A chip (journey or group) is on when every journey it represents is in the base-list filter. */
+  baseJourneyOn(item: { journeys: string[] }): boolean {
+    return item.journeys.length > 0 && item.journeys.every(j => this.journeyGroupFilter.includes(j));
+  }
+  /** Toggle a chip's journey(s) in the base-list journey filter. `null` clears them. Clears the
+   *  search-bar single-select Journey so the two controls never intersect into an empty list. */
+  toggleBaseJourney(item: { journeys: string[] } | null): void {
+    let next = [...this.journeyGroupFilter];
+    if (!item) next = [];
+    else if (this.baseJourneyOn(item)) next = next.filter(j => !item.journeys.includes(j));
+    else next = [...new Set([...next, ...item.journeys])];
+    this.journeyGroupFilter = next;
+    this.journeyFilter = '';   // guard: the panel multi-select wins over the search-bar single-select
+    this.applyFilters();
+  }
+  /** Search-bar single-select Journey changed → clear the panel multi-select (guard the intersection). */
+  onTopJourneyChange(): void {
+    if (this.journeyFilter) this.journeyGroupFilter = [];
+    this.applyFilters();
+  }
+
+  /** Clear every filter affordance (panel + journey/status/search + lever) and reset to defaults. */
   clearFilters(): void {
     this.search = '';
     this.journeyFilter = '';
@@ -2859,7 +2988,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.statusFilter = '';
     this.lifecycleFilter = '';
     this.activeLever = 'all';
-    this.productTypeFilters = ['ecosystem'];
+    this.productTypeFilters = [];
     this.tierFilters = [];
     this.bandFilters = [];
     this.healthFilters = [];
@@ -2873,7 +3002,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** True when any filter differs from its default (drives the "Clear filters" affordance). */
   get hasActiveFilters(): boolean {
     return !!this.search || !!this.journeyFilter || this.journeyGroupFilter.length > 0 || !!this.statusFilter || !!this.lifecycleFilter || this.activeLever !== 'all'
-      || !(this.productTypeFilters.length === 1 && this.productTypeFilters[0] === 'ecosystem') || this.tierFilters.length > 0 || this.bandFilters.length > 0
+      || this.productTypeFilters.length > 0 || this.tierFilters.length > 0 || this.bandFilters.length > 0
       || this.healthFilters.length > 0 || this.financeFilters.length > 0
       || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
   }
