@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
@@ -23,6 +24,7 @@ import {
   serverTimestamp,
   Timestamp
 } from '@angular/fire/firestore';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 
 @Component({
   selector: 'app-createupcomingworkshops',
@@ -38,7 +40,8 @@ import {
     MatIconModule,
     MatDatepickerModule,
     MatSlideToggleModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatTooltipModule
   ],
   templateUrl: './createupcomingworkshops.component.html',
   styleUrl: './createupcomingworkshops.component.css'
@@ -52,9 +55,12 @@ export class CreateupcomingworkshopsComponent {
   widgettype: 'comingsoon' | 'ads' = 'comingsoon';
   private docId: string | null = null;
 
+  isUploading = false;
+
   constructor(
     private fb: FormBuilder,
     private firestore: Firestore,
+    private storage: Storage,
     private snackBar: MatSnackBar,
     private dialogRef: MatDialogRef<CreateupcomingworkshopsComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any
@@ -80,7 +86,9 @@ export class CreateupcomingworkshopsComponent {
           footer: w.footer || '',
           buttonname: w.buttonname || '',
           navigationlink: w.navigationlink || '',
-          show: !!w.show
+          show: !!w.show,
+          imageonly: !!w.imageonly,
+          adimage: w.adimage || ''
         });
       } else {
         this.form.patchValue({
@@ -94,7 +102,9 @@ export class CreateupcomingworkshopsComponent {
           totalseats: w.totalseats ?? null,
           unlimitedseat: !!w.unlimitedseat,
           showconfirmedseat: !!w.showconfirmedseat,
-          show: !!w.show
+          show: !!w.show,
+          upcomingimage: w.upcomingimage || '',
+          color: w.color || ''
         });
         if (w.unlimitedseat) {
           this.form.get('totalseats')?.disable();
@@ -115,7 +125,10 @@ export class CreateupcomingworkshopsComponent {
       totalseats: [null],
       unlimitedseat: [false],
       showconfirmedseat: [false],
-      show: [false]
+      show: [false],
+      upcomingimage: [''],
+      // Hex colour like #FFFFFF (empty allowed).
+      color: ['', [Validators.pattern(/^#[0-9A-Fa-f]{6}$/)]]
     });
 
     // When "Unlimited seat" is on, disable and clear the total seats input.
@@ -143,8 +156,68 @@ export class CreateupcomingworkshopsComponent {
       footer: [''],
       buttonname: [''],
       navigationlink: [''],
-      show: [false]
+      show: [false],
+      imageonly: [false],
+      adimage: ['']
     });
+  }
+
+  // --- colour picker (ads only) ---
+  // <input type="color"> needs a valid hex, so fall back to white.
+  get colorSwatchValue(): string {
+    const v = (this.form.get('color')?.value || '').trim();
+    return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : '#FFFFFF';
+  }
+
+  onSwatchChange(event: Event): void {
+    const value = (event.target as HTMLInputElement).value || '';
+    this.form.patchValue({ color: value.toUpperCase() });
+    this.form.get('color')?.markAsDirty();
+  }
+
+  // Image key for the current widget type.
+  get imageKey(): string {
+    return this.widgettype === 'ads' ? 'adimage' : 'upcomingimage';
+  }
+
+  get imageUrl(): string {
+    return this.form.get(this.imageKey)?.value || '';
+  }
+
+  // Upload an image (images only) to Firebase Storage under `eiflixhome`
+  // and store the download URL on the form.
+  uploadImage(): void {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.onchange = async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        this.snackBar.open('Please select an image file.', 'Close', { duration: 3000 });
+        return;
+      }
+      this.isUploading = true;
+      try {
+        const filePath = `eiflixhome/${Date.now()}_${file.name}`;
+        const fileRef = ref(this.storage, filePath);
+        await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(fileRef);
+        this.form.patchValue({ [this.imageKey]: downloadURL });
+        this.snackBar.open('Image uploaded.', 'Close', { duration: 2000 });
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        this.snackBar.open('Error uploading image. Please try again.', 'Close', { duration: 3000 });
+      } finally {
+        this.isUploading = false;
+      }
+    };
+    fileInput.click();
+  }
+
+  // Only clears the URL on the form — the stored file is left untouched.
+  removeImage(): void {
+    this.form.patchValue({ [this.imageKey]: '' });
   }
 
   private toDate(value: any): Date | null {
@@ -196,7 +269,9 @@ export class CreateupcomingworkshopsComponent {
           footer: (raw.footer || '').trim(),
           buttonname: (raw.buttonname || '').trim(),
           navigationlink: (raw.navigationlink || '').trim(),
-          show: !!raw.show
+          show: !!raw.show,
+          imageonly: !!raw.imageonly,
+          adimage: (raw.adimage || '').trim()
         }
       : {
           widgettype: 'comingsoon',
@@ -210,7 +285,9 @@ export class CreateupcomingworkshopsComponent {
           totalseats: raw.unlimitedseat ? null : (raw.totalseats ?? null),
           unlimitedseat: !!raw.unlimitedseat,
           showconfirmedseat: !!raw.showconfirmedseat,
-          show: !!raw.show
+          show: !!raw.show,
+          upcomingimage: (raw.upcomingimage || '').trim(),
+          color: (raw.color || '').trim().toUpperCase()
         };
 
     try {
