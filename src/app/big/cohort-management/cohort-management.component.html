@@ -839,7 +839,7 @@
     <button class="icon-btn" (click)="refreshStatus()" title="Refresh"><mat-icon>refresh</mat-icon></button>
   </div> -->
 
-  <div class="selectbar" *ngIf="selectMode">
+  <!-- <div class="selectbar" *ngIf="selectMode">
     <div class="sb-main-row">
       <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> selected</span>
       <span class="sb-divider"></span>
@@ -869,6 +869,51 @@
         </button>
         <button class="sb-btn primary" (click)="exportSelectedCohorts()">
           <mat-icon>download</mat-icon> Export ({{selectedCohortIds.size}})
+        </button>
+      </div>
+    </ng-container>
+  </div> -->
+
+  <div class="selectbar" *ngIf="selectMode" [class.expanded]="selectbarExpanded">
+    <div class="sb-main-row">
+      <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> selected</span>
+      <span class="sb-divider"></span>
+      <button class="sb-btn ghost" (click)="selectAllCohorts()" title="Select / clear all">
+        <mat-icon>select_all</mat-icon> All
+      </button>
+
+      <button class="sb-fab-toggle" *ngIf="selectedCohortIds.size > 0"
+        (click)="selectbarExpanded = !selectbarExpanded"
+        [attr.aria-expanded]="selectbarExpanded"
+        title="More actions">
+        <mat-icon>{{selectbarExpanded ? 'close' : 'more_horiz'}}</mat-icon>
+      </button>
+
+      <button class="sb-btn ghost" (click)="toggleSelectMode(); selectbarExpanded = false" title="Exit select mode">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <ng-container *ngIf="selectedCohortIds.size > 0">
+      <div class="sb-action-row">
+        <button class="sb-btn ghost icon-only" (click)="sendSelectedCohortsNotification()" title="Notify selected cohorts">
+          <mat-icon>notifications</mat-icon><span class="sb-lbl">Notify</span>
+        </button>
+        <button class="sb-btn ghost icon-only" (click)="sendSelectedCohortsEmail()" title="Email selected cohorts">
+          <mat-icon>email</mat-icon><span class="sb-lbl">Email</span>
+        </button>
+        <button class="sb-btn ghost wa icon-only" (click)="sendSelectedCohortsWhatsapp()" title="WhatsApp selected cohorts">
+          <i class="fa-brands fa-whatsapp"></i><span class="sb-lbl">WhatsApp</span>
+        </button>
+        <button class="sb-btn primary" (click)="sendSelectedCohortsPlaylist()"
+          title="recommend playlist selected cohorts">
+          <mat-icon>music_note</mat-icon> <span class="sb-lbl">Recommend Playlist</span>
+        </button>
+        <button class="sb-btn primary" (click)="exportSelectedCohorts()" title="Export selected cohorts">
+          <mat-icon>download</mat-icon> <span class="sb-lbl">Export ({{selectedCohortIds.size}})</span>
+        </button>
+        <button class="sb-btn danger" (click)="makeSelectedCohortsInactive()" title="Mark selected cohorts inactive">
+          <mat-icon>visibility_off</mat-icon> <span class="sb-lbl">Make Inactive</span>
         </button>
       </div>
     </ng-container>

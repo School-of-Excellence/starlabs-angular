@@ -114,7 +114,8 @@ export class CohortManagementComponent {
   selectedMarathon: string | null = null
   selectedAcceleratorEvent: string[] = []
   mapMarathon: any = {}
-  mapAcceleratorEvent: any = {}
+  mapAcceleratorEvent: any = {};
+  mapEvent : any = {};
   mapBigCohortsToAssignment: any = {};
   mapZoneEvent: any = {};
   mapEventQueue : any = {};
@@ -202,6 +203,7 @@ export class CohortManagementComponent {
   eventParticipationList: any[] = [];
 
   bigActivityMap = {};
+  selectbarExpanded = false
 
    // Cohort sorting - simplified to date and name only
   sortBy: 'date' | 'name' = 'date';
@@ -266,7 +268,8 @@ export class CohortManagementComponent {
       this.acceleratorEventList = snap.docs.map((e) => {
         let element: any = e.data()
         element['ref'] = e.ref
-        this.mapAcceleratorEvent[element['ref'].id] = element['name']
+        this.mapAcceleratorEvent[element['ref'].id] = element['name'];
+        this.mapEvent[element['ref'].id] = element;
         return element
       }).filter(e => e['bigmarathonref'] != undefined)
 
@@ -3657,6 +3660,88 @@ export class CohortManagementComponent {
     //     })
     //   }
     // });
+  }
+
+  async makeSelectedCohortsInactive(): Promise<void> {
+    if (this.selectedCohortIds.size === 0) return
+
+    const ids = Array.from(this.selectedCohortIds)
+    const confirmed = confirm(`Mark ${ids.length} selected cohort(s) as inactive?`)
+    if (!confirmed) return
+
+    const cohorts = this.cohortsList.filter((c)=>ids.includes(c?.docid) && c['status'] === 'active');
+    const eventMap = {};
+    const tempCohorts = [];
+
+    cohorts.forEach((cohort)=>{
+      if (cohort?.isTemporary == true && !this.isTemporaryCohortOverDue(cohort)) {
+        tempCohorts.push(cohort);
+      } else if (cohort?.cohortType === 'event') {
+        const eventId = cohort['eventref']?.id;
+        if(eventMap[eventId]){
+          eventMap[eventId].push(cohort);
+        } else if(!this.checkCohortEventIsOver(cohort)){
+          eventMap[eventId] = [cohort];
+        }
+      }
+    })
+
+    if (Object.keys(eventMap).length > 0) {
+      const msg = confirm(`some selected cohort has ongoing event do you want to still make it non active`);
+      if(!msg) return
+    }
+
+    if (tempCohorts.length > 0) {
+      const msg = confirm(`some selected temporary cohort are not expired do you want to still make it non active`);
+      if(!msg) return
+    }
+
+    try {
+      const batch = writeBatch(this.firestore)
+      ids.forEach((id: string) => {
+        const ref = doc(this.firestore, 'big cohorts', id)
+        batch.update(ref, { status: 'nonactive' })
+      })
+      await batch.commit();
+      this.loadCohorts();
+
+      this.selectedCohortIds.clear()
+      this.selectbarExpanded = false;
+      this.selectMode = false;
+
+      this.authguard.openSnackBar(
+        `${ids.length} cohort(s) marked inactive`, 'ok', 600
+      )
+    } catch (error) {
+      console.error('Error marking cohorts inactive:', error)
+      alert('Error updating cohorts. Please try again.')
+    }
+  }
+
+  checkCohortEventIsOver(cohort : any){
+    const event = this.mapEvent[cohort['eventref']?.id || '']
+    if(event){
+      const startDate = event['start_date']?.toDate ? event['start_date']?.toDate() : event['start_date']?.getDate ? event['start_date'] : null;
+      const endDate = event['end_date']?.toDate ? event['end_date']?.toDate() : event['end_date']?.getDate ? event['end_date'] : null;
+      const current = new Date();
+
+      if (endDate > current) {
+        return false;
+      } 
+    }
+    return true;
+  }
+ 
+  isTemporaryCohortOverDue(cohort : any){
+    if(cohort['isTemporary'] && cohort['status'] === 'active'){
+      const endDate = cohort['endDate']?.toDate ? cohort['endDate']?.toDate() : cohort['endDate'] instanceof Date ? cohort['endDate'] : null;
+      const current = new Date();
+
+      if (endDate <  current) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 

@@ -5,6 +5,17 @@
    softer depth via shadow instead of heavy borders, calmer typography.
    ================================================================ */
 
+/* ── Design tokens ─────────────────────────────────────────────── */
+/* IMPORTANT: these live on `:host`, not `.bc-root`. In the template,
+   `.loading-overlay` and `.bc-root` are SIBLINGS — both direct children
+   of this component's template root — not parent/child. A custom
+   property defined on `.bc-root` never reaches `.loading-overlay`,
+   because CSS variables only inherit down the DOM tree, and siblings
+   don't inherit from each other. `:host` is the one element that is a
+   true ancestor of everything the template renders (Angular's special
+   selector for the component's own host element), so tokens declared
+   here are visible everywhere in this component, regardless of which
+   top-level sibling a class lives on. */
 :host {
   --c-bg:        #F6F6F8;
   --c-surface:   #FFFFFF;
@@ -53,7 +64,7 @@
 /* ── Root / Reset ───────────────────────────────────────────────── */
 .bc-root {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  height: 90vh;
+  height: 100vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -812,14 +823,10 @@ button {
   background: var(--c-border);
 }
 
-/* Cohort grid */
-.cohort-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 14px;
-  margin-bottom: 8px;
-  padding: 0 4px;
-}
+/* Cohort grid — full responsive ladder now lives in one place, see the
+   "Card v2" section below (search COHORT-GRID-LADDER). This early
+   duplicate used to silently fight that one via cascade order and is
+   removed rather than left as dead code. */
 
 /* ================================================================
    COHORT CARD
@@ -876,14 +883,24 @@ button {
 }
 
 .card-open-btn {
+  background: none;
   border: none;
   padding: 2px 3px;
+  color: var(--c-text-mute);
   border-radius: 5px;
   line-height: 0;
   flex-shrink: 0;
+  opacity: 0;
   transition: opacity 0.15s, color 0.15s;
   cursor: pointer;
-  color: var(--c-accent-dark);
+}
+
+.cohort-card:hover .card-open-btn {
+  opacity: 1;
+}
+
+.card-open-btn:hover {
+  color: var(--c-accent);
   background: var(--c-accent-soft);
 }
 
@@ -1257,10 +1274,6 @@ button {
 @media (max-width: 900px) {
   .sidebar {
     width: 190px;
-  }
-
-  .cohort-grid {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   }
 
   .topbar-search {
@@ -1772,6 +1785,12 @@ button {
 }
 
 /* ==================== SELECT BAR ==================== */
+/* Desktop/tablet: one pill, bottom-center, two rows as before.
+   Mobile (see media query far below): reflows into a compact cluster
+   (count + All + Close) always pinned bottom-right, with everything
+   else (Notify/Email/WhatsApp/Playlist/Export/Make Inactive) hidden
+   behind a toggle FAB and, once opened, stacking vertically upward
+   from that corner — a speed-dial, not a permanent wall of buttons. */
 .selectbar {
   position: fixed;
   left: 50%;
@@ -1872,6 +1891,18 @@ button {
   background: rgba(37, 211, 102, .18);
 }
 
+/* State-changing / semi-destructive action — deliberately a different
+   hue from the routine Notify/Email/WhatsApp/Export actions so it
+   never reads as "just another item in the row." */
+.sb-btn.danger {
+  background: rgba(220, 38, 38, .16);
+  color: #FF8A8A;
+}
+.sb-btn.danger:hover {
+  background: rgba(220, 38, 38, .28);
+  color: #FFB3B3;
+}
+
 .sb-btn i {
   font-size: 15px;
   line-height: 15px;
@@ -1888,6 +1919,109 @@ button {
   width: 1px;
   height: 20px;
   background: rgba(255, 255, 255, .15);
+}
+
+/* Labels default to visible (this is how Recommend Playlist / Export
+   already looked). Only buttons explicitly marked .icon-only (Notify,
+   Email, WhatsApp — unchanged from the original icon-only look) hide
+   their label on desktop; the mobile speed-dial media query below
+   turns labels back on for those too, since a bare icon column isn't
+   scannable in an expanded menu. */
+.sb-lbl {
+  display: inline;
+}
+.sb-btn.icon-only .sb-lbl {
+  display: none;
+}
+
+/* "More actions" FAB toggle — desktop never sees this (see media
+   query); exists in the DOM unconditionally so no extra *ngIf wiring
+   was needed beyond reusing the existing selectedCohortIds check. */
+.sb-fab-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, .1);
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.15s;
+}
+.sb-fab-toggle:hover { background: rgba(255, 255, 255, .18); }
+.sb-fab-toggle mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+}
+
+/* ── Mobile: bottom-right compact cluster + vertical speed-dial ──── */
+@media (max-width: 560px) {
+  .selectbar {
+    left: auto;
+    right: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom, 14px));
+    transform: none;
+    max-width: calc(100vw - 28px);
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    /* DOM order stays logical (compact row, then actions) — reversing
+       only the visual flex order puts the compact cluster nearest the
+       corner and lets the action list "rise" above it when opened. */
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 10px;
+    animation: none;
+  }
+
+  .sb-main-row {
+    background: #17181F;
+    border-radius: var(--r-pill);
+    padding: 8px 8px 8px 16px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sb-fab-toggle { display: inline-flex; }
+
+  .sb-action-row {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .selectbar.expanded .sb-action-row {
+    display: flex;
+    animation: sb-dial-in 0.16s ease;
+  }
+
+  .sb-action-row .sb-btn {
+    justify-content: flex-start;
+    background: #17181F;
+    border-radius: var(--r-pill);
+    box-shadow: var(--shadow-lg);
+    width: max-content;
+    margin-left: auto;
+    padding: 9px 16px;
+  }
+  .sb-action-row .sb-btn.danger {
+    background: #2B1414;
+  }
+  /* In the expanded speed-dial, even the icon-only buttons show their
+     label — there's no hover/title tooltip on mobile, so a bare icon
+     column would be a guessing game. */
+  .sb-action-row .sb-lbl {
+    display: inline;
+  }
+
+  @keyframes sb-dial-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }
 
 /* select under card */
@@ -2323,6 +2457,8 @@ button {
   box-shadow: 0 0 0 3px var(--c-accent-soft) !important;
   transform: translateY(-2px);
 }
+.cohort-card { cursor: grab; }
+.cohort-card:active { cursor: grabbing; }
 
 /* ── Card tag variants (event/studio/specialist/draft) ────────── */
 .tag.event       { background: var(--c-blue-soft); color: #1D4ED8; }
@@ -2415,15 +2551,36 @@ button {
    Card v2: handle, open-btn, wider grid, accent stats, tab-action
    ════════════════════════════════════════════════════════════════ */
 
+/* COHORT-GRID-LADDER — every .cohort-grid breakpoint lives here, in one
+   place, ordered widest-condition-first so cascade order and visual
+   intent always agree (this is the fix for the tablet dead-zone: 861-
+   1200px used to silently land on the 380-440px tier meant for desktop,
+   because that rule appeared later in the file than the 900px tier that
+   was supposed to apply there). */
 .cohort-grid {
+  display: grid;
   grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
   gap: 16px;
+  margin-bottom: 8px;
+  padding: 0 4px;
 }
 @media (min-width: 1600px) {
   .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); }
 }
 @media (max-width: 1200px) {
   .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+}
+/* NEW tablet tier — previously missing entirely, so 1200px's 380px
+   minimum kept applying all the way down to 861px, leaving too little
+   room once the sidebar + activity log were also on screen. */
+@media (max-width: 1024px) {
+  .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+}
+@media (max-width: 860px) {
+  .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+}
+@media (max-width: 560px) {
+  .cohort-grid { grid-template-columns: 1fr; }
 }
 
 .card-top {
@@ -2459,6 +2616,7 @@ button {
   align-items: center;
   justify-content: center;
 }
+.cohort-card:hover .card-open-btn { color: var(--c-accent-dark); }
 .card-top .card-open-btn:hover {
   color: var(--c-accent-dark);
   background: var(--c-accent-soft);
@@ -3072,14 +3230,16 @@ button {
   .activity-sidenav.collapsed { width: 100%; height: 30px; }
   .activity-sidenav-tab { writing-mode: initial; }
   .activity-sidenav-tab .activity-vlabel { writing-mode: initial; transform: none; }
-  .cohort-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  /* .cohort-grid for this tier is set in COHORT-GRID-LADDER above. */
   .refine-row { flex-wrap: wrap; row-gap: 8px; }
 }
 @media (max-width: 560px) {
   .topbar-actions { flex-wrap: wrap; row-gap: 6px; }
-  .cohort-grid { grid-template-columns: 1fr; }
+  /* .cohort-grid for this tier is set in COHORT-GRID-LADDER above. */
   .card-tab-action { margin-right: 4px; }
-  .selectbar { left: 8px; right: 8px; transform: none; bottom: 12px; flex-wrap: wrap; }
+  /* .selectbar mobile layout is fully defined next to the component's
+     own rules above (bottom-right speed-dial) — not repeated here to
+     avoid the two falling out of sync again. */
 }
 
 /* ==================== UNASSIGNED SELECT BAR ==================== */
