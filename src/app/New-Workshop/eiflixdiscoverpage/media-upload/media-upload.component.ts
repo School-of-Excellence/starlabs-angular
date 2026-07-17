@@ -47,8 +47,10 @@ export class MediaUploadComponent implements ControlValueAccessor {
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
-  /** Current value = the stored download URL. */
+  /** Current value = the stored download URL (uploaded, or typed in directly). */
   value = '';
+  /** What's in the URL box — committed to `value` on Enter/blur/"Use". */
+  urlDraft = '';
   disabled = false;
 
   isUploading = false;
@@ -72,12 +74,22 @@ export class MediaUploadComponent implements ControlValueAccessor {
   get formatHint(): string {
     return this.isVideo ? 'MP4, WebM or MOV' : 'PNG, JPG, WebP or GIF';
   }
+  get urlPlaceholder(): string {
+    return this.isVideo ? 'https://… paste a video URL' : 'https://… paste an image URL';
+  }
+  /** True while the URL box holds an uncommitted edit. */
+  get urlDirty(): boolean {
+    return (this.urlDraft || '').trim() !== this.value;
+  }
   private get effectiveMaxMb(): number {
     return this.maxSizeMb > 0 ? this.maxSizeMb : (this.isVideo ? 500 : 15);
   }
 
   // ---- ControlValueAccessor ----
-  writeValue(val: string): void { this.value = val || ''; }
+  writeValue(val: string): void {
+    this.value = val || '';
+    this.urlDraft = this.value;
+  }
   registerOnChange(fn: (val: string) => void): void { this.onChange = fn; }
   registerOnTouched(fn: () => void): void { this.onTouched = fn; }
   setDisabledState(isDisabled: boolean): void { this.disabled = isDisabled; }
@@ -116,9 +128,34 @@ export class MediaUploadComponent implements ControlValueAccessor {
 
   remove(): void {
     this.value = '';
+    this.urlDraft = '';
     this.fileName = '';
     this.onChange('');
     this.onTouched();
+  }
+
+  // ---- direct URL entry (the alternative to uploading) ----
+
+  onUrlDraftChange(v: string): void {
+    this.urlDraft = v;
+  }
+
+  /** Commit the typed URL as this field's value. */
+  applyUrl(): void {
+    if (this.disabled) return;
+    const v = (this.urlDraft || '').trim();
+    if (v === this.value) return;
+    this.urlDraft = v;
+    this.value = v;
+    this.fileName = '';
+    this.onChange(v);
+    this.onTouched();
+  }
+
+  /** Enter commits the URL — never submits the surrounding form. */
+  onUrlEnter(event: Event): void {
+    event.preventDefault();
+    this.applyUrl();
   }
 
   copyUrl(): void {
@@ -171,6 +208,7 @@ export class MediaUploadComponent implements ControlValueAccessor {
         try {
           const url = await getDownloadURL(task.snapshot.ref);
           this.value = url;
+          this.urlDraft = url;
           this.onChange(url);
           this.onTouched();
           this.snackBar.open(`${this.isVideo ? 'Video' : 'Image'} uploaded.`, 'Close', { duration: 2000 });
