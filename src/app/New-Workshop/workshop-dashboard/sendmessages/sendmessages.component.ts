@@ -90,7 +90,9 @@ export class SendmessagesComponent implements OnInit, OnDestroy {
       templateName: ['', Validators.required]
     });
     
-    this.selectedTabIndex = this.data?.type === 'whatsapp' ? 1 : 0;
+    // The Email tab is commented out in the template, so WhatsApp is the only
+    // tab and always sits at index 0. Was: type === 'whatsapp' ? 1 : 0.
+    this.selectedTabIndex = 0;
     console.log(this.data.selectedprofiles, 'consoling selected profiles');
     
     this.templateSearchCtrl.valueChanges
