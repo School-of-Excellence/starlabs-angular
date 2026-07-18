@@ -558,6 +558,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         autoGainControl: !this.dfnEnabled,
       });
       await this.applyDfnProcessor();
+      this.logMicProcessingState('initial mic set');
       this.startDfnBroadcast();
 
       // Expose this component so the audio A/B test can be driven from the console:
@@ -743,6 +744,36 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * DIAGNOSTIC (validation phase): whenever the mic input is set or changed, report whether
+   * the captured signal is RAW or already PROCESSED. "Processed" here = the browser reports
+   * NS/EC/AGC active on the track (`getSettings()`), which includes the Bluetooth-HFP case
+   * where the device forces its own noise cancellation and the browser reflects NS=true.
+   * NOTE: purely on-device/system DSP the browser doesn't know about (e.g. AirPods onboard NC,
+   * macOS Voice Isolation) is invisible to this API and will still read as RAW.
+   */
+  private logMicProcessingState(context: string): void {
+    try {
+      const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+      const mst = micTrack?.mediaStreamTrack;
+      if (!mst) { console.warn(`[mic-check] (${context}) no local mic track yet`); return; }
+      const s = (mst.getSettings() as any) ?? {};
+      const processed = s.noiseSuppression === true || s.echoCancellation === true || s.autoGainControl === true;
+      console.log(
+        `%c[mic-check] (${context}) "${mst.label}" → ${processed ? 'PROCESSED (browser-level NS/EC/AGC active)' : 'RAW'}`,
+        `font-weight:bold;color:${processed ? '#ff9800' : '#4caf50'}`,
+        {
+          noiseSuppression: s.noiseSuppression,
+          echoCancellation: s.echoCancellation,
+          autoGainControl: s.autoGainControl,
+          voiceIsolation: s.voiceIsolation,
+          sampleRate: s.sampleRate,
+          dfnEnabled: this.dfnEnabled,
+        },
+      );
+    } catch (e) { console.warn(`[mic-check] (${context}) failed:`, e); }
+  }
+
   // ── DeepFilterNet3 control methods (exact DfnControls.tsx behaviour) ─────────
 
   /** Apply or remove the DFN TrackProcessor on the local mic + set input constraints. */
@@ -800,29 +831,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           await mst.applyConstraints(constraints as unknown as MediaTrackConstraints);
         }
       } catch (ce: any) {
-        // Only treat this as "device can't provide raw audio" when a CORE constraint failed
-        // (noiseSuppression/echoCancellation/autoGainControl) OR the device reports NS still on.
-        // That's the genuine Bluetooth-HFP case → DFN would double-process → disable it. A
-        // failure on any other/unknown constraint is harmless (raw capture already happened at
-        // setMicrophoneEnabled), so keep DFN running.
-        const failed = String(ce?.constraint || '');
-        const coreRaw = ['noiseSuppression', 'echoCancellation', 'autoGainControl'].includes(failed);
-        let forcedNs = false;
-        try { forcedNs = (micTrack.mediaStreamTrack?.getSettings() as any)?.noiseSuppression === true; } catch (_) {}
-
-        if (this.dfnEnabled && (coreRaw || forcedNs)) {
-          console.warn(`[dfn] Device cannot provide raw audio (forces its own noise cancellation, failed=${failed || 'settings'}) — disabling DFN`);
-          this.dfnEnabled = false;
-          try { this.dfnProc = null; await micTrack.stopProcessor(); } catch (_) {}
-          try {
-            await micTrack.mediaStreamTrack?.applyConstraints(
-              { echoCancellation: true, noiseSuppression: true, autoGainControl: true } as unknown as MediaTrackConstraints
-            );
-          } catch (_) { /* device manages it anyway */ }
-          this.broadcastDfn();
-        } else {
-          console.warn('[dfn] applyConstraints non-core failure (keeping DFN):', failed || ce?.name);
-        }
+        // Diagnostic-only for now: DFN is NO LONGER auto-disabled when a device can't provide
+        // raw audio (the old Bluetooth-HFP guard). We first want to observe, per device, whether
+        // the input is actually raw or processed — see logMicProcessingState() — and decide the
+        // policy from that evidence.
+        console.warn('[dfn] applyConstraints failed (keeping DFN):', String(ce?.constraint || '') || ce?.name, ce?.message);
       }
     } catch (e) {
       console.error('DFN control error', e);
@@ -850,11 +863,48 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.dfnBroadcastTimer = setInterval(() => this.broadcastDfn(), 3000);
   }
 
-  /** Master DFN on/off. */
-  async toggleDfn(): Promise<void> {
-    this.dfnEnabled = !this.dfnEnabled;
-    await this.applyDfnProcessor();
+  /**
+   * Noise-cancellation mode (the Audio-menu two options):
+   *  'builtin' — browser/inbuilt noise + echo cancellation + AGC, DFN off.
+   *  'dfn'     — DeepFilterNet3 on RAW capture (all inbuilt processing off), as designed.
+   * NS/EC/AGC are only honoured at CAPTURE (Chrome ignores applyConstraints on a live track —
+   * proven 2026-07-06), so flipping the mode mid-call must re-acquire the mic via
+   * restartTrack. deviceId must be included: restart() drops the other audio constraints
+   * when no deviceId is present.
+   */
+  async setNcMode(mode: 'builtin' | 'dfn'): Promise<void> {
+    const wantDfn = mode === 'dfn';
+    if (wantDfn === this.dfnEnabled) return;
+    this.dfnEnabled = wantDfn;
+
+    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+    if (micTrack) {
+      // Going to built-in: detach DFN BEFORE the capture restart.
+      if (!wantDfn && this.dfnProc) {
+        this.dfnProc = null;
+        try { await micTrack.stopProcessor(); } catch (_) {}
+      }
+      const deviceId = this.selectedMicId || micTrack.mediaStreamTrack?.getSettings?.()?.deviceId || undefined;
+      try {
+        await micTrack.restartTrack({
+          deviceId,
+          echoCancellation: !wantDfn,
+          noiseSuppression: !wantDfn,
+          autoGainControl: !wantDfn,
+        });
+      } catch (e) { console.warn('[nc] mic capture restart failed:', e); }
+      // Going to DFN: attach the processor to the fresh raw track.
+      this.dfnProc = null;
+      await this.applyDfnProcessor();
+    }
+
+    this.logMicProcessingState(`nc mode → ${mode}`);
     this.broadcastDfn();
+  }
+
+  /** Master DFN on/off (diag NR-Tune panel) — routes through the same mode switch. */
+  async toggleDfn(): Promise<void> {
+    await this.setNcMode(this.dfnEnabled ? 'builtin' : 'dfn');
   }
 
   onDfnAttenChange(v: number): void {
@@ -1178,6 +1228,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // (NS/EC/AGC off) to the new track. This is what guarantees raw input on device switch.
       this.dfnProc = null;
       await this.applyDfnProcessor();
+      this.logMicProcessingState('mic changed');
     } catch (e) { console.warn('selectMic failed:', e); }
   }
 
@@ -1187,9 +1238,25 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async selectSpeaker(deviceId: string): Promise<void> {
-    // audiooutput switching uses setSinkId under the hood (Chrome/Edge; no-op where unsupported).
-    try { await this.room()?.switchActiveDevice('audiooutput', deviceId); this.selectedSpeakerId = deviceId; }
-    catch (e) { console.warn('selectSpeaker failed (output selection may be unsupported):', e); }
+    this.selectedSpeakerId = deviceId;
+
+    // LiveKit path — stores room.options.audioOutput so tracks subscribed LATER inherit the
+    // sink, and applies setSinkId to the elements it has in its bookkeeping. (audiooutput
+    // switching uses setSinkId — Chrome/Edge; Safari neither lists outputs nor supports it.)
+    try { await this.room()?.switchActiveDevice('audiooutput', deviceId); }
+    catch (e) { console.warn('[speaker] switchActiveDevice failed:', e); }
+
+    // Direct path — the LiveKit path alone was observed NOT to change the output device in
+    // Chrome, so guarantee every rendered <audio> element follows, and log each element's
+    // resulting sinkId as evidence.
+    const els = Array.from(document.querySelectorAll('audio')) as (HTMLAudioElement & { setSinkId?: (id: string) => Promise<void>; sinkId?: string })[];
+    await Promise.all(els.map(async el => {
+      if (typeof el.setSinkId !== 'function') { console.warn('[speaker] setSinkId unsupported on this browser'); return; }
+      try { await el.setSinkId(deviceId); }
+      catch (e) { console.warn(`[speaker] element "${el.id || '?'}" setSinkId failed:`, e); }
+    }));
+    const label = this.speakers.find(s => s.deviceId === deviceId)?.label || deviceId;
+    console.log(`[speaker] output → "${label}"`, els.map(el => ({ element: el.id || '?', sinkId: el.sinkId })));
   }
 
   async startScreenShare() {

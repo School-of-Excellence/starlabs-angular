@@ -482,9 +482,13 @@
           <span>{{ d.label || 'Speaker' }}</span>
         </button>
         <div class="device-menu-header" mat-menu-item disabled>Noise Cancellation</div>
-        <button mat-menu-item (click)="toggleDfn(); $event.stopPropagation()">
+        <button mat-menu-item (click)="setNcMode('builtin')">
+          <mat-icon>{{ !dfnEnabled ? 'check' : '' }}</mat-icon>
+          <span>In-Built Noise Cancellation</span>
+        </button>
+        <button mat-menu-item (click)="setNcMode('dfn')">
           <mat-icon>{{ dfnEnabled ? 'check' : '' }}</mat-icon>
-          <span>{{ dfnEnabled ? 'Enabled' : 'Disabled' }}</span>
+          <span>Deep Filter Noise</span>
         </button>
       </mat-menu>
 

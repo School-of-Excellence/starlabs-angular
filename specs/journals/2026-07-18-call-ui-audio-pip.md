@@ -134,3 +134,35 @@ DFN edge cases (operator re-verifying).
    voiceIsolation fix; consider surfacing "NC handled by device" in the UI.
 3. Backend multi-provider threads still open in the 2026-07-17 journal (deploy, ONS confirm,
    acceptance matrix, commits — git still permission-blocked for Claude all session).
+
+---
+
+## 10. (session 5) Audio menu: mic-check logging, output-switch fix, NC two options
+Operator direction (explicit): input = OBSERVE ONLY (console, never enforce DFN on/off);
+output = fix (not changing even in Chrome); NC = two menu options, same functionality.
+All three IMPLEMENTED in `join-livekit-call`, `ng build --configuration production` clean:
+- **Input:** removed the Bluetooth/HFP DFN auto-disable (item 8's guard) — applyConstraints
+  failures now only warn. New `logMicProcessingState(ctx)` logs `[mic-check]` on
+  `initial mic set` (joinCall) and `mic changed` (selectMic): track label + RAW vs PROCESSED
+  (PROCESSED = getSettings() reports NS/EC/AGC true) + the settings object. KNOWN LIMIT:
+  getSettings() only sees browser-level processing; on-device DSP (AirPods NC, macOS Voice
+  Isolation) reads as RAW. NOTHING auto-toggles DFN anymore — only the user menu does.
+- **Output:** static analysis showed the livekit-client 2.19.1 chain
+  (switchActiveDevice→setAudioOutput→RemoteAudioTrack.setSinkId→attached elements) correct
+  for Chrome/Edge, yet operator observed no device change in Chrome. Fix = belt-and-braces
+  `selectSpeaker`: keep the LiveKit path (stores options.audioOutput so late-subscribed
+  tracks inherit the sink) + DIRECTLY `setSinkId` every rendered `<audio>` element, logging
+  each element's resulting sinkId (`[speaker]` console line) as evidence. Safari remains
+  unsupportable (library hard-returns false from supportsSetSinkId; no audiooutput
+  enumeration → empty speaker list).
+- **NC two options:** menu now shows "In-Built Noise Cancellation" (browser NS/EC/AGC, DFN
+  off) vs "Deep Filter Noise" (DFN on raw capture) with ✓ on the active one, via new
+  `setNcMode('builtin'|'dfn')`. CRITICAL mechanism: NS/EC/AGC are only honoured at CAPTURE
+  (Chrome ignores applyConstraints on a live track — proven 2026-07-06), so the mode flip
+  re-acquires the mic via `LocalAudioTrack.restartTrack({deviceId, EC/NS/AGC})`. deviceId
+  MUST be passed — LocalTrack.restart() drops the other audio constraints to `audio:true`
+  without it (verified in the 2.19.1 source). Order: builtin→ stopProcessor BEFORE restart;
+  dfn→ restart raw THEN attach DFN (dfnProc dropped so applyDfnProcessor re-attaches fresh).
+  Diag-panel `toggleDfn()` now delegates to setNcMode (gets the proper restart too). Expect a
+  brief sub-second mic gap on mode switch (capture restart — unavoidable).
+- Git commit permission-blocked again this session; changes uncommitted in the working tree.
