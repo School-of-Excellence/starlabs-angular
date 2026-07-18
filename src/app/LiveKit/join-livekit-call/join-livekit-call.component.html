@@ -1,3 +1,8 @@
+<!-- Source for auto Picture-in-Picture on tab switch (Chrome/Edge). Positioned off-screen at a
+     real size (a 1px/opacity:0 video is rejected by Chrome's PiP). Muted — audio plays through
+     the normal elements; this only carries the active remote's video. -->
+<video #pipVideo class="pip-source" playsinline muted autoplay autopictureinpicture></video>
+
 <div *ngIf="loading" class="text-center">
   Connecting...
 </div>
@@ -141,9 +146,13 @@
 
           <!-- Name badge with mute + network bars -->
           <div class="zoom-name-badge main-badge">
-            <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
-            <span class="dfn-badge" *ngIf="dfnState.infoFor(remote.participantIdentity) as info" [class.dfn-on]="info.dfn">{{ info.dfn ? ('🔇 NR ' + info.atten + ' · ' + (info.norm || 1).toFixed(1) + '×') : 'NR off' }}</span>
-            {{ remote.participantName }}
+            <span class="badge-name">{{ remote.participantName }}</span>
+            <mat-icon class="badge-icon mute-icon" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+            <span class="nr-chip" *ngIf="dfnState.infoFor(remote.participantIdentity) as info" [class.nr-on]="info.dfn"
+                  [title]="info.dfn ? ('Noise reduction ON · ' + info.atten + ' dB attenuation') : 'Noise reduction OFF'">
+              <mat-icon class="badge-icon">graphic_eq</mat-icon>
+              <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
+            </span>
             <span class="network-bars">
               <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
                 [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
@@ -253,7 +262,11 @@
       </div>
 
       <!-- DRAG HANDLE: horizontal resize between screen share and participant sidebar -->
-      <div class="screen-resize-divider" (mousedown)="startSidebarResize($event)" title="Drag to resize"></div>
+      <div class="screen-resize-divider" (mousedown)="startSidebarResize($event)" title="Drag to resize">
+        <div class="grip-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
 
       <!-- SIDEBAR: All Participants (Scrollable) -->
       <div class="participants-sidebar"
@@ -296,9 +309,13 @@
             </app-openvidu-video-element>
 
             <div class="zoom-name-badge">
-              <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
-            <span class="dfn-badge" *ngIf="dfnState.infoFor(remote.participantIdentity) as info" [class.dfn-on]="info.dfn">{{ info.dfn ? ('🔇 NR ' + info.atten + ' · ' + (info.norm || 1).toFixed(1) + '×') : 'NR off' }}</span>
-              {{ remote.participantName }}
+              <span class="badge-name">{{ remote.participantName }}</span>
+              <mat-icon class="badge-icon mute-icon" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+              <span class="nr-chip" *ngIf="dfnState.infoFor(remote.participantIdentity) as info" [class.nr-on]="info.dfn"
+                    [title]="info.dfn ? ('Noise reduction ON · ' + info.atten + ' dB attenuation') : 'Noise reduction OFF'">
+                <mat-icon class="badge-icon">graphic_eq</mat-icon>
+                <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
+              </span>
               <span class="network-bars">
                 <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
                   [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
@@ -373,9 +390,13 @@
         </mat-menu>
 
         <div class="zoom-name-badge">
-          <mat-icon class="material-icons text-danger" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
-            <span class="dfn-badge" *ngIf="dfnState.infoFor(remote.participantIdentity) as info" [class.dfn-on]="info.dfn">{{ info.dfn ? ('🔇 NR ' + info.atten + ' · ' + (info.norm || 1).toFixed(1) + '×') : 'NR off' }}</span>
-          {{ remote.participantName }}
+          <span class="badge-name">{{ remote.participantName }}</span>
+          <mat-icon class="badge-icon mute-icon" *ngIf="isRemoteAudioMuted(remote.participantIdentity)">mic_off</mat-icon>
+          <span class="nr-chip" *ngIf="dfnState.infoFor(remote.participantIdentity) as info" [class.nr-on]="info.dfn"
+                [title]="info.dfn ? ('Noise reduction ON · ' + info.atten + ' dB attenuation') : 'Noise reduction OFF'">
+            <mat-icon class="badge-icon">graphic_eq</mat-icon>
+            <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
+          </span>
           <span class="network-bars" [title]="'Network: ' + getNetworkBars(remote.participantIdentity).bars + ' bars'">
             <span class="bar" [class.active]="getNetworkBars(remote.participantIdentity).bars >= 1"
               [style.background]="getNetworkBars(remote.participantIdentity).color"></span>
@@ -405,22 +426,16 @@
 
     <div class="zoom-controls">
 
-      <button class="zoom-btn" [class.muted]="isAudioMuted()" (click)="toggleMute()">
-        <span class="material-icons">{{isAudioMuted() ? "mic_off" : "mic"}}</span>
-        <span class="zoom-btn-label">{{isAudioMuted() ? "Unmute" : "Mute"}}</span>
-      </button>
-
-      <!-- DeepFilterNet3 noise filter (exact DfnControls config) -->
-      <div class="camera-btn-group">
-        <button class="zoom-btn" [class.active]="dfnEnabled" (click)="toggleDfn()">
-          <span class="material-icons">{{ dfnEnabled ? 'graphic_eq' : 'noise_control_off' }}</span>
-          <span class="zoom-btn-label">{{ dfnEnabled ? 'Noise Filter: On' : 'Noise Filter: Off' }}</span>
-        </button>
-        <button class="zoom-btn blur-menu-trigger" (click)="dfnPanelOpen = !dfnPanelOpen">
+      <!-- Advanced DFN tuning — ops only, first/leftmost, behind ?diag=1 / #diag -->
+      <div class="camera-btn-group" *ngIf="diagEnabled">
+        <button class="zoom-btn blur-menu-trigger" (click)="dfnPanelOpen = !dfnPanelOpen" title="Advanced noise-filter tuning (diag)">
           <span class="material-icons">tune</span>
+          <span class="zoom-btn-label">NR Tune</span>
         </button>
-
         <div class="dfn-panel" *ngIf="dfnPanelOpen" (click)="$event.stopPropagation()">
+          <div class="dfn-row">
+            <label><input type="checkbox" [checked]="dfnEnabled" (change)="toggleDfn()"> Noise Filter</label>
+          </div>
           <div class="dfn-row" [class.dfn-dim]="!dfnEnabled">
             <span>Attenuation</span>
             <input type="range" min="0" max="100" [value]="dfnAtten" [disabled]="!dfnEnabled"
@@ -444,45 +459,83 @@
         </div>
       </div>
 
-      <div class="camera-btn-group">
-        <button class="zoom-btn" [class.muted]="isVideoHidden()" (click)="toggleCamera()">
-          <span class="material-icons">{{isVideoHidden() ? "videocam_off" : "videocam"}}</span>
-          <span class="zoom-btn-label">{{isVideoHidden() ? "Start Video" : "Stop Video"}}</span>
+      <!-- AUDIO: mute toggle + caret menu (mic / speaker) -->
+      <div class="zoom-split">
+        <button class="zoom-btn" [class.muted]="isAudioMuted()" (click)="toggleMute()">
+          <span class="material-icons">{{isAudioMuted() ? "mic_off" : "mic"}}</span>
+          <span class="zoom-btn-label">Audio</span>
         </button>
-        <button class="zoom-btn blur-menu-trigger" [matMenuTriggerFor]="blurMenu">
+        <button class="zoom-caret" [matMenuTriggerFor]="audioMenu" aria-label="Audio settings">
           <span class="material-icons">expand_less</span>
         </button>
       </div>
 
-      <mat-menu #blurMenu="matMenu">
-        <button mat-menu-item (click)="applyBlur('mid')" [disabled]="blurLevel === 'mid'">
-          <mat-icon>blur_on</mat-icon>
-          <span>Blur Mid (60%)</span>
+      <mat-menu #audioMenu="matMenu" class="device-menu" xPosition="after" yPosition="above">
+        <div class="device-menu-header" mat-menu-item disabled>Select a Microphone</div>
+        <button mat-menu-item *ngFor="let d of mics" (click)="selectMic(d.deviceId)">
+          <mat-icon>{{ d.deviceId === selectedMicId ? 'check' : '' }}</mat-icon>
+          <span>{{ d.label || 'Microphone' }}</span>
         </button>
-        <button mat-menu-item (click)="applyBlur('high')" [disabled]="blurLevel === 'high'">
-          <mat-icon>blur_on</mat-icon>
-          <span>Blur High (100%)</span>
+        <div class="device-menu-header" mat-menu-item disabled>Select a Speaker</div>
+        <button mat-menu-item *ngFor="let d of speakers" (click)="selectSpeaker(d.deviceId)">
+          <mat-icon>{{ d.deviceId === selectedSpeakerId ? 'check' : '' }}</mat-icon>
+          <span>{{ d.label || 'Speaker' }}</span>
         </button>
-        <button mat-menu-item (click)="applyBlur('none')" [disabled]="blurLevel === 'none'">
-          <mat-icon>blur_off</mat-icon>
-          <span>Remove Blur</span>
+        <div class="device-menu-header" mat-menu-item disabled>Noise Cancellation</div>
+        <button mat-menu-item (click)="toggleDfn(); $event.stopPropagation()">
+          <mat-icon>{{ dfnEnabled ? 'check' : '' }}</mat-icon>
+          <span>{{ dfnEnabled ? 'Enabled' : 'Disabled' }}</span>
         </button>
       </mat-menu>
 
+      <!-- VIDEO: show/hide toggle + caret menu (blur / camera) -->
+      <div class="zoom-split">
+        <button class="zoom-btn" [class.muted]="isVideoHidden()" (click)="toggleCamera()">
+          <span class="material-icons">{{isVideoHidden() ? "videocam_off" : "videocam"}}</span>
+          <span class="zoom-btn-label">Video</span>
+        </button>
+        <button class="zoom-caret" [matMenuTriggerFor]="videoMenu" aria-label="Video settings">
+          <span class="material-icons">expand_less</span>
+        </button>
+      </div>
+
+      <mat-menu #videoMenu="matMenu" class="device-menu" xPosition="after" yPosition="above">
+        <div class="device-menu-header" mat-menu-item disabled>Background Blur</div>
+        <button mat-menu-item (click)="applyBlur('none')">
+          <mat-icon>{{ blurLevel === 'none' ? 'check' : '' }}</mat-icon>
+          <span>No Blur</span>
+        </button>
+        <button mat-menu-item (click)="applyBlur('mid')">
+          <mat-icon>{{ blurLevel === 'mid' ? 'check' : '' }}</mat-icon>
+          <span>Blur (Mid)</span>
+        </button>
+        <button mat-menu-item (click)="applyBlur('high')">
+          <mat-icon>{{ blurLevel === 'high' ? 'check' : '' }}</mat-icon>
+          <span>Blur (High)</span>
+        </button>
+        <div class="device-menu-header" mat-menu-item disabled>Select a Camera</div>
+        <button mat-menu-item *ngFor="let d of cameras" (click)="selectCamera(d.deviceId)">
+          <mat-icon>{{ d.deviceId === selectedCameraId ? 'check' : '' }}</mat-icon>
+          <span>{{ d.label || 'Camera' }}</span>
+        </button>
+        <div class="device-menu-header" mat-menu-item disabled>Picture-in-Picture</div>
+        <button mat-menu-item (click)="togglePip()">
+          <mat-icon>picture_in_picture_alt</mat-icon>
+          <span>Pop out video</span>
+        </button>
+      </mat-menu>
+
+      <!-- SHARE -->
       <button class="zoom-btn" [class.active]="isScreenSharing()" (click)="toggleScreenShare()">
         <span class="material-icons">{{isScreenSharing() ? "stop_screen_share" : "screen_share"}}</span>
-        <span class="zoom-btn-label">{{isScreenSharing() ? "Stop Share" : "Share"}}</span>
+        <span class="zoom-btn-label">Share</span>
       </button>
 
+      <!-- FULL SCREEN -->
       <button class="zoom-btn" [class.fullscreen]="isFullscreen" (click)="toggleFullscreen()">
         <span class="material-icons">fullscreen</span>
         <span class="zoom-btn-label">Full Screen</span>
       </button>
-
-      <!-- <button class="zoom-btn" (click)="takeSnapshot()">
-        <span class="material-icons">photo_camera</span>
-        <span class="zoom-btn-label">Snapshot</span>
-      </button> -->
 
     </div>
 

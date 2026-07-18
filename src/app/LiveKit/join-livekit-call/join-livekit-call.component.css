@@ -290,12 +290,13 @@
   justify-content: center;
 }
 
-/* Video element fills tile */
+/* Video element fills tile — CONTAIN preserves the camera's real aspect ratio (no crop,
+   letterboxed) and renders identically in Chrome and Safari. */
 .zoom-video-tile app-openvidu-video-element,
 .zoom-video-tile video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 /* Name label like Zoom */
@@ -317,7 +318,38 @@
 
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
+}
+
+/* --- Name-badge chips: Name · Mute · NR · Network, one consistent row --- */
+.zoom-name-badge .badge-name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+/* All badge icons share a compact size so they line up with the text */
+.zoom-name-badge .badge-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+.zoom-name-badge .mute-icon {
+  color: #ff5252;   /* muted = red mic */
+}
+/* Noise-reduction indicator: greyed when off, green (+ attenuation) when on */
+.zoom-name-badge .nr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: rgba(255, 255, 255, 0.4);   /* NR off = dim */
+}
+.zoom-name-badge .nr-chip.nr-on {
+  color: #4caf50;                     /* NR on = green */
+}
+.zoom-name-badge .nr-chip .nr-atten {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 
@@ -394,6 +426,43 @@
 
 .zoom-btn-label {
   font-size: 11px;
+}
+
+/* Zoom-style split button: main action + small caret that opens a device menu.
+   align-items:flex-start keeps the ^ caret at the TOP, next to the button. */
+.zoom-split {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+}
+.zoom-caret {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: transparent;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  padding-left: 0;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+.zoom-caret:hover { background: #333; }
+.zoom-caret .material-icons { font-size: 16px; }
+
+/* Device menu (mic / speaker / camera / noise filter) */
+.device-menu .device-menu-header {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.7;
+  pointer-events: none;
+  min-height: 32px;
+  line-height: 32px;
+}
+.device-menu .mat-mdc-menu-item .mat-icon {
+  margin-right: 6px;
+  color: #2e7d32;
 }
 
 /* End Call */
@@ -824,7 +893,6 @@
   border-radius: 0 6px 6px 0 !important;
   padding: 6px 6px !important;
   min-width: unset;
-  border-left: 1px solid rgba(255,255,255,0.15);
 }
 
 .blur-menu-trigger .material-icons {
@@ -967,16 +1035,34 @@
 
 /* Draggable horizontal divider between screen share and the participant sidebar */
 .screen-resize-divider {
-  width: 6px;
+  width: 10px;
   flex-shrink: 0;
   cursor: col-resize;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 4px;
   transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .screen-resize-divider:hover,
 .screen-resize-divider:active {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.28);
+}
+/* Grip affordance — three dots so it's obviously draggable */
+.screen-resize-divider .grip-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.screen-resize-divider .grip-dots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+}
+.screen-resize-divider:hover .grip-dots span {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* Participants sidebar (right side - SCROLLABLE). Width is set inline (draggable);
@@ -1029,7 +1115,7 @@
 .zoom-video-tile-small video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .zoom-video-tile-small .zoom-name-badge {
@@ -1118,3 +1204,14 @@
   pointer-events: none;
 }
 .dfn-badge.dfn-on { background: rgba(31, 157, 85, 0.82); }
+
+/* PiP source video — off-screen at a REAL size (Chrome refuses to PiP a 1px/hidden video),
+   kept rendered (not display:none) and playing so auto-PiP can grab it on tab switch. */
+.pip-source {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 320px;
+  height: 180px;
+  pointer-events: none;
+}

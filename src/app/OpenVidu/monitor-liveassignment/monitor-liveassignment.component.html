@@ -70,13 +70,16 @@
                         [participantIdentity]="remote.participantName">
                       </app-openvidu-video-element>
 
-                      <!-- Name badge -->
+                      <!-- Name badge: Name · Mute (only if muted) · NR · Network -->
                       <div class="name-badge">
-                        <mat-icon class="badge-mic-icon"
-                          [class.text-danger]="isParticipantMuted(studio['roomid'], remote.participantIdentity)">
-                          {{ isParticipantMuted(studio['roomid'], remote.participantIdentity) ? 'mic_off' : 'mic' }}
-                        </mat-icon>
-                        {{ remote.participantName }}
+                        <span class="badge-name">{{ remote.participantName }}</span>
+                        <mat-icon class="badge-icon mute-icon"
+                          *ngIf="isParticipantMuted(studio['roomid'], remote.participantIdentity)">mic_off</mat-icon>
+                        <span class="nr-chip" *ngIf="getDfnInfo(studio['roomid'], remote.participantIdentity) as info" [class.nr-on]="info.dfn"
+                              [title]="info.dfn ? ('Noise reduction ON · ' + info.atten + ' dB attenuation') : 'Noise reduction OFF'">
+                          <mat-icon class="badge-icon">graphic_eq</mat-icon>
+                          <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
+                        </span>
                         <span class="network-bars">
                           <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 1" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>
                           <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 2" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>

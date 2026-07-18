@@ -7,6 +7,7 @@ import { CommonModule } from '@angular/common';
 import { OpenviduVideoElementComponent } from '../openvidu-video-element/openvidu-video-element.component';
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
+import { DfnInfo } from '../../LiveKit/dfn/dfn-state.service';
 import { OpenviduAudioElementComponent } from '../openvidu-audio-element/openvidu-audio-element.component';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { MatDialog } from '@angular/material/dialog';
@@ -50,6 +51,10 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   // Per-participant state — compound key "roomId:::identity"
   participantsMute    = signal<Map<string, boolean>>(new Map());
   participantsQuality = signal<Map<string, ConnectionQuality>>(new Map());
+  // Noise-reduction state per participant, from their DFN data broadcasts. The shared
+  // DfnStateService only tracks one room; the monitor watches many, so we keep our own
+  // per-room map (same pattern as mute/quality above).
+  participantsDfn     = signal<Map<string, DfnInfo>>(new Map());
   activeSpeakersMap: { [roomId: string]: string[] } = {};
 
   // Room connection state — true while connecting, false once connected
@@ -205,6 +210,7 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
         // Clean up per-participant state immediately
         this.participantsMute.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
         this.participantsQuality.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
+        this.participantsDfn.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
 
         // Count non-ghost participants
         const participantJoined = (this.mapOpenViduRoom[roomName] ?? {})["participantjoined"] ?? []
@@ -236,6 +242,20 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     // Track network quality
     room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
       this.participantsQuality.update(m => { m.set(`${roomName}:::${participant.identity}`, quality); return m; });
+    });
+
+    // Track each participant's noise-reduction (DFN) state from their data broadcasts.
+    // Same message shape the join screen sends: { type:'dfn', dfn, atten, norm }.
+    room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload));
+        if (msg && msg.type === 'dfn' && participant) {
+          this.participantsDfn.update(m => {
+            m.set(`${roomName}:::${participant.identity}`, { dfn: !!msg.dfn, atten: Number(msg.atten), norm: Number(msg.norm) });
+            return m;
+          });
+        }
+      } catch {}
     });
 
     // Track active speakers
@@ -377,6 +397,11 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       return m;
     });
     this.participantsQuality.update(m => {
+      for (const key of Array.from(m.keys()))
+        if (key.startsWith(`${RoomId}:::`)) m.delete(key);
+      return m;
+    });
+    this.participantsDfn.update(m => {
       for (const key of Array.from(m.keys()))
         if (key.startsWith(`${RoomId}:::`)) m.delete(key);
       return m;
@@ -749,6 +774,11 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
 
   isParticipantMuted(roomId: string, identity: string): boolean {
     return this.participantsMute().get(`${roomId}:::${identity}`) ?? false;
+  }
+
+  /** Noise-reduction state for a participant, or undefined if not yet broadcast. */
+  getDfnInfo(roomId: string, identity: string): DfnInfo | undefined {
+    return this.participantsDfn().get(`${roomId}:::${identity}`);
   }
 
   isActiveSpeaker(roomId: string, identity: string): boolean {
