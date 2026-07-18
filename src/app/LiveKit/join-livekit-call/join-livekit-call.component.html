@@ -252,8 +252,13 @@
         </ng-container>
       </div>
 
+      <!-- DRAG HANDLE: horizontal resize between screen share and participant sidebar -->
+      <div class="screen-resize-divider" (mousedown)="startSidebarResize($event)" title="Drag to resize"></div>
+
       <!-- SIDEBAR: All Participants (Scrollable) -->
-      <div class="participants-sidebar">
+      <div class="participants-sidebar"
+           [style.width.px]="screenSidebarWidth()"
+           [style.min-width.px]="screenSidebarWidth()">
         
         <!-- LOCAL VIDEO -->
         <div class="zoom-video-tile-small" [class.active-speaker]="activeSpeakers().includes(localParticipantIdentity)">

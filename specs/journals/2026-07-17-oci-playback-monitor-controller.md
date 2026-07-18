@@ -76,3 +76,61 @@ pre-multiprovider rooms.
 2. Commit all three repos (git still permission-blocked for Claude).
 3. Later: DO bring-up (parked), Phase-6 OCI prod (reserved IP + patch MASTER apt race in
    template BEFORE first apply + R2 recording storage), revisit 45s client retry window.
+
+---
+
+# Session 3 (later) — activeprovider architecture, real-flow fix, instant meetings
+
+The #5 items above were deployed and tested working. Then the operator asked to validate the
+REAL user flow (book journey/onboarding appointment → studio "Launch Meeting Now") — which
+exposed that the production join path is **/joinroom → join-openvidu-call**, an AWS-only
+component, while all provider work lived in /joinlivekit. Redesign (operator-decided):
+
+### activeprovider — one source of truth
+`openvidu server/mediaprovider { activeprovider: "aws"|"oci" }` (operator seeded). Consumers:
+- **Both scheduled controllers** gate on it as step 1: not-my-turn → NO lifecycle actions
+  (no wake, no room creation, no stop). AWS idles silently (its status stays fresh via
+  EventBridge); OCI idles but still refreshes its status doc each tick. Even with both
+  schedulers running, exactly one cloud creates each meeting's room.
+- **Monitor screen**: developer-only AWS/OCI radio selector writes the field. Only the
+  active provider's cards render; the inactive side is a collapsed strip that turns into a
+  red danger banner with a single Stop button (media→0 + master stop) if that server is
+  found running. Latent template bug fixed en route: AWS cards previously rendered whenever
+  EITHER status doc existed, crashing on null infraStatus.
+- **Instant meetings** stamp new rooms from it.
+
+### Room pre-create parity + restamp
+- `createOciRoomForMeeting` is now a FULL twin of AWS's (LiveKit room + profile/type lookups
+  → title → openviduroom doc create/reactivate → appointment flag), stamping
+  `mediaProvider:"oci"`. No in-function waits (AWS sleeps 90s+; OCI defers to next tick —
+  flag stays unset so it retries).
+- AWS's `createRoomForMeeting` now stamps `mediaProvider:"aws"` on create AND reactivate.
+  **Reactivate restamp is load-bearing**: a doc pre-created under provider X, reactivated
+  under provider Y, must flip — the room is hosted by Y now. Both sides restamp.
+- Corrected an operator assumption: both-schedulers-running would NOT create two docs — the
+  doc id IS the meeting id, so it's first-wins on ONE doc (benign, but single-doc).
+
+### /joinroom redirect (join-openvidu-call deprecated)
+Route now loads `JoinLivekitCallComponent` (old line commented for rollback; component file
+untouched). ALL /joinroom traffic — appointments AND queue/liveassignment links — moves to
+the provider-aware LiveKit component (DFN noise suppression included).
+
+### join-livekit-call: provider-aware server gate
+`checkServer()` now watches the matching cloud's status doc (AWS_System / OCI_System) and
+holds the "server starting…" screen until master running + ≥1 healthy media node. This
+retires the 45s-retry-vs-8-min-boot trap and is what makes instant meetings viable. DO still
+skips the gate (no status doc yet).
+
+### Instant meeting (/openvidurecordings)
+New Room now: creates the room stamped from activeprovider → fires that provider's start
+function (HTTP 400 "already running" treated as success) → auto-navigates the creator to
+`/joinroom/<id>` (server-starting screen until ready). `createOpenViduRoom` signature gained
+optional `mediaProvider`.
+
+### Verified (this block)
+CF: node --check + require-load (all modules). Angular: full production build. Runtime =
+operator's V2 acceptance matrix (S/R/I sections of the test-cases doc).
+
+### Deploy needed
+`firebase deploy --only functions:CheckMasternodeStatus,functions:CheckOciNodeStatus
+--project starlabs-test` + Angular rebuild/serve. Firestore seed done by operator.

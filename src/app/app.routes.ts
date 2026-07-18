@@ -303,7 +303,10 @@ export const routes: Routes = [
 
   // OpenVidu
   {path: 'monitorliveassignment', loadComponent: () => import('./OpenVidu/monitor-liveassignment/monitor-liveassignment.component').then(m => m.MonitorLiveassignmentComponent), canActivate: [authGuard]},
-  {path: 'joinroom/:roomid', loadComponent: () => import('./OpenVidu/join-openvidu-call/join-openvidu-call.component').then(m => m.JoinOpenviduCallComponent), canActivate: [authGuard]},
+  // DEPRECATED 2026-07-17: join-openvidu-call is AWS-only. All /joinroom traffic (appointments,
+  // queue links) now lands on the provider-aware LiveKit component below. Old line kept for rollback.
+  // {path: 'joinroom/:roomid', loadComponent: () => import('./OpenVidu/join-openvidu-call/join-openvidu-call.component').then(m => m.JoinOpenviduCallComponent), canActivate: [authGuard]},
+  {path: 'joinroom/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},
 
   // LiveKit (new call flow with DeepFilterNet3 client-side noise suppression)
   {path: 'joinlivekit/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},

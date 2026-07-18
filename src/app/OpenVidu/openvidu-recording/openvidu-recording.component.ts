@@ -1,7 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment'
-import { lastValueFrom, Subject, takeUntil } from 'rxjs';
+import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
+import { InstanceStatusService } from '../../instance-status.service';
 import { Firestore, collection, query, orderBy, getDocs, where, collectionData, Timestamp, serverTimestamp, setDoc, doc } from '@angular/fire/firestore';
 import { CommonModule } from '@angular/common';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
@@ -74,7 +76,9 @@ export class OpenviduRecordingComponent {
     private firestore: Firestore,
     public httpClient: HttpClient,
     public dialog: MatDialog,
-    public guard: AuthguardService
+    public guard: AuthguardService,
+    private router: Router,
+    private infraService: InstanceStatusService
   ){
     guard.getRoles().then(roles =>{
       this.loggedInProfileRoles = roles
@@ -115,6 +119,19 @@ export class OpenviduRecordingComponent {
     } finally {
       this.loading = false;
     }
+  }
+
+  // A live room is one currently in the Live Rooms list (active === true).
+  isLiveRoom(room: OpenViduRoom | null): boolean {
+    if (!room) return false;
+    return this.liveRooms.some(r => r.roomid === room.roomid);
+  }
+
+  // Join an already-live room. The room doc carries mediaProvider, so /joinroom (LiveKit
+  // component) routes to the right cluster and gates on server readiness — no server start
+  // needed here (a live room's server is already up).
+  joinRoom(room: OpenViduRoom) {
+    this.router.navigate(['/joinroom', room.roomid]);
   }
 
   async selectRoom(room: OpenViduRoom) {
@@ -209,12 +226,24 @@ export class OpenviduRecordingComponent {
     }
   }
 
+  // Instant meeting: create the room stamped with the ACTIVE provider, wake that
+  // provider's server if it's off, and take the creator straight into the room (the
+  // join screen shows "server starting…" until the cluster is ready).
   async createNewRoom(){
     if(confirm("Sure, do you want to create a New Room?")){
       var RoomTitle = prompt("Enter Title for Room")
       if(RoomTitle.trim().length > 0){
         const collectionName = "openviduroom"
         const roomId = this.guard.generateId(this.firestore, collectionName)
+
+        // Which cloud hosts this room — from openvidu server/mediaprovider (default aws).
+        var activeProvider: 'aws' | 'oci' = 'aws'
+        try {
+          const providerData = await firstValueFrom(this.infraService.getActiveProvider())
+          if (providerData?.activeprovider === 'oci') activeProvider = 'oci'
+        } catch (e) {
+          console.log("Active provider read failed, defaulting to aws", e)
+        }
 
         await this.guard.createOpenViduRoom({
           active: true,
@@ -226,7 +255,27 @@ export class OpenviduRecordingComponent {
           participantid: null,
           title: RoomTitle,
           metadata: {},
+          mediaProvider: activeProvider,
         })
+
+        // Wake the provider's server. A 400 means "already running" — that's success here.
+        const startFn = activeProvider === 'oci' ? 'startOciMasterHTTP' : 'startMasterNodeHTTP'
+        try {
+          await lastValueFrom(this.httpClient.post(
+            `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/${startFn}`, {}
+          ))
+          console.log(`[Instant meeting] ${activeProvider} server starting`)
+        } catch (error: any) {
+          if (error?.status === 400) {
+            console.log(`[Instant meeting] ${activeProvider} server already running`)
+          } else {
+            console.error(`[Instant meeting] ${startFn} failed:`, error)
+            alert("Room created, but the server could not be started. Check the monitor screen.")
+          }
+        }
+
+        // Straight into the room — join screen gates on server readiness.
+        this.router.navigate(['/joinroom', roomId])
 
         // var roomData = {
         //   active: true,

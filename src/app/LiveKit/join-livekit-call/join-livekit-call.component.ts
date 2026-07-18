@@ -117,6 +117,28 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private cachedBlurProcessor: any = null;
   private cachedBlurRadius: number = 0;
 
+  // Screen-share sidebar width (px), user-draggable via the divider. Dragging the divider
+  // left widens the sidebar (more participant video), right widens the screen share.
+  screenSidebarWidth = signal<number>(280);
+
+  /** Start a horizontal drag on the screen-share divider to resize the participant sidebar. */
+  startSidebarResize(event: MouseEvent): void {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = this.screenSidebarWidth();
+    const onMove = (e: MouseEvent) => {
+      // Divider moving left (clientX decreases) → wider sidebar. Clamp to sane bounds.
+      const delta = startX - e.clientX;
+      this.screenSidebarWidth.set(Math.min(700, Math.max(180, startWidth + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
   // Layout mode computed from participant count and screen share state
   layoutMode = computed<LayoutMode>(() => {
     const remoteVideoCount = this.getRemoteVideoCount();
@@ -174,12 +196,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             console.log("Provider", this.provider)
 
             // Prepare Call - Only when screen launched first time.
-            // checkServer() reads AWS_System/instance_status — it only gates the AWS OpenVidu cluster.
-            // DO/OCI media nodes are provisioned by their own controller, so skip the AWS gate and
-            // prepare directly; capacity is still handled by the 503 retry in getTokenWithRetry().
+            // checkServer() is provider-aware: it gates on the matching cloud's status doc
+            // (AWS_System / OCI_System) and shows "server starting…" until the master is
+            // running with ≥1 healthy media node — essential for instant meetings, where the
+            // server was fired moments ago and boots for several minutes. DO has no status
+            // doc yet, so it skips the gate (capacity handled by the 503 retry).
             if(this.roomDetail.title == ""){
-              if(this.provider === "aws") this.checkServer()
-              else this.prepareParticipant()
+              if(this.provider === "do") this.prepareParticipant()
+              else this.checkServer()
             }
 
             this.roomDetail = {
@@ -228,7 +252,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async checkServer(){
-    this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
+    // Watch the status doc of the cloud hosting THIS room (poll + event-push keep it fresh).
+    const status$ = this.provider === "oci" ? this.infraService.getOciStatus() : this.infraService.getStatus();
+    status$.pipe(takeUntil(this.serverSubscription)).subscribe({
       next: (serverData) => {
         if (serverData) {
           const masterStatus = serverData["master"]["state"]
@@ -891,6 +917,15 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         videoEncoding: screenPreset.encoding,
         simulcast: false, // screen share is single-layer — simulcast not applicable
       });
+
+      // Browser-native "Stop sharing" (the Chrome bar / OS control) ends the capture track
+      // WITHOUT going through our stopScreenShare(), so isLocalScreenSharing stayed true and
+      // the layout froze on a blank screen-share box. Listen for the track's own end and run
+      // the same cleanup — the local equivalent of the remote TrackUnsubscribed handler.
+      track.mediaStreamTrack.addEventListener('ended', () => {
+        console.log("Screen share track ended (browser stop) — resetting layout");
+        this.stopScreenShare();
+      });
     }
     console.log("Screen sharing started");
     this.isLocalScreenSharing.set(true);
@@ -902,8 +937,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.room()?.localParticipant.unpublishTrack(pub.track!);
       pub.track?.stop();
       console.log("Screen sharing stopped");
-      this.isLocalScreenSharing.set(false);
     }
+    // Always reset the flag (even if the publication is already gone from a browser-native
+    // stop) so the layout leaves screen-share mode. Idempotent — safe to call twice.
+    this.isLocalScreenSharing.set(false);
   }
 
   // Recording Control

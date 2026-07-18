@@ -74,7 +74,16 @@
         </div>
 
         <div *ngIf="selectedRoom">
-          <div class="ms-2 mb-3 fs-6 fw-semibold">{{ selectedRoom.title }} - Recordings</div>
+          <div class="ms-2 mb-3 d-flex justify-content-between align-items-center">
+            <span class="fs-6 fw-semibold">{{ selectedRoom.title }} - Recordings</span>
+            <button
+              *ngIf="isLiveRoom(selectedRoom)"
+              mat-flat-button
+              color="primary"
+              (click)="joinRoom(selectedRoom)">
+              Join Call Now
+            </button>
+          </div>
 
           <div *ngIf="eventsLoading" class="text-center py-4">
             <div class="spinner-border text-primary" role="status">

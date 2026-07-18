@@ -124,10 +124,43 @@
       <button (click)="infraSuccess = null" class="close-btn">✕</button>
     </div>
 
+    <!-- Active media provider selector (single source of truth: openvidu server/mediaprovider) -->
+    <div class="provider-selector">
+      <span class="provider-selector-label">Media Provider:</span>
+      <label>
+        <input type="radio" name="activeprovider" [checked]="activeProvider === 'aws'" (change)="switchProvider('aws')"> AWS
+      </label>
+      <label>
+        <input type="radio" name="activeprovider" [checked]="activeProvider === 'oci'" (change)="switchProvider('oci')"> OCI
+      </label>
+    </div>
+
+    <!-- Inactive-provider danger strips: silent when that cloud is off; red alert + Stop when running -->
+    <div class="provider-strip" *ngIf="activeProvider !== 'aws'" [class.danger]="isInactiveServerRunning('aws')">
+      <ng-container *ngIf="isInactiveServerRunning('aws'); else awsIdleStrip">
+        ⚠️ AWS server is running while OCI is the active provider
+        <button (click)="stopMasterNode()" [disabled]="infraActionInProgress" class="infra-btn btn-stop">
+          <span *ngIf="!infraActionInProgress">⏹️ Stop AWS</span>
+          <span *ngIf="infraActionInProgress">⏳</span>
+        </button>
+      </ng-container>
+      <ng-template #awsIdleStrip>AWS (inactive)</ng-template>
+    </div>
+    <div class="provider-strip" *ngIf="activeProvider !== 'oci'" [class.danger]="isInactiveServerRunning('oci')">
+      <ng-container *ngIf="isInactiveServerRunning('oci'); else ociIdleStrip">
+        ⚠️ OCI server is running while AWS is the active provider
+        <button (click)="stopOciMasterNode()" [disabled]="ociActionInProgress" class="infra-btn btn-stop">
+          <span *ngIf="!ociActionInProgress">⏹️ Stop OCI</span>
+          <span *ngIf="ociActionInProgress">⏳</span>
+        </button>
+      </ng-container>
+      <ng-template #ociIdleStrip>OCI (inactive)</ng-template>
+    </div>
+
     <div class="infra-cards">
-      
+
       <!-- Master Node Card -->
-      <div class="infra-card">
+      <div class="infra-card" *ngIf="activeProvider === 'aws' && infraStatus">
         <div class="infra-card-header">
           <div class="header-content">
             <h3>Master Node</h3>
@@ -174,7 +207,7 @@
       </div>
 
       <!-- Media Nodes Card -->
-      <div class="infra-card">
+      <div class="infra-card" *ngIf="activeProvider === 'aws' && infraStatus">
         <div class="infra-card-header">
           <div class="header-content">
             <h3>Media Nodes</h3>
@@ -229,7 +262,7 @@
       </div>
 
       <!-- OCI Master Node Card -->
-      <div class="infra-card" *ngIf="ociInfraStatus">
+      <div class="infra-card" *ngIf="activeProvider === 'oci' && ociInfraStatus">
         <div class="infra-card-header">
           <div class="header-content">
             <h3>OCI Master Node</h3>
@@ -273,7 +306,7 @@
       </div>
 
       <!-- OCI Media Nodes Card (instance pool) -->
-      <div class="infra-card" *ngIf="ociInfraStatus">
+      <div class="infra-card" *ngIf="activeProvider === 'oci' && ociInfraStatus">
         <div class="infra-card-header">
           <div class="header-content">
             <h3>OCI Media Nodes</h3>

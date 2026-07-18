@@ -58,6 +58,9 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   infraStatus: InfrastructureStatus | null = null;
   // OCI twin of infraStatus — separate doc (OCI_System/instance_status), same shape.
   ociInfraStatus: InfrastructureStatus | null = null;
+  // Which cloud is allowed to act (openvidu server/mediaprovider). Drives which cards
+  // render, which controls are live, and both CF controllers' lifecycle gates.
+  activeProvider: 'aws' | 'oci' = 'aws';
   infraActionInProgress = false;
   // Separate in-progress flag so OCI clicks don't disable AWS buttons (and vice versa).
   ociActionInProgress = false;
@@ -102,6 +105,7 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       if(roles["developer"]) {
         this.loadInfrastructureStatus();
         this.loadOciInfrastructureStatus();
+        this.loadActiveProvider();
       }
     })
   }
@@ -308,7 +312,11 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       );
     }
 
-    // OpenVidu self-hosted: existing capacity-aware retry loop (unchanged)
+    // OpenVidu self-hosted: existing capacity-aware retry loop. The room's mediaProvider
+    // (aws/oci) tells the token function which cluster to issue for — WITHOUT it the server
+    // defaults to aws, so the monitor would try to join an OCI room on the AWS master and
+    // never connect. Missing mediaProvider == aws (legacy rooms).
+    const mediaProvider = this.mapOpenViduRoom[roomID]?.['mediaProvider'] || 'aws';
     let retryCount = 0;
 
     while (retryCount <= 3) {
@@ -317,7 +325,8 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
           this.http.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
             roomName,
             participantName,
-            participantId
+            participantId,
+            provider: mediaProvider
           })
         );
       } catch (error: any) {
@@ -471,6 +480,41 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     if (status === 'stable') return 'state-stable';
     if (status === 'scaling-up' || status === 'scaling-down') return 'state-transitioning';
     return 'state-unknown';
+  }
+
+  loadActiveProvider() {
+    this.infraService.getActiveProvider()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.activeProvider = data?.activeprovider === 'oci' ? 'oci' : 'aws';
+        },
+        error: (err) => {
+          console.error('Active provider read error:', err);
+        }
+      });
+  }
+
+  async switchProvider(provider: 'aws' | 'oci') {
+    if (provider === this.activeProvider) return;
+    if (!confirm(`Switch active media provider to ${provider.toUpperCase()}? New rooms and the schedulers will use ${provider.toUpperCase()} from now on.`)) return;
+    try {
+      await this.infraService.setActiveProvider(provider);
+      this.infraSuccess = `Active provider switched to ${provider.toUpperCase()}`;
+      setTimeout(() => this.infraSuccess = null, 5000);
+    } catch (err: any) {
+      this.infraError = err?.message || 'Failed to switch provider';
+    }
+  }
+
+  /** Inactive-provider danger: anything of that cloud still up? (master running or media present) */
+  isInactiveServerRunning(provider: 'aws' | 'oci'): boolean {
+    if (provider === this.activeProvider) return false;
+    const status = provider === 'aws' ? this.infraStatus : this.ociInfraStatus;
+    if (!status) return false;
+    const masterUp = status.master?.state === 'running' || status.master?.state === 'starting';
+    const mediaUp = (status.media?.instanceStates?.total || 0) > 0 || (status.media?.desiredCapacity || 0) > 0;
+    return masterUp || mediaUp;
   }
 
   // ---- OCI manual controls (twins of the AWS handlers below; shared alert strip) ----
@@ -696,9 +740,11 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     return this.mapOpenViduRoom[roomId]?.['provider'] === 'livekit-cloud' ? 'livekit-cloud' : 'openvidu';
   }
 
-  /** Human label for the provider badge. */
+  /** Human label for the provider badge (reflects the actual media backend). */
   getProviderLabel(roomId: string): string {
-    return this.getProvider(roomId) === 'livekit-cloud' ? 'LiveKit Cloud' : 'OpenVidu AWS';
+    if (this.getProvider(roomId) === 'livekit-cloud') return 'LiveKit Cloud';
+    const media = (this.mapOpenViduRoom[roomId]?.['mediaProvider'] || 'aws').toString().toUpperCase();
+    return `OpenVidu ${media}`;
   }
 
   isParticipantMuted(roomId: string, identity: string): boolean {

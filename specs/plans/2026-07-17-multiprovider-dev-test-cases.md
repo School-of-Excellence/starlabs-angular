@@ -61,6 +61,46 @@
 ## Known caveats (by design, agreed)
 
 - Manual Start with no join and no appointment: the next 5-min tick stops the cluster again (AWS-parity idle rule). Join within the tick or create an appointment.
-- Client auto-retries the 503 for only ~45s; a fresh node boot takes ~5–8 min → early joiners must retry/refresh manually (revisit later).
-- Any upcoming `platform:"openvidu"` appointment wakes **both** masters (same query on both controllers, per decision 2026-07-17).
+- ~~Client auto-retries the 503 for only ~45s~~ **Superseded in V2:** the join screen now gates on the provider's status doc ("server starting…") for both AWS and OCI, so the retry window no longer bites.
+- ~~Any upcoming appointment wakes both masters~~ **Superseded in V2:** the `activeprovider` gate means only the active cloud's controller acts.
 - Status via events is near-instant; the 5-min poll remains as backstop, so worst-case staleness without events is 5 min.
+
+---
+
+# V2 — Real-flow product acceptance (2026-07-17, activeprovider + instant meeting)
+
+> Prereq: `openvidu server/mediaprovider { activeprovider }` doc exists; V2 functions deployed
+> (`CheckMasternodeStatus`, `CheckOciNodeStatus`); Angular rebuilt; `/joinroom` now = LiveKit component.
+
+## S — Provider switch & monitor
+
+| # | Scenario | Steps | PASS when | Status |
+|---|----------|-------|-----------|--------|
+| S1 | Selector + single-provider view | As developer open monitor; switch AWS↔OCI | Only active provider's 2 cards render; other side is a slim "(inactive)" strip; Firestore field updates on confirm | |
+| S2 | Controllers obey the flag | Set `activeprovider:"oci"`; watch both schedulers' next tick in logs | AWS logs `activeprovider=oci — AWS controller idle` and does nothing; OCI runs the full controller | |
+| S3 | Danger strip | With OCI active, start the AWS master from the AWS console | Red strip "⚠ AWS server is running while OCI is the active provider" appears (via EventBridge push); its Stop button zeroes media + stops master; strip returns to silent | |
+| S4 | Reverse danger | With AWS active, start OCI master from OCI console | Same behavior via `ociEventWebhook`; Stop OCI works from the strip | |
+
+## R — Real booking flow (journey coaching / onboarding)
+
+| # | Scenario | Steps | PASS when | Status |
+|---|----------|-------|-----------|--------|
+| R1 | AWS appointment E2E (`activeprovider:"aws"`) | Book platform-OpenVidu appointment 10–15 min out → wait tick → studio Launch at LIVE → call → leave → idle | Room doc created with `mediaProvider:"aws"` + title; `/joinroom` lands on the NEW LiveKit component and connects on AWS; hands-free record; 15-min room end; master auto-stop | |
+| R2 | OCI appointment E2E (`activeprovider:"oci"`) | Same booking, OCI active | OCI controller wakes OCI master + pool 1, creates room doc `mediaProvider:"oci"` with proper title; studio Launch → `/joinroom` → "server starting…" if still booting → call on OCI; record → OCI bucket; playback; room end; OCI stop-to-zero. AWS never wakes | |
+| R3 | Reactivation restamp | Room doc from an OCI period goes inactive; switch to AWS; same appointment re-fires | Doc reactivated with `mediaProvider` flipped to `"aws"`; join lands on AWS | |
+| R4 | Cancelled appointment | Book then set `cancelled:true` before start | No server wake; if awake and idle, next tick stops it | |
+| R5 | Back-to-back appointments | Two appointments 20 min apart | Server up through both, stops only after both done | |
+| R6 | Zoom isolation | Book platform-Zoom | No server wake at all | |
+
+## I — Instant meeting
+
+| # | Scenario | Steps | PASS when | Status |
+|---|----------|-------|-----------|--------|
+| I1 | Instant meeting, server off | `activeprovider:"oci"`, OCI stopped → `/openvidurecordings` → New Room → title | Room doc `mediaProvider:"oci"`; OCI master starts; creator auto-navigates to `/joinroom/<id>` showing "server starting…"; connects when ready (~5–8 min) | |
+| I2 | Instant meeting, server on | Same with OCI already running + healthy | Start returns "already running" (silent); creator lands in the call within seconds | |
+| I3 | Instant meeting on AWS | `activeprovider:"aws"` → New Room | Same flow against AWS (`startMasterNodeHTTP` + AWS gate screen) | |
+| I4 | Second participant | Share `/joinroom/<id>` while server still booting | They also get "server starting…", then connect — no hardcoded-capacity error | |
+
+## Operational notes
+- **Switch procedure:** ensure the outgoing provider has no active rooms → flip the selector → if the outgoing server is still up, the danger strip's Stop finishes the job. Room housekeeping for the *inactive* provider is dormant — lingering rooms of that provider wait until you switch back (or close them manually).
+- Deprecated: `join-openvidu-call` (route commented in `app.routes.ts`; component kept for rollback).

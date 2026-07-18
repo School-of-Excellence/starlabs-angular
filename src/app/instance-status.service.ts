@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Firestore, doc, docData, Timestamp } from '@angular/fire/firestore';
+import { Firestore, doc, docData, setDoc, Timestamp } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 import { environment } from '../environments/environment';
 
@@ -99,6 +99,20 @@ export class InstanceStatusService {
     return this.http.post(`${this.baseUrl}/scaleMediaNodes`, {
       action: 'scale-down'
     });
+  }
+
+  // ---- Active media provider (openvidu server/mediaprovider.activeprovider) ----
+  // Single source of truth for which cloud acts: both CF controllers gate on it, the
+  // monitor selector writes it, and instant meetings stamp new rooms from it.
+
+  getActiveProvider(): Observable<{ activeprovider?: 'aws' | 'oci' } | undefined> {
+    const providerDoc = doc(this.firestore, 'openvidu server/mediaprovider');
+    return docData(providerDoc) as Observable<{ activeprovider?: 'aws' | 'oci' } | undefined>;
+  }
+
+  setActiveProvider(provider: 'aws' | 'oci'): Promise<void> {
+    const providerDoc = doc(this.firestore, 'openvidu server/mediaprovider');
+    return setDoc(providerDoc, { activeprovider: provider }, { merge: true });
   }
 
   // ---- OCI twins (separate functions — same contracts as the AWS ones) ----

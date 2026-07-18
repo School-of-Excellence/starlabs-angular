@@ -965,10 +965,24 @@
   object-fit: contain;
 }
 
-/* Participants sidebar (right side - SCROLLABLE) */
+/* Draggable horizontal divider between screen share and the participant sidebar */
+.screen-resize-divider {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.screen-resize-divider:hover,
+.screen-resize-divider:active {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Participants sidebar (right side - SCROLLABLE). Width is set inline (draggable);
+   these are fallbacks only. */
 .participants-sidebar {
   width: 280px;
-  min-width: 280px;
   display: flex;
   flex-direction: column;
   gap: 6px;
