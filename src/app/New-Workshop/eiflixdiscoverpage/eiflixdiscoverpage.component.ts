@@ -8,6 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
 import { PickerModule } from '@ctrl/ngx-emoji-mart';
@@ -59,6 +60,7 @@ interface MediaField extends BaseField {
     MatSelectModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    MatSlideToggleModule,
     NgxEditorModule,
     PickerModule,
     MediaUploadComponent
@@ -86,6 +88,7 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
 
   /** Snapshot of the last-loaded/saved values, used to reset & detect changes. */
   private pristine: Record<string, string> = {};
+  private pristineBlurProfile = false;
 
   /** Full document as last loaded, so the size meter also counts any other fields. */
   private docData: Record<string, any> = {};
@@ -362,6 +365,8 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
     group['livearenavideos'] = this.fb.array([]);
     group['prodigiesvideos'] = this.fb.array([]);
     group['adsleftmap'] = this.fb.array([]);
+    // Section 6 boolean toggle (stored as a real boolean, not a scalar string).
+    group['blurprofile'] = [false];
     this.form = this.fb.group(group);
   }
 
@@ -387,6 +392,12 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
       // writes — otherwise trimming/empty-HTML collapse would read as "dirty".
       this.pristine = {};
       this.allFields.forEach(f => (this.pristine[f.key] = this.normalizeScalar(f.key, patch[f.key])));
+
+      // Section 6 boolean toggle.
+      const blurprofile = !!data?.['blurprofile'];
+      this.form.patchValue({ blurprofile }, { emitEvent: false });
+      this.pristineBlurProfile = blurprofile;
+
       this.invalidateCaches();
 
       // Hydrate the proofs-in-number array of maps.
@@ -515,8 +526,10 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
     const liveArenaDirty = JSON.stringify(this.serializeLiveArenaVideos()) !== this.pristineLiveArenaVideos;
     const prodigiesDirty = JSON.stringify(this.serializeProdigiesVideos()) !== this.pristineProdigiesVideos;
     const adsDirty = JSON.stringify(this.serializeAds()) !== this.pristineAds;
+    const blurProfileDirty = !!this.form.get('blurprofile')?.value !== this.pristineBlurProfile;
     return scalarsDirty || proofsDirty || pubsDirty || awardsDirty || scienceVideosDirty
-      || ahVideosDirty || eiVideosDirty || loveLettersDirty || liveArenaDirty || prodigiesDirty || adsDirty;
+      || ahVideosDirty || eiVideosDirty || loveLettersDirty || liveArenaDirty || prodigiesDirty
+      || adsDirty || blurProfileDirty;
   }
 
   /* ---------- proofs-in-number (array of maps) ---------- */
@@ -776,7 +789,8 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
   }
 
   get section6FieldCount(): number {
-    return this.section6RichFields.length + 1;
+    // rich fields + love letters + the blur-profile toggle
+    return this.section6RichFields.length + 2;
   }
 
   /** Lazily-created rich editor for a love-letter row. */
@@ -893,6 +907,7 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
       title2: [a?.title2 || ''],
       content: [a?.content || ''],
       buttonname: [a?.buttonname || ''],
+      buttonnavigationlink: [a?.buttonnavigationlink || ''],
       buttonbelowtext: [a?.buttonbelowtext || ''],
       proof: proofArray
     });
@@ -936,13 +951,14 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
           title2: this.normRich(c.get('title2')?.value),
           content: this.normRich(c.get('content')?.value),
           buttonname: this.normText(c.get('buttonname')?.value),
+          buttonnavigationlink: this.normText(c.get('buttonnavigationlink')?.value),
           buttonbelowtext: this.normText(c.get('buttonbelowtext')?.value),
           proof
         };
       })
       .filter(a =>
         a.head !== '' || a.title1 !== '' || a.title2 !== '' || a.content !== '' ||
-        a.buttonname !== '' || a.buttonbelowtext !== '' || a.proof.length > 0
+        a.buttonname !== '' || a.buttonnavigationlink !== '' || a.buttonbelowtext !== '' || a.proof.length > 0
       );
   }
 
@@ -1081,7 +1097,7 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
   }
 
   reset(): void {
-    this.form.patchValue({ ...this.pristine });
+    this.form.patchValue({ ...this.pristine, blurprofile: this.pristineBlurProfile });
 
     const proofs = JSON.parse(this.pristineProofs || '[]');
     this.proofRows.clear();
@@ -1173,6 +1189,7 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
     payload['livearenavideos'] = this.serializeLiveArenaVideos();
     payload['prodigiesvideos'] = this.serializeProdigiesVideos();
     payload['adsleftmap'] = this.serializeAds();
+    payload['blurprofile'] = !!this.form.get('blurprofile')?.value;
 
     try {
       // merge:true — never clobber other fields on classify/eiflixdiscoverpage.
@@ -1193,6 +1210,7 @@ export class EiflixdiscoverpageComponent implements OnInit, OnDestroy {
       this.pristineLiveArenaVideos = JSON.stringify(payload['livearenavideos']);
       this.pristineProdigiesVideos = JSON.stringify(payload['prodigiesvideos']);
       this.pristineAds = JSON.stringify(payload['adsleftmap']);
+      this.pristineBlurProfile = payload['blurprofile'];
       this.invalidateCaches(); // pristine changed → recompute dirty/size
       this.snackBar.open('Discover page saved.', 'Close', { duration: 2000 });
     } catch (err) {
