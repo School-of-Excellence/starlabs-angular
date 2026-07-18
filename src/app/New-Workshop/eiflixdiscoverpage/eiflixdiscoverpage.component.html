@@ -797,6 +797,17 @@
             </div></div>
           </section>
 
+          <!-- Blur profile toggle -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>blur_on</mat-icon></span>
+                <div class="field-label-text"><h3>Blur Profile</h3><p>Blur participant profiles in this section.</p></div>
+              </div>
+              <mat-slide-toggle formControlName="blurprofile" color="primary"></mat-slide-toggle>
+            </div>
+          </section>
+
           <!-- Love letters: [{profileid (select), letter (rich)}] -->
           <section class="field-card">
             <div class="field-head">
@@ -1006,6 +1017,10 @@
                   <mat-form-field appearance="outline" subscriptSizing="dynamic">
                     <mat-label>Button name</mat-label>
                     <input matInput formControlName="buttonname" placeholder="Get started" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Button navigation link</mat-label>
+                    <input matInput formControlName="buttonnavigationlink" placeholder="https://…" autocomplete="off" />
                   </mat-form-field>
                   <mat-form-field appearance="outline" subscriptSizing="dynamic">
                     <mat-label>Button below text</mat-label>

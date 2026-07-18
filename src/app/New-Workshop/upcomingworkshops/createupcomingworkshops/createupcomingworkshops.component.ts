@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -24,7 +25,7 @@ import {
   serverTimestamp,
   Timestamp
 } from '@angular/fire/firestore';
-import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
+import { Storage, ref, uploadBytesResumable, getDownloadURL } from '@angular/fire/storage';
 
 @Component({
   selector: 'app-createupcomingworkshops',
@@ -41,6 +42,7 @@ import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage
     MatDatepickerModule,
     MatSlideToggleModule,
     MatProgressSpinnerModule,
+    MatProgressBarModule,
     MatTooltipModule
   ],
   templateUrl: './createupcomingworkshops.component.html',
@@ -55,12 +57,19 @@ export class CreateupcomingworkshopsComponent {
   widgettype: 'comingsoon' | 'ads' = 'comingsoon';
   private docId: string | null = null;
 
-  isUploading = false;
+  // Per-field upload state (keyed by form control name).
+  uploadingKeys = new Set<string>();
+  uploadProgress: Record<string, number> = {};
+
+  get isUploadingAny(): boolean {
+    return this.uploadingKeys.size > 0;
+  }
 
   constructor(
     private fb: FormBuilder,
     private firestore: Firestore,
     private storage: Storage,
+    private zone: NgZone,
     private snackBar: MatSnackBar,
     private dialogRef: MatDialogRef<CreateupcomingworkshopsComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any
@@ -88,7 +97,9 @@ export class CreateupcomingworkshopsComponent {
           navigationlink: w.navigationlink || '',
           show: !!w.show,
           imageonly: !!w.imageonly,
-          adimage: w.adimage || ''
+          adimage: w.adimage || '',
+          adimagetab: w.adimagetab || '',
+          adimagemobile: w.adimagemobile || ''
         });
       } else {
         this.form.patchValue({
@@ -158,7 +169,9 @@ export class CreateupcomingworkshopsComponent {
       navigationlink: [''],
       show: [false],
       imageonly: [false],
-      adimage: ['']
+      adimage: [''],
+      adimagetab: [''],
+      adimagemobile: ['']
     });
   }
 
@@ -175,49 +188,90 @@ export class CreateupcomingworkshopsComponent {
     this.form.get('color')?.markAsDirty();
   }
 
-  // Image key for the current widget type.
-  get imageKey(): string {
-    return this.widgettype === 'ads' ? 'adimage' : 'upcomingimage';
+  // The upload fields shown for the current widget type, with size hints.
+  get uploadFields(): { key: string; label: string; hint: string }[] {
+    return this.widgettype === 'ads'
+      ? [
+          { key: 'adimage', label: 'Ad Image', hint: '1680 × 348' },
+          { key: 'adimagetab', label: 'Ad Image (Tab)', hint: '1400 × 700' },
+          { key: 'adimagemobile', label: 'Ad Image (Mobile)', hint: '1080 × 540' }
+        ]
+      : [{ key: 'upcomingimage', label: 'Upcoming Image', hint: '640 × 400' }];
   }
 
-  get imageUrl(): string {
-    return this.form.get(this.imageKey)?.value || '';
+  imageUrlOf(key: string): string {
+    return this.form.get(key)?.value || '';
   }
 
-  // Upload an image (images only) to Firebase Storage under `eiflixhome`
-  // and store the download URL on the form.
-  uploadImage(): void {
+  isUploadingKey(key: string): boolean {
+    return this.uploadingKeys.has(key);
+  }
+
+  progressOf(key: string): number {
+    return this.uploadProgress[key] ?? 0;
+  }
+
+  // Upload an image (images only) to Firebase Storage under `eiflixhome`,
+  // reporting progress, then store the download URL on the form.
+  uploadImage(key: string): void {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
-    fileInput.onchange = async (event) => {
+    fileInput.onchange = (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
       if (!file.type.startsWith('image/')) {
         this.snackBar.open('Please select an image file.', 'Close', { duration: 3000 });
         return;
       }
-      this.isUploading = true;
-      try {
-        const filePath = `eiflixhome/${Date.now()}_${file.name}`;
-        const fileRef = ref(this.storage, filePath);
-        await uploadBytes(fileRef, file);
-        const downloadURL = await getDownloadURL(fileRef);
-        this.form.patchValue({ [this.imageKey]: downloadURL });
-        this.snackBar.open('Image uploaded.', 'Close', { duration: 2000 });
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        this.snackBar.open('Error uploading image. Please try again.', 'Close', { duration: 3000 });
-      } finally {
-        this.isUploading = false;
-      }
+
+      this.uploadingKeys.add(key);
+      this.uploadProgress[key] = 0;
+
+      const filePath = `eiflixhome/${Date.now()}_${file.name}`;
+      const task = uploadBytesResumable(ref(this.storage, filePath), file);
+
+      task.on(
+        'state_changed',
+        (snap) => {
+          // Firebase callbacks can fire outside Angular's zone.
+          this.zone.run(() => {
+            this.uploadProgress[key] = snap.totalBytes
+              ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100)
+              : 0;
+          });
+        },
+        (error) => {
+          console.error('Error uploading image:', error);
+          this.zone.run(() => {
+            this.uploadingKeys.delete(key);
+            this.snackBar.open('Error uploading image. Please try again.', 'Close', { duration: 3000 });
+          });
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(task.snapshot.ref);
+            this.zone.run(() => {
+              this.form.patchValue({ [key]: downloadURL });
+              this.snackBar.open('Image uploaded.', 'Close', { duration: 2000 });
+            });
+          } catch (error) {
+            console.error('Error getting download URL:', error);
+            this.zone.run(() =>
+              this.snackBar.open('Error uploading image. Please try again.', 'Close', { duration: 3000 })
+            );
+          } finally {
+            this.zone.run(() => this.uploadingKeys.delete(key));
+          }
+        }
+      );
     };
     fileInput.click();
   }
 
   // Only clears the URL on the form — the stored file is left untouched.
-  removeImage(): void {
-    this.form.patchValue({ [this.imageKey]: '' });
+  removeImage(key: string): void {
+    this.form.patchValue({ [key]: '' });
   }
 
   private toDate(value: any): Date | null {
@@ -271,7 +325,9 @@ export class CreateupcomingworkshopsComponent {
           navigationlink: (raw.navigationlink || '').trim(),
           show: !!raw.show,
           imageonly: !!raw.imageonly,
-          adimage: (raw.adimage || '').trim()
+          adimage: (raw.adimage || '').trim(),
+          adimagetab: (raw.adimagetab || '').trim(),
+          adimagemobile: (raw.adimagemobile || '').trim()
         }
       : {
           widgettype: 'comingsoon',
