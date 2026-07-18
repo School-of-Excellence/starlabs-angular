@@ -688,6 +688,17 @@
   width: 100%;
   margin: 0;
 }
+/* Journey multi-select chips (replaces the Product type field) — spans the whole grid row */
+.jchd-filter-panel .fp-journey-field { grid-column: 1 / -1; }
+.jchd-filter-panel .fp-journey-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.jchd-filter-panel .fp-jchip { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px;
+  color: #3c3c43; background: #f2f2f7; border: none; border-radius: 999px; padding: 5px 10px; cursor: pointer;
+  transition: background .15s ease, box-shadow .15s ease; }
+.jchd-filter-panel .fp-jchip:hover { background: #e9e9ee; }
+.jchd-filter-panel .fp-jchip.is-on { background: #eaf2ff; color: #007aff; box-shadow: inset 0 0 0 1px #007aff; }
+.jchd-filter-panel .fp-jgico { font-size: 14px; width: 14px; height: 14px; }
+.jchd-filter-panel .fp-jcount { font-size: 11px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+.jchd-filter-panel .fp-jchip.is-on .fp-jcount { color: #007aff; }
 .jchd-filter-panel .fp-field-label {
   font-size: 11px;
   text-transform: uppercase;
@@ -2132,6 +2143,12 @@ td.mat-mdc-cell span {
 .fb-mcount { color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .fb-mitem.on .fb-mcount { color: #007aff; }
 .fb-mgico { font-size: 15px; width: 15px; height: 15px; }
+.fb-mcheck { font-size: 16px; width: 16px; height: 16px; line-height: 16px; color: #007aff; flex: 0 0 16px; }
+.fb-menu-backdrop { position: fixed; inset: 0; z-index: 19; background: transparent; }
+.fb-menu { z-index: 20; }
+.fb-mdone { width: 100%; text-align: center; border: none; background: transparent; font: inherit; font-size: 13px; font-weight: 600;
+  color: #007aff; padding: 8px; border-radius: 8px; cursor: pointer; margin-top: 4px; border-top: 0.5px solid #f0f0f2; }
+.fb-mdone:hover { background: #f2f2f7; }
 
 .fb-clear { display: inline-flex; align-items: center; gap: 3px; font: inherit; font-size: 12px; color: var(--ink-2);
   background: transparent; border: 0.5px solid #e5e5ea; border-radius: 999px; padding: 5px 10px 5px 8px; cursor: pointer; }

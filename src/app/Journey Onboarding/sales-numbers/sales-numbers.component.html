@@ -66,7 +66,7 @@
       <mat-form-field appearance="outline" class="sn-filter" floatLabel="always" subscriptSizing="dynamic">
         <mat-label>Source</mat-label>
         <mat-select multiple [(ngModel)]="filters.sources" (selectionChange)="onFilterChange()" placeholder="All sources">
-          <mat-option *ngFor="let s of data.sources" [value]="s">{{ s }}</mat-option>
+          <mat-option *ngFor="let o of sourceOptions" [value]="o.id">{{ o.name }}</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -260,20 +260,21 @@
 
     <mat-card class="sn-panel">
       <h2>Roster</h2>
-      <p class="sn-src-hint">Flagged salespeople (from the Salespeople tab). Assign each to a team — membership is stored by profile id.</p>
+      <p class="sn-src-hint">All salespeople seen in sales. Assign each to a team — membership is stored by profile id. A name with no matching user record can't be assigned (flag/link it from that person's profile).</p>
       <div class="st-roster">
-        <div class="st-roster-row" *ngFor="let sp of salespersonRoster">
-          <span class="st-person">{{ sp.name }}</span>
+        <div class="st-roster-row" *ngFor="let name of teamSalespeople">
+          <span class="st-person">{{ name }}</span>
+          <span class="st-nolink" *ngIf="!resolvable(name)" matTooltip="No user record matches this name">no profile id</span>
           <mat-form-field appearance="outline" class="st-assign" floatLabel="always" subscriptSizing="dynamic">
             <mat-label>Team</mat-label>
-            <mat-select [ngModel]="teamIdOf(sp.profileid)" (selectionChange)="assignTeam(sp.profileid, $event.value)" [disabled]="saving" placeholder="Unassigned">
+            <mat-select [ngModel]="teamIdOfName(name)" (selectionChange)="assignTeamByName(name, $event.value)" [disabled]="saving || !resolvable(name)" placeholder="Unassigned">
               <mat-option [value]="''">Unassigned</mat-option>
               <mat-option *ngFor="let t of teams" [value]="t.id">{{ t.team }}</mat-option>
             </mat-select>
           </mat-form-field>
         </div>
       </div>
-      <p class="st-empty" *ngIf="!salespersonRoster.length">No salespeople flagged yet — flag them in the Salespeople tab first.</p>
+      <p class="st-empty" *ngIf="!teamSalespeople.length">No salespeople in the last 12 months.</p>
     </mat-card>
   </ng-container>
 
@@ -303,6 +304,10 @@
       <p class="sn-src-hint">Set the lead source on each sale (last 12 months). Saves immediately.</p>
       <div class="sn-loading" *ngIf="sourceLoading"><mat-spinner diameter="36"></mat-spinner></div>
       <table mat-table [dataSource]="sourceRows" class="sn-table" *ngIf="!sourceLoading">
+        <ng-container matColumnDef="participant">
+          <th mat-header-cell *matHeaderCellDef>Participant</th>
+          <td mat-cell *matCellDef="let r">{{ r.participantName }}</td>
+        </ng-container>
         <ng-container matColumnDef="product">
           <th mat-header-cell *matHeaderCellDef>Product</th>
           <td mat-cell *matCellDef="let r">{{ r.productName }}</td>
@@ -320,7 +325,7 @@
           <td mat-cell *matCellDef="let r">
             <mat-form-field appearance="outline" class="sn-src-select" subscriptSizing="dynamic">
               <mat-select [ngModel]="r.source" (selectionChange)="setSource(r, $event.value)" placeholder="Set source">
-                <mat-option *ngFor="let o of SOURCE_OPTIONS" [value]="o">{{ o }}</mat-option>
+                <mat-option *ngFor="let o of sourceOptions" [value]="o.id">{{ o.name }}</mat-option>
               </mat-select>
             </mat-form-field>
           </td>
