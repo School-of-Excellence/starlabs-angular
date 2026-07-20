@@ -70,6 +70,150 @@
   margin-top: 2px;
 }
 
+/* ---- colour swatch (ads) ---- */
+.color-swatch {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e2e6ee;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  margin-left: 6px;
+  flex: 0 0 auto;
+}
+
+.color-swatch::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.color-swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+/* ---- image upload ---- */
+.upload-block {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.upload-head {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.upload-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.92rem;
+}
+
+.upload-size {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.upload-desc {
+  color: #6b7280;
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.upload-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.upload-preview {
+  width: 120px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e6ee;
+  background: #ffffff;
+}
+
+.upload-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 72px;
+  border-radius: 8px;
+  border: 1px dashed #dbe0ea;
+  background: #ffffff;
+}
+
+.upload-empty mat-icon {
+  color: #c4cbd7;
+  font-size: 28px;
+  height: 28px;
+  width: 28px;
+}
+
+.upload-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-progress mat-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+}
+
+.upload-percent {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #4f46e5;
+  min-width: 34px;
+  text-align: right;
+}
+
+.upload-actions mat-icon {
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.upload-remove {
+  color: #d76060;
+}
+
 .dialog-actions {
   padding: 12px 4px 4px 4px;
   gap: 10px;

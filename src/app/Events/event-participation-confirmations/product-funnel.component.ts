@@ -861,6 +861,8 @@ export class ProductFunnelComponent implements OnInit {
   get readyCount() { return this.selection.selected.filter(r => this.isApprovable(r)).length; }
   get selectedToMark() { return this.selection.selected.filter(r => r.isApproved && !r.attended); }
   get selectedToUnattend() { return this.selection.selected.filter(r => r.isApproved); }
+  // Requested (not yet approved) rows that have an actual request doc to revoke.
+  get selectedToRevokeRequested() { return this.selection.selected.filter(r => !!r.requestData?.['docid'] && !r.isApproved); }
 
   // ---- Display helpers ----
   formatMonthYear(ms: number): string {
@@ -1179,6 +1181,52 @@ export class ProductFunnelComponent implements OnInit {
       this.selectedDeliverySet = seq;
       this.selectedQueueVariation = variation;
     });
+  }
+
+  // Single per-row entry point: approved rows take the heavy path (cancel product etc.),
+  // requested rows take the lightweight status-only path.
+  revoke(row: PRow) {
+    if (row.isApproved) this.markRevoked([row]);
+    else this.markRevokedRequested([row]);
+  }
+
+  // ---- Revoke a still-REQUESTED participant (lightweight): status -> 'revoked' only. ----
+  // Requested people have no initiated product / event profile / deliverables yet, so unlike
+  // markRevoked() this ONLY flips the request status and records who/when — nothing else is touched.
+  async markRevokedRequested(rows: PRow[]) {
+    const targets = rows.filter(r => r.requestData?.['docid'] && !r.isApproved);
+    if (!targets.length) return;
+    const ref = this.dialog.open(this.confirmTpl, {
+      width: '440px', autoFocus: false, panelClass: 'sx-dialog',
+      data: {
+        title: 'Revoke requested participation',
+        body: `Revoke ${targets.length} requested participant(s). Their request will be cancelled.`,
+        warn: 'This cancels the participation request. It cannot be undone.',
+        confirm: `Revoke ${targets.length}`
+      }
+    });
+    const ok = await ref.afterClosed().toPromise();
+    if (!ok) return;
+
+    this.progress = { msg: 'Revoking…', value: 0, total: targets.length, eta: '' };
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
+    try {
+      const batch = writeBatch(this.firestore);
+      const revokedBy = (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
+      for (const r of targets) {
+        batch.update(doc(this.firestore, 'event participation request', r.requestData['docid']),
+          { status: 'revoked', revoked_by: revokedBy, revoked_date: serverTimestamp() });
+      }
+      await batch.commit();
+      this.snackbar.open(`Revoked ${targets.length}`, 'OK', { duration: 4000 });
+      this.selection.clear();
+      await this.loadData();
+    } catch (e) {
+      console.log(e);
+      this.snackbar.open('Could not revoke', 'OK', { duration: 4000 });
+    } finally {
+      pref.close();
+    }
   }
 
   // ---- Finalize attendance (after the event): mark no-show + lock the frozen snapshot ----

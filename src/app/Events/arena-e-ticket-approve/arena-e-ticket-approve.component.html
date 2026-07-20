@@ -47,7 +47,7 @@
       <table mat-table [dataSource]="dataSource" matSort>
         <ng-container matColumnDef="profileid">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
-          <td mat-cell *matCellDef="let row"> {{mapProfile[row.profileid]['name']}} </td>
+          <td mat-cell *matCellDef="let row"> {{mapProfile[row.profileid]?.['name']}} </td>
         </ng-container>
         <ng-container matColumnDef="eventdate">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Event Date </th>
@@ -58,19 +58,27 @@
         </ng-container>
         <ng-container matColumnDef="eventref">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Event </th>
-          <td mat-cell *matCellDef="let row"> {{mapEvents[row.eventref.id]['name']}} </td>
+          <td mat-cell *matCellDef="let row"> {{mapEvents[row.eventref?.id]?.['name']}} </td>
         </ng-container>
         <ng-container matColumnDef="productref">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Product </th>
-          <td mat-cell *matCellDef="let row"> {{mapProducts[row.productref.id]['product']}} </td>
+          <td mat-cell *matCellDef="let row"> {{mapProducts[row.productref?.id]?.['product']}} </td>
+        </ng-container>
+        <ng-container matColumnDef="venuefee">
+          <th mat-header-cell *matHeaderCellDef> Venue Fee </th>
+          <td mat-cell *matCellDef="let row"> {{getVenueFeeStatus(row)}} </td>
+        </ng-container>
+        <ng-container matColumnDef="contract">
+          <th mat-header-cell *matHeaderCellDef> Contract </th>
+          <td mat-cell *matCellDef="let row"> {{getContractStatus(row)}} </td>
         </ng-container>
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Action</th>
           <td mat-cell *matCellDef="let row" >
-            <button *ngIf="mapArenaETicket[row['profileid']] === undefined" mat-stroked-button type="button" (click)="onSubmit(row)">Approve</button>
+            <button *ngIf="mapArenaETicket[row['profileid']] === undefined" mat-stroked-button type="button" [disabled]="!canApprove(row)" (click)="onSubmit(row)">Approve</button>
             <span *ngIf="mapArenaETicket[row['profileid']] != undefined">Generated</span>&nbsp;&nbsp;
             <span *ngIf="mapArenaETicket[row['profileid']] != undefined">
-              <span *ngIf="!mapArenaETicket[row['profileid']]['producteligible'].includes(row['productref'].id)">
+              <span *ngIf="!mapArenaETicket[row['profileid']]['producteligible']?.includes(row['productref']?.id)">
                 <button mat-stroked-button type="button" (click)="onProductAppend(row)">Append Product</button>
               </span>
             </span>

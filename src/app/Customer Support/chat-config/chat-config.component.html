@@ -113,6 +113,7 @@
                                     <div class="category-info">
                                         <div class="category-name">{{ getCategoryName(i) }}</div>
                                         <div class="category-assigned">{{ getAssignedNames(i) }}</div>
+                                        <div *ngIf="getCategoryDescription(i)" class="category-description">{{ getCategoryDescription(i) }}</div>
                                         <div *ngIf="getSubcategories(i).length > 0" class="category-subcategories">
                                             <span class="subcategory-label">Subcategories:</span>
                                             <span *ngFor="let sub of getSubcategories(i)" class="subcategory-chip">{{ sub }}</span>
@@ -168,6 +169,12 @@
                                             </mat-error>
                                         </mat-form-field>
                                     </div>
+
+                                    <mat-form-field appearance="outline" style="width: 100%;">
+                                        <mat-label>Description</mat-label>
+                                        <textarea matInput placeholder="Enter a description for this category"
+                                            formControlName="description" rows="3"></textarea>
+                                    </mat-form-field>
 
                                     <!-- Subcategories -->
                                     <div formArrayName="subcategories" class="subcategories-section">
