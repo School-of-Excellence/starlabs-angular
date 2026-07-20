@@ -8,7 +8,7 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { collection, collectionData, doc, docData, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
@@ -109,6 +109,15 @@ export class DynamicStudioV2Component {
   liveAssignmentSubStudioIds = ''
   liveAssignment = null
   mapStudioLiveAssignment = {}
+
+  // Webhook-derived presence truth (collection `live assignment log`, keyed by the
+  // live assignment docid). Populated by the zoomActivitylog webhook from Zoom's
+  // participant_joined/left + meeting.started/ended events. `presenceView` overlays
+  // these onto `liveAssignment` so the existing presence getters read the reliable
+  // server truth instead of the client-stamped one-shots. See specs/plans/2026-07-11.
+  liveAssignmentLog: any = null
+  private liveAssignmentLogSub: Subscription | null = null
+  private liveAssignmentLogSubId = ''
   // Token
   tokenSubscription:Subscription = null
   stageTokenList = []
@@ -560,12 +569,87 @@ export class DynamicStudioV2Component {
     }
   }
 
+  // Subscribe to this assignment's `live assignment log` doc (webhook presence).
+  // Re-subscribes only when the docid actually changes, so selecting the same
+  // studio twice doesn't churn the listener. Cleared when no assignment is selected.
+  private subscribeLiveAssignmentLog(): void {
+    const docid = this.liveAssignment?.['docid'] || ''
+    if (docid === this.liveAssignmentLogSubId) return
+    this.liveAssignmentLogSub?.unsubscribe()
+    this.liveAssignmentLogSub = null
+    this.liveAssignmentLog = null
+    this.liveAssignmentLogSubId = docid
+    if (!docid) return
+    this.liveAssignmentLogSub = docData(
+      doc(this.firestore, 'live assignment log', docid)
+    ).subscribe(
+      (log: any) => { this.liveAssignmentLog = log || null },
+      (err: any) => console.warn('[presence] live assignment log sub failed', err)
+    )
+  }
+
+  // Overlay webhook presence (`live assignment log`) onto `liveAssignment` so the
+  // presence getters read reliable server truth. Only fields the log actually has
+  // override the client one-shots; everything else falls through unchanged (old
+  // calls with no log doc keep their existing behaviour). `participantReadyAt` is
+  // NEVER overridden — it is a pre-Zoom "arrived at wait screen" state the webhook
+  // cannot see, and stays client-stamped.
+  get presenceView(): any {
+    const la: any = this.liveAssignment || {}
+    const log: any = this.liveAssignmentLog
+    if (!log) return la
+    const specialists: any = log['specialists'] || {}
+    const specVals: any[] = Object.values(specialists)
+    const specialistPresent = specVals.some(s => s && s.joinedAt && !s.leftAt)
+    const specialistEverJoined = specVals.some(s => s && s.joinedAt)
+    const anyJoinedAt = (specVals.find(s => s && s.joinedAt) || {})['joinedAt']
+    const anyLeftAt = (specVals.filter(s => s && s.leftAt).pop() || {})['leftAt']
+    const overlay: any = {}
+    if (log['participantInCallAt']) overlay['participantInCallAt'] = log['participantInCallAt']
+    if (log['participantLeftAt']) overlay['participantLeftAt'] = log['participantLeftAt']
+    if (specialistEverJoined) {
+      // Collapse the per-specialist map into the single-field semantics the getters
+      // expect: joined = anyone ever joined; left = everyone who joined has left.
+      overlay['specialistJoinedAt'] = anyJoinedAt || true
+      overlay['specialistLeftAt'] = specialistPresent ? null : (anyLeftAt || log['meetingEndedAt'] || true)
+    }
+    // Only treat the session as ended if the ended event was for the CURRENT
+    // meeting — after a regenerate the OLD meeting's end must not end the new one.
+    const currentMeetingId = la?.['zoomdata']?.['id']
+    if (log['meetingEndedAt'] && log['endedMeetingId'] != null &&
+        String(log['endedMeetingId']) === String(currentMeetingId)) {
+      overlay['meetingEndedAt'] = log['meetingEndedAt']
+    }
+    return { ...la, ...overlay }
+  }
+
+  // ---- Regenerate availability ----------------------------------------------
+  // The link is EXPIRED when the join token's lifetime (linkExpiresAt, written by
+  // studioZoomLink/regenerate) has passed.
+  get linkExpired(): boolean {
+    void this.presenceTick
+    const exp: any = this.liveAssignment?.['linkExpiresAt']
+    if (!exp) return false
+    const ms = typeof exp?.toMillis === 'function' ? exp.toMillis()
+             : typeof exp?.seconds === 'number' ? exp.seconds * 1000
+             : new Date(exp).getTime()
+    return Number.isFinite(ms) && ms < Date.now()
+  }
+  // Offer regenerate ONLY when the link is unusable — meeting ended (callEnded
+  // already folds in the webhook meetingEndedAt), token expired, or link broken.
+  // While the call is healthy the specialist uses "Start Meeting" (rejoin) instead.
+  // With the backend ending the old meeting first, regenerating here can never hit
+  // "other meeting in progress". (isZoomLinkBroken is defined below.)
+  get canRegenerate(): boolean {
+    return this.callEnded || this.linkExpired || this.isZoomLinkBroken
+  }
+
   // True only when the participant is currently in the wait screen (which
   // is the moment the specialist might want to jump to the meeting button).
   // Used to gate the topbar "Jump to Meeting" CTA.
   get participantInWaitingRoom(): boolean {
     void this.presenceTick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     const ready = la['participantReadyAt']
     const inCall = la['participantInCallAt']
     const left = la['participantLeftAt']
@@ -576,7 +660,7 @@ export class DynamicStudioV2Component {
   // True when the participant is actually live in the Zoom call.
   get participantHasJoinedCall(): boolean {
     void this.presenceTick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     if (!la['participantInCallAt']) return false
     if (la['participantLeftAt']) return false
     return true
@@ -739,17 +823,17 @@ export class DynamicStudioV2Component {
   // tones: primary | green | amber | slate. icons are Material icon names.
   get topBarStatus(): { tone: string; icon: string; title: string; sub: string } {
     void this.presenceTick // re-run on tick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     const readyAt = la['participantReadyAt']
     const inCallAt = la['participantInCallAt']
     const leftAt = la['participantLeftAt']
     const specialistJoinedAt = la['specialistJoinedAt']
     const specialistLeftAt = la['specialistLeftAt']
 
-    // call ended — BOTH parties left after the call had started (e.g. "End
-    // meeting for all"). Must be checked before the participant-left branch,
+    // call ended — the webhook `meeting.ended` (via callEnded) OR the legacy
+    // both-parties-left signal. Must be checked before the participant-left branch,
     // otherwise an ended call reads as "participant left · waiting for rejoin".
-    if (leftAt && specialistLeftAt && specialistJoinedAt) {
+    if (this.callEnded || (leftAt && specialistLeftAt && specialistJoinedAt)) {
       return { tone: 'slate', icon: 'check_circle', title: 'Call ended', sub: 'Complete the activity to finish this session.' }
     }
     // participant in call (joined live) — readyAt/leftAt are nulled on join
@@ -1289,6 +1373,8 @@ export class DynamicStudioV2Component {
    this.studioChannel = null
    this.chatUnreadSub?.unsubscribe()
    this.chatLiveSub?.unsubscribe()
+   this.liveAssignmentLogSub?.unsubscribe()
+   this.liveAssignmentLogSub = null
    // takeUntil tears down only on a notifier `next` — emitting it BEFORE
    // `complete()` is what actually unsubscribes every takeUntil(subscriptionHandle)
    // stream. The previous order (complete() then next()) left ~18 realtime
@@ -1933,6 +2019,11 @@ export class DynamicStudioV2Component {
                 ...{token: (this.liveAssignment ?? {})["token"]},
                 ...this.mapStudioLiveAssignment[this.selectedStudio["docid"]]
               }
+              // Keep the webhook presence log subscribed for THIS assignment. This
+              // realtime path (auto-enter / collaborator) sets liveAssignment without
+              // going through selectStudio, so without this the log (and therefore
+              // callEnded / presence) would never load. No-op if already subscribed.
+              this.subscribeLiveAssignmentLog()
               // Fetch the participant's active journey + ensure their profile
               // is in mapProfile (in case they were created after the initial load).
               const profId = this.liveAssignment?.['participantid'] || this.liveAssignment?.['token']?.['profile_id']
@@ -1957,6 +2048,7 @@ export class DynamicStudioV2Component {
             }
             else{
               this.liveAssignment = null
+              this.subscribeLiveAssignmentLog()
               this.participantJourneyName = null
               this.journeyLoadedForProfile = ''
               // Session ended (e.g. participant moved to another stage) — drop the
@@ -2098,6 +2190,7 @@ export class DynamicStudioV2Component {
     this.selectedStudio = studio
     console.log(this.selectedStudio)
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
+    this.subscribeLiveAssignmentLog()
     this.initChatThread()
     console.log(this.liveAssignment, 'this.liveAssignment');
     console.log('[studio] queue studio pairing id:', this.selectedStudio?.['docid'] ?? null,
@@ -3482,19 +3575,26 @@ export class DynamicStudioV2Component {
       console.log('[regenerateZoomLink] error (ignored, link regenerates server-side)', err)
     }
 
-    // A fresh link is a fresh session: clear the ended-session presence one-shots
-    // so `callEnded` resets (re-enabling "Start Meeting" for the new link) and no
-    // stale status (e.g. "participant in call") lingers from the old meeting.
+    // A fresh link is a fresh session: clear the participant's `participantReadyAt`
+    // wait-screen one-shot. The in-call/leave presence lives in `live assignment
+    // log`, which is reset by the deleteDoc below — so no other fields to clear.
     try {
       await updateDoc(doc(this.firestore, 'live assignment', this.liveAssignment['docid']), {
-        specialistJoinedAt: null,
-        specialistLeftAt: null,
-        participantLeftAt: null,
-        participantInCallAt: null,
         participantReadyAt: null
       })
     } catch (e) {
       console.warn('[regenerateZoomLink] could not reset presence one-shots', e)
+    }
+
+    // A fresh link is a fresh session: drop the webhook presence log so the old
+    // meeting's join/leave/ended state doesn't bleed into the new one. The next
+    // Zoom event for the new meeting recreates it fresh (an OLD meeting.ended that
+    // lands afterwards is harmless — it carries endedMeetingId of the old meeting,
+    // which presenceView ignores).
+    try {
+      await deleteDoc(doc(this.firestore, 'live assignment log', this.liveAssignment['docid']))
+    } catch (e) {
+      console.warn('[regenerateZoomLink] could not reset presence log', e)
     }
 
     generateLoading.close()
@@ -4521,7 +4621,9 @@ export class DynamicStudioV2Component {
   // page — they MUST generate a fresh link instead.
   get callEnded(): boolean {
     void this.presenceTick // re-run this getter on the presence tick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
+    // Webhook says the meeting ended → definitively ended (cleanest signal).
+    if (la['meetingEndedAt']) return true
     return !!(la['participantLeftAt'] && la['specialistLeftAt'] && la['specialistJoinedAt'])
   }
 
@@ -4530,7 +4632,7 @@ export class DynamicStudioV2Component {
   // Meeting" so they know they're already in.
   get specialistInMeeting(): boolean {
     void this.presenceTick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     return !!la['specialistJoinedAt'] && !la['specialistLeftAt'] && !this.callEnded
   }
 
