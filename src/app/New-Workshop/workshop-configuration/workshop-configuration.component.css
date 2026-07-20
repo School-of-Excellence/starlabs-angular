@@ -948,3 +948,18 @@ mat-divider { margin: 8px 0 !important; }
     max-width: none;
   }
 }
+/* ---- hero accent colour swatch ---- */
+.color-swatch {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e2e6ee;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  margin-left: 6px;
+  flex: 0 0 auto;
+}
+.color-swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+.color-swatch::-webkit-color-swatch { border: none; border-radius: 4px; }
+.color-swatch::-moz-color-swatch { border: none; border-radius: 4px; }
