@@ -1,9 +1,6 @@
 <div class="m-4">
   <span class="d-flex justify-content-center">
     <h1>{{dialogdata == null ? 'Add' : 'Edit'}} Delivery Activities</h1>
-    <div *ngIf="data != null && selectedType == 'Form'">
-      <button type="button" mat-stroked-button style="left: 200px;" class="cancelbtn" (click)="deleteForm()">Delete</button>
-    </div>
   </span>
   <div class="d-flex flex-row justify-content-between">
     <mat-form-field appearance="outline">
@@ -57,214 +54,274 @@
     </div>
 
     <!-- Form type -->
-    <!-- *ngSwitchCase=" ['Form','Report'].includes(selectedType) ? selectedType : '' " -->
-    <div *ngSwitchCase="'Form'">
+    <div *ngSwitchCase="'Form'" class="fb">
       <form [formGroup]="formform">
-        <mat-form-field class="textField" appearance="outline">
-          <mat-label>Form For</mat-label>
-          <mat-select formControlName="formfor">
-            <mat-option *ngFor="let option of ['workshop']" [value]="option">{{option}}</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field class="textField" appearance="outline">
-          <mat-label>Form Names</mat-label>
-          <input type="text" matInput formControlName="formname">
-          <mat-error *ngIf="formform.get('formname').hasError('required')">
-            <strong>Required</strong>
-          </mat-error>
-        </mat-form-field><br>
-        <!--  (input)="autoGrowTextZone($event)" -->
-        <mat-form-field class="textField" appearance="outline">
-          <mat-label>Form Description</mat-label>
-          <textarea id="fd" matInput formControlName="formdescription"></textarea>
-        </mat-form-field><br>
-        <mat-form-field class="textField" appearance="outline">
-          <mat-label>Form Type</mat-label>
-          <mat-select formControlName="formtype">
-            <mat-option *ngFor="let option of ['stepper','normal']" [value]="option">{{option}}</mat-option>
-          </mat-select>
-          <mat-error *ngIf="formform.get('formtype').hasError('required')">
-            <strong>Required</strong>
-          </mat-error>
-        </mat-form-field>
-        <div formArrayName="formarray">
-          <ul>
-            <li style="box-shadow: inset 0 0 10px grey;" class="p-3 mb-5 bg-white rounded"
-              *ngFor="let list of formarray.controls;let i = index" [formGroupName]="i"
-            >
-              <mat-form-field class="formfield2" appearance="fill">
-                <mat-label>Field Name</mat-label>
-                <textarea #textarea0 (input)="adjustHeight0(i)" matInput formControlName="fieldname" required></textarea>
-              </mat-form-field><br>
 
-              <mat-form-field class="formfield2" appearance="fill">
-                <mat-label>Field Description</mat-label>
-                <textarea  #textarea1 (input)="adjustHeight1(i)" matInput formControlName="fielddescription"></textarea>
-              </mat-form-field><br>
+        <!-- Form details -->
+        <section class="fb-section">
+          <header class="fb-section-head">
+            <div>
+              <h2 class="fb-section-title">Form details</h2>
+              <p class="fb-section-sub">What participants see at the top of the form.</p>
+            </div>
+          </header>
 
-              <mat-form-field class="formfield2" appearance="fill">
-                <mat-label>Field Notes</mat-label>
-                <textarea #textarea2 (input)="adjustHeight2(i)" matInput formControlName="fieldnotes"></textarea>
-              </mat-form-field><br>
+          <div class="fb-grid">
+            <mat-form-field class="fb-colspan" appearance="outline">
+              <mat-label>Form Name</mat-label>
+              <input type="text" matInput formControlName="formname">
+              <mat-error *ngIf="formform.get('formname').hasError('required')">
+                <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
 
-              <mat-form-field class="formfield2" appearance="fill" >
-                <mat-label>Field Type</mat-label>
-                <mat-select formControlName="type" required (selectionChange)="onTypeSelect($event.value,i)">
-                  <mat-option *ngFor="let value of keys" [value]="value">{{value}}</mat-option>
-                </mat-select>
-              </mat-form-field><br>
-              <mat-form-field
-                *ngIf="formarray.controls[i].get('type')?.value === 'array'"
-                class="formfield2"
-                appearance="fill">
-                <mat-label>Max Items (max entries user can add)</mat-label>
+            <mat-form-field appearance="outline">
+              <mat-label>Form Type</mat-label>
+              <mat-select formControlName="formtype">
+                <mat-option *ngFor="let option of ['stepper','normal']" [value]="option">{{option}}</mat-option>
+              </mat-select>
+              <mat-error *ngIf="formform.get('formtype').hasError('required')">
+                <strong>Required</strong>
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Form For</mat-label>
+              <mat-select formControlName="formfor">
+                <mat-option *ngFor="let option of ['workshop']" [value]="option">{{option}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field class="fb-colspan" appearance="outline">
+              <mat-label>Form Description</mat-label>
+              <textarea id="fd" (input)="autoGrow($event)" matInput formControlName="formdescription"></textarea>
+            </mat-form-field>
+          </div>
+        </section>
+
+        <!-- Fields -->
+        <section class="fb-section" formArrayName="formarray">
+          <header class="fb-section-head">
+            <div>
+              <h2 class="fb-section-title">Fields</h2>
+              <p class="fb-section-sub">The questions participants answer, in order.</p>
+            </div>
+            <button *ngIf="formarray.length > 1" mat-button type="button" class="fb-collapse-all" (click)="toggleAllCollapsed()">
+              {{allCollapsed ? 'Expand all' : 'Collapse all'}}
+            </button>
+            <span class="fb-count">{{formarray.length}} {{formarray.length === 1 ? 'field' : 'fields'}}</span>
+          </header>
+
+          <div class="fb-cards" cdkDropList (cdkDropListDropped)="dropField($event)">
+          <div class="fb-card" [class.fb-collapsed]="isCollapsed(list)" cdkDrag
+            *ngFor="let list of formarray.controls;let i = index" [formGroupName]="i">
+            <div class="fb-card-head">
+              <button mat-icon-button type="button" class="fb-icon-btn" [title]="isCollapsed(list) ? 'Expand' : 'Collapse'"
+                [attr.aria-label]="isCollapsed(list) ? 'Expand field' : 'Collapse field'" (click)="toggleCollapsed(list)">
+                <mat-icon class="fb-chevron">expand_more</mat-icon>
+              </button>
+              <span class="fb-index">{{i + 1}}</span>
+              <span class="fb-card-name">{{formarray.controls[i].get('fieldname')?.value || 'Untitled field'}}</span>
+              <span class="fb-card-type" *ngIf="formarray.controls[i].get('type')?.value">{{formarray.controls[i].get('type')?.value}}</span>
+              <span class="fb-flex-spacer"></span>
+              <button mat-icon-button type="button" class="fb-icon-btn" title="Duplicate this field (added at the end)"
+                aria-label="Duplicate this field" (click)="duplicateField(i)">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+              <button mat-icon-button type="button" class="fb-icon-btn" title="Add a field below"
+                aria-label="Add a field below" (click)="addarray(i)">
+                <mat-icon>add</mat-icon>
+              </button>
+              <button mat-icon-button type="button" class="fb-icon-btn fb-icon-danger" title="Remove this field"
+                aria-label="Remove this field" (click)="removearray(i)" [disabled]="formarray.length === 1">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+              <span class="fb-drag-handle" cdkDragHandle title="Drag to reorder" aria-hidden="true">
+                <mat-icon>drag_indicator</mat-icon>
+              </span>
+            </div>
+
+            <div class="fb-card-body">
+              <div class="fb-grid">
+                <mat-form-field class="fb-colspan" appearance="outline">
+                  <mat-label>Field Name</mat-label>
+                  <textarea #textarea0 (input)="autoGrow($event)" matInput formControlName="fieldname" required></textarea>
+                  <mat-error>Field name is required</mat-error>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Field Type</mat-label>
+                  <mat-select formControlName="type" required (selectionChange)="onTypeSelect($event.value,i)">
+                    <mat-option *ngFor="let value of keys" [value]="value">{{value}}</mat-option>
+                  </mat-select>
+                  <mat-error>Choose a type</mat-error>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Field Description</mat-label>
+                  <textarea #textarea1 (input)="autoGrow($event)" matInput formControlName="fielddescription"></textarea>
+                </mat-form-field>
+
+                <mat-form-field class="fb-colspan" appearance="outline">
+                  <mat-label>Field Notes</mat-label>
+                  <textarea #textarea2 (input)="autoGrow($event)" matInput formControlName="fieldnotes"></textarea>
+                </mat-form-field>
+              </div>
+
+              <mat-form-field *ngIf="formarray.controls[i].get('type')?.value === 'array'" appearance="outline" class="fb-wide">
+                <mat-label>Max Items</mat-label>
                 <input type="number" matInput formControlName="maxitems" min="1">
-                <mat-hint>Leave empty for no limit</mat-hint>
-              </mat-form-field><br>
-
-              <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true && maxMinFor.includes(formarray.controls[i].get('type')?.value)" class="formfield2" appearance="fill">
-                <mat-label>Maximum Count (ex:maximum how many options user can select)</mat-label>
-                <input type="number" matInput formControlName="maxcount" >
+                <mat-hint>Most entries a user can add. Leave empty for no limit.</mat-hint>
               </mat-form-field>
 
-              <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true && maxMinFor.includes(formarray.controls[i].get('type')?.value)" class="formfield2" appearance="fill">
-                <mat-label>Minimum Count (ex:minimum how many options user can select)</mat-label>
-                <input type="number" matInput formControlName="mincount" >
-              </mat-form-field>
+              <div class="fb-grid" *ngIf="values[formarray.controls[i].get('type')?.value] == true && maxMinFor.includes(formarray.controls[i].get('type')?.value)">
+                <mat-form-field appearance="outline">
+                  <mat-label>Maximum selections</mat-label>
+                  <input type="number" matInput formControlName="maxcount">
+                  <mat-hint>Most options a user may pick</mat-hint>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Minimum selections</mat-label>
+                  <input type="number" matInput formControlName="mincount">
+                  <mat-hint>Fewest options a user must pick</mat-hint>
+                </mat-form-field>
+              </div>
 
-              <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true" class="formfield2" appearance="fill">
-                <mat-label>Options for {{formarray.controls[i].get('type')?.value}}</mat-label>
+              <mat-form-field *ngIf="values[formarray.controls[i].get('type')?.value] == true" class="fb-wide" appearance="outline">
+                <mat-label>{{['video','audio'].includes(formarray.controls[i].get('type')?.value) ? 'Media URL' : 'Options for ' + formarray.controls[i].get('type')?.value}}</mat-label>
                 <mat-chip-grid #chipList formControlName="options">
                   <mat-chip-row
-                    *ngFor="let Options of formarray.controls[i].get('options').value;let j =index"
+                    *ngFor="let Options of formarray.controls[i].get('options').value;let j = index"
                     [value]="Options"
-                    [editable]="editable"
-                    (removed)="remove(i,j )"
+                    (removed)="remove(i,j,optInput)"
                   >
-                    {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
+                    {{Options}}<mat-icon matChipRemove [attr.aria-label]="'Remove ' + Options">cancel</mat-icon>
                   </mat-chip-row>
-                  <input placeholder=" Type New Option...and Press Enter"
+                  <input #optInput [placeholder]="['video','audio'].includes(formarray.controls[i].get('type')?.value) ? 'Paste the URL and press Enter' : 'Add an option and press Enter'"
                           [matChipInputFor]="chipList"
                           (matChipInputTokenEnd)="add($event,i,formarray.controls[i].get('type')?.value)">
                 </mat-chip-grid>
-                <mat-hint *ngIf="formarray.controls[i].get('type')?.value == 'video'">If youtube url use syntax as shown here : "https://www.youtube.com/embed/placeholder_id"</mat-hint>
-              </mat-form-field><br>
+                <mat-hint *ngIf="formarray.controls[i].get('type')?.value == 'video'">For YouTube, use the embed form: "https://www.youtube.com/embed/placeholder_id"</mat-hint>
+              </mat-form-field>
 
-              <span *ngIf="!['array','video','audio'].includes(formarray.controls[i].get('type')?.value)">
-                <mat-slide-toggle  formControlName="required">Required</mat-slide-toggle>&nbsp;&nbsp;&nbsp;
-              </span><br>
-              <br>
-
-              <p class="ml-4" *ngIf="values[formarray.controls[i].get('type')?.value] == true && flippingFor.includes(formarray.controls[i].get('type')?.value)">
-                <mat-checkbox formControlName="flipping" (change)="onFlippingValueChange(i)">Enable Flipping (means:answer is flipped to questions)</mat-checkbox>
-              </p>
-
-              <div *ngIf="formarray.controls[i].get('flipping')?.value" class="ml-4" >
-                <span class="mt-2 mb-2"><mat-divider></mat-divider></span>
-                <span class="d-flex justify-content-center font-weight-bold mt-1">Flipping Question</span>
-                <div formGroupName="flippingquestion">
-                  <mat-form-field class="formfield2" appearance="fill">
-                    <mat-label>Field Name</mat-label>
-                    <textarea #textarea3 (input)="adjustHeight3(i)" matInput formControlName="fieldname" required></textarea>
-                  </mat-form-field><br>
-                  <mat-form-field class="formfield2" appearance="fill">
-                    <mat-label>Field Description</mat-label>
-                    <textarea  #textarea4 (input)="adjustHeight4(i)" matInput formControlName="fielddescription"></textarea>
-                  </mat-form-field><br>
-                  <mat-form-field class="formfield2" appearance="fill" >
-                    <mat-label>Field Type</mat-label>
-                    <mat-select formControlName="type" required >
-                      <mat-option *ngFor="let value of ['slider','Text']" [value]="value">{{value}}</mat-option>
-                    </mat-select>
-                  </mat-form-field><br>
-                  <mat-form-field class="formfield2" appearance="fill">
-                    <mat-label>Options </mat-label>
-                    <mat-chip-grid #chipList2 formControlName="options">
-                      <mat-chip-row
-                        *ngFor="let Options of formarray.controls[i].get('flippingquestion').get('options').value;let j =index"
-                        [value]="Options"
-                        [editable]="editable"
-                        (removed)="removeFlippingQuestionOption(i,j )"
-                      >
-                        {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
-                      </mat-chip-row>
-                      <input placeholder=" Type New Option...and Press Enter"
-                            [matChipInputFor]="chipList2"
-                            (matChipInputTokenEnd)="addFlippingQuestionOption($event,i)">
-                    </mat-chip-grid>
-                  </mat-form-field><br>
-                  <mat-slide-toggle  formControlName="required">Required</mat-slide-toggle>
-                </div>
-              </div><br>
-              <div class="ml-6" *ngIf="formarray.controls[i].get('type')?.value === 'array'" >
-                <mat-divider class="mt-2 mb-2"></mat-divider>
-                <span class="d-flex justify-content-center font-weight-bold mt-1">Array</span>
-                <div formArrayName="array">
-                  <ul>
-                    <li *ngFor="let list of getSubFormArray(i).controls;let subindex = index" [formGroupName]="subindex">
-                      <mat-form-field class="formfield2" appearance="fill">
-                        <mat-label>Field Name</mat-label>
-                        <input type="text" formControlName="fieldname" matInput required>
-                      </mat-form-field><br>
-
-                      <mat-form-field class="formfield2" appearance="fill" >
-                        <mat-label>Field Type</mat-label>
-                        <mat-select  formControlName="type" required >
-                          <mat-option *ngFor="let value of keys" [value]="value">{{value}}</mat-option>
-                        </mat-select>
-                        <mat-hint style="color: crimson;" *ngIf="getSubFormArray(i).controls[subindex].get('type').value == 'array'">Type Array won't work here.</mat-hint>
-                      </mat-form-field><br>
-
-                      <mat-form-field *ngIf="values[getSubFormArray(i).controls[subindex].get('type')?.value] == true" class="formfield2" appearance="fill">
-                        <mat-label>Options for {{getSubFormArray(i).controls[subindex].get('type')?.value}}</mat-label>
-                        <mat-chip-grid #chipList3 formControlName="options">
-                          <mat-chip-row
-                            *ngFor="let Options of getSubFormArray(i).controls[subindex].get('options').value;let k =index"
-                            [value]="Options"
-                            [editable]="editable"
-                            (removed)="removeSubFormOption(i,subindex,k,subOptionInput)"
-                          >
-                            {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
-                          </mat-chip-row>
-                          <input #subOptionInput placeholder=" Type New Option...and Press Enter"
-                                  [matChipInputFor]="chipList3"
-                                  (matChipInputTokenEnd)="addSubFormOption($event,i,subindex)">
-                        </mat-chip-grid>
-                      </mat-form-field><br>
-
-                      <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
-
-                      &nbsp;&nbsp;&nbsp;<button
-                        *ngIf="subindex == (getSubFormArray(i).length - 1)"
-                        mat-mini-fab
-                        color="primary"
-                        class="formfield ml10"
-                        type="button"
-                        (click)="addSubFormControl(i)">
-                        <mat-icon>add</mat-icon>
-                      </button>
-                      &nbsp;&nbsp;&nbsp;<button
-                        *ngIf="subindex == (getSubFormArray(i).length - 1)"
-                        mat-mini-fab
-                        class="formfield ml10"
-                        type="button"
-                        (click)="removeSubFormControl(i, subindex)">
-                        <mat-icon>remove</mat-icon>
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-                <mat-divider class="mt-2 mb-2"></mat-divider>
+              <div class="fb-card-foot" *ngIf="!['array','video','audio'].includes(formarray.controls[i].get('type')?.value)">
+                <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
+                <mat-checkbox *ngIf="values[formarray.controls[i].get('type')?.value] == true && flippingFor.includes(formarray.controls[i].get('type')?.value)"
+                  formControlName="flipping" (change)="onFlippingValueChange(i)">
+                  Flipping <span class="fb-muted">(the answer flips into a follow-up question)</span>
+                </mat-checkbox>
               </div>
-              <button  mat-mini-fab color="primary" (click)="addarray(i)" type="button"> <mat-icon>add</mat-icon></button>&nbsp;&nbsp;&nbsp;
-              <button  mat-mini-fab (click)="removearray(i)" type="button"> <mat-icon>remove</mat-icon></button>
-            </li>
-          </ul>
-        </div>
-        <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button type="submit" mat-stroked-button class="successbtn" (click)="submitForm(formform.value)" [disabled]="loading">Submit</button>
-        </div>
+
+              <div *ngIf="formarray.controls[i].get('flipping')?.value" class="fb-nest">
+                <div class="fb-nest-head">Flipping question</div>
+                <div formGroupName="flippingquestion">
+                  <div class="fb-grid">
+                    <mat-form-field class="fb-colspan" appearance="outline">
+                      <mat-label>Field Name</mat-label>
+                      <textarea #textarea3 (input)="autoGrow($event)" matInput formControlName="fieldname" required></textarea>
+                      <mat-error>Field name is required</mat-error>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Field Type</mat-label>
+                      <mat-select formControlName="type" required>
+                        <mat-option *ngFor="let value of ['slider','Text']" [value]="value">{{value}}</mat-option>
+                      </mat-select>
+                      <mat-error>Choose a type</mat-error>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Field Description</mat-label>
+                      <textarea #textarea4 (input)="autoGrow($event)" matInput formControlName="fielddescription"></textarea>
+                    </mat-form-field>
+                    <mat-form-field class="fb-colspan" appearance="outline"
+                      *ngIf="values[formarray.controls[i].get('flippingquestion')?.get('type')?.value] == true">
+                      <mat-label>Options</mat-label>
+                      <mat-chip-grid #chipList2 formControlName="options">
+                        <mat-chip-row
+                          *ngFor="let Options of formarray.controls[i].get('flippingquestion').get('options').value;let j = index"
+                          [value]="Options"
+                          (removed)="removeFlippingQuestionOption(i,j,flipOptInput)"
+                        >
+                          {{Options}}<mat-icon matChipRemove [attr.aria-label]="'Remove ' + Options">cancel</mat-icon>
+                        </mat-chip-row>
+                        <input #flipOptInput placeholder="Add an option and press Enter"
+                              [matChipInputFor]="chipList2"
+                              (matChipInputTokenEnd)="addFlippingQuestionOption($event,i)">
+                      </mat-chip-grid>
+                    </mat-form-field>
+                  </div>
+                  <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
+                </div>
+              </div>
+
+              <div *ngIf="formarray.controls[i].get('type')?.value === 'array'" class="fb-nest">
+                <div class="fb-nest-head">Sub-fields <span class="fb-muted">(each entry the user adds repeats these)</span></div>
+                <div formArrayName="array">
+                  <div class="fb-subrow" *ngFor="let list of getSubFormArray(i).controls;let subindex = index" [formGroupName]="subindex">
+                    <span class="fb-index fb-index-sub">{{i + 1}}.{{subindex + 1}}</span>
+                    <div class="fb-subrow-fields">
+                      <div class="fb-grid">
+                        <mat-form-field appearance="outline">
+                          <mat-label>Field Name</mat-label>
+                          <input type="text" formControlName="fieldname" matInput required>
+                          <mat-error>Field name is required</mat-error>
+                        </mat-form-field>
+                        <mat-form-field appearance="outline">
+                          <mat-label>Field Type</mat-label>
+                          <mat-select formControlName="type" required>
+                            <mat-option *ngFor="let value of keys" [value]="value">{{value}}</mat-option>
+                          </mat-select>
+                          <mat-hint class="fb-warn" *ngIf="getSubFormArray(i).controls[subindex].get('type').value == 'array'">Type Array won't work here.</mat-hint>
+                          <mat-error>Choose a type</mat-error>
+                        </mat-form-field>
+                        <mat-form-field *ngIf="values[getSubFormArray(i).controls[subindex].get('type')?.value] == true" class="fb-colspan" appearance="outline">
+                          <mat-label>{{['video','audio'].includes(getSubFormArray(i).controls[subindex].get('type')?.value) ? 'Media URL' : 'Options for ' + getSubFormArray(i).controls[subindex].get('type')?.value}}</mat-label>
+                          <mat-chip-grid #chipList3 formControlName="options">
+                            <mat-chip-row
+                              *ngFor="let Options of getSubFormArray(i).controls[subindex].get('options').value;let k = index"
+                              [value]="Options"
+                              (removed)="removeSubFormOption(i,subindex,k,subOptionInput)"
+                            >
+                              {{Options}}<mat-icon matChipRemove [attr.aria-label]="'Remove ' + Options">cancel</mat-icon>
+                            </mat-chip-row>
+                            <input #subOptionInput [placeholder]="['video','audio'].includes(getSubFormArray(i).controls[subindex].get('type')?.value) ? 'Paste the URL and press Enter' : 'Add an option and press Enter'"
+                                    [matChipInputFor]="chipList3"
+                                    (matChipInputTokenEnd)="addSubFormOption($event,i,subindex)">
+                          </mat-chip-grid>
+                        </mat-form-field>
+                      </div>
+                      <div class="fb-subrow-foot">
+                        <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
+                        <span class="fb-flex-spacer"></span>
+                        <button mat-icon-button type="button" class="fb-icon-btn fb-icon-danger" title="Remove this sub-field"
+                          (click)="removeSubFormControl(i, subindex)">
+                          <mat-icon>delete_outline</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <button mat-stroked-button type="button" class="fb-add-btn" (click)="addSubFormControl(i)">
+                    <mat-icon>add</mat-icon> Add sub-field
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <button mat-stroked-button type="button" class="fb-add-btn fb-add-field" (click)="addarray(formarray.length - 1)">
+            <mat-icon>add</mat-icon> Add field
+          </button>
+        </section>
+
+        <footer class="fb-footer">
+          <button *ngIf="data != null" mat-button type="button" class="fb-delete" (click)="deleteForm()" [disabled]="loading">
+            <mat-icon>delete_outline</mat-icon> Delete form
+          </button>
+          <span class="fb-flex-spacer"></span>
+          <span class="fb-autosave">Valid changes save automatically</span>
+          <button type="button" mat-stroked-button class="fb-close" (click)="closeDialog()" [disabled]="loading">Close</button>
+          <button type="submit" mat-flat-button class="fb-save" (click)="submitForm(formform.value, true)" [disabled]="loading">Save</button>
+        </footer>
       </form>
     </div>
 
