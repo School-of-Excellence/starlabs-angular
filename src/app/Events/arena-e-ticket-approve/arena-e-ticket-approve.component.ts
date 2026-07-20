@@ -36,7 +36,7 @@ import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/pr
   styleUrl: './arena-e-ticket-approve.component.css'
 })
 export class ArenaETicketApproveComponent {
-  displayedColumns: string[] = ["profileid","eventdate","eventref","productref","action","active"];
+  displayedColumns: string[] = ["profileid","eventdate","eventref","productref","venuefee","contract","action","active"];
   dataSource: MatTableDataSource<any> = new MatTableDataSource();
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
@@ -46,7 +46,8 @@ export class ArenaETicketApproveComponent {
 
   mapProfile = {}
   mapArenaETicket = {}
-  
+  mapEligibility = {}
+
   mapProducts={}
   filterForm = {
     profileid:null,
@@ -119,7 +120,7 @@ export class ArenaETicketApproveComponent {
       let e = data
       let value = JSON.parse(filter);
       return (value['profileid'] != null ? (e['profileid'] === value['profileid']) : true) && 
-            (value['event'].length != 0 ? (value['event'].includes(e['eventref'].id)) : true) 
+            (value['event'].length != 0 ? (value['event'].includes(e['eventref']?.id)) : true)
             // (value['productid'].length != 0 ? (value['productid'].includes(e['productref'].id)) : true)
     }
     return filterFunction;
@@ -143,6 +144,52 @@ export class ArenaETicketApproveComponent {
         this.mapArenaETicket[element['profileid']] = element
       }
     })
+
+    // e-ticket eligibility (mirrored from Watson) — keyed per EPR by eventparticipationid
+    const eligibilityCollRef = collection(this.firestore,"e-ticket eligibility")
+    const eligibilityQuery = query(eligibilityCollRef,where("eventid","==",this.selectedEvent))
+    collectionData(eligibilityQuery).pipe(takeUntil(this.destroy$)).subscribe(eligibilitysnap => {
+      this.mapEligibility = {}
+      for (let i = 0; i < eligibilitysnap.length; i++) {
+        const element = eligibilitysnap[i];
+        this.mapEligibility[element['eventparticipationid']] = element
+      }
+    })
+  }
+
+  // Venue fee column — exempted / paid / not paid, from the e-ticket eligibility mirror
+  getVenueFeeStatus(row:any):string{
+    const eligibility = this.mapEligibility[row['docid']]
+    if([null,undefined].includes(eligibility)){
+      return '—'
+    }
+    if(eligibility['exempted'] === true){
+      return 'Exempted'
+    }
+    return eligibility['venue_fee_paid'] === true ? 'Paid' : 'Not paid'
+  }
+
+  // Contract column — zohostatus from the e-ticket eligibility mirror
+  getContractStatus(row:any):string{
+    const eligibility = this.mapEligibility[row['docid']]
+    if([null,undefined].includes(eligibility) || [null,undefined,''].includes(eligibility['zohostatus'])){
+      return '—'
+    }
+    return eligibility['zohostatus']
+  }
+
+  // Approve is allowed only when the participant's e-ticket eligibility says either:
+  //   1. exempted === true, OR
+  //   2. venue_fee_paid === true AND zohostatus === 'completed'
+  canApprove(row:any):boolean{
+    const eligibility = this.mapEligibility[row['docid']]
+    if([null,undefined].includes(eligibility)){
+      return false
+    }
+    if(eligibility['exempted'] === true){
+      return true
+    }
+    return eligibility['venue_fee_paid'] === true && eligibility['zohostatus'] === 'completed'
   }
 
   ngAfterViewInit() {
