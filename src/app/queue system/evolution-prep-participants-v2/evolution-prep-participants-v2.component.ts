@@ -6,6 +6,7 @@ import {
   query, setDoc, where,
 } from '@angular/fire/firestore';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -18,6 +19,7 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { AtcFirebaseService } from '../../ATC-Ops/atc-firebase.service';
+import { TranscriptViewerDialog } from './transcript-viewer.dialog';
 import { AtcGenDoc, AtcStatus } from '../../ATC-Ops/atc-ops.types';
 
 /**
@@ -130,6 +132,14 @@ export interface PairingView {
   hits: LiveAssignmentHit[];      // zoom only
   targetLaId: string | null;      // zoom only — where a pasted link is written
   trail: string[];                // zoom only
+  /**
+   * Studio sessions that exist for this participant but are logged under queues
+   * NOT on their transferredfrom lineage. Only probed when the walk found nothing.
+   * Their existence means the token is disconnected from the participant's history
+   * — the fix is to link the token, not to attach a recording.
+   */
+  offLineage: Array<{ laId: string; queueId: string; hasTranscript: boolean }>;
+  offLineageProbed: boolean;
   dropboxLink: string;
   saving: boolean;
 }
@@ -143,6 +153,14 @@ export interface Row {
   currentstage: string;
 
   crossed: boolean | null;      // crossed the ATC stage? null until walked
+  /**
+   * 'here'        — token has no transferredfrom: the participant started in THIS
+   *                 queue, so the lineage is a single level and there is nothing to
+   *                 climb.
+   * 'transferred' — token carries transferredfrom + tokentransferredfrom, so the
+   *                 walk can reach ancestor queues.
+   */
+  origin: 'here' | 'transferred';
   walking: boolean;
   walkError: string | null;
 
@@ -163,7 +181,7 @@ export interface Row {
     CommonModule, FormsModule,
     MatTableModule, MatPaginatorModule, MatSortModule,
     MatFormFieldModule, MatInputModule, MatButtonModule,
-    MatIconModule, MatSelectModule,
+    MatIconModule, MatSelectModule, MatDialogModule,
     MatProgressSpinnerModule, MatTooltipModule, MatSnackBarModule,
   ],
   templateUrl: './evolution-prep-participants-v2.component.html',
@@ -205,7 +223,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   searchText = '';
   filterTranscript = '';   // '' | 'yes' | 'no' | 'superseded' | 'nosession'
   filterCrossed = '';      // '' | 'yes' | 'no'
-  filterGen = '';          // '' | 'none' | AtcStatus
+  filterGen: string[] = [];  // multi: 'none' | AtcStatus
+  filterOrigin = '';         // '' | 'here' | 'transferred'
 
   readonly genStatusOptions: AtcStatus[] =
     ['dataincomplete', 'pending', 'processing', 'completed', 'error'];
@@ -227,6 +246,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     private firestore: Firestore,
     private atcSvc: AtcFirebaseService,
     private snackbar: MatSnackBar,
+    private dialog: MatDialog,
   ) {}
 
   ngOnInit(): void { this.loadQueues(); }
@@ -520,6 +540,54 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     return this.queues.find((x) => x.id === id)?.name ?? id.slice(0, 6);
   }
 
+  /**
+   * When the lineage walk found NO studio session, ask the blunt question: does one
+   * exist for this participant ANYWHERE?
+   *
+   * This is the diagnosis for a token with no `transferredfrom`. Such a token has a
+   * single-level lineage, so if the studio stage is not part of THIS queue's flow
+   * there is nowhere to look — yet the participant may well have done the session
+   * under a different queue. Both of bk2Fx9's originated-here participants are
+   * exactly this: Scope Enhancement sessions logged under V3hxDt / L3rqCr, a token
+   * that cannot reach them, and consequently no gen doc at all.
+   *
+   * Distinguishing "never did the session" from "did it, but the token is
+   * disconnected" matters because the fixes are completely different: the first
+   * needs a recording, the second needs the token's lineage repaired. Attaching a
+   * recording to the second would be wrong.
+   *
+   * Deliberately a LAST-RESORT query — the same flat, queueref-less lookup that was
+   * v1's central bug — run only for rows the walk already came up empty on, and
+   * used only as evidence, never to pick an attach target.
+   */
+  private async probeOffLineage(row: Row, p: PairingView): Promise<void> {
+    p.offLineageProbed = true;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'queue stage log'),
+        where('currentstage', '==', p.stage),
+        where('status', '==', 'instudio'),
+        where('profile_id', '==', row.profile_id),
+      ));
+      const seen = new Set<string>();
+      for (const d of snap.docs) {
+        const l: any = d.data();
+        const laId = l.liveassignmentid;
+        if (!laId || seen.has(laId)) continue;
+        seen.add(laId);
+        let hasTranscript = false;
+        try {
+          const la = await getDoc(doc(this.firestore, 'live assignment', laId));
+          const ld: any = la.exists() ? la.data() : null;
+          hasTranscript = !!(ld?.transcript_text && String(ld.transcript_text).trim());
+        } catch { /* evidence only */ }
+        p.offLineage.push({ laId, queueId: l.queueref?.id ?? '?', hasTranscript });
+      }
+    } catch (e) {
+      console.error('probeOffLineage failed', e);
+    }
+  }
+
   /** Read each discovered live assignment and record whether a transcript exists. */
   private async hydrateHits(hits: LiveAssignmentHit[]): Promise<void> {
     for (const h of hits) {
@@ -655,11 +723,14 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
             profile_name: t.profile_name ?? '',
             currentstage: t.currentstage ?? '',
             crossed: null,
+            origin: (t.transferredfrom && t.tokentransferredfrom) ? 'transferred' : 'here',
             walking: true, walkError: null,
             pairings: cfgPairings.map((c) => ({
               stage: c.stage, category: c.category, zoom: c.zoom,
               status: 'unknown' as const, source: 'none' as const,
-              hits: [], targetLaId: null, trail: [], dropboxLink: '', saving: false,
+              hits: [], targetLaId: null, trail: [],
+              offLineage: [], offLineageProbed: false,
+              dropboxLink: '', saving: false,
             })),
             genDocId: null, genStatus: null, genMissing: [],
             rebuilding: false,
@@ -724,6 +795,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
               v.hits[0]
             )?.laId ?? null;
             pv.dropboxLink = v.hits.find((h) => h.dropboxlink)?.dropboxlink ?? '';
+            // nothing on the lineage — is there a session off it?
+            if (!v.hits.length) await this.probeOffLineage(row, pv);
           }
         } catch (e: any) {
           row.walkError = e?.message ?? 'walk failed';
@@ -773,6 +846,12 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     return this.studio(r).some((p) => p.status !== 'resolved' && p.hits.length > 0);
   }
 
+  /** No session on the lineage, but sessions exist elsewhere — a broken token link. */
+  offLineageOnly(r: Row): boolean {
+    if (r.walking) return false;
+    return this.studio(r).some((p) => !p.hits.length && p.offLineage.length > 0);
+  }
+
   pairingStatus(p: PairingView): CaptureStatus {
     return p.hits.find((h) => h.laId === p.targetLaId)?.status ?? null;
   }
@@ -796,6 +875,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (r.walkError) return 'walk failed — retry';
     if (this.isBusy(r)) return 'transcribing…';
     if (this.studio(r).some((p) => this.pairingStatus(p) === 'failed')) return 'retry the recording';
+    if (this.offLineageOnly(r)) return 'session exists off-lineage — link the token';
     if (this.noSession(r)) return r.crossed ? 'no studio session logged — cannot fix here' : 'not in studio yet';
     if (this.supersededOnly(r)) return 're-attach to current session';
     if (!this.hasTranscript(r)) return 'attach a Dropbox recording';
@@ -976,6 +1056,46 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Open the captured transcript for one studio session.
+   *
+   * The dialog is handed a loader rather than the data, so the document is fetched
+   * only when actually opened — the table never reads transcript bodies (they run
+   * to ~90k chars; pre-loading hundreds would be pointless traffic).
+   */
+  viewTranscript(row: Row, p: PairingView, laId?: string): void {
+    const id = laId ?? p.hits.find((h) => h.primary && h.hasTranscript)?.laId
+                    ?? p.hits.find((h) => h.hasTranscript)?.laId;
+    if (!id) { this.snackbar.open('No captured transcript for this session', 'Close', { duration: 4000 }); return; }
+
+    this.dialog.open(TranscriptViewerDialog, {
+      autoFocus: false,
+      data: {
+        participant: row.profile_name || row.profile_id,
+        laId: id,
+        load: async () => {
+          const snap = await getDoc(doc(this.firestore, 'live assignment', id));
+          if (!snap.exists()) return null;
+          const d: any = snap.data();
+          return {
+            transcript_text: d.transcript_text ?? '',
+            coach: d.coach,
+            confidence: d.confidence,
+            audio_sec: d.audio_sec ?? null,
+            capturedAt: d.transcriptCapturedAt?.toDate?.() ?? null,
+            dropboxlink: d.dropboxlink ?? '',
+          };
+        },
+      },
+    });
+  }
+
+  /** Any session on this pairing that has a transcript worth opening. */
+  viewableLa(p: PairingView): string | null {
+    return (p.hits.find((h) => h.primary && h.hasTranscript)
+         ?? p.hits.find((h) => h.hasTranscript))?.laId ?? null;
+  }
+
   // ── filters / telemetry ────────────────────────────────────────────────────
 
   applyFilters(): void {
@@ -983,6 +1103,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     const tx = this.filterTranscript;
     const cr = this.filterCrossed;
     const gen = this.filterGen;
+    const or = this.filterOrigin;
 
     this.dataSource.data = this.allRows.filter((r) => {
       if (tx === 'yes' && !this.hasTranscript(r)) return false;
@@ -993,8 +1114,15 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       if (cr === 'yes' && r.crossed !== true) return false;
       if (cr === 'no' && r.crossed !== false) return false;
 
-      if (gen === 'none' && r.genDocId) return false;
-      if (gen && gen !== 'none' && r.genStatus !== gen) return false;
+      // multi-select: a row matches if it satisfies ANY chosen ATC-doc state
+      if (gen.length) {
+        const ok = gen.some((g) => g === 'none' ? !r.genDocId : r.genStatus === g);
+        if (!ok) return false;
+      }
+
+      if (or === 'here' && r.origin !== 'here') return false;
+      if (or === 'transferred' && r.origin !== 'transferred') return false;
+      if (or === 'offlineage' && !this.offLineageOnly(r)) return false;
 
       if (term &&
           !r.profile_name.toLowerCase().includes(term) &&
@@ -1008,19 +1136,24 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     this.searchText = '';
     this.filterTranscript = '';
     this.filterCrossed = '';
-    this.filterGen = '';
+    this.filterGen = [];
+    this.filterOrigin = '';
     this.applyFilters();
   }
 
   /** One-click drill-downs from the telemetry tiles. */
-  focus(kind: 'crossed' | 'needsLink' | 'superseded' | 'noSession' | 'noGen' | 'dataincomplete'): void {
+  focus(kind: 'crossed' | 'needsLink' | 'superseded' | 'noSession' | 'noGen' | 'dataincomplete'
+              | 'here' | 'transferred' | 'offlineage'): void {
     this.clearFilters();
     if (kind === 'crossed') this.filterCrossed = 'yes';
     if (kind === 'needsLink') { this.filterCrossed = 'yes'; this.filterTranscript = 'no'; }
     if (kind === 'superseded') this.filterTranscript = 'superseded';
     if (kind === 'noSession') { this.filterCrossed = 'yes'; this.filterTranscript = 'nosession'; }
-    if (kind === 'noGen') { this.filterCrossed = 'yes'; this.filterGen = 'none'; }
-    if (kind === 'dataincomplete') this.filterGen = 'dataincomplete';
+    if (kind === 'noGen') { this.filterCrossed = 'yes'; this.filterGen = ['none']; }
+    if (kind === 'dataincomplete') this.filterGen = ['dataincomplete'];
+    if (kind === 'here') this.filterOrigin = 'here';
+    if (kind === 'transferred') this.filterOrigin = 'transferred';
+    if (kind === 'offlineage') this.filterOrigin = 'offlineage';
     this.applyFilters();
   }
 
@@ -1041,6 +1174,11 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   get countNoGen(): number {
     return this.allRows.filter((r) => r.crossed === true && !r.genDocId).length;
   }
+  // origin metadata
+  get countHere(): number { return this.allRows.filter((r) => r.origin === 'here').length; }
+  get countTransferred(): number { return this.allRows.filter((r) => r.origin === 'transferred').length; }
+  get countOffLineage(): number { return this.allRows.filter((r) => this.offLineageOnly(r)).length; }
+
   get countGen(): Record<string, number> {
     const out: Record<string, number> = {};
     for (const r of this.allRows) if (r.genStatus) out[r.genStatus] = (out[r.genStatus] ?? 0) + 1;

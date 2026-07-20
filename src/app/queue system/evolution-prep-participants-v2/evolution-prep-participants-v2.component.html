@@ -65,6 +65,30 @@
       <span>Walking transfer chains — {{ walkProgress }} / {{ walkTotal }}</span>
     </div>
 
+    <!-- ── METADATA: where these participants came from ─────────────────── -->
+    <div class="meta-bar">
+      <span class="meta-item">
+        <strong>{{ totalAll }}</strong> total participants
+        <span class="meta-hint">Active + Approved in this queue</span>
+      </span>
+      <span class="meta-sep">·</span>
+      <span class="meta-item clickable" (click)="focus('here')"
+            matTooltip="No transferredfrom on the token — they started in THIS queue, so their lineage is a single level with nothing to climb">
+        <strong>{{ countHere }}</strong> started here
+      </span>
+      <span class="meta-sep">·</span>
+      <span class="meta-item clickable" (click)="focus('transferred')"
+            matTooltip="Token carries transferredfrom + tokentransferredfrom — the walk can reach their ancestor queues">
+        <strong>{{ countTransferred }}</strong> transferred in
+      </span>
+      <span class="meta-sep" *ngIf="countOffLineage">·</span>
+      <span class="meta-item warn clickable" *ngIf="countOffLineage" (click)="focus('offlineage')"
+            matTooltip="No studio session on their lineage, but sessions DO exist under other queues. The token is disconnected from the participant's history — link the token; do not attach a recording.">
+        <mat-icon>link_off</mat-icon>
+        <strong>{{ countOffLineage }}</strong> off-lineage sessions
+      </span>
+    </div>
+
     <!-- ── TELEMETRY: the funnel, left to right ─────────────────────────── -->
     <div class="funnel">
       <div class="fstep" (click)="clearFilters()" matTooltip="All Active + Approved participants in the selected queue">
@@ -173,10 +197,19 @@
 
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>ATC generation doc</mat-label>
-        <mat-select [(ngModel)]="filterGen" (ngModelChange)="applyFilters()">
-          <mat-option value="">All</mat-option>
+        <mat-select [(ngModel)]="filterGen" (ngModelChange)="applyFilters()" multiple>
           <mat-option value="none">— not created —</mat-option>
           <mat-option *ngFor="let s of genStatusOptions" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Origin</mat-label>
+        <mat-select [(ngModel)]="filterOrigin" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="here">Started in this queue</mat-option>
+          <mat-option value="transferred">Transferred in</mat-option>
+          <mat-option value="offlineage">🔗 Off-lineage session</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -201,6 +234,12 @@
               <div class="name-info">
                 <span class="name-text">{{ row.profile_name || '—' }}</span>
                 <span class="profile-id">{{ row.profile_id }}</span>
+                <span class="origin-tag" [class.origin-here]="row.origin === 'here'"
+                      [matTooltip]="row.origin === 'here'
+                        ? 'Started in this queue — no transferredfrom, so the lineage is a single level'
+                        : 'Transferred in — the walk can climb to the ancestor queues'">
+                  {{ row.origin === 'here' ? 'started here' : 'transferred in' }}
+                </span>
                 <span class="next-action" [matTooltip]="'Suggested next step'">{{ nextAction(row) }}</span>
               </div>
             </div>
@@ -263,10 +302,19 @@
                 <span *ngIf="p.status === 'resolved'" class="yes-badge">
                   <mat-icon>check_circle</mat-icon> Transcript
                 </span>
-                <span *ngIf="p.status !== 'resolved' && !p.hits.length" class="none-badge"
+                <span *ngIf="p.status !== 'resolved' && !p.hits.length && !p.offLineage.length" class="none-badge"
                       matTooltip="No 'instudio' log for this stage anywhere on the transferredfrom lineage">
                   <mat-icon>block</mat-icon> No session
                 </span>
+                <span *ngIf="!p.hits.length && p.offLineage.length" class="offlin-badge"
+                      matTooltip="Sessions exist for this participant, but under queues that are NOT on their transferredfrom lineage. Neither this screen nor the ATC resolver can reach them — the token needs linking, not a recording.">
+                  <mat-icon>link_off</mat-icon> Off-lineage
+                </span>
+
+                <button mat-icon-button class="view-btn" *ngIf="viewableLa(p)"
+                        (click)="viewTranscript(row, p)" matTooltip="View transcript">
+                  <mat-icon>visibility</mat-icon>
+                </button>
                 <span *ngIf="p.status !== 'resolved' && p.hits.length && pairingBusy(p)" class="busy-badge">
                   <mat-spinner diameter="12" strokeWidth="2"></mat-spinner> {{ pairingStatus(p) }}
                 </span>
