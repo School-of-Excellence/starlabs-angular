@@ -42,9 +42,7 @@ export class QueueEventHealthComponent {
   showQueueDropdown = false;
   queueSearchText = '';
   reportLoaded = false;
-  initiatedNotInQueueDocs: any[] = [];
   initiatedNotInQueueRecords: any[] = [];
-  initiatedNotInQueuePpUnsub: any;
   activeView: 'main' | 'initiated_not_in_queue' = 'main';
 
   /* ================= DATA ================= */
@@ -89,6 +87,10 @@ export class QueueEventHealthComponent {
   fixingNoQueueAtcs = false;
   atcListPageSize = 10;
   atcListCurrentPage = 1;
+  atcListPageSizeOptions = [10, 25, 50, 100];
+  atcActiveFilter: 'product' | 'stage' | null = null;
+  atcSelectedProduct = '';
+  atcSelectedStage = '';
 
   /* ================= FILTERS ================= */
 
@@ -157,87 +159,80 @@ export class QueueEventHealthComponent {
 
   validateRecord(
     productStatus: string,
-    tokenStage: string,
     integrationMode: string,
-    eventParticipationStatus: string
+    eventParticipationStatus: string,
+    tokenStatus: string
   ): { passed: boolean; reason: string } {
 
     const status = (productStatus || '').toLowerCase();
-    const stage = (tokenStage || '').toLowerCase();
     const mode = (integrationMode || '').toLowerCase();
     const epstatus = (eventParticipationStatus || '').toLowerCase();
+    const tstatus = String(tokenStatus || '').trim().toLowerCase();
+    const modeIsEmpty = !integrationMode || mode === 'null' || mode === '';
 
     // HARD FAIL → INVALID if event participation status not found
-    if (
-      !eventParticipationStatus ||
-      eventParticipationStatus === 'Not Found'
-    ) {
-      return {
-        passed: false,
-        reason: 'Invalid: event participation status not found'
-      };
+    if (!eventParticipationStatus || eventParticipationStatus === 'Not Found') {
+      return { passed: false, reason: 'Invalid: event participation status not found' };
     }
 
-    /* CASE 1 */
+    // SCENARIO 1: Initiated
     if (
-      (['completed'].includes(status) &&
+      status === 'initiated' &&
+      epstatus === 'approved' &&
+      tstatus === 'active' &&
+      ['event mode', 'early preparation mode', 'preparation mode'].includes(mode)
+    ) {
+      return { passed: true, reason: 'Valid: initiated' };
+    }
+
+    // SCENARIO 2: Ongoing
+    if (
+      status === 'ongoing' &&
+      epstatus === 'approved' &&
+      tstatus === 'active' &&
+      mode === 'event mode'
+    ) {
+      return { passed: true, reason: 'Valid: ongoing' };
+    }
+
+    // SCENARIO 3: Completed
+    if (
+      status === 'completed' &&
+      ['attended'].includes(epstatus) &&
+      tstatus === 'active' &&
       [
         'integration mode',
         'performance mode',
         'extended performance mode',
         'after extended performance mode'
-      ].includes(mode)) || status == "shifted" &&
-      epstatus == 'attended'
+      ].includes(mode)
     ) {
-      return {
-        passed: true,
-        reason: 'Valid: completed/shifted via integration/performance flow'
-      };
+      return { passed: true, reason: 'Valid: completed' };
     }
 
-    /* CASE 2 */
-    if (
-      status == 'initiated' || status ==  'ongoing' &&
-      [
-        'event mode',
-        'preparation',
-        'early preparation'
-      ].includes(mode) &&
-      epstatus == 'approved'
-    ) {
-      return {
-        passed: true,
-        reason: 'Valid: event/preparation flow'
-      };
-    }
-
-    // CASE 3 → VALID
-    if (
-      status === 'cancelled' &&
-      eventParticipationStatus?.toLowerCase() === 'unattended'
-    ) {
-      return {
-        passed: true,
-        reason: 'Valid: marked as unattended'
-      };
-    }
-
-    // CASE 4
+    // SCENARIO 4: Shifted
     if (
       status === 'shifted' &&
-      epstatus === 'attended' || epstatus === 'approved'
+      epstatus === 'attended' &&
+      tstatus === 'active' &&
+      modeIsEmpty
     ) {
-      return {
-        passed: true,
-        reason: 'Valid: shifted'
-      };
+      return { passed: true, reason: 'Valid: shifted' };
     }
 
+    // SCENARIO 5: Cancelled
+    if (
+      status === 'cancelled' &&
+      ['unattended', 'revoked','denied'].includes(epstatus) &&
+      tstatus === 'inactive' &&
+      modeIsEmpty
+    ) {
+      return { passed: true, reason: 'Valid: cancelled' };
+    }
 
-    // EVERYTHING ELSE → INVALID
     return {
       passed: false,
-      reason: `product status is ${status || '-'}, current stage is ${stage || '-'}, mode is ${mode || 'N/A'}`
+      reason: `product status is ${status || '-'}, mode is ${mode || 'N/A'}, token status is ${tstatus || '-'}`
     };
   }
 
@@ -364,7 +359,6 @@ export class QueueEventHealthComponent {
     this.validationFailures = [];
     this.activeKpiFilter = null;
     this.initiatedNotInQueueRecords = [];
-    this.initiatedNotInQueueDocs = [];
     this.activeView = 'main';
     this.atcGivenCount = 0;
     this.atcNotGivenCount = 0;
@@ -387,11 +381,6 @@ export class QueueEventHealthComponent {
     if (this.atcValidateUnsub) {
       this.atcValidateUnsub();
       this.atcValidateUnsub = null;
-    }
-
-    if (this.initiatedNotInQueuePpUnsub) {
-      this.initiatedNotInQueuePpUnsub();
-      this.initiatedNotInQueuePpUnsub = null;
     }
 
     this.dashboard = {
@@ -708,95 +697,83 @@ export class QueueEventHealthComponent {
   }
 
   async buildInitiatedNotInQueueRecords() {
-    const queueProductRefIds = new Set<string>(
-      [...this.arenaEventMap.keys()]
-    );
+    // STEP 1: Find all participantproductids that have an ACTIVE token
+    let activeTokenPpIds: string[] = [];
 
-    const tokenPpIds = new Set<string>(
-      this.liveTokens
-        .map(t => t['participantproductid'])
-        .filter(Boolean)
-    );
+    for (let i = 0; i < this.liveTokens.length; i++) {
+      const token = this.liveTokens[i];
+      const status = String(token['tokenstatus']).trim().toLowerCase();
+      if (status === 'active') {
+        activeTokenPpIds.push(token['participantproductid']);
+      }
+    }
 
-    const filtered = this.initiatedNotInQueueDocs
-      .filter(pp => {
-        const productRefId = pp.productref?.id ?? null;
-        return productRefId && queueProductRefIds.has(productRefId);
-      })
-      .filter(pp => !tokenPpIds.has(pp.id));
+    // STEP 2: Find participantsproduct docs that are "initiated" and do NOT have an active token
+    let candidates: any[] = [];
+    for (let i = 0; i < this.livePpDocs.length; i++) {
+      const pp = this.livePpDocs[i];
+      const ppStatus = String(pp.status).toLowerCase();
+      const hasActiveToken = activeTokenPpIds.includes(pp.id);
+      if (ppStatus === 'initiated' && !hasActiveToken) {
+        candidates.push(pp);
+      }
+    }
 
-      // console.log('initiatedNotInQueueDocs count:', this.initiatedNotInQueueDocs.length);
-      // console.log('arenaEventMap keys:', [...this.arenaEventMap.keys()]);
-      // console.log('queueProductRefIds:', Array.from(queueProductRefIds));
-      // console.log('tokenPpIds size:', tokenPpIds.size);
-      // console.log('filtered (before resolve):', filtered.length);
+    // STEP 3: For each candidate, get participant name, product name, and EP status
+    let resolved: any[] = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const pp = candidates[i];
+      // Get participant name
+      let participantName = '-';
+      if (pp.profileid) {
+        const profileSnap = await getDoc(doc(this.firestoreDefault, 'profile_data', pp.profileid));
+        if (profileSnap.exists()) {
+          participantName = profileSnap.data()['name'] ?? '-';
+        }
+      }
 
-    const resolved = await Promise.all(
-      filtered.map(async (pp) => {
+      // Get product name
+      let productName = '-';
+      const productRefId = pp.productref ? pp.productref.id : null;
+      if (productRefId) {
+        const productSnap = await getDoc(doc(this.firestoreDefault, 'products', productRefId));
+        if (productSnap.exists()) {
+          productName = productSnap.data()['product'] ?? '-';
+        }
+      }
 
-        let participantName = '-';
-        if (pp.profileid) {
-          try {
-            const profileSnap = await getDoc(
-              doc(this.firestoreDefault, 'profile_data', pp.profileid)
-            );
-            if (profileSnap.exists()) {
-              const d = profileSnap.data();
-              participantName = d['name'] ?? '-';
-            }
-          } catch (e) {
-            console.warn('Failed to fetch profile_data', pp.profileid, e);
+      // Get event participation status (from data we already have, no new query)
+      let epStatus = 'Not Found';
+      const epId = pp.eventparticipationid ?? null;
+      if (epId) {
+        for (let j = 0; j < this.liveEventParticipationDocs.length; j++) {
+          if (this.liveEventParticipationDocs[j].docid === epId) {
+            epStatus = this.liveEventParticipationDocs[j].status;
+            break;
           }
         }
+      }
 
-        let productName = '-';
-        const productRefId = pp.productref?.id ?? null;
-        if (productRefId) {
-          try {
-            const productSnap = await getDoc(
-              doc(this.firestoreDefault, 'products', productRefId)
-            );
-            if (productSnap.exists()) {
-              const d = productSnap.data();
-              productName = d['product'] ?? '-';
-            }
-          } catch (e) {
-            console.warn('Failed to fetch product', productRefId, e);
-          }
-        }
+      // Build the record
+      const record = {
+        participantName: participantName,
+        productName: productName,
+        productStatus: pp.status ?? '-',
+        epStatus: epStatus,
+        tokenDocId: null,
+        participantproductid: pp.id,
+        eventParticipationId: epId,
+        selected: false
+      };
 
-        const epId = pp.eventparticipationid ?? null;
-        let epStatus = 'Not Found';
+      resolved.push(record);
+    }
 
-        if (epId) {
-          try {
-            const epSnap = await getDoc(
-              doc(this.firestoreDefault, 'event participation request', epId)
-            );
-            if (epSnap.exists()) {
-              epStatus = epSnap.data()['status'] ?? 'Found (status missing)';
-            }
-          } catch (e) {
-            console.warn('Failed to fetch EP doc', epId, e);
-          }
-        }
-        return {
-          participantName,
-          productName,
-          productStatus: pp.status ?? '-',
-          epStatus,
-          tokenDocId: null,
-          participantproductid: pp.id,
-          eventParticipationId: epId ?? null,
-          selected: false
-        };
-      })
-    );
-
+    // STEP 4: Save the result and update dashboard count
     this.initiatedNotInQueueRecords = resolved;
-    this.dashboard.initiatedNotInQueue = this.initiatedNotInQueueRecords.length;
+    this.dashboard.initiatedNotInQueue = resolved.length;
 
-    // Reuse main pagination if currently in this view
+    // STEP 5: If user is currently on this view, refresh the table
     if (this.activeView === 'initiated_not_in_queue') {
       this.filteredRecords = this.initiatedNotInQueueRecords;
       this.currentPage = 1;
@@ -866,25 +843,7 @@ export class QueueEventHealthComponent {
   loadReport(queueId: string) {
     this.loading = true;
     this.resetReport();
-    // ---- INITIATED NOT IN QUEUE LISTENER ----
-    if (this.initiatedNotInQueuePpUnsub) this.initiatedNotInQueuePpUnsub();
-    const queueRef = doc(this.firestoreDefault,'queue generation',queueId);
-    this.initiatedNotInQueuePpUnsub = onSnapshot(
-      query(
-        collection(this.firestoreDefault, 'participantsproduct'),
-        where('status', '==', 'initiated'),
-        where('eventref','==', queueRef)
-      ),
-      (snap) => {
-        this.initiatedNotInQueueDocs = snap.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        }));
-        this.buildInitiatedNotInQueueRecords();
-      }
-    );
-
-      // const queueRef = doc(this.firestoreDefault, 'queue generation', queueId);
+    const queueRef = doc(this.firestoreDefault,'queue generation', queueId);
       onSnapshot(
         query(
           collection(this.firestoreDefault, 'arena events'),
@@ -1170,21 +1129,21 @@ export class QueueEventHealthComponent {
 
       await batch.commit();
 
-      const idSet = new Set(selectedEntries.map(e => e.id));
+      // const idSet = new Set(selectedEntries.map(e => e.id));
 
-      this.atcAlphaRecords = this.atcAlphaRecords.map(a =>
-        idSet.has(a.id) ? { ...a, queueid: this.selectedQueueId } : a
-      );
+      // this.atcAlphaRecords = this.atcAlphaRecords.map(a =>
+      //   idSet.has(a.id) ? { ...a, queueid: this.selectedQueueId } : a
+      // );
 
-      this.atcValidateRecords = this.atcValidateRecords.map(a =>
-        idSet.has(a.id) ? { ...a, queueid: this.selectedQueueId } : a
-      );
+      // this.atcValidateRecords = this.atcValidateRecords.map(a =>
+      //   idSet.has(a.id) ? { ...a, queueid: this.selectedQueueId } : a
+      // );
 
-      this.atcQueueRecords = [...this.atcAlphaRecords, ...this.atcValidateRecords];
+      // this.atcQueueRecords = [...this.atcAlphaRecords, ...this.atcValidateRecords];
 
-      this.calculateAtcNoQueueCounts();
-      this.calculateAtcGivenCounts();
-      await this.buildAllProfileAtcDetails();
+      // this.calculateAtcNoQueueCounts();
+      // this.calculateAtcGivenCounts();
+      // await this.buildAllProfileAtcDetails();
 
     } catch (e) {
       console.error('Failed to fix ATC queue mapping', e);
@@ -1205,13 +1164,56 @@ export class QueueEventHealthComponent {
     }
   }
 
+  get atcProductOptions(): any[] {
+    return Array.from(
+      new Map(
+        this.currentAtcList.map(r => [
+          r.productName,
+          {
+            value: r.productName,
+            count: this.currentAtcList.filter(x => x.productName === r.productName).length
+          }
+        ])
+      ).values()
+    );
+  }
+
+  get atcStageOptions(): any[] {
+    return Array.from(
+      new Map(
+        this.currentAtcList.map(r => [
+          r.tokenStage,
+          {
+            value: r.tokenStage,
+            count: this.currentAtcList.filter(x => x.tokenStage === r.tokenStage).length
+          }
+        ])
+      ).values()
+    );
+  }
+
+  get filteredAtcList(): any[] {
+    return this.currentAtcList.filter(r => {
+      if (this.atcSelectedProduct && r.productName !== this.atcSelectedProduct) return false;
+      if (this.atcSelectedStage && r.tokenStage !== this.atcSelectedStage) return false;
+      if (this.searchText) {
+        const search = this.searchText.toLowerCase();
+        const searchableString = [ r.participantName, r.productName, r.tokenStage, r.TokenID ].filter(Boolean).join(' ').toLowerCase();
+        if (!searchableString.includes(search)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
   get atcListTotalPages(): number {
-    return Math.max(1, Math.ceil(this.currentAtcList.length / this.atcListPageSize));
+    return Math.max(1, Math.ceil(this.filteredAtcList.length / this.atcListPageSize));
   }
 
   get paginatedAtcList(): any[] {
     const start = (this.atcListCurrentPage - 1) * this.atcListPageSize;
-    return this.currentAtcList.slice(start, start + this.atcListPageSize);
+    return this.filteredAtcList.slice(start, start + this.atcListPageSize);
   }
 
   prevAtcListPage() {
@@ -1224,6 +1226,31 @@ export class QueueEventHealthComponent {
     if (this.atcListCurrentPage < this.atcListTotalPages) {
       this.atcListCurrentPage++;
     }
+  }
+
+  onAtcListPageSizeChange(event: any) {
+    this.atcListPageSize = Number(event.target.value);
+    this.atcListCurrentPage = 1;
+  }
+
+  toggleAtcFilter(type: 'product' | 'stage') {
+    this.atcActiveFilter = this.atcActiveFilter === type ? null : type;
+  }
+
+  closeAtcFilter() {
+    this.atcActiveFilter = null;
+  }
+
+  selectAtcProductFilter(value: string) {
+    this.atcSelectedProduct = value;
+    this.atcActiveFilter = null;
+    this.atcListCurrentPage = 1;
+  }
+
+  selectAtcStageFilter(value: string) {
+    this.atcSelectedStage = value;
+    this.atcActiveFilter = null;
+    this.atcListCurrentPage = 1;
   }
 
   exportAtcListCSV() {
@@ -1402,10 +1429,10 @@ export class QueueEventHealthComponent {
       // ---------------- RUN VALIDATION ----------------
       const validation = this.validateRecord(
         record.productStatus,
-        record.tokenStage,
+        // record.tokenStage,
         record.integrationMode,
         record.eventParticipationStatus,
-        // record.tokenStatus
+        record.tokenStatus
       );
 
       record.validationPassed = validation.passed;
@@ -1604,6 +1631,53 @@ export class QueueEventHealthComponent {
     this.allRecords.forEach(r => r.selected = false);
   }
 
+  // Mark as Attended function
+  async bulkMarkAttended() {
+    const selectedRecords = this.activeView === 'initiated_not_in_queue'
+      ? this.initiatedNotInQueueRecords.filter(r => r.selected)
+      : this.allRecords.filter(r => r.selected);
+
+    if (selectedRecords.length === 0) {
+      alert('No participants selected');
+      return;
+    }
+
+    const confirmAction = confirm(
+      `Are you sure you want to mark ${selectedRecords.length} participant(s) as Attended?\n\n` +
+      `This will:\n` +
+      `• Set Event Participation → attended\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmAction) {
+      return;
+    }
+
+    const batch = writeBatch(this.firestoreDefault);
+    let updateCount = 0;
+
+    for (const record of selectedRecords) {
+      if (!record.eventParticipationId) {
+        continue;
+      }
+      if (String(record.eventParticipationStatus).toLowerCase() === 'attended') {
+        continue;
+      }
+      const epRef = doc(this.firestoreDefault, 'event participation request', record.eventParticipationId);
+      batch.update(epRef, { status: 'attended' });
+      updateCount++;
+    }
+
+    if (updateCount === 0) {
+      alert('Nothing to update — selected records have no event participation record or are already attended.');
+      return;
+    }
+
+    await batch.commit();
+    // Clear selection
+    selectedRecords.forEach(r => r.selected = false);
+  }
+
   toggleSelectAll(event: any) {
     const checked = event.target.checked;
     this.paginatedRecords.forEach(r => r.selected = checked);
@@ -1615,6 +1689,9 @@ export class QueueEventHealthComponent {
     this.activeAtcListType = this.activeAtcListType === type ? null : type;
     this.showAtcNameList = this.activeAtcListType !== null;
     this.atcListCurrentPage = 1;
+    this.atcSelectedProduct = '';
+    this.atcSelectedStage = '';
+    this.atcActiveFilter = null;
 
     if (this.showAtcNameList) {
       this.buildAllProfileAtcDetails();

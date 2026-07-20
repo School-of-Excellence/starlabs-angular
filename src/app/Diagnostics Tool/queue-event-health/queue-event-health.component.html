@@ -187,7 +187,7 @@
         class="search-input"
         placeholder="Search..."
         [(ngModel)]="searchText"
-        (input)="applyFilters()"
+        (input)="applyFilters(); atcListCurrentPage = 1"
       />
     </div>
 
@@ -202,8 +202,17 @@
     *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
     (click)="bulkMarkUnattended()"
     [disabled]="selectedCount === 0"
-    class="bulk-btn">
+    class="bulk-btn"
+    style="margin-right: 12px;">
     Mark As Unattended ({{ selectedCount }})
+  </button>
+
+  <button
+    *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
+    (click)="bulkMarkAttended()"
+    [disabled]="selectedCount === 0"
+    class="bulk-btn">
+    Mark As Attended ({{ selectedCount }})
   </button>
 
 <!-- ALL TOKENS TABLE -->
@@ -344,9 +353,33 @@
       <thead>
         <tr>
           <th>Participant Name</th>
-          <th>Product Name</th>
+          <th class="filter-header">
+            <span>Product Name</span>
+            <div class="filter-wrapper">
+              <span class="filter-icon" (click)="toggleAtcFilter('product')">▼</span>
+              <div class="filter-dropdown" *ngIf="atcActiveFilter === 'product'">
+                <div class="filter-option" (click)="selectAtcProductFilter('')">All</div>
+                <div class="filter-option" *ngFor="let product of atcProductOptions"
+                  (click)="selectAtcProductFilter(product.value)">
+                  {{ product.value }} ({{ product.count }})
+                </div>
+              </div>
+            </div>
+          </th>
           <th>Token Number</th>
-          <th>Current Stage</th>
+          <th class="filter-header">
+            <span>Current Stage</span>
+            <div class="filter-wrapper">
+              <span class="filter-icon" (click)="toggleAtcFilter('stage')">▼</span>
+              <div class="filter-dropdown" *ngIf="atcActiveFilter === 'stage'">
+                <div class="filter-option" (click)="selectAtcStageFilter('')">All</div>
+                <div class="filter-option" *ngFor="let stage of atcStageOptions"
+                  (click)="selectAtcStageFilter(stage.value)">
+                  {{ stage.value }} ({{ stage.count }})
+                </div>
+              </div>
+            </div>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -380,10 +413,17 @@
       </tbody>
     </table>
 
-    <div class="pagination" *ngIf="atcListTotalPages > 1">
+    <div class="pagination">
       <button (click)="prevAtcListPage()" [disabled]="atcListCurrentPage === 1">Prev</button>
       Page {{ atcListCurrentPage }} / {{ atcListTotalPages }}
       <button (click)="nextAtcListPage()" [disabled]="atcListCurrentPage === atcListTotalPages">Next</button>
+
+      <label style="margin-left:16px;">
+        Records per page:
+        <select [ngModel]="atcListPageSize" (change)="onAtcListPageSizeChange($event)">
+          <option *ngFor="let size of atcListPageSizeOptions" [value]="size">{{ size }}</option>
+        </select>
+      </label>
     </div>
   </div>
 
