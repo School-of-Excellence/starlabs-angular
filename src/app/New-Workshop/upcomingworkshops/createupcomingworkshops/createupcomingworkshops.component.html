@@ -63,6 +63,16 @@
             <input matInput type="number" min="0" formControlName="totalseats" placeholder="Enter total seats" />
             <mat-hint *ngIf="form.get('unlimitedseat')?.value">Unlimited seats enabled</mat-hint>
           </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Color</mat-label>
+            <input matInput formControlName="color" placeholder="#FFFFFF" maxlength="7" />
+            <input matSuffix type="color" class="color-swatch" [value]="colorSwatchValue"
+              (input)="onSwatchChange($event)" matTooltip="Pick a colour" aria-label="Pick a colour" />
+            <mat-error *ngIf="form.get('color')?.hasError('pattern')">
+              Use a hex code like #FFFFFF.
+            </mat-error>
+          </mat-form-field>
         </div>
 
         <div class="toggles">
@@ -140,6 +150,14 @@
         <div class="toggles">
           <div class="toggle-row">
             <div class="toggle-text">
+              <span class="toggle-title">Image Only</span>
+              <span class="toggle-desc">Show only the image for this ad.</span>
+            </div>
+            <mat-slide-toggle formControlName="imageonly" color="primary"></mat-slide-toggle>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
               <span class="toggle-title">Show</span>
               <span class="toggle-desc">Display this ad.</span>
             </div>
@@ -148,13 +166,50 @@
         </div>
       </ng-container>
 
+      <!-- Image uploads — ads => adimage / adimagetab / adimagemobile, coming soon => upcomingimage -->
+      <div class="upload-block" *ngFor="let f of uploadFields">
+        <div class="upload-head">
+          <span class="upload-title">
+            {{ f.label }}
+            <span class="upload-size" *ngIf="f.hint">{{ f.hint }}</span>
+          </span>
+          <span class="upload-desc">Images only. Uploaded to the <strong>eiflixhome</strong> folder.</span>
+        </div>
+
+        <div class="upload-body">
+          <img *ngIf="imageUrlOf(f.key)" [src]="imageUrlOf(f.key)" class="upload-preview" alt="Selected image" />
+          <div class="upload-empty" *ngIf="!imageUrlOf(f.key)">
+            <mat-icon>image</mat-icon>
+          </div>
+
+          <div class="upload-side">
+            <div class="upload-actions">
+              <button mat-stroked-button type="button" (click)="uploadImage(f.key)"
+                [disabled]="isUploadingKey(f.key)">
+                <mat-icon>upload</mat-icon>
+                {{ isUploadingKey(f.key) ? 'Uploading…' : (imageUrlOf(f.key) ? 'Replace image' : 'Upload image') }}
+              </button>
+              <button mat-button type="button" class="upload-remove"
+                *ngIf="imageUrlOf(f.key) && !isUploadingKey(f.key)" (click)="removeImage(f.key)">
+                Remove
+              </button>
+            </div>
+
+            <div class="upload-progress" *ngIf="isUploadingKey(f.key)">
+              <mat-progress-bar mode="determinate" [value]="progressOf(f.key)"></mat-progress-bar>
+              <span class="upload-percent">{{ progressOf(f.key) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </mat-dialog-content>
 
     <mat-dialog-actions align="end" class="dialog-actions">
       <button mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
-      <button mat-flat-button color="primary" type="submit" [disabled]="isSaving">
+      <button mat-flat-button color="primary" type="submit" [disabled]="isSaving || isUploadingAny">
         <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
-        <span *ngIf="!isSaving">{{ isEditMode ? 'Update' : 'Save' }}</span>
+        <span *ngIf="!isSaving">{{ isUploadingAny ? 'Uploading…' : (isEditMode ? 'Update' : 'Save') }}</span>
       </button>
     </mat-dialog-actions>
   </form>

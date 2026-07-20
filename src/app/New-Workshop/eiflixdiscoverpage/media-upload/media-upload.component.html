@@ -40,21 +40,13 @@
   <div *ngIf="value && !isUploading" class="preview">
     <div class="preview-media">
       <video *ngIf="isVideo" [src]="value" controls preload="metadata"></video>
-      <img *ngIf="!isVideo" [src]="value" [alt]="'thumbnail preview'" />
+      <img *ngIf="!isVideo" [src]="value" [alt]="'preview'" />
     </div>
 
     <div class="preview-side">
       <div class="preview-badge">
         <mat-icon>check_circle</mat-icon>
-        {{ isVideo ? 'Video' : 'Image' }} uploaded
-      </div>
-
-      <div class="url-row" [matTooltip]="value">
-        <mat-icon>link</mat-icon>
-        <span class="url-text">{{ value }}</span>
-        <button type="button" mat-icon-button class="url-copy" (click)="copyUrl()" matTooltip="Copy URL">
-          <mat-icon>content_copy</mat-icon>
-        </button>
+        {{ isVideo ? 'Video' : 'Image' }} set
       </div>
 
       <div class="preview-actions">
@@ -65,6 +57,47 @@
           <mat-icon>delete_outline</mat-icon> Remove
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- URL ENTRY: the alternative to uploading — always available -->
+  <div class="url-entry-wrap" *ngIf="!isUploading">
+    <div class="url-or" *ngIf="!value"><span>or paste a link</span></div>
+
+    <div class="url-entry" [class.dirty]="urlDirty">
+      <mat-icon>link</mat-icon>
+      <input
+        #urlBox
+        class="url-input"
+        type="text"
+        [value]="urlDraft"
+        [placeholder]="urlPlaceholder"
+        [disabled]="disabled"
+        autocomplete="off"
+        (input)="onUrlDraftChange(urlBox.value)"
+        (blur)="applyUrl()"
+        (keydown.enter)="onUrlEnter($event)" />
+
+      <button
+        *ngIf="urlDirty"
+        type="button"
+        mat-flat-button
+        color="primary"
+        class="url-use"
+        (click)="applyUrl()"
+        [disabled]="disabled">
+        Use
+      </button>
+
+      <button
+        *ngIf="value && !urlDirty"
+        type="button"
+        mat-icon-button
+        class="url-copy"
+        (click)="copyUrl()"
+        matTooltip="Copy URL">
+        <mat-icon>content_copy</mat-icon>
+      </button>
     </div>
   </div>
 </div>
