@@ -283,3 +283,31 @@ td.mat-mdc-cell { font-size: 13px; color: #2b3140; padding: 10px 12px; vertical-
   margin-top: 6px; font-size: 11px; line-height: 26px; min-width: 0; padding: 0 10px;
 }
 .rebuild-btn mat-icon { font-size: 15px; width: 15px; height: 15px; margin-right: 2px; }
+
+/* ── pairing sources column ─────────────────────────────────────────────── */
+.col-sources { min-width: 210px; }
+.src-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 10px; padding: 2px 8px; margin: 0 4px 4px 0;
+  font-size: 11px; white-space: nowrap;
+  background: #eceff1; color: #607d8b;
+}
+.src-chip mat-icon { font-size: 13px; width: 13px; height: 13px; }
+.src-chip.src-ok      { background: #e6f4ea; color: #1e7e34; }
+.src-chip.src-bad     { background: #fdecea; color: #b3261e; }
+.src-chip.src-warn    { background: #fff3e0; color: #e65100; }
+.src-chip.src-unknown { background: #f1f3f5; color: #9aa0ac; }
+.one-of {
+  font-size: 8.5px; text-transform: uppercase; letter-spacing: .4px;
+  margin-left: 4px; opacity: .8; border: 1px solid currentColor;
+  border-radius: 6px; padding: 0 3px;
+}
+
+/* ── studio session column ──────────────────────────────────────────────── */
+.col-studio { min-width: 330px; }
+.studio-block { padding: 2px 0; }
+.studio-block + .studio-block {
+  margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e3e6ec;
+}
+.studio-head { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
+.studio-stage { font-size: 10.5px; color: #6b7280; font-weight: 600; margin-right: 2px; }

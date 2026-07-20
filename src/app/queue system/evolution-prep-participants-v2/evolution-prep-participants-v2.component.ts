@@ -32,10 +32,12 @@ import { AtcGenDoc, AtcStatus } from '../../ATC-Ops/atc-ops.types';
  *
  * What V1 got wrong, and V2 fixes:
  *
- *  1. QUEUE LIST IS DATA-DRIVEN AND MULTI-SELECT. V1 hardcoded four queue ids.
- *     V2 lists every `queue generation` doc carrying an `atcrequiredstages` config
- *     and lets several be inspected at once (participants routinely sit in a prep
- *     queue and a diagnostics queue).
+ *  1. QUEUE LIST IS DATA-DRIVEN. V1 hardcoded four queue ids. V2 lists every
+ *     `queue generation` doc carrying an `atcrequiredstages` config. One queue at a
+ *     time, on purpose: a participant recurs across queues (prep -> diagnostics) but
+ *     crosses a given stage only once, so a multi-select yields duplicate rows for
+ *     the same person and double-counts every tile. Picking one queue loses nothing
+ *     — the lineage walk already reaches back through the ancestor queues.
  *
  *  2. THE CHAIN WALK IS REAL. V1's saveDropboxLink() ran ONE flat `queue stage log`
  *     query with no `queueref` filter and took the globally-latest studio session
@@ -63,11 +65,25 @@ import { AtcGenDoc, AtcStatus } from '../../ATC-Ops/atc-ops.types';
 
 // ── view models ──────────────────────────────────────────────────────────────
 
+/** One pairing stage of an ATC entry, with the completeness rule it lives under. */
+export interface PairingCfg {
+  stage: string;
+  category: 'mandatory' | 'atleastonerequired';
+  /** Studio stage → a Dropbox recording can be attached to it. */
+  zoom: boolean;
+}
+
+/** One `atcrequiredstages` entry with generateatc:true — what the picker offers. */
+export interface AtcStageCfg {
+  stage: string;                 // the .stage field, e.g. "Guided Self ATC"
+  ownType: string | null;        // the entry's own `type`
+  pairings: PairingCfg[];
+}
+
 export interface QueueOpt {
   id: string;
   name: string;
-  genStages: string[];   // atcrequiredstages entries with generateatc === true
-  zoomStages: string[];  // their pairing stages that are studio (zoom) stages
+  atcStages: AtcStageCfg[];
 }
 
 export type CaptureStatus =
@@ -92,6 +108,32 @@ export interface LiveAssignmentHit {
   lastError?: string;
 }
 
+/**
+ * One pairing source for one participant.
+ *
+ * `status` comes from two places by design:
+ *   - ZOOM pairings are resolved by the browser chain walk, because those are the
+ *     ones an operator can act on (attach a recording) and the walk is what finds
+ *     the live-assignment doc to attach to.
+ *   - FORM pairings are read from the gen doc's `stagedata`, which is the
+ *     pipeline's own already-computed answer. Re-resolving them here would mean a
+ *     second Firestore handle (firestore-forms) and a query per stage per
+ *     participant, to reproduce a verdict we can simply read.
+ * With no gen doc and no zoom type, status is 'unknown' rather than a guess.
+ */
+export interface PairingView {
+  stage: string;
+  category: 'mandatory' | 'atleastonerequired';
+  zoom: boolean;
+  status: 'resolved' | 'missing' | 'unknown';
+  source: 'walk' | 'gendoc' | 'none';
+  hits: LiveAssignmentHit[];      // zoom only
+  targetLaId: string | null;      // zoom only — where a pasted link is written
+  trail: string[];                // zoom only
+  dropboxLink: string;
+  saving: boolean;
+}
+
 export interface Row {
   tokenId: string;
   queueId: string;
@@ -100,19 +142,16 @@ export interface Row {
   profile_name: string;
   currentstage: string;
 
-  crossed: boolean | null;      // crossed the studio stage? null until walked
+  crossed: boolean | null;      // crossed the ATC stage? null until walked
   walking: boolean;
   walkError: string | null;
-  trail: string[];
-  hits: LiveAssignmentHit[];
-  targetLaId: string | null;
+
+  pairings: PairingView[];
 
   genDocId: string | null;      // queue_atc_generation doc, if one exists
   genStatus: AtcStatus | null;
-  genMissing: string[];         // stagedata entries still 'missing'
+  genMissing: string[];         // what is ACTUALLY blocking — see blockingMissing()
 
-  dropboxLink: string;
-  saving: boolean;
   rebuilding: boolean;
   _token: any;
 }
@@ -136,17 +175,26 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
   // ---- pickers ----
   queues: QueueOpt[] = [];
-  selectedQueueIds: string[] = [];
-  selectedStage = '';
+  /**
+   * SINGLE queue, deliberately not multi-select. A participant recurs across
+   * queues (prep -> diagnostics) but crosses a given stage only once, so selecting
+   * several queues produced one row per queue for the same person — each walking a
+   * different lineage — and double-counted every funnel tile. The lineage walk
+   * already reaches back through the ancestor queues, so one queue is all you pick.
+   */
+  selectedQueueId = '';
+  /** The chosen atcrequiredstages[].stage, e.g. "Guided Self ATC". */
+  selectedAtcStage = '';
   queuesLoading = true;
   queuesError: string | null = null;
 
   // ---- table ----
   dataSource = new MatTableDataSource<Row>([]);
   allRows: Row[] = [];
+  // No 'queue' column: with a single-select queue every row shares it.
   displayedColumns = [
-    'profile_name', 'queue', 'currentstage', 'crossed',
-    'transcript', 'sessions', 'genDoc', 'dropboxLink',
+    'profile_name', 'currentstage', 'crossed',
+    'sources', 'studio', 'genDoc',
   ];
 
   loading = false;
@@ -216,13 +264,21 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     return zoom;
   }
 
-  /** pairingstages may be a legacy flat array OR {mandatory, atleastonerequired}. */
-  private normalizePairing(raw: any): string[] {
-    if (Array.isArray(raw)) return raw.slice();
-    if (raw && typeof raw === 'object') {
-      return [...(raw.mandatory ?? []), ...(raw.atleastonerequired ?? [])];
+  /**
+   * pairingstages may be a legacy flat array OR {mandatory, atleastonerequired}.
+   * A legacy array is treated as all-mandatory, matching resolver.normalizePairingStages.
+   */
+  private normalizePairing(raw: any): Array<{ stage: string; category: 'mandatory' | 'atleastonerequired' }> {
+    const out: Array<{ stage: string; category: 'mandatory' | 'atleastonerequired' }> = [];
+    if (Array.isArray(raw)) {
+      raw.forEach((st: string) => out.push({ stage: st, category: 'mandatory' }));
+    } else if (raw && typeof raw === 'object') {
+      (raw.mandatory ?? []).forEach((st: string) => out.push({ stage: st, category: 'mandatory' }));
+      (raw.atleastonerequired ?? []).forEach((st: string) => {
+        if (!out.some((p) => p.stage === st)) out.push({ stage: st, category: 'atleastonerequired' });
+      });
     }
-    return [];
+    return out;
   }
 
   async loadQueues(): Promise<void> {
@@ -239,20 +295,24 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         const req: any[] = Array.isArray(data?.atcrequiredstages) ? data.atcrequiredstages : [];
         if (!req.length) return;                     // queue selection is driven by this field
 
-        const genStages = req.filter((s) => s?.generateatc === true)
-                             .map((s) => String(s?.stage ?? '')).filter(Boolean);
-        const zoomStages = [...new Set(
-          req.filter((s) => s?.generateatc === true)
-             .flatMap((s) => this.normalizePairing(s?.pairingstages))
-             .filter((s: string) => this.zoomCapable.has(s)),
-        )];
-        opts.push({ id: d.id, name: String(data?.queuename ?? d.id), genStages, zoomStages });
+        // The picker is driven by atcrequiredstages[].stage — the ATC stage being
+        // generated. Its pairingstages are the sources that must resolve for it.
+        const atcStages: AtcStageCfg[] = req
+          .filter((s) => s?.generateatc === true && s?.stage)
+          .map((s) => ({
+            stage: String(s.stage),
+            ownType: s?.type ?? null,
+            pairings: this.normalizePairing(s?.pairingstages)
+              .map((p) => ({ ...p, zoom: this.zoomCapable.has(p.stage) })),
+          }));
+        if (!atcStages.length) return;
+        opts.push({ id: d.id, name: String(data?.queuename ?? d.id), atcStages });
       });
 
       this.queues = opts.sort((a, b) => a.name.localeCompare(b.name));
       if (this.queues.length) {
-        this.selectedQueueIds = [this.queues[0].id];
-        this.selectedStage = this.queues[0].zoomStages[0] ?? '';
+        this.selectedQueueId = this.queues[0].id;
+        this.selectedAtcStage = this.queues[0].atcStages[0]?.stage ?? '';
       }
     } catch (e: any) {
       console.error('loadQueues failed', e);
@@ -262,22 +322,33 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     }
   }
 
-  get selectedQueueOpts(): QueueOpt[] {
-    return this.queues.filter((q) => this.selectedQueueIds.includes(q.id));
+  get selectedQueueOpt(): QueueOpt | undefined {
+    return this.queues.find((q) => q.id === this.selectedQueueId);
   }
 
-  /** Studio stages offered = union across the selected queues. */
-  get availableStages(): string[] {
-    return [...new Set(this.selectedQueueOpts.flatMap((q) => q.zoomStages))];
+  get availableAtcStages(): AtcStageCfg[] {
+    return this.selectedQueueOpt?.atcStages ?? [];
   }
 
-  get genStagesLabel(): string {
-    return [...new Set(this.selectedQueueOpts.flatMap((q) => q.genStages))].join(', ') || '—';
+  /** Config for the currently picked ATC stage. */
+  get atcCfg(): AtcStageCfg | undefined {
+    return this.availableAtcStages.find((a) => a.stage === this.selectedAtcStage);
+  }
+
+  /** Pairings we can actually act on — a Dropbox recording only fits a studio stage. */
+  get zoomPairings(): PairingCfg[] {
+    return (this.atcCfg?.pairings ?? []).filter((p) => p.zoom);
+  }
+
+  get pairingSummary(): string {
+    return (this.atcCfg?.pairings ?? [])
+      .map((p) => `${p.stage}${p.category === 'atleastonerequired' ? ' (one-of)' : ''}`)
+      .join(', ') || '—';
   }
 
   onQueueChange(): void {
-    if (!this.availableStages.includes(this.selectedStage)) {
-      this.selectedStage = this.availableStages[0] ?? '';
+    if (!this.availableAtcStages.some((a) => a.stage === this.selectedAtcStage)) {
+      this.selectedAtcStage = this.availableAtcStages[0]?.stage ?? '';
     }
     this.allRows = [];
     this.dataSource.data = [];
@@ -353,24 +424,50 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    * Firestore serves without one) and sorts logdate client-side. Same documents,
    * same order — just sorted locally.
    */
-  private async walkChain(
-    queueRef: DocumentReference, queueData: any, tokenData: any, tokenId: string, stage: string,
-  ): Promise<{ hits: LiveAssignmentHit[]; trail: string[]; crossed: boolean }> {
-    const hits: LiveAssignmentHit[] = [];
-    const trail: string[] = [];
-    const visited = new Set<string>([tokenId]);
+  /**
+   * Resolve EVERY zoom pairing of the selected ATC stage for one participant, in a
+   * single pass over the transferredfrom lineage.
+   *
+   * Mirrors resolver.resolveStageData's loop: at each level only look at stages
+   * that TYPE-MATCH there. A stage that does not type at this level is not
+   * "missing" — it simply belongs to a deeper level of the lineage, so it is
+   * retried on the next hop. One pass serves all pairings, so a second studio
+   * stage costs no extra hops.
+   *
+   * The lineage is walked to EXHAUSTION rather than stopping at the first level
+   * that yields a session. The resolver only stops when a source actually
+   * RESOLVES; a level whose newest session carries no transcript does not stop it,
+   * and the real transcript may sit one hop deeper. Stopping early here would
+   * report "missing" for a participant the pipeline can resolve fine. Whether a
+   * transcript exists is only known after hydrateHits() reads the docs, which is
+   * why the decision cannot be made inside this loop.
+   */
+  private async walkPairings(
+    queueRef: DocumentReference, queueData: any, tokenData: any, tokenId: string,
+    pairings: PairingCfg[],
+  ): Promise<{ views: Map<string, { hits: LiveAssignmentHit[]; trail: string[] }>; crossed: boolean }> {
+    const views = new Map<string, { hits: LiveAssignmentHit[]; trail: string[] }>();
+    pairings.forEach((p) => views.set(p.stage, { hits: [], trail: [] }));
 
+    const visited = new Set<string>([tokenId]);
     let lvlQ = queueRef, lvlQD = queueData, lvlT = tokenData, level = 0;
     let crossed = false;
 
     while (true) {
       const active = await this.activeStagesOf(lvlQD, lvlT);
-      if (level === 0) crossed = this.isCrossed(active, tokenData?.currentstage ?? '', stage);
+      if (level === 0) {
+        crossed = this.isCrossed(active, tokenData?.currentstage ?? '', this.selectedAtcStage);
+      }
 
-      const type = this.stageTypeAt(lvlQD, stage, active);
-      let found = 0;
+      for (const { stage } of pairings) {
+        const type = this.stageTypeAt(lvlQD, stage, active);
+        const view = views.get(stage)!;
+        if (type !== 'zoom') {
+          // not a studio stage at THIS level — may still be one further back
+          view.trail.push(`${this.queueLabel(lvlQ.id)}[${type ?? '–'}]:0`);
+          continue;
+        }
 
-      if (type === 'zoom') {
         const snap = await getDocs(query(
           collection(this.firestore, 'queue stage log'),
           where('currentstage', '==', stage),
@@ -380,23 +477,23 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         ));
         const logs = snap.docs.map((d) => d.data())
           .sort((a, b) => (b['logdate']?.toMillis?.() ?? 0) - (a['logdate']?.toMillis?.() ?? 0));
+
         // Only the FIRST session at a level is primary — the single doc the resolver
         // reads there. Later ones are kept as evidence (a transcript on a superseded
         // session explains an otherwise baffling dataincomplete) but never count as
         // satisfying the pipeline.
-        let seenAtLevel = 0;
+        let seenAtLevel = 0, found = 0;
         for (const l of logs) {
           const laId = l['liveassignmentid'];
-          if (!laId || hits.some((h) => h.laId === laId)) continue;
-          hits.push({
+          if (!laId || view.hits.some((h) => h.laId === laId)) continue;
+          view.hits.push({
             laId, queueId: lvlQ.id, level, primary: seenAtLevel === 0,
             exists: false, hasTranscript: false, status: null, dropboxlink: '',
           });
-          seenAtLevel++;
-          found++;
+          seenAtLevel++; found++;
         }
+        view.trail.push(`${this.queueLabel(lvlQ.id)}[zoom]:${found}`);
       }
-      trail.push(`${this.queueLabel(lvlQ.id)}${type ? `[${type}]` : '[–]'}:${found}`);
 
       // climb one hop: BOTH refs are required, exactly as the resolver requires
       const aq = lvlT?.transferredfrom, at = lvlT?.tokentransferredfrom;
@@ -405,7 +502,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
       let prevToken = this.tokenCache.get(at.id);
       if (prevToken === undefined) {
-        try { const s = await getDoc(at); prevToken = s.exists() ? s.data() : null; }
+        try { const snap2 = await getDoc(at); prevToken = snap2.exists() ? snap2.data() : null; }
         catch { prevToken = null; }
         this.tokenCache.set(at.id, prevToken);
       }
@@ -416,7 +513,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       lvlQ = aq; lvlQD = prevQD; lvlT = prevToken; level++;
     }
 
-    return { hits, trail, crossed };
+    return { views, crossed };
   }
 
   private queueLabel(id: string): string {
@@ -449,7 +546,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    */
   private async loadGenDocs(): Promise<void> {
     this.genByProfile.clear();
-    for (const qid of this.selectedQueueIds) {
+    for (const qid of [this.selectedQueueId]) {
       try {
         const snap = await getDocs(query(
           collection(this.atcSvc.atcDb, 'queue_atc_generation'),
@@ -473,21 +570,59 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * What is ACTUALLY blocking this gen doc — mirrors resolver.computeStatus().
+   *
+   * Listing every stagedata entry with status 'missing' is wrong and actively
+   * misleading. `atleastonerequired` stages are alternatives: the group is
+   * satisfied as soon as ONE of them resolves, so the others sit at 'missing'
+   * forever by design. A doc can be perfectly healthy (status pending, prompt
+   * built) while still showing a missing entry — e.g. "uP! Life Report" missing
+   * because "uP! Life Aspiration Report" resolved instead. Showing that reads as a
+   * problem to fix when there is nothing to fix.
+   *
+   * Rule, identical to the backend's:
+   *   - mandatory missing        → always blocking, list each one
+   *   - atleastonerequired       → blocking ONLY if none of the group resolved,
+   *                                and then reported as one "need one of" item
+   */
+  private blockingMissing(stagedata: any): string[] {
+    const entries = Object.entries(stagedata ?? {}) as Array<[string, any]>;
+    const out = entries
+      .filter(([, v]) => v?.category === 'mandatory' && v?.status === 'missing')
+      .map(([k]) => k);
+
+    const group = entries.filter(([, v]) => v?.category === 'atleastonerequired');
+    if (group.length && !group.some(([, v]) => v?.status === 'resolved')) {
+      out.push(`one of: ${group.map(([k]) => k).join(' / ')}`);
+    }
+    return out;
+  }
+
   private applyGenDoc(row: Row): void {
     const g = this.genByProfile.get(row.profile_id);
     row.genDocId = g?.id ?? null;
     row.genStatus = (g?.data.status ?? null) as AtcStatus | null;
-    row.genMissing = g
-      ? Object.entries((g.data as any).stagedata ?? {})
-          .filter(([, v]: any) => v?.status === 'missing')
-          .map(([k]) => k)
-      : [];
+    const sd: any = g ? (g.data as any).stagedata ?? {} : null;
+    row.genMissing = g ? this.blockingMissing(sd) : [];
+
+    // Seed NON-studio pairings from the gen doc. The pipeline already resolved
+    // them; re-deriving a form's status in the browser would need a second
+    // Firestore handle (firestore-forms) and a query per stage per participant to
+    // reproduce a verdict we can just read. Studio pairings are left alone — the
+    // chain walk owns those, because those are the ones an operator can act on.
+    for (const p of row.pairings) {
+      if (p.zoom) continue;
+      const entry = sd?.[p.stage];
+      p.status = entry ? (entry.status === 'resolved' ? 'resolved' : 'missing') : 'unknown';
+      p.source = entry ? 'gendoc' : 'none';
+    }
   }
 
   // ── load ───────────────────────────────────────────────────────────────────
 
   async load(): Promise<void> {
-    if (!this.selectedQueueIds.length || !this.selectedStage) return;
+    if (!this.selectedQueueId || !this.selectedAtcStage) return;
 
     this.loading = true;
     this.allRows = [];
@@ -498,7 +633,9 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       await this.loadGenDocs();
 
       const rows: Row[] = [];
-      for (const qid of this.selectedQueueIds) {
+      const cfgPairings = this.atcCfg?.pairings ?? [];
+      {
+        const qid = this.selectedQueueId;
         const qref = doc(this.firestore, 'queue generation', qid);
         // Active + Approved — the live-participant filter, same as the backend's
         // atc-generate-for-queue.js token selection.
@@ -518,10 +655,14 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
             profile_name: t.profile_name ?? '',
             currentstage: t.currentstage ?? '',
             crossed: null,
-            walking: true, walkError: null, trail: [], hits: [],
-            targetLaId: null,
+            walking: true, walkError: null,
+            pairings: cfgPairings.map((c) => ({
+              stage: c.stage, category: c.category, zoom: c.zoom,
+              status: 'unknown' as const, source: 'none' as const,
+              hits: [], targetLaId: null, trail: [], dropboxLink: '', saving: false,
+            })),
             genDocId: null, genStatus: null, genMissing: [],
-            dropboxLink: '', saving: false, rebuilding: false,
+            rebuilding: false,
             _token: t,
           });
         });
@@ -560,22 +701,30 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         const row = rows[cursor++];
         try {
           const qref = doc(this.firestore, 'queue generation', row.queueId);
-          const { hits, trail, crossed } = await this.walkChain(
-            qref, this.queueDataCache.get(row.queueId), row._token, row.tokenId, this.selectedStage);
-          await this.hydrateHits(hits);
-          row.hits = hits;
-          row.trail = trail;
+          const { views, crossed } = await this.walkPairings(
+            qref, this.queueDataCache.get(row.queueId), row._token, row.tokenId,
+            this.zoomPairings);
           row.crossed = crossed;
-          // Paste target = the nearest PRIMARY session still lacking a transcript.
-          // Primary because that is the only doc the resolver reads at a level;
-          // nearest because that is the level the resolver reaches first. Writing to
-          // a superseded session would produce a transcript the pipeline ignores.
-          row.targetLaId = (
-            hits.find((h) => h.primary && !h.hasTranscript) ??
-            hits.find((h) => h.primary) ??
-            hits[0]
-          )?.laId ?? null;
-          row.dropboxLink = hits.find((h) => h.dropboxlink)?.dropboxlink ?? '';
+
+          for (const pv of row.pairings) {
+            const v = views.get(pv.stage);
+            if (!v) continue;                       // form pairing — status came from the gen doc
+            await this.hydrateHits(v.hits);
+            pv.hits = v.hits;
+            pv.trail = v.trail;
+            pv.source = 'walk';
+            pv.status = v.hits.some((h) => h.primary && h.hasTranscript) ? 'resolved' : 'missing';
+            // Paste target = the nearest PRIMARY session still lacking a transcript.
+            // Primary because that is the only doc the resolver reads at a level;
+            // nearest because that is the level the resolver reaches first. Writing
+            // to a superseded session yields a transcript the pipeline ignores.
+            pv.targetLaId = (
+              v.hits.find((h) => h.primary && !h.hasTranscript) ??
+              v.hits.find((h) => h.primary) ??
+              v.hits[0]
+            )?.laId ?? null;
+            pv.dropboxLink = v.hits.find((h) => h.dropboxlink)?.dropboxlink ?? '';
+          }
         } catch (e: any) {
           row.walkError = e?.message ?? 'walk failed';
         } finally {
@@ -591,29 +740,51 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
   // ── row helpers (used by the template) ─────────────────────────────────────
 
+  /** The studio pairings of this row (the ones a recording can be attached to). */
+  studio(r: Row): PairingView[] { return r.pairings.filter((p) => p.zoom); }
+
   /**
-   * Does the ATC pipeline have a usable transcript for this participant?
+   * Does the ATC pipeline have a usable transcript for every studio pairing?
    *
-   * Deliberately counts PRIMARY sessions only. A transcript on a superseded session
-   * is invisible to resolveStageSource(), so treating it as "present" would paint a
-   * row green while its gen doc sits dataincomplete forever.
+   * Counts PRIMARY sessions only. A transcript on a superseded session is invisible
+   * to resolveStageSource(), so treating it as "present" would paint a row green
+   * while its gen doc sits dataincomplete forever.
    */
-  hasTranscript(r: Row): boolean { return r.hits.some((h) => h.primary && h.hasTranscript); }
+  hasTranscript(r: Row): boolean {
+    const st = this.studio(r);
+    return st.length > 0 && st.every((p) => p.status === 'resolved');
+  }
 
   /** Transcript exists, but only on a session the resolver will never read. */
   supersededOnly(r: Row): boolean {
-    return !r.walking && !this.hasTranscript(r) && r.hits.some((h) => h.hasTranscript);
+    if (r.walking || this.hasTranscript(r)) return false;
+    return this.studio(r).some(
+      (p) => p.status !== 'resolved' && p.hits.some((h) => h.hasTranscript));
   }
 
-  noSession(r: Row): boolean { return !r.walking && r.hits.length === 0; }
-  needsLink(r: Row): boolean { return !r.walking && r.hits.length > 0 && !this.hasTranscript(r); }
-
-  targetStatus(r: Row): CaptureStatus {
-    return r.hits.find((x) => x.laId === r.targetLaId)?.status ?? null;
+  noSession(r: Row): boolean {
+    if (r.walking) return false;
+    const st = this.studio(r);
+    return st.length > 0 && st.every((p) => p.hits.length === 0);
   }
-  isBusy(r: Row): boolean {
-    const s = this.targetStatus(r);
-    return s === 'queued' || s === 'processing' || s === 'retrigger';
+
+  needsLink(r: Row): boolean {
+    if (r.walking) return false;
+    return this.studio(r).some((p) => p.status !== 'resolved' && p.hits.length > 0);
+  }
+
+  pairingStatus(p: PairingView): CaptureStatus {
+    return p.hits.find((h) => h.laId === p.targetLaId)?.status ?? null;
+  }
+  pairingBusy(p: PairingView): boolean {
+    const st = this.pairingStatus(p);
+    return st === 'queued' || st === 'processing' || st === 'retrigger';
+  }
+  isBusy(r: Row): boolean { return this.studio(r).some((p) => this.pairingBusy(p)); }
+
+  /** Transcript present but on a superseded session, for THIS pairing. */
+  pairingSuperseded(p: PairingView): boolean {
+    return p.status !== 'resolved' && p.hits.some((h) => h.hasTranscript);
   }
 
   /**
@@ -624,13 +795,13 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (r.walking) return 'checking…';
     if (r.walkError) return 'walk failed — retry';
     if (this.isBusy(r)) return 'transcribing…';
-    if (this.targetStatus(r) === 'failed') return 'retry the recording';
+    if (this.studio(r).some((p) => this.pairingStatus(p) === 'failed')) return 'retry the recording';
     if (this.noSession(r)) return r.crossed ? 'no studio session logged — cannot fix here' : 'not in studio yet';
     if (this.supersededOnly(r)) return 're-attach to current session';
     if (!this.hasTranscript(r)) return 'attach a Dropbox recording';
     if (!r.genDocId) return r.crossed ? 'transcript ready — no ATC doc yet' : 'transcript ready — waiting to cross';
     if (r.genStatus === 'dataincomplete') {
-      return r.genMissing.length ? `rebuild (missing: ${r.genMissing.join(', ')})` : 'rebuild';
+      return r.genMissing.length ? `rebuild — needs ${r.genMissing.join('; ')}` : 'rebuild';
     }
     if (r.genStatus === 'error') return 'ATC errored — inspect';
     if (r.genStatus === 'completed') return 'done';
@@ -664,7 +835,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   }
 
   /**
-   * Write the pasted Dropbox URL onto the resolved live-assignment doc.
+   * Write the pasted Dropbox URL onto the live-assignment doc resolved for ONE
+   * studio pairing.
    *
    * Only `dropboxlink` (plus `profile_name`) is written. `dropboxlink` CHANGING is
    * what seLiveTranscribeSubmit gates on, and nothing the pipeline writes back
@@ -677,64 +849,70 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    * before 712edc8 changed it to fire on dropboxlink change; it is now vestigial and
    * is deliberately not written.
    */
-  async saveLink(row: Row): Promise<void> {
-    const pasted = (row.dropboxLink ?? '').trim();
+  async saveLink(row: Row, p: PairingView): Promise<void> {
+    const pasted = (p.dropboxLink ?? '').trim();
     if (!pasted) { this.snackbar.open('Paste a Dropbox link first', 'Close', { duration: 3000 }); return; }
     if (!this.looksLikeDropbox(pasted)) {
       this.snackbar.open('That does not look like a Dropbox URL', 'Close', { duration: 5000 });
       return;
     }
     const url = this.normalizeDropboxUrl(pasted);
-    if (!row.targetLaId) {
-      this.snackbar.open(`No studio session on ${row.profile_name}'s queue lineage — a recording cannot be attached`, 'Close', { duration: 6000 });
+    if (!p.targetLaId) {
+      this.snackbar.open(
+        `No ${p.stage} session on ${row.profile_name}'s queue lineage — a recording cannot be attached`,
+        'Close', { duration: 6000 });
       return;
     }
-    const target = row.hits.find((h) => h.laId === row.targetLaId);
+    const target = p.hits.find((h) => h.laId === p.targetLaId);
     if (target?.hasTranscript &&
-        !confirm(`${row.profile_name} already has a transcript. Replace it with a new one from this recording?`)) {
+        !confirm(`${row.profile_name} already has a ${p.stage} transcript. Replace it with a new one from this recording?`)) {
       return;
     }
 
-    row.saving = true;
+    p.saving = true;
     try {
       await setDoc(
-        doc(this.firestore, 'live assignment', row.targetLaId),
+        doc(this.firestore, 'live assignment', p.targetLaId),
         { dropboxlink: url, profile_name: row.profile_name ?? '' },
         { merge: true },
       );
-      row.dropboxLink = url;   // show the operator what was actually stored
+      p.dropboxLink = url;   // show the operator what was actually stored
       this.snackbar.open(`Submitted — transcribing ${row.profile_name}`, 'Close', { duration: 3000 });
-      this.watch(row);
+      this.watch(row, p);
     } catch (e: any) {
       console.error('saveLink failed', e);
       this.snackbar.open(`Save failed: ${e?.message ?? e}`, 'Close', { duration: 5000 });
     } finally {
-      row.saving = false;
+      p.saving = false;
     }
   }
 
   /** Live-follow the target live assignment until the transcript lands (or fails). */
-  private watch(row: Row): void {
-    if (!row.targetLaId) return;
-    const laId = row.targetLaId;
+  private watch(row: Row, p: PairingView): void {
+    if (!p.targetLaId) return;
+    const laId = p.targetLaId;
     this.laUnsubs.get(laId)?.();
     const unsub = onSnapshot(
       doc(this.firestore, 'live assignment', laId),
       (snap) => {
         const d: any = snap.exists() ? snap.data() : null;
-        const hit = row.hits.find((h) => h.laId === laId);
+        const hit = p.hits.find((h) => h.laId === laId);
         if (!hit || !d) return;
         hit.status = (d.transcriptCaptureStatus ?? null) as CaptureStatus;
         hit.hasTranscript = !!(d.transcript_text && String(d.transcript_text).trim());
         hit.dropboxlink = d.dropboxlink ?? '';
         hit.lastError = d.transcriptCaptureLastError;
+        if (hit.primary && hit.hasTranscript) p.status = 'resolved';
 
         if (hit.hasTranscript || hit.status === 'failed') {
           this.laUnsubs.get(laId)?.();
           this.laUnsubs.delete(laId);
           if (hit.hasTranscript) {
             this.snackbar.open(`Transcript captured for ${row.profile_name}`, 'Close', { duration: 4000 });
-            void this.rebuild(row, true);   // close the loop automatically
+            // Close the loop only once EVERY studio pairing is satisfied — rebuilding
+            // while another mandatory transcript is still missing just re-reports
+            // dataincomplete.
+            if (this.hasTranscript(row)) void this.rebuild(row, true);
           } else {
             this.snackbar.open(
               `Transcription FAILED for ${row.profile_name}: ${hit.lastError ?? 'unknown'}`,
@@ -770,11 +948,24 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       const res = await this.atcSvc.regenerateAtcDoc({ docid: row.genDocId });
       const data: any = res?.data;
       row.genStatus = (data?.status ?? row.genStatus) as AtcStatus;
-      row.genMissing = (data?.missing ?? []).map((m: any) => m.stage);
+
+      // Re-read the doc rather than trusting the callable's `missing` array: that
+      // array lists every unresolved stage, including atleastonerequired siblings
+      // that are missing purely because another member of their group resolved.
+      // blockingMissing() applies the resolver's own completeness rule.
+      try {
+        const fresh = await getDoc(doc(this.atcSvc.atcDb, 'queue_atc_generation', row.genDocId));
+        const fd: any = fresh.exists() ? fresh.data() : null;
+        if (fd) {
+          row.genStatus = fd.status ?? row.genStatus;
+          row.genMissing = this.blockingMissing(fd.stagedata);
+        }
+      } catch { /* keep the callable's answer */ }
+
       this.snackbar.open(
-        data?.status === 'pending'
-          ? `${row.profile_name}: ATC doc is now PENDING (${data.resolvedStages} stages resolved)`
-          : `${row.profile_name}: still dataincomplete — missing ${row.genMissing.join(', ') || 'sources'}`,
+        row.genStatus === 'pending'
+          ? `${row.profile_name}: ATC doc is now PENDING (${data?.resolvedStages ?? '?'} stages resolved)`
+          : `${row.profile_name}: still dataincomplete — needs ${row.genMissing.join('; ') || 'sources'}`,
         'Close', { duration: 6000 });
       this.applyFilters();
     } catch (e: any) {
