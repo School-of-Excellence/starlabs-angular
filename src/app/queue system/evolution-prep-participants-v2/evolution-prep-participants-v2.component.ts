@@ -162,11 +162,13 @@ export interface Row {
    */
   origin: 'here' | 'transferred';
   /**
-   * Token has been transferred OUT of this queue (currentstage "Transfered").
-   * Its ATC doc belongs to the DESTINATION queue, so the absence of one here is
-   * normal and must not be reported as missing — see transferredOut().
+   * Token has been transferred OUT of this queue — it carries `transferredto`
+   * (destination queue ref) and `tokentransferredto` (destination token ref).
    */
   transferredOut: boolean;
+  /** Destination queue, from `transferredto`. */
+  toQueueId: string | null;
+  toQueueName: string;
   walking: boolean;
   walkError: string | null;
 
@@ -174,6 +176,13 @@ export interface Row {
 
   genDocId: string | null;      // queue_atc_generation doc, if one exists
   genStatus: AtcStatus | null;
+  /**
+   * Which queue the gen doc was actually found in — this queue, or the queue the
+   * token was transferred to. Being transferred does NOT by itself mean the doc
+   * moved: 89 of 120 transferred-and-completed tokens still had their doc here.
+   * So the destination is CHECKED rather than assumed.
+   */
+  genIn: 'this' | 'destination' | null;
   genMissing: string[];         // what is ACTUALLY blocking — see blockingMissing()
 
   rebuilding: boolean;
@@ -241,6 +250,9 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   private variationCache = new Map<string, string[] | null>();
   /** profileid → gen doc, per selected queue. */
   private genByProfile = new Map<string, { id: string; data: AtcGenDoc }>();
+  /** profileid → gen doc found in a queue the token was transferred TO. */
+  private genByProfileElsewhere =
+    new Map<string, { id: string; data: AtcGenDoc; queueId: string }>();
 
   /** Stages that are studio (zoom) stages ANYWHERE — see buildZoomCapableSet(). */
   private zoomCapable = new Set<string>();
@@ -435,19 +447,21 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   /**
    * Has this token left the queue?
    *
-   * The stage is spelled "Transfered" in the queue configs (single r) — matched
-   * loosely so a corrected spelling does not silently break the check.
+   * The authoritative signal is the pair `transferredto` (destination queue ref) +
+   * `tokentransferredto` (destination token ref) — the mirror of the
+   * transferredfrom / tokentransferredfrom pair the lineage walk climbs.
+   * `currentstage === "Transfered"` is accepted as a fallback because one prod
+   * token carries the stage without the refs. Spelling is matched loosely (the
+   * configs use a single r) so a later correction cannot silently break this.
    *
-   * This matters for the ATC-doc column: once a participant is transferred out,
-   * their gen doc is created against the DESTINATION queue, so this queue holds no
-   * doc for them and never will. Counting that as "crossed but no ATC doc" turns a
-   * normal hand-off into a false backlog — in V3hx it was 265 of 328 such rows,
-   * i.e. the metric was almost entirely noise. Their transcript still matters
-   * though: the destination token's lineage points back here, so a recording
-   * attached in this queue is what the destination's resolver will read.
+   * NOTE this is only "has left", NOT "its ATC doc is elsewhere". Those are
+   * different questions and conflating them is wrong in both directions: of 120
+   * transferred tokens that had moved on to Completed, 89 still had their gen doc
+   * in THIS queue. Where the doc lives is resolved by looking, in loadGenDocs().
    */
-  private isTransferredOut(currentstage: string): boolean {
-    return /^transfer/i.test((currentstage || '').trim());
+  private isTransferredOut(t: any): boolean {
+    if (t?.transferredto && t?.tokentransferredto) return true;
+    return /^transfer/i.test(String(t?.currentstage ?? '').trim());
   }
 
   private async queueDataOf(id: string, ref: DocumentReference): Promise<any> {
@@ -636,8 +650,30 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    * `queueref` is a DocumentReference whose path must be built on the firestore-atc
    * handle to match what the pipeline wrote.
    */
-  private async loadGenDocs(): Promise<void> {
+  private async loadGenDocs(destinationQueueIds: string[] = []): Promise<void> {
     this.genByProfile.clear();
+    this.genByProfileElsewhere.clear();
+
+    // Destination queues are queried ONCE each, not once per participant — the 384
+    // transferred tokens in V3hx all point at the same destination.
+    for (const qid of destinationQueueIds) {
+      try {
+        const snap = await getDocs(query(
+          collection(this.atcSvc.atcDb, 'queue_atc_generation'),
+          where('queueref', '==', doc(this.atcSvc.atcDb, 'queue generation', qid)),
+        ));
+        snap.docs.forEach((d) => {
+          const data = d.data() as AtcGenDoc;
+          const pid = (data as any).profileid;
+          if (pid && !this.genByProfileElsewhere.has(pid)) {
+            this.genByProfileElsewhere.set(pid, { id: d.id, data, queueId: qid });
+          }
+        });
+      } catch (e) {
+        console.error(`loadGenDocs (destination ${qid}) failed`, e);
+      }
+    }
+
     for (const qid of [this.selectedQueueId]) {
       try {
         const snap = await getDocs(query(
@@ -693,10 +729,18 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
   private applyGenDoc(row: Row): void {
     const g = this.genByProfile.get(row.profile_id);
-    row.genDocId = g?.id ?? null;
-    row.genStatus = (g?.data.status ?? null) as AtcStatus | null;
-    const sd: any = g ? (g.data as any).stagedata ?? {} : null;
-    row.genMissing = g ? this.blockingMissing(sd) : [];
+    // Prefer this queue's doc; only if there is none and the token was transferred
+    // out do we report the destination queue's doc.
+    const elsewhere = (!g && row.transferredOut)
+      ? this.genByProfileElsewhere.get(row.profile_id) : undefined;
+    const eff = g ?? elsewhere;
+
+    row.genDocId = eff?.id ?? null;
+    row.genStatus = (eff?.data.status ?? null) as AtcStatus | null;
+    row.genIn = g ? 'this' : (elsewhere ? 'destination' : null);
+    if (elsewhere) row.toQueueName = this.queueLabel(elsewhere.queueId);
+    const sd: any = eff ? (eff.data as any).stagedata ?? {} : null;
+    row.genMissing = eff ? this.blockingMissing(sd) : [];
 
     // Seed NON-studio pairings from the gen doc. The pipeline already resolved
     // them; re-deriving a form's status in the browser would need a second
@@ -722,8 +766,6 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     this.walkProgress = 0;
 
     try {
-      await this.loadGenDocs();
-
       const rows: Row[] = [];
       const cfgPairings = this.atcCfg?.pairings ?? [];
       {
@@ -748,7 +790,9 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
             currentstage: t.currentstage ?? '',
             crossed: null,
             origin: (t.transferredfrom && t.tokentransferredfrom) ? 'transferred' : 'here',
-            transferredOut: this.isTransferredOut(t.currentstage ?? ''),
+            transferredOut: this.isTransferredOut(t),
+            toQueueId: t.transferredto?.id ?? null,
+            toQueueName: t.transferredto?.id ? this.queueLabel(t.transferredto.id) : '',
             walking: true, walkError: null,
             pairings: cfgPairings.map((c) => ({
               stage: c.stage, category: c.category, zoom: c.zoom,
@@ -757,13 +801,18 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
               offLineage: [], offLineageProbed: false,
               dropboxLink: '', saving: false,
             })),
-            genDocId: null, genStatus: null, genMissing: [],
+            genDocId: null, genStatus: null, genMissing: [], genIn: null,
             rebuilding: false,
             _token: t,
           });
         });
       }
 
+      // Destinations must be known BEFORE gen docs are fetched, so the lookup can
+      // cover the queues these tokens were transferred to.
+      const destinations = [...new Set(
+        rows.map((r) => r.toQueueId).filter((x): x is string => !!x))];
+      await this.loadGenDocs(destinations);
       rows.forEach((r) => this.applyGenDoc(r));
       this.allRows = rows;
       this.walkTotal = rows.length;
@@ -904,8 +953,11 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (this.noSession(r)) return r.crossed ? 'no studio session logged — cannot fix here' : 'not in studio yet';
     if (this.supersededOnly(r)) return 're-attach to current session';
     if (!this.hasTranscript(r)) return 'attach a Dropbox recording';
-    if (r.transferredOut) return 'transferred out — ATC doc is in the destination queue';
-    if (!r.genDocId) return r.crossed ? 'transcript ready — no ATC doc yet' : 'transcript ready — waiting to cross';
+    if (r.genIn === 'destination') return `ATC doc lives in ${r.toQueueName || 'the destination queue'}`;
+    if (!r.genDocId) {
+      if (r.transferredOut) return `transferred out — no ATC doc in either queue`;
+      return r.crossed ? 'transcript ready — no ATC doc yet' : 'transcript ready — waiting to cross';
+    }
     if (r.genStatus === 'dataincomplete') {
       return r.genMissing.length ? `rebuild — needs ${r.genMissing.join('; ')}` : 'rebuild';
     }
@@ -1144,9 +1196,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       // 'none' means genuinely absent — a transferred-out token is not "missing"
       // a doc, its doc simply belongs to the destination queue.
       if (gen.length) {
-        const ok = gen.some((g) => g === 'none'
-          ? (!r.genDocId && !r.transferredOut)
-          : g === 'out' ? r.transferredOut
+        const ok = gen.some((g) => g === 'none' ? !r.genDocId
+          : g === 'out' ? r.genIn === 'destination'
           : r.genStatus === g);
         if (!ok) return false;
       }
@@ -1182,7 +1233,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (kind === 'needsLink') { this.filterCrossed = 'yes'; this.filterTranscript = 'no'; }
     if (kind === 'superseded') this.filterTranscript = 'superseded';
     if (kind === 'noSession') { this.filterCrossed = 'yes'; this.filterTranscript = 'nosession'; }
-    if (kind === 'noGen') { this.filterCrossed = 'yes'; this.filterGen = ['none']; this.filterOrigin = 'instay'; }
+    if (kind === 'noGen') { this.filterCrossed = 'yes'; this.filterGen = ['none']; }
     if (kind === 'transferredOut') this.filterOrigin = 'out';
     if (kind === 'dataincomplete') this.filterGen = ['dataincomplete'];
     if (kind === 'here') this.filterOrigin = 'here';
@@ -1210,8 +1261,11 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    * Transferred-out tokens are excluded: their doc lives in the destination queue.
    */
   get countNoGen(): number {
-    return this.allRows.filter(
-      (r) => r.crossed === true && !r.genDocId && !r.transferredOut).length;
+    return this.allRows.filter((r) => r.crossed === true && !r.genDocId).length;
+  }
+  /** Doc exists, but in the queue this token was transferred to. */
+  get countGenElsewhere(): number {
+    return this.allRows.filter((r) => r.genIn === 'destination').length;
   }
   get countTransferredOut(): number {
     return this.allRows.filter((r) => r.transferredOut).length;
