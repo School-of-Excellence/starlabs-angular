@@ -81,6 +81,12 @@
             matTooltip="Token carries transferredfrom + tokentransferredfrom — the walk can reach their ancestor queues">
         <strong>{{ countTransferred }}</strong> transferred in
       </span>
+      <span class="meta-sep" *ngIf="countTransferredOut">·</span>
+      <span class="meta-item clickable" *ngIf="countTransferredOut" (click)="focus('transferredOut')"
+            matTooltip="currentstage is 'Transfered' — these participants have LEFT this queue. Their ATC doc belongs to the destination queue, so none exists here and none ever will. A recording attached here still counts: the destination token's lineage points back to this queue.">
+        <mat-icon>logout</mat-icon>
+        <strong>{{ countTransferredOut }}</strong> transferred out
+      </span>
       <span class="meta-sep" *ngIf="countOffLineage">·</span>
       <span class="meta-item warn clickable" *ngIf="countOffLineage" (click)="focus('offlineage')"
             matTooltip="No studio session on their lineage, but sessions DO exist under other queues. The token is disconnected from the participant's history — link the token; do not attach a recording.">
@@ -112,7 +118,7 @@
 
       <div class="fstep clickable" [class.ok]="!countNoGen" [class.warn]="countNoGen"
            (click)="focus('noGen')"
-           matTooltip="Crossed the stage but no queue_atc_generation doc exists yet">
+           matTooltip="Crossed the stage, still in this queue, and no queue_atc_generation doc exists. Transferred-out participants are excluded — their doc belongs to the destination queue.">
         <span class="fnum">{{ countNoGen }}</span>
         <span class="flabel">crossed, no ATC doc</span>
       </div>
@@ -199,6 +205,7 @@
         <mat-label>ATC generation doc</mat-label>
         <mat-select [(ngModel)]="filterGen" (ngModelChange)="applyFilters()" multiple>
           <mat-option value="none">— not created —</mat-option>
+          <mat-option value="out">— transferred out —</mat-option>
           <mat-option *ngFor="let s of genStatusOptions" [value]="s">{{ s }}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -209,6 +216,8 @@
           <mat-option value="">All</mat-option>
           <mat-option value="here">Started in this queue</mat-option>
           <mat-option value="transferred">Transferred in</mat-option>
+          <mat-option value="out">➜ Transferred OUT</mat-option>
+          <mat-option value="instay">Still in this queue</mat-option>
           <mat-option value="offlineage">🔗 Off-lineage session</mat-option>
         </mat-select>
       </mat-form-field>
@@ -234,7 +243,12 @@
               <div class="name-info">
                 <span class="name-text">{{ row.profile_name || '—' }}</span>
                 <span class="profile-id">{{ row.profile_id }}</span>
-                <span class="origin-tag" [class.origin-here]="row.origin === 'here'"
+                <span class="origin-tag origin-out" *ngIf="row.transferredOut"
+                      matTooltip="currentstage is 'Transfered' — left this queue; the ATC doc belongs to the destination queue">
+                  transferred out
+                </span>
+                <span class="origin-tag" *ngIf="!row.transferredOut"
+                      [class.origin-here]="row.origin === 'here'"
                       [matTooltip]="row.origin === 'here'
                         ? 'Started in this queue — no transferredfrom, so the lineage is a single level'
                         : 'Transferred in — the walk can climb to the ancestor queues'">
@@ -377,8 +391,12 @@
         <ng-container matColumnDef="genDoc">
           <th mat-header-cell *matHeaderCellDef class="col-gen">ATC doc</th>
           <td mat-cell *matCellDef="let row" class="col-gen">
-            <span *ngIf="!row.genDocId" class="none-badge"
-                  matTooltip="No queue_atc_generation doc exists for this participant in the selected queues">
+            <span *ngIf="!row.genDocId && row.transferredOut" class="xfer-badge"
+                  matTooltip="Transferred out of this queue — the ATC doc was generated against the DESTINATION queue. Nothing is missing here.">
+              <mat-icon>logout</mat-icon> transferred out
+            </span>
+            <span *ngIf="!row.genDocId && !row.transferredOut" class="none-badge"
+                  matTooltip="No queue_atc_generation doc exists for this participant in this queue">
               <mat-icon>remove</mat-icon> none
             </span>
 

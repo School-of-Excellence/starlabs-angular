@@ -161,6 +161,12 @@ export interface Row {
    *                 walk can reach ancestor queues.
    */
   origin: 'here' | 'transferred';
+  /**
+   * Token has been transferred OUT of this queue (currentstage "Transfered").
+   * Its ATC doc belongs to the DESTINATION queue, so the absence of one here is
+   * normal and must not be reported as missing — see transferredOut().
+   */
+  transferredOut: boolean;
   walking: boolean;
   walkError: string | null;
 
@@ -424,6 +430,24 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     const at = activeStages.indexOf(currentstage);
     if (at < 0) return true;                     // off-list currentstage → terminal
     return at > target;
+  }
+
+  /**
+   * Has this token left the queue?
+   *
+   * The stage is spelled "Transfered" in the queue configs (single r) — matched
+   * loosely so a corrected spelling does not silently break the check.
+   *
+   * This matters for the ATC-doc column: once a participant is transferred out,
+   * their gen doc is created against the DESTINATION queue, so this queue holds no
+   * doc for them and never will. Counting that as "crossed but no ATC doc" turns a
+   * normal hand-off into a false backlog — in V3hx it was 265 of 328 such rows,
+   * i.e. the metric was almost entirely noise. Their transcript still matters
+   * though: the destination token's lineage points back here, so a recording
+   * attached in this queue is what the destination's resolver will read.
+   */
+  private isTransferredOut(currentstage: string): boolean {
+    return /^transfer/i.test((currentstage || '').trim());
   }
 
   private async queueDataOf(id: string, ref: DocumentReference): Promise<any> {
@@ -724,6 +748,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
             currentstage: t.currentstage ?? '',
             crossed: null,
             origin: (t.transferredfrom && t.tokentransferredfrom) ? 'transferred' : 'here',
+            transferredOut: this.isTransferredOut(t.currentstage ?? ''),
             walking: true, walkError: null,
             pairings: cfgPairings.map((c) => ({
               stage: c.stage, category: c.category, zoom: c.zoom,
@@ -879,6 +904,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (this.noSession(r)) return r.crossed ? 'no studio session logged — cannot fix here' : 'not in studio yet';
     if (this.supersededOnly(r)) return 're-attach to current session';
     if (!this.hasTranscript(r)) return 'attach a Dropbox recording';
+    if (r.transferredOut) return 'transferred out — ATC doc is in the destination queue';
     if (!r.genDocId) return r.crossed ? 'transcript ready — no ATC doc yet' : 'transcript ready — waiting to cross';
     if (r.genStatus === 'dataincomplete') {
       return r.genMissing.length ? `rebuild — needs ${r.genMissing.join('; ')}` : 'rebuild';
@@ -1114,12 +1140,19 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       if (cr === 'yes' && r.crossed !== true) return false;
       if (cr === 'no' && r.crossed !== false) return false;
 
-      // multi-select: a row matches if it satisfies ANY chosen ATC-doc state
+      // multi-select: a row matches if it satisfies ANY chosen ATC-doc state.
+      // 'none' means genuinely absent — a transferred-out token is not "missing"
+      // a doc, its doc simply belongs to the destination queue.
       if (gen.length) {
-        const ok = gen.some((g) => g === 'none' ? !r.genDocId : r.genStatus === g);
+        const ok = gen.some((g) => g === 'none'
+          ? (!r.genDocId && !r.transferredOut)
+          : g === 'out' ? r.transferredOut
+          : r.genStatus === g);
         if (!ok) return false;
       }
 
+      if (or === 'out' && !r.transferredOut) return false;
+      if (or === 'instay' && r.transferredOut) return false;
       if (or === 'here' && r.origin !== 'here') return false;
       if (or === 'transferred' && r.origin !== 'transferred') return false;
       if (or === 'offlineage' && !this.offLineageOnly(r)) return false;
@@ -1143,13 +1176,14 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
   /** One-click drill-downs from the telemetry tiles. */
   focus(kind: 'crossed' | 'needsLink' | 'superseded' | 'noSession' | 'noGen' | 'dataincomplete'
-              | 'here' | 'transferred' | 'offlineage'): void {
+              | 'here' | 'transferred' | 'offlineage' | 'transferredOut'): void {
     this.clearFilters();
     if (kind === 'crossed') this.filterCrossed = 'yes';
     if (kind === 'needsLink') { this.filterCrossed = 'yes'; this.filterTranscript = 'no'; }
     if (kind === 'superseded') this.filterTranscript = 'superseded';
     if (kind === 'noSession') { this.filterCrossed = 'yes'; this.filterTranscript = 'nosession'; }
-    if (kind === 'noGen') { this.filterCrossed = 'yes'; this.filterGen = ['none']; }
+    if (kind === 'noGen') { this.filterCrossed = 'yes'; this.filterGen = ['none']; this.filterOrigin = 'instay'; }
+    if (kind === 'transferredOut') this.filterOrigin = 'out';
     if (kind === 'dataincomplete') this.filterGen = ['dataincomplete'];
     if (kind === 'here') this.filterOrigin = 'here';
     if (kind === 'transferred') this.filterOrigin = 'transferred';
@@ -1171,8 +1205,16 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   get countNoSession(): number {
     return this.allRows.filter((r) => r.crossed === true && this.noSession(r)).length;
   }
+  /**
+   * Crossed, still in this queue, and genuinely has no ATC doc.
+   * Transferred-out tokens are excluded: their doc lives in the destination queue.
+   */
   get countNoGen(): number {
-    return this.allRows.filter((r) => r.crossed === true && !r.genDocId).length;
+    return this.allRows.filter(
+      (r) => r.crossed === true && !r.genDocId && !r.transferredOut).length;
+  }
+  get countTransferredOut(): number {
+    return this.allRows.filter((r) => r.transferredOut).length;
   }
   // origin metadata
   get countHere(): number { return this.allRows.filter((r) => r.origin === 'here').length; }

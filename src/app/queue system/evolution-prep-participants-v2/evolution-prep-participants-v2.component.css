@@ -352,3 +352,13 @@ td.mat-mdc-cell { font-size: 13px; color: #2b3140; padding: 10px 12px; vertical-
 .offlin-chip mat-icon { font-size: 11px; width: 11px; height: 11px; }
 .view-btn { width: 28px; height: 28px; line-height: 28px; }
 .view-btn mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+/* transferred OUT of this queue — ATC doc belongs to the destination queue */
+.xfer-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #e0f2f1; color: #00695c;
+  border-radius: 12px; padding: 3px 10px; font-size: 11.5px; font-weight: 500;
+  white-space: nowrap;
+}
+.xfer-badge mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.origin-tag.origin-out { color: #00897b; }
