@@ -1,0 +1,83 @@
+<div class="config-wrap">
+  <div class="loading" *ngIf="loading">
+    <mat-spinner diameter="34"></mat-spinner>
+  </div>
+
+  <form [formGroup]="form" *ngIf="!loading" (ngSubmit)="save()">
+    <div class="config-card">
+      <div class="config-head">
+        <div>
+          <h2>Home Configuration</h2>
+          <p>Choose what appears on the EiFlix home screen and how each item is shown.</p>
+        </div>
+        <button mat-flat-button color="primary" type="submit" class="save-btn" [disabled]="isSaving">
+          <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
+          <ng-container *ngIf="!isSaving"><mat-icon>save</mat-icon> Save</ng-container>
+        </button>
+      </div>
+
+      <mat-form-field appearance="outline" class="select-field">
+        <mat-label>Home items</mat-label>
+        <mat-select formControlName="selected" multiple (selectionChange)="onSelectedChange($event.value)">
+          <mat-select-trigger>{{ selectedLabels() }}</mat-select-trigger>
+
+          <mat-optgroup label="Widgets">
+            <mat-option *ngFor="let opt of staticOptions" [value]="opt.key">{{ opt.label }}</mat-option>
+          </mat-optgroup>
+
+          <mat-optgroup label="Home Series" *ngIf="seriesOptions.length > 0">
+            <mat-option *ngFor="let opt of seriesOptions" [value]="opt.key">{{ opt.label }}</mat-option>
+          </mat-optgroup>
+        </mat-select>
+        <mat-hint>{{ (selectedControl?.value || []).length }} selected</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div class="items-list" formArrayName="items" cdkDropList (cdkDropListDropped)="drop($event)">
+      <div class="item-card" *ngFor="let group of items.controls; let i = index" [formGroupName]="i" cdkDrag>
+        <div class="item-drag-preview" *cdkDragPreview>{{ optionLabel(group.get('key')?.value) }}</div>
+
+        <div class="item-head">
+          <button mat-icon-button type="button" class="drag-btn" cdkDragHandle
+            matTooltip="Drag to reorder" aria-label="Drag to reorder">
+            <mat-icon>drag_indicator</mat-icon>
+          </button>
+          <span class="item-index">{{ i + 1 }}</span>
+          <div class="item-name-wrap">
+            <span class="item-name">{{ optionLabel(group.get('key')?.value) }}</span>
+            <span class="item-tag" [ngClass]="'tag-' + optionType(group.get('key')?.value)">
+              {{ optionType(group.get('key')?.value) === 'homeseries' ? 'Home Series' : (optionLabel(group.get('key')?.value)) }}
+            </span>
+          </div>
+          <button mat-icon-button type="button" class="remove-btn" (click)="removeItem(i)"
+            matTooltip="Remove" aria-label="Remove">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="item-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Title</mat-label>
+            <input matInput formControlName="title" placeholder="Enter title" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Subtitle</mat-label>
+            <input matInput formControlName="subtitle" placeholder="Enter subtitle" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Show To</mat-label>
+            <mat-select formControlName="showto">
+              <mat-option *ngFor="let s of showToOptions" [value]="s.value">{{ s.label }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="items-empty" *ngIf="items.length === 0">
+        <mat-icon>dashboard_customize</mat-icon>
+        <h3>Nothing selected yet</h3>
+        <p>Pick items above to configure how they appear on the home screen.</p>
+      </div>
+    </div>
+  </form>
+</div>

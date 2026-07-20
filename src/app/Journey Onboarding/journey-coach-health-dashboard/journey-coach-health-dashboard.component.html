@@ -69,7 +69,7 @@
 
       <!-- Global summary filter: lifecycle + journey/group. Rescopes every metric below.
            Active only when the full base is loaded; disabled in the paged/All view (honest). -->
-      <div class="ios2-filter" [class.is-disabled]="pagedMode">
+      <div class="ios2-filter" [class.is-disabled]="!summaryFilterReady">
         <span class="fb-label"><mat-icon>tune</mat-icon>Filter</span>
         <div class="fb-seg" role="group" aria-label="Lifecycle">
           <button type="button" [class.on]="shownLifecycle==='all'" (click)="setSumLifecycle('all')">All</button>
@@ -78,20 +78,26 @@
           <button type="button" [class.on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">Discontinued</button>
         </div>
         <div class="fb-journey">
-          <button type="button" class="fb-jbtn" [class.on]="!!sumJourney()" (click)="toggleJourneyMenu()">
-            <mat-icon *ngIf="sumJourney()?.group" class="fb-jgico">folder</mat-icon>{{ summaryJourneyLabel }}<mat-icon class="fb-jchev">expand_more</mat-icon>
+          <button type="button" class="fb-jbtn" [class.on]="sumJourneys().size > 0" (click)="toggleJourneyMenu()">
+            {{ summaryJourneyLabel }}<mat-icon class="fb-jchev">expand_more</mat-icon>
           </button>
+          <div class="fb-menu-backdrop" *ngIf="journeyMenuOpen" (click)="closeJourneyMenu()"></div>
           <div class="fb-menu" *ngIf="journeyMenuOpen">
-            <button type="button" class="fb-mitem" [class.on]="!sumJourney()" (click)="setSumJourney(null)">All journeys</button>
+            <button type="button" class="fb-mitem" [class.on]="sumJourneys().size === 0" (click)="setSumJourney(null)">
+              <mat-icon class="fb-mcheck">{{ sumJourneys().size === 0 ? 'check' : '' }}</mat-icon>
+              <span class="fb-mname">All journeys</span>
+            </button>
             <button type="button" class="fb-mitem" *ngFor="let j of journeyView()" [class.on]="isSummaryJourneyOn(j)" (click)="setSumJourney(j)">
+              <mat-icon class="fb-mcheck">{{ isSummaryJourneyOn(j) ? 'check' : '' }}</mat-icon>
               <mat-icon *ngIf="j.group" class="fb-mgico">folder</mat-icon>
               <span class="fb-mname">{{ j.name }}</span><span class="fb-mcount">{{ j.count }}</span>
             </button>
+            <button type="button" class="fb-mdone" (click)="closeJourneyMenu()">Done</button>
           </div>
         </div>
         <button type="button" class="fb-clear" *ngIf="summaryFilterActive" (click)="clearSummaryFilter()"><mat-icon>close</mat-icon>Clear</button>
-        <span class="fb-count" *ngIf="!pagedMode">{{ filteredRows().length }} of {{ allRows().length }}</span>
-        <span class="fb-hint" *ngIf="pagedMode">Available in a coach view</span>
+        <span class="fb-count" *ngIf="summaryFilterReady">{{ summaryShownCount }} of {{ summaryScopeTotal }}</span>
+        <span class="fb-hint" *ngIf="!summaryFilterReady">Loading base…</span>
       </div>
 
       <!-- Row 1: Needs attention (who needs you) + Your base (lifecycle split) -->
@@ -341,7 +347,7 @@
       <div class="jchd-filter-pills">
         <label class="jchd-pill jchd-pill-select">
           <span class="jchd-pill-label">Journey</span>
-          <select [(ngModel)]="journeyFilter" (ngModelChange)="applyFilters()" aria-label="Journey">
+          <select [(ngModel)]="journeyFilter" (ngModelChange)="onTopJourneyChange()" aria-label="Journey">
             <option value="">All</option>
             <option *ngFor="let j of journeyOptions" [value]="j">{{ j }}</option>
           </select>
@@ -363,7 +369,7 @@
 
         <button type="button" class="jchd-pill" [class.is-on]="filtersExpanded || hasActiveFilters"
           (click)="filtersExpanded = !filtersExpanded"
-          matTooltip="Product type, tier, priority, health, finance, renewal & quiet filters">
+          matTooltip="Journey, priority, health, finance, renewal & quiet filters">
           <mat-icon class="jchd-pill-ic">tune</mat-icon> Filters
         </button>
 
@@ -379,29 +385,16 @@
     <!-- Intelligent filter panel (collapsible). Product type defaults to Ecosystem. -->
     <section class="jchd-filter-panel" *ngIf="selectedCoachId !== UNASSIGNED && filtersExpanded">
       <div class="fp-grid">
-        <label class="fp-field"
-          matTooltip="Ecosystem = B!G/LYL/uP!/CPM journeys · DFU = Done-For-You · Gifts = FTO">
-          <span class="fp-field-label">Product type</span>
-          <mat-form-field appearance="outline" class="fp-mat">
-            <mat-select [(ngModel)]="productTypeFilters" (ngModelChange)="applyFilters()" multiple
-              panelClass="jchd-fp-panel" placeholder="Any">
-              <mat-option value="ecosystem">Ecosystem</mat-option>
-              <mat-option value="dfu">DFU</mat-option>
-              <mat-option value="gifts">Gifts</mat-option>
-              <mat-option value="other">Other</mat-option>
-            </mat-select>
-          </mat-form-field>
-        </label>
-
-        <label class="fp-field">
-          <span class="fp-field-label">Tier</span>
-          <mat-form-field appearance="outline" class="fp-mat">
-            <mat-select [(ngModel)]="tierFilters" (ngModelChange)="applyFilters()" multiple
-              panelClass="jchd-fp-panel" placeholder="Any">
-              <mat-option *ngFor="let t of tierOptions" [value]="t">{{ t }}</mat-option>
-            </mat-select>
-          </mat-form-field>
-        </label>
+        <div class="fp-field fp-journey-field">
+          <span class="fp-field-label">Journey</span>
+          <div class="fp-journey-chips">
+            <button type="button" class="fp-jchip" [class.is-on]="journeyGroupFilter.length === 0" (click)="toggleBaseJourney(null)">All</button>
+            <button type="button" class="fp-jchip" *ngFor="let j of journeyView()" [class.is-group]="j.group" [class.is-on]="baseJourneyOn(j)"
+              (click)="toggleBaseJourney(j)">
+              <mat-icon *ngIf="j.group" class="fp-jgico">folder</mat-icon>{{ j.name }}<span class="fp-jcount">{{ j.count }}</span>
+            </button>
+          </div>
+        </div>
 
         <label class="fp-field">
           <span class="fp-field-label">Priority band</span>
@@ -420,7 +413,7 @@
           <mat-form-field appearance="outline" class="fp-mat">
             <mat-select [(ngModel)]="healthFilters" (ngModelChange)="applyFilters()" multiple
               panelClass="jchd-fp-panel" placeholder="Any">
-              <mat-option *ngFor="let h of healthOptions" [value]="h">{{ healthLabel(h) }}</mat-option>
+              <mat-option *ngFor="let h of healthFilterOptions" [value]="h">{{ healthFilterLabel(h) }}</mat-option>
             </mat-select>
           </mat-form-field>
         </label>
@@ -470,7 +463,7 @@
 
       <div class="fp-note" *ngIf="pagedMode">
         <mat-icon>info</mat-icon>
-        <span>Search, product type, tier, status, finance &amp; renewal-window filters cover the
+        <span>Search, journey, status, finance &amp; renewal-window filters cover the
           <strong>full base</strong> via a lightweight index. Priority band, coach-health &amp;
           going-quiet refine within loaded pages — page through to apply them across everyone.</span>
       </div>
