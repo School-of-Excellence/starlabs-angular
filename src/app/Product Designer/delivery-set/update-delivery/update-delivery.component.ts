@@ -529,14 +529,22 @@ export class UpdateDeliveryComponent {
   }
 
   addSubFormOption(event:MatChipInputEvent,mainindex:number,subindex:number):void {
-      this.getSubFormArray(mainindex).controls[subindex].get('options').value.push(event.value.trim())
-      event.value = null;
-      this.submitForm(this.formform.value);
+      const value = (event.value || '').trim()
+      if(value){
+        this.getSubFormArray(mainindex).controls[subindex].get('options').value.push(value)
+        this.submitForm(this.formform.value)
+      }
+      event.chipInput.clear()
   }
 
-  removeSubFormOption(mainindex,subindex,optionindex){
+  removeSubFormOption(mainindex,subindex,optionindex,optioninput?:HTMLInputElement){
     this.getSubFormArray(mainindex).controls[subindex].get('options').value.splice(optionindex,1)
     this.submitForm(this.formform.value)
+    // refocus the chip input after the chip is destroyed, so repeated
+    // backspace keeps deleting (Material loses focus to <body> otherwise)
+    if(optioninput){
+      setTimeout(() => optioninput.focus())
+    }
   }
 
   addFlippingGroup(index:number){

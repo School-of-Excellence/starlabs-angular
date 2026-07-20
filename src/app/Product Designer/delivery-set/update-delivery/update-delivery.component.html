@@ -222,11 +222,11 @@
                             *ngFor="let Options of getSubFormArray(i).controls[subindex].get('options').value;let k =index"
                             [value]="Options"
                             [editable]="editable"
-                            (removed)="removeSubFormOption(i,subindex,k )"
+                            (removed)="removeSubFormOption(i,subindex,k,subOptionInput)"
                           >
                             {{Options}}<mat-icon matChipRemove >cancel</mat-icon>
                           </mat-chip-row>
-                          <input placeholder=" Type New Option...and Press Enter"
+                          <input #subOptionInput placeholder=" Type New Option...and Press Enter"
                                   [matChipInputFor]="chipList3"
                                   (matChipInputTokenEnd)="addSubFormOption($event,i,subindex)">
                         </mat-chip-grid>
