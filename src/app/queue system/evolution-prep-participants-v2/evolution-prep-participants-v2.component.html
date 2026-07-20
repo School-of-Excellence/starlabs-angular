@@ -93,6 +93,12 @@
         <mat-icon>call_made</mat-icon>
         <strong>{{ countGenElsewhere }}</strong> ATC doc in destination queue
       </span>
+      <span class="meta-sep" *ngIf="countGenOtherToken">·</span>
+      <span class="meta-item warn" *ngIf="countGenOtherToken"
+            matTooltip="A gen doc exists for the profile but keyed to a different queue_token — a duplicate or rebuilt token.">
+        <mat-icon>warning</mat-icon>
+        <strong>{{ countGenOtherToken }}</strong> doc under another token
+      </span>
       <span class="meta-sep" *ngIf="countOffLineage">·</span>
       <span class="meta-item warn clickable" *ngIf="countOffLineage" (click)="focus('offlineage')"
             matTooltip="No studio session on their lineage, but sessions DO exist under other queues. The token is disconnected from the participant's history — link the token; do not attach a recording.">
@@ -403,9 +409,13 @@
               <mat-icon>logout</mat-icon> none (transferred)
             </span>
             <span *ngIf="!row.genDocId && !row.transferredOut" class="none-badge"
-                  matTooltip="No queue_atc_generation doc exists for this participant in this queue">
+                  matTooltip="No queue_atc_generation doc is keyed to this queue_token">
               <mat-icon>remove</mat-icon> none
             </span>
+            <div class="othertok" *ngIf="row.genOtherToken"
+                 matTooltip="A gen doc exists for this PROFILE but under a different queue_token. Docs are keyed to a token, so this one still has none — usually a duplicate or rebuilt token.">
+              <mat-icon>warning</mat-icon> doc under another token
+            </div>
 
             <ng-container *ngIf="row.genDocId">
               <span class="gen-badge" [ngClass]="'gen-' + row.genStatus"

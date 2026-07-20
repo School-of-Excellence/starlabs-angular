@@ -169,6 +169,8 @@ export interface Row {
   /** Destination queue, from `transferredto`. */
   toQueueId: string | null;
   toQueueName: string;
+  /** Destination token, from `tokentransferredto` — the exact token to look up. */
+  toTokenId: string | null;
   walking: boolean;
   walkError: string | null;
 
@@ -183,6 +185,12 @@ export interface Row {
    * So the destination is CHECKED rather than assumed.
    */
   genIn: 'this' | 'destination' | null;
+  /**
+   * A gen doc exists for this PROFILE but under a different queue_token. Not the
+   * same as having one: docs are keyed to a token, so this is a data smell (a
+   * duplicate/rebuilt token) rather than a satisfied requirement.
+   */
+  genOtherToken: boolean;
   genMissing: string[];         // what is ACTUALLY blocking — see blockingMissing()
 
   rebuilding: boolean;
@@ -249,10 +257,17 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   private tokenCache = new Map<string, any>();
   private variationCache = new Map<string, string[] | null>();
   /** profileid → gen doc, per selected queue. */
-  private genByProfile = new Map<string, { id: string; data: AtcGenDoc }>();
-  /** profileid → gen doc found in a queue the token was transferred TO. */
-  private genByProfileElsewhere =
+  /**
+   * queue_token_id → gen doc. Keyed by TOKEN, not profile: a gen doc is written
+   * against one token, and 13 of 384 (queue, profile) pairs in prod carry more
+   * than one doc, so a profile key is ambiguous. `tokentransferredto` gives the
+   * exact destination token to look up.
+   */
+  private genByToken = new Map<string, { id: string; data: AtcGenDoc }>();
+  private genByTokenElsewhere =
     new Map<string, { id: string; data: AtcGenDoc; queueId: string }>();
+  /** profileid → true, for either queue. Detects a doc under a DIFFERENT token. */
+  private genProfiles = new Set<string>();
 
   /** Stages that are studio (zoom) stages ANYWHERE — see buildZoomCapableSet(). */
   private zoomCapable = new Set<string>();
@@ -651,8 +666,9 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    * handle to match what the pipeline wrote.
    */
   private async loadGenDocs(destinationQueueIds: string[] = []): Promise<void> {
-    this.genByProfile.clear();
-    this.genByProfileElsewhere.clear();
+    this.genByToken.clear();
+    this.genByTokenElsewhere.clear();
+    this.genProfiles.clear();
 
     // Destination queues are queried ONCE each, not once per participant — the 384
     // transferred tokens in V3hx all point at the same destination.
@@ -663,10 +679,10 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
           where('queueref', '==', doc(this.atcSvc.atcDb, 'queue generation', qid)),
         ));
         snap.docs.forEach((d) => {
-          const data = d.data() as AtcGenDoc;
-          const pid = (data as any).profileid;
-          if (pid && !this.genByProfileElsewhere.has(pid)) {
-            this.genByProfileElsewhere.set(pid, { id: d.id, data, queueId: qid });
+          const data: any = d.data();
+          if (data.profileid) this.genProfiles.add(data.profileid);
+          if (data.queue_token_id) {
+            this.genByTokenElsewhere.set(data.queue_token_id, { id: d.id, data, queueId: qid });
           }
         });
       } catch (e) {
@@ -681,15 +697,15 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
           where('queueref', '==', doc(this.atcSvc.atcDb, 'queue generation', qid)),
         ));
         snap.docs.forEach((d) => {
-          const data = d.data() as AtcGenDoc;
-          const pid = (data as any).profileid;
-          if (!pid) return;
-          const prev = this.genByProfile.get(pid);
-          // Prefer the most advanced doc if a profile somehow has several.
-          const rank = (s?: AtcStatus | null) =>
-            ['error', 'dataincomplete', 'pending', 'processing', 'completed'].indexOf(String(s));
+          const data: any = d.data();
+          if (data.profileid) this.genProfiles.add(data.profileid);
+          if (!data.queue_token_id) return;
+          const prev = this.genByToken.get(data.queue_token_id);
+          // Prefer the most advanced doc if one token somehow has several.
+          const rank = (x?: string | null) =>
+            ['error', 'dataincomplete', 'pending', 'processing', 'completed'].indexOf(String(x));
           if (!prev || rank(data.status) > rank(prev.data.status)) {
-            this.genByProfile.set(pid, { id: d.id, data });
+            this.genByToken.set(data.queue_token_id, { id: d.id, data });
           }
         });
       } catch (e) {
@@ -728,16 +744,17 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   }
 
   private applyGenDoc(row: Row): void {
-    const g = this.genByProfile.get(row.profile_id);
+    const g = this.genByToken.get(row.tokenId);
     // Prefer this queue's doc; only if there is none and the token was transferred
     // out do we report the destination queue's doc.
-    const elsewhere = (!g && row.transferredOut)
-      ? this.genByProfileElsewhere.get(row.profile_id) : undefined;
+    const elsewhere = (!g && row.transferredOut && row.toTokenId)
+      ? this.genByTokenElsewhere.get(row.toTokenId) : undefined;
     const eff = g ?? elsewhere;
 
     row.genDocId = eff?.id ?? null;
     row.genStatus = (eff?.data.status ?? null) as AtcStatus | null;
     row.genIn = g ? 'this' : (elsewhere ? 'destination' : null);
+    row.genOtherToken = !g && !elsewhere && this.genProfiles.has(row.profile_id);
     if (elsewhere) row.toQueueName = this.queueLabel(elsewhere.queueId);
     const sd: any = eff ? (eff.data as any).stagedata ?? {} : null;
     row.genMissing = eff ? this.blockingMissing(sd) : [];
@@ -793,6 +810,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
             transferredOut: this.isTransferredOut(t),
             toQueueId: t.transferredto?.id ?? null,
             toQueueName: t.transferredto?.id ? this.queueLabel(t.transferredto.id) : '',
+            toTokenId: t.tokentransferredto?.id ?? null,
             walking: true, walkError: null,
             pairings: cfgPairings.map((c) => ({
               stage: c.stage, category: c.category, zoom: c.zoom,
@@ -802,6 +820,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
               dropboxLink: '', saving: false,
             })),
             genDocId: null, genStatus: null, genMissing: [], genIn: null,
+            genOtherToken: false,
             rebuilding: false,
             _token: t,
           });
@@ -954,6 +973,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (this.supersededOnly(r)) return 're-attach to current session';
     if (!this.hasTranscript(r)) return 'attach a Dropbox recording';
     if (r.genIn === 'destination') return `ATC doc lives in ${r.toQueueName || 'the destination queue'}`;
+    if (r.genOtherToken) return 'ATC doc exists under a DIFFERENT token — check for a duplicate';
     if (!r.genDocId) {
       if (r.transferredOut) return `transferred out — no ATC doc in either queue`;
       return r.crossed ? 'transcript ready — no ATC doc yet' : 'transcript ready — waiting to cross';
@@ -1266,6 +1286,9 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   /** Doc exists, but in the queue this token was transferred to. */
   get countGenElsewhere(): number {
     return this.allRows.filter((r) => r.genIn === 'destination').length;
+  }
+  get countGenOtherToken(): number {
+    return this.allRows.filter((r) => r.genOtherToken).length;
   }
   get countTransferredOut(): number {
     return this.allRows.filter((r) => r.transferredOut).length;
