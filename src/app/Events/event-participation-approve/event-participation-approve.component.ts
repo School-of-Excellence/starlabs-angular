@@ -78,6 +78,13 @@ export class EventParticipationApproveComponent {
   @ViewChild('paginator3') paginator3!: MatPaginator;
   @ViewChild('sort3') sort3!: MatSort;
 
+  // Revoke (read-only — no row actions)
+  revoked = []
+  displayedColumns4: string[] = ['sno', 'clientname', 'product', 'status'];
+  dataSource4 = new MatTableDataSource()
+  @ViewChild('paginator4') paginator4!: MatPaginator;
+  @ViewChild('sort4') sort4!: MatSort;
+
   // requestedQueue = []
   // attendenceQueue = []
   requestselection = new SelectionModel(true,[]);
@@ -161,6 +168,10 @@ export class EventParticipationApproveComponent {
     this.dataSource3.data = this.attended
     this.dataSource3.sort = this.sort3
     this.dataSource3.paginator = this.paginator3
+
+    this.dataSource4.data = this.revoked
+    this.dataSource4.sort = this.sort4
+    this.dataSource4.paginator = this.paginator4
   }
 
   ngOnDestroy(){
@@ -190,6 +201,11 @@ export class EventParticipationApproveComponent {
     this.dataSource3.filter = filterValue.trim().toLowerCase();
   }
 
+  applyFilterD4(event: Event) {
+    const filterValue = (event.target as HTMLInputElement).value;
+    this.dataSource4.filter = filterValue.trim().toLowerCase();
+  }
+
   onEventSelect(){
     // this.requestSubscription?.next()
     // this.requestSubscription?.complete()
@@ -206,6 +222,7 @@ export class EventParticipationApproveComponent {
       this.approved = []
       this.attendance = []
       this.attended = []
+      this.revoked = []
       for (let i = 0; i < snap.length; i++) {
         const element = snap[i];
         element['clientname'] = this.mapProfileName[element['profileid']]
@@ -222,7 +239,10 @@ export class EventParticipationApproveComponent {
         }
         else if(element["status"] == "attended"){
           this.attended.push(element)
-        } 
+        }
+        else if(element["status"] == "revoked"){
+          this.revoked.push(element)
+        }
       }
       this.ngAfterViewInit()
     })
