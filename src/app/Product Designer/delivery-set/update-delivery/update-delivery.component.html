@@ -60,12 +60,16 @@
         <!-- Form details -->
         <section class="fb-section">
           <header class="fb-section-head">
-            <div>
-              <h2 class="fb-section-title">Form details</h2>
-              <p class="fb-section-sub">What participants see at the top of the form.</p>
+            <div class="fb-section-left">
+              <span class="fb-section-index">1</span>
+              <div class="fb-section-text">
+                <h2 class="fb-section-title">Form details</h2>
+                <p class="fb-section-sub">What participants see at the top of the form.</p>
+              </div>
             </div>
           </header>
 
+          <div class="fb-section-body">
           <div class="fb-grid">
             <mat-form-field class="fb-colspan" appearance="outline">
               <mat-label>Form Name</mat-label>
@@ -97,21 +101,28 @@
               <textarea id="fd" (input)="autoGrow($event)" matInput formControlName="formdescription"></textarea>
             </mat-form-field>
           </div>
+          </div>
         </section>
 
         <!-- Fields -->
         <section class="fb-section" formArrayName="formarray">
           <header class="fb-section-head">
-            <div>
-              <h2 class="fb-section-title">Fields</h2>
-              <p class="fb-section-sub">The questions participants answer, in order.</p>
+            <div class="fb-section-left">
+              <span class="fb-section-index">2</span>
+              <div class="fb-section-text">
+                <h2 class="fb-section-title">Fields</h2>
+                <p class="fb-section-sub">The questions participants answer, in order.</p>
+              </div>
             </div>
-            <button *ngIf="formarray.length > 1" mat-button type="button" class="fb-collapse-all" (click)="toggleAllCollapsed()">
-              {{allCollapsed ? 'Expand all' : 'Collapse all'}}
-            </button>
-            <span class="fb-count">{{formarray.length}} {{formarray.length === 1 ? 'field' : 'fields'}}</span>
+            <div class="fb-section-right">
+              <button *ngIf="formarray.length > 1" mat-button type="button" class="fb-collapse-all" (click)="toggleAllCollapsed()">
+                {{allCollapsed ? 'Expand all' : 'Collapse all'}}
+              </button>
+              <span class="fb-count">{{formarray.length}} {{formarray.length === 1 ? 'field' : 'fields'}}</span>
+            </div>
           </header>
 
+          <div class="fb-section-body">
           <div class="fb-cards" cdkDropList (cdkDropListDropped)="dropField($event)">
           <div class="fb-card" [class.fb-collapsed]="isCollapsed(list)" cdkDrag
             *ngFor="let list of formarray.controls;let i = index" [formGroupName]="i">
@@ -311,6 +322,7 @@
           <button mat-stroked-button type="button" class="fb-add-btn fb-add-field" (click)="addarray(formarray.length - 1)">
             <mat-icon>add</mat-icon> Add field
           </button>
+          </div>
         </section>
 
         <footer class="fb-footer">
@@ -318,7 +330,7 @@
             <mat-icon>delete_outline</mat-icon> Delete form
           </button>
           <span class="fb-flex-spacer"></span>
-          <span class="fb-autosave">Valid changes save automatically</span>
+          <span class="fb-autosave"><span class="fb-autosave-dot"></span>Autosaves when valid</span>
           <button type="button" mat-stroked-button class="fb-close" (click)="closeDialog()" [disabled]="loading">Close</button>
           <button type="submit" mat-flat-button class="fb-save" (click)="submitForm(formform.value, true)" [disabled]="loading">Save</button>
         </footer>
