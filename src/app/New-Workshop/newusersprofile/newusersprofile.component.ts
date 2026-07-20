@@ -115,12 +115,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Resolve refferedprofile ids to names (read-only use of the shared map).
     this.authguard.getParticipantMetaMap()
       .then(res => (this.metaMap = res?.map || {}))
       .catch(err => console.error('Error loading participant meta map:', err));
-
-    // Live tag id -> name map for rendering the Tags column.
     collectionData(collection(this.firestore, 'newusertags'), { idField: 'id' }).subscribe({
       next: (rows: any[]) => {
         const map: Record<string, string> = {};
