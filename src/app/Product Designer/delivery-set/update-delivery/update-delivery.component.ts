@@ -589,10 +589,62 @@ export class UpdateDeliveryComponent {
     let condition:boolean = ['video','audio'].includes(type) ? this.formarray.controls[i].get('options').value.length >= 1 ? true : false : false
     if(!condition){
       this.formarray.controls[i].get('options').value.push(value)
+      this.maybeSuggestSeries(this.formarray.controls[i].get('options').value)
     }else{
       this.openSnackBar("Only one URL is allowed for video and audio", 2500)
     }
     event.chipInput.clear()
+  }
+
+  // series auto-fill: after consecutive entries like "1","2" or "a","b", offer
+  // (native prompt only, at most once per options list) to fill the rest
+  private seriesPrompted = new WeakSet<object>()
+
+  private maybeSuggestSeries(options:any[]){
+    if(!Array.isArray(options) || options.length < 2 || this.seriesPrompted.has(options)){ return }
+    const prev = String(options[options.length - 2]).trim()
+    const last = String(options[options.length - 1]).trim()
+    const MAX_FILL = 200
+
+    if(/^\d+$/.test(prev) && /^\d+$/.test(last) && parseInt(last,10) === parseInt(prev,10) + 1){
+      this.seriesPrompted.add(options)
+      const lastNum = parseInt(last,10)
+      const answer = prompt(`Series detected (${prev}, ${last}, ...). Auto-fill options until which number? (Cancel to skip)`, String(lastNum + 8))
+      if(answer == null){ return }
+      const until = parseInt(answer.trim(),10)
+      if(isNaN(until) || until <= lastNum){
+        alert("Enter a number greater than " + lastNum)
+        return
+      }
+      const end = Math.min(until, lastNum + MAX_FILL)
+      for(let n = lastNum + 1; n <= end; n++){
+        options.push(String(n))
+      }
+      return
+    }
+
+    const isLetter = (s:string) => /^[a-zA-Z]$/.test(s)
+    if(isLetter(prev) && isLetter(last) && last.charCodeAt(0) === prev.charCodeAt(0) + 1){
+      this.seriesPrompted.add(options)
+      const isUpper = last === last.toUpperCase()
+      const answer = prompt(`Series detected (${prev}, ${last}, ...). Auto-fill options until which letter? (Cancel to skip)`, isUpper ? 'J' : 'j')
+      if(answer == null){ return }
+      const target = answer.trim()
+      if(!isLetter(target)){
+        alert("Enter a single letter")
+        return
+      }
+      const lastCode = last.toLowerCase().charCodeAt(0)
+      const untilCode = target.toLowerCase().charCodeAt(0)
+      if(untilCode <= lastCode){
+        alert("Enter a letter after " + last)
+        return
+      }
+      for(let c = lastCode + 1; c <= untilCode; c++){
+        const ch = String.fromCharCode(c)
+        options.push(isUpper ? ch.toUpperCase() : ch)
+      }
+    }
   }
 
   remove(i:number,j:number,optioninput?:HTMLInputElement) {
@@ -628,6 +680,7 @@ export class UpdateDeliveryComponent {
       const value = (event.value || '').trim()
       if(value){
         this.getSubFormArray(mainindex).controls[subindex].get('options').value.push(value)
+        this.maybeSuggestSeries(this.getSubFormArray(mainindex).controls[subindex].get('options').value)
         this.submitForm(this.formform.value)
       }
       event.chipInput.clear()
