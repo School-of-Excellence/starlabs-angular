@@ -17,7 +17,7 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { RouterModule } from '@angular/router';
 import {
   Firestore, collection, doc, query, where,
-  updateDoc, Timestamp, Unsubscribe,
+  updateDoc, setDoc, Timestamp, Unsubscribe,
   getDoc, getDocs, onSnapshot, getFirestore, documentId,
 } from '@angular/fire/firestore';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
@@ -30,8 +30,9 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatRadioModule } from '@angular/material/radio';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment.development';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { SnackbarService } from '../../shared/snackbar.service';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsapp-progress-dialog.component';
@@ -518,6 +519,68 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     }
     this.applyFilterSide();
+  }
+
+  // ============ Email composer (same flow as participants-analytics) ============
+  // EmailInputComponent reads `profileid`, `email` and `name` off each entry, so
+  // flatten the panel's participants ({ profileid, name, metadata }) into that shape.
+  private get emailRecipients(): any[] {
+    return (this.filteredParticipants || [])
+      .filter(p => p?.['metadata']?.['email'])
+      .map(p => ({
+        ...p['metadata'],
+        profileid: p['profileid'],
+        name: p['name'] || p['metadata']?.['name'],
+        email: p['metadata']?.['email'],
+      }));
+  }
+
+  sendEmailToSelectedParicipant() {
+    const recipients = this.emailRecipients;
+    if (recipients.length === 0) {
+      this.snackbarService.show('No valid recipients found');
+      return;
+    }
+
+    const dialogRef = this.dialog.open(EmailInputComponent, {
+      data: recipients,
+      minWidth: '600px',
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe(async result => {
+      if (result != null && result != undefined) {
+        const docRef = doc(collection(this.firestoreDefault, 'email archive'), result['docid']);
+        if (result['status'] == 'queued' || result['status'] == 'send') {
+          await setDoc(docRef, result, { merge: true }).then(() => {
+            this.snackbarService.show(result['status'] == 'queued' ? 'Successfully Added to Queue' : 'Email Sent Successfully');
+          }).catch(err => {
+            console.log(err);
+            this.snackbarService.show('Error Sending Email');
+          });
+        } else if (result['status'] == 'validated') {
+          let url: string;
+          if (environment.firebase.projectId == 'starlabs-test') {
+            url = 'https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail';
+          } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+            url = 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail';
+          }
+          const data = result;
+          data['archiveid'] = result['docid'];
+          this.http.post(url, JSON.stringify(data), {
+            responseType: 'text',
+            headers: new HttpHeaders().set('Content-Type', 'application/json'),
+          }).subscribe({
+            next: (response) => {
+              console.log('response', response);
+            },
+            error: (err) => {
+              console.log('Error: ' + err);
+            }
+          });
+        }
+      }
+    });
   }
 
   async sendMail() {

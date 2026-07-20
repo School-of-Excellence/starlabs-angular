@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatMenuModule } from '@angular/material/menu';
@@ -24,9 +24,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
-import { Firestore, collection, collectionData, doc, writeBatch } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, doc, setDoc, writeBatch } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { AssignTagsDialogComponent } from './assign-tags-dialog/assign-tags-dialog.component';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
 @Component({
   selector: 'app-newusersprofile',
@@ -477,6 +478,74 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   private readonly WHATSAPP_CHUNK_SIZE = 200;
   private readonly CHUNK_DELAY_MS = 1000;
+
+  // ============ Email composer (ported from participants-analytics) ============
+  // EmailInputComponent reads `profileid`, `email` and `name` off each entry, so
+  // pass the raw user doc with profileid resolved the same way the rest of this
+  // component does.
+  private get emailRecipients(): any[] {
+    const byId = new Map<string, any>(this.dataSource.data.map(u => [this.rowId(u), u]));
+    return this.selection.selected
+      .map(id => byId.get(id))
+      .filter(u => u && u.email)
+      .map(u => ({ ...u, profileid: u.profileid || this.rowId(u) }));
+  }
+
+  openSnackBar(message: string, action: string) {
+    this.snackBar.open(message, action);
+  }
+
+  sendEmailToSelectedParicipant() {
+    const recipients = this.emailRecipients;
+    if (recipients.length === 0) {
+      this.openSnackBar('No selected profile has an email address', 'OK');
+      return;
+    }
+
+    let dialogRef = this.dialog.open(EmailInputComponent, {
+      data: recipients,
+      minWidth: "600px",
+      disableClose: true
+    });
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        console.log(result);
+
+        const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
+        if (result['status'] == 'queued' || result['status'] == 'send') {
+          await setDoc(docRef, result, { merge: true }).then(() => {
+            this.openSnackBar(result['status'] == 'queued' ? 'Successfully Added to Queue' : "Email Sent Successfully", "OK");
+          }).catch(err => {
+            console.log(err);
+            this.openSnackBar("Error Sending Email", "OK");
+          });
+        } else if (result['status'] == 'validated') {
+          let url: string;
+          if (environment.firebase.projectId == 'starlabs-test') {
+            url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
+          } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+            url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail"
+          }
+          console.log("EMAIL :", url);
+          let data = result;
+          data['archiveid'] = result['docid'];
+          this.http.post(url, JSON.stringify(data), {
+            responseType: 'text',
+            headers: new HttpHeaders().set('Content-Type', 'application/json'),
+          }).subscribe({
+            next: (response) => {
+              console.log('response', response);
+            },
+            error: (err) => {
+              console.log(err);
+              console.log("Error: " + err);
+            }
+          });
+        }
+
+      }
+    })
+  }
 
   async sendMail() {
     const { SendmessagesComponent } = await import('../workshop-dashboard/sendmessages/sendmessages.component');

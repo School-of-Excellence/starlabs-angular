@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CdkDragDrop, moveItemInArray, DragDropModule } from '@angular/cdk/drag-drop';
-import { collection, collectionData, Firestore, getDoc, getDocs, orderBy, query, where, doc, deleteDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, collectionData, documentId, Firestore, getDoc, getDocs, orderBy, query, where, doc, deleteDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -90,6 +90,14 @@ export class EventOpportunityDashboardComponent {
   mapQueue = {}
   showQueueSelect: boolean = true
   mapData = {}
+
+  // Webhook presence: `live assignment log` docs (keyed by live-assignment id) for
+  // the live assignments across the selected queues. Used only to decide "has the
+  // call started + how long ago" from the specialist's real join time. Subscribed
+  // via documentId() IN chunks; re-subscribes when the id set changes.
+  private logByLaId: Record<string, any> = {};
+  private logSubs: Subscription[] = [];
+  private logSubKey = '';
   mapLiveAssignmentData = {};
   mapProfile = {}
   mapEmail = {}
@@ -226,6 +234,8 @@ export class EventOpportunityDashboardComponent {
   ngOnDestroy() {
     if (this.studioWatchTimer) clearInterval(this.studioWatchTimer);
     this.queueTokensSub?.unsubscribe();
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
     this.subscription.complete();
     this.subscription.next();
   }
@@ -495,6 +505,7 @@ export class EventOpportunityDashboardComponent {
 
   handleEventData(eventData: any, queueId: string): void {
     this.mapData[queueId] = eventData;
+    this.subscribeStudioWatchLogs();
     this.mapLiveAssignmentData = eventData["mapLiveStudioToData"];
     this.rebuildCompletedMaps(queueId, eventData["liveAssignmentList"] || []);
     const stages: string[] = eventData["stages"] || [];
@@ -1355,11 +1366,61 @@ export class EventOpportunityDashboardComponent {
     return isNaN(t) ? null : t;
   }
 
+  // Subscribe to `live assignment log` for the LIVE assignments across the selected
+  // queues (documentId() IN, chunks of 30). Re-subscribes only when the id set
+  // changes. Feeds specialistJoinedMs() so "call started" reflects the real join.
+  private subscribeStudioWatchLogs(): void {
+    const ids: string[] = [];
+    for (const queueid of this.selectedQueueList) {
+      const list: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+      for (const a of list) {
+        if (a?.['status'] !== 'live') continue;
+        const id = a?.['id'] || a?.['docid'];
+        if (id) ids.push(id);
+      }
+    }
+    const uniq = Array.from(new Set(ids));
+    const key = uniq.slice().sort().join(',');
+    if (key === this.logSubKey) return;
+    this.logSubKey = key;
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
+    this.logByLaId = {};
+    for (let i = 0; i < uniq.length; i += 30) {
+      const chunk = uniq.slice(i, i + 30);
+      const sub = collectionData(
+        query(collection(this.firestore, 'live assignment log'), where(documentId(), 'in', chunk)),
+        { idField: 'docid' }
+      ).subscribe(
+        (rows: any[]) => { rows.forEach(r => { this.logByLaId[r['docid']] = r; }); },
+        () => {}
+      );
+      this.logSubs.push(sub);
+    }
+  }
+
+  // Real "specialist joined" time in ms for an assignment: earliest specialist join
+  // from the webhook log when available (log present but nobody joined → null =
+  // "not started"), else the legacy `specialistJoinedAt` one-shot as a fallback.
+  private specialistJoinedMs(a: any): number | null {
+    const id = a?.['id'] || a?.['docid'];
+    const log = id ? this.logByLaId[id] : null;
+    if (log) {
+      const specialists: any = log['specialists'] || {};
+      const joinedTs = Object.values(specialists).map((s: any) => s?.joinedAt).filter(Boolean);
+      if (!joinedTs.length) return null;
+      const earliest = joinedTs.reduce((x: any, y: any) =>
+        (this.tsToMillis(x) ?? Infinity) <= (this.tsToMillis(y) ?? Infinity) ? x : y);
+      return this.tsToMillis(earliest);
+    }
+    return this.tsToMillis(a?.['specialistJoinedAt']);
+  }
+
   /**
    * Studios flagged by the 4-hour rule across the currently selected board
    * queues. JOINED assignments are measured from `created` (studio entry);
-   * ACTIVE assignments (call started) from `specialistJoinedAt`. Sorted
-   * longest-waiting first.
+   * ACTIVE assignments (call started) from the specialist's real join time
+   * (webhook log, falling back to `specialistJoinedAt`). Sorted longest-waiting first.
    */
   get studioWatchItems(): Array<{
     key: string;
@@ -1386,7 +1447,7 @@ export class EventOpportunityDashboardComponent {
         if (!stage) continue;
         if (!this.isStageSelected(queueid, stage)) continue;
 
-        const joinedMs = this.tsToMillis(a?.['specialistJoinedAt']);
+        const joinedMs = this.specialistJoinedMs(a);
         const type: 'joined' | 'active' = joinedMs != null ? 'active' : 'joined';
         const startMs = joinedMs != null ? joinedMs : this.tsToMillis(a?.['created']);
         if (startMs == null) continue;
