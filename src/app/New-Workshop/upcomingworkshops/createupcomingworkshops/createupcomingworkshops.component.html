@@ -59,6 +59,21 @@
           </mat-form-field>
 
           <mat-form-field appearance="outline">
+            <mat-label>URL Name</mat-label>
+            <input matInput formControlName="urlname" placeholder="Enter URL name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>URL Button Name</mat-label>
+            <input matInput formControlName="urlbuttonname" placeholder="Enter URL button name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Notified Text</mat-label>
+            <input matInput formControlName="notifiedtext" placeholder="Enter notified text" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
             <mat-label>Total Seats</mat-label>
             <input matInput type="number" min="0" formControlName="totalseats" placeholder="Enter total seats" />
             <mat-hint *ngIf="form.get('unlimitedseat')?.value">Unlimited seats enabled</mat-hint>
@@ -98,6 +113,14 @@
               <span class="toggle-desc">Display this workshop.</span>
             </div>
             <mat-slide-toggle formControlName="show" color="primary"></mat-slide-toggle>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Tentative</span>
+              <span class="toggle-desc">Mark this workshop as tentative.</span>
+            </div>
+            <mat-slide-toggle formControlName="tentative" color="primary"></mat-slide-toggle>
           </div>
         </div>
       </ng-container>
