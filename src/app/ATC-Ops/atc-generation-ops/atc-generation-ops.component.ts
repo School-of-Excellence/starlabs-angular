@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -27,6 +27,7 @@ import { mapAtcError } from '../atc-reason-map';
 import {
   AtcGenDoc,
   AtcStatus,
+  OpsNote,
   parseAtcOutput,
   ParsedAtcOutput,
   PodWorker,
@@ -34,7 +35,7 @@ import {
   StageData,
 } from '../atc-ops.types';
 import { toDate, toMillis } from '../ist-time.util';
-import { AtcGenDataService, QueueOption } from './atc-gen-data.service';
+import { AtcGenDataService, DocLite, QueueOption } from './atc-gen-data.service';
 
 type ChipKind = 'own' | 'resolved' | 'missing-mandatory' | 'atleastone';
 interface StageChip {
@@ -52,6 +53,8 @@ interface RowBreakdown {
 
 interface AtcRow extends AtcGenDoc {
   name: string;
+  queueId: string; // queue this doc belongs to
+  queueName: string; // resolved queue display name
   ageMs: number | null; // time in current status
   stuck: boolean; // processing & started > 30m
   nearMax: boolean; // attempts >= 2
@@ -101,7 +104,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   queues: QueueOption[] = [];
   queuesLoading = true;
   queuesError: string | null = null;
-  selectedQueueId: string | null = null;
+  selectedQueueIds: string[] = [];
 
   // ---- pod status ----
   pod: PodWorker | null = null;
@@ -111,11 +114,14 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   readonly displayedColumns = [
     'status',
     'name',
+    'queue',
     'stage',
     'type',
     'attempts',
     'age',
     'createdAt',
+    'promptAt',
+    'outputAt',
     'actions',
   ];
   dataSource = new MatTableDataSource<AtcRow>([]);
@@ -154,10 +160,24 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   promptDraft = '';
   savingPrompt = false;
 
+  // ---- notes (append-only log on the selected doc) ----
+  noteDraft = '';
+  addingNote = false;
+
+  // ---- resizable detail column ----
+  detailWidth = 440; // px; the notes column is fixed, the table absorbs the rest
+  readonly DETAIL_MIN = 340;
+  readonly DETAIL_MAX = 820;
+  resizing = false;
+  private resizeStartX = 0;
+  private resizeStartWidth = 0;
+
   authExpired = false;
 
   private mapProfileData: Record<string, string> = {};
-  private queueUnsub: (() => void) | null = null;
+  private queueUnsubs: Array<() => void> = []; // one live listener per selected queue
+  private queueDocs = new Map<string, DocLite[]>(); // latest docs per queue id
+  private queuesReported = new Set<string>(); // queues that have delivered a snapshot
   private detailUnsub: (() => void) | null = null;
   private podUnsub: (() => void) | null = null;
 
@@ -168,6 +188,8 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    const savedWidth = this.readStoredWidth();
+    if (savedWidth != null) this.detailWidth = savedWidth;
     this.configureDataSource();
     this.data.getProfileMap().then((m) => {
       this.mapProfileData = m;
@@ -187,7 +209,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.queueUnsub?.();
+    this.queueUnsubs.forEach((u) => u());
     this.detailUnsub?.();
     this.podUnsub?.();
   }
@@ -197,12 +219,18 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
       switch (col) {
         case 'createdAt':
           return toMillis(row.createdAt) ?? 0;
+        case 'promptAt':
+          return toMillis(row.promptUpdatedAt) ?? 0;
+        case 'outputAt':
+          return toMillis(this.outputGeneratedAt(row)) ?? 0;
         case 'age':
           return row.ageMs ?? 0;
         case 'attempts':
           return row.attempts ?? 0;
         case 'name':
           return (row.name ?? '').toLowerCase();
+        case 'queue':
+          return (row.queueName ?? '').toLowerCase();
         default:
           return ((row as any)[col] ?? '').toString().toLowerCase();
       }
@@ -244,7 +272,10 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
 
   onQueueChange(): void {
     this.closeDetail();
-    this.queueUnsub?.();
+    this.queueUnsubs.forEach((u) => u());
+    this.queueUnsubs = [];
+    this.queueDocs.clear();
+    this.queuesReported.clear();
     this.dataSource.data = [];
     this.availableFailures = [];
     this.allStages = [];
@@ -252,38 +283,58 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     this.totalRows = 0;
     this.listError = null;
     this.diag = null;
-    if (!this.selectedQueueId) return;
+    if (!this.selectedQueueIds.length) return;
 
+    // One live listener per selected queue; snapshots are merged in rebuildRows.
     this.listLoading = true;
-    this.queueUnsub = this.data.listenQueueDocs(
-      this.selectedQueueId,
-      (docs) => {
-        const now = Date.now();
-        const rows: AtcRow[] = docs.map(({ id, data }) => this.toRow(id, data, now));
-        rows.sort((a, b) => (toMillis(b.createdAt) ?? 0) - (toMillis(a.createdAt) ?? 0));
-        this.dataSource.data = rows;
-        this.totalRows = rows.length;
-        this.availableFailures = this.distinct(
-          rows.map((r) => r.failureCategory ?? undefined),
-        );
-        // all stages present across the queue's docs (every stagedata key)
-        this.allStages = this.distinct(
-          rows.flatMap((r) => (r.stagedata ? Object.keys(r.stagedata) : [])),
-        );
-        this.statusCounts = this.countBy(rows);
-        this.applyFilters();
-        this.listLoading = false;
-        if (rows.length === 0) this.runProbe();
-        else this.diag = null;
-      },
-      (err) => {
-        this.listLoading = false;
-        this.listError =
-          err?.code === 'permission-denied'
-            ? 'Access denied reading the "firestore-atc" database. Its security rules are likely not deployed for client reads — deploy Firestore rules for the firestore-atc database (see firebase.json).'
-            : 'Could not load ATC docs for this queue. Retry.';
-      },
+    for (const qid of this.selectedQueueIds) {
+      this.queueUnsubs.push(
+        this.data.listenQueueDocs(
+          qid,
+          (docs) => {
+            this.queueDocs.set(qid, docs);
+            this.queuesReported.add(qid);
+            // hide the spinner once every selected queue has reported once
+            if (this.queuesReported.size >= this.selectedQueueIds.length)
+              this.listLoading = false;
+            this.rebuildRows();
+          },
+          (err) => {
+            this.listLoading = false;
+            this.listError =
+              err?.code === 'permission-denied'
+                ? 'Access denied reading the "firestore-atc" database. Its security rules are likely not deployed for client reads — deploy Firestore rules for the firestore-atc database (see firebase.json).'
+                : 'Could not load ATC docs for these queues. Retry.';
+          },
+        ),
+      );
+    }
+  }
+
+  /** Merge every selected queue's latest snapshot into one sorted row set. */
+  private rebuildRows(): void {
+    const now = Date.now();
+    const nameById = new Map(this.queues.map((q) => [q.id, q.name]));
+    const rows: AtcRow[] = [];
+    for (const [qid, docs] of this.queueDocs) {
+      const qname = nameById.get(qid) ?? qid;
+      for (const { id, data } of docs) rows.push(this.toRow(id, data, now, qid, qname));
+    }
+    rows.sort((a, b) => (toMillis(b.createdAt) ?? 0) - (toMillis(a.createdAt) ?? 0));
+    this.dataSource.data = rows;
+    this.totalRows = rows.length;
+    this.availableFailures = this.distinct(
+      rows.map((r) => r.failureCategory ?? undefined),
     );
+    // all stages present across the selected queues' docs (every stagedata key)
+    this.allStages = this.distinct(
+      rows.flatMap((r) => (r.stagedata ? Object.keys(r.stagedata) : [])),
+    );
+    this.statusCounts = this.countBy(rows);
+    this.applyFilters();
+    // the 0-doc probe only makes sense for a single queue
+    if (rows.length === 0 && this.selectedQueueIds.length === 1) this.runProbe();
+    else this.diag = null;
   }
 
   retryQueueLoad(): void {
@@ -292,7 +343,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
 
   /** When a queue returns 0 docs, probe the collection to explain why. */
   private async runProbe(): Promise<void> {
-    const qid = this.selectedQueueId;
+    const qid = this.selectedQueueIds[0];
     if (!qid) return;
     const p = await this.data.probeCollection(qid);
     console.warn('[ATC-ops] queue returned 0 docs — probe:', p);
@@ -310,7 +361,13 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private toRow(id: string, data: AtcGenDoc, now: number): AtcRow {
+  private toRow(
+    id: string,
+    data: AtcGenDoc,
+    now: number,
+    queueId: string,
+    queueName: string,
+  ): AtcRow {
     const started = toMillis(data.startedAt);
     const created = toMillis(data.createdAt);
     const finalized = toMillis(data.finalizedAt);
@@ -336,6 +393,8 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
       ...(lean as AtcGenDoc),
       docid: id,
       name: this.resolveName(data.profileid),
+      queueId,
+      queueName,
       ageMs,
       stuck,
       nearMax: (data.attempts ?? 0) >= 2,
@@ -465,6 +524,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     this.detailNotFound = false;
     this.detailLoading = true;
     this.editingPrompt = false;
+    this.noteDraft = '';
     this.detailUnsub?.();
     this.detailUnsub = this.data.listenDoc(
       docid,
@@ -573,6 +633,90 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Notes (append-only log on the selected doc)
+  // -------------------------------------------------------------------------
+  /** Notes on the selected doc, newest first. */
+  get notes(): OpsNote[] {
+    const list = this.selectedDoc?.opsNotes ?? [];
+    return [...list].sort((a, b) => (toMillis(b.at) ?? 0) - (toMillis(a.at) ?? 0));
+  }
+
+  async addNote(): Promise<void> {
+    const docid = this.selectedDoc?.docid;
+    const text = this.noteDraft.trim();
+    if (!docid || !text || this.addingNote) return;
+    this.addingNote = true;
+    try {
+      await this.data.addNote(docid, text);
+      this.noteDraft = '';
+      this.toast('Note added', 'success');
+    } catch (e: any) {
+      this.toast(
+        e?.code === 'permission-denied'
+          ? 'No permission to add notes.'
+          : 'Could not add note. Try again.',
+        'error',
+      );
+    } finally {
+      this.addingNote = false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Resizable detail column (drag handle on its left edge)
+  // -------------------------------------------------------------------------
+  startResize(ev: PointerEvent): void {
+    ev.preventDefault();
+    this.resizing = true;
+    this.resizeStartX = ev.clientX;
+    this.resizeStartWidth = this.detailWidth;
+    (ev.target as Element)?.setPointerCapture?.(ev.pointerId);
+  }
+
+  @HostListener('document:pointermove', ['$event'])
+  onResizeMove(ev: PointerEvent): void {
+    if (!this.resizing) return;
+    // handle sits on the detail column's LEFT edge → dragging left widens it
+    const dx = this.resizeStartX - ev.clientX;
+    this.detailWidth = this.clampWidth(this.resizeStartWidth + dx);
+  }
+
+  @HostListener('document:pointerup')
+  onResizeEnd(): void {
+    if (!this.resizing) return;
+    this.resizing = false;
+    this.storeWidth(this.detailWidth);
+  }
+
+  /** Double-click the handle to snap between min and max width. */
+  toggleDetailWidth(): void {
+    const mid = (this.DETAIL_MIN + this.DETAIL_MAX) / 2;
+    this.detailWidth = this.detailWidth > mid ? this.DETAIL_MIN : this.DETAIL_MAX;
+    this.storeWidth(this.detailWidth);
+  }
+
+  private clampWidth(w: number): number {
+    return Math.max(this.DETAIL_MIN, Math.min(this.DETAIL_MAX, Math.round(w)));
+  }
+  private readStoredWidth(): number | null {
+    try {
+      if (typeof localStorage === 'undefined') return null;
+      const v = parseInt(localStorage.getItem('atcOps.detailWidth') || '', 10);
+      return isNaN(v) ? null : this.clampWidth(v);
+    } catch {
+      return null;
+    }
+  }
+  private storeWidth(w: number): void {
+    try {
+      if (typeof localStorage !== 'undefined')
+        localStorage.setItem('atcOps.detailWidth', String(w));
+    } catch {
+      /* ignore storage failures */
+    }
+  }
+
   async onRebuildPrompt(): Promise<void> {
     const docid = this.selectedDoc?.docid;
     if (!docid || this.detailInFlight) return;
@@ -657,6 +801,10 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   }
   asDate(ts: any): Date | null {
     return toDate(ts);
+  }
+  /** When ATC output was generated — only meaningful for completed docs. */
+  outputGeneratedAt(r: AtcGenDoc): any {
+    return r.status === 'completed' ? (r.completedAt ?? r.finalizedAt) : null;
   }
   relativeTime(ts: any): string {
     return this.humanDur(this.msSince(ts));

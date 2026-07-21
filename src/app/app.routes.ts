@@ -333,6 +333,7 @@ export const routes: Routes = [
   //queue-web
   {path: 'queue-web', loadComponent: () => import('./queue system/QueueWebVerison1/queue-web-version1.component').then(m => m.QueueWebVersion1Component), canActivate: [authGuard] },
   {path: 'evolution-prep-participants', loadComponent: () => import('./queue system/evolution-prep-participants/evolution-prep-participants.component').then(m => m.EvolutionPrepParticipantsComponent), canActivate: [authGuard]},
+  {path: 'evolution-prep-participants-v2', loadComponent: () => import('./queue system/evolution-prep-participants-v2/evolution-prep-participants-v2.component').then(m => m.EvolutionPrepParticipantsV2Component), canActivate: [authGuard]},
 
   // Dev - Test
   {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
