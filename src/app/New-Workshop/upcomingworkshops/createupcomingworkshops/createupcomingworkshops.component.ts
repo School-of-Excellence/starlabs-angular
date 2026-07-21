@@ -110,10 +110,14 @@ export class CreateupcomingworkshopsComponent {
           with: w.with || '',
           location: w.location || '',
           buttonname: w.buttonname || '',
+          urlname: w.urlname || '',
+          urlbuttonname: w.urlbuttonname || '',
+          notifiedtext: w.notifiedtext || '',
           totalseats: w.totalseats ?? null,
           unlimitedseat: !!w.unlimitedseat,
           showconfirmedseat: !!w.showconfirmedseat,
           show: !!w.show,
+          tentative: !!w.tentative,
           upcomingimage: w.upcomingimage || '',
           color: w.color || ''
         });
@@ -133,10 +137,14 @@ export class CreateupcomingworkshopsComponent {
       with: [''],
       location: [''],
       buttonname: [''],
+      urlname: [''],
+      urlbuttonname: [''],
+      notifiedtext: [''],
       totalseats: [null],
       unlimitedseat: [false],
       showconfirmedseat: [false],
       show: [false],
+      tentative: [false],
       upcomingimage: [''],
       // Hex colour like #FFFFFF (empty allowed).
       color: ['', [Validators.pattern(/^#[0-9A-Fa-f]{6}$/)]]
@@ -338,10 +346,14 @@ export class CreateupcomingworkshopsComponent {
           with: (raw.with || '').trim(),
           location: (raw.location || '').trim(),
           buttonname: (raw.buttonname || '').trim(),
+          urlname: (raw.urlname || '').trim(),
+          urlbuttonname: (raw.urlbuttonname || '').trim(),
+          notifiedtext: (raw.notifiedtext || '').trim(),
           totalseats: raw.unlimitedseat ? null : (raw.totalseats ?? null),
           unlimitedseat: !!raw.unlimitedseat,
           showconfirmedseat: !!raw.showconfirmedseat,
           show: !!raw.show,
+          tentative: !!raw.tentative,
           upcomingimage: (raw.upcomingimage || '').trim(),
           color: (raw.color || '').trim().toUpperCase()
         };
