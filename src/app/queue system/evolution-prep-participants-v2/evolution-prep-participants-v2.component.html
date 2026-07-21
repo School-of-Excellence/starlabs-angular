@@ -88,10 +88,10 @@
         <strong>{{ countTransferredOut }}</strong> transferred out
       </span>
       <span class="meta-sep" *ngIf="countGenElsewhere">·</span>
-      <span class="meta-item clickable" *ngIf="countGenElsewhere" (click)="focus('transferredOut')"
-            matTooltip="Their ATC doc was found in the queue they were transferred to — nothing is missing for these.">
-        <mat-icon>call_made</mat-icon>
-        <strong>{{ countGenElsewhere }}</strong> ATC doc in destination queue
+      <span class="meta-item clickable" *ngIf="countGenElsewhere" (click)="focus('genElsewhere')"
+            matTooltip="Their ATC doc was found in another queue on their lineage — the queue they transferred FROM or TO. Nothing is missing for these.">
+        <mat-icon>swap_horiz</mat-icon>
+        <strong>{{ countGenElsewhere }}</strong> ATC doc in another queue
       </span>
       <span class="meta-sep" *ngIf="countGenOtherToken">·</span>
       <span class="meta-item warn" *ngIf="countGenOtherToken"
@@ -217,7 +217,7 @@
         <mat-label>ATC generation doc</mat-label>
         <mat-select [(ngModel)]="filterGen" (ngModelChange)="applyFilters()" multiple>
           <mat-option value="none">— not created —</mat-option>
-          <mat-option value="out">— doc in destination queue —</mat-option>
+          <mat-option value="out">— doc in another queue —</mat-option>
           <mat-option *ngFor="let s of genStatusOptions" [value]="s">{{ s }}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -420,15 +420,16 @@
             <ng-container *ngIf="row.genDocId">
               <span class="gen-badge" [ngClass]="'gen-' + row.genStatus"
                     [matTooltip]="'doc ' + row.genDocId +
-                                  (row.genIn === 'destination'
-                                    ? ' · in the queue this token was transferred to'
-                                    : ' · in this queue') +
+                                  (row.genIn === 'this' ? ' · in this queue'
+                                   : row.genIn === 'ancestor' ? ' · in the queue they transferred FROM'
+                                   : ' · in the queue they transferred TO') +
                                   (row.genMissing.length ? ' · missing: ' + row.genMissing.join(', ') : '')">
                 {{ row.genStatus }}
               </span>
-              <span class="in-dest" *ngIf="row.genIn === 'destination'"
-                    [matTooltip]="'This doc belongs to ' + row.toQueueName + ', not this queue'">
-                <mat-icon>call_made</mat-icon> in {{ row.toQueueName }}
+              <span class="in-dest" *ngIf="row.genIn !== 'this'"
+                    [matTooltip]="'This doc belongs to ' + row.genInQueueName + ', not this queue'">
+                <mat-icon>{{ row.genIn === 'ancestor' ? 'call_received' : 'call_made' }}</mat-icon>
+                in {{ row.genInQueueName }}
               </span>
               <div class="gen-missing" *ngIf="row.genMissing.length">
                 missing: {{ row.genMissing.join(', ') }}

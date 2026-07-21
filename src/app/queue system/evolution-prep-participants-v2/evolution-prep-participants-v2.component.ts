@@ -184,7 +184,9 @@ export interface Row {
    * moved: 89 of 120 transferred-and-completed tokens still had their doc here.
    * So the destination is CHECKED rather than assumed.
    */
-  genIn: 'this' | 'destination' | null;
+  genIn: 'this' | 'ancestor' | 'destination' | null;
+  /** Display name of the queue the doc was found in, when not this queue. */
+  genInQueueName: string;
   /**
    * A gen doc exists for this PROFILE but under a different queue_token. Not the
    * same as having one: docs are keyed to a token, so this is a data smell (a
@@ -258,16 +260,17 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   private variationCache = new Map<string, string[] | null>();
   /** profileid → gen doc, per selected queue. */
   /**
-   * queue_token_id → gen doc. Keyed by TOKEN, not profile: a gen doc is written
-   * against one token, and 13 of 384 (queue, profile) pairs in prod carry more
-   * than one doc, so a profile key is ambiguous. `tokentransferredto` gives the
-   * exact destination token to look up.
+   * queue_token_id → gen doc (with the queue it lives in). Keyed by TOKEN, not
+   * profile: a gen doc is written against one token, and 13 of 384 (queue, profile)
+   * pairs in prod carry more than one doc, so a profile key is ambiguous. This is a
+   * UNIFIED map across every queue loaded — this queue, transferredto destinations,
+   * and transferredfrom ancestors discovered during the walk.
    */
-  private genByToken = new Map<string, { id: string; data: AtcGenDoc }>();
-  private genByTokenElsewhere =
-    new Map<string, { id: string; data: AtcGenDoc; queueId: string }>();
-  /** profileid → true, for either queue. Detects a doc under a DIFFERENT token. */
+  private genByToken = new Map<string, { id: string; data: AtcGenDoc; queueId: string }>();
+  /** profileid → true, across every loaded queue. Detects a doc under a DIFFERENT token. */
   private genProfiles = new Set<string>();
+  /** queueId → promise of its gen-doc load, so each queue is scanned at most once. */
+  private genQueueLoads = new Map<string, Promise<void>>();
 
   /** Stages that are studio (zoom) stages ANYWHERE — see buildZoomCapableSet(). */
   private zoomCapable = new Set<string>();
@@ -518,11 +521,19 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   private async walkPairings(
     queueRef: DocumentReference, queueData: any, tokenData: any, tokenId: string,
     pairings: PairingCfg[],
-  ): Promise<{ views: Map<string, { hits: LiveAssignmentHit[]; trail: string[] }>; crossed: boolean }> {
+  ): Promise<{
+    views: Map<string, { hits: LiveAssignmentHit[]; trail: string[] }>;
+    crossed: boolean;
+    lineage: Array<{ queueId: string; tokenId: string }>;
+  }> {
     const views = new Map<string, { hits: LiveAssignmentHit[]; trail: string[] }>();
     pairings.forEach((p) => views.set(p.stage, { hits: [], trail: [] }));
 
     const visited = new Set<string>([tokenId]);
+    // (queueId, tokenId) at each level the walk visits — this queue first, then
+    // each transferredfrom ancestor. The ATC-doc lookup checks the participant's
+    // doc against every token on this lineage, so an ancestor's doc is found.
+    const lineage: Array<{ queueId: string; tokenId: string }> = [{ queueId: queueRef.id, tokenId }];
     let lvlQ = queueRef, lvlQD = queueData, lvlT = tokenData, level = 0;
     let crossed = false;
 
@@ -584,9 +595,10 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       if (!prevQD) break;
 
       lvlQ = aq; lvlQD = prevQD; lvlT = prevToken; level++;
+      lineage.push({ queueId: aq.id, tokenId: at.id });
     }
 
-    return { views, crossed };
+    return { views, crossed, lineage };
   }
 
   private queueLabel(id: string): string {
@@ -661,57 +673,43 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   // ── generation docs (the "did an ATC doc get made" half of the funnel) ──────
 
   /**
-   * Load every queue_atc_generation doc for the selected queues, keyed by profile.
-   * `queueref` is a DocumentReference whose path must be built on the firestore-atc
-   * handle to match what the pipeline wrote.
+   * Load every queue_atc_generation doc of ONE queue into the unified genByToken
+   * map. Cached by queue id (shared promise) so a queue is scanned at most once no
+   * matter how many participants' lineages pass through it — the 384 transferred
+   * V3hx tokens all point at the same destination, and many share ancestors.
    */
-  private async loadGenDocs(destinationQueueIds: string[] = []): Promise<void> {
-    this.genByToken.clear();
-    this.genByTokenElsewhere.clear();
-    this.genProfiles.clear();
-
-    // Destination queues are queried ONCE each, not once per participant — the 384
-    // transferred tokens in V3hx all point at the same destination.
-    for (const qid of destinationQueueIds) {
-      try {
-        const snap = await getDocs(query(
-          collection(this.atcSvc.atcDb, 'queue_atc_generation'),
-          where('queueref', '==', doc(this.atcSvc.atcDb, 'queue generation', qid)),
-        ));
-        snap.docs.forEach((d) => {
-          const data: any = d.data();
-          if (data.profileid) this.genProfiles.add(data.profileid);
-          if (data.queue_token_id) {
-            this.genByTokenElsewhere.set(data.queue_token_id, { id: d.id, data, queueId: qid });
-          }
-        });
-      } catch (e) {
-        console.error(`loadGenDocs (destination ${qid}) failed`, e);
-      }
-    }
-
-    for (const qid of [this.selectedQueueId]) {
-      try {
-        const snap = await getDocs(query(
-          collection(this.atcSvc.atcDb, 'queue_atc_generation'),
-          where('queueref', '==', doc(this.atcSvc.atcDb, 'queue generation', qid)),
-        ));
-        snap.docs.forEach((d) => {
-          const data: any = d.data();
-          if (data.profileid) this.genProfiles.add(data.profileid);
-          if (!data.queue_token_id) return;
-          const prev = this.genByToken.get(data.queue_token_id);
-          // Prefer the most advanced doc if one token somehow has several.
+  private loadQueueGenDocs(qid: string): Promise<void> {
+    if (!this.genQueueLoads.has(qid)) {
+      this.genQueueLoads.set(qid, (async () => {
+        try {
+          const snap = await getDocs(query(
+            collection(this.atcSvc.atcDb, 'queue_atc_generation'),
+            where('queueref', '==', doc(this.atcSvc.atcDb, 'queue generation', qid)),
+          ));
           const rank = (x?: string | null) =>
             ['error', 'dataincomplete', 'pending', 'processing', 'completed'].indexOf(String(x));
-          if (!prev || rank(data.status) > rank(prev.data.status)) {
-            this.genByToken.set(data.queue_token_id, { id: d.id, data });
-          }
-        });
-      } catch (e) {
-        console.error(`loadGenDocs failed for ${qid}`, e);
-      }
+          snap.docs.forEach((d) => {
+            const data: any = d.data();
+            if (data.profileid) this.genProfiles.add(data.profileid);
+            if (!data.queue_token_id) return;
+            const prev = this.genByToken.get(data.queue_token_id);
+            // Prefer the most advanced doc if one token somehow has several.
+            if (!prev || rank(data.status) > rank(prev.data.status)) {
+              this.genByToken.set(data.queue_token_id, { id: d.id, data, queueId: qid });
+            }
+          });
+        } catch (e) {
+          console.error(`loadQueueGenDocs failed for ${qid}`, e);
+        }
+      })());
     }
+    return this.genQueueLoads.get(qid)!;
+  }
+
+  private resetGenCaches(): void {
+    this.genByToken.clear();
+    this.genProfiles.clear();
+    this.genQueueLoads.clear();
   }
 
   /**
@@ -743,21 +741,54 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     return out;
   }
 
-  private applyGenDoc(row: Row): void {
-    const g = this.genByToken.get(row.tokenId);
-    // Prefer this queue's doc; only if there is none and the token was transferred
-    // out do we report the destination queue's doc.
-    const elsewhere = (!g && row.transferredOut && row.toTokenId)
-      ? this.genByTokenElsewhere.get(row.toTokenId) : undefined;
-    const eff = g ?? elsewhere;
+  /**
+   * Resolve the participant's ATC doc by walking their token lineage IN ORDER, the
+   * same order the pipeline itself would attribute one:
+   *
+   *   1. this queue + this token        — the doc generated for them here
+   *   2. transferredfrom ancestors      — they transferred IN; the doc may have been
+   *                                       generated in the queue they came from
+   *   3. transferredto destination      — they transferred OUT; the doc may have been
+   *                                       generated in the queue they went to
+   *
+   * The first hit wins, so a doc "here" is always preferred over an inherited one.
+   * Only when NO token on the whole lineage has a doc is the participant genuinely
+   * missing one. `lineage` (this token + every transferredfrom ancestor) is collected
+   * for free by the studio-session walk; the destination token is appended here.
+   *
+   * Every queue the lineage touches is loaded on demand and cached, so an ancestor
+   * or destination queue is scanned at most once regardless of how many
+   * participants pass through it.
+   */
+  private async applyGenDoc(
+    row: Row, lineage: Array<{ queueId: string; tokenId: string }>,
+  ): Promise<void> {
+    // The ordered list of (queue, token) to check: own lineage, then destination.
+    const chain = [...lineage];
+    if (row.transferredOut && row.toQueueId && row.toTokenId) {
+      chain.push({ queueId: row.toQueueId, tokenId: row.toTokenId });
+    }
+    // Load every queue involved (cached / shared).
+    await Promise.all([...new Set(chain.map((c) => c.queueId))].map((q) => this.loadQueueGenDocs(q)));
 
-    row.genDocId = eff?.id ?? null;
-    row.genStatus = (eff?.data.status ?? null) as AtcStatus | null;
-    row.genIn = g ? 'this' : (elsewhere ? 'destination' : null);
-    row.genOtherToken = !g && !elsewhere && this.genProfiles.has(row.profile_id);
-    if (elsewhere) row.toQueueName = this.queueLabel(elsewhere.queueId);
-    const sd: any = eff ? (eff.data as any).stagedata ?? {} : null;
-    row.genMissing = eff ? this.blockingMissing(sd) : [];
+    let hit: { id: string; data: AtcGenDoc; queueId: string } | undefined;
+    let where: 'this' | 'ancestor' | 'destination' | null = null;
+    for (const step of chain) {
+      const g = this.genByToken.get(step.tokenId);
+      if (!g) continue;
+      hit = g;
+      where = step.queueId === this.selectedQueueId ? 'this'
+            : (row.toTokenId === step.tokenId ? 'destination' : 'ancestor');
+      break;
+    }
+
+    row.genDocId = hit?.id ?? null;
+    row.genStatus = (hit?.data.status ?? null) as AtcStatus | null;
+    row.genIn = where;
+    row.genOtherToken = !hit && this.genProfiles.has(row.profile_id);
+    if (hit && where !== 'this') row.genInQueueName = this.queueLabel(hit.queueId);
+    const sd: any = hit ? (hit.data as any).stagedata ?? {} : null;
+    row.genMissing = hit ? this.blockingMissing(sd) : [];
 
     // Seed NON-studio pairings from the gen doc. The pipeline already resolved
     // them; re-deriving a form's status in the browser would need a second
@@ -783,6 +814,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     this.walkProgress = 0;
 
     try {
+      this.resetGenCaches();
       const rows: Row[] = [];
       const cfgPairings = this.atcCfg?.pairings ?? [];
       {
@@ -820,19 +852,13 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
               dropboxLink: '', saving: false,
             })),
             genDocId: null, genStatus: null, genMissing: [], genIn: null,
-            genOtherToken: false,
+            genInQueueName: '', genOtherToken: false,
             rebuilding: false,
             _token: t,
           });
         });
       }
 
-      // Destinations must be known BEFORE gen docs are fetched, so the lookup can
-      // cover the queues these tokens were transferred to.
-      const destinations = [...new Set(
-        rows.map((r) => r.toQueueId).filter((x): x is string => !!x))];
-      await this.loadGenDocs(destinations);
-      rows.forEach((r) => this.applyGenDoc(r));
       this.allRows = rows;
       this.walkTotal = rows.length;
       this.dataSource.data = rows;
@@ -865,10 +891,15 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         const row = rows[cursor++];
         try {
           const qref = doc(this.firestore, 'queue generation', row.queueId);
-          const { views, crossed } = await this.walkPairings(
+          const { views, crossed, lineage } = await this.walkPairings(
             qref, this.queueDataCache.get(row.queueId), row._token, row.tokenId,
             this.zoomPairings);
           row.crossed = crossed;
+
+          // Resolve the ATC doc across the full token lineage (this token → every
+          // transferredfrom ancestor → transferredto destination). lineage was
+          // collected by the walk above, so this adds only the gen-doc reads.
+          await this.applyGenDoc(row, lineage);
 
           for (const pv of row.pairings) {
             const v = views.get(pv.stage);
@@ -972,7 +1003,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (this.noSession(r)) return r.crossed ? 'no studio session logged — cannot fix here' : 'not in studio yet';
     if (this.supersededOnly(r)) return 're-attach to current session';
     if (!this.hasTranscript(r)) return 'attach a Dropbox recording';
-    if (r.genIn === 'destination') return `ATC doc lives in ${r.toQueueName || 'the destination queue'}`;
+    if (r.genIn === 'ancestor') return `ATC doc is in ${r.genInQueueName || 'the queue they came from'}`;
+    if (r.genIn === 'destination') return `ATC doc is in ${r.genInQueueName || 'the queue they went to'}`;
     if (r.genOtherToken) return 'ATC doc exists under a DIFFERENT token — check for a duplicate';
     if (!r.genDocId) {
       if (r.transferredOut) return `transferred out — no ATC doc in either queue`;
@@ -1217,7 +1249,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       // a doc, its doc simply belongs to the destination queue.
       if (gen.length) {
         const ok = gen.some((g) => g === 'none' ? !r.genDocId
-          : g === 'out' ? r.genIn === 'destination'
+          : (g === 'out' || g === 'elsewhere') ? (r.genIn === 'ancestor' || r.genIn === 'destination')
           : r.genStatus === g);
         if (!ok) return false;
       }
@@ -1247,7 +1279,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
   /** One-click drill-downs from the telemetry tiles. */
   focus(kind: 'crossed' | 'needsLink' | 'superseded' | 'noSession' | 'noGen' | 'dataincomplete'
-              | 'here' | 'transferred' | 'offlineage' | 'transferredOut'): void {
+              | 'here' | 'transferred' | 'offlineage' | 'transferredOut' | 'genElsewhere'): void {
     this.clearFilters();
     if (kind === 'crossed') this.filterCrossed = 'yes';
     if (kind === 'needsLink') { this.filterCrossed = 'yes'; this.filterTranscript = 'no'; }
@@ -1255,6 +1287,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (kind === 'noSession') { this.filterCrossed = 'yes'; this.filterTranscript = 'nosession'; }
     if (kind === 'noGen') { this.filterCrossed = 'yes'; this.filterGen = ['none']; }
     if (kind === 'transferredOut') this.filterOrigin = 'out';
+    if (kind === 'genElsewhere') this.filterGen = ['elsewhere'];
     if (kind === 'dataincomplete') this.filterGen = ['dataincomplete'];
     if (kind === 'here') this.filterOrigin = 'here';
     if (kind === 'transferred') this.filterOrigin = 'transferred';
@@ -1284,9 +1317,12 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     return this.allRows.filter((r) => r.crossed === true && !r.genDocId).length;
   }
   /** Doc exists, but in the queue this token was transferred to. */
+  /** Doc found in another queue on the lineage (ancestor or destination). */
   get countGenElsewhere(): number {
-    return this.allRows.filter((r) => r.genIn === 'destination').length;
+    return this.allRows.filter((r) => r.genIn === 'ancestor' || r.genIn === 'destination').length;
   }
+  get countGenAncestor(): number { return this.allRows.filter((r) => r.genIn === 'ancestor').length; }
+  get countGenDestination(): number { return this.allRows.filter((r) => r.genIn === 'destination').length; }
   get countGenOtherToken(): number {
     return this.allRows.filter((r) => r.genOtherToken).length;
   }
