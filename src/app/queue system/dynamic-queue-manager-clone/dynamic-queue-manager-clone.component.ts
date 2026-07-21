@@ -257,7 +257,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   
   //dharshan
   availableStagesFromSlot: string[] = [];
-  availableTimeSlots: { timeRange: string; count: number; title?: string }[] = [];
+  availableTimeSlots: { timeRange: string; count: number; title?: string; slotKey: string }[] = [];
   quickLinks: Array<{ screenName: string; url: string; isInternal: boolean }> = [];
   activeStageCountFilter: string[] = []; 
   selectedTimeSlots: string[] = [];
@@ -273,9 +273,12 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   queueTagSearchTerm: string = '';
   filteredQueueTags: any[] = [];
 
-  selectedStageSlot: string | null = null;
+  selectedStageSlots: string[] = [];
   dateRangeStart: Date | null = null;
+  stageSlotBookingFilter: 'booked' | 'notbooked' = 'booked';
+  notBookedSlotCountCached: number = 0;
   dateRangeEnd: Date | null = null;
+  cachedPlanningData: any = null;
   editingReminderDate: Date | null = null;
   editingReminderId: string | null = null;
   newReminderDate: Date | null = null;
@@ -944,8 +947,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.approvedDropdownOpen = false;
     this.dfuFilterActive = false;
     this.reminderTodayFilterActive = false;
-    this.selectedStageSlot = null;
+    this.selectedStageSlots = [];
     this.dateRangeStart = null;
+    this.stageSlotBookingFilter = 'booked';
     this.dateRangeEnd = null;
     this.showDateRangePicker = false;
     this.availableTimeSlots = [];
@@ -1210,14 +1214,48 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.processTokensIntoStages(this.allTokensData);
   }
 
+  private stageSlotMatches(stagename: string | undefined): boolean {
+    return !!stagename && this.selectedStageSlots.includes(stagename);
+  }
+
+  get isStageSlotFilterActive(): boolean {
+    return this.selectedStageSlots.length > 0;
+  }
+
+  getStageSlotDisplayLabel(): string {
+    if (this.selectedStageSlots.length === 0) return '';
+    if (this.selectedStageSlots.length === this.availableStagesFromSlot.length) return 'All Stages';
+    return this.selectedStageSlots.join(', ');
+  }
+
   //dharshan
-  onStageSlotChange() {  
-    if (!this.selectedStageSlot) {
+  onStageSlotChange(stages?: string[], toggleStage?: string) {
+    if (toggleStage !== undefined) {
+      const index = this.selectedStageSlots.indexOf(toggleStage);
+      if (index > -1) {
+        this.selectedStageSlots.splice(index, 1);
+      } else {
+        this.selectedStageSlots.push(toggleStage);
+      }
+    } else if (stages !== undefined) {
+      this.selectedStageSlots = stages;
+    }
+
+    if (this.selectedStageSlots.length === 0) {
       this.dateRangeStart = null;
       this.dateRangeEnd = null;
       this.availableTimeSlots = [];
       this.selectedTimeSlots = [];
       this.showTimeSlotPicker = false;
+      this.stageSlotBookingFilter = 'booked';
+    }
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
+  selectBookingStatus(status: 'booked' | 'notbooked') {
+    this.stageSlotBookingFilter = status;
+    if (status === 'notbooked') {
+      this.selectedTimeSlots = [];
     }
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -1232,7 +1270,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
 
   clearStageSlotFilter() {
-    this.selectedStageSlot = null;
+    this.selectedStageSlots = [];
     this.dateRangeStart = null;
     this.dateRangeEnd = null;
     this.showDateRangePicker = false;
@@ -1240,87 +1278,87 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.selectedTimeSlots = [];
     this.showTimeSlotPicker = false;
     this.showTimeDropdown = false;
+    this.stageSlotBookingFilter = 'booked';
     this.processTokensIntoStages(this.allTokensData);
   }
- 
+
   //dharshan
   extractUniqueTimeSlots() {
-    if (!this.dateRangeStart || !this.dateRangeEnd || !this.selectedStageSlot) {
-      this.availableTimeSlots = [];
-      this.selectedTimeSlots = [];
-      this.showTimeSlotPicker = false;
-      return;
-    }
-    const timeMap = new Map<string, { count: number; title?: string }>();
-    this.allTokensData.forEach(token => {
-      const slotData = token.selectedstageslot;
-      if (!slotData) return;
-
-      Object.values(slotData).forEach((slot: any) => {
-        if (slot?.stagename !== this.selectedStageSlot) return;
-        if (!slot?.startdate || !slot?.enddate) return;
-
-        let startDate: Date;
-        let endDate: Date;
-
-        if (slot.startdate.toDate) {
-          startDate = slot.startdate.toDate();
-        } else if (slot.startdate instanceof Date) {
-          startDate = slot.startdate;
-        } else return;
-
-        if (slot.enddate.toDate) {
-          endDate = slot.enddate.toDate();
-        } else if (slot.enddate instanceof Date) {
-          endDate = slot.enddate;
-        } else return;
-
-        const endOfDay = new Date(this.dateRangeEnd!);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        if (startDate >= this.dateRangeStart! && startDate <= endOfDay) {
-          const startTime = startDate.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          });
-          const endTime = endDate.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          });
-
-          const key = `${startTime} – ${endTime}`;
-          const existing = timeMap.get(key);
-          const titleKey = `${this.selectedStageSlot}_${startDate.getTime()}_${endDate.getTime()}`;
-          const title = this.slotTitleMap[titleKey] || '';
-          timeMap.set(key, { count: (existing?.count || 0) + 1, title });
-        }
-      });
-    });
-
-    // Sort chronologically
-    this.availableTimeSlots = Array.from(timeMap.entries())
-      .sort((a, b) => {
-        const timeA = new Date(`1970/01/01 ${a[0].split(' – ')[0]}`).getTime();
-        const timeB = new Date(`1970/01/01 ${b[0].split(' – ')[0]}`).getTime();
-        return timeA - timeB;
-      })
-      .map(([timeRange, data]) => ({ timeRange, count: data.count, title: data.title }));
-
-    this.showTimeSlotPicker = this.availableTimeSlots.length > 0;
+  if (!this.dateRangeStart || !this.dateRangeEnd || this.selectedStageSlots.length === 0) {
+    this.availableTimeSlots = [];
+    this.selectedTimeSlots = [];
+    this.showTimeSlotPicker = false;
+    return;
   }
+  const timeMap = new Map<string, { count: number; title?: string; timeRange: string; sortTime: number }>();
+  this.allTokensData.forEach(token => {
+    const slotData = token.selectedstageslot;
+    if (!slotData) return;
 
-  selectTimeSlot(time: string | null) { 
-    if (time === null) {
-      // Clicking "All" clears all selections
+    Object.values(slotData).forEach((slot: any) => {
+      if (!this.stageSlotMatches(slot?.stagename)) return;
+      if (!slot?.startdate || !slot?.enddate) return;
+
+      let startDate: Date;
+      let endDate: Date;
+
+      if (slot.startdate.toDate) {
+        startDate = slot.startdate.toDate();
+      } else if (slot.startdate instanceof Date) {
+        startDate = slot.startdate;
+      } else return;
+
+      if (slot.enddate.toDate) {
+        endDate = slot.enddate.toDate();
+      } else if (slot.enddate instanceof Date) {
+        endDate = slot.enddate;
+      } else return;
+
+      const endOfDay = new Date(this.dateRangeEnd!);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      if (startDate >= this.dateRangeStart! && startDate <= endOfDay) {
+        const startTime = startDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        const endTime = endDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+
+      const slotKey = `${startDate.getTime()}_${endDate.getTime()}`;
+        const existing = timeMap.get(slotKey);
+        const titleKey = `${slot.stagename}_${startDate.getTime()}_${endDate.getTime()}`;
+        const title = this.slotTitleMap[titleKey] || '';
+        timeMap.set(slotKey, {
+          count: (existing?.count || 0) + 1,
+          title,
+          timeRange: `${startTime} – ${endTime}`,
+          sortTime: startDate.getTime()
+        });
+      }
+    });
+  });
+
+   this.availableTimeSlots = Array.from(timeMap.entries())
+    .sort((a, b) => a[1].sortTime - b[1].sortTime)
+    .map(([slotKey, data]) => ({ slotKey, timeRange: data.timeRange, count: data.count, title: data.title }));
+
+  this.showTimeSlotPicker = this.availableTimeSlots.length > 0;
+}
+
+  selectTimeSlot(slotKey: string | null) { 
+    if (slotKey === null) {
       this.selectedTimeSlots = [];
     } else {
-      const index = this.selectedTimeSlots.indexOf(time);
+      const index = this.selectedTimeSlots.indexOf(slotKey);
       if (index > -1) {
         this.selectedTimeSlots.splice(index, 1);
       } else {
-        this.selectedTimeSlots.push(time);
+        this.selectedTimeSlots.push(slotKey);
       }
     }
     this.processTokensIntoStages(this.allTokensData);
@@ -2054,7 +2092,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
 
   toggleQueueTagDropdown() {
-    if (this.dfuFilterActive || !!this.selectedStageSlot) return;
+    if (this.dfuFilterActive || !!this.selectedStageSlots) return;
     this.queueTagDropdownOpen = !this.queueTagDropdownOpen;
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
@@ -2160,8 +2198,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     this.totalParticipants = this.stageQueue.filter(stage => stage.stagename !== "Unattended Participants").reduce(function (sum, stage) {
       return sum + stage.allTokens.length;
-    }, 0);
-  }
+    }, 0); 
+    }
 
   applyFilters(tokens: any[]): any[] {
     let filteredTokens = [...tokens];
@@ -2244,70 +2282,69 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       filteredTokens = filteredTokens.filter(token => !this.approvedProfileIds.has(token['profile_id']));
     }
     //dharshan
-    if (this.selectedStageSlot) {
-      filteredTokens = filteredTokens.filter(token => {
-        if (!token.selectedstageslot) return false;
+    if (this.isStageSlotFilterActive) {
+      this.notBookedSlotCountCached = filteredTokens.filter(
+        (t: any) => t.tokenstatus === 'Active' && this.hasNoBookedSlot(t)
+      ).length;
 
-        let hasStage = false;
-        let matchesDateRange = false;
-        let matchesTimeSlot = false;
+      if (this.stageSlotBookingFilter === 'notbooked') {
+        filteredTokens = filteredTokens.filter(token => this.hasNoBookedSlot(token));
+      } else {
+        filteredTokens = filteredTokens.filter(token => {
+          if (!token.selectedstageslot) return false;
 
-        Object.values(token.selectedstageslot).forEach((slot: any) => {
-          if (slot && slot.stagename === this.selectedStageSlot) {
-            hasStage = true;
+          let hasStage = false;
+          let matchesDateRange = false;
+          let matchesTimeSlot = false;
 
-            if (slot.startdate) {
-              let tokenStartDate: Date;
-              if (slot.startdate.toDate && typeof slot.startdate.toDate === 'function') {
-                tokenStartDate = slot.startdate.toDate();
-              } else if (slot.startdate instanceof Date) {
-                tokenStartDate = slot.startdate;
-              } else return;
+          Object.values(token.selectedstageslot).forEach((slot: any) => {
+            if (slot && this.stageSlotMatches(slot.stagename)) {
+              hasStage = true;
 
-              if (this.dateRangeStart && this.dateRangeEnd) {
-                if (tokenStartDate >= this.dateRangeStart && tokenStartDate <= this.dateRangeEnd) {
-                  matchesDateRange = true;
-                  if (this.selectedTimeSlots.length > 0) {
-                  let endDate: Date | null = null;
+              if (slot.startdate) {
+                let tokenStartDate: Date;
+                if (slot.startdate.toDate && typeof slot.startdate.toDate === 'function') {
+                  tokenStartDate = slot.startdate.toDate();
+                } else if (slot.startdate instanceof Date) {
+                  tokenStartDate = slot.startdate;
+                } else return;
 
-                  if (slot.enddate?.toDate) {
-                    endDate = slot.enddate.toDate();
-                  } else if (slot.enddate instanceof Date) {
-                    endDate = slot.enddate;
-                  }
+                if (this.dateRangeStart && this.dateRangeEnd) {
+                  const endOfDay = new Date(this.dateRangeEnd);
+                  endOfDay.setHours(23, 59, 59, 999);
 
-                  const startTime = tokenStartDate.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true
-                  });
+                  if (tokenStartDate >= this.dateRangeStart && tokenStartDate <= endOfDay) {
+                    matchesDateRange = true;
+                    if (this.selectedTimeSlots.length > 0) {
+                      let endDate: Date | null = null;
 
-                  const endTime = endDate ? endDate.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true
-                  }) : '';
+                      if (slot.enddate?.toDate) {
+                        endDate = slot.enddate.toDate();
+                      } else if (slot.enddate instanceof Date) {
+                        endDate = slot.enddate;
+                      }
 
-                  const tokenTimeRange = endTime
-                    ? `${startTime} – ${endTime}`
-                    : startTime;
+                      const tokenSlotKey = `${tokenStartDate.getTime()}_${endDate ? endDate.getTime() : ''}`;
 
-                  if (this.selectedTimeSlots.includes(tokenTimeRange)) {
-                    matchesTimeSlot = true;
+                      if (this.selectedTimeSlots.includes(tokenSlotKey)) {
+                        matchesTimeSlot = true;
+                      }
+                    } else {
+                      matchesTimeSlot = true;
+                    }
                   }
                 } else {
+                  matchesDateRange = true;
                   matchesTimeSlot = true;
                 }
-                }
-              } else {
-                matchesDateRange = true;
-                matchesTimeSlot = true;
               }
             }
-          }
+          });
+          return hasStage && matchesDateRange && matchesTimeSlot;
         });
-        return hasStage && matchesDateRange && matchesTimeSlot;
-      });
+      }
+    } else {
+      this.notBookedSlotCountCached = 0;
     }
     if (this.dfuFilterActive) {
       filteredTokens = filteredTokens.filter(
@@ -2552,6 +2589,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       this.slotTitleMap = {};
       if (!queuePlanningSnap.empty) {
         const queuePlanningDoc = queuePlanningSnap.docs[0].data();
+        this.cachedPlanningData = queuePlanningDoc;
         this.queuePlanningSegments = queuePlanningDoc['segmentlist'] || [];
 
         const planning = queuePlanningDoc['planning'] || [];
@@ -2662,18 +2700,18 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     return stages;
   }
 
-  getBookedSlotTitle(token: any): string {
+getBookedSlotTitle(token: any): string {
     const slot = this.getBookedSlot(token);
     if (!slot) return '';
-    const key = `${this.selectedStageSlot}_${slot.start.getTime()}_${slot.end.getTime()}`;
+    const key = `${slot.stagename}_${slot.start.getTime()}_${slot.end.getTime()}`;
     return this.slotTitleMap[key] || '';
   }
 
-  getBookedSlot(token: any): { start: Date; end: Date } | null { //dharshan
-    if (!this.selectedStageSlot || !token.selectedstageslot) return null;
+  getBookedSlot(token: any): { start: Date; end: Date; stagename: string } | null { //dharshan
+    if (!this.isStageSlotFilterActive || !token.selectedstageslot) return null;
 
     const slots = Object.values(token.selectedstageslot) as any[];
-    const matchedSlot = slots.find(slot => slot?.stagename === this.selectedStageSlot);
+    const matchedSlot = slots.find(slot => this.stageSlotMatches(slot?.stagename));
 
     if (!matchedSlot?.startdate) return null;
 
@@ -2692,8 +2730,74 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       end = matchedSlot.enddate;
     }
 
-    return { start, end };
+    return { start, end: end as Date, stagename: matchedSlot.stagename };
   }
+
+  private getStageConfigForVariationSegment(variationId: string, segmentId: string): { stageName: string; slotConfigured: boolean }[] {
+    const stageConfig = (this.selectedQueue.stages as string[]).map(stageName => ({ stageName, slotConfigured: false }));
+    if (!this.cachedPlanningData || !this.cachedPlanningData.planning) return stageConfig;
+
+    for (const variationPlanning of this.cachedPlanningData.planning) {
+      if (variationPlanning.variationid !== variationId) continue;
+      for (const segmentData of (variationPlanning.segments || [])) {
+        if (segmentData.segmentid !== segmentId) continue;
+        for (const slot of (segmentData.slots || [])) {
+          const idx = stageConfig.findIndex(s => s.stageName === slot.stagename);
+          if (idx >= 0) stageConfig[idx].slotConfigured = true;
+        }
+      }
+    }
+    return stageConfig;
+  }
+
+  private findLastPreviousStageWithSlot(currentIdx: number, stageConfig: { slotConfigured: boolean; stageName: string }[]) {
+    for (let i = currentIdx - 1; i >= 0; i--) {
+      if (stageConfig[i].slotConfigured) return { index: i, stageName: stageConfig[i].stageName };
+    }
+    return { index: -1, stageName: null };
+  }
+  
+  private hasNoBookedSlot(token: any): boolean {
+    const queueStages: string[] = this.selectedQueue.stages;
+    const profileId = token.profile_id || token.profileid;
+    const candidateSegmentIds = this.availableSegments
+      .filter(segment =>
+        (this.participantListMap[profileId] || []).some(plId =>
+          (this.segmentParticipantListMap[segment.id] || []).includes(plId)
+        )
+      )
+      .map(segment => segment.id);
+    if (candidateSegmentIds.length === 0) return false;
+    if (!this.cachedPlanningData?.planning) return false;
+
+    return this.selectedStageSlots.some(stagename => {
+      const currentStageIndex = queueStages.indexOf(stagename);
+      if (currentStageIndex === -1) return false;
+
+      const stageConfig = this.cachedPlanningData.planning
+        .filter((variationPlanning: any) =>
+          (variationPlanning.segments || []).some((s: any) => candidateSegmentIds.includes(s.segmentid))
+        )
+        .map((variationPlanning: any) => {
+          const segmentId = variationPlanning.segments.find((s: any) => candidateSegmentIds.includes(s.segmentid))?.segmentid;
+          return this.getStageConfigForVariationSegment(variationPlanning.variationid, segmentId);
+        })
+        .find((config: any[]) => config[currentStageIndex]?.slotConfigured);
+      if (!stageConfig) return false;
+
+      const lastPrev = this.findLastPreviousStageWithSlot(currentStageIndex, stageConfig);
+      const checkFromStageIndex = lastPrev.index >= 0 ? lastPrev.index + 1 : 0;
+
+      const tokenStageIndex = queueStages.indexOf(token.currentstage);
+      if (tokenStageIndex === -1) return false;
+      if (tokenStageIndex > currentStageIndex) return false;
+      if (tokenStageIndex < checkFromStageIndex) return false;
+
+      const hasConfirmedThisStage = (token.selectedstageslot || {})[stagename] != null;
+      return !hasConfirmedThisStage;
+    });
+  }
+
   removeSegment(segId) {
     return this.selectedSegments = this.selectedSegments.filter(s => s !== segId)
   }
@@ -4684,14 +4788,15 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   toggleMoveMenu(event: Event, token: any, stagename: string, type: string) {
     event.stopPropagation();
-
+    this.closeTokenMenu();
     const tokenId = token.profile_id || token.id;
+    const wasOpen = this.showMoveMenu[tokenId];
 
     Object.keys(this.showMoveMenu).forEach(key => {
       this.showMoveMenu[key] = false;
     });
 
-    this.showMoveMenu[tokenId] = !this.showMoveMenu[tokenId];
+    this.showMoveMenu[tokenId] = !wasOpen;
 
     if (this.showMoveMenu[tokenId]) {
       this.checkAvailablestages(token, stagename, type);
@@ -5111,20 +5216,20 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
   }
 
-  toggleSegmentDropdown() {
-    if (this.dfuFilterActive || this.selectedStageSlot) return;
+toggleSegmentDropdown() {
+    if (this.dfuFilterActive || this.isStageSlotFilterActive) return;
     this.segmentDropdownOpen = !this.segmentDropdownOpen;
     if (this.segmentDropdownOpen) this.onSegmentDropdownOpen();
   }
 
   toggleTagDropdown() {
-    if (this.dfuFilterActive || this.selectedStageSlot) return;
+    if (this.dfuFilterActive || this.isStageSlotFilterActive) return;
     this.tagDropdownOpen = !this.tagDropdownOpen;
     if (this.tagDropdownOpen) this.onTagDropdownOpen();
   }
 
   togglePreassignedDropdown() {
-    if (this.dfuFilterActive || !!this.selectedStageSlot) return;
+    if (this.dfuFilterActive || this.isStageSlotFilterActive) return;
     this.preassignedDropdownOpen = !this.preassignedDropdownOpen;
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
@@ -5134,7 +5239,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   }
 
   toggleApprovedDropdown() {
-    if (this.dfuFilterActive || !!this.selectedStageSlot) return;
+    if (this.dfuFilterActive || this.isStageSlotFilterActive) return;
     this.approvedDropdownOpen = !this.approvedDropdownOpen;
     this.segmentDropdownOpen = false;
     this.tagDropdownOpen = false;
@@ -5142,7 +5247,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     this.stageSlotDropdownOpen = false;
     this.preassignedDropdownOpen = false;
   }
-
   toggleStageSlotDropdown() {
     if (this.dfuFilterActive) return;
     this.stageSlotDropdownOpen = !this.stageSlotDropdownOpen;
@@ -5235,17 +5339,33 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
   goToToken(reminder: any) {
     this.closeReminderListModal();
+    const stage = this.stageQueue.find(s =>
+      (s.allTokens || s.tokenlist || []).some((t: any) => t.profile_id === reminder.profileid)
+    );
 
+    if (stage) {
+      const tokens = stage.allTokens || stage.tokenlist || [];
+      const tokenIndex = tokens.findIndex((t: any) => t.profile_id === reminder.profileid);
+      const currentDisplayCount = this.stageDisplayCounts[stage.stageKey] || this.PAGE_SIZE;
+
+      if (tokenIndex !== -1 && tokenIndex >= currentDisplayCount) {
+        this.stageDisplayCounts[stage.stageKey] = tokenIndex + 5;
+      }
+    } else {
+      this.guard.openSnackBar('Participant not visible — check active filters', 'OK', 3000);
+      return;
+    }
     setTimeout(() => {
       const element = document.querySelector(`[data-token-id="${reminder.profileid}"]`);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         element.classList.add('highlight-token');
-        setTimeout(() => {
-          element.classList.remove('highlight-token');
-        }, 3000);
+        setTimeout(() => element.classList.remove('highlight-token'), 3000);
+      } else {
+        console.warn('Token element not found for profile:', reminder.profileid);
+        this.guard.openSnackBar('Could not locate this participant on the board', 'OK', 3000);
       }
-    }, 300);
+    }, 350);
   }
   
   toggleReminderTodayFilter() {
@@ -5358,8 +5478,9 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     count += this.selectedQueueTags.length;
     if (this.preassignedFilter !== 'all') count++;
     if (this.approvedFilter !== 'all') count++;
-    if (this.selectedStageSlot) count++;
+    if (this.isStageSlotFilterActive) count++;
     if (this.dateRangeStart && this.dateRangeEnd) count++;
+    if (this.stageSlotBookingFilter === 'notbooked') count++;
     if (this.selectedTimeSlots?.length > 0) count++;
     if (this.dfuFilterActive) count++;
     if (this.reminderTodayFilterActive) count++;

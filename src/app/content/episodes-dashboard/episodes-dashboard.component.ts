@@ -39,7 +39,8 @@ import { environment } from '../../../environments/environment';
   styleUrls: ['../../content-upload-version2/content-upload-shared.css']
 })
 export class EpisodesDashboardComponent {
-  displayedColumns: string[] = ['select', 'Title', 'Referencetitle', 'Duration', 'added', 'convertedtohls', 'srt', 'videosize', 'Series', 'Edit', 'Delete'];
+  // displayedColumns: string[] = ['select', 'Title', 'Referencetitle', 'Duration', 'added', 'convertedtohls', 'srt', 'videosize', 'Series', 'Edit', 'Delete'];
+  displayedColumns: string[] = ['Title', 'Referencetitle', 'Duration', 'added', 'convertedtohls', 'srt', 'videosize', 'Series', 'Edit', 'Delete'];
   dataSource = new MatTableDataSource();
 
   readonly maxSelection = 5;

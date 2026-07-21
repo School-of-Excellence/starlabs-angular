@@ -229,9 +229,14 @@
 
     <div class="comm-panel" *ngIf="showComm">
       <div class="comm-bar">
+        <button type="button" class="comm-btn" (click)="sendEmailToSelectedParicipant()" matTooltip="Email">
+          <mat-icon>mail</mat-icon>
+        </button>
+        <!-- Old email composer — replaced by the EmailInputComponent flow above.
         <button type="button" class="comm-btn" (click)="sendMail()" matTooltip="Email">
           <i class="fa-solid fa-envelope"></i>
         </button>
+        -->
         <button type="button" class="comm-btn" (click)="sendWatti()" matTooltip="WhatsApp">
           <i class="fa-brands fa-whatsapp"></i>
         </button>

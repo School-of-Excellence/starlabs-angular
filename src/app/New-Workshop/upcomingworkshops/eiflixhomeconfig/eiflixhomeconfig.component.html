@@ -71,6 +71,41 @@
             </mat-select>
           </mat-form-field>
         </div>
+
+        <!-- Home Series only: enable tag toggle + up to 3 tags -->
+        <div class="series-extra" *ngIf="optionType(group.get('key')?.value) === 'homeseries'">
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Enable Tag</span>
+              <span class="toggle-desc">Show tags for this series.</span>
+            </div>
+            <mat-slide-toggle formControlName="enabletag" color="primary"></mat-slide-toggle>
+          </div>
+
+          <div class="tags-block">
+            <div class="tags-head">
+              <span class="tags-label">Tags <span class="muted">(max 3)</span></span>
+              <button mat-stroked-button type="button" class="add-tag-btn"
+                (click)="addTag(i)" [disabled]="itemTags(i).length >= 3">
+                <mat-icon>add</mat-icon> Add tag
+              </button>
+            </div>
+
+            <div class="tags-list" formArrayName="tags">
+              <div class="tag-row" *ngFor="let tag of itemTags(i).controls; let t = index">
+                <mat-form-field appearance="outline" class="tag-field">
+                  <mat-label>Tag {{ t + 1 }}</mat-label>
+                  <input matInput [formControlName]="t" placeholder="Enter tag" />
+                </mat-form-field>
+                <button mat-icon-button type="button" class="tag-remove" (click)="removeTag(i, t)"
+                  matTooltip="Remove tag">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              <div class="tags-empty" *ngIf="itemTags(i).length === 0">No tags added.</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="items-empty" *ngIf="items.length === 0">

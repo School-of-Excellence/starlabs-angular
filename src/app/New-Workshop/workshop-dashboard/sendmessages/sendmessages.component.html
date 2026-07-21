@@ -13,6 +13,9 @@
   </div>
   
   <mat-tab-group [(selectedIndex)]="selectedTabIndex" class="message-tabs">
+    <!-- Email tab disabled — email is sent through EmailInputComponent from the
+         calling screen instead. To restore: uncomment this block and put back
+         the selectedTabIndex logic in the .ts (WhatsApp becomes index 1 again).
     <mat-tab>
       <ng-template mat-tab-label>
         <i class="fa-regular fa-envelope tab-icon"></i>
@@ -70,6 +73,7 @@
         </form>
       </div>
     </mat-tab>
+    -->
     
     <mat-tab>
       <ng-template mat-tab-label>

@@ -39,6 +39,8 @@ interface QueueOption {
   endValue: number;
   live: boolean;          // true if the queue is live (no end date or end date >= today)
   variations: Record<string, string>;   // variationId → variationname (from `queue variation`)
+  arenaeventidlist: string[];  // arena docids this queue serves (→ products, via `arena events`)
+  productIds: string[];        // product ids this queue is mapped to (resolved from arenaeventidlist)
 }
 
 // A stage column = one stage of one selected queue (merged across all selected queues).
@@ -66,8 +68,10 @@ interface StageRow {
   status: string;
   journeyId: string;             // journey chosen by customerstatus (active/non active/other)
   unconsumedProducts: string[];  // product ids still unconsumed (participant metadata)
-  // by queueId: current stage, slot bookings, and completion dates (previousstage → logdate ms)
-  tokens: Record<string, { currentstage: string; selectedstageslot: any; completedAt: Record<string, number> }>;
+  activeProducts: string[];      // product ids currently being consumed (participant metadata: activeproduct)
+  // by queueId: current stage, slot bookings, completion dates (previousstage → logdate ms), and
+  // lastMs = most recent token/stage-log activity time in that queue (for "most recent" picks).
+  tokens: Record<string, { currentstage: string; selectedstageslot: any; completedAt: Record<string, number>; lastMs: number }>;
   metaMissing: boolean;
 }
 
@@ -135,16 +139,24 @@ export class EventsStageDataComponent {
   cardFilter = '';   // quick-filter the table by a clicked cohort card ('inqueue'|'requested'|'approved'|'approved-nq'|'ready')
   selectedParticipant: StageRow | null = null;   // row opened in the detail side panel
   summaryReady = { active: 0, nonactive: 0, total: 0 };
+  summaryDfu = { active: 0, nonactive: 0, total: 0 };   // #5 DFU Ongoing (active product outside the selected queues)
 
   // ---- Per-arena journey group config ----
   journeyGroups: { name: string; journeyIds: string[] }[] = [];
   groupsEditorOpen = false;
   configOpen = false;
 
-  // ---- Per-arena "ready" stage config (stored in the same localStorage entry) ----
+  // ---- Per-arena "ready" stage config (stored in the same config doc) ----
   readyStages: string[] = [];
   readyStageByQueue: Record<string, string> = {};   // queueId -> the stage that marks "ready for the event"
   readyCfgOpen = false;                              // collapsed by default to save space
+
+  // ---- Configurable definitions (persisted in the SAME per-arena config doc, Alt A) ----
+  stageDefs: { id: string; label: string; byQueue: Record<string, string> }[] = [];  // #4/#6 named "Yet to Complete <stage>"
+  queueEligibility: Record<string, string[]> = {};   // #3 per-queue eligible unconsumed-product group
+  dfuProductIds: string[] = [];                      // #5 optional narrowing of DFU-ongoing to a product set
+  private stageDefSeq = 0;
+  eligibilityFilter = '';                            // #3 filter: show only participants eligible for this queueId
 
   // Filters
   requestFilter = '';    // '' | 'requested' | 'approved'
@@ -292,7 +304,7 @@ export class EventsStageDataComponent {
     this.variationFilter = '';
     this.segmentFilter = '';
     this.journeyFilters = [];
-    this.productFilter = ''; this.productMode = 'only';
+    this.productFilter = ''; this.productMode = 'only'; this.eligibilityFilter = '';
     this.completedFrom = ''; this.completedTo = ''; this.completedStage = '';
     this.slotFrom = ''; this.slotTo = '';
     this.notBookedOnly = false;
@@ -378,10 +390,11 @@ export class EventsStageDataComponent {
         customerStatus: m?.['customerstatus'] ?? '',
         journeyId: this.pickJourneyId(m),
         unconsumedProducts: Array.isArray(m?.['unconsumedproducts']) ? m['unconsumedproducts'].map((p: any) => (p ?? '').toString()) : [],
+        activeProducts: Array.isArray(m?.['activeproduct']) ? m['activeproduct'].map((p: any) => (p ?? '').toString()) : [],
         status, tokens: {}, metaMissing: !m
       } as StageRow;
     } catch {
-      return { profileid: pid, name: '', email: '', phone: '', customerStatus: '', journeyId: '', unconsumedProducts: [], status, tokens: {}, metaMissing: true } as StageRow;
+      return { profileid: pid, name: '', email: '', phone: '', customerStatus: '', journeyId: '', unconsumedProducts: [], activeProducts: [], status, tokens: {}, metaMissing: true } as StageRow;
     }
   }
 
@@ -432,25 +445,33 @@ export class EventsStageDataComponent {
   }
 
   // Per-arena journey group config, persisted in localStorage (key esd_journeygroups_<arenaeventid>).
-  // Same structure as before ({ groups, readyStages }); no `stage opportunity count` read/write.
+  // Stored entirely client-side — no `stage opportunity count` (or any Firestore) read/write.
   private journeyGroupsKey(arenaeventid: string): string { return `esd_journeygroups_${arenaeventid}`; }
   private async loadJourneyGroups(arenaeventid: string): Promise<void> {
     this.journeyGroups = []; this.readyStages = [];
+    this.stageDefs = []; this.queueEligibility = {}; this.dfuProductIds = [];
     try {
       const raw = localStorage.getItem(this.journeyGroupsKey(arenaeventid));
       if (raw) {
         const data = JSON.parse(raw) || {};
         this.journeyGroups = (data['groups'] || []).map((g: any) => ({ name: g.name || '', journeyIds: g.journeyIds || [] }));
         this.readyStages = (data['readyStages'] || []);
+        this.stageDefs = (data['stageDefs'] || []).map((s: any) => ({ id: s.id || ('sd' + (++this.stageDefSeq)), label: s.label || '', byQueue: s.byQueue || {} }));
+        this.queueEligibility = data['queueEligibility'] || {};
+        this.dfuProductIds = data['dfuProductIds'] || [];
       }
     } catch (e) { console.error('load journey groups failed', e); }
   }
-  // Persist the arena config (journey groups + ready stages) to localStorage.
+  // Persist the arena config (journey groups, ready stages, stage defs, eligibility) to localStorage.
   private async saveArenaConfig(): Promise<void> {
     const arenaeventid = this.selectedArena?.docid; if (!arenaeventid) return;
     const groups = this.journeyGroups.filter(g => (g.name || '').trim()).map(g => ({ name: g.name.trim(), journeyIds: g.journeyIds || [] }));
     const readyStages = this.readyStages;
-    localStorage.setItem(this.journeyGroupsKey(arenaeventid), JSON.stringify({ groups, readyStages, updated: new Date().toISOString() }));
+    const stageDefs = this.stageDefs.filter(s => (s.label || '').trim()).map(s => ({ id: s.id, label: s.label.trim(), byQueue: s.byQueue || {} }));
+    const queueEligibility = this.queueEligibility;
+    const dfuProductIds = this.dfuProductIds;
+    const payload = { groups, readyStages, stageDefs, queueEligibility, dfuProductIds, updated: new Date().toISOString() };
+    localStorage.setItem(this.journeyGroupsKey(arenaeventid), JSON.stringify(payload));
   }
   async saveJourneyGroups(): Promise<void> {
     if (!this.selectedArena?.docid) return;
@@ -496,9 +517,15 @@ export class EventsStageDataComponent {
     return [...m.entries()].map(([id, count]) => ({ id, name: this.journeyMap[id] || id, count })).sort((a, b) => b.count - a.count);
   }
 
-  // Journey-wise split: every journey is its own row; a named local group collapses its journeys into one row.
-  get summaryJourneyRows(): { key: string; label: string; reqA: number; reqNA: number; appA: number; appNA: number; readyA: number; readyNA: number }[] {
+  // Configured stage definitions that have a label — the journey-split's dynamic columns (#6).
+  get splitDefs(): { id: string; label: string; byQueue: Record<string, string> }[] {
+    return this.stageDefs.filter(s => (s.label || '').trim());
+  }
+  // Journey-wise split: every journey is its own row; a named local group collapses its journeys
+  // into one row. Each row also carries per-stageDef "yet to complete" + "pending" counts (#6).
+  get summaryJourneyRows(): any[] {
     const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+    const defs = this.splitDefs;
     const groupNames = this.journeyGroups.map(g => (g.name || '').trim()).filter(Boolean);
     const keyOf = (pid: string): string => {
       const jid = this.journeyIdByPid.get(pid);
@@ -509,19 +536,38 @@ export class EventsStageDataComponent {
       }
       return 'Other';
     };
+    const mkDefs = () => { const d: any = {}; defs.forEach(sd => d[sd.id] = { ytcA: 0, ytcNA: 0, penA: 0, penNA: 0 }); return d; };
     const jr: Record<string, any> = {};
     (this.stageRows || []).forEach(r => {
       const k = keyOf(r.profileid);
-      const b = jr[k] ??= { key: k, label: k, reqA: 0, reqNA: 0, appA: 0, appNA: 0, readyA: 0, readyNA: 0 };
+      const b = jr[k] ??= { key: k, label: k, reqA: 0, reqNA: 0, appA: 0, appNA: 0, readyA: 0, readyNA: 0, defs: mkDefs() };
       const act = isActive(r);
       if (r.status === 'requested') act ? b.reqA++ : b.reqNA++;
       else if (r.status === 'approved') act ? b.appA++ : b.appNA++;
       if (this.isReady(r)) act ? b.readyA++ : b.readyNA++;
+      defs.forEach(sd => {
+        if (this.isYetToComplete(r, sd)) act ? b.defs[sd.id].ytcA++ : b.defs[sd.id].ytcNA++;
+        if (this.isStagePending(r, sd)) act ? b.defs[sd.id].penA++ : b.defs[sd.id].penNA++;
+      });
     });
     const groups = groupNames.filter(n => jr[n]).map(n => jr[n]);
     const rest = Object.keys(jr).filter(k => !groupNames.includes(k))
       .sort((a, b) => a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b)).map(k => jr[k]);
     return [...groups, ...rest];
+  }
+  // Totals row for the per-stageDef journey-split columns.
+  get splitTotals(): Record<string, { ytcA: number; ytcNA: number; penA: number; penNA: number }> {
+    const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+    const out: any = {};
+    this.splitDefs.forEach(sd => out[sd.id] = { ytcA: 0, ytcNA: 0, penA: 0, penNA: 0 });
+    (this.stageRows || []).forEach(r => {
+      const act = isActive(r);
+      this.splitDefs.forEach(sd => {
+        if (this.isYetToComplete(r, sd)) act ? out[sd.id].ytcA++ : out[sd.id].ytcNA++;
+        if (this.isStagePending(r, sd)) act ? out[sd.id].penA++ : out[sd.id].penNA++;
+      });
+    });
+    return out;
   }
 
   pct(n: number, total: number): number { return total > 0 ? Math.round(n / total * 100) : 0; }
@@ -542,6 +588,33 @@ export class EventsStageDataComponent {
       const t = r.tokens?.[qid];
       return !!t && !this.isUnattendedStage(t.currentstage);
     });
+  }
+  // #5 DFU Ongoing — the participant is actively consuming a product OUTSIDE the selected
+  // queue(s): an activeproduct that no selected queue is mapped to. These people are available
+  // for planning / follow-up. Relies on the queue→product mapping resolved in loadSelectedTokens.
+  private selectedQueueProductIds(): Set<string> {
+    const s = new Set<string>();
+    this.selectedQueueIds.forEach(qid => (this.queues.find(q => q.id === qid)?.productIds ?? []).forEach(p => s.add(p)));
+    return s;
+  }
+  isDfuOngoing(r: StageRow): boolean {
+    if (!r.activeProducts.length) return false;
+    const covered = this.selectedQueueProductIds();
+    return r.activeProducts.some(p => !covered.has(p));
+  }
+  // #3 — a participant is "eligible" for a queue when they still hold (unconsumed) at least one of
+  // that queue's configured eligible products. Several products can be grouped under one queue;
+  // adding a product to the group needs no code change.
+  isEligibleFor(r: StageRow, qid: string): boolean {
+    return (this.queueEligibility[qid] || []).some(p => r.unconsumedProducts.includes(p));
+  }
+  isEligibleProduct(qid: string, productId: string): boolean {
+    return (this.queueEligibility[qid] || []).includes(productId);
+  }
+  toggleEligibleProduct(qid: string, productId: string): void {
+    const cur = this.queueEligibility[qid] || [];
+    this.queueEligibility[qid] = cur.includes(productId) ? cur.filter(p => p !== productId) : [...cur, productId];
+    this.saveArenaConfig().catch(e => console.error('save eligibility failed', e));
   }
   // Ready for the event = approved AND, in some selected queue, their current stage is at or
   // past the operator-picked "ready" stage for that queue (using the queue's ordered stage list).
@@ -581,6 +654,7 @@ export class EventsStageDataComponent {
       this.summaryInQueue = seg(r => this.inSelectedQueue(r));
       this.summaryReady = seg(r => this.isReady(r));
       this.summaryApprovedNotQueued = seg(r => r.status === 'approved' && !this.inSelectedQueue(r));
+      this.summaryDfu = seg(r => this.isDfuOngoing(r));
       this.summaryLoaded = true;   // summaryJourneyRows is a reactive getter (grouping updates live)
     } finally {
       this.summaryLoading = false;
@@ -606,14 +680,16 @@ export class EventsStageDataComponent {
         const q = d.data();
         if (q['delete'] == true) return;
         const end = this.toMillis(q['queueenddate']);
-        const mapped = (q['arenaeventidlist'] ?? []).includes(row.docid);
+        const arenaList: string[] = Array.isArray(q['arenaeventidlist']) ? q['arenaeventidlist'] : [];
+        const mapped = arenaList.includes(row.docid);
         const isLive = !end || end >= todayStart;
         const recentlyEnded = !!end && end >= eightMonthsAgo;
         if (!isLive && !mapped && !recentlyEnded) return;
         queues.push({
           id: d.id, name: q['queuename'] ?? 'Queue', ref: d.ref,
           stages: Array.isArray(q['stages']) ? q['stages'] : [],
-          mapped, endValue: end, live: isLive, variations: {}
+          mapped, endValue: end, live: isLive, variations: {},
+          arenaeventidlist: arenaList, productIds: []
         });
       });
       queues.sort((a, b) => (Number(b.mapped) - Number(a.mapped)) || (b.endValue - a.endValue));
@@ -672,7 +748,8 @@ export class EventsStageDataComponent {
         const [tokSnap, logSnap, varSnap] = await Promise.all([
           getDocs(query(collection(this.firestore, 'queue_token'), where('queueref', '==', q.ref))),
           getDocs(query(collection(this.firestore, 'queue stage log'), where('queueref', '==', q.ref))),
-          getDocs(query(collection(this.firestore, 'queue variation'), where('queueref', '==', q.ref)))
+          getDocs(query(collection(this.firestore, 'queue variation'), where('queueref', '==', q.ref))),
+          this.resolveQueueProducts(q)   // #8/#5: which product(s) this queue is mapped to
         ]);
         const vmap: Record<string, string> = {};
         varSnap.docs.forEach(d => { vmap[d.id] = d.data()['variationname'] ?? d.id; });
@@ -725,7 +802,7 @@ export class EventsStageDataComponent {
           const latest = latestByPid.get(r.profileid);
           const completedAt = completedByPid.get(r.profileid) ?? {};
           if (t || latest || Object.keys(completedAt).length) {
-            r.tokens[qid] = { currentstage: latest?.currentstage ?? t?.currentstage ?? '', selectedstageslot: t?.selectedstageslot ?? {}, completedAt };
+            r.tokens[qid] = { currentstage: latest?.currentstage ?? t?.currentstage ?? '', selectedstageslot: t?.selectedstageslot ?? {}, completedAt, lastMs: Math.max(latest?.ms ?? 0, t?.ms ?? 0) };
           }
         });
         this.loadedTokenQueues.add(qid);
@@ -737,6 +814,22 @@ export class EventsStageDataComponent {
       this.loadingQueue = false;
     }
     this.computeCohortSummary().catch(e => console.log('cohort summary failed', e));
+  }
+
+  // Resolve a queue's product ids once, from its arena events (docid ∈ arenaeventidlist).
+  // Chunked to respect Firestore's `in` limit. Drives #8 (current stage) and #5 (DFU ongoing).
+  private async resolveQueueProducts(q: QueueOption): Promise<void> {
+    if (q.productIds.length || !q.arenaeventidlist.length) return;
+    const prods = new Set<string>();
+    try {
+      for (let i = 0; i < q.arenaeventidlist.length; i += 30) {
+        const chunk = q.arenaeventidlist.slice(i, i + 30).filter(Boolean);
+        if (!chunk.length) continue;
+        const snap = await getDocs(query(collection(this.firestore, 'arena events'), where('docid', 'in', chunk)));
+        snap.docs.forEach(d => { const pid = (d.data() as any)['productref']?.id; if (pid) prods.add(pid); });
+      }
+      q.productIds = [...prods];
+    } catch (e) { console.log('resolve queue products failed', e); }
   }
 
   // ---- Merged stage columns ----
@@ -833,6 +926,42 @@ export class EventsStageDataComponent {
     const col = this.resolveCombined(r, cc); return col ? this.slotKind(r, col) : 'none';
   }
 
+  // ---- #4/#6: persisted "Yet to complete <stage>" definitions ----
+  // A stageDef is a labelled cross-queue stage (same shape as a combined column, but saved).
+  private sdAsCol(sd: { id: string; label: string; byQueue: Record<string, string> }): CombinedCol {
+    return { id: sd.id, name: sd.label, byQueue: sd.byQueue };
+  }
+  // Yet to complete = the participant is in a mapped queue but has not completed the mapped stage.
+  isYetToComplete(r: StageRow, sd: { id: string; label: string; byQueue: Record<string, string> }): boolean {
+    const col = this.resolveCombined(r, this.sdAsCol(sd));
+    return !!col && !this.crossedStage(r, col);
+  }
+  // #6 "Diagnostics Pending" flavour — booked (live/upcoming) for the mapped stage but not completed.
+  isStagePending(r: StageRow, sd: { id: string; label: string; byQueue: Record<string, string> }): boolean {
+    const col = this.resolveCombined(r, this.sdAsCol(sd));
+    return !!col && !this.crossedStage(r, col) && this.isBooked(r, col);
+  }
+  // Config editor.
+  addStageDef(): void { this.stageDefs = [...this.stageDefs, { id: 'sd' + (++this.stageDefSeq), label: '', byQueue: {} }]; }
+  removeStageDef(id: string): void { this.stageDefs = this.stageDefs.filter(s => s.id !== id); this.saveStageDefs(); }
+  setStageDefStage(sd: { byQueue: Record<string, string> }, qid: string, stage: string): void {
+    if (stage) sd.byQueue[qid] = stage; else delete sd.byQueue[qid];
+    this.saveStageDefs();
+  }
+  saveStageDefs(): void {
+    this.saveArenaConfig().catch(e => console.error('save stagedefs failed', e));
+    this.computeCohortSummary().catch(() => {});
+  }
+  // Cohort cards: per stageDef, the count of participants yet to complete it (Active/Non-active).
+  get stageDefCards(): { id: string; label: string; active: number; nonactive: number; total: number }[] {
+    const isActive = (r: any) => String(r.customerStatus ?? '').toLowerCase().trim() === 'active';
+    return this.stageDefs.filter(s => (s.label || '').trim()).map(sd => {
+      let a = 0, n = 0;
+      (this.stageRows || []).forEach(r => { if (this.isYetToComplete(r, sd)) (isActive(r) ? a++ : n++); });
+      return { id: sd.id, label: sd.label, active: a, nonactive: n, total: a + n };
+    });
+  }
+
   // Stages available to the "Completed date" stage picker = only the added table columns.
   get completedStageOptions(): string[] {
     return [...new Set(this.addedCols.map(c => c.stage))];
@@ -844,20 +973,32 @@ export class EventsStageDataComponent {
 
   // ---- Per (queue, stage) computations ----
   private token(r: StageRow, col: StageCol) { return r.tokens[col.queueId]; }
+  // A stage is COMPLETED only when the participant's activity history records a transition OUT
+  // of that specific stage (`completedAt[stage]`, built from `queue stage log` previousstage
+  // entries in loadSelectedTokens). This is activity-based, NOT queue-position-based: if a
+  // participant skipped a stage (no log entry for it) and moved to a later one, the skipped
+  // stage is not completed. The position concept ("reached or passed a point") is a different
+  // thing and lives separately in `isReady` — do not route it through here.
   crossedStage(r: StageRow, col: StageCol): boolean {
-    const q = this.queues.find(x => x.id === col.queueId);
-    const t = this.token(r, col);
-    if (!q || !t) return false;
-    const ci = q.stages.indexOf(t.currentstage);
-    const si = q.stages.indexOf(col.stage);
-    return ci > -1 && si > -1 && ci > si;
+    return this.completedMs(r, col) > 0;
   }
   completedLabel(r: StageRow, col: StageCol): string {
     return this.crossedStage(r, col) ? 'Completed' : 'Not completed';
   }
+  // A slot counts as "booked" only if it is LIVE or UPCOMING — a fully-past appointment
+  // (enddate before now; or, with no enddate, a start before today) is not an active booking,
+  // so it reads as "Not booked" and surfaces the participant for rebooking.
   isBooked(r: StageRow, col: StageCol): boolean {
-    const t = this.token(r, col);
-    return !!(t && t.selectedstageslot && t.selectedstageslot[col.stage]);
+    const slot = this.token(r, col)?.selectedstageslot?.[col.stage];
+    return !!slot && this.slotIsActive(slot);
+  }
+  // Live (end at/after now) or upcoming; a dateless slot stays counted (cannot classify it).
+  private slotIsActive(slot: any): boolean {
+    const end = this.toMillis(slot['enddate']);
+    if (end) return end >= Date.now();
+    const start = this.toMillis(slot['startdate']);
+    if (start) { const t = new Date(); t.setHours(0, 0, 0, 0); return start >= t.getTime(); }
+    return true;
   }
   private slotStartMs(r: StageRow, col: StageCol): number {
     return this.toMillis(this.token(r, col)?.selectedstageslot?.[col.stage]?.['startdate']);
@@ -902,7 +1043,7 @@ export class EventsStageDataComponent {
         else if (col && this.isBooked(r, col)) booked++;
         else notBooked++;
       });
-      return { label: cc.name, completed, notCompleted: booked + notBooked, booked, notBooked };
+      return { id: cc.id, label: cc.name, completed, notCompleted: booked + notBooked, booked, notBooked };
     });
   }
 
@@ -944,14 +1085,23 @@ export class EventsStageDataComponent {
   currentStageFor(r: StageRow, qid: string): string {
     return r.tokens[qid]?.currentstage ?? '';
   }
-  // One "Current stage" cell across all selected queues: stage (main) + queue name (sub-text).
+  // #8 — a queue is "active" for a participant when its mapped product(s) include one of the
+  // participant's currently-active products (metadata activeproduct).
+  private queueMatchesActiveProduct(r: StageRow, qid: string): boolean {
+    if (!r.activeProducts.length) return false;
+    const prods = this.queues.find(q => q.id === qid)?.productIds ?? [];
+    return prods.some(p => r.activeProducts.includes(p));
+  }
+  // One "Current stage" cell: the stage of the queue mapped to the participant's currently active
+  // product; when several apply, the most recently active one (latest token/log activity). Falls
+  // back to the most-recent selected-queue stage when no active-product mapping is available.
   currentStagePairs(r: StageRow): { stage: string; queueName: string }[] {
-    const out: { stage: string; queueName: string }[] = [];
-    this.selectedQueueIds.forEach(qid => {
-      const st = r.tokens[qid]?.currentstage;
-      if (st) out.push({ stage: st, queueName: this.queues.find(x => x.id === qid)?.name ?? '' });
-    });
-    return out;
+    const withStage = this.selectedQueueIds.filter(qid => r.tokens[qid]?.currentstage);
+    if (!withStage.length) return [];
+    const active = withStage.filter(qid => this.queueMatchesActiveProduct(r, qid));
+    const pick = (active.length ? active : withStage)
+      .reduce((best, qid) => (r.tokens[qid].lastMs >= (r.tokens[best]?.lastMs ?? -1) ? qid : best));
+    return [{ stage: r.tokens[pick].currentstage, queueName: this.queues.find(x => x.id === pick)?.name ?? '' }];
   }
 
   // ---- Journey (customerstatus-driven) + Segments displays ----
@@ -983,6 +1133,17 @@ export class EventsStageDataComponent {
     return Object.entries(this.mapProduct)
       .map(([id, name]) => ({ id, name: name || id }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  productName(pid: string): string { return this.mapProduct[pid] || pid; }
+  // #3 config: products not yet in a queue's eligible group (for the "+ Add product" picker).
+  ssEligibleAddOpts(qid: string): SsOption[] {
+    const chosen = new Set(this.queueEligibility[qid] || []);
+    return [{ value: '', label: '+ Add product' }, ...this.productOptions.filter(p => !chosen.has(p.id)).map(p => ({ value: p.id, label: p.name }))];
+  }
+  // #3 filter: only queues that actually have an eligible-product group configured.
+  get ssEligibilityOpts(): SsOption[] {
+    const qs = this.selectedQueues.filter(q => (this.queueEligibility[q.id] || []).length);
+    return [{ value: '', label: 'Any' }, ...qs.map(q => ({ value: q.id, label: q.name }))];
   }
 
   // ---- Searchable-dropdown option lists (SsOption = {value,label}) ----
@@ -1128,6 +1289,20 @@ export class EventsStageDataComponent {
       if (this.cardFilter === 'approved' && r.status !== 'approved') return false;
       if (this.cardFilter === 'approved-nq' && !(r.status === 'approved' && !this.inSelectedQueue(r))) return false;
       if (this.cardFilter === 'ready' && !this.isReady(r)) return false;
+      if (this.cardFilter === 'dfu' && !this.isDfuOngoing(r)) return false;
+      if (this.cardFilter.startsWith('sd:')) { const sd = this.stageDefs.find(s => s.id === this.cardFilter.slice(3)); if (sd && !this.isYetToComplete(r, sd)) return false; }
+      if (this.cardFilter.startsWith('cc:')) {
+        const [, id, state] = this.cardFilter.split(':');
+        const cc = this.combinedCols.find(c => c.id === id);
+        if (cc) {
+          const col = this.resolveCombined(r, cc);
+          const done = !!col && this.crossedStage(r, col);
+          const booked = !!col && !done && this.isBooked(r, col);
+          if (state === 'completed' && !done) return false;
+          if (state === 'booked' && !booked) return false;
+          if (state === 'notbooked' && (done || booked)) return false;
+        }
+      }
       if (this.requestFilter && r.status !== this.requestFilter) return false;
       const cs = this.rowCurrentStages(r);
       if (this.stageFilter === '__none') { if (cs.length) return false; }
@@ -1145,6 +1320,7 @@ export class EventsStageDataComponent {
         if (this.productMode === 'only' && !has) return false;   // keep only those who have it unconsumed
         if (this.productMode === 'exclude' && has) return false;  // remove those who have it unconsumed
       }
+      if (this.eligibilityFilter && !this.isEligibleFor(r, this.eligibilityFilter)) return false;
       if (this.notBookedOnly && !this.isNotBooked(r)) return false;
       if (compActive && !this.allCompletedMs(r).some(ms => this.inDateRange(ms, this.completedFrom, this.completedTo))) return false;
       if (slotActive && !this.allSlotStartMs(r).some(ms => this.inDateRange(ms, this.slotFrom, this.slotTo))) return false;
@@ -1171,6 +1347,7 @@ export class EventsStageDataComponent {
     if (this.segmentFilter) out.push({ label: 'Segment: ' + this.segmentFilter, clear: () => clr(() => this.segmentFilter = '') });
     this.journeyFilters.forEach(j => out.push({ label: 'Journey: ' + j, clear: () => clr(() => this.journeyFilters = this.journeyFilters.filter(x => x !== j)) }));
     if (this.productFilter) out.push({ label: 'Product: ' + this.productFilter, clear: () => clr(() => { this.productFilter = ''; this.productMode = 'only'; }) });
+    if (this.eligibilityFilter) out.push({ label: 'Eligible: ' + (this.queues.find(q => q.id === this.eligibilityFilter)?.name ?? ''), clear: () => clr(() => this.eligibilityFilter = '') });
     if (this.completedFrom || this.completedTo) out.push({ label: 'Completed ' + (this.completedFrom || '…') + ' – ' + (this.completedTo || '…'), clear: () => clr(() => { this.completedFrom = ''; this.completedTo = ''; this.completedStage = ''; }) });
     if (this.slotFrom || this.slotTo) out.push({ label: 'Slot ' + (this.slotFrom || '…') + ' – ' + (this.slotTo || '…'), clear: () => clr(() => { this.slotFrom = ''; this.slotTo = ''; }) });
     if (this.notBookedOnly) out.push({ label: 'Not booked', clear: () => clr(() => this.notBookedOnly = false) });
@@ -1180,7 +1357,7 @@ export class EventsStageDataComponent {
   get isStageFiltered(): boolean {
     return this.searchStage.trim().length > 0 || !!this.requestFilter || !!this.stageFilter || !!this.customerFilter
       || !!this.variationFilter || !!this.segmentFilter || this.journeyFilters.length > 0 || !!this.productFilter
-      || !!this.completedFrom || !!this.completedTo || !!this.slotFrom || !!this.slotTo || this.notBookedOnly;
+      || !!this.completedFrom || !!this.completedTo || !!this.slotFrom || !!this.slotTo || this.notBookedOnly || !!this.eligibilityFilter;
   }
   onStagePage(e: PageEvent) { this.stagePageIndex = e.pageIndex; this.stagePageSize = e.pageSize; }
   onStageSearch() { this.stagePageIndex = 0; }
@@ -1196,7 +1373,7 @@ export class EventsStageDataComponent {
   closeParticipant() { this.selectedParticipant = null; }
   clearFilters() {
     this.searchStage = ''; this.requestFilter = ''; this.stageFilter = ''; this.customerFilter = '';
-    this.variationFilter = ''; this.segmentFilter = ''; this.journeyFilters = []; this.productFilter = ''; this.productMode = 'only';
+    this.variationFilter = ''; this.segmentFilter = ''; this.journeyFilters = []; this.productFilter = ''; this.productMode = 'only'; this.eligibilityFilter = '';
     this.completedFrom = ''; this.completedTo = ''; this.completedStage = '';
     this.slotFrom = ''; this.slotTo = '';
     this.notBookedOnly = false;
