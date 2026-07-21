@@ -340,6 +340,63 @@
               </ng-container>
             </div>
 
+            <mat-divider class="section-divider"></mat-divider>
+            <div class="row g-3">
+              <div class="col-12 d-flex">
+                <div class="section-wrapper full-width">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <h3 class="section-title">Outcomes</h3>
+                    <button mat-icon-button type="button" class="btn-primary-outline" (click)="addOutcome()"
+                      matTooltip="Add outcome" aria-label="Add outcome">
+                      <mat-icon>add</mat-icon>
+                    </button>
+                  </div>
+                  <div formArrayName="outcome">
+                    <div *ngFor="let group of outcomeArray.controls; let i = index" [formGroupName]="i"
+                      class="form-row align-items-center">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Value</mat-label>
+                        <input matInput formControlName="value" placeholder="Enter value" />
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Title</mat-label>
+                        <input matInput formControlName="title" placeholder="Enter title" />
+                      </mat-form-field>
+                      <button mat-icon-button class="btn-danger-icon" type="button" (click)="removeOutcome(i)">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <mat-divider class="section-divider"></mat-divider>
+            <div class="row g-3">
+              <div class="col-md-6 d-flex">
+                <div class="section-wrapper">
+                  <h3 class="section-title">Hometags</h3>
+                  <div formArrayName="hometags" cdkDropList (cdkDropListDropped)="drop($event, 'hometags')">
+                    <div *ngFor="let control of getFormArray('hometags').controls; let j = index"
+                      class="form-row align-items-center" cdkDrag>
+                      <mat-icon matTooltip="Drag to reorder" class="drag-icon" cdkDragHandle>drag_indicator</mat-icon>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <input matInput [formControlName]="j" placeholder="Enter a hometag" />
+                      </mat-form-field>
+                      <button mat-icon-button class="btn-danger-icon"
+                        (click)="removeField('hometags', j, 'At least 1 hometag is required.')">
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                  <button mat-stroked-button class="btn-primary-outline" type="button"
+                    (click)="addField('hometags')" *ngIf="isAllFilled('hometags')">
+                    <mat-icon>add</mat-icon> Add Home Tags
+                  </button>
+                </div>
+              </div>
+            </div>
+
           </form>
         </mat-card-content>
           </mat-card>
@@ -933,6 +990,16 @@
                     <div class="setting-row">
                       <div class="setting-row-main">
                         <div class="setting-row-text">
+                          <h4 class="setting-row-title">Enable Home Screen Widget</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('homescreenwidget')?.value ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="homescreenwidget" (change)="onToggleChange('homescreenwidget', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
                           <h4 class="setting-row-title">Enable Q&amp;A</h4>
                           <p class="setting-row-desc">{{ settingsForm.get('qanda')?.value ? 'Q&A is active and visible to participants' : 'Q&A is inactive and hidden from participants' }}</p>
                         </div>
@@ -1483,6 +1550,17 @@
                   </div>
 
                   <div class="form-section">
+                    <h3 class="section-title">Congratulations Message</h3>
+                    <div class="comm-section-body">
+                      <mat-form-field appearance="outline" class="w-100">
+                        <mat-label>Congratulations Message</mat-label>
+                        <textarea matInput formControlName="enrolledcongrats" rows="3"
+                          placeholder="Enter the congratulations message..."></textarea>
+                      </mat-form-field>
+                    </div>
+                  </div>
+
+                  <div class="form-section">
                     <h3 class="section-title">Workshop Chat</h3>
                     <div class="comm-section-body">
                       <mat-form-field appearance="outline" class="w-100">
@@ -1532,23 +1610,45 @@
                       </mat-form-field>
                       <div class="upload-block">
                         <p class="upload-label">Choose Web Hero Image — Recommended Size: 3840 × 1350</p>
-                        <input type="file" (change)="onHeroImageUpload($event)" />
+                        <input #webHeroInput type="file" (change)="onHeroImageUpload($event)" />
                         <div *ngIf="settingsForm.get('heroImage')?.value" class="upload-preview">
                           <img [src]="settingsForm.get('heroImage')?.value" alt="Hero Image">
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroImage', webHeroInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
+
+                        <mat-form-field appearance="outline" class="w-100 hero-accent-field">
+                          <mat-label>Hero Accent Color</mat-label>
+                          <input matInput formControlName="heroAccent" placeholder="#FFFFFF" maxlength="7" />
+                          <input matSuffix type="color" class="color-swatch" [value]="heroAccentSwatch"
+                            (input)="onHeroAccentSwatch($event)" matTooltip="Pick a colour" aria-label="Pick a colour" />
+                          <mat-error *ngIf="heroAccentControl?.hasError('pattern')">
+                            Use a hex code like #FFFFFF.
+                          </mat-error>
+                        </mat-form-field>
                       </div>
                       <div class="upload-block">
                         <p class="upload-label">Choose Mobile Hero Image — Recommended Size: EiFlix Series Image Size</p>
-                        <input type="file" (change)="onHeroMobileImageUpload($event)" />
+                        <input #mobileHeroInput type="file" (change)="onHeroMobileImageUpload($event)" />
                         <div *ngIf="settingsForm.get('heroImageMobile')?.value" class="upload-preview">
                           <img [src]="settingsForm.get('heroImageMobile')?.value" alt="Hero Image">
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroImageMobile', mobileHeroInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                       <div class="upload-block">
                         <p class="upload-label">Choose Video</p>
-                        <input type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
+                        <input #heroVideoInput type="file" accept="video/*" (change)="onHeroVideoUpload($event)" />
                         <div *ngIf="settingsForm.get('heroVideo')?.value" class="upload-preview">
                           <video [src]="settingsForm.get('heroVideo')?.value" controls></video>
+                          <button mat-stroked-button color="warn" type="button"
+                            (click)="removeHeroAsset('heroVideo', heroVideoInput)">
+                            <mat-icon>delete</mat-icon> Remove
+                          </button>
                         </div>
                       </div>
                     </div>

@@ -1,6 +1,6 @@
 import { Component, Injectable, inject } from '@angular/core';
 import { CommonModule, DatePipe, Location } from "@angular/common";
-import { collection, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from '@angular/fire/firestore';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { Subject, Subscription, takeUntil, timer } from 'rxjs';
@@ -643,7 +643,21 @@ export class EditAtcComponent {
     this.reportATC.bigactivity = value["bigactivity"] ?? {}
     this.selectedAdditionalActivity = value["otheractivity"] ?? []
     this.reportATC.directive = value["directive"] ?? null
-    this.reportATC.transcription = value["transcript"] ?? []
+    // Existing rows carry native snapshots (adjData / procedureData) that IndexedDB stored as
+    // firestore/*/1.0 maps. Revive ONLY those carriers back to native so submit's spread writes the
+    // original structure. Editable primitives (adjustmentedit, awareness, delete flags…) sit OUTSIDE
+    // the carriers and round-trip safely, so they pass through untouched and the user's edits survive.
+    // NEW rows (procedure.newprocedure / newtranscript) have no carrier → left exactly as edited;
+    // submit rebuilds their native types from the primitives.
+    this.reportATC.transcription = (value["transcript"] ?? []).map((adj: any) => ({
+      ...adj,
+      adjData: this.reviveFirestore(adj.adjData),                               // existing adjustment carrier
+      procedure: (adj.procedure ?? []).map((p: any) =>
+        p.newprocedure
+          ? p                                                                  // new procedure in an existing adj → as-is
+          : { ...p, procedureData: this.reviveFirestore(p.procedureData) }     // existing procedure carrier
+      ),
+    }))
     this.updatedAdjustment = value["updatedadjustment"] ?? []
     this.newTranscription = value["newtranscript"] ?? []
     this.editNotes.consultationsummary = value["consultationsummary"] ?? null
@@ -654,6 +668,26 @@ export class EditAtcComponent {
       // lastupdated may be a Firestore Timestamp (server read) or a JS Date (local cache) — handle both
       this.lastDraftSavedOn = this.toJsDate(value["lastupdated"])
     }
+  }
+
+  // Convert IndexedDB's serialized firestore forms back to native types when an edit-draft is imported.
+  //   { seconds, nanoseconds, type: 'firestore/timestamp/1.0' }  -> Timestamp
+  //   { referencePath,        type: 'firestore/documentReference/1.0' } -> DocumentReference (firestore-atc)
+  // Recurses arrays/objects (covers assigned_to[]); primitives, null, and already-native values pass
+  // through. A no-op when the carrier is null (new rows), so only existing adjData/procedureData revive.
+  private reviveFirestore(v: any): any {
+    if (v == null || typeof v !== 'object') return v;
+    if (v instanceof Timestamp || v instanceof DocumentReference) return v;
+    if (v['type'] === 'firestore/timestamp/1.0' && typeof v['seconds'] === 'number') {
+      return new Timestamp(v['seconds'], v['nanoseconds'] ?? 0);
+    }
+    if (v['type'] === 'firestore/documentReference/1.0' && typeof v['referencePath'] === 'string') {
+      return doc(this.firestoreATC, v['referencePath']);
+    }
+    if (Array.isArray(v)) return v.map(x => this.reviveFirestore(x));
+    const out: any = {};
+    for (const k of Object.keys(v)) out[k] = this.reviveFirestore(v[k]);
+    return out;
   }
 
   // reconcile the CURRENTLY-OPEN edit-draft against the server (fired when autosave/reconnect detects a 'conflict'):

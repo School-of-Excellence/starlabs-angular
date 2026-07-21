@@ -18,7 +18,7 @@ StarLabs / "Breakthroughs" — a coaching & customer-journey platform (workshops
 ## Getting Started
 
 ```bash
-npm install --legacy-peer-deps     # install (peer deps require the flag)
+npm install     # install (peer deps require the flag)
 ng serve                           # dev
 ng test                            # unit (Karma/Jasmine — 398/399 specs are empty CLI stubs today)
 ng build --configuration production # build

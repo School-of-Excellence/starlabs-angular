@@ -968,6 +968,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     const noterichTextControls = {};
     this.settingsForm = this.fb.group({
       active: [false],
+      homescreenwidget: [false],
       qanda: [false],
       breakdown: [false],
       enableshare: [false],
@@ -1025,13 +1026,16 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       heroHeading: [''],
       heroDescription: [''],
       heroshowtype: [''],
-      heroImage: [''], 
+      heroImage: [''],
       heroImageMobile:[''],
       heroVideo:[''],
+      // Hero accent colour hex like #FFFFFF (empty allowed).
+      heroAccent: ['', [Validators.pattern(/^#[0-9A-Fa-f]{6}$/)]],
       testusers: [[],],
       facilitatorprofiles:[[],],
       selectedgroup: [''],
       enrollwattimessage: [''],
+      enrolledcongrats: [''],
       loginlogchannel:['workshop-logs'],
       workshopactivitychannel:['workshop-logs'],
       selectedjourneys: [[],],
@@ -1095,6 +1099,10 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       sneakpeak: this.fb.array([]),
       knowinfo: this.fb.array([]),
       faq: this.fb.array([]),
+      // Outcomes: array of { value, title } maps.
+      outcome: this.fb.array([]),
+      // Hometags: simple string list (same shape as "Who is this workshop for?").
+      hometags: this.fb.array([]),
     });
   this.detailPageForm.get('selectedTestimonials')?.valueChanges
     .pipe(takeUntil(this.subscription))
@@ -1289,6 +1297,23 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         array.push(group);
       });
     });
+
+    // Outcomes: array of { value, title } maps.
+    const outcomeArray = this.getFormArray('outcome');
+    outcomeArray.clear();
+    (data.detailpage['outcome'] || []).forEach((item: any) => {
+      outcomeArray.push(this.fb.group({
+        value: [item?.value || ''],
+        title: [item?.title || '']
+      }));
+    });
+
+    // Hometags: simple string list (same shape as "Who is this workshop for?").
+    const hometagsArray = this.getFormArray('hometags');
+    hometagsArray.clear();
+    (data.detailpage['hometags'] || []).forEach((value: string) => {
+      hometagsArray.push(this.fb.control(value));
+    });
   }
 
   onEditorContentChange(content: string, fieldKey: string): void {
@@ -1343,6 +1368,23 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       return this.detailPageForm.get(key) as FormArray;
     }
 
+    // --- hero accent colour picker (settingsForm.heroAccent) ---
+    get heroAccentControl(): FormControl {
+      return this.settingsForm.get('heroAccent') as FormControl;
+    }
+
+    // <input type="color"> needs a valid hex; fall back to white for the swatch.
+    get heroAccentSwatch(): string {
+      const v = (this.settingsForm.get('heroAccent')?.value || '').trim();
+      return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : '#FFFFFF';
+    }
+
+    onHeroAccentSwatch(event: Event): void {
+      const value = (event.target as HTMLInputElement).value || '';
+      this.settingsForm.patchValue({ heroAccent: value.toUpperCase() });
+      this.settingsForm.get('heroAccent')?.markAsDirty();
+    }
+
     addIconWithText(key: string, maxItems: number): void {
       const formArray = this.getFormArray(key);
       if (formArray.length >= maxItems) {
@@ -1380,6 +1422,21 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
   isAllFilled(key: string): boolean {
     const formArray = this.detailPageForm.get(key) as FormArray;
     return formArray.controls.every(control => control.value && control.valid);
+  }
+
+  get outcomeArray(): FormArray {
+    return this.detailPageForm.get('outcome') as FormArray;
+  }
+
+  addOutcome(): void {
+    this.outcomeArray.push(this.fb.group({
+      value: [''],
+      title: ['']
+    }));
+  }
+
+  removeOutcome(index: number): void {
+    if (index >= 0) this.outcomeArray.removeAt(index);
   }
 
   get primarylyTaughtArray(): FormArray {
@@ -2134,6 +2191,7 @@ private rebuildActivityIds(): void {
     if (data && typeof data === 'object') {
       this.settingsForm.patchValue({
         active: data['active'] || false,
+        homescreenwidget: data['homescreenwidget'] || false,
         qanda: data['qanda'] || false,
         breakdown: data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
@@ -2184,6 +2242,7 @@ private rebuildActivityIds(): void {
         facilitatorprofiles: data['facilitatorprofiles'] || [],
         selectedgroup: data['selectedgroup'] || null,
         enrollwattimessage: data['enrollwattimessage'] || null,
+        enrolledcongrats: data['enrolledcongrats'] ?? '',
         loginlogchannel: data['loginlogchannel'] || 'workshop-logs',
         workshopactivitychannel: data['workshopactivitychannel'] || 'workshop-logs',
         mailTemplate: data['mailTemplate'] || null,
@@ -2202,6 +2261,7 @@ private rebuildActivityIds(): void {
         heroImage: data['heroImage'] || '',
         heroImageMobile: data['heroImageMobile'] || '',
         heroVideo: data['heroVideo'] || '',
+        heroAccent: data['heroAccent'] || '',
       });
 
       const isEvergreenEnabled = !!data['evergreenWorkshop'];
@@ -2353,6 +2413,7 @@ private rebuildActivityIds(): void {
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
       await updateDoc(ref, {
         active: this.settingsForm.get('active')?.value || false,
+        homescreenwidget: this.settingsForm.get('homescreenwidget')?.value || false,
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
         enableshare: this.settingsForm.get('enableshare')?.value || false,
@@ -2382,6 +2443,7 @@ private rebuildActivityIds(): void {
         selectedgroup: this.settingsForm.get('selectedgroup')?.value || null,
         loginlogchannel: this.settingsForm.get('loginlogchannel')?.value || null,
         enrollwattimessage: this.settingsForm.get('enrollwattimessage')?.value || null,
+        enrolledcongrats: this.settingsForm.get('enrolledcongrats')?.value || '',
         workshopactivitychannel: this.settingsForm.get('workshopactivitychannel')?.value || null,
         mailTemplate: this.settingsForm.get('mailTemplate')?.value || null,
         testusers: this.settingsForm.get('testusers')?.value || [],
@@ -2400,6 +2462,7 @@ private rebuildActivityIds(): void {
         heroImage: this.settingsForm.get('heroImage')?.value || '',
         heroImageMobile: this.settingsForm.get('heroImageMobile')?.value || '',
         heroVideo: this.settingsForm.get('heroVideo')?.value || '',
+        heroAccent: (this.settingsForm.get('heroAccent')?.value || '').trim().toUpperCase(),
       });
       
       this.snackBar.open('Settings saved successfully!', 'Close', { duration: 2000 });
@@ -2463,7 +2526,15 @@ private rebuildActivityIds(): void {
       this.snackBar.open('Video upload failed', 'Close', { duration: 2000 });
     }
   }
-  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
+  // Clear a selected hero asset (web image / mobile image / video). Only removes
+  // it from the config; the actual file in Storage is left untouched.
+  removeHeroAsset(field: 'heroImage' | 'heroImageMobile' | 'heroVideo', input?: HTMLInputElement): void {
+    this.settingsForm.get(field)?.setValue('');
+    if (input) {
+      input.value = '';
+    }
+  }
+  onToggleChange(field: 'active' | 'homescreenwidget' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }

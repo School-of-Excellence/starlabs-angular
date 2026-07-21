@@ -226,6 +226,10 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   } | null = null;
   private arenaEventSearchSub: Subscription | null = null;
 
+  // separate remarks
+  separateRemarks: { [entryIndex: number]: { text: string; profileid: string; updatedon: any }[] } = {};
+  separateEditRemarks: { [entryIndex: number]: { text: string; profileid: string; updatedon: any }[] } = {};
+
   constructor(
     private firestore: Firestore,
     private storage: Storage,
@@ -417,6 +421,176 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       });
     }
     this.fetchSummaryStats();
+  }
+
+  async saveRemarkForEntry(entryIndex: number, isEdit: boolean = false) {
+    const text = (this.RemarkTexts[entryIndex] || '').trim();
+    if (!text) return;
+
+    const newRemark = {
+      text,
+      profileid: this.loggedInProfileId,
+      updatedon: Timestamp.now()
+    };
+
+    const target = isEdit ? this.separateEditRemarks : this.separateRemarks;
+    if (!target[entryIndex]) target[entryIndex] = [];
+    target[entryIndex].push(newRemark);
+    this.RemarkTexts[entryIndex] = '';
+
+    if (isEdit && this.editVideoForm) {
+      const entries = (this.editVideoForm.get('entries') as FormArray).value;
+      const docId = entries[entryIndex]?.docId;
+      if (!docId) return;
+
+      try {
+        const remarksToSave = target[entryIndex].map((r: any) => ({
+          text: r.text,
+          profileid: r.profileid || this.loggedInProfileId,
+          updatedon: (r.updatedon instanceof Timestamp) ? r.updatedon : Timestamp.now(),
+        }));
+        await updateDoc(doc(this.firestore, 'participant videos', docId), {
+          remarks: remarksToSave,
+        });
+
+        if (this.editVideoIndex !== null) {
+          const updated = [...this.logEvents];
+          const card = updated[this.editVideoIndex] as any;
+          if (entryIndex === 0) {
+            updated[this.editVideoIndex] = { ...card, remarks: [...target[entryIndex]] };
+          } else {
+            const extras = [...(card.extraVideos || [])];
+            extras[entryIndex - 1] = { ...extras[entryIndex - 1], remarks: [...target[entryIndex]] };
+            updated[this.editVideoIndex] = { ...card, extraVideos: extras };
+          }
+          this.logEvents = updated;
+          this.filteredLogEvents = this.selectedLogEventFilter.length
+            ? this.logEvents.filter((e) => {
+                const eventId = (e as any).eventId || null;
+                return eventId && this.selectedLogEventFilter.includes(eventId);
+              })
+            : [...updated];
+        }
+      } catch (err) {
+        console.error('Failed to save remark:', err);
+      }
+    }
+  }
+
+  async removeRemarkFromSeparate(entryIndex: number, remarkIndex: number, isEdit: boolean = false) {
+    const target = isEdit ? this.separateEditRemarks : this.separateRemarks;
+    if (target[entryIndex]) {
+      target[entryIndex].splice(remarkIndex, 1);
+    }
+
+    if (isEdit && this.editVideoForm) {
+      const entries = (this.editVideoForm.get('entries') as FormArray).value;
+      const docId = entries[entryIndex]?.docId;
+      if (!docId) return;
+
+      try {
+        const remarksToSave = (target[entryIndex] || []).map((r: any) => ({
+          text: r.text,
+          profileid: r.profileid || this.loggedInProfileId,
+          updatedon: (r.updatedon instanceof Timestamp) ? r.updatedon : Timestamp.now(),
+        }));
+        await updateDoc(doc(this.firestore, 'participant videos', docId), {
+          remarks: remarksToSave,
+        });
+
+        if (this.editVideoIndex !== null) {
+          const updated = [...this.logEvents];
+          const card = updated[this.editVideoIndex] as any;
+          if (entryIndex === 0) {
+            updated[this.editVideoIndex] = { ...card, remarks: [...(target[entryIndex] || [])] };
+          } else {
+            const extras = [...(card.extraVideos || [])];
+            extras[entryIndex - 1] = { ...extras[entryIndex - 1], remarks: [...(target[entryIndex] || [])] };
+            updated[this.editVideoIndex] = { ...card, extraVideos: extras };
+          }
+          this.logEvents = updated;
+          this.filteredLogEvents = this.selectedLogEventFilter.length
+            ? this.logEvents.filter((e) => {
+                const eventId = (e as any).eventId || null;
+                return eventId && this.selectedLogEventFilter.includes(eventId);
+              })
+            : [...updated];
+        }
+      } catch (err) {
+        console.error('Failed to remove remark:', err);
+      }
+    }
+  }
+
+  async saveRemarksOnly() {
+    this.addVideoForm.get('participantId')?.markAsTouched();
+    if (!this.addVideoForm.get('participantId')?.valid) return;
+
+    const formValue = this.addVideoForm.value;
+    const participantMetadataId = formValue.participantId;
+    const profileid = this.mapProfiles[participantMetadataId]?.['profileid'] || null;
+
+    const hasAnyRemark = Object.values(this.separateRemarks).some(
+      (arr: any[]) => arr && arr.length > 0
+    );
+    if (!hasAnyRemark) return;
+
+    try {
+      const savedRefs = await Promise.all(
+        formValue.entries.map((entry: any, index: number) => {
+          const remarks = this.separateRemarks[index] || [];
+          if (!remarks.length) return Promise.resolve(null);
+
+          const eventRef = entry.eventId
+            ? doc(this.firestore, 'event collection', entry.eventId)
+            : null;
+
+          return addDoc(collection(this.firestore, 'participant videos'), {
+            profileid,
+            title: entry.title || '',
+            recordeddate: entry.recordedDate
+              ? Timestamp.fromDate(new Date(entry.recordedDate))
+              : null,
+            type: entry.type || '',
+            eventref: eventRef,
+            videourl: entry.videoUrl || '',
+            uploadedon: serverTimestamp(),
+            uploadedby: this.loggedInProfileId,
+            delete: false,
+            remarks: remarks.map((r: any) => ({
+              text: r.text,
+              profileid: this.loggedInProfileId,
+              updatedon: Timestamp.now(),
+            })),
+          });
+        })
+      );
+
+      if (this.showLogOverlay && this.pendingLogEventIndex !== null) {
+        const idx = this.pendingLogEventIndex;
+        const firstEntry = formValue.entries[0];
+        const firstRef = savedRefs[0];
+        if (firstRef) {
+          const updated = [...this.logEvents];
+          const current = updated[idx] as any;
+          updated[idx] = {
+            ...current,
+            remarks: this.separateRemarks[0] || [],
+            docId: firstRef.id,
+          };
+          this.logEvents = [...updated];
+        }
+        this.pendingLogEventIndex = null;
+      }
+
+    this.closeAddVideo();
+      this.fetchRecords();
+      if (this.showLogOverlay && this.currentLogProfileId) {
+        this.loadEventLog(this.currentLogProfileId);
+      }
+    } catch (err) {
+      console.error('Error saving remarks only:', err);
+    }
   }
 
   getFilteredProfileIds(): string[] {
@@ -1369,34 +1543,41 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
   }
 
   buildEntry(): FormGroup {
-    return this.fb.group({
-      title: ['', Validators.required],
-      recordedDate: [null],
-      type: ['', Validators.required],
-      eventId: [''],
-      videoUrl: ['', Validators.required],
-      remarks: this.fb.array([]),
-    });
+  return this.fb.group({
+    title: ['', Validators.required],
+    recordedDate: [null],
+    type: ['', Validators.required],
+    eventId: [''],
+    videoUrl: ['', Validators.required],
+  });
+}
+
+openAddVideo(prefillParticipantId?: string) {
+  this.addVideoSubmitted = false;
+  this.addVideoForm = this.buildAddVideoForm();
+  this.addVideoFilteredParticipants = [...this.participantOptions];
+  this.separateRemarks = {};
+  this.showAddVideoOverlay = true;
+
+  if (prefillParticipantId) {
+    const participantEntry = this.participantOptions.find(
+      (p) => this.mapProfiles[p.id]?.['profileid'] === prefillParticipantId
+    );
+    if (participantEntry) {
+      this.addVideoForm.get('participantId')?.setValue(participantEntry.id);
+    }
   }
 
-  openAddVideo() {
-    this.addVideoSubmitted = false;
-    this.addVideoForm = this.buildAddVideoForm();
-    this.addVideoFilteredParticipants = [...this.participantOptions];
-    this.showAddVideoOverlay = true;
-    if (this.addVideoSearchSub) {
-      this.addVideoSearchSub.unsubscribe();
-    }
-    this.addVideoSearchSub = this.addVideoParticipantCtrl.valueChanges.pipe(
-      debounceTime(200),
-      distinctUntilChanged()
-    ).subscribe((search) => {
-      const lower = (search || '').toLowerCase();
-      this.addVideoFilteredParticipants = this.participantOptions.filter((p) =>
-        p.name?.toLowerCase().includes(lower)
-      );
-    });
-  }
+  if (this.addVideoSearchSub) this.addVideoSearchSub.unsubscribe();
+  this.addVideoSearchSub = this.addVideoParticipantCtrl.valueChanges.pipe(
+    debounceTime(200), distinctUntilChanged()
+  ).subscribe((search) => {
+    const lower = (search || '').toLowerCase();
+    this.addVideoFilteredParticipants = this.participantOptions.filter((p) =>
+      p.name?.toLowerCase().includes(lower)
+    );
+  });
+}
 
   closeAddVideo() {
     this.addVideoSubmitted = false;
@@ -1409,6 +1590,8 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.bulkImportSaving = false;
     this.pendingLogEventIndex = null; 
     this.RemarkTexts = {};
+    this.separateRemarks = {};     
+    this.separateEditRemarks = {}; 
     if (this.addVideoSearchSub) {
       this.addVideoSearchSub.unsubscribe();
       this.addVideoSearchSub = null;
@@ -1419,7 +1602,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
     this.addVideoSubmitted = false;
     this.addVideoForm = this.buildAddVideoForm();
     this.addVideoFilteredParticipants = [...this.participantOptions];
-
+    this.separateRemarks = {};
     // Pre-fill participant
     const participantEntry = this.participantOptions.find(
       (p) => this.mapProfiles[p.id]?.['profileid'] === this.currentLogProfileId
@@ -1485,7 +1668,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
     try {
       const savedRefs = await Promise.all(
-        formValue.entries.map((entry: any) => {
+        formValue.entries.map((entry: any, index: number) => {
           const eventRef = entry.eventId
             ? doc(this.firestore, 'event collection', entry.eventId)
             : null;
@@ -1502,7 +1685,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             uploadedon: serverTimestamp(),
             uploadedby: this.loggedInProfileId,
             delete: false,
-            remarks: (entry.remarks || []).map((r: any) => ({
+            remarks: (this.separateRemarks[index] || []).map((r: any) => ({
               text: r.text,
               profileid: this.loggedInProfileId,
               updatedon: Timestamp.now(),
@@ -1523,7 +1706,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           videoType: firstEntry.type,
           hasVideo: !!firstEntry.videoUrl,
           docId: savedRefs[0].id,
-          remarks: firstEntry.remarks || [],
+          remarks: this.separateRemarks[0] || [],
           date: firstEntry.recordedDate
             ? new Date(firstEntry.recordedDate)
             : current.date,
@@ -1532,7 +1715,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             videoTitle: e.title,
             docId: savedRefs[i + 1].id,
             videoType: e.type,
-            remarks: e.remarks || [],
+            remarks: this.separateRemarks[i + 1] || [],
           })),
         };
         this.logEvents = [...updated];
@@ -1540,6 +1723,9 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
       }
       this.closeAddVideo();
       this.fetchRecords();
+      if (this.showLogOverlay && this.currentLogProfileId) {
+        this.loadEventLog(this.currentLogProfileId);
+      }
 
     } catch (err) {
       console.error('Error saving video:', err);
@@ -1548,6 +1734,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
   openEditVideo(event: any, i: number) {
     this.editVideoIndex = i;
+    this.separateEditRemarks = {}; 
     const allVideos = [
       {
         docId: event.docId || '',
@@ -1568,6 +1755,9 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
         remarks: v.remarks || [],
       }))
     ];
+    allVideos.forEach((v, idx) => {
+    this.separateEditRemarks[idx] = (v.remarks || []).map((r: any) => ({ ...r }));
+  });
 
     this.editVideoForm = this.fb.group({
       entries: this.fb.array(
@@ -1578,13 +1768,6 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           type: [v.type, Validators.required],
           eventId: [v.eventId],
           videoUrl: [v.videoUrl, Validators.required],
-          remarks: this.fb.array(
-            (v.remarks || []).map((r: any) => this.fb.group({
-              text: [r.text || ''],
-              profileid: [r.profileid || ''],
-              updatedon: [r.updatedon || null],
-            }))
-          ),
         }))
       )
     });
@@ -1592,11 +1775,12 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
   }
   closeEditVideo() {
-    this.showEditVideoOverlay = false;
-    this.editVideoIndex = null;
-    this.editVideoSaving = false;
-    this.RemarkTexts = {};
-  }
+  this.showEditVideoOverlay = false;
+  this.editVideoIndex = null;
+  this.editVideoSaving = false;
+  this.RemarkTexts = {};
+  this.separateEditRemarks = {};  
+}
 
   async saveEditVideo() {
     this.editVideoForm.markAllAsTouched();
@@ -1607,7 +1791,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
 
     try {
       await Promise.all(
-        entries.map((val: any) => {
+        entries.map((val: any, index: number) => {
           const eventRef = val.eventId
             ? doc(this.firestore, 'event collection', val.eventId)
             : null;
@@ -1620,7 +1804,7 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
             type: val.type,
             eventref: eventRef,
             videourl: val.videoUrl,
-            remarks: (val.remarks || []).map((r: any) => ({
+            remarks: (this.separateEditRemarks[index] || []).map((r: any) => ({
               text: r.text,
               profileid: r.profileid || this.loggedInProfileId,
               updatedon: r.profileid ? r.updatedon : Timestamp.now(),
@@ -1646,22 +1830,27 @@ export class EvolutionMappingNewComponent implements OnInit, OnDestroy {
           videoUrl: primary.videoUrl,
           hasVideo: !!primary.videoUrl,
           docId: primary.docId,
-          remarks: primary.remarks || [],
-          extraVideos: extras.map((e: any) => ({
+          remarks: this.separateEditRemarks[0] || [],
+          extraVideos: extras.map((e: any, idx: number) => ({
             docId: e.docId,
             videoUrl: e.videoUrl,
             videoTitle: e.title,
             videoType: e.type,
             recordedDate: e.recordedDate ? new Date(e.recordedDate) : null,
             eventId: e.eventId ? `event collection/${e.eventId}` : null,
-            remarks: e.remarks || [],
+            remarks: this.separateEditRemarks[idx + 1] || [],  
           })),
         };
 
         this.logEvents = [...updated];
+        this.filteredLogEvents = this.selectedLogEventFilter.length? this.logEvents.filter((e) => 
+        {
+          const eventId = (e as any).eventId || null;
+          return eventId && this.selectedLogEventFilter.includes(eventId);
+        })
+        : [...this.logEvents];
       }
       this.closeEditVideo();
-      this.fetchRecords();
 
     } catch (err) {
       console.error('Error saving video:', err);

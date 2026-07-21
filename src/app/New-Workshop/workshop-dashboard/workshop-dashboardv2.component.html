@@ -1,0 +1,2077 @@
+<div class="workshop-dashboard" [class.panel-open]="showParticipantPanel">
+  <div class="dashboard-main" [class.slide-left]="showParticipantPanel">
+    <div *ngIf="loading" class="loading-container">
+      <mat-spinner diameter="60"></mat-spinner>
+      <p class="loading-text">Loading workshop dashboard...</p>
+    </div>
+    <div *ngIf="error" class="error-container">
+      <mat-card class="error-card">
+        <mat-card-content>
+          <mat-icon class="error-icon">error</mat-icon>
+          <h3>Error Loading Dashboard</h3>
+          <p>{{ error }}</p>
+          <button mat-raised-button color="primary" (click)="loadWorkshopDashboard()">
+            <mat-icon>refresh</mat-icon>
+            Retry
+          </button>
+        </mat-card-content>
+      </mat-card>
+    </div>
+    <div *ngIf="!loading && !error && workshopData" class="dashboard-content">
+      <mat-card class="header-card" elevation="2">
+        <mat-card-header>
+          <mat-card-title style="font-weight: bold;">{{ workshopTitle }}</mat-card-title>
+          <mat-card-subtitle>{{ workshopDescription }}</mat-card-subtitle>
+          <mat-card-subtitle style="color:white;font-weight:500">{{ workshopType }}</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="workshop-dates" *ngIf="workshopStartDateFormatted !== 'N/A'">
+            <mat-icon>date_range</mat-icon>
+            <span class="date-text">
+              {{ workshopStartDateFormatted }} - {{ workshopEndDateFormatted }}
+            </span>
+          </div>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <!-- <button mat-raised-button color="accent" (click)="openNewUserDialog()">
+            {{'New Users ' + '( ' +objectKeys(mapProfileNew).length + ' )'}} 
+          </button>&nbsp;&nbsp; -->
+          <button mat-raised-button color="accent" (click)="openQADialog()">
+            <mat-icon>help_outline</mat-icon>
+            Q & A
+          </button>&nbsp;&nbsp;
+
+          <button mat-raised-button color="accent" (click)="openClearDialog()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || loggedinProfile === 'iBMwpJMbysfW3I5gvhGI' || loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ'">
+            <mat-icon>delete</mat-icon>
+            Clear
+          </button>&nbsp;&nbsp;
+          <button mat-raised-button color="accent" (click)="manualenroll()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'">
+            <!-- <mat-icon>matGolfCourse</mat-icon> -->
+            Enroll
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    <div class="metrics-section">
+        <div class="metrics-grid">
+
+          <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalEnrolled')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">group</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ totalEnrolled }}</h2>
+                  <p class="metric-label">Total Enrolled</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <ng-container *ngIf="workshopData?.categorybased === true">
+            <mat-card class="metric-card clickable-metric category-metric"
+                      *ngFor="let cat of categoryWiseEnrolled"
+                      (click)="onCategoryClick(cat)">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">category</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ cat.count }}</h2>
+                    <p class="metric-label">{{ cat.categoryName }}</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+
+          <mat-card class="metric-card clickable-metric cohort-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onCohortClick()">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">science</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ cohortParticipantCount }}</h2>
+                  <p class="metric-label">Above Diagnostics</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card clickable-metric facilitator-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onFacilitatorClick()">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">school</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ facilitatorCount }}</h2>
+                  <p class="metric-label">Facilitator Only</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card clickable-metric active-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onCategoryBasedMetricClick('active')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">trending_up</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ categoryBasedMetrics.totalActive }}</h2>
+                  <p class="metric-label">Active Participants</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card clickable-metric completed-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onCategoryBasedMetricClick('completed')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">check_circle</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ categoryBasedMetrics.totalCompleted }}</h2>
+                  <p class="metric-label">Completed</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card clickable-metric notstartedm-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onCategoryBasedMetricClick('notStarted')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">pause_circle_outline</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ categoryBasedMetrics.totalNotStarted }}</h2>
+                  <p class="metric-label">Not Started</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card progress-metric"
+                    *ngIf="workshopData?.categorybased === true">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">analytics</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ categoryBasedMetrics.overallAvgProgress.toFixed(1) }}%</h2>
+                  <p class="metric-label">Overall Avg Progress</p>
+                </div>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="categoryBasedMetrics.overallAvgProgress" class="metric-progress-bar"></mat-progress-bar>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card completion-metric"
+                    *ngIf="workshopData?.categorybased === true">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">emoji_events</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ categoryBasedMetrics.overallCompletionRate.toFixed(1) }}%</h2>
+                  <p class="metric-label">Overall Completion Rate</p>
+                </div>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="categoryBasedMetrics.overallCompletionRate" color="primary" class="metric-progress-bar"></mat-progress-bar>
+            </mat-card-content>
+          </mat-card>
+
+          <ng-container *ngIf="workshopData?.categorybased === true">
+            <mat-card class="metric-card clickable-metric category-progress-metric"
+                      *ngFor="let catProg of categoryBasedMetrics.categoryProgress"
+                      (click)="onCategoryBasedMetricClick('categoryCompleted', catProg.categoryId)">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">insights</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ catProg.avgProgress.toFixed(1) }}%</h2>
+                    <p class="metric-label">{{ catProg.categoryName }} Progress</p>
+                    <p class="metric-sub">{{ catProg.completedCount }}/{{ catProg.totalCount }} completed</p>
+                  </div>
+                </div>
+                <mat-progress-bar mode="determinate" [value]="catProg.avgProgress" class="metric-progress-bar category-bar"></mat-progress-bar>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+
+          <mat-card class="metric-card clickable-metric cohort-progress-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onCategoryBasedMetricClick('cohortCompleted')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">science</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ categoryBasedMetrics.cohortAvgProgress.toFixed(1) }}%</h2>
+                  <p class="metric-label">Above Diagnostics Progress</p>
+                  <p class="metric-sub">{{ categoryBasedMetrics.cohortCompletedCount }}/{{ cohortParticipantCount }} completed</p>
+                </div>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="categoryBasedMetrics.cohortAvgProgress" class="metric-progress-bar cohort-bar"></mat-progress-bar>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card clickable-metric facilitator-progress-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onCategoryBasedMetricClick('facilitatorCompleted')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">school</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ categoryBasedMetrics.facilitatorAvgProgress.toFixed(1) }}%</h2>
+                  <p class="metric-label">Facilitator Progress</p>
+                  <p class="metric-sub">{{ categoryBasedMetrics.facilitatorCompletedCount }}/{{ facilitatorCount }} completed</p>
+                </div>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="categoryBasedMetrics.facilitatorAvgProgress" class="metric-progress-bar facilitator-bar"></mat-progress-bar>
+            </mat-card-content>
+          </mat-card>
+
+          <ng-container *ngIf="workshopData?.categorybased !== true">
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalStarted')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">play_arrow</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalStarted }}</h2>
+                    <p class="metric-label">Total Started</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('notStarted')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">pause_circle_outline</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ notStarted }}</h2>
+                    <p class="metric-label">Not Started</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('activeParticipants')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">trending_up</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ activeParticipants }}</h2>
+                    <p class="metric-label">Active Participants</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">analytics</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ averageProgress.toFixed(1) }}%</h2>
+                    <p class="metric-label">Average Progress</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">check_circle</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ completionRate.toFixed(1) }}%</h2>
+                    <p class="metric-label">Completion Rate</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-smile"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalNewUsersEnrolled }}</h2>
+                    <p class="metric-label">New Users Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsersNotEnrolled')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-frown"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalNewUsersNotEnrolled }}</h2>
+                    <p class="metric-label">New Users Not Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+
+          <!-- Evergreen-only referral cards -->
+          <ng-container *ngIf="workshopData?.evergreenWorkshop === true">
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClicked')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">share</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ shareClicked }}</h2>
+                    <p class="metric-label">Share Clicked</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClaimed')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">redeem</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ shareClaimed }}</h2>
+                    <p class="metric-label">Share Claimed</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+
+        </div>
+      </div>
+
+      <!-- ===== Evergreen: participant day-journey timeline ===== -->
+      <section class="ev-day-section"
+               *ngIf="workshopData?.evergreenWorkshop === true && evergreenWorkshopDays > 0">
+        <div class="ev-day-head">
+          <div class="ev-day-heading">
+            <h3 class="ev-day-title">Participant Journey</h3>
+            <p class="ev-day-sub">
+              {{ evergreenWorkshopDays }}-day workshop
+              <span class="ev-day-dot">•</span>
+              {{ evergreenDayTotal }} {{ evergreenDayTotal === 1 ? 'participant' : 'participants' }}
+            </p>
+          </div>
+          <span class="ev-day-pill">{{ evergreenWorkshopDays }} Days</span>
+        </div>
+
+        <div class="ev-day-track">
+          <button type="button"
+                  class="ev-day-node"
+                  *ngFor="let d of evergreenDayDistribution"
+                  [class.is-empty]="d.count === 0"
+                  [disabled]="d.count === 0"
+                  (click)="onDayClick(d)">
+            <span class="ev-day-badge">{{ d.day }}</span>
+            <span class="ev-day-count">{{ d.count }}</span>
+            <span class="ev-day-caption">Day {{ d.day }}</span>
+          </button>
+
+          <button type="button"
+                  class="ev-day-node ev-day-node--done"
+                  *ngIf="evergreenCompletedBucket.count > 0"
+                  (click)="onDayClick(evergreenCompletedBucket)">
+            <span class="ev-day-badge ev-day-badge--done">
+              <mat-icon>check</mat-icon>
+            </span>
+            <span class="ev-day-count">{{ evergreenCompletedBucket.count }}</span>
+            <span class="ev-day-caption">Completed</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- <div class="metrics-section">
+        <div class="metrics-grid">
+
+          <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalEnrolled')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">group</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ totalEnrolled }}</h2>
+                  <p class="metric-label">Total Enrolled</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <ng-container *ngIf="workshopData?.categorybased === true">
+            <mat-card class="metric-card clickable-metric category-metric"
+                      *ngFor="let cat of categoryWiseEnrolled"
+                      (click)="onCategoryClick(cat)">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">category</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ cat.count }}</h2>
+                    <p class="metric-label">{{ cat.categoryName }}</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+          <mat-card class="metric-card clickable-metric cohort-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onCohortClick()">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">science</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ cohortParticipantCount }}</h2>
+                  <p class="metric-label">Above Diagnostics</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+          <mat-card class="metric-card clickable-metric facilitator-metric"
+                    *ngIf="workshopData?.categorybased === true"
+                    (click)="onFacilitatorClick()">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">school</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ facilitatorCount }}</h2>
+                  <p class="metric-label">Facilitator Only</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+          <ng-container *ngIf="workshopData?.categorybased !== true">
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalStarted')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">play_arrow</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalStarted }}</h2>
+                    <p class="metric-label">Total Started</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('notStarted')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">pause_circle_outline</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ notStarted }}</h2>
+                    <p class="metric-label">Not Started</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('activeParticipants')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">trending_up</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ activeParticipants }}</h2>
+                    <p class="metric-label">Active Participants</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">analytics</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ averageProgress.toFixed(1) }}%</h2>
+                    <p class="metric-label">Average Progress</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">check_circle</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ completionRate.toFixed(1) }}%</h2>
+                    <p class="metric-label">Completion Rate</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-smile"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalNewUsersEnrolled }}</h2>
+                    <p class="metric-label">New Users Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsersNotEnrolled')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-frown"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalNewUsersNotEnrolled }}</h2>
+                    <p class="metric-label">New Users Not Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+
+        </div>
+      </div> -->
+      <!-- <div class="metrics-section">
+        <div class="metrics-grid">
+        <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalEnrolled')">
+          <mat-card-content>
+            <div class="metric-content">
+              <mat-icon class="metric-icon">group</mat-icon>
+              <div class="metric-details">
+                <h2 class="metric-value">{{ totalEnrolled }}</h2>
+                <p class="metric-label">Total Enrolled</p>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalStarted')">
+          <mat-card-content>
+            <div class="metric-content">
+              <mat-icon class="metric-icon">play_arrow</mat-icon>
+              <div class="metric-details">
+                <h2 class="metric-value">{{ totalStarted }}</h2>
+                <p class="metric-label">Total Started</p>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="metric-card clickable-metric" (click)="onMetricClick('notStarted')">
+          <mat-card-content>
+            <div class="metric-content">
+              <mat-icon class="metric-icon">pause_circle_outline</mat-icon>
+              <div class="metric-details">
+                <h2 class="metric-value">{{ notStarted }}</h2>
+                <p class="metric-label">Not Started</p>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
+          <mat-card class="metric-card clickable-metric" (click)="onMetricClick('activeParticipants')">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">trending_up</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ activeParticipants }}</h2>
+                  <p class="metric-label">Active Participants</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+          <mat-card class="metric-card">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">analytics</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ averageProgress.toFixed(1) }}%</h2>
+                  <p class="metric-label">Average Progress</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="metric-card">
+            <mat-card-content>
+              <div class="metric-content">
+                <mat-icon class="metric-icon">check_circle</mat-icon>
+                <div class="metric-details">
+                  <h2 class="metric-value">{{ completionRate.toFixed(1) }}%</h2>
+                  <p class="metric-label">Completion Rate</p>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
+          <mat-card-content>
+            <div class="metric-content">
+                <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-smile"></i></mat-icon>
+              <div class="metric-details">
+                <h2 class="metric-value">{{ totalNewUsersEnrolled }}</h2>
+                  <p class="metric-label">New Users Enrolled </p>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsersNotEnrolled')">
+          <mat-card-content>
+            <div class="metric-content">
+              <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-frown"></i></mat-icon>
+              <div class="metric-details">
+                <h2 class="metric-value">{{ totalNewUsersNotEnrolled }}</h2>
+                  <p class="metric-label">New Users Not Enrolled</p>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+        </div>
+      </div> -->
+
+      <!-- <mat-card class="challenges-card" elevation="2">
+        <mat-card-header>
+          <mat-card-title style="font-weight: bold;padding: 20px;">Challenge Progress Overview</mat-card-title>
+        </mat-card-header> -->
+        <mat-card class="challenges-card" elevation="2">
+        <mat-card-header>
+          <mat-card-title style="font-weight: bold;padding: 20px;">Challenge Progress Overview</mat-card-title>
+          <span style="flex: 1 1 auto;"></span>
+          <mat-form-field appearance="outline" class="category-filter-dropdown"
+                          *ngIf="workshopData?.categorybased === true" 
+                          style="margin-right: 20px; margin-top: 10px;">
+            <mat-label>Filter by Category</mat-label>
+            <mat-select [(value)]="selectedCategoryFilter" (selectionChange)="onCategoryFilterChange()">
+              <mat-option value="all">All Categories</mat-option>
+              <mat-option *ngFor="let catId of workshopData?.categoriesforthisworkshop || []" [value]="catId">
+                {{ categoryNamesMap.get(catId) || 'Loading...' }}
+              </mat-option>
+              <mat-option value="cohort">Above Diagnostics</mat-option>
+              <mat-option value="facilitator">Facilitator Only</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-accordion class="challenge-accordion" multi="true">
+              <mat-expansion-panel *ngFor="let challengeStat of challengeStatistics; let i = index" 
+                     class="challenge-panel" #panel
+                     [style.display]="isChallengeVisibleForCategory(i) ? '' : 'none'">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <div class="challenge-title-container">
+                    <span class="challenge-number">{{ i + 1 }}</span>
+                    <span class="challenge-title">{{ challengeStat.challengeName }}</span>
+                  </div>
+                </mat-panel-title>
+                <mat-panel-description *ngIf="!panel.expanded">
+                  <div class="challenge-summary-chips">
+                    <mat-chip class="category-chip" *ngIf="workshopData?.categorybased === true && getChallengeCategoryNames(i)">
+                      <!-- <mat-icon style="font-size: 16px; margin-right: 4px;">category</mat-icon> -->
+                      {{ getChallengeCategoryNames(i) }}
+                    </mat-chip>
+                    <mat-chip class="completed-chip">
+                      {{ challengeStat.participantsByStatus.get('completed')?.length || 0 }} Completed
+                    </mat-chip>
+                    <mat-chip class="progress-chip">
+                      {{ challengeStat.participantsByStatus.get('inprogress')?.length || 0 }} In Progress
+                    </mat-chip>
+                    <mat-chip class="ready-chip" *ngIf="(challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0) > 0">
+                      {{ challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0 }} Ready to Start
+                    </mat-chip>
+                    <mat-chip class="pending-chip">
+                      {{ challengeStat.participantsByStatus.get('notstarted')?.length || 0 }} Not Started
+                    </mat-chip>
+                  </div>
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+              
+              <div class="expanded-content">
+                <div class="challenge-summary-section">
+                  <div class="challenge-summary-chips">
+                    <mat-chip class="completed-chip clickable" 
+                              (click)="onChallengeMainStatusClick('completed', i, challengeStat.participantsByStatus.get('completed')?.length || 0)">
+                      {{ challengeStat.participantsByStatus.get('completed')?.length || 0 }} Completed
+                    </mat-chip>
+                    <mat-chip class="progress-chip clickable" 
+                              (click)="onChallengeMainStatusClick('inprogress', i, challengeStat.participantsByStatus.get('inprogress')?.length || 0)">
+                      {{ challengeStat.participantsByStatus.get('inprogress')?.length || 0 }} In Progress
+                    </mat-chip>
+                    <mat-chip class="ready-chip clickable" 
+                              *ngIf="(challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0) > 0"
+                              (click)="onChallengeMainStatusClick('notstartedcurrent', i, challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0)">
+                      {{ challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0 }} Ready to Start
+                    </mat-chip>
+                    <mat-chip class="pending-chip clickable" 
+                              (click)="onChallengeMainStatusClick('notstarted', i, challengeStat.participantsByStatus.get('notstarted')?.length || 0)">
+                      {{ challengeStat.participantsByStatus.get('notstarted')?.length || 0 }} Not Started
+                    </mat-chip>
+                    <mat-chip class="zoomcall-chip clickable" 
+                              *ngIf="workshopData?.challenges?.[i]?.type === 'zoomcall'"
+                              (click)="openZoomDialog(workshopData?.challenges?.[i],i)">
+                      Zoom Call Action
+                    </mat-chip>
+                    <mat-chip class="zoom-attendees-chip clickable"
+                      *ngIf="
+                        workshopData?.challenges?.[i]?.type === 'zoomcall' &&
+                        workshopData?.challenges?.[i]?.zoomattended?.length > 0"
+                      (click)="openZoomAttendees(workshopData?.challenges?.[i], i)">
+                      Zoom Attendees ({{ workshopData?.challenges?.[i]?.zoomattended?.length }})
+                    </mat-chip>
+                  </div>
+                </div>
+                <div class="sub-challenges-container">
+                  <div *ngFor="let subStat of challengeStat.subChallengeStats; let j = index" class="sub-challenge-item">
+                    <div class="sub-challenge-header">
+                      <div class="sub-challenge-info">
+                        <span class="sub-challenge-number">{{ i + 1 }}.{{ j + 1 }}</span>
+                        <span class="sub-challenge-name">{{ subStat.subChallengeName }}</span>
+                        <mat-chip class="type-chip">{{ subStat.type }}</mat-chip>
+                      </div>
+                      <div class="sub-challenge-summary">
+                        <span class="summary-text">{{ subStat.participantsByStatus.get('completed')?.length || 0 }}/{{ totalEnrolled }} completed</span>
+                      </div>
+                    </div>
+                    <div class="progress-bar-container">
+                      <div class="custom-progress-bar">
+                        <div class="progress-segment completed" 
+                            [style.width.%]="((subStat.participantsByStatus.get('completed')?.length || 0) / totalEnrolled) * 100"
+                            [title]="'Completed: ' + (subStat.participantsByStatus.get('completed')?.length || 0)"></div>
+                        
+                        <div class="progress-segment in-review" 
+                            [style.width.%]="((subStat.participantsByStatus.get('inreview')?.length || 0) / totalEnrolled) * 100"
+                            [title]="'In Review: ' + (subStat.participantsByStatus.get('inreview')?.length || 0)"></div>
+                        
+                        <div class="progress-segment rework" 
+                            [style.width.%]="((subStat.participantsByStatus.get('rework')?.length || 0) / totalEnrolled) * 100"
+                            [title]="'Rework: ' + (subStat.participantsByStatus.get('rework')?.length || 0)"></div>
+                        
+                        <div class="progress-segment ready-mobile" 
+                            [style.width.%]="((subStat.participantsByStatus.get('readyformobile')?.length || 0) / totalEnrolled) * 100"
+                            [title]="'Ready for Mobile: ' + (subStat.participantsByStatus.get('readyformobile')?.length || 0)"></div>
+                        
+                        <div class="progress-segment in-progress" 
+                            [style.width.%]="((subStat.participantsByStatus.get('inprogress')?.length || 0) / totalEnrolled) * 100"
+                            [title]="'In Progress: ' + (subStat.participantsByStatus.get('inprogress')?.length || 0)"></div>
+                      </div>
+                      <div class="status-indicators">
+                        <ng-container *ngFor="let status of ['completed', 'inreview', 'rework', 'readyformobile', 'inprogress', 'notstarted']">
+                          <div class="status-item clickable" 
+                               *ngIf="(subStat.participantsByStatus.get(status)?.length || 0) > 0" 
+                               (click)="onStatusClick(status, i, j, subStat.participantsByStatus.get(status)?.length || 0)">
+                            <div class="status-dot" [class]="status"></div>
+                            <span>{{ subStat.participantsByStatus.get(status)?.length || 0 }} {{ statusDisplayMap.get(status) || status }}</span>
+                          </div>
+                        </ng-container>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="participants-card" elevation="2">
+      <mat-card-header>
+        <div style="display: flex; align-items: center; width: 100%;">
+          <div>
+            <mat-card-title style="font-weight: bold;">Participant Progress Details</mat-card-title>
+             <mat-card-subtitle>
+              {{ workshopData?.categorybased === true ? getFilteredTableParticipants().length : participantProgressList.length }} participants
+              <span *ngIf="workshopData?.categorybased === true && selectedCategoryFilter !== 'all'" style="color: #7c4dff; font-weight: 500;">
+                (filtered)
+              </span>
+            </mat-card-subtitle>
+          </div>
+          <span style="flex: 1 1 auto;"></span>
+          <button mat-raised-button 
+            color="primary" 
+            (click)="exportParticipantsToCSV()"
+            [disabled]="loading || enrolledParticipants.length === 0"
+          >
+            <mat-icon>download</mat-icon>
+            Export
+          </button>
+        </div>
+      </mat-card-header>
+
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 10px 4px;">
+          <mat-form-field appearance="outline" style="flex: 1 1 220px; min-width: 180px; max-width: 50%;">
+            <mat-label>Search</mat-label>
+            <input matInput (keyup)="applyFilter($event)" placeholder="Search participants">
+          </mat-form-field>
+
+          <ng-container *ngIf="workshopData?.categorybased === true">
+            <mat-form-field appearance="outline" style="flex: 0 0 180px;">
+              <mat-label>Filter by Type</mat-label>
+              <mat-select [(value)]="tableTypeFilter" (selectionChange)="onTableTypeFilterChange()">
+                <mat-option value="all">All Types</mat-option>
+                <mat-option *ngFor="let catId of workshopData?.categoriesforthisworkshop || []" [value]="'cat_' + catId">
+                  {{ categoryNamesMap.get(catId) || catId }}
+                </mat-option>
+                <mat-option value="cohort">Above Diagnostics</mat-option>
+                <mat-option value="facilitator">Facilitator</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" style="flex: 0 0 170px;">
+              <mat-label>Filter by Status</mat-label>
+              <mat-select [(value)]="tableStatusFilter" (selectionChange)="onTableStatusFilterChange()">
+                <mat-option value="all">All Statuses</mat-option>
+                <mat-option value="completed">Completed</mat-option>
+                <mat-option value="active">Active</mat-option>
+                <mat-option value="notstarted">Not Started</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <button mat-icon-button
+                    *ngIf="tableTypeFilter !== 'all' || tableStatusFilter !== 'all'"
+                    (click)="clearTableFilters()"
+                    matTooltip="Clear filters"
+                    color="warn"
+                    style="margin-bottom: 4px;">
+              <mat-icon>filter_list_off</mat-icon>
+            </button>
+          </ng-container>
+        </div>
+
+        <mat-card-content>
+          <div class="table-container">
+            <table mat-table [dataSource]="dataSource" matSort class="progress-table">
+              <ng-container matColumnDef="participantId">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+                <td mat-cell *matCellDef="let participant">
+                  <div class="participant-info">
+                    <mat-icon class="participant-icon">person</mat-icon>
+                    <!-- {{ mapProfile[participant.profileid]['name'] }} -->
+                    <div class="participant-details">
+                      <span class="participant-name">{{ mapProfile[participant.profileid]['name'] }}</span>
+                      <img
+                        *ngIf="mapProfile[participant.profileid]?.workshoponly"
+                        src="assets/new.png"
+                        alt="New"
+                        class="new-badge"
+                      />
+                  </div>
+                  </div>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="type">
+                <th mat-header-cell *matHeaderCellDef>Type</th>
+                <td mat-cell *matCellDef="let participant">
+                  <div class="participant-type-chip" [class]="getParticipantTypeClass(participant.profileid)">
+                    {{ getParticipantTypeLabel(participant.profileid) }}
+                  </div>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="currentChallenge">
+                <th mat-header-cell *matHeaderCellDef>Current Challenge</th>
+                <td mat-cell *matCellDef="let participant">
+                  <div class="challenge-info">
+                    <ng-container *ngIf="workshopData?.challenges[participant.currentChallengeIndex]?.type === 'challenge'">
+                      <span class="challenge-index">{{ participant.currentChallengeIndex + 1 }}.{{ participant.currentSubChallengeIndex + 1 }}</span>
+                      <span class="challenge-name" *ngIf="workshopData?.challenges[participant.currentChallengeIndex]?.challenges?.[participant.currentSubChallengeIndex]">
+                        {{ workshopData.challenges[participant.currentChallengeIndex].challenges[participant.currentSubChallengeIndex].name }}
+                      </span>
+                    </ng-container>
+                    <ng-container *ngIf="workshopData?.challenges[participant.currentChallengeIndex]?.type === 'zoomcall'">
+                      <span class="challenge-index">{{ participant.currentChallengeIndex + 1 }}</span>
+                      <span class="challenge-name">
+                        {{ workshopData.challenges[participant.currentChallengeIndex].heading }}: {{ workshopData.challenges[participant.currentChallengeIndex].subheading }}
+                      </span>
+                    </ng-container>
+                  </div>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="progress">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Progress</th>
+                <td mat-cell *matCellDef="let participant">
+                  <div class="progress-container">
+                    <mat-progress-bar 
+                      mode="determinate" 
+                      [value]="workshopData?.categorybased === true ? calculateAccessBasedProgress(participant).progressPercentage : participant.progressPercentage"
+                      [color]="(workshopData?.categorybased === true ? calculateAccessBasedProgress(participant).progressPercentage : participant.progressPercentage) === 100 ? 'primary' : 'accent'">
+                    </mat-progress-bar>
+                    <span class="progress-text">{{ (workshopData?.categorybased === true ? calculateAccessBasedProgress(participant).progressPercentage : participant.progressPercentage).toFixed(0) }}%</span>
+                  </div>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="completed">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Completed</th>
+                <td mat-cell *matCellDef="let participant">
+                  <span class="completed-count">{{ workshopData?.categorybased === true ? calculateAccessBasedProgress(participant).completedChallenges : participant.completedChallenges }}</span>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="total">
+                <th mat-header-cell *matHeaderCellDef>Total</th>
+                <td mat-cell *matCellDef="let participant">
+                  <span class="total-count">{{ workshopData?.categorybased === true ? calculateAccessBasedProgress(participant).totalChallenges : participant.totalChallenges }}</span>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let participant">
+                  <ng-container *ngIf="workshopData?.categorybased === true; else defaultStatus">
+                    <div class="custom-status-chip"
+                        [class]="calculateAccessBasedProgress(participant).progressPercentage === 100 ? 'status-completed' : 
+                                  calculateAccessBasedProgress(participant).progressPercentage > 0 ? 'status-active' : 'status-inactive'">
+                      <span>{{ calculateAccessBasedProgress(participant).progressPercentage === 100 ? 'Completed' : 
+                              calculateAccessBasedProgress(participant).progressPercentage > 0 ? 'Active' : 'Not Started' }}</span>
+                    </div>
+                  </ng-container>
+                  <ng-template #defaultStatus>
+                    <div class="custom-status-chip"
+                        [class]="participant.progressPercentage === 100 ? 'status-completed' : 
+                                  participant.progressPercentage > 0 ? 'status-active' : 'status-inactive'">
+                      <span>{{ participant.progressPercentage === 100 ? 'Completed' : 
+                              participant.progressPercentage > 0 ? 'Active' : 'Not Started' }}</span>
+                    </div>
+                  </ng-template>
+                </td>
+              </ng-container>
+              <!-- <ng-container matColumnDef="progress">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Progress</th>
+                <td mat-cell *matCellDef="let participant">
+                  <div class="progress-container">
+                    <mat-progress-bar 
+                      mode="determinate" 
+                      [value]="participant.progressPercentage"
+                      [color]="participant.progressPercentage === 100 ? 'primary' : 'accent'">
+                    </mat-progress-bar>
+                    <span class="progress-text">{{ participant.progressPercentage.toFixed(0) }}%</span>
+                  </div>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="completed">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Completed</th>
+                <td mat-cell *matCellDef="let participant">
+                  <span class="completed-count">{{ participant.completedChallenges }}</span>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="total">
+                <th mat-header-cell *matHeaderCellDef>Total</th>
+                <td mat-cell *matCellDef="let participant">
+                  <span class="total-count">{{ participant.totalChallenges }}</span>
+                </td>
+              </ng-container> -->
+              <!-- <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let participant">
+                  <div class="custom-status-chip"
+                      [class]="participant.progressPercentage === 100 ? 'status-completed' : 
+                                participant.progressPercentage > 0 ? 'status-active' : 'status-inactive'">
+                    <span>{{ participant.progressPercentage === 100 ? 'Completed' : 
+                            participant.progressPercentage > 0 ? 'Active' : 'Not Started' }}</span>
+                  </div>
+                </td>
+              </ng-container> -->
+
+              <ng-container matColumnDef="action">
+                <th mat-header-cell *matHeaderCellDef>Action</th>
+                <td mat-cell *matCellDef="let participant">
+                  <button mat-raised-button 
+                          [disabled]="participant.progressPercentage === 100 || 
+                                    isMovingParticipant === participant.profileid ||
+                                    workshopData?.challenges[participant.currentChallengeIndex]?.type === 'zoomcall'"
+                          (click)="moveParticipantToNext(participant)"
+                          [color]="participant.progressPercentage === 100 ? 'primary' : 'accent'"
+                          [matTooltip]="getButtonTooltip(participant)">
+                    <mat-spinner *ngIf="isMovingParticipant === participant.profileid" diameter="20"></mat-spinner>
+                    <span *ngIf="isMovingParticipant !== participant.profileid">
+                      {{ getButtonText(participant) }}
+                    </span>
+                  </button>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="assignment">
+                <th mat-header-cell *matHeaderCellDef>Assignment</th>
+                <td mat-cell *matCellDef="let participant">
+                  <button mat-stroked-button 
+                          (click)="reviewAssignment(participant)"
+                          [disabled]="!canReviewAssignment(participant)"
+                          [matTooltip]="canReviewAssignment(participant) ? 'Review assignment' : 'No assignment to review'">
+                    Review
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row 
+                *matRowDef="let row; columns: displayedColumns;" 
+                class="participant-row clickable-row"
+                (click)="onParticipantClick(row)"
+                [class.selected-row]="selectedParticipantData?.profileid === row.profileid">
+            </tr>
+            </table>
+
+            <mat-paginator 
+              [pageSizeOptions]="[10, 25, 50, 100]" 
+              [pageSize]="10"
+              showFirstLastButtons>
+            </mat-paginator>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="participant-data-card" elevation="2" id="participantDataCard" #participantDataSection>
+        <mat-card-header>
+          <mat-card-title style="font-weight: bold;padding: 20px;">
+            Participant Data
+          </mat-card-title>
+        </mat-card-header>
+        
+        <mat-card-content>
+          <div *ngIf="!selectedParticipantData" class="empty-state">
+            <mat-icon class="empty-icon">person_outline</mat-icon>
+            <h3>No Participant Selected</h3>
+            <p>Click on a participant in the table above to view their detailed data</p>
+          </div>
+
+          <div *ngIf="selectedParticipantData" class="participant-data-content">
+            
+            <div class="data-section">
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Name:</span>
+                  <span class="info-value">{{ mapProfile[selectedParticipantData.profileid]['name'] }}
+                    <img
+                      *ngIf="mapProfile[selectedParticipantData.profileid]?.workshoponly"
+                      src="assets/new.png"
+                      alt="New"
+                      class="new-badge"
+                    />
+                  </span>
+                </div>
+                <div class="info-item" *ngIf="workshopData?.categorybased === true">
+                  <span class="info-label">Type:</span>
+                  <span class="info-value">
+                    <span class="participant-type-chip" [class]="getParticipantTypeClass(selectedParticipantData.profileid)">
+                      {{ getParticipantTypeLabel(selectedParticipantData.profileid) }}
+                    </span>
+                  </span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Enrollment Date:</span>
+                  <span class="info-value">{{ formatDate(selectedParticipantData.enrollmentdate) }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Status:</span>
+                  <span class="info-value status-badge" [class]="selectedParticipantData.status">
+                    {{ selectedParticipantData.status | titlecase }}
+                  </span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Progress:</span>
+                  <span class="info-value" *ngIf="workshopData?.categorybased !== true">{{ getParticipantProgress(selectedParticipantData.profileid) }}%</span>
+                  <span class="info-value" *ngIf="workshopData?.categorybased === true">{{ getAccessBasedProgressForProfile(selectedParticipantData.profileid) }}%</span>
+                </div>
+                <!-- <div class="info-item">
+                  <span class="info-label">Progress:</span>
+                  <span class="info-value">{{ getParticipantProgress(selectedParticipantData.profileid) }}%</span>
+                </div> -->
+              </div>
+            </div>
+
+            <div class="data-section">
+              <h4 class="section-title">
+                <mat-icon>assignment</mat-icon>
+                Challenge Progress Details
+              </h4>
+              <div *ngIf="loadingParticipantWorkshop" class="loading-section">
+                <mat-spinner diameter="40"></mat-spinner>
+                <p>Loading participant workshop data...</p>
+              </div>
+              <div *ngIf="participantWorkshopError" class="error-section">
+                <mat-icon class="error-icon">error</mat-icon>
+                <p>{{ participantWorkshopError }}</p>
+                <!-- <button mat-stroked-button (click)="loadParticipantWorkshopData(selectedParticipantData.profileid)">
+                  <mat-icon>refresh</mat-icon>
+                  Retry
+                </button> -->
+              </div>
+
+              <div *ngIf="displayChallenges.length > 0 && !loadingParticipantWorkshop" class="workshop-data">
+                <mat-accordion class="participant-challenges-accordion" multi="true">
+                  <mat-expansion-panel 
+                    *ngFor="let displayChallenge of displayChallenges; let i = index" 
+                    class="participant-challenge-panel"
+                    [expanded]="displayChallenge.isCurrentChallenge">
+                    
+                    <mat-expansion-panel-header>
+                      <mat-panel-title>
+                        <div class="challenge-header-content">
+                          <span class="challenge-number">{{ i + 1 }}</span>
+                          <span class="challenge-name">{{ displayChallenge.challengeName }}</span>
+                          <mat-chip class="status-chip" [class]="displayChallenge.statusClass">
+                            {{ displayChallenge.statusDisplayName }}
+                          </mat-chip>
+                        </div>
+                      </mat-panel-title>
+                      <mat-panel-description>
+                        <span class="challenge-type">{{ displayChallenge.challengeType }}</span>
+                      </mat-panel-description>
+                    </mat-expansion-panel-header>
+
+                    <div class="challenge-details">
+                      <div class="challenge-metadata" *ngIf="displayChallenge.challengeMetadata.started || displayChallenge.challengeMetadata.completed">
+                        <div class="metadata-item" *ngIf="displayChallenge.challengeMetadata.started">
+                          <mat-icon>play_arrow</mat-icon>
+                          <span>Started: {{ displayChallenge.challengeMetadata.started }}</span>
+                        </div>
+                        <div class="metadata-item" *ngIf="displayChallenge.challengeMetadata.completed">
+                          <mat-icon>check_circle</mat-icon>
+                          <span>Completed: {{ displayChallenge.challengeMetadata.completed }}</span>
+                        </div>
+                        <div class="metadata-item" *ngIf="displayChallenge.challengeMetadata.manualCompletion">
+                          <mat-icon>admin_panel_settings</mat-icon>
+                          <span>Manual Completion</span>
+                        </div>
+                      </div>
+                      <div *ngIf="displayChallenge.subChallenges.length > 0" class="sub-challenges">
+                        <h5>Sub-Challenges</h5>
+                        <div class="sub-challenge-list">
+                          <div *ngFor="let subChallenge of displayChallenge.subChallenges; let j = index" 
+                               class="sub-challenge-item"
+                               [class.current-sub-challenge]="subChallenge.isCurrentSubChallenge">
+                            
+                            <div class="sub-challenge-header">
+                              <span class="sub-challenge-number">{{ i + 1 }}.{{ j + 1 }}</span>
+                              <span class="sub-challenge-name">{{ subChallenge.subChallengeName }}</span>
+                              <mat-chip class="sub-status-chip" [class]="subChallenge.statusClass">
+                                {{ subChallenge.statusDisplayName }}
+                              </mat-chip>
+                            </div>
+
+                            <div class="sub-challenge-details">
+                              <div class="sub-challenge-info">
+                                <span class="info-label">Type:</span>
+                                <span class="info-value">{{ subChallenge.subChallengeType }}</span>
+                              </div>
+                              
+                              <div class="sub-challenge-metadata" *ngIf="subChallenge.startedDate || subChallenge.completedDate">
+                                <div *ngIf="subChallenge.startedDate" class="metadata-item">
+                                  <mat-icon>schedule</mat-icon>
+                                  <span>Started: {{ subChallenge.startedDate }}</span>
+                                </div>
+                                <div *ngIf="subChallenge.completedDate" class="metadata-item">
+                                  <mat-icon>done</mat-icon>
+                                  <span>Completed: {{ subChallenge.completedDate }}</span>
+                                </div>
+                              </div>
+                              <div *ngIf="subChallenge.canViewQuiz" class="form-data">
+                                <div class="form-info">
+                                  <div class="info-item clickable-form-item quiz-item"
+                                      (click)="viewQuiz(subChallenge, i, j)"
+                                      matTooltip="Click to view quiz results ({{ subChallenge.quizResultsCount }} result{{ subChallenge.quizResultsCount > 1 ? 's' : '' }})">
+                                    <mat-icon>radio_button_checked</mat-icon>
+                                    <span>Quiz Results</span>
+                                    <span class="quiz-count-badge" *ngIf="subChallenge.quizResultsCount > 1">{{ subChallenge.quizResultsCount }}</span>
+                                    <mat-icon class="view-icon">visibility</mat-icon>
+                                  </div>
+                                </div>
+                              </div>
+                                <!-- <div *ngIf="subChallenge.canViewQuiz" class="form-data">
+                                  <div class="form-info">
+                                    <div class="info-item clickable-form-item quiz-item"
+                                        (click)="viewQuiz(subChallenge, i, j)"
+                                        matTooltip="Click to view quiz results">
+                                      <mat-icon>radio_button_checked</mat-icon>
+                                      <span>Quiz Results</span>
+                                      <mat-icon class="view-icon">visibility</mat-icon>
+                                    </div>
+                                  </div>
+                                </div> -->
+                              <div *ngIf="subChallenge.canViewVA" class="form-data">
+                                <div class="form-info">
+                                  <div *ngIf="subChallenge.canViewVA"
+                                      class="info-item clickable-form-item"
+                                      (click)="viewVideoAsk(subChallenge, i, j)"
+                                      matTooltip="Click to view current form">
+                                    <mat-icon>videocam</mat-icon>
+                                    <span>Video Ask</span>
+                                    <mat-icon class="view-icon">visibility</mat-icon>
+                                  </div>
+                                </div>
+                              </div>
+                              <div *ngIf="subChallenge.canViewForm || subChallenge.canViewAssignmentForm || subChallenge.canViewAssignmentQuestion || subChallenge.canViewAssignmentQuestionText || subChallenge.hasOldResults" class="form-data">
+                                <div class="form-info">
+                                  <div *ngIf="subChallenge.canViewForm"
+                                      class="info-item clickable-form-item"
+                                      (click)="viewForm(subChallenge, i, j)"
+                                      matTooltip="Click to view current form">
+                                    <mat-icon>description</mat-icon>
+                                    <span>Form</span>
+                                    <mat-icon class="view-icon">visibility</mat-icon>
+                                  </div>
+                                  <div *ngIf="subChallenge.canViewAssignmentForm"
+                                      class="info-item clickable-form-item"
+                                      (click)="viewForm(subChallenge, i, j)"
+                                      matTooltip="Click to view current assignment form">
+                                    <mat-icon>assignment</mat-icon>
+                                    <span>Assignment (Form)</span>
+                                    <mat-icon class="view-icon">visibility</mat-icon>
+                                  </div>
+
+                                  <div *ngIf="subChallenge.canViewAssignmentQuestion"
+                                      class="info-item clickable-form-item assignment-question-item"
+                                      (click)="viewQuestionAssignment(subChallenge, i, j)"
+                                      matTooltip="Click to review assignment submissions">
+                                    <mat-icon>quiz</mat-icon>
+                                    <span>Assignment (Question)</span>
+                                    <div class="assignment-preview" *ngIf="subChallenge.metadata.originalData.assignmentresult">
+                                      <mat-icon class="preview-icon">attachment</mat-icon>
+                                      <span class="submission-count">{{ subChallenge.metadata.originalData.assignmentresult.length }} submission(s)</span>
+                                    </div>
+                                    <mat-icon class="view-icon">visibility</mat-icon>
+                                  </div>
+                                  <div *ngIf="subChallenge.canViewAssignmentQuestionText"
+                                      class="info-item clickable-form-item assignment-question-item">
+                                    <mat-icon>quiz</mat-icon>
+                                    <span>Assignment (Question - Text)</span>
+                                    <h3 style="color: black;">{{ subChallenge.metadata.originalData.result }}</h3>
+                                    <!-- <div class="assignment-preview" *ngIf="subChallenge.metadata.originalData.assignmentresult">
+                                      <mat-icon class="preview-icon">attachment</mat-icon>
+                                      <span class="submission-count">{{ subChallenge.metadata.originalData.assignmentresult.length }} submission(s)</span>
+                                    </div> -->
+                                    <mat-icon class="view-icon">visibility</mat-icon>
+                                  </div>
+                                  <ng-container *ngIf="subChallenge.hasOldResults">
+                                    <div *ngFor="let oldResult of subChallenge.oldResults.slice().reverse(); let reversedIndex = index"
+                                        class="info-item clickable-form-item old-result-item"
+                                        [class.old-question-result]="oldResult.isQuestionAssignment"
+                                        (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)"
+                                        [matTooltip]="getOldResultTooltip(oldResult)">
+                                      <mat-icon>history</mat-icon>
+                                      <span>
+                                        Previous Submission {{ subChallenge.oldResults.length - reversedIndex }}
+                                        <small *ngIf="oldResult.date" class="submission-date">({{ oldResult.date }})</small>
+                                      </span>
+                                      <div class="old-result-preview">
+                                        <div *ngIf="oldResult.isQuestionAssignment" class="question-assignment-preview">
+                                          <mat-icon class="preview-icon">attachment</mat-icon>
+                                          <span class="submission-count">{{ oldResult.result?.length || 0 }} file(s)</span>
+                                        </div>
+                                        <div *ngIf="!oldResult.isQuestionAssignment" class="form-assignment-preview">
+                                          <mat-icon class="preview-icon">description</mat-icon>
+                                          <span class="form-indicator">Form Data</span>
+                                        </div>
+                                      </div>
+                                      <div *ngIf="oldResult.notes && oldResult.notes.length > 0" class="old-result-notes">
+                                        <mat-icon class="note-icon">note</mat-icon>
+                                        <span class="notes-preview">{{ oldResult.notes[0] }}</span>
+                                        <span *ngIf="oldResult.notes.length > 1" class="more-notes">+{{ oldResult.notes.length - 1 }} more</span>
+                                      </div>
+                                      
+                                      <mat-icon class="view-icon">visibility</mat-icon>
+                                    </div>
+                                  </ng-container>
+
+                                </div>
+                              </div>
+
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div *ngIf="displayChallenge.challengeType === 'Zoomcall'" class="zoom-call-details">
+                        <div class="zoom-info">
+                          <mat-icon>video_call</mat-icon>
+                          <span>Zoom Call Session</span>
+                        </div>
+                      </div>
+                    </div>
+                  </mat-expansion-panel>
+                </mat-accordion>
+                <mat-card class="assignment-data-card" elevation="2">
+                  <mat-card-header>
+                    <mat-card-title style="font-weight: bold;padding: 20px;">
+                      Assignment Data
+                    </mat-card-title>
+                  </mat-card-header>
+                  
+                  <mat-card-content>
+                    <div *ngFor="let displayChallenge of displayChallenges; let i = index" class="challenge-assignments">
+                      <div *ngIf="hasAssignmentData(displayChallenge)" class="challenge-assignment-header">
+                        <h4 class="assignment-challenge-title">
+                          <mat-icon>assignment</mat-icon>
+                          {{ i + 1 }}. {{ displayChallenge.challengeName }}
+                        </h4>
+                      </div>
+                      <div *ngFor="let subChallenge of displayChallenge.subChallenges; let j = index" 
+                          class="sub-challenge-assignments">
+                        <div *ngIf="subChallenge.canViewAssignmentForm || subChallenge.canViewAssignmentQuestion || subChallenge.canViewAssignmentQuestionText || subChallenge.hasOldResults"
+                            class="assignment-section">
+                          <div class="sub-challenge-assignment-header">
+                            <h5>{{ i + 1 }}.{{ j + 1 }} {{ subChallenge.subChallengeName }}</h5>
+                            <mat-chip class="assignment-type-chip" [class]="subChallenge.statusClass">
+                              {{ subChallenge.statusDisplayName }}
+                            </mat-chip>
+                          </div>
+                          <div class="assignment-items">
+                            <mat-card *ngIf="subChallenge.canViewAssignmentForm" class="assignment-item-card" elevation="1">
+                              <mat-card-content>
+                                <div class="assignment-item-header">
+                                  <mat-icon>assignment</mat-icon>
+                                  <span class="assignment-type">Assignment Form</span>
+                                  <button mat-stroked-button 
+                                          (click)="viewForm(subChallenge, i, j)"
+                                          class="view-assignment-btn">
+                                    <mat-icon>visibility</mat-icon>
+                                    View
+                                  </button>
+                                </div>
+                                <div class="assignment-metadata">
+                                  <span class="metadata-label">Type:</span>
+                                  <span class="metadata-value">Form-based Assignment</span>
+                                </div>
+                              </mat-card-content>
+                            </mat-card>
+                            <mat-card *ngIf="subChallenge.canViewAssignmentQuestion" class="assignment-item-card" elevation="1">
+                              <mat-card-content>
+                                <div class="assignment-item-header">
+                                  <mat-icon>quiz</mat-icon>
+                                  <span class="assignment-type">Assignment Question</span>
+                                  <button mat-stroked-button 
+                                          (click)="viewQuestionAssignment(subChallenge, i, j)"
+                                          class="view-assignment-btn">
+                                    <mat-icon>visibility</mat-icon>
+                                    Review
+                                  </button>
+                                </div>
+                                <div class="assignment-metadata">
+                                  <span class="metadata-label">Submissions:</span>
+                                  <span class="metadata-value">
+                                    {{ subChallenge.metadata.originalData.assignmentresult?.length || 0 }} file(s)
+                                  </span>
+                                </div>
+                                <div class="assignment-preview" *ngIf="subChallenge.metadata.originalData.assignmentresult">
+                                  <mat-icon class="preview-icon">attachment</mat-icon>
+                                  <span class="submission-count">{{ subChallenge.metadata.originalData.assignmentresult.length }} submission(s)</span>
+                                </div>
+                              </mat-card-content>
+                            </mat-card>
+                            <mat-card *ngIf="subChallenge.canViewAssignmentQuestionText" class="assignment-item-card" elevation="1">
+                              <mat-card-content>
+                                <div class="assignment-item-header">
+                                  <mat-icon>text_fields</mat-icon>
+                                  <span class="assignment-type">Assignment Question (Text)</span>
+                                </div>
+                                <div class="assignment-text-content">
+                                  <div class="text-response">
+                                    <span class="response-label">Response:</span>
+                                    <p class="response-text">{{ subChallenge.metadata.originalData.result }}</p>
+                                  </div>
+                                </div>
+                              </mat-card-content>
+                            </mat-card>
+                            <div *ngIf="subChallenge.hasOldResults" class="old-results-section">
+                              <h6 class="old-results-title">
+                                <mat-icon>history</mat-icon>
+                                Previous Submissions ({{ subChallenge.oldResults.length }})
+                              </h6>
+                              
+                              <mat-card *ngFor="let oldResult of subChallenge.oldResults.slice().reverse(); let reversedIndex = index" 
+                                        class="assignment-item-card old-result-card" elevation="1">
+                                <mat-card-content>
+                                  <div class="assignment-item-header">
+                                    <mat-icon>history</mat-icon>
+                                    <span class="assignment-type">
+                                      Previous Submission {{ subChallenge.oldResults.length - reversedIndex }}
+                                    </span>
+                                    <button mat-stroked-button 
+                                            (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)"
+                                            class="view-assignment-btn">
+                                      <mat-icon>visibility</mat-icon>
+                                      View
+                                    </button>
+                                  </div>
+                                  
+                                  <div class="assignment-metadata">
+                                    <div *ngIf="oldResult.date" class="metadata-item">
+                                      <span class="metadata-label">Date:</span>
+                                      <span class="metadata-value">{{ oldResult.date }}</span>
+                                    </div>
+                                    
+                                    <div class="metadata-item">
+                                      <span class="metadata-label">Type:</span>
+                                      <span class="metadata-value">
+                                        {{ oldResult.isQuestionAssignment ? 'Question Assignment' : 'Form Assignment' }}
+                                      </span>
+                                    </div>
+                                    <div *ngIf="oldResult.isQuestionAssignment" class="assignment-preview">
+                                      <mat-icon class="preview-icon">attachment</mat-icon>
+                                      <span class="submission-count">{{ oldResult.result?.length || 0 }} file(s)</span>
+                                    </div>
+                                    <div *ngIf="!oldResult.isQuestionAssignment" class="assignment-preview">
+                                      <mat-icon class="preview-icon">description</mat-icon>
+                                      <span class="form-indicator">Form Data Available</span>
+                                    </div>
+                                  </div>
+                                  <div *ngIf="oldResult.notes && oldResult.notes.length > 0" class="notes-section">
+                                    <span class="notes-label">Notes:</span>
+                                    <div class="notes-list">
+                                      <p *ngFor="let note of oldResult.notes" class="note-item">{{ note }}</p>
+                                    </div>
+                                  </div>
+                                </mat-card-content>
+                              </mat-card>
+                            </div>
+
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div *ngIf="!hasAnyAssignmentData()" class="no-assignments-state">
+                      <mat-icon class="empty-icon">assignment_turned_in</mat-icon>
+                      <h4>No Assignment Data</h4>
+                      <p>This participant doesn't have any assignment submissions or forms to review.</p>
+                    </div>
+                  </mat-card-content>
+                </mat-card>
+
+                <mat-expansion-panel
+                  class="raw-data-panel"
+                  *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'"
+                >
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      <mat-icon>code</mat-icon>
+                      Raw Data
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      View complete participant workshop data [developer only]
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  <div class="raw-data-content">
+                    <pre class="json-data">{{ participantWorkshopData | json }}</pre>
+                  </div>
+                </mat-expansion-panel>
+
+              </div>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+<mat-card elevation="2" class="full-assignments-card">
+  <mat-card-header>
+    <mat-card-title style="font-weight: bold;padding: 20px;">
+      {{ workshopTitle }}'s Assignments
+    </mat-card-title>
+    <mat-card-subtitle style="padding: 0 20px;">
+      {{ assignmentsList.length }} assignment(s) in {{ workshopTitle }} workshop
+    </mat-card-subtitle>
+  </mat-card-header>
+  
+  <mat-card-content>
+
+    <div *ngIf="assignmentsList.length === 0" class="no-assignments-state">
+      <mat-icon class="empty-icon">assignment</mat-icon>
+      <h4>No Assignments Found</h4>
+      <p>This workshop doesn't contain any assignments yet.</p>
+    </div>
+
+
+    <mat-accordion *ngIf="assignmentsList.length > 0" class="assignments-accordion" multi="true">
+      <mat-expansion-panel *ngFor="let assignment of assignmentsList; let i = index" class="assignment-expansion-panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+              <div class="assignment-info">
+                <span class="assignment-name">{{ assignment.assignmentName }}</span>
+                <!-- <span class="challenge-context">{{ assignment.challengeName }}</span> -->
+              </div>
+            <!-- <div class="assignment-header-content">
+              <span class="assignment-number">{{ i + 1 }}</span>
+              <div class="assignment-info">
+                <span class="assignment-name">{{ assignment.assignmentName }}</span> -->
+                <!-- <span class="challenge-context">{{ assignment.challengeName }}</span> -->
+              <!-- </div>
+            </div> -->
+          </mat-panel-title>
+          <mat-panel-description>
+            <mat-chip class="type-chip">{{ assignment.assignmentType }}</mat-chip>&nbsp;&nbsp;
+            <mat-chip class="count-chip">
+              {{ assignment.participants.length }} participant(s)
+            </mat-chip>
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <div class="assignment-details">
+          <div class="assignment-description" *ngIf="assignment.description">
+            <h5>Description:</h5>
+            <p>{{ assignment.description }}</p>
+          </div>
+
+          <div class="assignment-participants-section">
+            <h6>
+                <span class="challenge-context">{{ assignment.challengeName }}</span>
+            </h6>
+            <h5 class="section-title">
+              <mat-icon>people</mat-icon>
+              Participants ({{ assignment.participants.length }})
+            </h5>
+
+            <div *ngIf="assignment.participants.length === 0" class="empty-participants">
+              <mat-icon>person_off</mat-icon>
+              <p>No participants have completed this assignment yet.</p>
+            </div>
+
+            <div *ngIf="assignment.participants.length > 0" class="participants-grid">
+              <mat-card *ngFor="let participant of assignment.participants" 
+                        class="participant-assignment-card"
+                        [class.clickable]="participant.hasResult"
+                        (click)="participant.hasResult ? viewParticipantAssignment(assignment, participant) : null">
+                <mat-card-content>
+                  <div class="participant-assignment-content">
+                    <div class="participant-header">
+                      <mat-icon class="participant-icon">person</mat-icon>
+                      <div class="participant-infos">
+                        <span class="participant-name">{{ participant.name }}</span>
+                        <!-- <span class="participant-id">{{ participant.profileid }}</span> -->
+                      </div>
+                    </div>
+
+                    <div class="assignment-status-info">
+                      <mat-chip class="status-chip" [class]="participant.status">
+                        {{ statusDisplayMap.get(participant.status) || participant.status }}
+                      </mat-chip>
+                      
+                      <div class="submission-info" *ngIf="participant.completedDate">
+                        <mat-icon>schedule</mat-icon>
+                        <span>{{ participant.completedDate }}</span>
+                      </div>
+                    </div>
+
+                    <div class="result-preview" *ngIf="participant.hasResult">
+                      <div *ngIf="participant.assignmentType === 'form'" class="form-result">
+                        <mat-icon>description</mat-icon>
+                        <span>Form Submitted</span>
+                        <mat-icon class="view-icon">visibility</mat-icon>
+                      </div>
+                      
+                      <div *ngIf="participant.assignmentType === 'question' && participant.assignmentresult" class="question-result">
+                        <mat-icon>attachment</mat-icon>
+                        <span>{{ participant.assignmentresult.length }} file(s)</span>
+                        <mat-icon class="view-icon">visibility</mat-icon>
+                      </div>
+
+                      <div *ngIf="participant.assignmentType === 'question' && participant.submissionformat === 'text' && participant.result" class="text-result">
+                        <mat-icon>text_fields</mat-icon>
+                        <!-- <span class="text-preview">{{ participant.result | slice:0:50 }}{{ participant.result.length > 50 ? '...' : '' }}</span> -->
+                        <span class="text-preview">{{ participant.result}}</span>
+                      </div>
+                    </div>
+
+                    <div class="old-results-indicator" *ngIf="participant.oldResults.length > 0">
+                      <mat-icon>history</mat-icon>
+                      <span>{{ participant.oldResults.length }} previous submission(s)</span>
+                    </div>
+
+                
+                    <div class="notes-indicator" *ngIf="participant.completionNotes.length > 0">
+                      <mat-icon>note</mat-icon>
+                      <span>{{ participant.completionNotes.length }} note(s)</span>
+                    </div>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </div>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
+  </mat-card-content>
+</mat-card>
+<mat-card elevation="2" class="full-assignments-card">
+    <mat-card-header>
+      <mat-card-title style="font-weight: bold;padding: 20px;">
+        {{ workshopTitle }} Forms
+      </mat-card-title>
+      <mat-card-subtitle style="padding: 0 20px;">
+        {{ challengeForms.length }} Form(s) in {{ workshopTitle }} workshop
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div *ngIf="challengeForms.length === 0" class="no-assignments-state">
+        <mat-icon class="empty-icon">description</mat-icon>
+        <h4>No Challenge Forms Found</h4>
+        <p>This workshop doesn't contain any form-type challenges outside of assignments.</p>
+      </div>
+      <mat-accordion *ngIf="challengeForms.length > 0" class="assignments-accordion" multi="true">
+        <mat-expansion-panel *ngFor="let form of challengeForms; let i = index" class="assignment-expansion-panel">
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <div class="assignment-info">
+                <span class="assignment-name">{{ form.title }}</span>
+              </div>
+            </mat-panel-title>
+            <mat-panel-description>
+              <mat-chip class="type-chip">form</mat-chip>&nbsp;&nbsp;
+              <mat-chip class="count-chip">
+                {{ form.participants.length }} participant(s)
+              </mat-chip>
+            </mat-panel-description>
+          </mat-expansion-panel-header>
+          <div class="assignment-details">
+            <div class="assignment-participants-section">
+              <h6>
+                <span class="challenge-context">{{ form.challengeTitle }}</span>
+              </h6>
+              <h5 class="section-title">
+                <mat-icon>people</mat-icon>
+                Participants ({{ form.participants.length }})
+              </h5>
+              <div *ngIf="form.participants.length === 0" class="empty-participants">
+                <mat-icon>person_off</mat-icon>
+                <p>No participants have completed this form yet.</p>
+              </div>
+              <div *ngIf="form.participants.length > 0" class="participants-grid">
+                <mat-card *ngFor="let participant of form.participants"
+                          class="participant-assignment-card clickable"
+                          (click)="openChallengeFormReview(form, participant)">
+                  <mat-card-content>
+                    <div class="participant-assignment-content">
+                      <div class="participant-header">
+                        <mat-icon class="participant-icon">person</mat-icon>
+                        <div class="participant-infos">
+                          <span class="participant-name">{{ participant.name }}</span>
+                        </div>
+                      </div>
+                      <div class="assignment-status-info">
+                        <mat-chip class="status-chip" [class]="participant.status">
+                          {{ statusDisplayMap.get(participant.status) || participant.status }}
+                        </mat-chip>
+                        <div class="submission-info" *ngIf="participant.submittedDate">
+                          <mat-icon>schedule</mat-icon>
+                          <span>{{ participant.submittedDate.toDate() | date: 'MMM dd, yyyy' }}</span>
+                        </div>
+                      </div>
+                      <div class="result-preview" *ngIf="participant.formSubmitted">
+                        <div class="form-result">
+                          <mat-icon>description</mat-icon>
+                          <span>Form Submitted</span>
+                          <mat-icon class="view-icon">visibility</mat-icon>
+                        </div>
+                      </div>
+                    </div>
+                  </mat-card-content>
+                </mat-card>
+              </div>
+            </div>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+    </mat-card-content>
+  </mat-card>
+    </div>
+  </div>
+  <div class="participant-panel" [class.panel-visible]="showParticipantPanel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <div class="title-text">
+          <h3>{{ selectedStatusInfo?.status | titlecase }}</h3>
+          <p>{{ selectedStatusInfo?.challengeName }} - {{ selectedStatusInfo?.subChallengeName }}</p>
+        </div>
+      </div>
+
+      <div class="panel-actions">
+        <button mat-icon-button class="close-button" (click)="sendMail()">
+          <i class="fa-solid fa-envelope"></i>
+        </button>
+        <button mat-icon-button class="close-button" (click)="sendWatti()">
+          <i class="fa-brands fa-whatsapp"></i>
+        </button>
+        <button mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
+          <mat-icon>notifications_active</mat-icon>
+        </button>
+        <button mat-icon-button class="close-button" (click)="closeParticipantPanel()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    
+    <div class="panel-content">
+    <div class="participant-container">
+      <div class="participant-count">
+        <span class="count">{{ filteredParticipants.length }}</span>
+        <span class="label">participants</span><br>
+        <span class="label" style="font-size: 10px;">*click to export</span> 
+      </div>
+      <button class="export-btn" (click)="exportParticipants()">
+        <mat-icon>file_download</mat-icon>
+      </button>
+    </div>
+      <div class="participants-list">
+        <div class="filter-header">
+          <h4>Filter {{ filterOption | titlecase }} ({{ filteredParticipants.length }})</h4>
+          <div>  
+        <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' && 
+                            selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled'">
+          <button mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants">
+            <mat-icon>filter_list</mat-icon>
+          </button>
+          <mat-menu #filterMenu="matMenu">
+            <mat-radio-group [(ngModel)]="filterOption" (change)="applyFilterSide()">
+              <mat-radio-button value="all">All</mat-radio-button><br />
+              <mat-radio-button value="new">New</mat-radio-button><br />
+              <mat-radio-button value="old">Old</mat-radio-button>
+            </mat-radio-group>
+          </mat-menu>
+        </ng-container>
+
+    <ng-container *ngIf="selectedStatusInfo?.status === 'totalNewUsers' || selectedStatusInfo?.status === 'totalNewUsersNotEnrolled'">
+          <button mat-icon-button [matMenuTriggerFor]="newUserFilterMenu" aria-label="Filter new users"
+            [color]="selectedSubscriberCode.length > 0 || showReferredOnly ? 'accent' : ''">
+            <mat-icon>filter_list</mat-icon>
+          </button>
+
+              <mat-menu #newUserFilterMenu="matMenu">
+                <div style="padding: 12px 16px; min-width: 260px;"
+                    (click)="$event.stopPropagation()">
+
+                  <p style="font-size: 11px; font-weight: 700; margin: 0 0 8px;
+                            text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6;">
+                    Subscribers
+                  </p>
+                  <mat-form-field appearance="outline" style="width: 100%;">
+                    <mat-label>Select Code</mat-label>
+                    <mat-select
+                      [(ngModel)]="selectedSubscriberCode"
+                      multiple
+                      [disabled]="showReferredOnly"
+                      (ngModelChange)="applyFilterSide()">
+                      <mat-option *ngFor="let code of subscriberCodes" [value]="code">
+                        {{ code }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+            <div style="padding-top: 12px; border-top: 1px solid rgba(128,128,128,0.2);">
+              <p style="font-size: 11px; font-weight: 700; margin: 0 0 8px;
+                        text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6;">
+                Referred
+              </p>
+              <mat-checkbox
+                [(ngModel)]="showReferredOnly"
+                [disabled]="selectedSubscriberCode.length > 0"
+                (change)="applyFilterSide()"
+                style="font-size: 13px;">
+                Referred (not subscribed)
+              </mat-checkbox>
+            </div>
+          </div>
+        </mat-menu>
+
+    </ng-container>
+          <ng-container *ngIf="selectedStatusInfo?.status === 'cohortParticipants'">
+            <button mat-icon-button
+                    [matMenuTriggerFor]="cohortTypeFilterMenu"
+                    [color]="cohortTypeFilter !== 'all' ? 'accent' : ''"
+                    aria-label="Filter by participant type">
+              <mat-icon>filter_alt</mat-icon>
+            </button>
+            <mat-menu #cohortTypeFilterMenu="matMenu">
+              <mat-radio-group [(ngModel)]="cohortTypeFilter"
+                               (change)="applyFilterSide()"
+                               (click)="$event.stopPropagation()"
+                               style="display: flex; flex-direction: column; padding: 8px 16px; gap: 6px;">
+                <mat-radio-button value="all">All</mat-radio-button>
+                <mat-radio-button value="facilitator">Facilitator</mat-radio-button>
+                <mat-radio-button value="cohort">Above Diagnostics</mat-radio-button>
+              </mat-radio-group>
+            </mat-menu>
+          </ng-container>
+          <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
+            <button mat-icon-button
+                    [matMenuTriggerFor]="journeyFilterMenu"
+                    [color]="(selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0) ? 'accent' : ''">
+              <mat-icon>sort</mat-icon>
+            </button>
+            <mat-menu #journeyFilterMenu="matMenu" class="filter-scroll-menu">
+              <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+
+                <!-- Journey Filter -->
+                <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Journey Filter
+                </div>
+                <div style="padding: 4px 0;">
+                  <mat-checkbox
+                    *ngFor="let journey of workshopData?.selectedjourneys"
+                    [checked]="selectedJourneyFilters.includes(journey)"
+                    (change)="toggleJourneyFilter(journey)"
+                    style="display: block; padding: 6px 16px;">
+                    {{ JourneyMap[journey] || journey }}
+                  </mat-checkbox>
+                </div>
+
+                <!-- Tier Filter -->
+                <ng-container *ngIf="workshopData?.tierbased === true">
+                  <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                    Tier Filter
+                  </div>
+                  <div style="padding: 4px 0;">
+                    <mat-checkbox
+                      *ngFor="let tier of workshopData?.selectedtiers"
+                      [checked]="selectedTierFilters.includes(tier)"
+                      (change)="toggleTierFilter(tier)"
+                      style="display: block; padding: 6px 16px;">
+                      {{ tierMap[tier] }}
+                    </mat-checkbox>
+                  </div>
+                </ng-container>
+
+                <!-- Category Filter -->
+                <ng-container *ngIf="workshopData?.categoriesforthisworkshop?.length > 0">
+                  <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                    Category Filter
+                  </div>
+                  <div style="padding: 4px 0;">
+                    <mat-checkbox
+                      *ngFor="let catId of workshopData?.categoriesforthisworkshop"
+                      [checked]="selectedCategoryFilters.includes(catId)"
+                      (change)="toggleCategoryFilter(catId)"
+                      style="display: block; padding: 6px 16px;">
+                      {{ categoryNamesMap.get(catId) || catId }}
+                    </mat-checkbox>
+                  </div>
+                </ng-container>
+
+                <!-- Enrollment Status Filter -->
+                <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Enrollment Status
+                </div>
+                <div style="padding: 4px 0;">
+                  <mat-checkbox
+                    [checked]="selectedEnrollmentStatusFilters.includes('enrolled')"
+                    (change)="toggleEnrollmentStatusFilter('enrolled')"
+                    style="display: block; padding: 6px 16px;">
+                    Started
+                  </mat-checkbox>
+                  <mat-checkbox
+                    [checked]="selectedEnrollmentStatusFilters.includes('enrollednotstarted')"
+                    (change)="toggleEnrollmentStatusFilter('enrollednotstarted')"
+                    style="display: block; padding: 6px 16px;">
+                    Not Started
+                  </mat-checkbox>
+                </div>
+
+              </div>
+
+              <!-- Clear all at the bottom -->
+              <div style="padding: 6px 16px 8px; border-top: 1px solid rgba(128,128,128,0.2);">
+                <button mat-button color="warn" style="font-size: 11px; width: 100%;"
+                        (click)="clearJourneyFilters(); clearTierFilters(); clearCategoryFilters(); clearEnrollmentStatusFilters(); $event.stopPropagation()">
+                  <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
+                  Clear All Filters
+                </button>
+              </div>
+            </mat-menu>
+
+            <!-- Selected filter chips shown below the button row -->
+            <div *ngIf="selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0"
+                style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
+              <mat-chip
+                *ngFor="let journey of selectedJourneyFilters"
+                [removable]="true"
+                (removed)="toggleJourneyFilter(journey)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ JourneyMap[journey] || journey }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                *ngFor="let tier of selectedTierFilters"
+                [removable]="true"
+                (removed)="toggleTierFilter(tier)"
+                color="accent"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ tierMap[tier] }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                *ngFor="let catId of selectedCategoryFilters"
+                [removable]="true"
+                (removed)="toggleCategoryFilter(catId)"
+                color="primary"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ categoryNamesMap.get(catId) || catId }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                *ngFor="let es of selectedEnrollmentStatusFilters"
+                [removable]="true"
+                (removed)="toggleEnrollmentStatusFilter(es)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ es === 'enrolled' ? 'Started' : 'Not Started' }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+            </div>
+          </ng-container>
+          <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'notStarted'">
+            <button mat-icon-button
+                    [matMenuTriggerFor]="notStartedFilterMenu"
+                    [color]="(selectedCategoryFilters.length > 0 || selectedNotStartedTypeFilters.length > 0) ? 'accent' : ''">
+              <mat-icon>sort</mat-icon>
+            </button>
+            <mat-menu #notStartedFilterMenu="matMenu" class="filter-scroll-menu">
+              <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+                <ng-container *ngIf="workshopData?.categoriesforthisworkshop?.length > 0">
+                  <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                    Category Filter
+                  </div>
+                  <div style="padding: 4px 0;">
+                    <mat-checkbox
+                      *ngFor="let catId of workshopData?.categoriesforthisworkshop"
+                      [checked]="selectedCategoryFilters.includes(catId)"
+                      (change)="toggleCategoryFilter(catId)"
+                      style="display: block; padding: 6px 16px;">
+                      {{ categoryNamesMap.get(catId) || catId }}
+                    </mat-checkbox>
+                  </div>
+                </ng-container>
+                <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Enrollment Status
+                </div>
+                <div style="padding: 4px 0;">
+                  <mat-checkbox
+                    [checked]="selectedNotStartedTypeFilters.includes('enrollednotstarted')"
+                    (change)="toggleNotStartedTypeFilter('enrollednotstarted')"
+                    style="display: block; padding: 6px 16px;">
+                    Category Not Selected
+                  </mat-checkbox>
+                  <mat-checkbox
+                    [checked]="selectedNotStartedTypeFilters.includes('enrolled_zero_progress')"
+                    (change)="toggleNotStartedTypeFilter('enrolled_zero_progress')"
+                    style="display: block; padding: 6px 16px;">
+                    Not Started
+                  </mat-checkbox>
+                </div>
+
+              </div>
+              <div style="padding: 6px 16px 8px; border-top: 1px solid rgba(128,128,128,0.2);">
+                <button mat-button color="warn" style="font-size: 11px; width: 100%;"
+                        (click)="clearCategoryFilters(); clearNotStartedTypeFilters(); $event.stopPropagation()">
+                  <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
+                  Clear All Filters
+                </button>
+              </div>
+            </mat-menu>
+            <div *ngIf="selectedCategoryFilters.length > 0 || selectedNotStartedTypeFilters.length > 0"
+                style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
+              <mat-chip
+                *ngFor="let catId of selectedCategoryFilters"
+                [removable]="true"
+                (removed)="toggleCategoryFilter(catId)"
+                color="primary"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ categoryNamesMap.get(catId) || catId }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                *ngFor="let t of selectedNotStartedTypeFilters"
+                [removable]="true"
+                (removed)="toggleNotStartedTypeFilter(t)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ t === 'enrollednotstarted' ? 'Not Started' : 'Not Completed 1.1' }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+            </div>
+          </ng-container>
+          <!-- <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
+            <button mat-icon-button
+                    [matMenuTriggerFor]="journeyFilterMenu"
+                    [color]="selectedJourneyFilters.length > 0 ? 'accent' : ''">
+              <mat-icon>route</mat-icon>
+            </button>
+            <mat-menu #journeyFilterMenu="matMenu">
+              <div style="padding: 8px 16px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                Journey Filter
+              </div>
+              <div (click)="$event.stopPropagation()" style="padding: 4px 0;">
+                <mat-checkbox
+                  *ngFor="let journey of workshopData?.selectedjourneys"
+                  [checked]="selectedJourneyFilters.includes(journey)"
+                  (change)="toggleJourneyFilter(journey)"
+                  style="display: block; padding: 6px 16px;">
+                  {{ JourneyMap[journey] || journey }}
+                </mat-checkbox>
+              </div>
+              <div style="padding: 2px 16px 8px; border-bottom: 1px solid rgba(128,128,128,0.2);">
+                <button mat-button color="warn" style="font-size: 11px;" (click)="clearJourneyFilters(); $event.stopPropagation()">Clear</button>
+              </div>
+
+              <ng-container *ngIf="workshopData?.tierbased === true">
+                <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Tier Filter
+                </div>
+                <div (click)="$event.stopPropagation()" style="padding: 4px 0;">
+                  <mat-checkbox
+                    *ngFor="let tier of workshopData?.selectedtiers"
+                    [checked]="selectedTierFilters.includes(tier)"
+                    (change)="toggleTierFilter(tier)"
+                    style="display: block; padding: 6px 16px;">
+                    {{ tierMap[tier] }}
+                  </mat-checkbox>
+                </div>
+                <div style="padding: 2px 16px 8px;">
+                  <button mat-button color="warn" style="font-size: 11px;"
+                          (click)="clearTierFilters(); $event.stopPropagation()">Clear</button>
+                </div>
+              </ng-container>
+
+            </mat-menu>
+          </ng-container> -->
+          </div>
+        </div>
+        <!-- <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
+          <mat-card-content>
+            <a
+              class="participant-item"
+              [href]="'/userprofile/' + participant.profileid"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="text-decoration: none; color: inherit; cursor: pointer;"
+            >
+              <mat-icon class="participant-avatar">person</mat-icon>
+            <div class="participant-details">
+              <span class="participant-name">{{ participant.name }}</span>
+              <img
+                *ngIf="mapProfile[participant.profileid]?.workshoponly"
+                src="assets/new.png"
+                alt="New"
+                class="new-badge"
+              />
+          </div>
+            </a>
+          </mat-card-content>
+        </mat-card> -->
+        <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
+          <mat-card-content>
+            <a
+              class="participant-item"
+              [href]="'/userprofile/' + participant.profileid"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="text-decoration: none; color: inherit; cursor: pointer;"
+            >
+              <mat-icon class="participant-avatar">person</mat-icon>
+              <div class="participant-details">
+                <span class="participant-name">{{ participant.name }}</span>
+                <img
+                  *ngIf="mapProfile[participant.profileid]?.workshoponly"
+                  src="assets/new.png"
+                  alt="New"
+                  class="new-badge"
+                />
+                <ng-container *ngIf="workshopData?.categorybased === true">
+                  <span style="font-size: 11px; margin-top: 3px; display: block;"
+                        [style.opacity]="0.7">
+                    <ng-container *ngIf="participant.isFacilitator">Facilitator</ng-container>
+                    <ng-container *ngIf="!participant.isFacilitator && participant.isCohort">Above Diagnostics</ng-container>
+                    <ng-container *ngIf="!participant.isFacilitator && !participant.isCohort">{{ participant.categoryName }}</ng-container>
+                  </span>
+                </ng-container>
+                <span *ngIf="participant.referredNames?.length"
+                      style="font-size: 11px; margin-top: 3px; display: block; opacity: 0.7;">
+                  Enrolled via code: {{ participant.referredNames.join(', ') }}
+                </span>
+              </div>
+            </a>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+    </div>
+  </div>
+
+
+  <div class="panel-overlay" 
+       [class.overlay-visible]="showParticipantPanel"
+       (click)="closeParticipantPanel()"></div>
+</div>

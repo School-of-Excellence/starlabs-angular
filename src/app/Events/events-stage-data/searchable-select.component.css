@@ -1,0 +1,23 @@
+.ss { position: relative; display: inline-block; min-width: 150px; font-family: inherit; }
+
+.ss-trigger { display: inline-flex; align-items: center; gap: 8px; width: 100%; cursor: pointer;
+  background: #fff; border: .5px solid rgba(60,60,67,.25); border-radius: 9px; padding: 6px 11px;
+  font-size: 13px; color: #1c1c1e; }
+.ss-trigger:hover { background: #fafafd; }
+.ss.open .ss-trigger { border-color: #007aff; }
+.ss.disabled .ss-trigger { opacity: .5; cursor: default; }
+.ss-val { flex: 1 1 auto; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-ph { color: rgba(60,60,67,.5); }
+.ss-caret { color: rgba(60,60,67,.5); font-size: 11px; }
+
+.ss-panel { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; min-width: 100%;
+  background: #fff; border: .5px solid rgba(60,60,67,.15); border-radius: 11px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.14); overflow: hidden; }
+.ss-search { width: 100%; box-sizing: border-box; border: none; border-bottom: .5px solid rgba(60,60,67,.12);
+  padding: 9px 12px; font-size: 13px; font-family: inherit; outline: none; color: #1c1c1e; }
+.ss-list { list-style: none; margin: 0; padding: 4px; max-height: 240px; overflow: auto; }
+.ss-list li { padding: 7px 10px; border-radius: 7px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.ss-list li:hover { background: #f2f2f7; }
+.ss-list li.sel { background: rgba(0,122,255,.12); color: #0060df; font-weight: 600; }
+.ss-empty { color: rgba(60,60,67,.5); font-style: italic; cursor: default; }
+.ss-empty:hover { background: none; }

@@ -83,7 +83,7 @@ export class DynamicStudioComponent {
   stageTokenList = []
   // Studio Invitation
   invitationCountdown:MatDialogRef<any> = null
-  studioInvitationSubscription: Subscription 
+  studioInvitationSubscription: Subscription
   studioInvitation = null
   studioGroupingInvitationSubscription: Subscription = null
   studioconversationSubscription: Subscription = null
@@ -112,7 +112,7 @@ export class DynamicStudioComponent {
   tripleATCList = []
   // Transferred Queue
   transferredQueue = null
-  
+
   checkinlog : any
   onhold: boolean = false;
   allStudioList = [];
@@ -135,7 +135,7 @@ export class DynamicStudioComponent {
   selectedParticipant = false
   participantinvitationSubscription : Subscription
   private subscriptionHandle = new Subject<void>()
-  messageform:FormGroup 
+  messageform:FormGroup
   chatId: any;
   pendingMessagesCount: { [key: string]: number } = {};
   isChatContainerOpen: boolean = false;
@@ -178,7 +178,7 @@ export class DynamicStudioComponent {
       await getDoc(roles['profile_ref']).then((profileDoc) => {
         if (profileDoc.exists()) {
           this.currentuserData = profileDoc.data();
-          this.currentuseruid = profileDoc.data()['user_ref'].id;        
+          this.currentuseruid = profileDoc.data()['user_ref'].id;
         }
       });
       // get atcmodel
@@ -226,11 +226,11 @@ export class DynamicStudioComponent {
         for (let i = 0; i < profileDoc.length; i++) {
           const element = profileDoc[i];
           // this.profileList.push(profileDoc[i].payload.doc.id);
-  
+
           if(![null,undefined,''].includes(element['notification_token']) ){
             this.mapNotificationid[element['user_ref'].id] = element['notification_token']
           }
-          
+
           if(element['user_ref'] != null || element['user_ref'] != undefined){
             // this.userListId.push(element['user_ref'].id);
             this.mapProfileuid[element['user_ref'].id] = element
@@ -256,12 +256,12 @@ export class DynamicStudioComponent {
 
   processMessage(message: string): string {
     if (!message) return '';
-    
+
     // Handle linebreaks and links in one go
     let processed = message.replace(/\n/g, '<br>');
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     processed = processed.replace(urlRegex, '<a href="$1" target="_blank">$1</a>');
-    
+
     return processed;
   }
 
@@ -397,7 +397,7 @@ export class DynamicStudioComponent {
           updateDoc(doc.ref , {
             checkin: false
           })
-         
+
         })
       })
     }
@@ -463,7 +463,7 @@ export class DynamicStudioComponent {
       this.allStudioList = studio
       this.studioList = studio.filter(e => e["participants"].includes(this.profileid) && [null, undefined, false].includes(e['delete']))
       console.log(this.studioList, 'this.studioList');
-      
+
       this.liveStudio = this.studioList.filter(e => e["status"] == "live")
       console.log("Live Studio", this.liveStudio)
       this.isLoadingStudios = false;
@@ -509,7 +509,7 @@ export class DynamicStudioComponent {
             }
           })
         // }
-        
+
         // Check if Live Assignment is On
         var studioID = this.studioList.map(e => e["docid"])
         if(this.liveassignmentSubscription == null){
@@ -542,7 +542,7 @@ export class DynamicStudioComponent {
         }
         if(!this.studioInvitationSubscription){
           console.log(this.studioInvitationSubscription, 'studioInvitationSubscription');
-          
+
           collectionData(query(collection(this.firestore,"studioinvitation"), where("specialistpairing", 'array-contains', this.profileid),where("queueref", '==', doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("studioid", "in", studioID),where("expirydate", ">=", new Date())), {idField: 'id'}).pipe(takeUntil(this.subscriptionHandle)).subscribe(async invitationSnap => {
           // this.studioInvitationSubscription = this.firestore.collection("studioinvitation", ref => ref.where("specialistpairing", 'array-contains', this.profileid).where("queueref", '==', this.firestore.collection("queue generation").doc(this.ongoingQueue["docid"]).ref).where("studioid", "in", studioID).where("expirydate", ">=", new Date())).valueChanges().subscribe(async invitationSnap => {
             console.log(invitationSnap)
@@ -562,11 +562,11 @@ export class DynamicStudioComponent {
                   this.invitationCountdown.close()
                   this.invitationCountdown = null
                 }
-                
+
                 if(this.studioInvitation["clientresponse"] == "approved"){
                   const approvedInvitation = Object.assign({}, this.studioInvitation);
                   if(this.studioInvitation['createdby'] && this.studioInvitation['createdby'] === this.profileid){
-                    this.assignStudio(approvedInvitation); 
+                    this.assignStudio(approvedInvitation);
                   }
                   this.studioInvitation = null;
                 }
@@ -594,7 +594,7 @@ export class DynamicStudioComponent {
                 }
                 if(this.studioInvitation != null && this.studioInvitation != undefined){
                   console.log('checking......');
-                  
+
                   // Open Invitation Countdown
                   if(this.invitationCountdown == null){
                     this.invitationCountdown = this.dialog.open(QueueInvitationApprovalComponent,{
@@ -637,7 +637,7 @@ export class DynamicStudioComponent {
 
   async onStudioSelect(studio){
     console.log("****** studio select ******");
-    
+
     var loading = this.dialog.open(LoadingProgressComponent, {
       data: {msg: "Setting up Studio..."},
       disableClose: true
@@ -647,7 +647,7 @@ export class DynamicStudioComponent {
     console.log(this.selectedStudio)
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
     console.log(this.liveAssignment, 'this.liveAssignment');
-    
+
     var studioStage = []
     // List Eligible Stages and Token
     var activityParse = Object.values(this.selectedStudio["participantsactivity"]).sort((a, b) => a.toString().localeCompare(b.toString())).join(",")
@@ -656,20 +656,20 @@ export class DynamicStudioComponent {
     for (let i = 0; i < stageList.length; i++) {
       const stage = stageList[i]
       console.log(stage, 'stage');
-      
+
       const stageProperty = this.ongoingQueue["stageproperty"][stage];
       console.log(stageProperty, 'stageProperty');
-      
+
       var compulsoryActivity = Object.values(stageProperty["compulsoryactivity"] ?? {})
       console.log(compulsoryActivity, 'compulsoryActivity');
-      
+
       for (let j = 0; j < compulsoryActivity.length; j++) {
         const activitycombination:any = compulsoryActivity[j];
         const combinationArray = Array.isArray(activitycombination) ? activitycombination : [activitycombination];
         var parse = combinationArray.sort((a, b) => a.toString().localeCompare(b.toString())).join(",")
         // var parse = activitycombination.sort((a, b) => a.toString().localeCompare(b.toString())).join(",")
         console.log(parse);
-        
+
         if(parse == activityParse){
           studioStage.push(stage)
         }
@@ -682,7 +682,7 @@ export class DynamicStudioComponent {
 
       const messagePromises = this.studiochatList.map(async doc => {
         console.log(doc['docid'], doc);
-        
+
         // Fetch messages for the current document
         const count = await getDocs(collection(this.firestore,"studio conversation", doc['docid'], 'messages'));
         const messages = count.docs.map(e => e.data());
@@ -696,7 +696,7 @@ export class DynamicStudioComponent {
 
       await Promise.all(messagePromises);
     });
-    
+
     if(studioStage.length != 0){
       collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
         console.log(token)
@@ -704,8 +704,8 @@ export class DynamicStudioComponent {
           this.liveAssignment["token"] = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
           console.log(this.liveAssignment['docid']);
           console.log(this.liveAssignment['token']);
-          
-          
+
+
           // Transferred Queue Detail
           if(![null,undefined].includes(this.liveAssignment["token"] ? this.liveAssignment["token"]["transferredfrom"] : null)){
             await getDoc(doc(this.firestore,this.liveAssignment["token"]["transferredfrom"].path)).then(previousQueue=>{
@@ -816,7 +816,7 @@ export class DynamicStudioComponent {
         })
         this.stageTokenList = localTokenList
         console.log(this.stageTokenList, 'stageTokenList');
-        
+
         loading?.close()
         loading = null
       })
@@ -830,33 +830,33 @@ export class DynamicStudioComponent {
 
   async checkinStudio(value){
     const currentDate = new Date();
-    const currentTime = currentDate.getTime(); 
+    const currentTime = currentDate.getTime();
     const scheduledTimes = (this.selectedStudio["checkinscheduletime"] ?? []).filter(timestamp => {
-      const timestampTime = timestamp.toDate().getTime(); 
+      const timestampTime = timestamp.toDate().getTime();
       console.log(timestampTime);
-      
-      return timestampTime > currentTime; 
+
+      return timestampTime > currentTime;
     });
     console.log(scheduledTimes);
     const dayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
     const dayEnd = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1);
-    
+
     await getDocs(query(collection(this.firestore,"studio checkin log"),where('logparticipant', '==', this.profileid),where('logdate', '>=', dayStart),where('logdate', '<', dayEnd)))
     .then(snap => {
       this.checkinlog = snap.docs.length
       console.log(this.checkinlog);
     })
-    
-    console.log(this.selectedStudio["checkinscheduletime"] == undefined || 
+
+    console.log(this.selectedStudio["checkinscheduletime"] == undefined ||
     this.selectedStudio["checkinscheduletime"].length == 0 || scheduledTimes.length > 0 || this.checkinlog != 0);
-    
-    if(this.selectedStudio["checkinscheduletime"] == undefined || 
+
+    if(this.selectedStudio["checkinscheduletime"] == undefined ||
       this.selectedStudio["checkinscheduletime"].length == 0 || scheduledTimes.length > 0 || this.checkinlog != 0){
       this.selectedStudio["checkin"] = value
       updateDoc(doc(this.firestore, 'queue studio pairing',this.selectedStudio["docid"]),{
         checkin: this.selectedStudio["checkin"]
       })
-     
+
       let id = doc(collection(this.firestore, 'studio checkin log')).id
       let activity =  value == true ? "checkin" : "checkout"
       let data = {
@@ -942,7 +942,7 @@ export class DynamicStudioComponent {
           updateDoc(doc(this.firestore, 'studioinvitation', invitationID), {
             status: "success"
           })
-         
+
           result.forEach(studioid=>{
             var studio
             var findMandatory = mandatoryStudio.find(e => e["studioid"] == studioid)
@@ -967,7 +967,7 @@ export class DynamicStudioComponent {
           updateDoc(doc(this.firestore, 'studioinvitation', invitationID),{
             status: "cancelled"
           })
-         
+
         }
       })
     }
@@ -1000,7 +1000,7 @@ export class DynamicStudioComponent {
         setDoc(doc(this.firestore,"studioinvitation",invitationData['docid']),invitationData,{merge:true}).catch((err)=>{
           alert(err)
         })
-       
+
       }
     })
   }
@@ -1051,7 +1051,7 @@ export class DynamicStudioComponent {
   //     alert(error.message || "Transaction failed");
   //     throw error;
   //   }
-  // } 
+  // }
 
   assignStudio(invitation){
     console.log(invitation)
@@ -1097,7 +1097,7 @@ export class DynamicStudioComponent {
         await updateDoc(doc(this.firestore,"queue studio pairing",result["docid"]),{
           status: "live",
         })
-        
+
         var liveassignmentid = doc(collection(this.firestore,'live assignment')).id
         // Update Token
         var data = {
@@ -1140,7 +1140,7 @@ export class DynamicStudioComponent {
         }
         liveassignmentData["zoomlinkrequired"] = this.ongoingQueue["zoomlinkrequired"] ?? true
         await setDoc(doc(this.firestore,('live assignment/' + liveassignmentid)),liveassignmentData, {merge: true})
-        
+
         loading.close()
       }
     })
@@ -1151,7 +1151,7 @@ export class DynamicStudioComponent {
     await updateDoc(doc(this.firestore,"queue_token",log["docid"]),log).catch(err =>{
       console.log(err)
     })
-   
+
     var logdocid = doc(collection(this.firestore, 'queue stage log')).id
     log["logdocid"] = logdocid
     log["movedby"] = this.profileid
@@ -1162,7 +1162,7 @@ export class DynamicStudioComponent {
   }
   async moveStage(nextstage:string,markascompleted:any){
     console.log("********* moveStage *********");
-    
+
     console.log(nextstage, 'nextstage',markascompleted,"markascompleted");
     console.log(this.liveAssignment);
 
@@ -1176,7 +1176,7 @@ export class DynamicStudioComponent {
         }
       }
     }
-    
+
     var preloading = this.dialog.open(LoadingProgressComponent, {
       data: {msg: "Validating next stage..."},
       disableClose: true
@@ -1185,14 +1185,14 @@ export class DynamicStudioComponent {
     var preassignActivity = []
     var nextStageProperty = (this.ongoingQueue["stageproperty"][nextstage] ?? {})
     console.log(nextStageProperty);
-    
+
     var nextStageMandatoryStage = nextStageProperty["mandatorystagegrouping"] ?? []
     console.log(nextStageMandatoryStage);
-    
+
     var nextActivtityProperty = nextStageProperty["transferactivityproperty"] ?? []
     console.log(nextActivtityProperty);
     console.log(this.liveAssignment["stagename"]);
-    
+
     if(nextStageMandatoryStage.includes(this.liveAssignment["stagename"])){
       Object.keys(this.selectedStudio["participantsactivity"] ?? {}).forEach(profileid=>{
         var activity = this.selectedStudio["participantsactivity"][profileid]
@@ -1208,7 +1208,7 @@ export class DynamicStudioComponent {
     }
     console.log(preassignActivity)
 
-    var eligiblePreStudio = []  
+    var eligiblePreStudio = []
     var preassignProfile = preassignActivity.map(e => e["profileid"])
     if(preassignProfile.length != 0){
       await getDocs(query(collection(this.firestore,"queue studio pairing"), where("queueref", "==", doc(this.firestore,"queue generation",this.ongoingQueue["docid"])),where("participants", "array-contains-any", preassignProfile),where("studioin", "==", true))).then(otherStudio=>{
@@ -1235,10 +1235,10 @@ export class DynamicStudioComponent {
 
     var token = this.liveAssignment["token"]
     console.log(token);
-    
+
     token["preassigned"] = token["preassigned"] ?? {}
     token["preassigned"][nextstage] = token["preassigned"][nextstage] ?? []
-    
+
     if(eligiblePreStudio.length == 1){
       if(!token["preassigned"][nextstage].includes(token["preassigned"][nextstage])) token["preassigned"][nextstage].push(eligiblePreStudio[0]["docid"])
       await updateDoc(doc(this.firestore,"queue_token" ,token["docid"]),{
@@ -1332,8 +1332,8 @@ export class DynamicStudioComponent {
             console.log("Drop Index", dropIndex, "Length", stageList.length)
             if(dropIndex+1 == stageList.length){
               await this.guard.updateDeliveryStatus(
-                doc(this.firestore, "queue_token", log["docid"]).path, 
-                "completed", 
+                doc(this.firestore, "queue_token", log["docid"]).path,
+                "completed",
                 {
                   eventRequestRef: query(
                     collection(this.firestore, 'event participation request'),
@@ -1362,15 +1362,15 @@ export class DynamicStudioComponent {
         var confirm = this.dialog.open(HoldAlertDialogComponent, {
           data : {}
         })
-  
+
         const result =  await confirm.afterClosed().toPromise()
         if (result == null) {
-          return;          
+          return;
         }
-  
+
         this.ngZone.run(async () => {
           if(result != null){
-  
+
             var loading = this.dialog.open(LoadingProgressComponent, {
               data: {msg: "Closing Studio"},
               disableClose: true
@@ -1410,7 +1410,7 @@ export class DynamicStudioComponent {
           }
         })
       }
-     
+
     }
   }
 
@@ -1578,8 +1578,8 @@ export class DynamicStudioComponent {
     Object.keys(this.liveAssignment["bonusactivity"] ?? {}).forEach(profileid =>{
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]] = additionalActivities[this.liveAssignment["bonusactivity"][profileid]] ?? []
       additionalActivities[this.liveAssignment["bonusactivity"][profileid]].push(profileid)
-    }) 
-    console.log(additionalActivities)   
+    })
+    console.log(additionalActivities)
     var inviteParticipant = this.dialog.open(AssignQueueStudioComponent, {
       data: {
         title: reviewSpecialist ? "Assign Other Specialist if attended in this Studio" : "Update Additional Specialist and Activity in the Studio",
@@ -1592,7 +1592,7 @@ export class DynamicStudioComponent {
       maxWidth: "90vw",
       maxHeight: "90vh"
     })
-    
+
     try {
       const result = await inviteParticipant.afterClosed().toPromise();
       if(result != null){
@@ -1602,17 +1602,17 @@ export class DynamicStudioComponent {
           var mergeActivity = reviewSpecialist ? (result["bonusactivity"] ?? {}) : {...(this.liveAssignment["bonusactivity"] ?? {}), ...result["bonusactivity"]}
           console.log(mergeActivity)
           var additionalSpecialist = Object.keys(mergeActivity)
-          
+
           await updateDoc(doc(this.firestore, "live assignment", this.liveAssignment["docid"]), {
             bonusactivity: additionalSpecialist.length != 0 ? mergeActivity : null,
             bonusactivityparticipant: additionalSpecialist.length != 0 ? additionalSpecialist : null
           });
-  
+
           // Update People Involved
           var peopleInvolved = Object.keys(mergeActivity)
           var mergePeopleInvolved = Array.from(new Set(peopleInvolved.concat(this.liveAssignment["pairing"] ?? []) as string[]))
           console.log(mergePeopleInvolved)
-          
+
           await updateDoc(doc(this.firestore, "queue_token", this.liveAssignment["token"]["docid"]), {
             people_involved: mergePeopleInvolved
           });
@@ -1624,13 +1624,13 @@ export class DynamicStudioComponent {
     }
     return invited
   }
-  
+
   async regenerateZoomLink(){
     var url:string
     if(environment.firebase.projectId == "starlabs-test"){
       console.log("test")
       console.log(this.liveAssignment["zoomdata"], 'liveassignment');
-      
+
       url = "https://us-central1-starlabs-test.cloudfunctions.net/studioZoomLinkRegenerate?liveassignmentid="+this.liveAssignment["docid"]+"&zoomdata="+JSON.stringify(this.liveAssignment['zoomdata'])
     }
     else if(environment.firebase.projectId == "fir-sample-aae4a" || environment.firebase.projectId == "launch-your-legacy-development"){
@@ -1642,51 +1642,51 @@ export class DynamicStudioComponent {
         msg: "Generating Link...."
       }
     })
-    
+
     try {
       const res = await this.http.get(url).toPromise();
       console.log(res)
     } catch (err) {
       console.log("Error", err)
     }
-    
+
     generateLoading.close()
     this.enableZoomLinkGenerator()
   }
-  
+
   viewform(form){
     const firestoreForms = getFirestore("firestore-forms")
     let path = doc(firestoreForms, "formsByClient", form['docid']).path
     const url = this.router.createUrlTree(['/formtemplate'],{queryParams: {id: form.formid, type:'form', patchdata:path}})
     window.open(url.toString(), '_blank')
   }
-  
+
   addATC(validated, profileid) {
     console.log(profileid, 'profileid');
-  
+
     const url = this.router.createUrlTree(['/prescribeATC'], { queryParams: { validation: validated, profileid: profileid } }).toString();
     window.open(url, '_blank');
   }
-  
+
   updateATC(atcid, collection, option){
     var url = '/editATC/'+atcid+"/" + collection + option
     window.open(url.toString(), '_blank')
   }
-  
+
   async previewATC(collectiontype){
 
     const firestoreATC = getFirestore("firestore-atc")
 
     var startDate = this.transferredQueue != null ? this.transferredQueue["queuestartdate"].toDate() : this.ongoingQueue["queuestartdate"].toDate()
     console.log("ATC Fetch Date", startDate, this.transferredQueue)
-    
+
     var unvalidateQuery = this.profileRoles["mentor"] || this.profileRoles["ah"] || this.profileRoles["developer"] || true ? // Allow all Specialist to access all Queue ATC
       query(
         collection(firestoreATC, "atc_to_validate"),
         where("status", "==", "atc given"),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
-      ) : 
+      ) :
       query(
         collection(firestoreATC, "atc_to_validate"),
         where("author", "array-contains", doc(firestoreATC, "profile_data", this.profileid)),
@@ -1694,23 +1694,23 @@ export class DynamicStudioComponent {
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
       );
-      
+
     var alphaQuery = this.profileRoles["mentor"] || this.profileRoles["ah"] || this.profileRoles["developer"] || true ? // Allow all Specialist to access all Queue ATC
       query(
         collection(firestoreATC, "atc_alpha"),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
-      ) : 
+      ) :
       query(
         collection(firestoreATC, "atc_alpha"),
         where("author", "array-contains", doc(firestoreATC, "profile_data", this.profileid)),
         where("profileid", "==", this.liveAssignment["participantid"]),
         where("prescription_date", ">=", startDate)
       );
-      
+
     var queryToUse = collectiontype == "alpha" ? alphaQuery : unvalidateQuery
     var atcList = []
-    
+
     try {
       const atcsnap = await getDocs(queryToUse);
       var atc = atcsnap.docs.filter(e => e.data()["status"] != "upgraded")
@@ -1726,7 +1726,7 @@ export class DynamicStudioComponent {
           this.unvalidatedATCList = []
         }
       }
-      
+
       for (let i = 0; i < atc.length; i+=10) {
         var notesIDList:any[] = atc.slice(i, i+10).map(e => e.data()["notesid"]).filter(e => e != null && e != undefined)
         if(notesIDList.length != 0){
@@ -1735,7 +1735,7 @@ export class DynamicStudioComponent {
             where(documentId(), "in", notesIDList)
           );
           const notes = await getDocs(notesQuery);
-          
+
           for (let a = 0; a < notes.docs.length; a++) {
             const notedoc = notes.docs[a];
             var notedata = notedoc.data()
@@ -1743,7 +1743,7 @@ export class DynamicStudioComponent {
           }
         }
       }
-      
+
       for (let i = 0; i < atc.length; i+=10) {
         var mentoringIDList:any[] = atc.slice(i, i+10).map(e => e.data()["mentoringid"]).filter(e => e != null && e != undefined)
         if(mentoringIDList.length != 0){
@@ -1752,7 +1752,7 @@ export class DynamicStudioComponent {
             where(documentId(), "in", mentoringIDList)
           );
           const notes = await getDocs(mentoringQuery);
-          
+
           for (let a = 0; a < notes.docs.length; a++) {
             const notedoc = notes.docs[a];
             var notedata = notedoc.data()
@@ -1760,7 +1760,7 @@ export class DynamicStudioComponent {
           }
         }
       }
-      
+
       for (let a = 0; a < atc.length; a++) {
         const atcDoc = atc[a];
         if(atcList[a] == null || atcList[a] == undefined){
@@ -1770,13 +1770,13 @@ export class DynamicStudioComponent {
             transcription: []
           }
         }
-        
+
         const correctionsQuery = query(
           collection(firestoreATC, atcDoc.ref.path, "corrections"),
           where("isdelete", "==", false)
         );
         const adjustment = await getDocs(correctionsQuery);
-        
+
         for (let b = 0; b < adjustment.docs.length; b++) {
           const adjDoc = adjustment.docs[b];
           if(atcList[a].transcription[b] == undefined || atcList[a].transcription[b] == null){
@@ -1785,13 +1785,13 @@ export class DynamicStudioComponent {
               procedure: []
             }
           }
-          
+
           const proceduresQuery = query(
             collection(firestoreATC, adjDoc.ref.path, "procedures"),
             where("isdelete", "==", false)
           );
           const procedure = await getDocs(proceduresQuery);
-          
+
           for (let c = 0; c < procedure.docs.length; c++) {
             const procedureDoc = procedure.docs[c];
             var data = procedureDoc.data()
@@ -1814,7 +1814,7 @@ export class DynamicStudioComponent {
       console.error('Error in previewATC:', error);
     }
   }
-  
+
   async getParticipantUPVisit(){
     const profileid = this.liveAssignment?.["participantid"]
     if(!profileid){
@@ -1882,7 +1882,7 @@ export class DynamicStudioComponent {
     const firestoreATC = getFirestore("firestore-atc");
 
     var startDate = this.transferredQueue != null ? this.transferredQueue["queuestartdate"].toDate() : this.ongoingQueue["queuestartdate"].toDate()
-    
+
     try {
       const atcQuery = query(
         collection(firestoreATC, "atc_alpha"),
@@ -1891,51 +1891,51 @@ export class DynamicStudioComponent {
         where("prescription_date", ">=", startDate)
       );
       const atc = await getDocs(atcQuery);
-      
+
       console.log(atc.size)
       if(atc.size == 0){
         this.cwATClist = []
       }
-      
+
       for (let a = 0; a < atc.docs.length; a++) {
         const atcDoc = atc.docs[a];
         var atcData = atcDoc.data()
-        
+
         this.cwATClist[a] = {
           atcdata: atcData,
           adjustments: [],
           cwbrief: []
         }
-        
+
         const adjustmentQuery = query(
           collection(firestoreATC, atcDoc.ref.path, "corrections"),
           where("implementationagent", "array-contains", this.profileid)
         );
         const adjustment = await getDocs(adjustmentQuery);
-        
+
         console.log("Total Adj", adjustment.size)
         var adjustmentread = 0
-        
+
         for (let b = 0; b < adjustment.docs.length; b++) {
           const adjDoc = adjustment.docs[b];
           var adjustmentdata = adjDoc.data()
-          
+
           this.cwATClist[a]["adjustments"][b] = {
             adjustments: adjustmentdata["name"],
             procedure: []
           }
-          
+
           const procedureQuery = query(
             collection(firestoreATC, adjDoc.ref.path, "procedures"),
             where("mandatory", "==", true),
             where("assigned_to", "array-contains", doc(firestoreATC, "profile_data", this.profileid))
           );
           const procedure = await getDocs(procedureQuery);
-          
+
           console.log("Total Pro", procedure.size)
           adjustmentread += 1
           var procedureList = []
-          
+
           for (let c = 0; c < procedure.docs.length; c++) {
             const procedureDoc = procedure.docs[c];
             var data = procedureDoc.data()
@@ -1945,25 +1945,25 @@ export class DynamicStudioComponent {
               path: procedureDoc.ref.path
             })
           }
-          
+
           this.cwATClist[a]["adjustments"][b]["procedure"] = procedureList
           console.log(this.cwATClist[a]["adjustments"])
-  
+
           if(adjustmentread == adjustment.size){
             console.log("Adjustment Reading completed for ATC", a+1, this.cwATClist[a]["atcdata"]["atcid"], this.cwATClist[a]["atcdata"]["notesid"])
             var hasProcedure = this.cwATClist[a]["adjustments"].some(e => e["procedure"].length != 0)
             console.log(hasProcedure)
-            
+
             if(hasProcedure && this.cwATClist[a]["atcdata"]["notesid"] != null){
               const atcnotesDoc = await getDoc(doc(firestoreATC, "atc_notes", this.cwATClist[a]["atcdata"]["notesid"]));
               if(atcnotesDoc.exists()){
                 var notesdata = atcnotesDoc.data()
                 this.cwATClist[a]["cwbrief"] = notesdata["changeworkbrief"] ?? []
               }
-            } 
+            }
             else if(!hasProcedure){
               this.cwATClist[a]["adjustments"] = []
-            }                     
+            }
           }
           console.log(this.cwATClist)
         }
@@ -1972,13 +1972,13 @@ export class DynamicStudioComponent {
       console.error('Error in getAssignedATC:', error);
     }
   }
-  
+
   async markProcedure(atcindex, adjindex, proindex){
     const firestoreATC = getFirestore("firestore-atc");
     var procedure = this.cwATClist[atcindex]["adjustments"][adjindex]["procedure"][proindex]
     console.log(procedure)
     procedure["status"] = procedure["status"] == "completed" ? "yet to start" : "completed"
-    
+
     try {
       await updateDoc(doc(firestoreATC, procedure["path"]), {
         status: procedure["status"]
@@ -1987,7 +1987,7 @@ export class DynamicStudioComponent {
       console.error('Error updating procedure:', error);
     }
   }
-  
+
   async assignChangeagent(validated){
     const firestoreATC = getFirestore("firestore-atc");
     // var assignProperty = this.ongoingQueue['stageproperty'][this.liveAssignment['stagename']]?.studioassignprocedureproperty ?? {}
@@ -2001,16 +2001,16 @@ export class DynamicStudioComponent {
     for (let i = 0; i < eligibleStages.length; i++) {
       const stage = eligibleStages[i];
       console.log(stage);
-      
+
       const stageProperty = this.ongoingQueue["stageproperty"][stage];
       var compulsoryActivity = Object.values(stageProperty["compulsoryactivity"] ?? {})
       console.log(compulsoryActivity,'compulsoryActivity');
-      
+
       for (let j = 0; j < compulsoryActivity.length; j++) {
         const activitycombination:any = compulsoryActivity[j];
         var parse = activitycombination.sort((a, b) => a.toString().localeCompare(b.toString())).join(",")
         eligibleActivityParse.push(parse)
-      } 
+      }
     }
     console.log(eligibleActivityParse)
 
@@ -2040,11 +2040,11 @@ export class DynamicStudioComponent {
     console.log(preassigned.length);
     let preassignedagent = [];
     await Promise.all(preassigned).then(results => {
-      console.log(results); 
+      console.log(results);
       results.forEach(snap => {
         snap.docs.forEach(e => {
           console.log(e.data());
-          preassignedagent.push(e.data()) 
+          preassignedagent.push(e.data())
           if(e.data()['implementationagent'] != null && e.data()['implementationagent'] != undefined && e.data()['implementationagent'].length != 0){
             e.data()['implementationagent'].forEach(agent => {
               console.log(agent);
@@ -2059,7 +2059,7 @@ export class DynamicStudioComponent {
             })
           }
         })
-        
+
       });
       preassignedagent.forEach(e => {
         if(e['implementationagent'] != null && e['implementationagent'] != undefined && ![null,undefined].includes(e['implementationagentcount'])){
@@ -2084,8 +2084,8 @@ export class DynamicStudioComponent {
     .catch(error => {
         console.error('Error fetching documents:', error);
     });
-    
-    
+
+
 
     this.dialog.open(AssignProcedureStudioComponent, {
       data: {
@@ -2110,30 +2110,30 @@ export class DynamicStudioComponent {
         updateDoc(doc(this.firestore, 'queue_token', token["docid"]), {
           preassigned: preassigned
         })
-        
+
       }
     })
   }
-  
+
   getTripleATC(){
     const firestoreATC = getFirestore("firestore-atc")
     var involvedQueue = [this.ongoingQueue["docid"]]
     console.log(involvedQueue)
     if(this.transferredQueue != null) involvedQueue.push(this.transferredQueue["docid"])
     console.log(this.transferredQueue)
-    
+
     const tripleATCQuery = query(
       collection(firestoreATC, "triple atc"),
       where("profileid", "==", this.liveAssignment["participantid"]),
       where("queueid", "in", involvedQueue),
       where("status", "==", "atc given")
     );
-    
+
     this.tripleATCSubscription = collectionData(tripleATCQuery).subscribe(atc => {
       this.tripleATCList = atc.sort((a, b) => a["prescription_date"].toDate() - b["prescription_date"].toDate())
     });
   }
-  
+
   viewTripleATC(id){
     const url = this.router.createUrlTree(['/edittripleATC/'+id])
     window.open(url.toString(), '_blank')
@@ -2143,13 +2143,13 @@ export class DynamicStudioComponent {
     let docData = await getDoc(value)
     return docData.data()
   }
-  
+
   async getCurrentAEL(){
     console.log("Checking AEL.....")
     this.participantAEL = {}
 
     if(!this.liveAssignment["token"]) return;
-    
+
     try {
       const level = await getDocs(collection(this.firestore, "accelerated evolution level"));
       this.aelLevelList = level.docs.map(e => e.data())
@@ -2186,7 +2186,7 @@ export class DynamicStudioComponent {
           })
         }
       }
-      
+
       /*
       const deliverableQuery = query(
         collection(this.firestore, "deliverables"),
@@ -2194,16 +2194,16 @@ export class DynamicStudioComponent {
         limit(1)
       );
       const deliverable = await getDocs(deliverableQuery);
-      
+
       if(deliverable.size != 0){
         var participantProductID = deliverable.docs[0].data()["participantproductid"]
         console.log("Participant Product ID", participantProductID)
-        
+
         const product = await getDoc(doc(this.firestore, "participantsproduct", participantProductID));
         if(product.exists()){
           var productData = product.data()
           console.log("AEL ID", productData["aelid"])
-          
+
           if(productData["aelid"] != null && productData["aelid"] != undefined){
             const ael = await getDoc(doc(this.firestore, "participant AEL", productData["aelid"]));
             if(ael.exists()){
@@ -2225,12 +2225,12 @@ export class DynamicStudioComponent {
       console.error('Error in getCurrentAEL:', error);
     }
   }
-  
+
   async updateCurrentAEL(){
     var reviewed = false
     // Generate new document ID
     const newDocId = doc(collection(this.firestore, 'temp')).id;
-    
+
     var crossoverdata = {
       "docid": newDocId,
       "aelid": this.participantAEL["docid"],
@@ -2239,7 +2239,7 @@ export class DynamicStudioComponent {
       "profileid": this.liveAssignment["participantid"],
       "validatedby": this.profileid
     }
-    
+
     Object.keys(this.participantAEL["crossovermetric"]).forEach(key =>{
       var original = this.participantAEL["originalmetric"][key]
       var metric = this.participantAEL["crossovermetric"][key]
@@ -2254,7 +2254,7 @@ export class DynamicStudioComponent {
       }
     })
     console.log(crossoverdata)
-  
+
     try {
       var batch = writeBatch(this.firestore)
       batch.set(doc(this.firestore, "interim crossover", crossoverdata.docid), crossoverdata)
@@ -2276,7 +2276,7 @@ export class DynamicStudioComponent {
       console.error('Error in updateCurrentAEL:', error);
     }
   }
-  
+
   navigateMeeting(doc:any){
     console.log(doc);
     const zoomData = doc["zoomdata"] ?? {}
@@ -2289,14 +2289,14 @@ export class DynamicStudioComponent {
     const url = this.router.serializeUrl(
       this.router.createUrlTree(['/openmeeting', doc['docid'], 'queue'])
     );
-         
+
     window.open(url, "_blank");
   }
-  
+
   async movetoNextMonthReview(){
     console.log(this.liveAssignment);
     var token = this.liveAssignment["token"]
-    
+
     if(window.confirm('Are you sure want to move participants to the next month review?')){
       try {
         await setDoc(doc(this.firestore, "review participants", token['docid']), token);
@@ -2309,7 +2309,7 @@ export class DynamicStudioComponent {
   async getstudiochat(chat) {
     if(Object.keys(this.subscription).includes('messages')){
       console.log("Destroy");
-      
+
       for(var key in this.subscription) {
         this.subscription[key].unsubscribe();
       }
@@ -2333,10 +2333,10 @@ export class DynamicStudioComponent {
       collection(this.firestore, 'studio conversation'),
       where('docid', '==', chat['docid'])
     );
-    
-  
+
+
     const chatDocs = await this.chatref.get().toPromise();
-  
+
     if (!chatDocs.empty) {
       chatDocs.forEach(async chatDoc => {
         const chatData = chatDoc.data();
@@ -2352,12 +2352,12 @@ export class DynamicStudioComponent {
           docref: chatDoc.ref,
           docid: chatDoc.id,
         };
-  
+
         this.selectedChat = data;
         this.selectedchat(this.selectedChat);
-  
+
         const messagesRef = query(collection(this.firestore,`studio conversation/${chatDoc.id}/messages`), orderBy('time', 'asc'));
-        
+
         this.subscription['messages'] = collectionSnapshots(messagesRef).pipe(takeUntil(this.subscriptionHandle)).subscribe((messageDocs) => {
           this.subscribemessagesboolean = true;
           const messages = messageDocs.map(messageDoc => {
@@ -2374,7 +2374,7 @@ export class DynamicStudioComponent {
             element['type'] = element['type'] ?? null;
             return element;
           });
-  
+
           this.messagescopy = messages;
           this.messages = messages;
           this.cdr.detectChanges();
@@ -2385,10 +2385,10 @@ export class DynamicStudioComponent {
       console.log('No chat documents found.');
     }
   }
-  
+
 
   scrollToIndex() {
-  
+
     if (this.itemElements && this.itemElements.length > 0) {
       const lastItem = this.itemElements.last.nativeElement;
       lastItem.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -2409,7 +2409,7 @@ export class DynamicStudioComponent {
       alert("Oops, Please type a message....");
     }else{
       console.log("Sending Message");
-      
+
       var msgData ={};
       var lastmessage = {};
       var message = formvalue.sms
@@ -2429,7 +2429,7 @@ export class DynamicStudioComponent {
 
         var members = this.selectedChat['members'] ?? [];
         var index = members.indexOf(this.selectedChat['useruid']);
-        
+
         if (index > -1) {
             members.splice(index, 1);
         }
@@ -2505,7 +2505,7 @@ export class DynamicStudioComponent {
         console.error('No chat document found for the given live assignment ID');
     }
 
-     
+
     }
   }
 
@@ -2530,10 +2530,10 @@ export class DynamicStudioComponent {
       files :[]
     });
   }
-  
+
   sendMsg(e: Event) {
     const keyboardEvent = e as KeyboardEvent;
-    if (!keyboardEvent.shiftKey) { 
+    if (!keyboardEvent.shiftKey) {
       keyboardEvent.preventDefault();
       var msg = this.messageform.controls['sms'].value.trim();
       if (msg != "") {
@@ -2545,7 +2545,7 @@ export class DynamicStudioComponent {
   openSnackBar(message:string,action:string) {
     this.snackBar.open(message,action,{ duration: 2000})
   }
-  
+
   //updating supportchat message
   updateRecipient(msgRef,uid) {
     msgRef.update({

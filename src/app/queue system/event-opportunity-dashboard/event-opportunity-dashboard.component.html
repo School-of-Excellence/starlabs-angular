@@ -364,23 +364,7 @@
       </div>
     </div>
 
-    <app-planning-tab
-      [hidden]="activeTab !== 'planning'"
-      [selectedQueueList]="planningQueues"
-      (queueSelectionChange)="onPlanningQueuesChange($event)"
-      [mapQueue]="mapQueue"
-      [mapData]="mapData"
-      [queueTokens]="queueTokens"
-      [allCompletedStageCount]="allCompletedStageCount"
-      [mapProfile]="mapProfile"
-      [mapNumber]="mapNumber"
-      [eventList]="eventList"
-      [queueList]="queueList"
-      [active]="activeTab === 'planning'"
-      [currentProfileId]="currentProfileId"
-      (patchQueues)="onPlanningQueuesChange($event)"
-      [refreshKey]="planningRefreshKey">
-    </app-planning-tab>
+    <app-events-stage-data [hidden]="activeTab !== 'planning'"></app-events-stage-data>
   </div>
 
   <!-- Side Panel for Stage Details -->

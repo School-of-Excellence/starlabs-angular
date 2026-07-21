@@ -3,6 +3,7 @@ import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
 
 export const routes: Routes = [
+  {path: 'slackwebhookurls',loadComponent:()=> import('./slackwebhookurls/slackwebhookurls.component').then(m => m.SlackwebhookurlsComponent), canActivate:[authGuard]},
   {path: 'journeyonboardingdetail', loadComponent: () => import('./journey-onboarding-detail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent), canActivate:[authGuard]},
   {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
   {path: 'login', loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)},
@@ -119,6 +120,7 @@ export const routes: Routes = [
   {path: 'tieraccessconfig', loadComponent: () => import('./content/tier-access-config/view-tier-access/view-tier-access.component').then(m => m.ViewTierAccessComponent), canActivate: [authGuard]},
   {path: 'event_participation_approve', loadComponent: () => import('./Events/event-participation-approve/event-participation-approve.component').then(m => m.EventParticipationApproveComponent), canActivate: [authGuard]},
   {path: 'event-participation-confirmation', loadComponent: () => import('./Events/event-participation-confirmations/event-participation-confirmations.component').then(m => m.EventParticipationConfirmationsComponent), canActivate: [authGuard]},
+  {path: 'events-stage-data', loadComponent: () => import('./Events/events-stage-data/events-stage-data.component').then(m => m.EventsStageDataComponent), canActivate: [authGuard]},
   {path: 'create_event', loadComponent: () => import('./Events/event-list/event-list.component').then(m => m.EventListComponent), canActivate: [authGuard]},
   {path: 'arena_e_ticket_approve', loadComponent: () => import('./Events/arena-e-ticket-approve/arena-e-ticket-approve.component').then(m => m.ArenaETicketApproveComponent), canActivate: [authGuard]},
   {path: 'qr-scanner', loadComponent: () => import('./Events/qr-scanner/qr-scanner.component').then(m => m.QrScannerComponent), canActivate: [authGuard]},
@@ -267,6 +269,9 @@ export const routes: Routes = [
   {path: 'create-workshop', loadComponent: () => import('./New-Workshop/create-workshop/create-workshop.component').then(m => m.CreateWorkshopComponent)},
   {path: 'workshopconfig/:id', loadComponent: () => import('./New-Workshop/workshop-configuration/workshop-configuration.component').then(m => m.WorkshopConfigurationComponent)},
   {path: 'workshops', loadComponent: () => import('./New-Workshop/workshops/workshops.component').then(m => m.WorkshopsComponent),canActivate:[authGuard]},
+  {path: 'eiflixhomeconfig', loadComponent: () => import('./New-Workshop/upcomingworkshops/upcomingworkshops.component').then(m => m.UpcomingworkshopsComponent)},
+  {path: 'newusersprofile', loadComponent: () => import('./New-Workshop/newusersprofile/newusersprofile.component').then(m => m.NewusersprofileComponent)},
+  {path: 'eiflixdiscoverpage', loadComponent: () => import('./New-Workshop/eiflixdiscoverpage/eiflixdiscoverpage.component').then(m => m.EiflixdiscoverpageComponent)},
   {path: 'workshop_dashboard/:id', loadComponent: () => import('./New-Workshop/workshop-dashboard/workshop-dashboard.component').then(m => m.WorkshopDashboardComponent), canActivate:[authGuard]},
   {path: 'formtemplateworkshop', loadComponent: () => import('./New-Workshop/form-assignment/form-assignment.component').then(m => m.FormAssignmentComponent), canActivate:[authGuard]},
   {path: 'productpageworkshop', loadComponent: () => import('./New-Workshop/product-page/product-page.component').then(m => m.ProductPageComponent),canActivate:[authGuard]},

@@ -336,6 +336,11 @@
   color: #92400e;
   border-color: #f6d199;
 }
+.type-badge.type-evergreen {
+  background: #e6f6ec;
+  color: #1e7e42;
+  border-color: #a9dfbf;
+}
 
 .date-cell {
   display: flex;
