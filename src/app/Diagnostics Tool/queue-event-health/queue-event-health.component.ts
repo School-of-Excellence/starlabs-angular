@@ -542,9 +542,10 @@ export class QueueEventHealthComponent {
   }
 
   async fixAllInvalidEventStatus() {
-    // Only fix records with missing event participation
+    // Only fix SELECTED records with missing event participation
     const recordsToFix = this.filteredRecords.filter(
       r =>
+        r.selected &&
         !r.validationPassed &&
         r.eventParticipationStatus === 'Not Found' &&
         !r.fixing
@@ -565,6 +566,9 @@ export class QueueEventHealthComponent {
         record.fixing = false;
       }
     }
+
+    // Clear selection after fixing
+    recordsToFix.forEach(r => r.selected = false);
 
     // Rebuild once after all fixes
     this.buildLiveReport();
@@ -647,6 +651,8 @@ export class QueueEventHealthComponent {
             prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
             queueid: d.data()['queueid'] ?? null,
             author: d.data()['author'] ?? [],
+            mentorref: d.data()['mentorref'] ?? [],
+            product: d.data()['product'] ?? '-',
             source: 'atc_alpha'
           }));
           this.calculateAtcGivenCounts();
@@ -674,6 +680,8 @@ export class QueueEventHealthComponent {
             prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
             queueid: d.data()['queueid'] ?? null,
             author: d.data()['author'] ?? [],
+            mentorref: d.data()['mentorref'] ?? [],
+            product: d.data()['product'] ?? '-',
             status: d.data()['status'] ?? null,
             source: 'atc_to_validate'
           }));
@@ -1314,6 +1322,7 @@ export class QueueEventHealthComponent {
 
       const resolved = await Promise.all(allAtcs.map(async (a: any) => {
         const authorNames = await this.resolveAuthorNames(a.author);
+        const mentorNames = await this.resolveAuthorNames(a.mentorref)
         const isValidated = a.source === 'atc_alpha' ? true : (a.status !== 'atc given');
         const noQueue = a.queueid === null || a.queueid === undefined || String(a.queueid).trim() === '';
         return {
@@ -1321,6 +1330,8 @@ export class QueueEventHealthComponent {
           source: a.source,
           prescriptionDate: a.prescriptionDate,
           authorNames,
+          mentorNames,
+          atcmodel: a.product,
           isValidated,
           noQueue,
           selected: false
