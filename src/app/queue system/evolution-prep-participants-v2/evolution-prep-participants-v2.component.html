@@ -150,8 +150,8 @@
         <div><strong>{{ countNeeds }}</strong><span>needs a recording</span></div>
       </div>
 
-      <div class="stat rebuild clickable" *ngIf="countRebuildable" (click)="focus('dataincomplete')"
-           matTooltip="Transcript is present but the ATC doc is still dataincomplete — rebuild it">
+      <div class="stat rebuild clickable" *ngIf="countRebuildable" (click)="focus('rebuildable')"
+           matTooltip="Every studio transcript is present, the ATC doc (owned by this queue) is still dataincomplete, and one Rebuild click will re-resolve it">
         <mat-icon>autorenew</mat-icon>
         <div><strong>{{ countRebuildable }}</strong><span>ready to rebuild</span></div>
       </div>

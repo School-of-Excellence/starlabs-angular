@@ -249,6 +249,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   filterTranscript = '';   // '' | 'yes' | 'no' | 'superseded' | 'nosession'
   filterCrossed = '';      // '' | 'yes' | 'no'
   filterGen: string[] = [];  // multi: 'none' | AtcStatus
+  filterRebuildable = false;
   filterOrigin = '';         // '' | 'here' | 'transferred'
 
   readonly genStatusOptions: AtcStatus[] =
@@ -635,19 +636,20 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         where('profile_id', '==', row.profile_id),
       ));
       const seen = new Set<string>();
-      for (const d of snap.docs) {
-        const l: any = d.data();
-        const laId = l.liveassignmentid;
-        if (!laId || seen.has(laId)) continue;
-        seen.add(laId);
+      const rows = snap.docs.map((d) => d.data()).filter((l: any) => {
+        const id = l.liveassignmentid;
+        if (!id || seen.has(id)) return false;
+        seen.add(id); return true;
+      });
+      await Promise.all(rows.map(async (l: any) => {
         let hasTranscript = false;
         try {
-          const la = await getDoc(doc(this.firestore, 'live assignment', laId));
+          const la = await getDoc(doc(this.firestore, 'live assignment', l.liveassignmentid));
           const ld: any = la.exists() ? la.data() : null;
           hasTranscript = !!(ld?.transcript_text && String(ld.transcript_text).trim());
         } catch { /* evidence only */ }
-        p.offLineage.push({ laId, queueId: l.queueref?.id ?? '?', hasTranscript });
-      }
+        p.offLineage.push({ laId: l.liveassignmentid, queueId: l.queueref?.id ?? '?', hasTranscript });
+      }));
     } catch (e) {
       console.error('probeOffLineage failed', e);
     }
@@ -655,7 +657,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
   /** Read each discovered live assignment and record whether a transcript exists. */
   private async hydrateHits(hits: LiveAssignmentHit[]): Promise<void> {
-    for (const h of hits) {
+    // Independent reads — fetch them together rather than one at a time.
+    await Promise.all(hits.map(async (h) => {
       try {
         const s = await getDoc(doc(this.firestore, 'live assignment', h.laId));
         const d: any = s.exists() ? s.data() : null;
@@ -667,7 +670,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       } catch {
         h.exists = false;
       }
-    }
+    }));
   }
 
   // ── generation docs (the "did an ATC doc get made" half of the funnel) ──────
@@ -877,12 +880,16 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   }
 
   /**
-   * Walk every row through a BOUNDED pool. A queue can hold ~700 Active tokens and
-   * each walk is several round-trips; firing them all at once (V1 used an unbounded
-   * Promise.all) stalls the tab and can exhaust the SDK's connection pool.
+   * Walk rows through a bounded pool. A queue holds ~700 Active tokens and each walk
+   * is several round-trips; an unbounded Promise.all (v1) stalls the tab and
+   * exhausts the SDK's long-polling connection pool. 12 is a deliberate ceiling —
+   * higher starts contending on that pool on this network. The per-row cost is also
+   * cut by parallelising the independent reads inside each walk (see hydrateHits /
+   * probeOffLineage) and by the token/queue/gen caches shared across all rows.
    */
+  private readonly WALK_POOL = 12;
   private async walkAll(): Promise<void> {
-    const POOL = 8;
+    const POOL = this.WALK_POOL;
     let cursor = 0;
     const rows = this.allRows;
 
@@ -1244,6 +1251,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       if (cr === 'yes' && r.crossed !== true) return false;
       if (cr === 'no' && r.crossed !== false) return false;
 
+      if (this.filterRebuildable && !this.isRebuildable(r)) return false;
+
       // multi-select: a row matches if it satisfies ANY chosen ATC-doc state.
       // 'none' means genuinely absent — a transferred-out token is not "missing"
       // a doc, its doc simply belongs to the destination queue.
@@ -1274,12 +1283,14 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     this.filterCrossed = '';
     this.filterGen = [];
     this.filterOrigin = '';
+    this.filterRebuildable = false;
     this.applyFilters();
   }
 
   /** One-click drill-downs from the telemetry tiles. */
   focus(kind: 'crossed' | 'needsLink' | 'superseded' | 'noSession' | 'noGen' | 'dataincomplete'
-              | 'here' | 'transferred' | 'offlineage' | 'transferredOut' | 'genElsewhere'): void {
+              | 'rebuildable' | 'here' | 'transferred' | 'offlineage' | 'transferredOut'
+              | 'genElsewhere'): void {
     this.clearFilters();
     if (kind === 'crossed') this.filterCrossed = 'yes';
     if (kind === 'needsLink') { this.filterCrossed = 'yes'; this.filterTranscript = 'no'; }
@@ -1289,6 +1300,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (kind === 'transferredOut') this.filterOrigin = 'out';
     if (kind === 'genElsewhere') this.filterGen = ['elsewhere'];
     if (kind === 'dataincomplete') this.filterGen = ['dataincomplete'];
+    if (kind === 'rebuildable') this.filterRebuildable = true;
     if (kind === 'here') this.filterOrigin = 'here';
     if (kind === 'transferred') this.filterOrigin = 'transferred';
     if (kind === 'offlineage') this.filterOrigin = 'offlineage';
@@ -1339,9 +1351,16 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     for (const r of this.allRows) if (r.genStatus) out[r.genStatus] = (out[r.genStatus] ?? 0) + 1;
     return out;
   }
-  /** Ready to rebuild right now: transcript present but ATC doc still blocked. */
-  get countRebuildable(): number {
-    return this.allRows.filter(
-      (r) => this.hasTranscript(r) && r.genDocId && r.genStatus === 'dataincomplete').length;
+  /**
+   * Ready to rebuild right now: every studio transcript is present, the ATC doc is
+   * still dataincomplete, AND it is owned by THIS queue (Rebuild calls
+   * regenerateAtcDoc on it; a doc that belongs to an ancestor/destination queue
+   * must not be regenerated from here, and its Rebuild button is hidden).
+   */
+  isRebuildable(r: Row): boolean {
+    return r.genIn === 'this'
+        && r.genStatus === 'dataincomplete'
+        && this.hasTranscript(r);
   }
+  get countRebuildable(): number { return this.allRows.filter((r) => this.isRebuildable(r)).length; }
 }
