@@ -436,21 +436,21 @@ mat-list-item:hover {
     flex-direction: column;
     gap: 10px;
   }
-  
+
   .procedure-row {
     flex-wrap: wrap;
   }
-  
+
   .procedure-name {
     flex: 0 0 100%;
     margin-bottom: 5px;
   }
-  
+
   .assigned-authors {
     flex: 1 0 100%;
     margin: 5px 0;
   }
-  
+
   .profile-image {
     width: 50px;
     height: 50px;
@@ -530,4 +530,42 @@ mat-list-item:hover {
   background: #e5e7eb;
   margin: 0 8px;
   flex-shrink: 0;
+}
+
+.product-edit-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+
+.product-select {
+  width: 150px;
+  /* removes the extra bottom space Angular Material reserves for hints/errors */
+  --mat-form-field-subscript-text-line-height: 0;
+}
+.product-select .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+.product-select .mat-mdc-text-field-wrapper {
+  height: 34px;
+}
+.product-select .mdc-notched-outline__notch,
+.product-select .mat-mdc-form-field-flex {
+  height: 34px;
+}
+.product-select .mat-mdc-form-field-infix {
+  min-height: unset;
+  padding: 5px 0;
+  display: flex;
+  align-items: center;
+}
+
+.cancelbtn-sm, .submitbtn-sm {
+  min-width: unset;
+  height: 34px;
+  line-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  margin: 0;
 }
