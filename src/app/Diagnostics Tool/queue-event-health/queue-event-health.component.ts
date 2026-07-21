@@ -128,6 +128,7 @@ export class QueueEventHealthComponent {
   pageSize = 10;
   currentPage = 1;
   totalPages = 1;
+  pageSizeOptions = [10, 25, 50, 100];
 
   /* ================= KPI ================= */
 
@@ -1899,6 +1900,12 @@ export class QueueEventHealthComponent {
   updatePage() {
     const start = (this.currentPage - 1) * this.pageSize;
     this.paginatedRecords = this.filteredRecords.slice(start, start + this.pageSize);
+  }
+
+  onPageSizeChange(event: any) {
+    this.pageSize = Number(event.target.value);
+    this.currentPage = 1;
+    this.calculatePagination();
   }
 
   prevPage() {

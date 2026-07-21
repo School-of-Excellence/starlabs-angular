@@ -457,6 +457,13 @@
     <button (click)="prevPage()" [disabled]="currentPage === 1">Prev</button>
     Page {{ currentPage }} / {{ totalPages }}
     <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+
+    <label style="margin-left:16px;">
+      Records per page:
+      <select [ngModel]="pageSize" (change)="onPageSizeChange($event)">
+        <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
+      </select>
+    </label>
   </div>
 
 </div>
