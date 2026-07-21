@@ -165,8 +165,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
    * Return null → quartile rows render structure with zero counts.
    */
   participantCompletionRatio(p: PanelParticipant): number | null {
-    // USER-OWNED (C-6): define the real ratio; null = "unknown" (excluded).
-    return null;
+    // CONFIRMED (C-6, Option A) — ATC completion per participant = adjustments
+    // completed / total adjustments (V1 atccompletionpercentage). The 100% tier =
+    // participants who fully completed their ATC. Participants with no adjustments
+    // (no ATC, adjTotal===0) are EXCLUDED (null) — they belong to the ATC "none"
+    // bucket, not a completion tier — and show "—" in the ATC % column.
+    const agg = this.data.participantAtc[p.profileid];
+    if (!agg || agg.adjTotal === 0) { return null; }
+    return agg.adjDone / agg.adjTotal;
   }
 
   // ==========================================================================

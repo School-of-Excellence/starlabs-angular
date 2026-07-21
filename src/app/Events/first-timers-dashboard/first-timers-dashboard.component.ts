@@ -388,6 +388,23 @@ export class FirstTimersDashboardComponent implements OnDestroy {
       let models: string[] = [];
       variationSnapshots.forEach(variationSnapshot => { variationSnapshot.docs.forEach((doc) => { models.push(doc.data()['atcmodel']); }); });
       this.atcModels = [...new Set(models)];
+      // TEMP DEBUG — why is a configured model (LYL) missing from atcModels?
+      this.selectedQueues.forEach((q) => {
+        const keys = Object.keys(q);
+        const lylHits = keys.filter(k => { try { return JSON.stringify(q[k]).includes('LYL'); } catch { return false; } });
+        console.log("[TEMP] selected queue:", q['queuename'] || q['name'],
+          "| ref:", this.getDocRefPath(q.docref),
+          "| all keys:", keys,
+          "| fields containing LYL:", lylHits,
+          "| LYL values:", lylHits.map(k => q[k]));
+      });
+      variationSnapshots.forEach((snap, i) => {
+        console.log("[TEMP] queue#" + i, "ref:", this.getDocRefPath(this.selectedQueueRefs[i]),
+          "| variation docs:", snap.docs.length,
+          "| atcmodels:", snap.docs.map(d => d.data()['atcmodel']),
+          "| variation.queueref:", snap.docs.map(d => { const qr: any = d.data()['queueref']; return qr && qr.path ? qr.path : qr; }));
+      });
+      console.log("[TEMP] final atcModels:", this.atcModels);
       this.subscribeToArenaOverview();
     } catch (error) { console.error('Error loading queue variation:', error); }
     finally { this.isLoadingQueues = false; }

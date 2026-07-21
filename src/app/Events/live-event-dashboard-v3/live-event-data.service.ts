@@ -125,7 +125,7 @@ export class LiveEventDataService implements OnDestroy {
   private lcwSub: Subscription | null = null;
   private lcwLiveSub: Subscription | null = null;
   private attendanceSub: Subscription | null = null;
-  private participantSub: Subscription | null = null;
+  private eTicketSub: Subscription | null = null;
   private videoAskSub: Subscription | null = null;
 
   // ==========================================================================
@@ -246,6 +246,7 @@ export class LiveEventDataService implements OnDestroy {
     console.log('[v3][select] event:', event['name'], '| window:', this.filterStartDate, '→', this.filterEndDate);
     await this.loadParticipants();
     this.calculateJourneyCounts();
+    this.subscribeToETickets();
     this.generateDayWiseStructure();
     this.applyDefaultProcedureDay();
     this.subscribeToAttendance();
@@ -277,45 +278,65 @@ export class LiveEventDataService implements OnDestroy {
     return this.selectedQueues.some(q => this.pathOf(q.docref) === this.pathOf(queue.docref));
   }
 
-  // ---- participant UNIVERSE — FT loadParticipants (arena e-ticket collection,
-  //      dedup by profileid, NO status filter). Real-time subscription; the FIRST
-  //      emission resolves the promise so selectEvent can continue, later emissions
-  //      re-derive every universe-dependent widget.
-  private loadParticipants(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      if (!this.selectedEvent) { resolve(); return; }
-      if (this.participantSub) { this.participantSub.unsubscribe(); this.participantSub = null; }
-      let first = true;
-      this.participantSub = collectionData(query(
-        collection(this.firestoreDefault, 'arena e-ticket'),
+  // ---- participant UNIVERSE — V2 loadParticipants (event participation request,
+  //      status in ['approved','attended'], dedup by profileid). Team-confirmed
+  //      source for eventParticipantProfileIds. registeredCount = its size.
+  private async loadParticipants(): Promise<void> {
+    if (!this.selectedEvent) return;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestoreDefault, 'event participation request'),
         where('eventref', '==', this.selectedEvent.docref),
-        where('active', '==', true)
-      ), { idField: 'id' }).subscribe({
-        next: (list: any[]) => {
-          const seen = new Set<string>();
-          list.forEach((d: any) => { const pid = d['profileid'] || ''; if (pid) { seen.add(pid); } });
-          this.eventParticipantProfileIds = [...seen];
-          // Universe == active arena e-ticket set. registered & "Generated"/scanned
-          // are the same set (operator-confirmed).
-          this.registeredCount = this.eventParticipantProfileIds.length;
-          this.scannedProfileIds = [...this.eventParticipantProfileIds];
-          this.scannedCount = this.scannedProfileIds.length;
-          this.notScannedProfileIds = [];
-          this.notScannedCount = 0;
-          this.eventParticipants = this.eventParticipantProfileIds.map(id => this.buildParticipantFromProfileId(id, false));
-          console.log('[v3][participants] event:', this.selectedEvent?.['name'],
-            '| arena e-ticket (active==true) universe = registered = generated:', this.eventParticipantProfileIds.length);
-          if (first) { first = false; resolve(); return; }
-          // Real-time universe change → re-derive dependents (FT re-runs procedures).
-          this.calculateJourneyCounts();
-          this.recomputeAttendanceDays();
-          this.recomputeAtcBuckets();
-          this.calculateProcedureData();
-          this.changed$.next();
-        },
-        error: (error) => { console.error('Error loading participants (arena e-ticket):', error); if (first) { first = false; resolve(); } }
+        where('status', 'in', ['approved', 'attended'])
+      ));
+      const seen = new Set<string>();
+      const docs: any[] = [];
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const profileId = data['profileid'] || '';
+        if (!profileId || seen.has(profileId)) return;
+        seen.add(profileId);
+        docs.push({ docref: d.id, profileid: profileId, ...data });
       });
+      this.eventParticipantProfileIds = [...seen];
+      this.registeredCount = this.eventParticipantProfileIds.length;
+      this.eventParticipants = docs.map(d => this.buildParticipantFromProfileId(d.profileid, false));
+      console.log('[v3][participants] event:', this.selectedEvent?.['name'],
+        '| approved/attended (registered universe):', this.registeredCount);
+    } catch (error) {
+      console.error('Error loading participants:', error);
+    }
+  }
+
+  // "Generated"/hero — V2 subscribeToETickets (arena e-ticket, active==true).
+  // A distinct set from the registered universe.
+  private subscribeToETickets(): void {
+    if (!this.selectedEvent) return;
+    if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
+    this.eTicketSub = collectionData(query(
+      collection(this.firestoreDefault, 'arena e-ticket'),
+      where('eventref', '==', this.selectedEvent.docref),
+      where('active', '==', true)
+    )).subscribe({
+      next: (list: any[]) => {
+        const scanned = new Set<string>();
+        list.forEach((d: any) => { const pid = d['profileid']; if (pid) { scanned.add(pid); } });
+        this.scannedProfileIds = [...scanned];
+        this.scannedCount = this.scannedProfileIds.length;
+        this.recomputeNotScanned();
+        console.log('[v3][hero/generated] e-ticket docs:', list.length,
+          '| registered:', this.registeredCount, '| scanned (hero):', this.scannedCount,
+          '| notScanned:', this.notScannedCount);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to e-tickets:', error)
     });
+  }
+
+  private recomputeNotScanned(): void {
+    const scanned = new Set(this.scannedProfileIds);
+    this.notScannedProfileIds = this.eventParticipantProfileIds.filter(id => !scanned.has(id));
+    this.notScannedCount = this.notScannedProfileIds.length;
   }
 
   // ---- attendance (V2 generateDayWiseStructure) ------------------------------
@@ -1069,7 +1090,7 @@ export class LiveEventDataService implements OnDestroy {
   private unsubscribeEventPipeline(): void {
     this.unsubscribeQueuePipeline();
     if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
-    if (this.participantSub) { this.participantSub.unsubscribe(); this.participantSub = null; }
+    if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
     if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
   }
 
@@ -1078,7 +1099,7 @@ export class LiveEventDataService implements OnDestroy {
   ngOnDestroy(): void {
     this.unsubscribeQueuePipeline();
     if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
-    if (this.participantSub) { this.participantSub.unsubscribe(); this.participantSub = null; }
+    if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
     if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
     if (this.eventSub) { this.eventSub.unsubscribe(); this.eventSub = null; }
     if (this.metadataSub) { this.metadataSub.unsubscribe(); this.metadataSub = null; }
