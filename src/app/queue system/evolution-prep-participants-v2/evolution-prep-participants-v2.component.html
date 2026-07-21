@@ -168,6 +168,18 @@
         <div><strong>{{ countNoSession }}</strong><span>no studio session</span></div>
       </div>
 
+      <div class="stat gap clickable" *ngIf="countNoDocFormPresent" (click)="focus('noDocFormPresent')"
+           matTooltip="Crossed, no ATC doc anywhere, but the config-stage form WAS submitted in this queue — the doc should exist. Genuine recovery gap; run the backfill.">
+        <mat-icon>report_problem</mat-icon>
+        <div><strong>{{ countNoDocFormPresent }}</strong><span>no doc · form present (gap)</span></div>
+      </div>
+
+      <div class="stat expected clickable" *ngIf="countNoDocFormMissing" (click)="focus('noDocFormMissing')"
+           matTooltip="Crossed but no config-stage form was submitted in this queue — so no ATC doc is created, by design. Expected, not a gap.">
+        <mat-icon>rule</mat-icon>
+        <div><strong>{{ countNoDocFormMissing }}</strong><span>no doc · no form (expected)</span></div>
+      </div>
+
       <div class="stat gen" *ngIf="countGen['dataincomplete']">
         <mat-icon>hourglass_bottom</mat-icon>
         <div><strong>{{ countGen['dataincomplete'] }}</strong><span>ATC dataincomplete</span></div>
@@ -219,6 +231,15 @@
           <mat-option value="none">— not created —</mat-option>
           <mat-option value="out">— doc in another queue —</mat-option>
           <mat-option *ngFor="let s of genStatusOptions" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Config-stage form (no-doc rows)</mat-label>
+        <mat-select [(ngModel)]="filterConfigData" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="present">✅ Form present — doc missing (gap)</mat-option>
+          <mat-option value="missing">➖ No form — no doc (expected)</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -412,6 +433,15 @@
                   matTooltip="No queue_atc_generation doc is keyed to this queue_token">
               <mat-icon>remove</mat-icon> none
             </span>
+            <div class="cfgform" *ngIf="!row.genDocId && row.ownFormPresent !== null"
+                 [class.cfg-gap]="row.ownFormPresent === true"
+                 [class.cfg-ok]="row.ownFormPresent === false"
+                 [matTooltip]="row.ownFormPresent
+                   ? 'The config-stage form WAS submitted in this queue, yet no ATC doc exists — the pipeline should have created one. Recovery gap; backfill will create it.'
+                   : 'No config-stage form was submitted in this queue, so no ATC doc is created — expected, not a gap.'">
+              <mat-icon>{{ row.ownFormPresent ? 'report_problem' : 'info' }}</mat-icon>
+              {{ row.ownFormPresent ? 'form present — doc missing' : 'no config form' }}
+            </div>
             <div class="othertok" *ngIf="row.genOtherToken"
                  matTooltip="A gen doc exists for this PROFILE but under a different queue_token. Docs are keyed to a token, so this one still has none — usually a duplicate or rebuilt token.">
               <mat-icon>warning</mat-icon> doc under another token

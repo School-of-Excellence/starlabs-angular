@@ -78,7 +78,8 @@ export interface PairingCfg {
 /** One `atcrequiredstages` entry with generateatc:true — what the picker offers. */
 export interface AtcStageCfg {
   stage: string;                 // the .stage field, e.g. "Guided Self ATC"
-  ownType: string | null;        // the entry's own `type`
+  ownType: string | null;        // the entry's own `type` (form | zoom)
+  ownFormId: string | null;      // stageproperty[stage].actionresource.id, when form-typed
   pairings: PairingCfg[];
 }
 
@@ -195,6 +196,16 @@ export interface Row {
   genOtherToken: boolean;
   genMissing: string[];         // what is ACTUALLY blocking — see blockingMissing()
 
+  /**
+   * Is the config stage's OWN source (its form) present for this participant in
+   * THIS queue? The gate processStage checks: no own form under the queue => no gen
+   * doc is ever created, by design. Set only for a crossed row with no doc anywhere
+   * (where it explains the absence): true => doc SHOULD exist (recovery gap / needs
+   * backfill); false => no ATC form submitted here => correctly no doc (expected).
+   * null = not applicable (a doc exists, not crossed, or own source isn't a form).
+   */
+  ownFormPresent: boolean | null;
+
   rebuilding: boolean;
   _token: any;
 }
@@ -250,6 +261,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   filterCrossed = '';      // '' | 'yes' | 'no'
   filterGen: string[] = [];  // multi: 'none' | AtcStatus
   filterRebuildable = false;
+  filterConfigData = '';   // '' | 'present' | 'missing' (own config form, among no-doc rows)
   filterOrigin = '';         // '' | 'here' | 'transferred'
 
   readonly genStatusOptions: AtcStatus[] =
@@ -272,6 +284,14 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   private genProfiles = new Set<string>();
   /** queueId → promise of its gen-doc load, so each queue is scanned at most once. */
   private genQueueLoads = new Map<string, Promise<void>>();
+  /**
+   * profileids who submitted the config stage's OWN form IN the selected queue —
+   * bulk-loaded with ONE query, not one per participant. This is the gate
+   * processStage checks (own source, queueref-scoped), so membership tells whether
+   * a missing gen doc is a genuine gap (form present) or expected (no form).
+   */
+  private ownFormProfiles = new Set<string>();
+  private ownFormLoaded = false;
 
   /** Stages that are studio (zoom) stages ANYWHERE — see buildZoomCapableSet(). */
   private zoomCapable = new Set<string>();
@@ -359,6 +379,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
           .map((s) => ({
             stage: String(s.stage),
             ownType: s?.type ?? null,
+            ownFormId: (data?.stageproperty ?? {})[String(s.stage)]?.actionresource?.id ?? null,
             pairings: this.normalizePairing(s?.pairingstages)
               .map((p) => ({ ...p, zoom: this.zoomCapable.has(p.stage) })),
           }));
@@ -713,6 +734,38 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     this.genByToken.clear();
     this.genProfiles.clear();
     this.genQueueLoads.clear();
+    this.ownFormProfiles.clear();
+    this.ownFormLoaded = false;
+  }
+
+  /**
+   * Bulk-load the set of profiles who submitted the config stage's own form in the
+   * selected queue — a single formsByClient query (two equality filters: formid +
+   * queueref, no composite index needed), not one read per participant. queueref in
+   * formsByClient is a DocumentReference at path "queue generation/{id}" built on
+   * the forms DB (that is what the pipeline's resolver matches against). Only
+   * meaningful when the own source is a form; a zoom own stage leaves the set empty
+   * and ownFormPresent stays null.
+   */
+  private async loadOwnFormProfiles(): Promise<void> {
+    this.ownFormProfiles.clear();
+    this.ownFormLoaded = false;
+    const cfg = this.atcCfg;
+    if (!cfg || cfg.ownType !== 'form' || !cfg.ownFormId) return;   // can't bulk-check a non-form own source
+    try {
+      const snap = await getDocs(query(
+        collection(this.atcSvc.formsDb, 'formsByClient'),
+        where('formid', '==', cfg.ownFormId),
+        where('queueref', '==', doc(this.atcSvc.formsDb, 'queue generation', this.selectedQueueId)),
+      ));
+      snap.docs.forEach((d) => {
+        const pid = (d.data() as any)?.profileid;
+        if (pid) this.ownFormProfiles.add(pid);
+      });
+      this.ownFormLoaded = true;
+    } catch (e) {
+      console.error('loadOwnFormProfiles failed', e);
+    }
   }
 
   /**
@@ -789,6 +842,9 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     row.genStatus = (hit?.data.status ?? null) as AtcStatus | null;
     row.genIn = where;
     row.genOtherToken = !hit && this.genProfiles.has(row.profile_id);
+    // Only explanatory for a crossed row with NO doc anywhere; otherwise n/a.
+    row.ownFormPresent = (!hit && row.crossed && this.ownFormLoaded)
+      ? this.ownFormProfiles.has(row.profile_id) : null;
     if (hit && where !== 'this') row.genInQueueName = this.queueLabel(hit.queueId);
     const sd: any = hit ? (hit.data as any).stagedata ?? {} : null;
     row.genMissing = hit ? this.blockingMissing(sd) : [];
@@ -818,6 +874,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
     try {
       this.resetGenCaches();
+      await this.loadOwnFormProfiles();   // one query — the config-stage own-form gate
       const rows: Row[] = [];
       const cfgPairings = this.atcCfg?.pairings ?? [];
       {
@@ -855,7 +912,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
               dropboxLink: '', saving: false,
             })),
             genDocId: null, genStatus: null, genMissing: [], genIn: null,
-            genInQueueName: '', genOtherToken: false,
+            genInQueueName: '', genOtherToken: false, ownFormPresent: null,
             rebuilding: false,
             _token: t,
           });
@@ -1014,8 +1071,10 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (r.genIn === 'destination') return `ATC doc is in ${r.genInQueueName || 'the queue they went to'}`;
     if (r.genOtherToken) return 'ATC doc exists under a DIFFERENT token — check for a duplicate';
     if (!r.genDocId) {
+      if (r.crossed && r.ownFormPresent === true) return 'config form submitted — ATC doc missing (backfill)';
+      if (r.crossed && r.ownFormPresent === false) return 'no config form submitted — no ATC doc expected';
       if (r.transferredOut) return `transferred out — no ATC doc in either queue`;
-      return r.crossed ? 'transcript ready — no ATC doc yet' : 'transcript ready — waiting to cross';
+      return r.crossed ? 'crossed — no ATC doc yet' : 'not yet crossed';
     }
     if (r.genStatus === 'dataincomplete') {
       return r.genMissing.length ? `rebuild — needs ${r.genMissing.join('; ')}` : 'rebuild';
@@ -1252,6 +1311,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       if (cr === 'no' && r.crossed !== false) return false;
 
       if (this.filterRebuildable && !this.isRebuildable(r)) return false;
+      if (this.filterConfigData === 'present' && !this.noDocFormPresent(r)) return false;
+      if (this.filterConfigData === 'missing' && !this.noDocFormMissing(r)) return false;
 
       // multi-select: a row matches if it satisfies ANY chosen ATC-doc state.
       // 'none' means genuinely absent — a transferred-out token is not "missing"
@@ -1284,13 +1345,14 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     this.filterGen = [];
     this.filterOrigin = '';
     this.filterRebuildable = false;
+    this.filterConfigData = '';
     this.applyFilters();
   }
 
   /** One-click drill-downs from the telemetry tiles. */
   focus(kind: 'crossed' | 'needsLink' | 'superseded' | 'noSession' | 'noGen' | 'dataincomplete'
               | 'rebuildable' | 'here' | 'transferred' | 'offlineage' | 'transferredOut'
-              | 'genElsewhere'): void {
+              | 'genElsewhere' | 'noDocFormPresent' | 'noDocFormMissing'): void {
     this.clearFilters();
     if (kind === 'crossed') this.filterCrossed = 'yes';
     if (kind === 'needsLink') { this.filterCrossed = 'yes'; this.filterTranscript = 'no'; }
@@ -1301,6 +1363,8 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (kind === 'genElsewhere') this.filterGen = ['elsewhere'];
     if (kind === 'dataincomplete') this.filterGen = ['dataincomplete'];
     if (kind === 'rebuildable') this.filterRebuildable = true;
+    if (kind === 'noDocFormPresent') { this.filterCrossed = 'yes'; this.filterConfigData = 'present'; }
+    if (kind === 'noDocFormMissing') { this.filterCrossed = 'yes'; this.filterConfigData = 'missing'; }
     if (kind === 'here') this.filterOrigin = 'here';
     if (kind === 'transferred') this.filterOrigin = 'transferred';
     if (kind === 'offlineage') this.filterOrigin = 'offlineage';
@@ -1363,4 +1427,15 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         && this.hasTranscript(r);
   }
   get countRebuildable(): number { return this.allRows.filter((r) => this.isRebuildable(r)).length; }
+
+  /** Crossed, no doc anywhere, and the config-stage OWN form IS present here. */
+  noDocFormPresent(r: Row): boolean {
+    return r.crossed === true && !r.genDocId && r.ownFormPresent === true;
+  }
+  /** Crossed, no doc anywhere, and the config-stage OWN form is MISSING here. */
+  noDocFormMissing(r: Row): boolean {
+    return r.crossed === true && !r.genDocId && r.ownFormPresent === false;
+  }
+  get countNoDocFormPresent(): number { return this.allRows.filter((r) => this.noDocFormPresent(r)).length; }
+  get countNoDocFormMissing(): number { return this.allRows.filter((r) => this.noDocFormMissing(r)).length; }
 }

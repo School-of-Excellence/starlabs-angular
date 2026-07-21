@@ -375,3 +375,14 @@ td.mat-mdc-cell { font-size: 13px; color: #2b3140; padding: 10px 12px; vertical-
   font-size: 10px; color: #e65100; margin-top: 3px;
 }
 .othertok mat-icon { font-size: 12px; width: 12px; height: 12px; }
+
+/* config-stage own-form diagnosis (why no ATC doc) */
+.stat.gap { border-left-color: #c62828; } .stat.gap mat-icon { color: #c62828; }
+.stat.expected { border-left-color: #9aa0ac; } .stat.expected mat-icon { color: #9aa0ac; }
+.cfgform {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; margin-top: 3px;
+}
+.cfgform mat-icon { font-size: 12px; width: 12px; height: 12px; }
+.cfgform.cfg-gap { color: #c62828; font-weight: 600; }
+.cfgform.cfg-ok  { color: #9aa0ac; }

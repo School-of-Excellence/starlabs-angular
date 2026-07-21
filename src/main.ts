@@ -34,6 +34,12 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   // The network blocks Firestore WebChannel streaming, so long-polling avoids
   // the "RPC 'Listen' stream transport errored" first-load stall for all ATC screens.
   initializeFirestore(app, { experimentalForceLongPolling: true }, 'firestore-atc');
+  // Named DB `firestore-forms`: same long-polling transport, same reason (blocked
+  // WebChannel streaming). The ATC ops screens read participant form submissions
+  // (formsByClient) to tell whether a config-stage own source exists. Initialized
+  // here, at the earliest point, so getFirestore('firestore-forms') consumers reuse
+  // this instance with a consistent transport.
+  initializeFirestore(app, { experimentalForceLongPolling: true }, 'firestore-forms');
 }
 
 (window as any).process = {
