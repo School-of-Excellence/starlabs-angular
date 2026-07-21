@@ -479,14 +479,22 @@ export class QueueEventHealthComponent {
           ? 'approved'
           : 'denied';
 
+      // Use the already-loaded pp doc instead of querying again —
+      const pp = this.livePpDocs.find(p => p.id === ppid);
+      if (!pp) {
+        console.warn('Participantsproduct document not found for ppid:', ppid);
+        return;
+      }
+      const ppRef = doc(this.firestoreDefault, 'participantsproduct', pp.id);
+
       //Create event participation request
       // Generate docID
       const epRef = doc(
         collection(this.firestoreDefault, 'event participation request')
       );
 
-      // SINGLE atomic write
-      await setDoc(epRef, {
+      const batch = writeBatch(this.firestoreDefault);
+      batch.set(epRef, {
         docid: epRef.id,
         doccreateddate: serverTimestamp(),
         eventref: selectedQueueRef,
@@ -498,24 +506,12 @@ export class QueueEventHealthComponent {
         initiatedfrom: 'health'
       });
 
-
-      // eventparticipationid into participantsproduct
-      const ppQuery = query(
-        collection(this.firestoreDefault, 'participantsproduct'),
-        where('docid', '==', ppid)
-      );
-
-      const ppSnap = await getDocs(ppQuery);
-
-      if (!ppSnap.empty) {
-        await updateDoc(ppSnap.docs[0].ref, {
-          eventparticipationid: epRef.id,
-          eventref: selectedQueueRef,
-          arenaeventid: arenaeventid
-        });
-      } else {
-        console.warn('Participantsproduct document not found for ppid:', ppid);
-      }
+      batch.update(ppRef, {
+        eventparticipationid: epRef.id,
+        eventref: selectedQueueRef,
+        arenaeventid: arenaeventid
+      });
+      await batch.commit();
 
       // OPTIMISTIC UPDATE (this is the key)
       this.liveEventParticipationDocs.push({
