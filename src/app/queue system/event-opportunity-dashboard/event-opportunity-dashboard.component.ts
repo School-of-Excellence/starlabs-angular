@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CdkDragDrop, moveItemInArray, DragDropModule } from '@angular/cdk/drag-drop';
-import { collection, collectionData, Firestore, getDoc, getDocs, orderBy, query, where, doc, deleteDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, collectionData, documentId, Firestore, getDoc, getDocs, orderBy, query, where, doc, deleteDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -90,6 +90,14 @@ export class EventOpportunityDashboardComponent {
   mapQueue = {}
   showQueueSelect: boolean = true
   mapData = {}
+
+  // Webhook presence: `live assignment log` docs (keyed by live-assignment id) for
+  // the live assignments across the selected queues. Used only to decide "has the
+  // call started + how long ago" from the specialist's real join time. Subscribed
+  // via documentId() IN chunks; re-subscribes when the id set changes.
+  private logByLaId: Record<string, any> = {};
+  private logSubs: Subscription[] = [];
+  private logSubKey = '';
   mapLiveAssignmentData = {};
   mapProfile = {}
   mapEmail = {}
@@ -131,10 +139,12 @@ export class EventOpportunityDashboardComponent {
   hideParticipants: boolean = false;
   private initializedStagesPerQueue: Set<string> = new Set();
   private seenStageKeys: Set<string> = new Set();
+  private readonly STUDIO_WATCH_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 hours
   private studioWatchTimer: any = null;
-  private studioWatchTick = 0;     // bumped by a timer so elapsed labels refresh
+  private studioWatchTick = 0; // bumped by a timer so elapsed labels refresh
   planningQueues: string[] = []
   get loadedQueues(): string[] { return [...new Set([...this.selectedQueueList, ...this.planningQueues])]; }
+  studioWatchOpen = false;  
 
   isStageVisibleOnScreen(queueid: string, stage: string): boolean {
     const opp = this.getStageTokenCount(queueid, stage, 'waiting') + this.getStageTokenCount(queueid, stage, 'queued');
@@ -223,6 +233,8 @@ export class EventOpportunityDashboardComponent {
   ngOnDestroy() {
     if (this.studioWatchTimer) clearInterval(this.studioWatchTimer);
     this.queueTokensSub?.unsubscribe();
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
     this.subscription.complete();
     this.subscription.next();
   }
@@ -493,6 +505,7 @@ export class EventOpportunityDashboardComponent {
 
   handleEventData(eventData: any, queueId: string): void {
     this.mapData[queueId] = eventData;
+    this.subscribeStudioWatchLogs();
     this.mapLiveAssignmentData = eventData["mapLiveStudioToData"];
     this.rebuildCompletedMaps(queueId, eventData["liveAssignmentList"] || []);
     const stages: string[] = eventData["stages"] || [];
@@ -1340,6 +1353,153 @@ export class EventOpportunityDashboardComponent {
       .filter((name: string) => name);
 
     return names.join(', ') || studioId;
+  }
+
+  // ===== Studio Watch =====================================================
+
+  private tsToMillis(ts: any): number | null {
+    if (!ts) return null;
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+    const d = new Date(ts);
+    const t = d.getTime();
+    return isNaN(t) ? null : t;
+  }
+
+  // Subscribe to `live assignment log` for the LIVE assignments across the selected
+  // queues (documentId() IN, chunks of 30). Re-subscribes only when the id set
+  // changes. Feeds specialistJoinedMs() so "call started" reflects the real join.
+  private subscribeStudioWatchLogs(): void {
+    const ids: string[] = [];
+    for (const queueid of this.selectedQueueList) {
+      const list: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+      for (const a of list) {
+        if (a?.['status'] !== 'live') continue;
+        const id = a?.['id'] || a?.['docid'];
+        if (id) ids.push(id);
+      }
+    }
+    const uniq = Array.from(new Set(ids));
+    const key = uniq.slice().sort().join(',');
+    if (key === this.logSubKey) return;
+    this.logSubKey = key;
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
+    this.logByLaId = {};
+    for (let i = 0; i < uniq.length; i += 30) {
+      const chunk = uniq.slice(i, i + 30);
+      const sub = collectionData(
+        query(collection(this.firestore, 'live assignment log'), where(documentId(), 'in', chunk)),
+        { idField: 'docid' }
+      ).subscribe(
+        (rows: any[]) => { rows.forEach(r => { this.logByLaId[r['docid']] = r; }); },
+        () => {}
+      );
+      this.logSubs.push(sub);
+    }
+  }
+
+  // Real "specialist joined" time in ms for an assignment: earliest specialist join
+  // from the webhook log when available (log present but nobody joined → null =
+  // "not started"), else the legacy `specialistJoinedAt` one-shot as a fallback.
+  private specialistJoinedMs(a: any): number | null {
+    const id = a?.['id'] || a?.['docid'];
+    const log = id ? this.logByLaId[id] : null;
+    if (log) {
+      const specialists: any = log['specialists'] || {};
+      const joinedTs = Object.values(specialists).map((s: any) => s?.joinedAt).filter(Boolean);
+      if (!joinedTs.length) return null;
+      const earliest = joinedTs.reduce((x: any, y: any) =>
+        (this.tsToMillis(x) ?? Infinity) <= (this.tsToMillis(y) ?? Infinity) ? x : y);
+      return this.tsToMillis(earliest);
+    }
+    return this.tsToMillis(a?.['specialistJoinedAt']);
+  }
+
+  /**
+   * Studios flagged by the 4-hour rule across the currently selected board
+   * queues. JOINED assignments are measured from `created` (studio entry);
+   * ACTIVE assignments (call started) from the specialist's real join time
+   * (webhook log, falling back to `specialistJoinedAt`). Sorted longest-waiting first.
+   */
+  get studioWatchItems(): Array<{
+    key: string;
+    queueid: string;
+    queuename: string;
+    stage: string;
+    type: 'joined' | 'active';
+    participant: string;
+    coach: string;
+    studioLabel: string;
+    elapsedMs: number;
+  }> {
+    void this.studioWatchTick; // re-evaluate on each tick so timers advance
+    const now = Date.now();
+    const out: Array<any> = [];
+
+    for (const queueid of this.selectedQueueList) {
+      const list: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+      const queuename = this.mapQueue[queueid]?.['queuename'] ?? queueid;
+
+      for (const a of list) {
+        if (a?.['status'] !== 'live') continue;
+        const stage = a?.['stagename'];
+        if (!stage) continue;
+        if (!this.isStageSelected(queueid, stage)) continue;
+
+        const joinedMs = this.specialistJoinedMs(a);
+        const type: 'joined' | 'active' = joinedMs != null ? 'active' : 'joined';
+        const startMs = joinedMs != null ? joinedMs : this.tsToMillis(a?.['created']);
+        if (startMs == null) continue;
+
+        const elapsedMs = now - startMs;
+        if (elapsedMs < this.STUDIO_WATCH_THRESHOLD_MS) continue;
+
+        // Respect the active event filter when one is applied.
+        const participantId = a?.['participantid'];
+        if (this.filteredProfileIds.size > 0 && !this.filteredProfileIds.has(participantId)) continue;
+
+        const pairing: string[] = a?.['pairing'] || [];
+        const coach = pairing.map(pid => this.mapProfile[pid] || pid).filter(Boolean).join(', ');
+
+        out.push({
+          key: a?.['id'] || a?.['docid'] || `${queueid}-${a?.['studioid']}`,
+          queueid,
+          queuename,
+          stage,
+          type,
+          participant: this.mapProfile[participantId] || participantId || '—',
+          coach: coach || '—',
+          studioLabel: this.getStudioWatchStudioLabel(queueid, a?.['studioid']) || queuename,
+          elapsedMs,
+        });
+      }
+    }
+
+    return out.sort((x, y) => y.elapsedMs - x.elapsedMs);
+  }
+
+  get studioWatchCount(): number {
+    return this.studioWatchItems.length;
+  }
+
+  private getStudioWatchStudioLabel(queueid: string, studioid: string): string {
+    const studio = this.mapData[queueid]?.['studioMap']?.[studioid];
+    if (!studio) return '';
+    const named = studio['studioname'] || studio['name'];
+    if (named && named !== 'Studio') return named;
+    const participants: string[] = studio['participants'] || [];
+    return participants.map(id => this.mapProfile[id] || id).filter(Boolean).join(', ');
+  }
+
+  /** "5h 12m" style elapsed label. */
+  formatWatchElapsed(ms: number): string {
+    if (ms == null || ms < 0) ms = 0;
+    const totalMin = Math.floor(ms / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h <= 0) return `${m}m`;
+    return `${h}h ${m.toString().padStart(2, '0')}m`;
   }
 
   formatActivityDate(timestamp: any): string {

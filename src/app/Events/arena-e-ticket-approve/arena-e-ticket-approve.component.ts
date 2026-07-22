@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
@@ -30,38 +31,51 @@ import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/pr
     MatSortModule,
     MatButtonModule,
     MatIconModule,
+    MatProgressSpinnerModule,
     ProfilePictureComponent
   ],
   templateUrl: './arena-e-ticket-approve.component.html',
   styleUrl: './arena-e-ticket-approve.component.css'
 })
 export class ArenaETicketApproveComponent {
-  displayedColumns: string[] = ["profileid","eventdate","eventref","productref","action","active"];
+  displayedColumns: string[] = ["profileid","eventdate","eventref","productref","venuefee","contract","action","active"];
   dataSource: MatTableDataSource<any> = new MatTableDataSource();
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
 
   mapEvents = {}
   selectedEvent = null
+  loading = false
 
   mapProfile = {}
   mapArenaETicket = {}
-  
+  mapEligibility = {}
+
   mapProducts={}
   filterForm = {
-    profileid:null,
-    event:[]
+    profileids:[],
+    card:null
+  }
+  // Active summary-card filter (one at a time); null = no card filter
+  cardFilter: string | null = null
+  // Counts shown in the top summary cards, recomputed whenever the event data changes
+  summary = {
+    total:0,
+    venuePaid:0, venueNotPaid:0,
+    contractSigned:0, contractNotSigned:0,
+    eticketApproved:0, eticketNotApproved:0
   }
   filterText= ""
   profileList = []
-  filterEvent = ""
+  selectEventSearch = ""
   eventList = []
 
   private destroy$ = new Subject<void>()
+  private eventChange$ = new Subject<void>()
   private firestore = inject(Firestore)
   constructor(){
     const eventCollRef = collection(this.firestore,"event collection")
-    const eventCollQuery = query(eventCollRef,orderBy("end_date","desc"))
+    const eventCollQuery = query(eventCollRef,orderBy("start_date","desc"))
     getDocs(eventCollQuery).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const element = snap.docs[i];
@@ -93,9 +107,19 @@ export class ArenaETicketApproveComponent {
 
   ngOnInit(): void {
     this.dataSource.filterPredicate = this.customfilter()
+    // Sort the "Name" column by the resolved participant name, not the raw profileid
+    this.dataSource.sortingDataAccessor = (row:any, column:string) => {
+      if(column === 'profileid'){
+        return (this.mapProfile[row['profileid']]?.['name'] || '').toString().trim().toLowerCase()
+      }
+      const value = row[column]
+      return typeof value === 'string' ? value.toLowerCase() : value
+    }
   }
 
   ngOnDestroy(){
+    this.eventChange$.next()
+    this.eventChange$.complete()
     this.destroy$.next()
     this.destroy$.complete()
   }
@@ -104,13 +128,20 @@ export class ArenaETicketApproveComponent {
     this.dataSource.filter = JSON.stringify(this.filterForm)
   }
 
+  clearProfileFilter(event?:Event){
+    event?.stopPropagation()
+    this.filterForm.profileids = []
+    this.onFilter()
+  }
+
   filterProfile(){
     let filterValue = this.filterText != null && this.filterText != "" ? this.filterText.trim().toLowerCase() : ""
     return this.profileList.filter(e => e['name'] != undefined ?  e['name'].trim().toLowerCase().includes(filterValue) : false)
   }
   
-  filterEvents(){
-    let filterValue = this.filterEvent != null && this.filterEvent != "" ? this.filterEvent.trim().toLowerCase() : ""
+  // Search list for the "Select Event" dropdown — eventList is already sorted by start_date (desc)
+  filterSelectEvents(){
+    let filterValue = this.selectEventSearch != null && this.selectEventSearch != "" ? this.selectEventSearch.trim().toLowerCase() : ""
     return this.eventList.filter(e => e['name'] != undefined ? e['name'].trim().toLowerCase().includes(filterValue) : false)
   }
   
@@ -118,31 +149,137 @@ export class ArenaETicketApproveComponent {
     let filterFunction = (data:any, filter:any):boolean => {
       let e = data
       let value = JSON.parse(filter);
-      return (value['profileid'] != null ? (e['profileid'] === value['profileid']) : true) && 
-            (value['event'].length != 0 ? (value['event'].includes(e['eventref'].id)) : true) 
-            // (value['productid'].length != 0 ? (value['productid'].includes(e['productref'].id)) : true)
+      return (value['profileids'] && value['profileids'].length != 0 ? value['profileids'].includes(e['profileid']) : true) &&
+            this.matchesCard(e, value['card'])
     }
     return filterFunction;
   }
 
+  // --- Summary-card classification (mirrors the table columns exactly) ---
+  isVenuePaid(row:any):boolean{ return this.getVenueFeeStatus(row) === 'Paid' }
+  isContractSigned(row:any):boolean{ return this.getContractStatus(row) === 'completed' }
+  isETicketApproved(row:any):boolean{ return this.mapArenaETicket[row['profileid']] != undefined }
+
+  private matchesCard(row:any, card:string | null):boolean{
+    switch(card){
+      case 'venue_paid': return this.isVenuePaid(row)
+      case 'venue_notpaid': return !this.isVenuePaid(row)
+      case 'contract_signed': return this.isContractSigned(row)
+      case 'contract_notsigned': return !this.isContractSigned(row)
+      case 'eticket_approved': return this.isETicketApproved(row)
+      case 'eticket_notapproved': return !this.isETicketApproved(row)
+      default: return true
+    }
+  }
+
+  computeSummary(){
+    const rows = this.dataSource.data || []
+    let venuePaid=0, contractSigned=0, eticketApproved=0
+    for(const row of rows){
+      if(this.isVenuePaid(row)) venuePaid++
+      if(this.isContractSigned(row)) contractSigned++
+      if(this.isETicketApproved(row)) eticketApproved++
+    }
+    const total = rows.length
+    this.summary = {
+      total,
+      venuePaid, venueNotPaid: total - venuePaid,
+      contractSigned, contractNotSigned: total - contractSigned,
+      eticketApproved, eticketNotApproved: total - eticketApproved
+    }
+  }
+
+  // Click a summary card to filter the table by that bucket; click the active one to clear
+  toggleCard(card:string){
+    this.cardFilter = this.cardFilter === card ? null : card
+    this.filterForm.card = this.cardFilter
+    this.onFilter()
+  }
+
   onEventSelect(){
+    // Tear down the previously selected event's live subscriptions and reset per-event state
+    // so the old event's data no longer flows into the table/maps after switching events.
+    this.eventChange$.next()
+    this.mapArenaETicket = {}
+    this.mapEligibility = {}
+    this.dataSource.data = []
+    this.loading = true
+    this.cardFilter = null
+    this.filterForm.card = null
+    this.computeSummary()
+
     let eventRef = doc(this.firestore,"event collection",this.selectedEvent)
 
     const eventPartReqCollRef = collection(this.firestore,"event participation request")
     const eventPartReqQuery = query(eventPartReqCollRef,where("eventref","==",eventRef),where("status","==","approved"))
-    collectionData(eventPartReqQuery).pipe(takeUntil(this.destroy$)).subscribe(eventParticipationSnap => {
+    collectionData(eventPartReqQuery).pipe(takeUntil(this.eventChange$),takeUntil(this.destroy$)).subscribe(eventParticipationSnap => {
       this.dataSource.data = eventParticipationSnap
-      this.ngAfterViewInit()
+      this.loading = false
+      this.computeSummary()
+      // paginator/sort live inside the *ngIf="!loading" block — wire them after the
+      // table has rendered, otherwise the @ViewChild refs are still undefined here.
+      setTimeout(() => this.ngAfterViewInit())
     })
 
     const arenaETicketCollRef = collection(this.firestore,"arena e-ticket")
     const arenaETicketQuery = query(arenaETicketCollRef,where("eventref","==",eventRef))
-    collectionData(arenaETicketQuery).pipe(takeUntil(this.destroy$)).subscribe(eticketsnap => {
+    collectionData(arenaETicketQuery).pipe(takeUntil(this.eventChange$),takeUntil(this.destroy$)).subscribe(eticketsnap => {
+      this.mapArenaETicket = {}
       for (let i = 0; i < eticketsnap.length; i++) {
         const element = eticketsnap[i];
         this.mapArenaETicket[element['profileid']] = element
       }
+      this.computeSummary()
+      this.onFilter()
     })
+
+    // e-ticket eligibility (mirrored from Watson) — keyed per EPR by eventparticipationid
+    const eligibilityCollRef = collection(this.firestore,"e-ticket eligibility")
+    const eligibilityQuery = query(eligibilityCollRef,where("eventid","==",this.selectedEvent))
+    collectionData(eligibilityQuery).pipe(takeUntil(this.eventChange$),takeUntil(this.destroy$)).subscribe(eligibilitysnap => {
+      this.mapEligibility = {}
+      for (let i = 0; i < eligibilitysnap.length; i++) {
+        const element = eligibilitysnap[i];
+        this.mapEligibility[element['eventparticipationid']] = element
+      }
+      this.computeSummary()
+      this.onFilter()
+    })
+  }
+
+  // Venue fee column — exempted / paid / not paid, from the e-ticket eligibility mirror
+  getVenueFeeStatus(row:any):string{
+    const eligibility = this.mapEligibility[row['docid']]
+    if([null,undefined].includes(eligibility)){
+      return '—'
+    }
+    if(eligibility['exempted'] === true){
+      return 'Exempted'
+    }
+    return eligibility['venue_fee_paid'] === true ? 'Paid' : 'Not paid'
+  }
+
+  // Contract column — zohostatus from the e-ticket eligibility mirror
+  getContractStatus(row:any):string{
+    const eligibility = this.mapEligibility[row['docid']]
+    if([null,undefined].includes(eligibility) || [null,undefined,''].includes(eligibility['zohostatus'])){
+      return '—'
+    }
+    return eligibility['zohostatus']
+  }
+
+  // Approve is allowed only when the participant's e-ticket eligibility says either:
+  //   1. exempted === true, OR
+  //   2. venue_fee_paid === true AND zohostatus === 'completed'
+  canApprove(row:any):boolean{
+    const eligibility = this.mapEligibility[row['docid']]
+    if([null,undefined].includes(eligibility)){
+      return false
+    }
+    if(eligibility['exempted'] === true){
+      return true
+    }
+    return eligibility['venue_fee_paid'] === true && eligibility['zohostatus'] === 'completed'
   }
 
   ngAfterViewInit() {

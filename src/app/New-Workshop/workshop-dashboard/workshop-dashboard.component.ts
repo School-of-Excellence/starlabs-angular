@@ -68,6 +68,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // claimed sharer profileid -> their referralcode (used to find who enrolled via that code)
   shareClaimedReferralByProfile: { [id: string]: string } = {};
 
+  // Evergreen + paid only: purchasers (workshoppaymentlog collection).
+  purchaseProfileIds: string[] = [];
+  purchaseProfileNames: { [id: string]: string } = {};
+
   // Evergreen day-journey distribution (only when evergreenWorkshop === true).
   // Each participant's "day" = floor((now - enrollmentdate) / 24h) + 1, exact to the second.
   evergreenDayDistribution: { day: number; count: number; profileIds: string[] }[] = [];
@@ -389,6 +393,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     let enrolledSnapshotInitialized = false;
     let referralSnapshotInitialized = false;
+    let paymentSnapshotInitialized = false;
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const unsubscribe = onSnapshot(workshopRef, (docSnap) => {
@@ -405,6 +410,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         if (this.workshopData.evergreenWorkshop === true && !referralSnapshotInitialized) {
           referralSnapshotInitialized = true;
           this.setupWorkshopReferralSnapshot();
+        }
+
+        // Purchasers list: evergreen + paid workshops only.
+        if (this.workshopData.evergreenWorkshop === true && this.workshopData.payment === true
+            && !paymentSnapshotInitialized) {
+          paymentSnapshotInitialized = true;
+          this.setupWorkshopPaymentSnapshot();
         }
 
         if (!enrolledSnapshotInitialized) {
@@ -456,6 +468,36 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       if (this.destroyed) return; // component torn down while awaiting
       this.shareProfileNames = names;
     }, (err) => console.error('workshopreferral snapshot error', err));
+
+    this.unsubscribes.push(unsubscribe);
+  }
+
+  // Evergreen + paid only: live list of purchasers for this workshop.
+  // workshoppaymentlog docs where workshopref == this workshop; each has `profileid`.
+  setupWorkshopPaymentSnapshot() {
+    if (!this.workshopId) return;
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
+    const paymentQuery = query(
+      collection(this.firestoreDefault, 'workshoppaymentlog'),
+      where('workshopref', '==', workshopRef)
+    );
+    const unsubscribe = onSnapshot(paymentQuery, async (snap) => {
+      const seen = new Set<string>();
+      const ids: string[] = [];
+      snap.forEach(d => {
+        const data: any = d.data();
+        const pid = data?.profileid;
+        if (pid && !seen.has(pid)) {
+          seen.add(pid);
+          ids.push(pid);
+        }
+      });
+      this.purchaseProfileIds = ids;
+      // Purchasers may not be enrolled, so resolve names from profile_data.
+      const names = await this.getProfileNameMapForIds(ids);
+      if (this.destroyed) return; // component torn down while awaiting
+      this.purchaseProfileNames = names;
+    }, (err) => console.error('workshoppaymentlog snapshot error', err));
 
     this.unsubscribes.push(unsubscribe);
   }
@@ -1625,6 +1667,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   get activeParticipants() { return this.metrics.get('activeParticipants')?.length || 0; }
   get shareClicked() { return this.shareClickedProfileIds.length; }
   get shareClaimed() { return this.shareClaimedProfileIds.length; }
+  get purchase() { return this.purchaseProfileIds.length; }
   get evergreenWorkshopDays(): number {
     return Number(this.workshopData?.evergreenWorkshopMeta?.workshopDays) || 0;
   }
@@ -1772,6 +1815,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         status: metricType,
         challengeName: 'Share',
         subChallengeName: metricType === 'shareClicked' ? 'Share Clicked' : 'Share Claimed',
+        count: this.selectedParticipants.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.applyFilterSide();
+
+    } else if (metricType === 'purchase') {
+      this.selectedParticipants = this.purchaseProfileIds.map(id => ({
+        profileid: id,
+        name: this.purchaseProfileNames[id] || this.mapProfile[id]?.name || 'Unknown',
+        metadata: this.mapProfile[id]
+      }));
+      this.selectedStatusInfo = {
+        status: metricType,
+        challengeName: 'Purchase',
+        subChallengeName: 'Purchase',
         count: this.selectedParticipants.length
       };
       this.showParticipantPanel = true;
