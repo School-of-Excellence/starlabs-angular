@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { Timestamp } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
 import {
   AtcBuckets, DayAttendance, EventData, JourneyCount, LiveEventDataService, PanelParticipant, QueueData
@@ -28,6 +29,24 @@ interface PdRow {
 interface PdFilter {
   q: string; journey: string; type: string; atc: string;
   pctOp: '>=' | '<=' | '<'; pctVal: number; presentOn: string; absentOn: string;
+}
+
+// ---- Arena Calling contract (C-9) — the call-outcome log exists in NO collection
+// yet. When the source is known, implement getCallLog() to map its docs to this. ---
+interface CallLogEntry {
+  profileId: string;
+  day: string;                                               // date-key matching dayWiseAttendance
+  status: 'pending' | 'coming' | 'no-answer' | 'not-coming';
+  calledAt?: Timestamp | null;
+  callerId?: string | null;
+}
+interface CallRow extends CallLogEntry { name: string; journeyId: string; }
+
+// ---- Customer Support feed contract (C-10) — in-progress/resolved/feed have no
+// confirmed query yet (statuses, assignee, timestamps unknown). ------------------
+interface TicketFeedEntry {
+  profileId: string; name: string; category: string; status: string;
+  time?: Timestamp | null; assigneeId?: string | null; resolutionHours?: number | null;
 }
 
 /**
@@ -83,6 +102,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       // Keep the service's first-timer set (used by procedure scope filter) in sync
       // with seam 3 so "First timers" resolves against the same registered universe.
       this.data.setFirstTimerIds(this.data.eventParticipantProfileIds.filter(id => this.isFirstTimer(id)));
+      // Drop optimistic call statuses that the live log has now confirmed, and
+      // refresh the cached call rows — only while the backend view is showing.
+      this.reconcileCallOptimistic();
+      if (this.activeView === 'backend') { this.rebuildCalls(); }
       this.cdr.detectChanges();
     });
     this.data.init();
@@ -101,21 +124,19 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // ==========================================================================
 
   /**
-   * SEAM 1 (C-3) — hero number = the "Generated" count from V2 (the operator's
-   * confirmed definition). That is V2 `scannedCount`: unique profileids scanned
-   * in for the selected event (arena e-ticket, active==true), lifted verbatim in
-   * `LiveEventDataService.subscribeToETickets`.
-   * Note: still per selected event (V2 semantics), not summed across all ongoing
-   * events/queues — that cross-event aggregation remains MISSING from Phase 0.
+   * SEAM 1 (C-3) — hero "Approved & attended participants" = the registered
+   * universe from `event participation request` (status in ['approved','attended']),
+   * i.e. `registeredCount` / `eventParticipantProfileIds` (team-confirmed).
+   * Still per selected event — no cross-event/queue aggregation.
    */
   getHeroApprovedAttended(): number | null {
     if (!this.data.selectedEvent) { return null; }
-    return this.data.scannedCount;
+    return this.data.registeredCount;
   }
 
-  /** Hero click → the generated (scanned-in) participants, like V2 openScannedPanel. */
+  /** Hero click → the approved/attended (registered) participants list. */
   openHero(): void {
-    this.openPanel('Generated', this.data.selectedEvent?.['name'] || '', this.data.scannedProfileIds);
+    this.openPanel('Approved & attended', this.data.selectedEvent?.['name'] || '', this.data.eventParticipantProfileIds);
   }
 
   /**
@@ -188,7 +209,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   isActiveQueue(queue: QueueData): boolean { return this.data.isQueueSelected(queue); }
 
-  setView(view: 'frontend' | 'backend' | 'zones'): void { this.activeView = view; }
+  setView(view: 'frontend' | 'backend' | 'zones'): void { this.activeView = view; if (view === 'backend') { this.rebuildCalls(); } }
 
   // ---- Event + Queue selectors (FT-style searchable dropdowns, v3-styled) -----
   eventDropdownOpen = false;
@@ -323,9 +344,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** SEAM — day-over-day attendance change. null → delta chip hidden. */
   attendanceDelta(day: DayAttendance): number | null { return null; }
 
-  /** SEAM — present that day ∧ no recording that day. Not surfaced in #attGrid
-   *  (belongs to the Backend Video Ask Review, Phase 4); stub ready for reuse. */
-  getMissingRecordingByDay(day: DayAttendance): string[] { return []; }
+  /** Present that day but did NOT submit a videoask (missing recording).
+   *  present (registered, scoped to universe) − submitted that day. */
+  getMissingRecordingByDay(day: DayAttendance): string[] {
+    const submitted = new Set(this.data.videoAskByDay[day.date] || []);
+    return day.presentProfileIds.filter(id => this.uni(id) && !submitted.has(id));
+  }
 
   // ==========================================================================
   // Daily Attendance (#attGrid) — V2 dayWiseAttendance / subscribeToAttendance
@@ -514,16 +538,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return this.data.videoAskTags.map((t, i) => ({ id: t, label: t, color: this.tagPalette[i % this.tagPalette.length] }));
   }
 
-  /** CONFIRMED (C-7) — one tag per participant via TAXONOMY-ORDER PRIORITY: the
-   *  first taxonomy tag the participant carries (metadata `videoasktags`). Note:
-   *  "latest-wins" isn't possible — metadata tags are an unordered array with no
-   *  timestamps — so priority order is the only well-defined single-tag rule. */
+  /** CONFIRMED (C-7) — one tag per participant via TAXONOMY-ORDER PRIORITY. Source
+   *  is now the participantvideoask SUBMISSION tags (∩ taxonomy) — the SAME source
+   *  the backend review uses — so the two sections reconcile. */
   getParticipantTag(profileId: string): string | null {
-    const meta = this.data.participantMetadataMap[profileId];
-    const tags: string[] = (meta && meta['videoasktags']) || [];
+    const tags = this.data.participantVideoAskTags[profileId] || [];
     if (!tags.length) { return null; }
     for (const t of this.data.videoAskTags) { if (tags.includes(t)) { return t; } }
-    return null; // participant has tags, but none in the taxonomy
+    return null;
   }
 
   get tagGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
@@ -540,7 +562,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   openTag(g: { label: string; profileIds: string[] }): void {
     this.openPanel(`Tag · ${g.label}`, `${this.data.selectedEvent?.['name'] || ''} · daily Video Ask review`, g.profileIds);
   }
-  participantName(profileId: string): string { return this.data.participantMetadataMap[profileId]?.['name'] || 'Unknown'; }
+  participantName(profileId: string): string { return this.data.participantMetadataMap[profileId]?.['name'] || this.data.registeredNames[profileId] || 'Unknown'; }
 
   // ==========================================================================
   // Arena Followup (#fuGrid) — 3 cards: Irregular, Not Doing CW, CW Not Received
@@ -570,6 +592,260 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     ];
   }
   openFu(title: string, ids: string[]): void { this.openPanel(title, this.data.selectedEvent?.['name'] || '', ids); }
+
+  // ==========================================================================
+  // BACKEND VIEW
+  // ==========================================================================
+  get hasEventDays(): boolean { return this.data.dayWiseAttendance.length > 0; }
+  private uni(id: string): boolean { return this.data.eventParticipantProfileIds.includes(id); }
+
+  // ---- Video Ask Review (#vaKpis / #vaTrays) — V2 review state -----------------
+  vaDay = 'today';   // 'today' | 'all' | date
+  get vaDayChips(): { value: string; label: string; active: boolean }[] {
+    const chips = [{ value: 'all', label: 'Overall', active: this.vaDay === 'all' }];
+    this.data.dayWiseAttendance.filter(d => !d.isFuture).forEach(d => chips.push({ value: d.date, label: d.isToday ? 'Today' : 'D' + d.day, active: this.vaDay === d.date || (this.vaDay === 'today' && d.isToday) }));
+    return chips;
+  }
+  setVaDay(v: string): void { this.vaDay = v; }
+  private vaScopeDates(): string[] {
+    if (this.vaDay === 'all') { return this.data.dayWiseAttendance.filter(d => !d.isFuture).map(d => d.date); }
+    if (this.vaDay === 'today') { const t = this.data.dayWiseAttendance.find(d => d.isToday); return t ? [t.date] : []; }
+    return [this.vaDay];
+  }
+  get vaReceivedIds(): string[] {
+    const s = new Set<string>();
+    this.vaScopeDates().forEach(dt => (this.data.videoAskByDay[dt] || []).forEach(id => { if (this.uni(id)) { s.add(id); } }));
+    return [...s];
+  }
+  // Reviewed = submitted AND tagged that day.
+  get vaReviewedIds(): string[] {
+    const s = new Set<string>();
+    this.vaScopeDates().forEach(dt => (this.data.videoAskTaggedByDay[dt] || []).forEach(id => { if (this.uni(id)) { s.add(id); } }));
+    return [...s];
+  }
+  // To review = submitted but NOT tagged.
+  get vaToReviewIds(): string[] { const r = new Set(this.vaReviewedIds); return this.vaReceivedIds.filter(id => !r.has(id)); }
+  // Missing = present that day but did NOT submit.
+  get vaMissingIds(): string[] {
+    const s = new Set<string>();
+    this.vaScopeDates().forEach(dt => { const day = this.data.dayWiseAttendance.find(d => d.date === dt); if (day) { this.getMissingRecordingByDay(day).forEach(id => s.add(id)); } });
+    return [...s];
+  }
+  get vaPercentage(): number { const r = this.vaReceivedIds.length; return r ? Math.round((this.vaReviewedIds.length / r) * 100) : 0; }
+  openVa(title: string, ids: string[]): void { this.openPanel(title, this.data.selectedEvent?.['name'] || '', ids); }
+
+  // ---- Arena Calling (#callDayChips + rows) — outcomes via getCallLog stub ------
+  callDay = 'today';
+  get callDayChips(): { value: string; label: string; active: boolean }[] {
+    const chips = [{ value: 'all', label: 'Overall', active: this.callDay === 'all' }];
+    this.data.dayWiseAttendance.filter(d => !d.isFuture).forEach(d => chips.push({ value: d.date, label: d.isToday ? 'Today' : 'D' + d.day, active: this.callDay === d.date || (this.callDay === 'today' && d.isToday) }));
+    return chips;
+  }
+  setCallDay(v: string): void { this.callDay = v; this.callShown = 20; this.rebuildCalls(); }
+  private callScopeDates(): string[] {
+    if (this.callDay === 'all') { return this.data.dayWiseAttendance.filter(d => !d.isFuture).map(d => d.date); }
+    if (this.callDay === 'today') { const t = this.data.dayWiseAttendance.find(d => d.isToday); return t ? [t.date] : []; }
+    return [this.callDay];
+  }
+
+  callShown = 20;
+  readonly callOptions: { value: CallLogEntry['status']; label: string }[] = [
+    { value: 'pending', label: 'To call' }, { value: 'coming', label: 'Coming' },
+    { value: 'no-answer', label: 'No answer' }, { value: 'not-coming', label: 'Not coming' }
+  ];
+  // optimistic overrides: `${profileId}|${dayKey}` → status, cleared once the
+  // live doc reflects it (reconciled in ngOnInit's changed$ handler).
+  private callOptimistic: { [key: string]: CallLogEntry['status'] } = {};
+
+  /** C-9 — reads the live event_caller_log state (service callLogMap). */
+  getCallLog(day: string): CallLogEntry[] {
+    return Object.values(this.data.callLogMap)
+      .filter(e => e.dayKey === day)
+      .map(e => ({ profileId: e.profileId, day: e.dayKey, status: e.status as CallLogEntry['status'], calledAt: e.calledAt, callerId: e.callerId }));
+  }
+
+  callRowsCache: CallRow[] = [];
+  callSummaryCache = { pending: 0, coming: 0, noAnswer: 0, notComing: 0 };
+
+  /** Rebuild the CACHED call rows + status summary. Called only when the backend
+   *  view is active or relevant state changes — so it never runs per-CD or while
+   *  another tab is showing (the getter version ran ~6× every cycle). */
+  rebuildCalls(): void {
+    const rows: CallRow[] = [];
+    this.callScopeDates().forEach(dt => {
+      const day = this.data.dayWiseAttendance.find(d => d.date === dt);
+      if (!day) { return; }
+      const logByProfile = new Map<string, CallLogEntry>();
+      this.getCallLog(dt).forEach(e => logByProfile.set(e.profileId, e));
+      day.absentProfileIds.forEach(pid => {
+        const e = logByProfile.get(pid);
+        const optimistic = this.callOptimistic[pid + '|' + dt];
+        const meta = this.data.participantMetadataMap[pid];
+        rows.push({
+          profileId: pid, day: dt, name: this.participantName(pid), journeyId: meta?.['activejourney'] || '',
+          status: optimistic || e?.status || 'pending', calledAt: e?.calledAt || null, callerId: e?.callerId || null
+        });
+      });
+    });
+    this.callRowsCache = rows;
+    const s = { pending: 0, coming: 0, noAnswer: 0, notComing: 0 };
+    rows.forEach(r => { if (r.status === 'pending') { s.pending++; } else if (r.status === 'coming') { s.coming++; } else if (r.status === 'no-answer') { s.noAnswer++; } else if (r.status === 'not-coming') { s.notComing++; } });
+    this.callSummaryCache = s;
+  }
+  get callRows(): CallRow[] { return this.callRowsCache; }
+  get callVisibleRows(): CallRow[] { return this.callRowsCache.slice(0, this.callShown); }
+  callMore(): void { this.callShown += 20; }
+  get callPending(): number { return this.callSummaryCache.pending; }
+  get callComing(): number { return this.callSummaryCache.coming; }
+  get callNoAnswer(): number { return this.callSummaryCache.noAnswer; }
+  get callNotComing(): number { return this.callSummaryCache.notComing; }
+  callStatusClass(s: string): string { return ({ pending: 'pending', coming: 'coming', 'no-answer': 'noanswer', 'not-coming': 'notcoming' } as { [k: string]: string })[s] || ''; }
+  callerName(id: string | null | undefined): string { if (!id) { return ''; } return this.data.participantMetadataMap[id]?.['name'] || id; }
+  fmtTime(t: Timestamp | null | undefined): string {
+    if (!t) { return ''; }
+    const d = (t as any).toDate ? (t as any).toDate() : new Date(t as any);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // Row detail helpers (real data, no new seam)
+  attendedDays(profileId: string): number { return this.data.dayWiseAttendance.filter(d => !d.isFuture && d.presentProfileIds.includes(profileId)).length; }
+  elapsedDays(): number { return this.data.eventDatesUntilToday.length; }
+  isNever(profileId: string): boolean { return this.data.allDayAbsentProfileIds.includes(profileId); }
+
+  /** Write outcome with optimistic update; revert on error. */
+  setCallOutcome(row: CallRow, status: CallLogEntry['status']): void {
+    const key = row.profileId + '|' + row.day;
+    const prev = this.callOptimistic[key];
+    this.callOptimistic[key] = status;
+    this.rebuildCalls();
+    this.data.setCallOutcome(row.profileId, row.day, status).catch(err => {
+      console.error('[v3][calls] write failed:', err);
+      if (prev === undefined) { delete this.callOptimistic[key]; } else { this.callOptimistic[key] = prev; }
+      this.rebuildCalls();
+      this.cdr.detectChanges();
+    });
+  }
+  /** Clear optimistic entries once the live log agrees (called from changed$). */
+  reconcileCallOptimistic(): void {
+    Object.keys(this.callOptimistic).forEach(k => {
+      if (this.data.callLogMap[k]?.status === this.callOptimistic[k]) { delete this.callOptimistic[k]; }
+    });
+  }
+
+  openCallStatus(status: string, title: string): void { this.openPanel(title, this.data.selectedEvent?.['name'] || '', this.callRows.filter(r => r.status === status).map(r => r.profileId)); }
+  openCallAll(): void { this.openPanel('Not in the Arena', this.data.selectedEvent?.['name'] || '', this.callRows.map(r => r.profileId)); }
+
+  // ---- Customer Support (#csKpis / #csCats / #tkList) — real (C-10) -------------
+  // open = status.status==='Open' && chatstatus==='New';
+  // inProgress = Open && chatstatus==='Responded'; resolved = closed today.
+  getSupportStatusCounts(): { open: number; inProgress: number; resolved: number } {
+    return this.data.supportCounts;
+  }
+  /** Mean open→close hours across closed-in-scope tickets. NOTE: the tile label
+   *  reads "Median resolution" but this is the MEAN (per the spec) — pending the
+   *  operator's call to keep the mean, use a true median, or relabel to "Avg". */
+  getSupportResolutionHours(): number { return this.data.supportResolutionHours; }
+
+  getTicketFeed(): TicketFeedEntry[] {
+    return this.data.clientIssues.map((t: any) => {
+      const label = this.data.ticketLabel(t);
+      const isClosed = label === 'resolved';
+      const status = isClosed ? 'Resolved' : (label === 'open' ? 'Open' : 'In Progress');
+      let resolutionHours: number | null = null;
+      if (isClosed) {
+        const cd = t['status']?.['date']; const closeDate = cd?.toDate ? cd.toDate() : (cd ? new Date(cd) : null);
+        const rd = t['reporteddate']; const openDate = rd?.toDate ? rd.toDate() : (rd ? new Date(rd) : null);
+        if (closeDate && openDate) { resolutionHours = Math.round(((closeDate.getTime() - openDate.getTime()) / 3600000) * 10) / 10; }
+      }
+      const assign = t['assign'];
+      const assigneeId = Array.isArray(assign) ? (assign[0] || null) : (assign || null);
+      return { profileId: t['clientid'], name: this.participantName(t['clientid']), category: t['category'] || '', status, time: t['reporteddate'] || null, assigneeId, resolutionHours };
+    });
+  }
+  feedStatusClass(s: string): string { return s === 'In Progress' ? 'inprogress' : s.toLowerCase(); }
+  assigneeName(id: string | null | undefined): string { if (!id) { return ''; } return this.data.participantMetadataMap[id]?.['name'] || ''; }
+  assigneeInitials(id: string | null | undefined): string { return this.initials(this.assigneeName(id)); }
+
+  get csCats(): { category: string; count: number; open: number; inProgress: number; resolved: number; profileIds: string[] }[] { return this.data.categoryCounts; }
+  get csHasTickets(): boolean { return this.data.clientIssues.length > 0; }
+  get csOpenProfileIds(): string[] {
+    return [...new Set(this.data.clientIssues.filter((t: any) => this.data.ticketLabel(t) === 'open').map((t: any) => t['clientid']).filter((id: string) => id))];
+  }
+  openCsOpen(): void { this.openPanel('Open tickets', 'Customer support', this.csOpenProfileIds); }
+  openCsCat(cat: { category: string; profileIds: string[] }): void { this.openPanel(`Support · ${cat.category}`, 'Customer support', cat.profileIds); }
+
+  // ==========================================================================
+  // ZONES VIEW (Phase 5) — live occupancy (READ-ONLY). Zone defs + cohorts +
+  // staff names reused from event-zone-management; allocations + no-zone from V2,
+  // all via LiveEventDataService. This view WRITES NOTHING (no toggle/allocation).
+  // ==========================================================================
+  private get zoneToday(): DayAttendance | undefined { return this.data.dayWiseAttendance.find(d => d.isToday); }
+  /** Zones go live with the event — a "today" inside the event range. */
+  get zonesLive(): boolean { return !!this.zoneToday; }
+  get zones(): any[] { return this.data.eventZoneList; }
+  get zonesLiveCount(): number { return this.data.eventZoneList.filter(z => z['status'] === 'open').length; }
+
+  // present TODAY, scoped to the registered universe so the KPIs reconcile
+  // (present = allocated + no-zone). Walk-ins outside the universe are excluded.
+  private get zonePresentIds(): string[] {
+    const t = this.zoneToday; if (!t) { return []; }
+    const uni = new Set(this.data.eventParticipantProfileIds);
+    return t.presentProfileIds.filter(id => uni.has(id));
+  }
+  get zonePresentCount(): number { return this.zonePresentIds.length; }
+  private get zoneAllocatedIds(): string[] { return this.zonePresentIds.filter(id => this.data.zoneParticipantIds.has(id)); }
+  private get zoneUnassignedIds(): string[] { return this.zonePresentIds.filter(id => !this.data.zoneParticipantIds.has(id)); }
+  get zoneAllocatedCount(): number { return this.zoneAllocatedIds.length; }
+  get zoneUnassignedCount(): number { return this.zoneUnassignedIds.length; }
+  get zoneCoveragePct(): number { const p = this.zonePresentIds.length; return p ? Math.round((this.zoneAllocatedIds.length / p) * 100) : 0; }
+
+  zoneIsLive(zone: any): boolean { return zone['status'] === 'open'; }
+  zoneCoordinators(zone: any): string { return this.staffNames(zone['coordinators']); }
+  zoneMentors(zone: any): string { return this.staffNames(zone['mentors']); }
+  private staffNames(ids: any): string {
+    const list = Array.isArray(ids) ? ids : [];
+    const names = list.map((id: string) => this.data.staffNameMap[id] || id).filter(Boolean);
+    return names.length ? names.join(', ') : '—';
+  }
+
+  // occupants of a zone = present-today whose allocation selectedzone == this zone.
+  private zoneOccupantIds(zone: any): string[] {
+    const zid = zone['docid'];
+    return this.zonePresentIds.filter(id => this.data.zoneAllocationMap[id]?.selectedzone === zid);
+  }
+  zoneOccupantCount(zone: any): number { return this.zoneOccupantIds(zone).length; }
+
+  // Cohort-when-multiple (FLAGGED): a participant's `eligiliblecohorts` may list
+  // several; we group under the FIRST (documented default). Resolve cohort id →
+  // name via ZM's big-cohorts map. No eligiliblecohorts → "No cohort".
+  cohortNameOf(profileId: string): string {
+    const cohortId = this.data.zoneAllocationMap[profileId]?.eligiliblecohorts?.[0];
+    if (!cohortId) { return 'No cohort'; }
+    return this.data.mapCohortsData[cohortId]?.['name'] || cohortId;
+  }
+  private groupByCohort(ids: string[]): { name: string; count: number; ids: string[] }[] {
+    const by: { [name: string]: string[] } = {};
+    ids.forEach(id => { const c = this.cohortNameOf(id); (by[c] = by[c] || []).push(id); });
+    return Object.keys(by).map(name => ({ name, count: by[name].length, ids: by[name] })).sort((a, b) => b.count - a.count);
+  }
+  zoneCohorts(zone: any): { name: string; count: number; ids: string[] }[] { return this.groupByCohort(this.zoneOccupantIds(zone)); }
+
+  checkinTime(profileId: string): string { return this.data.firstScanTimeToday(profileId); }
+  private zoneNameOf(profileId: string): string {
+    const zid = this.data.zoneAllocationMap[profileId]?.selectedzone;
+    return zid ? (this.data.mapEventZoneData[zid]?.['zonename'] || zid) : '';
+  }
+
+  // drill-downs (READ-ONLY panels; occupant flag = "cohort · in since HH:MM").
+  private openZoneList(title: string, sub: string, ids: string[], flag: (id: string) => string): void {
+    const rows = ids.map(id => ({ ...this.data.buildParticipantFromProfileId(id, true), _meta: flag(id) }));
+    this.openPanelRows(title, sub, rows);
+  }
+  openZonePresent(): void { this.openZoneList('In the Arena today', this.data.selectedEvent?.['name'] || '', this.zonePresentIds, id => this.zoneNameOf(id) || 'no zone yet'); }
+  openZoneAllocated(): void { this.openZoneList('Allocated to zones', this.data.selectedEvent?.['name'] || '', this.zoneAllocatedIds, id => this.zoneNameOf(id) || 'no zone yet'); }
+  openZoneUnassigned(): void { this.openZoneList('No zone yet', this.data.selectedEvent?.['name'] || '', this.zoneUnassignedIds, () => 'no zone yet'); }
+  openZone(zone: any): void { this.openZoneList(zone['zonename'], this.data.selectedEvent?.['name'] || '', this.zoneOccupantIds(zone), id => `${this.cohortNameOf(id)} · in since ${this.checkinTime(id)}`); }
+  openZoneCohort(zone: any, c: { name: string; ids: string[] }): void { this.openZoneList(`${zone['zonename']} · ${c.name}`, this.data.selectedEvent?.['name'] || '', c.ids, id => `${c.name} · in since ${this.checkinTime(id)}`); }
 
   // ==========================================================================
   // Drill-down panel

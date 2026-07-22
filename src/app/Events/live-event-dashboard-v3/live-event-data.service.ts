@@ -1,9 +1,10 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import {
-  collection, collectionData, doc, DocumentReference, getDoc, getDocs, getFirestore,
-  orderBy, query, where
+  addDoc, collection, collectionData, doc, documentId, DocumentReference, getDoc, getDocs, getFirestore,
+  limit, orderBy, query, serverTimestamp, Timestamp, updateDoc, where
 } from '@angular/fire/firestore';
 import { Subject, Subscription } from 'rxjs';
+import { AuthguardService } from '../../authguard.service';
 
 /**
  * LiveEventDataService — Phase 1 data layer for live-event-dashboard-v3.
@@ -67,6 +68,9 @@ export class LiveEventDataService implements OnDestroy {
   notScannedProfileIds: string[] = [];
   notScannedCount = 0;
   eventParticipants: PanelParticipant[] = [];
+  // name fallback from the event participation request doc (V2 does this) — used
+  // when a registered participant has no `participant metadata` doc.
+  registeredNames: { [profileid: string]: string } = {};
   participantMetadataMap: { [profileid: string]: any } = {};
   mapJourneyData: { [key: string]: any } = {};
   journeyCounts: JourneyCount[] = [];
@@ -105,7 +109,47 @@ export class LiveEventDataService implements OnDestroy {
   videoAskTags: string[] = [];
   // participantvideoask submissions bucketed by uploaded date → submitter profileids.
   videoAskByDay: { [date: string]: string[] } = {};
+  // same, but only TAGGED submissions (participantvideoask.tags ∩ taxonomy) — a
+  // tagged videoask counts as "reviewed" (operator rule).
+  videoAskTaggedByDay: { [date: string]: string[] } = {};
+  // per participant: their video-ask tags from submissions (∩ taxonomy). Drives the
+  // frontend Video Ask Tags scroller — SAME source as the backend review.
+  participantVideoAskTags: { [profileid: string]: string[] } = {};
   videoAskLoaded = false;
+
+  // ---- customer support (event-scoped: reporteddate window + participant filter)
+  clientIssues: any[] = [];              // in-scope tickets (any status), newest-first
+  totalOpenIssues = 0;                   // = supportCounts.open (New-open)
+  issueCategories: any[] = [];           // from chat config `categories`
+  categoryCounts: { category: string; count: number; open: number; inProgress: number; resolved: number; profileIds: string[] }[] = [];
+  supportCounts = { open: 0, inProgress: 0, resolved: 0 };   // open=New · inProgress=Responded · resolved=closed today
+  supportResolutionHours = 0;            // mean open→close hours over closed-in-scope
+
+  // ---- Arena Calling — event_caller_log (v3's ONLY write path) -----------------
+  // Deduped by `${profileid}|${dayKey}`, latest updateAt wins. `day` is normalized
+  // to start-of-day so the equality upsert-by-query matches.
+  callLogMap: { [key: string]: { id: string; profileId: string; dayKey: string; status: string; calledAt: any; callerId: string | null; upd: number } } = {};
+  loggedInProfileId: string | null = null;   // current user (AuthguardService.getRoles().profile_ref.id)
+
+  // ---- Zones (READ-ONLY; Phase 5) — ZM event-zone-management + V2 subscribeToZones
+  // v3 renders LIVE zone occupancy only; zone config / open-close toggle / allocation
+  // editing stay in event-zone-management. NOTHING here writes.
+  // Zone defs (ZM eventZoneList — "event zones"): docid, zonename, coordinators[],
+  // mentors[], cohorts[], status ('open'|'close'). Sorted by zonename.
+  eventZoneList: any[] = [];
+  mapEventZoneData: { [zoneDocId: string]: any } = {};
+  // Cohorts (ZM "big cohorts"): docid → {name, cohortCategory, participantidlist}.
+  mapCohortsData: { [cohortDocId: string]: any } = {};
+  mapCohortParticipants: { [cohortDocId: string]: string[] } = {};
+  // Allocations ("event participant zones"): profileid → {selectedzone, eligiliblecohorts}.
+  // V2 subscribeToZones reads only profileid; we EXTEND with selectedzone +
+  // eligiliblecohorts (both read by ZM) so occupancy can place people in zones/cohorts.
+  zoneAllocationMap: { [profileid: string]: { selectedzone: string; eligiliblecohorts: string[] } } = {};
+  zoneParticipantIds: Set<string> = new Set();       // V2: profileids with any allocation
+  noZoneProfileIds: string[] = [];                   // V2 calculateNoZoneParticipants
+  noZoneCount = 0;
+  // staff (coordinator/mentor) id → name, from ZM's authguard.getProfileMap().
+  staffNameMap: { [profileid: string]: string } = {};
 
   // ---- procedure tracking filters (FT setFilter / participantFilter) ----------
   procDayFilter: string = 'all';   // 'all' | 'yyyy-mm-dd'
@@ -127,6 +171,13 @@ export class LiveEventDataService implements OnDestroy {
   private attendanceSub: Subscription | null = null;
   private eTicketSub: Subscription | null = null;
   private videoAskSub: Subscription | null = null;
+  private clientIssuesSub: Subscription | null = null;
+  private callLogSub: Subscription | null = null;
+  private eventZonesSub: Subscription | null = null;
+  private bigCohortsSub: Subscription | null = null;
+  private participantZonesSub: Subscription | null = null;
+
+  constructor(private authguard: AuthguardService) {}
 
   // ==========================================================================
   // INIT
@@ -162,6 +213,25 @@ export class LiveEventDataService implements OnDestroy {
 
     // participant metadata (V2 loadParticipantMetadata)
     await this.loadParticipantMetadata();
+
+    // customer support categories config (global doc, loaded once); the tickets
+    // themselves are event-scoped and (re)subscribed per selectEvent.
+    await this.loadIssueCategories();
+
+    // current user for call-log writes (same accessor as V1/zone-management)
+    try {
+      const roles: any = await this.authguard.getRoles();
+      this.loggedInProfileId = roles?.['profile_ref']?.id || null;
+    } catch (err) { console.error('Error resolving current user:', err); }
+    console.log('[v3][init] logged-in profileId:', this.loggedInProfileId);
+
+    // staff (coordinator/mentor) id→name map for the Zones view — reused verbatim
+    // from event-zone-management (authguard.getProfileMap().map). Global, once.
+    try {
+      const pm: any = await this.authguard.getProfileMap();
+      this.staffNameMap = pm?.['map'] || {};
+    } catch (err) { console.error('Error loading profile map:', err); }
+    console.log('[v3][zones] staff name-map entries:', Object.keys(this.staffNameMap).length);
 
     // events (FT loadData events block / V2 identical)
     try {
@@ -251,6 +321,11 @@ export class LiveEventDataService implements OnDestroy {
     this.applyDefaultProcedureDay();
     this.subscribeToAttendance();
     this.subscribeToVideoAsk();
+    this.subscribeToClientIssues();
+    this.subscribeToCallLog();
+    this.subscribeToEventZones();
+    this.subscribeToBigCohorts();
+    this.subscribeToParticipantZones();
 
     // auto-select this event's ongoing queues → derives atcModels (FT/V2 default)
     this.selectedQueues = this.ongoingQueues.filter(q => q['eventref'] && this.selectedEvent && this.pathOf(q['eventref']) === this.pathOf(this.selectedEvent.docref));
@@ -300,9 +375,12 @@ export class LiveEventDataService implements OnDestroy {
       });
       this.eventParticipantProfileIds = [...seen];
       this.registeredCount = this.eventParticipantProfileIds.length;
+      this.registeredNames = {};
+      docs.forEach(d => { const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; } });
       this.eventParticipants = docs.map(d => this.buildParticipantFromProfileId(d.profileid, false));
+      const named = this.eventParticipantProfileIds.filter(id => this.participantMetadataMap[id]?.['name'] || this.registeredNames[id]).length;
       console.log('[v3][participants] event:', this.selectedEvent?.['name'],
-        '| approved/attended (registered universe):', this.registeredCount);
+        '| approved/attended (registered universe):', this.registeredCount, '| with a resolvable name:', named);
     } catch (error) {
       console.error('Error loading participants:', error);
     }
@@ -419,6 +497,10 @@ export class LiveEventDataService implements OnDestroy {
       const attendanceDates = this.mapAttendence[profileId]?.map(e => new Date(e['logdate'].toDate()).toLocaleDateString('en-CA')) || [];
       return this.eventDatesUntilToday.every(date => !attendanceDates.includes(date));
     });
+    if (todayDay) {
+      console.log('[v3][calls] today not-marked (absent):', todayDay.absentProfileIds.length,
+        '| sample names:', todayDay.absentProfileIds.slice(0, 5).map(id => this.participantMetadataMap[id]?.['name'] || this.registeredNames[id] || 'Unknown'));
+    }
   }
 
   // FT autoSelectToday — default the procedure Day filter to TODAY when the event
@@ -446,6 +528,8 @@ export class LiveEventDataService implements OnDestroy {
     if (!this.selectedEvent) return;
     if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
     this.videoAskByDay = {};
+    this.videoAskTaggedByDay = {};
+    this.participantVideoAskTags = {};
     this.videoAskLoaded = false;
     try {
       const snap = await getDocs(query(collection(this.firestoreDefault, 'arenavideoask'), where('eventref', '==', this.selectedEvent.docref)));
@@ -465,20 +549,32 @@ export class LiveEventDataService implements OnDestroy {
       )).subscribe({
         next: (docs: any[]) => {
           const byDay: { [date: string]: Set<string> } = {};
+          const taggedByDay: { [date: string]: Set<string> } = {};
+          const partTags: { [pid: string]: Set<string> } = {};
           docs.forEach((d: any) => {
             const pid = d['profileid'] || '';
             if (!pid) { return; }
+            // a tag counts only if it's in the classify/eventtags taxonomy
+            const matched = Array.isArray(d['tags']) ? d['tags'].filter((t: string) => this.videoAskTags.includes(t)) : [];
+            const isTagged = matched.length > 0;
+            if (isTagged) { const set = partTags[pid] = partTags[pid] || new Set<string>(); matched.forEach((t: string) => set.add(t)); }
             const uploaded = d['uploaded']?.toDate ? d['uploaded'].toDate() : (d['uploaded'] ? new Date(d['uploaded']) : null);
             if (uploaded) {
               const ds = uploaded.toLocaleDateString('en-CA');
               (byDay[ds] = byDay[ds] || new Set<string>()).add(pid);
+              if (isTagged) { (taggedByDay[ds] = taggedByDay[ds] || new Set<string>()).add(pid); }
             }
           });
           this.videoAskByDay = {};
           Object.keys(byDay).forEach(ds => { this.videoAskByDay[ds] = [...byDay[ds]]; });
+          this.videoAskTaggedByDay = {};
+          Object.keys(taggedByDay).forEach(ds => { this.videoAskTaggedByDay[ds] = [...taggedByDay[ds]]; });
+          this.participantVideoAskTags = {};
+          Object.keys(partTags).forEach(pid => { this.participantVideoAskTags[pid] = [...partTags[pid]]; });
           this.videoAskLoaded = true;
           console.log('[v3][videoask] participantvideoask docs:', docs.length,
-            '| per-day submitters:', Object.keys(this.videoAskByDay).map(d => `${d}:${this.videoAskByDay[d].length}`));
+            '| per-day submitters:', Object.keys(this.videoAskByDay).map(d => `${d}:${this.videoAskByDay[d].length}`),
+            '| per-day tagged (reviewed):', Object.keys(this.videoAskTaggedByDay).map(d => `${d}:${this.videoAskTaggedByDay[d].length}`));
           this.changed$.next();
         },
         error: (e) => console.error('Error subscribing to participantvideoask:', e)
@@ -486,6 +582,256 @@ export class LiveEventDataService implements OnDestroy {
     } catch (e) {
       console.error('Error loading arenavideoask:', e);
     }
+  }
+
+  // Category config (V2: chat config doc 0jqtiq3sxtbLVcEGMDhW → categories). Global, once.
+  private async loadIssueCategories(): Promise<void> {
+    try {
+      const configDoc = await getDocs(query(collection(this.firestoreDefault, 'chat config'), where(documentId(), '==', '0jqtiq3sxtbLVcEGMDhW')));
+      if (!configDoc.empty) { this.issueCategories = configDoc.docs[0].data()['categories'] || []; }
+    } catch (err) { console.error('Error loading chat config:', err); }
+  }
+
+  // Event-scoped support tickets. Range-query clientissue by the OPEN timestamp
+  // (reporteddate) over the event window server-side, then filter clientid ∈
+  // eventParticipantProfileIds client-side (avoids an unbounded `in` on profileIds).
+  // Field mapping (from Customer Support components): open=reporteddate,
+  // close=status.date, closed=status.status==='Closed', assignee=assign[] .
+  private subscribeToClientIssues(): void {
+    if (!this.selectedEvent) return;
+    if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
+    const s = this.selectedEvent['start_date']?.toDate ? this.selectedEvent['start_date'].toDate() : new Date(this.selectedEvent['start_date']);
+    const e = this.selectedEvent['end_date']?.toDate ? this.selectedEvent['end_date'].toDate() : new Date(this.selectedEvent['end_date']);
+    const startDate = new Date(s); startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(e); endDate.setHours(23, 59, 59, 999);
+    this.clientIssuesSub = collectionData(query(
+      collection(this.firestoreDefault, 'clientissue'),
+      where('reporteddate', '>=', startDate),
+      where('reporteddate', '<=', endDate),
+      orderBy('reporteddate', 'desc')
+    ), { idField: 'id' }).subscribe({
+      next: (issues: any[]) => {
+        const universe = new Set(this.eventParticipantProfileIds);
+        this.clientIssues = issues.filter(i => universe.has(i['clientid']));
+        this.calculateSupport();
+        console.log('[v3][support] window docs:', issues.length, '| in-scope (participant):', this.clientIssues.length,
+          '| open/inProgress/resolvedToday:', JSON.stringify(this.supportCounts), '| mean resolution h:', this.supportResolutionHours);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to client issues:', error)
+    });
+  }
+
+  // Single source of truth for a ticket's status (KPIs, category bar AND feed all
+  // use this — previously the KPI used a stricter rule and diverged):
+  //   closed → resolved · open & (New | no chatstatus) → open (not yet worked) ·
+  //   open & any other chatstatus (Responded / decision making / pending / …) → inProgress.
+  ticketLabel(t: any): 'open' | 'inProgress' | 'resolved' {
+    if (t['status']?.['status'] === 'Closed') { return 'resolved'; }
+    const cs = t['chatstatus'];
+    if (!cs || cs === 'New') { return 'open'; }
+    return 'inProgress';
+  }
+
+  private calculateSupport(): void {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    let open = 0, inProgress = 0, resolvedToday = 0;
+    const closedHours: number[] = [];
+    this.clientIssues.forEach(t => {
+      const label = this.ticketLabel(t);
+      if (label === 'resolved') {
+        const cd = t['status']?.['date']; const closeDate = cd?.toDate ? cd.toDate() : (cd ? new Date(cd) : null);
+        const rd = t['reporteddate']; const openDate = rd?.toDate ? rd.toDate() : (rd ? new Date(rd) : null);
+        if (closeDate && closeDate.toLocaleDateString('en-CA') === todayStr) { resolvedToday++; }
+        if (closeDate && openDate) { closedHours.push((closeDate.getTime() - openDate.getTime()) / 3600000); }
+      } else if (label === 'open') { open++; }
+      else { inProgress++; }
+    });
+    this.supportCounts = { open, inProgress, resolved: resolvedToday };
+    this.supportResolutionHours = closedHours.length ? Math.round((closedHours.reduce((a, b) => a + b, 0) / closedHours.length) * 10) / 10 : 0;
+    this.totalOpenIssues = open;
+    this.calculateCategoryCounts();
+  }
+
+  // V2 calculateCategoryCounts, over the scoped set + per-category status breakdown.
+  private calculateCategoryCounts(): void {
+    const build = (name: string, list: any[]) => {
+      const profileIds = [...new Set(list.map(i => i['clientid']).filter((id: string) => id))] as string[];
+      let o = 0, p = 0, r = 0;
+      list.forEach(t => { const l = this.ticketLabel(t); if (l === 'open') { o++; } else if (l === 'inProgress') { p++; } else { r++; } });
+      return { category: name, count: list.length, open: o, inProgress: p, resolved: r, profileIds };
+    };
+    this.categoryCounts = [];
+    this.issueCategories.forEach((cat: any) => {
+      const name = cat.category;
+      this.categoryCounts.push(build(name, this.clientIssues.filter(i => i['category'] === name)));
+    });
+    const categorized = this.issueCategories.map((c: any) => c.category);
+    const uncategorized = this.clientIssues.filter(i => !categorized.includes(i['category']));
+    if (uncategorized.length > 0) { this.categoryCounts.push(build('Uncategorized', uncategorized)); }
+  }
+
+  // ==========================================================================
+  // Arena Calling — event_caller_log (read subscription + upsert write)
+  // ==========================================================================
+  // dayKey ('yyyy-mm-dd') → normalized start-of-day Timestamp (app timezone).
+  private dayKeyToTimestamp(dayKey: string): Timestamp {
+    const [y, m, d] = dayKey.split('-').map(Number);
+    return Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0, 0));
+  }
+  // `day` Timestamp → dayKey ('yyyy-mm-dd'), matching dayWiseAttendance keys.
+  private dayTimestampToKey(day: any): string {
+    const dt = day?.toDate ? day.toDate() : new Date(day);
+    return dt.toLocaleDateString('en-CA');
+  }
+
+  // Real-time, dedup-tolerant read: latest updateAt per (profileid, dayKey).
+  private subscribeToCallLog(): void {
+    if (!this.selectedEvent) return;
+    if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
+    this.callLogSub = collectionData(query(
+      collection(this.firestoreDefault, 'event_caller_log'), where('eventref', '==', this.selectedEvent.docref)
+    ), { idField: 'id' }).subscribe({
+      next: (docs: any[]) => {
+        const map: LiveEventDataService['callLogMap'] = {};
+        docs.forEach((d: any) => {
+          if (!d['profileid'] || !d['day']) { return; }
+          const dayKey = this.dayTimestampToKey(d['day']);
+          const key = `${d['profileid']}|${dayKey}`;
+          const upd = d['updateAt']?.toMillis ? d['updateAt'].toMillis() : 0;
+          const prev = map[key];
+          if (!prev || upd >= prev.upd) {
+            map[key] = { id: d['id'], profileId: d['profileid'], dayKey, status: d['status'] || 'pending', calledAt: d['calledAt'] || null, callerId: d['callerId'] || null, upd };
+          }
+        });
+        this.callLogMap = map;
+        console.log('[v3][calls] event_caller_log docs:', docs.length, '| deduped entries:', Object.keys(map).length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to event_caller_log:', error)
+    });
+  }
+
+  // Upsert-by-query: one record per (participant, normalized day); latest wins.
+  // The ONLY write in v3. calledAt = exact marking time; updateAt = server time.
+  async setCallOutcome(profileId: string, dayKey: string, status: string): Promise<void> {
+    if (!this.selectedEvent) { return; }
+    const dayTs = this.dayKeyToTimestamp(dayKey);
+    const calledAt = Timestamp.now();
+    const callerId = this.loggedInProfileId || null;
+    const col = collection(this.firestoreDefault, 'event_caller_log');
+    const existing = await getDocs(query(col,
+      where('eventref', '==', this.selectedEvent.docref),
+      where('profileid', '==', profileId),
+      where('day', '==', dayTs),
+      limit(1)
+    ));
+    if (!existing.empty) {
+      await updateDoc(doc(this.firestoreDefault, 'event_caller_log', existing.docs[0].id), { status, calledAt, callerId, updateAt: serverTimestamp() });
+    } else {
+      await addDoc(col, { eventref: this.selectedEvent.docref, profileid: profileId, day: dayTs, status, calledAt, callerId, updateAt: serverTimestamp() });
+    }
+  }
+
+  // ==========================================================================
+  // ZONES — live occupancy (READ-ONLY). Zone defs + cohorts + staff names from
+  // event-zone-management (ZM); allocations + no-zone from V2 (subscribeToZones /
+  // calculateNoZoneParticipants). No writes — config/toggle stay in ZM.
+  // ==========================================================================
+
+  // ZM eventZoneList — "event zones" scoped to this event; sorted by zonename.
+  private subscribeToEventZones(): void {
+    if (!this.selectedEvent) return;
+    if (this.eventZonesSub) { this.eventZonesSub.unsubscribe(); this.eventZonesSub = null; }
+    this.eventZoneList = [];
+    this.mapEventZoneData = {};
+    this.eventZonesSub = collectionData(query(
+      collection(this.firestoreDefault, 'event zones'), where('eventref', '==', this.selectedEvent.docref)
+    ), { idField: 'docid' }).subscribe({
+      next: (data: any[]) => {
+        this.eventZoneList = [...data].sort((a, b) => (a['zonename'] || '').localeCompare(b['zonename'] || ''));
+        this.mapEventZoneData = {};
+        data.forEach((zone: any) => { this.mapEventZoneData[zone['docid']] = zone; });
+        console.log('[v3][zones] event zones:', data.length,
+          '| open:', this.eventZoneList.filter(z => z['status'] === 'open').length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to event zones:', error)
+    });
+  }
+
+  // ZM cohort block — "big cohorts" scoped to this event; docid→data + members.
+  private subscribeToBigCohorts(): void {
+    if (!this.selectedEvent) return;
+    if (this.bigCohortsSub) { this.bigCohortsSub.unsubscribe(); this.bigCohortsSub = null; }
+    this.mapCohortsData = {};
+    this.mapCohortParticipants = {};
+    this.bigCohortsSub = collectionData(query(
+      collection(this.firestoreDefault, 'big cohorts'), where('eventref', '==', this.selectedEvent.docref)
+    ), { idField: 'docid' }).subscribe({
+      next: (data: any[]) => {
+        this.mapCohortsData = {};
+        this.mapCohortParticipants = {};
+        data.forEach((cohort: any) => {
+          this.mapCohortsData[cohort['docid']] = cohort;
+          this.mapCohortParticipants[cohort['docid']] = cohort['participantidlist'] || [];
+        });
+        console.log('[v3][zones] big cohorts:', data.length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to big cohorts:', error)
+    });
+  }
+
+  // V2 subscribeToZones — "event participant zones"; EXTENDED to also capture
+  // selectedzone + eligiliblecohorts (both read by ZM) for the occupancy view.
+  private subscribeToParticipantZones(): void {
+    if (!this.selectedEvent) return;
+    if (this.participantZonesSub) { this.participantZonesSub.unsubscribe(); this.participantZonesSub = null; }
+    this.zoneAllocationMap = {};
+    this.zoneParticipantIds = new Set();
+    this.participantZonesSub = collectionData(query(
+      collection(this.firestoreDefault, 'event participant zones'), where('eventref', '==', this.selectedEvent.docref)
+    )).subscribe({
+      next: (docs: any[]) => {
+        const alloc: LiveEventDataService['zoneAllocationMap'] = {};
+        const ids = new Set<string>();
+        docs.forEach((zone: any) => {
+          const pid = zone['profileid'];
+          if (!pid) { return; }
+          ids.add(pid);   // V2: any allocation → "in a zone"
+          alloc[pid] = { selectedzone: zone['selectedzone'] || '', eligiliblecohorts: zone['eligiliblecohorts'] || zone['eligiblecohorts'] || [] };
+        });
+        this.zoneAllocationMap = alloc;
+        this.zoneParticipantIds = ids;
+        this.calculateNoZoneParticipants();
+        console.log('[v3][zones] participant-zone allocations:', docs.length,
+          '| allocated profiles:', ids.size, '| no-zone:', this.noZoneCount);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to participant zones:', error)
+    });
+  }
+
+  // V2 calculateNoZoneParticipants — registered universe minus allocated.
+  private calculateNoZoneParticipants(): void {
+    this.noZoneProfileIds = this.eventParticipantProfileIds.filter(id => !this.zoneParticipantIds.has(id));
+    this.noZoneCount = this.noZoneProfileIds.length;
+  }
+
+  // Earliest scan-in TODAY for a participant (from the already-subscribed
+  // mapAttendence), formatted 'HH:MM' (app timezone). mapAttendence is
+  // date-deduped, so in practice this is today's single kept scan record.
+  firstScanTimeToday(profileId: string): string {
+    const records = this.mapAttendence[profileId] || [];
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    let earliest: Date | null = null;
+    records.forEach(r => {
+      const ld = r['logdate']?.toDate ? r['logdate'].toDate() : new Date(r['logdate']);
+      if (ld.toLocaleDateString('en-CA') === todayStr && (!earliest || ld < earliest)) { earliest = ld; }
+    });
+    if (!earliest) { return ''; }
+    return (earliest as Date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
 
   // ---- procedure tracking: day + scope filters (FT setFilter/participantFilter)
@@ -1004,7 +1350,7 @@ export class LiveEventDataService implements OnDestroy {
     return {
       docref: registered?.docref || profileId,
       profileid: profileId,
-      name: metadata['name'] || registered?.name || 'Unknown',
+      name: metadata['name'] || this.registeredNames[profileId] || registered?.name || 'Unknown',
       email: metadata['email'] || registered?.email || '',
       phone: metadata['phone'] || registered?.phone || '',
       photo: metadata['photo'] || registered?.photo || '',
@@ -1092,6 +1438,15 @@ export class LiveEventDataService implements OnDestroy {
     if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
     if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
     if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
+    if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
+    if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
+    this.unsubscribeZonePipeline();
+  }
+
+  private unsubscribeZonePipeline(): void {
+    if (this.eventZonesSub) { this.eventZonesSub.unsubscribe(); this.eventZonesSub = null; }
+    if (this.bigCohortsSub) { this.bigCohortsSub.unsubscribe(); this.bigCohortsSub = null; }
+    if (this.participantZonesSub) { this.participantZonesSub.unsubscribe(); this.participantZonesSub = null; }
   }
 
   private pathOf(ref: any): string { return ref && ref.path ? ref.path : String(ref); }
@@ -1101,6 +1456,9 @@ export class LiveEventDataService implements OnDestroy {
     if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
     if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
     if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
+    if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
+    if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
+    this.unsubscribeZonePipeline();
     if (this.eventSub) { this.eventSub.unsubscribe(); this.eventSub = null; }
     if (this.metadataSub) { this.metadataSub.unsubscribe(); this.metadataSub = null; }
     this.changed$.complete();

@@ -95,21 +95,21 @@
 
   <!-- ================= HERO + TABS ================= -->
   <div class="hero">
-    <div class="hero-num num" id="heroNum" title="Generated (scanned-in) participants" (click)="openHero()">{{ getHeroApprovedAttended() ?? '—' }}</div>
+    <div class="hero-num num" id="heroNum" title="Approved &amp; attended participants" (click)="openHero()">{{ getHeroApprovedAttended() ?? '—' }}</div>
     <div class="hero-label">Approved &amp; attended participants</div>
     <div class="hero-right">
       <div class="tabs" id="tabs">
         <button class="tab" [class.active]="activeView === 'frontend'" (click)="setView('frontend')">Frontend Dashboard</button>
         <button class="tab" [class.active]="activeView === 'backend'" (click)="setView('backend')">Backend Dashboard</button>
         <button class="tab" [class.active]="activeView === 'zones'" (click)="setView('zones')">Zones
-          <span class="live-tag"><span class="dot live"></span>LIVE</span>
+          <span class="live-tag" *ngIf="zonesLiveCount > 0"><span class="dot live"></span>LIVE</span>
         </button>
       </div>
     </div>
   </div>
 
   <!-- ================= FRONTEND VIEW ================= -->
-  <main class="view" [class.active]="activeView === 'frontend'" id="view-frontend">
+  <main class="view active" *ngIf="activeView === 'frontend'" id="view-frontend">
 
     <!-- Row 1: ATC / Adjustments & Procedures / Participants -->
     <div class="ov-grid">
@@ -466,19 +466,248 @@
 
   </main>
 
-  <!-- ================= BACKEND VIEW (Phase 4) ================= -->
-  <main class="view" [class.active]="activeView === 'backend'" id="view-backend">
-    <div class="placeholder">
-      <b>Backend Dashboard</b>
-      Attendance mirror, Video Ask Review and Arena Calling arrive in a later phase.
+  <!-- ================= BACKEND VIEW ================= -->
+  <main class="view active" *ngIf="activeView === 'backend'" id="view-backend">
+
+    <!-- Row 1: Daily Attendance (mirror of frontend — same dayWiseAttendance) -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">Daily Attendance</div>
+        <div class="sec-meta">same live view the frontend team sees</div>
+        <div class="sec-right">
+          <span class="att-range">{{ attRange }}</span>
+          <span class="att-track">
+            <i *ngFor="let d of attDays" [class.done]="d.isPast" [class.today]="d.isToday"></i>
+          </span>
+        </div>
+      </div>
+      <div class="att-grid" id="attGridB">
+        <div class="day-card total" (click)="openAttTotal()">
+          <div class="day-eyebrow"><span>Total approved</span></div>
+          <div class="day-num num">{{ attTotalApproved | number }}</div>
+          <div class="day-sub" (click)="$event.stopPropagation(); openAttAbsentToday()"><span>Absent today</span><b class="num">{{ attAbsentToday }}</b></div>
+        </div>
+        <ng-container *ngFor="let d of attDays">
+          <div class="day-card upcoming" *ngIf="d.isFuture">
+            <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span></div>
+            <div class="day-line"></div>
+            <div class="day-sub">upcoming</div>
+          </div>
+          <div class="day-card" *ngIf="!d.isFuture" [class.today]="d.isToday" (click)="openAttDay(d)">
+            <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span>
+              <span class="delta" *ngIf="attendanceDelta(d) !== null"
+                    [class.up]="(attendanceDelta(d) || 0) > 0" [class.down]="(attendanceDelta(d) || 0) < 0" [class.flat]="attendanceDelta(d) === 0">
+                {{ (attendanceDelta(d) || 0) > 0 ? '+' : '' }}{{ attendanceDelta(d) }}
+              </span>
+            </div>
+            <div class="day-num num">{{ d.count }}</div>
+            <div class="day-bar" *ngIf="d.isToday && getVideoAskByDay(d) !== null"><i [style.width.%]="attTodayBarPct(d)"></i></div>
+            <div class="day-sub" (click)="$event.stopPropagation(); openAttVideo(d)"><span>Video Ask</span><span><b class="num">{{ getVideoAskByDay(d) ?? '—' }}</b></span></div>
+          </div>
+        </ng-container>
+        <div class="day-card never" (click)="openAttNever()">
+          <div class="day-eyebrow"><span>Never attended</span></div>
+          <div class="day-num num">{{ attNeverAttended }}</div>
+          <div class="day-sub"><span>any day &middot; critical</span></div>
+        </div>
+      </div>
+      <div class="footnote" style="padding-top:0;padding-bottom:16px">
+        Video Ask = daily recordings vs that day's attendance &middot; click a card for attendance, the Video Ask row for recordings
+      </div>
+    </section>
+
+    <!-- Row 2: Video Ask Review + Arena Calling -->
+    <div class="b-grid">
+      <!-- Video Ask Review (V2 review state; per-day via existing seams) -->
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Video Ask Review</div>
+          <div class="sec-meta">daily recordings &middot; review before tagging</div>
+        </div>
+        <div class="proc-filters">
+          <span class="pf-label">Day</span>
+          <div class="pf-group" id="vaDayChips">
+            <button class="pf-chip" *ngFor="let c of vaDayChips" [class.on]="c.active" (click)="setVaDay(c.value)">{{ c.label }}</button>
+          </div>
+        </div>
+        <ng-container *ngIf="hasEventDays; else vaEmpty">
+          <div class="kpi-grid" id="vaKpis">
+            <div class="kpi" (click)="openVa('Recordings received', vaReceivedIds)"><div class="kpi-num num">{{ vaReceivedIds.length }}</div><div class="kpi-label">Received</div></div>
+            <div class="kpi k-open" (click)="openVa('Missing recording', vaMissingIds)"><div class="kpi-num num">{{ vaMissingIds.length }}</div><div class="kpi-label">Missing</div></div>
+            <div class="kpi k-res" (click)="openVa('Reviewed', vaReviewedIds)"><div class="kpi-num num">{{ vaReviewedIds.length }}</div><div class="kpi-label">Reviewed</div></div>
+            <div class="kpi k-warn" (click)="openVa('Review queue', vaToReviewIds)"><div class="kpi-num num">{{ vaToReviewIds.length }}</div><div class="kpi-label">To review</div></div>
+          </div>
+          <div class="trays" id="vaTrays">
+            <div class="tray">
+              <div class="tag-col-h"><span class="dot" style="background:var(--warn)"></span><span class="tag-col-name">Review queue</span>
+                <span class="tag-col-count num" (click)="openVa('Review queue', vaToReviewIds)">{{ vaToReviewIds.length }}</span></div>
+              <div class="name-pill" *ngFor="let pid of vaToReviewIds.slice(0, 5)" (click)="openVa('Review queue', vaToReviewIds)">{{ participantName(pid) }}</div>
+              <span class="more-link" *ngIf="vaToReviewIds.length > 5" (click)="openVa('Review queue', vaToReviewIds)">+{{ vaToReviewIds.length - 5 }} more</span>
+              <div class="fu-empty" *ngIf="!vaToReviewIds.length">All clear</div>
+            </div>
+            <div class="tray">
+              <div class="tag-col-h"><span class="dot" style="background:var(--alert)"></span><span class="tag-col-name">Missing recording</span>
+                <span class="tag-col-count num" (click)="openVa('Missing recording', vaMissingIds)">{{ vaMissingIds.length }}</span></div>
+              <div class="name-pill" *ngFor="let pid of vaMissingIds.slice(0, 5)" (click)="openVa('Missing recording', vaMissingIds)">{{ participantName(pid) }}</div>
+              <span class="more-link" *ngIf="vaMissingIds.length > 5" (click)="openVa('Missing recording', vaMissingIds)">+{{ vaMissingIds.length - 5 }} more</span>
+              <div class="fu-empty" *ngIf="!vaMissingIds.length">All clear</div>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #vaEmpty><div class="tk-empty">No daily Video Ask for prep queues.</div></ng-template>
+      </section>
+
+      <!-- Arena Calling (absentees real; outcomes via getCallLog stub, C-9) -->
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Arena Calling</div>
+          <div class="sec-meta">not in the Arena &middot; backend team calls</div>
+          <div class="sec-right"><span class="live-pill" (click)="openCallStatus('pending', 'To call')"><span class="dot live"></span>{{ callPending }} TO CALL</span></div>
+        </div>
+        <div class="proc-filters">
+          <span class="pf-label">Day</span>
+          <div class="pf-group" id="callDayChips">
+            <button class="pf-chip" *ngFor="let c of callDayChips" [class.on]="c.active" (click)="setCallDay(c.value)">{{ c.label }}</button>
+          </div>
+        </div>
+        <ng-container *ngIf="hasEventDays; else callEmpty">
+          <div class="kpi-grid" id="callKpis">
+            <div class="kpi k-open" (click)="openCallStatus('pending', 'To call')"><div class="kpi-num num">{{ callPending }}</div><div class="kpi-label">To call</div></div>
+            <div class="kpi k-res" (click)="openCallStatus('coming', 'Confirmed coming')"><div class="kpi-num num">{{ callComing }}</div><div class="kpi-label">Coming</div></div>
+            <div class="kpi k-warn" (click)="openCallStatus('no-answer', 'No answer')"><div class="kpi-num num">{{ callNoAnswer }}</div><div class="kpi-label">No answer</div></div>
+            <div class="kpi k-mute" (click)="openCallStatus('not-coming', 'Not coming')"><div class="kpi-num num">{{ callNotComing }}</div><div class="kpi-label">Not coming</div></div>
+          </div>
+          <div class="tk-list" id="callList" style="max-height:420px">
+            <div class="tk-row" *ngFor="let r of callVisibleRows">
+              <span class="tk-main">
+                <div class="tk-name">{{ r.name }}<span class="never-chip" *ngIf="isNever(r.profileId)">Never</span></div>
+                <div class="tk-cat">
+                  {{ callDay === 'all' ? (r.day + ' · ') : '' }}{{ journeyLabel(r.journeyId) }}<ng-container *ngIf="!isNever(r.profileId)"> &middot; attended {{ attendedDays(r.profileId) }}/{{ elapsedDays() }} days</ng-container>
+                </div>
+              </span>
+              <span class="call-meta num">{{ r.status === 'pending' ? '—' : (fmtTime(r.calledAt) + (callerName(r.callerId) ? (' · ' + callerName(r.callerId)) : '')) }}</span>
+              <select class="call-select" [ngModel]="r.status" (ngModelChange)="setCallOutcome(r, $event)" [ngClass]="'st-' + callStatusClass(r.status)">
+                <option *ngFor="let o of callOptions" [value]="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+            <span class="more-link" *ngIf="callRows.length > callShown" (click)="callMore()">+{{ callRows.length - callShown }} more</span>
+            <div class="tk-empty" *ngIf="!callRows.length">Everyone is in the Arena.</div>
+          </div>
+        </ng-container>
+        <ng-template #callEmpty><div class="tk-empty">Calling starts with the live event.</div></ng-template>
+      </section>
     </div>
+
+    <!-- Row 3: Customer Support + Ticket Feed -->
+    <div class="cs-grid">
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Customer Support</div>
+          <div class="sec-meta">open vs resolved &middot; click any count for the list</div>
+          <div class="sec-right"><span class="live-pill" (click)="openCsOpen()"><span class="dot live"></span>{{ getSupportStatusCounts().open }} OPEN</span></div>
+        </div>
+        <ng-container *ngIf="csHasTickets; else csEmpty">
+          <div class="kpi-grid" id="csKpis">
+            <div class="kpi k-open" (click)="openCsOpen()"><div class="kpi-num num">{{ getSupportStatusCounts().open }}</div><div class="kpi-label">Open now</div></div>
+            <div class="kpi k-prog"><div class="kpi-num num">{{ getSupportStatusCounts().inProgress }}</div><div class="kpi-label">In progress</div></div>
+            <div class="kpi k-res"><div class="kpi-num num">{{ getSupportStatusCounts().resolved }}</div><div class="kpi-label">Resolved today</div></div>
+            <div class="kpi"><div class="kpi-num num">{{ getSupportResolutionHours() }}<small>h</small></div><div class="kpi-label">Median resolution</div></div>
+          </div>
+          <div class="cs-list" id="csCats">
+            <div class="cs-row" *ngFor="let c of csCats" (click)="openCsCat(c)">
+              <div class="cs-name">{{ c.category }}</div>
+              <div class="cs-bar">
+                <div class="seg-res" *ngIf="c.resolved" [style.flex]="c.resolved + ' 0 0'" [title]="c.resolved + ' resolved'"></div>
+                <div class="seg-prog" *ngIf="c.inProgress" [style.flex]="c.inProgress + ' 0 0'" [title]="c.inProgress + ' in progress'"></div>
+                <div class="seg-open" *ngIf="c.open" [style.flex]="c.open + ' 0 0'" [title]="c.open + ' open'"></div>
+              </div>
+              <div class="cs-meta num"><b *ngIf="c.open">{{ c.open }} open</b><span *ngIf="!c.open">clear</span> &middot; {{ c.resolved }} done</div>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #csEmpty>
+          <div class="tk-empty">No tickets yet — support opens when the queue starts.</div>
+        </ng-template>
+      </section>
+
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Ticket Feed</div>
+          <div class="sec-meta">latest first</div>
+        </div>
+        <div class="tk-list" id="tkList">
+          <div class="tk-row" *ngFor="let t of getTicketFeed()">
+            <span class="tk-time num">{{ fmtTime(t.time) }}</span>
+            <span class="tk-main">
+              <div class="tk-name">{{ t.name }}</div>
+              <div class="tk-cat">{{ t.category }}{{ t.status === 'Resolved' && t.resolutionHours != null ? ' · ' + t.resolutionHours + 'h' : '' }}</div>
+            </span>
+            <span class="tk-status" [ngClass]="feedStatusClass(t.status)">{{ t.status }}</span>
+            <span class="tk-assignee" *ngIf="assigneeInitials(t.assigneeId)" [title]="assigneeName(t.assigneeId)">{{ assigneeInitials(t.assigneeId) }}</span>
+          </div>
+          <div class="tk-empty" *ngIf="!getTicketFeed().length">Nothing in the feed.</div>
+        </div>
+      </section>
+    </div>
+
   </main>
 
-  <!-- ================= ZONES VIEW (Phase 5) ================= -->
-  <main class="view" [class.active]="activeView === 'zones'" id="view-zones">
-    <div class="placeholder">
-      <b>Zones</b>
-      Live occupancy by zone, cohort and mentor arrives in a later phase.
+  <!-- ================= ZONES VIEW (Phase 5) — live occupancy, READ-ONLY ================= -->
+  <main class="view active" *ngIf="activeView === 'zones'" id="view-zones">
+    <div id="zonesBody">
+
+      <!-- Not live yet — zones go live with the event -->
+      <div class="placeholder" *ngIf="!zonesLive">
+        <b>Zones are not live</b>
+        Zones go live with the event &mdash; occupancy appears here the moment participants are allocated.<br>
+        Zone setup itself lives in the Event Zones config screen.
+      </div>
+
+      <section class="card section" *ngIf="zonesLive">
+        <div class="sec-head">
+          <div class="sec-title">Zones &middot; Live</div>
+          <div class="sec-meta">who is where in the Arena right now &middot; zone setup lives in the Event Zones config screen</div>
+          <div class="sec-right"><span class="live-pill"><span class="dot live"></span>{{ zonesLiveCount }} ZONES LIVE</span></div>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi" (click)="openZonePresent()"><div class="kpi-num num">{{ zonePresentCount }}</div><div class="kpi-label">In the Arena today</div></div>
+          <div class="kpi k-res" (click)="openZoneAllocated()"><div class="kpi-num num">{{ zoneAllocatedCount }}</div><div class="kpi-label">Allocated to zones</div></div>
+          <div class="kpi k-open" (click)="openZoneUnassigned()"><div class="kpi-num num">{{ zoneUnassignedCount }}</div><div class="kpi-label">No zone yet</div></div>
+          <div class="kpi k-mute" (click)="openZoneAllocated()"><div class="kpi-num num">{{ zoneCoveragePct }}<small>%</small></div><div class="kpi-label">Coverage</div></div>
+        </div>
+        <div style="padding:0 22px 20px">
+          <div class="zones-grid">
+            <div class="zone-card" *ngFor="let z of zones" [class.standby]="!zoneIsLive(z)">
+              <div class="zone-head">
+                <span class="zone-name">{{ z['zonename'] }}</span>
+                <span class="zone-live" *ngIf="zoneIsLive(z)"><span class="dot live"></span>LIVE</span>
+                <span class="zone-standby-tag" *ngIf="!zoneIsLive(z)">Standby</span>
+              </div>
+              <div class="zone-num num" *ngIf="zoneIsLive(z)" (click)="openZone(z)">{{ zoneOccupantCount(z) }}<small>participants now</small></div>
+              <div class="zone-roles">
+                <div class="zone-role"><b>Coordinator</b><span>{{ zoneCoordinators(z) }}</span></div>
+                <div class="zone-role"><b>Mentors</b><span>{{ zoneMentors(z) }}</span></div>
+              </div>
+              <ng-container *ngIf="zoneIsLive(z)">
+                <div class="zone-cohorts">
+                  <div class="cohort-row" *ngFor="let c of zoneCohorts(z)" (click)="openZoneCohort(z, c)">
+                    <span class="cohort-name">{{ c.name }}</span><span class="cohort-count num">{{ c.count }}</span>
+                  </div>
+                </div>
+                <div class="zone-foot" (click)="openZone(z)">{{ zoneCohorts(z).length }} cohorts &middot; {{ zoneOccupantCount(z) }} participants</div>
+              </ng-container>
+              <ng-container *ngIf="!zoneIsLive(z)">
+                <div class="zone-empty">Not live &mdash; opens from the config screen</div>
+                <div class="zone-foot">0 cohorts &middot; 0 participants</div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+        <div class="footnote" style="padding-top:0;padding-bottom:16px">
+          Occupancy counts participants scanned in today &middot; click a zone, cohort or count for the list
+        </div>
+      </section>
+
     </div>
   </main>
 
