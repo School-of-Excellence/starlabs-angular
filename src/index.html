@@ -8,6 +8,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- favicon served same-origin: a cross-origin Firebase Storage URL is blocked under COEP: require-corp (Zoom SDK cross-origin isolation) -->
   <link rel="icon" type="image/png" href="assets/ah-black-logo-only.png">
+  <!--
+    Local dev (ng serve) doesn't get COOP/COEP from a host config, and the
+    esbuild/Vite dev server does not play well with the coi proxy worker: it
+    re-fetches every same-origin GET, and a failed re-fetch turns the document
+    itself into a synthetic 502 ("coi-serviceworker fetch failed"). So on
+    localhost we skip registration and deregister any stale worker. Production
+    (Firebase Hosting) sets the headers directly via firebase.json.
+  -->
+  <script>
+    (function () {
+      var h = location.hostname;
+      if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]') {
+        window.coi = {
+          shouldRegister: function () { return false; },
+          shouldDeregister: function () { return true; },
+          quiet: true,
+        };
+      }
+    })();
+  </script>
   <link crossorigin="anonymous" href="https://unpkg.com/@angular/material/prebuilt-themes/indigo-pink.css" rel="stylesheet">
   <link crossorigin="anonymous" href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script src="coi-serviceworker.js"></script>

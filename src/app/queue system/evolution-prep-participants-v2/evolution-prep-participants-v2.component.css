@@ -1,0 +1,388 @@
+/* ATC Transcript Ops v2 — visual language follows evolution-prep-participants (v1)
+   so the two screens read as siblings. */
+
+.mainscreen {
+  padding: 20px 24px 32px;
+  background: #f7f8fa;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+.page-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.header-left { display: flex; align-items: flex-start; gap: 12px; }
+.header-icon {
+  font-size: 30px; width: 30px; height: 30px; color: #3f51b5; margin-top: 2px;
+}
+.page-title {
+  margin: 0; font-size: 20px; font-weight: 600; color: #1f2430;
+  display: flex; align-items: center; gap: 8px;
+}
+.v2-tag {
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  background: #3f51b5; color: #fff; border-radius: 10px; padding: 2px 8px;
+}
+.page-subtitle { margin: 4px 0 0; font-size: 12.5px; color: #6b7280; max-width: 720px; }
+.refresh-btn { white-space: nowrap; }
+
+/* ── selectors ──────────────────────────────────────────────────────────── */
+.selector-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #fff; border-radius: 8px; padding: 12px 16px 0; margin-bottom: 14px;
+}
+.queue-field { min-width: 340px; flex: 1 1 340px; }
+.stage-field { min-width: 220px; }
+.hint { font-size: 11px; color: #9aa0ac; font-weight: 400; }
+.gen-note { font-size: 12.5px; color: #6b7280; padding-bottom: 18px; }
+
+/* ── banners ────────────────────────────────────────────────────────────── */
+.err-box, .warn-box {
+  display: flex; align-items: center; gap: 10px;
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px;
+}
+.err-box { background: #fdecea; color: #b3261e; }
+.warn-box { background: #fff8e1; color: #8a6100; }
+
+.loading-box { text-align: center; padding: 56px 0; color: #6b7280; }
+.loading-box p { margin-top: 12px; font-size: 13px; }
+
+.progress-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: #e8eaf6; color: #303f9f;
+  border-radius: 8px; padding: 8px 14px; margin-bottom: 12px; font-size: 12.5px;
+}
+
+.empty-hint { text-align: center; padding: 56px 0; color: #9aa0ac; }
+.empty-hint mat-icon { font-size: 34px; width: 34px; height: 34px; }
+.empty-hint p { margin-top: 8px; font-size: 13px; }
+
+/* ── summary ────────────────────────────────────────────────────────────── */
+.summary-bar { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.stat {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border-radius: 8px; padding: 12px 18px;
+  min-width: 190px; border-left: 4px solid #cfd3dc;
+}
+.stat mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.stat div { display: flex; flex-direction: column; line-height: 1.2; }
+.stat strong { font-size: 19px; color: #1f2430; }
+.stat span { font-size: 11.5px; color: #6b7280; }
+.stat.ok { border-left-color: #2e7d32; } .stat.ok mat-icon { color: #2e7d32; }
+.stat.need { border-left-color: #ef6c00; } .stat.need mat-icon { color: #ef6c00; }
+.stat.none { border-left-color: #9aa0ac; } .stat.none mat-icon { color: #9aa0ac; }
+.stat.superseded { border-left-color: #7b1fa2; } .stat.superseded mat-icon { color: #7b1fa2; }
+
+/* ── funnel telemetry ───────────────────────────────────────────────────── */
+.funnel {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  background: #fff; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px;
+}
+.fstep {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 108px; padding: 6px 12px; border-radius: 6px;
+}
+.fstep.clickable { cursor: pointer; }
+.fstep.clickable:hover { background: #f2f4f8; }
+.fnum { font-size: 21px; font-weight: 600; color: #1f2430; line-height: 1.1; }
+.flabel { font-size: 10.5px; color: #6b7280; text-align: center; margin-top: 2px; }
+.fstep.ok .fnum { color: #1e7e34; }
+.fstep.warn .fnum { color: #ef6c00; }
+.fstep.done .fnum { color: #3f51b5; }
+.farrow { color: #cfd3dc; }
+
+.stat.clickable { cursor: pointer; }
+.stat.clickable:hover { background: #f7f8fa; }
+.stat.rebuild { border-left-color: #3f51b5; } .stat.rebuild mat-icon { color: #3f51b5; }
+.stat.gen { border-left-color: #0277bd; } .stat.gen mat-icon { color: #0277bd; }
+.stat.err { border-left-color: #a4262c; } .stat.err mat-icon { color: #a4262c; }
+
+/* ── filters ────────────────────────────────────────────────────────────── */
+.filter-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #fff; border-radius: 8px; padding: 12px 16px 0; margin-bottom: 14px;
+}
+.search-field { min-width: 280px; flex: 1 1 280px; }
+.filter-field { min-width: 200px; }
+.clear-btn { margin-bottom: 18px; }
+.result-count { font-size: 12.5px; color: #6b7280; padding-bottom: 18px; margin-left: auto; }
+
+/* ── table ──────────────────────────────────────────────────────────────── */
+.body { background: #fff; border-radius: 8px; overflow: auto; }
+table { width: 100%; }
+th.mat-mdc-header-cell {
+  background: #f2f4f8; color: #48505f; font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+td.mat-mdc-cell { font-size: 13px; color: #2b3140; padding: 10px 12px; vertical-align: top; }
+.data-row:hover { background: #fafbfd; }
+
+.name-cell { display: flex; align-items: center; gap: 10px; }
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex: 0 0 30px;
+  background: #3f51b5; color: #fff; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.name-info { display: flex; flex-direction: column; line-height: 1.25; }
+.name-text { font-weight: 500; }
+.profile-id { font-size: 10.5px; color: #9aa0ac; font-family: monospace; }
+
+.stage-badge, .queue-badge {
+  display: inline-block; background: #eef1f7; color: #48505f;
+  border-radius: 12px; padding: 3px 10px; font-size: 11.5px;
+}
+.stage-badge { white-space: nowrap; }
+.queue-badge { max-width: 190px; line-height: 1.3; }
+
+/* suggested next step, under the participant name */
+.next-action {
+  font-size: 10.5px; color: #3f51b5; font-weight: 500; margin-top: 2px;
+}
+
+/* ── ATC generation doc cell ────────────────────────────────────────────── */
+.col-gen { min-width: 170px; }
+.gen-badge {
+  display: inline-block; border-radius: 12px; padding: 3px 10px;
+  font-size: 11.5px; font-weight: 500; text-transform: lowercase;
+}
+.gen-dataincomplete { background: #fff3e0; color: #e65100; }
+.gen-pending        { background: #e8eaf6; color: #303f9f; }
+.gen-processing     { background: #e0f7fa; color: #00838f; }
+.gen-completed      { background: #e6f4ea; color: #1e7e34; }
+.gen-error          { background: #fde7e9; color: #a4262c; }
+.gen-missing { font-size: 10px; color: #9aa0ac; margin-top: 3px; word-break: break-word; }
+.rebuild-btn {
+  margin-top: 6px; font-size: 11px; line-height: 26px; min-width: 0; padding: 0 10px;
+}
+.rebuild-btn mat-icon { font-size: 15px; width: 15px; height: 15px; margin-right: 2px; }
+.col-narrow { width: 96px; }
+
+/* ── transcript state badges ────────────────────────────────────────────── */
+.col-tx { width: 130px; }
+.yes-badge, .no-badge, .none-badge, .busy-badge, .fail-badge, .superseded-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 12px; padding: 3px 10px; font-size: 11.5px; font-weight: 500;
+  white-space: nowrap;
+}
+.yes-badge  { background: #e6f4ea; color: #1e7e34; }
+.no-badge   { background: #fdecea; color: #b3261e; }
+.none-badge { background: #eceff1; color: #607d8b; }
+.busy-badge { background: #e8eaf6; color: #303f9f; }
+.fail-badge { background: #fde7e9; color: #a4262c; }
+.superseded-badge { background: #f3e5f5; color: #6a1b9a; }
+.yes-badge mat-icon, .no-badge mat-icon, .none-badge mat-icon,
+.fail-badge mat-icon, .superseded-badge mat-icon {
+  font-size: 15px; width: 15px; height: 15px;
+}
+
+/* ── sessions / chain trail ─────────────────────────────────────────────── */
+.col-sessions { min-width: 260px; }
+.la-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: #eceff1; color: #607d8b;
+  border: 1px solid transparent; border-radius: 10px;
+  padding: 2px 8px; font-size: 11px; margin: 0 4px 4px 0;
+}
+.la-chip mat-icon { font-size: 13px; width: 13px; height: 13px; }
+.la-chip.la-ok { background: #e6f4ea; color: #1e7e34; }
+/* transcript present but on a superseded session — the pipeline cannot read it */
+.la-chip.la-stale { background: #f3e5f5; color: #6a1b9a; }
+.la-chip.la-secondary { opacity: .8; border-style: dashed; border-color: #c9ced8; }
+.la-chip.la-target { border-color: #3f51b5; border-style: solid; font-weight: 600; }
+.stale-mark {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .4px;
+  margin-left: 3px; opacity: .75;
+}
+.trail {
+  font-size: 10.5px; color: #9aa0ac; font-family: monospace;
+  margin-top: 2px; word-break: break-word;
+}
+.muted { color: #b6bac3; font-size: 12px; }
+
+/* ── dropbox link cell ──────────────────────────────────────────────────── */
+.col-link { min-width: 270px; }
+.link-cell { display: flex; align-items: center; gap: 4px; }
+.link-input {
+  flex: 1 1 auto; min-width: 150px;
+  border: 1px solid #d6dae2; border-radius: 6px;
+  padding: 6px 9px; font-size: 12px; outline: none; background: #fff;
+}
+.link-input:focus { border-color: #3f51b5; }
+.link-input:disabled { background: #f3f4f6; color: #9aa0ac; }
+.link-save-btn { flex: 0 0 auto; }
+.link-open-btn {
+  display: inline-flex; align-items: center; color: #3f51b5; text-decoration: none;
+}
+.link-open-btn mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+/* ── empty ──────────────────────────────────────────────────────────────── */
+.no-data-cell { text-align: center; padding: 40px 0; color: #9aa0ac; }
+.no-data-cell mat-icon { font-size: 30px; width: 30px; height: 30px; }
+.no-data-cell p { margin-top: 6px; font-size: 13px; }
+
+@media (max-width: 900px) {
+  .mainscreen { padding: 14px; }
+  .queue-field, .search-field { min-width: 100%; }
+  .result-count { margin-left: 0; }
+}
+
+/* ── funnel telemetry ───────────────────────────────────────────────────── */
+.funnel {
+  display: flex; align-items: stretch; gap: 4px; flex-wrap: wrap;
+  background: #fff; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;
+}
+.fstep {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 6px 16px; border-radius: 6px; min-width: 108px;
+  border-bottom: 3px solid #cfd3dc;
+}
+.fstep.clickable { cursor: pointer; }
+.fstep.clickable:hover { background: #f2f4f8; }
+.fnum { font-size: 21px; font-weight: 600; color: #1f2430; line-height: 1.1; }
+.flabel { font-size: 10.5px; color: #6b7280; text-align: center; margin-top: 2px; }
+.fstep.ok { border-bottom-color: #2e7d32; }
+.fstep.warn { border-bottom-color: #ef6c00; }
+.fstep.done { border-bottom-color: #1565c0; }
+.farrow { color: #cfd3dc; align-self: center; }
+
+/* ── extra stat tiles ───────────────────────────────────────────────────── */
+.stat.clickable { cursor: pointer; }
+.stat.clickable:hover { background: #f7f8fb; }
+.stat.rebuild { border-left-color: #1565c0; } .stat.rebuild mat-icon { color: #1565c0; }
+.stat.gen { border-left-color: #5c6bc0; } .stat.gen mat-icon { color: #5c6bc0; }
+.stat.err { border-left-color: #b3261e; } .stat.err mat-icon { color: #b3261e; }
+
+/* ── queue + next-action ────────────────────────────────────────────────── */
+.queue-badge {
+  display: inline-block; background: #e8eaf6; color: #3949ab;
+  border-radius: 10px; padding: 3px 9px; font-size: 11px; white-space: nowrap;
+}
+.next-action {
+  font-size: 10.5px; color: #ef6c00; font-style: italic; margin-top: 1px;
+}
+.col-narrow { width: 96px; }
+
+/* ── ATC gen doc cell ───────────────────────────────────────────────────── */
+.col-gen { min-width: 168px; }
+.gen-badge {
+  display: inline-block; border-radius: 12px; padding: 3px 10px;
+  font-size: 11.5px; font-weight: 500; text-transform: lowercase;
+  background: #eceff1; color: #607d8b;
+}
+.gen-badge.gen-dataincomplete { background: #fff3e0; color: #e65100; }
+.gen-badge.gen-pending        { background: #e8eaf6; color: #303f9f; }
+.gen-badge.gen-processing     { background: #e1f5fe; color: #0277bd; }
+.gen-badge.gen-completed      { background: #e6f4ea; color: #1e7e34; }
+.gen-badge.gen-error          { background: #fdecea; color: #b3261e; }
+.gen-missing {
+  font-size: 10px; color: #9aa0ac; margin-top: 3px; word-break: break-word;
+}
+.rebuild-btn {
+  margin-top: 6px; font-size: 11px; line-height: 26px; min-width: 0; padding: 0 10px;
+}
+.rebuild-btn mat-icon { font-size: 15px; width: 15px; height: 15px; margin-right: 2px; }
+
+/* ── pairing sources column ─────────────────────────────────────────────── */
+.col-sources { min-width: 210px; }
+.src-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 10px; padding: 2px 8px; margin: 0 4px 4px 0;
+  font-size: 11px; white-space: nowrap;
+  background: #eceff1; color: #607d8b;
+}
+.src-chip mat-icon { font-size: 13px; width: 13px; height: 13px; }
+.src-chip.src-ok      { background: #e6f4ea; color: #1e7e34; }
+.src-chip.src-bad     { background: #fdecea; color: #b3261e; }
+.src-chip.src-warn    { background: #fff3e0; color: #e65100; }
+.src-chip.src-unknown { background: #f1f3f5; color: #9aa0ac; }
+.one-of {
+  font-size: 8.5px; text-transform: uppercase; letter-spacing: .4px;
+  margin-left: 4px; opacity: .8; border: 1px solid currentColor;
+  border-radius: 6px; padding: 0 3px;
+}
+
+/* ── studio session column ──────────────────────────────────────────────── */
+.col-studio { min-width: 330px; }
+.studio-block { padding: 2px 0; }
+.studio-block + .studio-block {
+  margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e3e6ec;
+}
+.studio-head { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
+.studio-stage { font-size: 10.5px; color: #6b7280; font-weight: 600; margin-right: 2px; }
+
+/* ── origin metadata strip ──────────────────────────────────────────────── */
+.meta-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #fff; border-radius: 8px; padding: 10px 18px; margin-bottom: 12px;
+  font-size: 12.5px; color: #6b7280;
+}
+.meta-item { display: inline-flex; align-items: center; gap: 5px; padding: 2px 6px; border-radius: 5px; }
+.meta-item strong { font-size: 15px; color: #1f2430; }
+.meta-item.clickable { cursor: pointer; }
+.meta-item.clickable:hover { background: #f2f4f8; }
+.meta-item.warn { color: #8a6100; }
+.meta-item.warn strong { color: #e65100; }
+.meta-item mat-icon { font-size: 16px; width: 16px; height: 16px; }
+.meta-hint { font-size: 10.5px; color: #b6bac3; }
+.meta-sep { color: #cfd3dc; }
+
+/* origin badge under the participant name */
+.origin-tag {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .4px;
+  color: #7986cb; margin-top: 2px;
+}
+.origin-tag.origin-here { color: #26a69a; }
+
+/* ── off-lineage evidence ───────────────────────────────────────────────── */
+.offlin-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #ede7f6; color: #5e35b1;
+  border-radius: 12px; padding: 3px 10px; font-size: 11.5px; font-weight: 500;
+}
+.offlin-badge mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.offlin-list { font-size: 10.5px; color: #9aa0ac; margin-top: 4px; }
+.offlin-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: #ede7f6; color: #5e35b1; border-radius: 8px;
+  padding: 1px 6px; margin-left: 4px; font-family: monospace; font-size: 10px;
+}
+.offlin-chip.offlin-ok { background: #e6f4ea; color: #1e7e34; }
+.offlin-chip mat-icon { font-size: 11px; width: 11px; height: 11px; }
+.view-btn { width: 28px; height: 28px; line-height: 28px; }
+.view-btn mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+/* transferred OUT of this queue — ATC doc belongs to the destination queue */
+.xfer-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #e0f2f1; color: #00695c;
+  border-radius: 12px; padding: 3px 10px; font-size: 11.5px; font-weight: 500;
+  white-space: nowrap;
+}
+.xfer-badge mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.origin-tag.origin-out { color: #00897b; }
+
+/* gen doc that belongs to the queue this token was transferred to */
+.in-dest {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; color: #00695c; margin-top: 3px;
+}
+.in-dest mat-icon { font-size: 12px; width: 12px; height: 12px; }
+
+.othertok {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; color: #e65100; margin-top: 3px;
+}
+.othertok mat-icon { font-size: 12px; width: 12px; height: 12px; }
+
+/* config-stage own-form diagnosis (why no ATC doc) */
+.stat.gap { border-left-color: #c62828; } .stat.gap mat-icon { color: #c62828; }
+.stat.expected { border-left-color: #9aa0ac; } .stat.expected mat-icon { color: #9aa0ac; }
+.cfgform {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; margin-top: 3px;
+}
+.cfgform mat-icon { font-size: 12px; width: 12px; height: 12px; }
+.cfgform.cfg-gap { color: #c62828; font-weight: 600; }
+.cfgform.cfg-ok  { color: #9aa0ac; }
