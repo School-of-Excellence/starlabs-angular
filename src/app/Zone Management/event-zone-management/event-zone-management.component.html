@@ -422,6 +422,34 @@
                   <mat-icon>{{ participant.addedflow === 'manual' ? 'touch_app' : 'auto_mode' }}</mat-icon>
                   {{ participant.addedflow === 'manual' ? 'Manual Assignment' : 'Auto Assignment' }}
                 </span>
+
+                <button class="trail-toggle" (click)="toggleTrail(participant)" [disabled]="participant.trailLoading">
+                  <mat-icon>{{ participant.trailLoading ? 'hourglass_empty' : (participant.showTrail ? 'expand_less' : 'timeline') }}</mat-icon>
+                  {{ participant.trailLoading ? 'Loading...' : (participant.showTrail ? 'Hide Zone Trail' : 'View Zone Trail') }}
+                </button>
+              </div>
+
+              <!-- Zone Trail: chronological history of zone changes (oldest -> newest), fetched on demand -->
+              <div class="zone-trail" *ngIf="participant.showTrail && participant.zoneTrail">
+                <div class="trail-empty" *ngIf="participant.zoneTrail?.length === 0">No zone history found</div>
+                <div class="trail-step" *ngFor="let step of participant.zoneTrail; let last = last">
+                  <div class="trail-marker">
+                    <span class="trail-dot" [class.current]="last"></span>
+                    <span class="trail-line" *ngIf="!last"></span>
+                  </div>
+                  <div class="trail-content">
+                    <div class="trail-zone">
+                      {{ step.zoneName }}
+                      <span class="trail-current-badge" *ngIf="last">Current</span>
+                    </div>
+                    <div class="trail-meta">
+                      <span class="trail-date">{{ formatTime(step.date) }}</span>
+                      <span class="trail-flow" [class.manual]="step.addedflow === 'manual'">
+                        {{ step.addedflow === 'manual' ? 'Manual' : 'Auto' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

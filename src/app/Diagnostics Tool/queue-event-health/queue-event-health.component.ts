@@ -128,6 +128,7 @@ export class QueueEventHealthComponent {
   pageSize = 10;
   currentPage = 1;
   totalPages = 1;
+  pageSizeOptions = [10, 25, 50, 100];
 
   /* ================= KPI ================= */
 
@@ -479,14 +480,22 @@ export class QueueEventHealthComponent {
           ? 'approved'
           : 'denied';
 
+      // Use the already-loaded pp doc instead of querying again —
+      const pp = this.livePpDocs.find(p => p.id === ppid);
+      if (!pp) {
+        console.warn('Participantsproduct document not found for ppid:', ppid);
+        return;
+      }
+      const ppRef = doc(this.firestoreDefault, 'participantsproduct', pp.id);
+
       //Create event participation request
       // Generate docID
       const epRef = doc(
         collection(this.firestoreDefault, 'event participation request')
       );
 
-      // SINGLE atomic write
-      await setDoc(epRef, {
+      const batch = writeBatch(this.firestoreDefault);
+      batch.set(epRef, {
         docid: epRef.id,
         doccreateddate: serverTimestamp(),
         eventref: selectedQueueRef,
@@ -498,24 +507,12 @@ export class QueueEventHealthComponent {
         initiatedfrom: 'health'
       });
 
-
-      // eventparticipationid into participantsproduct
-      const ppQuery = query(
-        collection(this.firestoreDefault, 'participantsproduct'),
-        where('docid', '==', ppid)
-      );
-
-      const ppSnap = await getDocs(ppQuery);
-
-      if (!ppSnap.empty) {
-        await updateDoc(ppSnap.docs[0].ref, {
-          eventparticipationid: epRef.id,
-          eventref: selectedQueueRef,
-          arenaeventid: arenaeventid
-        });
-      } else {
-        console.warn('Participantsproduct document not found for ppid:', ppid);
-      }
+      batch.update(ppRef, {
+        eventparticipationid: epRef.id,
+        eventref: selectedQueueRef,
+        arenaeventid: arenaeventid
+      });
+      await batch.commit();
 
       // OPTIMISTIC UPDATE (this is the key)
       this.liveEventParticipationDocs.push({
@@ -542,9 +539,10 @@ export class QueueEventHealthComponent {
   }
 
   async fixAllInvalidEventStatus() {
-    // Only fix records with missing event participation
+    // Only fix SELECTED records with missing event participation
     const recordsToFix = this.filteredRecords.filter(
       r =>
+        r.selected &&
         !r.validationPassed &&
         r.eventParticipationStatus === 'Not Found' &&
         !r.fixing
@@ -565,6 +563,9 @@ export class QueueEventHealthComponent {
         record.fixing = false;
       }
     }
+
+    // Clear selection after fixing
+    recordsToFix.forEach(r => r.selected = false);
 
     // Rebuild once after all fixes
     this.buildLiveReport();
@@ -647,6 +648,8 @@ export class QueueEventHealthComponent {
             prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
             queueid: d.data()['queueid'] ?? null,
             author: d.data()['author'] ?? [],
+            mentorref: d.data()['mentorref'] ?? [],
+            product: d.data()['product'] ?? '-',
             source: 'atc_alpha'
           }));
           this.calculateAtcGivenCounts();
@@ -674,6 +677,8 @@ export class QueueEventHealthComponent {
             prescriptionDate: d.data()['prescription_date']?.toDate?.() ?? null,
             queueid: d.data()['queueid'] ?? null,
             author: d.data()['author'] ?? [],
+            mentorref: d.data()['mentorref'] ?? [],
+            product: d.data()['product'] ?? '-',
             status: d.data()['status'] ?? null,
             source: 'atc_to_validate'
           }));
@@ -1314,6 +1319,7 @@ export class QueueEventHealthComponent {
 
       const resolved = await Promise.all(allAtcs.map(async (a: any) => {
         const authorNames = await this.resolveAuthorNames(a.author);
+        const mentorNames = await this.resolveAuthorNames(a.mentorref)
         const isValidated = a.source === 'atc_alpha' ? true : (a.status !== 'atc given');
         const noQueue = a.queueid === null || a.queueid === undefined || String(a.queueid).trim() === '';
         return {
@@ -1321,6 +1327,8 @@ export class QueueEventHealthComponent {
           source: a.source,
           prescriptionDate: a.prescriptionDate,
           authorNames,
+          mentorNames,
+          atcmodel: a.product,
           isValidated,
           noQueue,
           selected: false
@@ -1892,6 +1900,12 @@ export class QueueEventHealthComponent {
   updatePage() {
     const start = (this.currentPage - 1) * this.pageSize;
     this.paginatedRecords = this.filteredRecords.slice(start, start + this.pageSize);
+  }
+
+  onPageSizeChange(event: any) {
+    this.pageSize = Number(event.target.value);
+    this.currentPage = 1;
+    this.calculatePagination();
   }
 
   prevPage() {
