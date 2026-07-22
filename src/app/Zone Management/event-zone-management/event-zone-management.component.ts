@@ -866,7 +866,8 @@ export class EventZoneManagementComponent implements OnDestroy {
         const participantLogDocument = doc(this.firestore, "event participant zones logs", logID)
         batch.set(participantLogDocument, {
           ...participantData,
-          logid: logID
+          logid: logID,
+          logdate: serverTimestamp()
         }, {merge: true})
       }
 
@@ -905,9 +906,9 @@ export class EventZoneManagementComponent implements OnDestroy {
       const participantZonesQuery = query(participantZonesCollection, where("eventref", "==", eventRef))
 
       const snapshot = await getDocs(participantZonesQuery)
-      
+
       const participants: any[] = []
-      
+
       snapshot.docs.forEach(docSnap => {
         const data = docSnap.data()
         const profileId = data["profileid"]
@@ -943,7 +944,10 @@ export class EventZoneManagementComponent implements OnDestroy {
           eligibleZoneNames: eligibleZoneNames,
           eligibleCohortIds: eligibleCohortIds,
           eligibleCohortNames: eligibleCohortNames,
-          addedflow: data["addedflow"] || 'N/A'
+          addedflow: data["addedflow"] || 'N/A',
+          zoneTrail: null, // Zone-change history — lazily fetched on first expand
+          showTrail: false, // Expanded/collapsed state of the trail section
+          trailLoading: false // True while this participant's logs are being fetched
         })
       })
 
@@ -978,11 +982,100 @@ export class EventZoneManagementComponent implements OnDestroy {
     }
 
     const search = this.participantZoneSearchTerm.toLowerCase()
-    return this.participantZoneList.filter(p => 
+    return this.participantZoneList.filter(p =>
       p.participantName.toLowerCase().includes(search) ||
       p.participantEmail.toLowerCase().includes(search) ||
       p.selectedZoneName.toLowerCase().includes(search)
     )
+  }
+
+  // ============================================================================
+  // ZONE TRAIL (participant zone history)
+  // ============================================================================
+
+  /**
+   * Toggle a participant's zone trail. The log data is fetched lazily — only on
+   * the FIRST expand for that participant — then cached on the object so
+   * re-opening it makes no further reads.
+   */
+  async toggleTrail(participant: any): Promise<void> {
+    // Collapse if already open
+    if (participant.showTrail) {
+      participant.showTrail = false
+      return
+    }
+
+    // Fetch once, then reuse the cached trail on subsequent opens
+    if (participant.zoneTrail === null) {
+      participant.trailLoading = true
+      try {
+        const eventRef = doc(this.firestore, "event collection", this.selectedEvent["docid"])
+        const logsCollection = collection(this.firestore, "event participant zones logs")
+        // Two equality filters (event + participant) — served by single-field
+        // indexes, so no composite index is required.
+        const logsQuery = query(
+          logsCollection,
+          where("eventref", "==", eventRef),
+          where("profileid", "==", participant.profileid)
+        )
+        const logsSnapshot = await getDocs(logsQuery)
+        participant.zoneTrail = this.buildParticipantTrail(logsSnapshot)
+      } catch (error) {
+        console.error('Error loading zone trail:', error)
+        participant.zoneTrail = []
+      }
+      participant.trailLoading = false
+    }
+
+    participant.showTrail = true
+  }
+
+  /**
+   * Build a single participant's "zone trail" from their assignment log rows.
+   *
+   * WHY: `event participant zones logs` records a snapshot on EVERY submit —
+   * even when the participant's zone didn't change — so the raw rows repeat the
+   * same zone many times. A trail should show only the points where they
+   * actually MOVED zones, in chronological order.
+   *
+   * FLOW:
+   * 1. Sort the rows oldest -> newest by logdate (drop rows with no logdate)
+   * 2. Collapse consecutive rows that share the same selectedzone, keeping only
+   *    the first row of each new zone (i.e. the moment the change happened)
+   */
+  private buildParticipantTrail(logsSnapshot: any): any[] {
+    const rows = logsSnapshot.docs
+      .map((d: any) => d.data())
+      .filter((r: any) => r["logdate"])
+      .sort((a: any, b: any) => this.toMillis(a["logdate"]) - this.toMillis(b["logdate"]))
+
+    const trail: any[] = []
+    let lastZoneId: string | null = null
+
+    rows.forEach((r: any) => {
+      const zoneId = r["selectedzone"]
+      // Collapse consecutive identical zones -> only record actual changes
+      if (zoneId === lastZoneId) return
+      lastZoneId = zoneId
+      trail.push({
+        zoneId: zoneId,
+        zoneName: this.mapEventZoneData[zoneId]?.["zonename"] || zoneId || 'N/A',
+        date: r["logdate"].toDate ? r["logdate"].toDate() : new Date(r["logdate"]),
+        addedflow: r["addedflow"] || 'N/A'
+      })
+    })
+
+    return trail
+  }
+
+  /**
+   * Normalize a Firestore Timestamp (or Date / millis) to milliseconds for sorting
+   */
+  private toMillis(ts: any): number {
+    if (!ts) return 0
+    if (ts.toMillis) return ts.toMillis()
+    if (ts.toDate) return ts.toDate().getTime()
+    return new Date(ts).getTime()
   }
 
   /**
