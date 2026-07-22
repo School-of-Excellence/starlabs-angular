@@ -1026,9 +1026,11 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       heroHeading: [''],
       heroDescription: [''],
       heroshowtype: [''],
-      heroImage: [''], 
+      heroImage: [''],
       heroImageMobile:[''],
       heroVideo:[''],
+      // Hero accent colour hex like #FFFFFF (empty allowed).
+      heroAccent: ['', [Validators.pattern(/^#[0-9A-Fa-f]{6}$/)]],
       testusers: [[],],
       facilitatorprofiles:[[],],
       selectedgroup: [''],
@@ -1364,6 +1366,23 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
 
     getFormArray(key: string): FormArray {
       return this.detailPageForm.get(key) as FormArray;
+    }
+
+    // --- hero accent colour picker (settingsForm.heroAccent) ---
+    get heroAccentControl(): FormControl {
+      return this.settingsForm.get('heroAccent') as FormControl;
+    }
+
+    // <input type="color"> needs a valid hex; fall back to white for the swatch.
+    get heroAccentSwatch(): string {
+      const v = (this.settingsForm.get('heroAccent')?.value || '').trim();
+      return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : '#FFFFFF';
+    }
+
+    onHeroAccentSwatch(event: Event): void {
+      const value = (event.target as HTMLInputElement).value || '';
+      this.settingsForm.patchValue({ heroAccent: value.toUpperCase() });
+      this.settingsForm.get('heroAccent')?.markAsDirty();
     }
 
     addIconWithText(key: string, maxItems: number): void {
@@ -2242,6 +2261,7 @@ private rebuildActivityIds(): void {
         heroImage: data['heroImage'] || '',
         heroImageMobile: data['heroImageMobile'] || '',
         heroVideo: data['heroVideo'] || '',
+        heroAccent: data['heroAccent'] || '',
       });
 
       const isEvergreenEnabled = !!data['evergreenWorkshop'];
@@ -2442,6 +2462,7 @@ private rebuildActivityIds(): void {
         heroImage: this.settingsForm.get('heroImage')?.value || '',
         heroImageMobile: this.settingsForm.get('heroImageMobile')?.value || '',
         heroVideo: this.settingsForm.get('heroVideo')?.value || '',
+        heroAccent: (this.settingsForm.get('heroAccent')?.value || '').trim().toUpperCase(),
       });
       
       this.snackBar.open('Settings saved successfully!', 'Close', { duration: 2000 });

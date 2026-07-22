@@ -1,21 +1,39 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-07 (Events stage-data screen)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-07-events-stage-data-screen.md`.
+_Last updated: 2026-07-20 (Form builder redesign)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-20-update-delivery-form-builder-redesign.md`.
 
 ## Current state
-- **New screen `events-stage-data` added** — a **3-step wizard** (Event ▸ Arena event ▸ Participants). Shows the chosen arena event's participants' **name, email, phone, customer status** — all from `participant metadata` (doc id = profileid).
-  - Files: `src/app/Events/events-stage-data/events-stage-data.component.{ts,html,css}`
-  - Route: `events-stage-data` (lazy, `authGuard`) in `src/app/app.routes.ts`. **URL: `/events-stage-data`**.
-  - Flow: **Step 1** `event collection` (events only) → **Step 2** `arena events` where `eventref == event.ref` → **Step 3** map queue (`queue generation` where `arenaeventidlist array-contains arena.docid`) + `event participation request` where `arenaeventid == arena.docid` → distinct `profileid`s → `participant metadata` doc per id.
-- Angular 19 SSR PWA on Firebase, auth-gated. Branch: `dynamic-studio-update`. **Uncommitted** — changes are local.
+- **UpdateDeliveryComponent's `Form` type fully redesigned** (Product Designer ▸
+  delivery-set ▸ update-delivery). Sectioned layout, numbered field cards with
+  duplicate / expand-collapse / drag-drop reorder, sticky Save footer, a11y
+  fixes. **All reactive-form bindings and Firestore writes unchanged** (parity
+  audit: zero regressions; `ng build` green). Committed on `nanda-development`:
+  `55cf4da` (chip-input bug fixes) and `84d2591` (redesign + features). Local
+  only — push is operator-gated.
+- Other delivery types (Appointment/Report/Events/Queue/Fieldwork) untouched.
+- Operator's separate New-Workshop changes (workshop-configuration,
+  workshop-dashboard) are uncommitted in the working tree — not mine, left alone.
 
-## Last session changes (2026-07-07) — why
-- Built the screen. First cut bulk-loaded all events/queues joined to arenas; operator asked for **stepwise selection**, so rebuilt as the Event ▸ Arena ▸ Participants wizard (breadcrumb nav, per-step loads).
-- Took **all four columns from metadata** per the request (note: sibling `product-funnel` sources email from `profile_data` instead — deliberately different here).
-- Used per-doc `getDoc('participant metadata', profileid)` because the request specified "profileid is the docid of metadata"; confirmed via `authguard.getParticipantMetaMap()` which keys its map by `doc.id`. Rows with no metadata doc are flagged (amber) but still listed.
-- Verified with `ng build --configuration development` — compiles clean; only pre-existing warnings in unrelated components.
+## Last session changes (2026-07-20) — why
+- Fixed array sub-field option chips: input not cleared on Enter (wrong
+  `event.value=` instead of `chipInput.clear()`) and dead backspace after one
+  removal (Material focus hand-off race; fixed by refocusing the chip input
+  after removal — deliberate, see journal).
+- Rebuilt the Form UI per operator directive "premium clean classic UI/UX,
+  don't touch data structure": scoped `.fb-*` styles appended to component CSS,
+  existing classes preserved for other types.
+- Added duplicate (deep clone appended at end), collapse keyed by control
+  identity (survives reorder), CDK drag-drop persisting order via the existing
+  debounced autosave.
+- 15-agent adversarial review → 9 confirmed findings all applied (contrast,
+  aria-labels, inline required errors + invalid-save snackbar, media-URL
+  labels, flipping-options gating, spacing/mobile/hairline fixes).
 
 ## Pending / next
-- **Not linked from any nav/menu** — reachable only by direct URL `/events-stage-data`. Add a menu entry if operators need discoverability.
-- For very large events, per-doc metadata reads could be slow — switch to chunked `where('profileid','in',…)` (as `product-funnel.loadMeta` does) if needed.
-- Commit + push are operator-gated. Branch is `dynamic-studio-update`; do not touch `main` without approval.
+- Operator manual test of duplicate / collapse / drag-drop in the dev app
+  (localhost:4200 — NOTE: dev serves production Firebase `fir-sample-aae4a`;
+  valid forms autosave to live `delivery forms`. Test with Form Name empty to
+  stay write-safe).
+- Known-but-deferred: `{Validators:[...]}` capital-V typo makes the TS
+  "required" validators on type selects inert (template `required` attr is the
+  live one); display-name map for raw type tokens — both optional, unapproved.

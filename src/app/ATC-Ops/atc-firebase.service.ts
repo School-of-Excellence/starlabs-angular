@@ -37,6 +37,14 @@ export class AtcFirebaseService {
    */
   readonly atcDb: Firestore = getFirestore(this.app, 'firestore-atc');
 
+  /**
+   * Named Firestore database `firestore-forms` — READ ONLY from the UI.
+   * Participant form submissions (formsByClient) live here; the ATC ops screens
+   * read them to tell whether a config-stage own source exists. Pre-initialized in
+   * main.ts with the same long-polling transport; just fetch the instance here.
+   */
+  readonly formsDb: Firestore = getFirestore(this.app, 'firestore-forms');
+
   /** Callables region for the ATC pipeline (v2 onCall). */
   readonly functions: Functions = getFunctions(this.app, 'us-central1');
 

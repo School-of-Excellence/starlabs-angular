@@ -182,6 +182,99 @@
   gap: 2px 14px;
 }
 
+/* ---- Home Series extra: enable tag + tags ---- */
+.series-extra {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e6ee;
+}
+
+.series-extra .toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.series-extra .toggle-title {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.series-extra .toggle-desc {
+  color: #6b7280;
+  font-size: 0.78rem;
+  margin-top: 2px;
+  display: block;
+}
+
+.tags-block {
+  margin-top: 10px;
+}
+
+.tags-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.tags-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.tags-label .muted {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.add-tag-btn {
+  border-radius: 8px;
+  height: 32px;
+  line-height: 30px;
+}
+
+.add-tag-btn mat-icon {
+  font-size: 18px;
+  height: 18px;
+  width: 18px;
+  vertical-align: middle;
+}
+
+.tags-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-field {
+  flex: 1;
+}
+
+.tag-remove {
+  color: #d76060;
+  flex: 0 0 auto;
+}
+
+.tags-empty {
+  color: #9ca3af;
+  font-size: 0.82rem;
+  padding: 4px 2px;
+}
+
 .item-grid mat-form-field {
   width: 100%;
 }

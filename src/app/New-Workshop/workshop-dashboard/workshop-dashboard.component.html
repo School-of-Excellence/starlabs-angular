@@ -335,6 +335,20 @@
                 </div>
               </mat-card-content>
             </mat-card>
+
+            <!-- Purchasers: evergreen + paid workshops only -->
+            <mat-card class="metric-card clickable-metric" *ngIf="workshopData?.payment === true"
+              (click)="onMetricClick('purchase')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">shopping_cart</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ purchase }}</h2>
+                    <p class="metric-label">Purchase</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
           </ng-container>
 
         </div>
@@ -1661,7 +1675,7 @@
       </div>
 
       <div class="panel-actions">
-        <button mat-icon-button class="close-button" (click)="sendMail()">
+        <button mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()">
           <i class="fa-solid fa-envelope"></i>
         </button>
         <button mat-icon-button class="close-button" (click)="sendWatti()">
