@@ -130,6 +130,12 @@
               <span class="atc-val num">{{ atcBucketValue(i) }}</span>
             </div>
           </div>
+          <!-- ATC in draft (temporary_ATC) — separate from the 4-bucket partition -->
+          <div class="atc-draft" (click)="openAtcDraft()">
+            <span class="sq" style="background:var(--accent)"></span>
+            <span class="atc-label">ATC in draft &middot; not yet submitted</span>
+            <span class="atc-val num">{{ atcDraftCount }}</span>
+          </div>
         </div>
       </section>
 
@@ -144,20 +150,26 @@
                 <div class="ap-head"><span class="ap-name">Adjustments</span>
                   <span class="ap-total num">{{ adjTotal | number }}<small>total</small></span></div>
                 <div class="ap-bar">
-                  <div class="done" [style.flex]="adjDone + ' 0 0'">{{ adjDone | number }} done · {{ adjPct }}%</div>
-                  <div class="pend" [style.flex]="adjPending + ' 0 0'">{{ adjPending | number }}</div>
+                  <div class="done" [style.flex]="adjDone + ' 0 0'"></div>
+                  <div class="pend" [style.flex]="adjPending + ' 0 0'"></div>
                 </div>
-                <div class="ap-sub num">{{ adjPending | number }} pending · {{ 100 - adjPct }}%</div>
+                <div class="ap-sub num">
+                  <span class="ap-done-txt">{{ adjDone | number }} done &middot; {{ adjPct }}%</span>
+                  <span class="ap-pend-txt">{{ adjPending | number }} pending &middot; {{ 100 - adjPct }}%</span>
+                </div>
               </div>
               <!-- Procedures (FT calculateProcedureData / overallProgressPct) -->
               <div class="ap-block">
                 <div class="ap-head"><span class="ap-name">Procedures</span>
                   <span class="ap-total num">{{ procTotal | number }}<small>total</small></span></div>
                 <div class="ap-bar">
-                  <div class="done" [style.flex]="procDone + ' 0 0'">{{ procDone | number }} done · {{ procPct }}%</div>
-                  <div class="pend" [style.flex]="procPending + ' 0 0'">{{ procPending | number }}</div>
+                  <div class="done" [style.flex]="procDone + ' 0 0'"></div>
+                  <div class="pend" [style.flex]="procPending + ' 0 0'"></div>
                 </div>
-                <div class="ap-sub num">{{ procPending | number }} pending · {{ 100 - procPct }}%</div>
+                <div class="ap-sub num">
+                  <span class="ap-done-txt">{{ procDone | number }} done &middot; {{ procPct }}%</span>
+                  <span class="ap-pend-txt">{{ procPending | number }} pending &middot; {{ 100 - procPct }}%</span>
+                </div>
               </div>
               <!-- LIVE banner (FT liveChangeworkTotal + list) -->
               <div class="live-banner" *ngIf="liveCount" (click)="openLive()">
@@ -168,7 +180,7 @@
             <!-- ATC completion quartiles (SEAM 5 — participantCompletionRatio) -->
             <div class="ap-right">
               <div class="ap-split-title">ATC completion per participant</div>
-              <div class="q-row" *ngFor="let qt of completionQuartiles" [ngClass]="qt.cls">
+              <div class="q-row" *ngFor="let qt of completionQuartiles" [ngClass]="qt.cls" (click)="applyPctFilter(qt)" title="Filter Participant Data by this ATC %">
                 <span class="q-label">{{ qt.label }}</span>
                 <div class="q-track"><i [style.width.%]="qt.width"></i></div>
                 <span class="q-count num">{{ qt.count }}</span>
@@ -182,41 +194,75 @@
         </div>
       </section>
 
-      <!-- Participants (journeys dynamic; first-timer via SEAM 3) -->
-      <section class="card">
-        <div class="sec-head">
-          <div class="sec-title">Participants</div>
-          <div class="sec-meta mono" id="ptTotalLabel">— {{ participantTotal | number }}</div>
+    </div>
+
+    <!-- Participants (full-width, above Daily Attendance) — journeys dynamic (C-5), first-timer via SEAM 3 -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">Participants</div>
+        <div class="sec-meta mono" id="ptTotalLabel">— {{ participantTotal | number }}</div>
+        <div class="sec-right">
+          <span class="att-range pt-nojourney" *ngIf="hasNoJourney" (click)="openPtNoJourney()">No journey &middot; {{ noJourneyCount | number }}</span>
+          <button class="pf-chip" [class.on-blue]="groupEditMode" (click)="toggleGroupEdit()">{{ groupEditMode ? 'Done' : 'Group journeys' }}</button>
         </div>
-        <div class="panel-body" style="padding-top:8px">
+      </div>
+
+      <!-- Group edit bar: tick journey columns below, name them, then Group -->
+      <div class="jgroup-bar" *ngIf="groupEditMode">
+        <span class="jgroup-hint">Tick journeys, type a group name, then Group. Grouped journeys collapse into one column.</span>
+        <input class="jgroup-input" type="text" [(ngModel)]="groupNameInput" placeholder="Group name…" list="jgroupNames" autocomplete="off">
+        <datalist id="jgroupNames"><option *ngFor="let n of existingGroupNames" [value]="n"></option></datalist>
+        <button class="jgroup-apply" [disabled]="!groupNameInput.trim() || !journeySel.size" (click)="groupSelected()">Group{{ journeySel.size ? ' (' + journeySel.size + ')' : '' }}</button>
+        <button class="jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
+        <span class="jgroup-existing" *ngIf="existingGroupNames.length">
+          <span class="jgroup-existing-lab">Groups:</span>
+          <button class="jgroup-chip" *ngFor="let n of existingGroupNames" (click)="setGroupName(n)">{{ n }}</button>
+        </span>
+      </div>
+
+      <div class="panel-body" style="padding-top:8px">
+        <div class="pt-wrap">
           <table class="pt-table" id="ptTable">
             <tr>
               <th></th>
-              <th *ngFor="let j of participantJourneys"><span>{{ journeyLabel(j.journeyId) }}</span></th>
+              <th *ngFor="let col of journeyColumns" [class.jcol-group]="col.isGroup">
+                <label class="jcol-head" *ngIf="groupEditMode">
+                  <input type="checkbox" [checked]="isJourneySel(col.journeyIds[0])" (change)="toggleJourneySel(col.journeyIds[0])">
+                  <span>{{ col.label }}</span>
+                  <span class="jcol-tag" *ngIf="journeyGroupOf(col.journeyIds[0])">{{ journeyGroupOf(col.journeyIds[0]) }}</span>
+                </label>
+                <span *ngIf="!groupEditMode">{{ col.label }}</span>
+              </th>
               <th>Total</th>
             </tr>
             <tr class="ft">
               <td (click)="openPt('all', true)">First timer</td>
-              <td *ngFor="let j of participantJourneys" class="num" (click)="openPt(j.journeyId, true)">{{ ptCount(j.journeyId, true) }}</td>
+              <td *ngFor="let col of journeyColumns" class="num" (click)="openPtCol(col, true)">{{ colCount(col, true) }}</td>
               <td class="num tot" (click)="openPt('all', true)">{{ ptCount('all', true) }}</td>
             </tr>
             <tr>
               <td (click)="openPt('all', false)">Repeat</td>
-              <td *ngFor="let j of participantJourneys" class="num" (click)="openPt(j.journeyId, false)">{{ ptCount(j.journeyId, false) }}</td>
+              <td *ngFor="let col of journeyColumns" class="num" (click)="openPtCol(col, false)">{{ colCount(col, false) }}</td>
               <td class="num tot" (click)="openPt('all', false)">{{ ptCount('all', false) }}</td>
             </tr>
+            <!-- Registered but no recognized journey — kept so the matrix reconciles to Total -->
+            <tr class="no-journey-row" *ngIf="hasNoJourney">
+              <td (click)="openPtNoJourney()">No journey</td>
+              <td *ngFor="let col of journeyColumns" class="num pd-dim">&mdash;</td>
+              <td class="num tot" (click)="openPtNoJourney()">{{ noJourneyCount }}</td>
+            </tr>
             <tr class="total-row">
-              <td (click)="openPt('all', null)">Total</td>
-              <td *ngFor="let j of participantJourneys" class="num" (click)="openPt(j.journeyId, null)">{{ ptCount(j.journeyId, null) }}</td>
-              <td class="num tot" (click)="openPt('all', null)">{{ ptCount('all', null) }}</td>
+              <td (click)="openPtAll()">Total</td>
+              <td *ngFor="let col of journeyColumns" class="num" (click)="openPtCol(col, null)">{{ colCount(col, null) }}</td>
+              <td class="num tot" (click)="openPtAll()">{{ participantTotal }}</td>
             </tr>
           </table>
         </div>
-        <div class="footnote" style="padding-top:0;padding-bottom:16px">
-          First timer vs repeat, split by journey &middot; click a journey or total to see the list
-        </div>
-      </section>
-    </div>
+      </div>
+      <div class="footnote" style="padding-top:0;padding-bottom:16px">
+        First timer vs repeat, split by journey &middot; &ldquo;No journey&rdquo; = registered with no journey set &middot; click a cell for the list
+      </div>
+    </section>
 
     <!-- Row 2: Daily Attendance (V2 dayWiseAttendance / subscribeToAttendance) -->
     <section class="card section">
@@ -330,11 +376,13 @@
       <div id="pdBody" *ngIf="pdOpen">
         <div class="pd-filters">
           <input class="pd-in" type="text" [(ngModel)]="pdFilter.q" (ngModelChange)="pdOnFilterChange()" placeholder="Search participant…">
+          <!-- Journey filter commented out per request (pdFilter.journey stays 'all' → no journey filtering)
           <span class="pd-lbl">Journey</span>
           <select class="pd-sel" [(ngModel)]="pdFilter.journey" (ngModelChange)="pdOnFilterChange()">
             <option value="all">All</option>
             <option *ngFor="let j of participantJourneys" [value]="j.journeyId">{{ journeyLabel(j.journeyId) }}</option>
           </select>
+          -->
           <span class="pd-lbl">Type</span>
           <select class="pd-sel" [(ngModel)]="pdFilter.type" (ngModelChange)="pdOnFilterChange()">
             <option value="all">All</option>
@@ -417,8 +465,9 @@
             </div>
             <div class="name-pill" *ngFor="let pid of g.profileIds.slice(0, 5)" (click)="openTag(g)">{{ participantName(pid) }}</div>
             <span class="more-link" *ngIf="g.profileIds.length > 5" (click)="openTag(g)">+{{ g.profileIds.length - 5 }} more</span>
+            <div class="fu-empty" *ngIf="!g.profileIds.length" style="padding:6px 2px">None</div>
           </div>
-          <div class="fu-empty" style="padding:10px 0 18px" *ngIf="!tagGroups.length">No tags yet.</div>
+          <div class="fu-empty" style="padding:10px 0 18px" *ngIf="!tagGroups.length">No video ask tags.</div>
         </div>
       </section>
 
@@ -463,6 +512,27 @@
         </div>
       </section>
     </div>
+
+    <!-- A&H CRM — flag status (first-timers-dashboard; participant tags tagsfor 'live event') -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">A&amp;H CRM &mdash; flag status</div>
+        <div class="sec-right"><span class="sec-meta">participants by CRM flag &middot; click a count for the list</span></div>
+      </div>
+      <div class="tag-scroll" id="crmScroll">
+        <div class="tag-col" *ngFor="let g of crmGroups">
+          <div class="tag-col-h">
+            <span class="dot" [style.background]="g.color"></span>
+            <span class="tag-col-name" [title]="g.label">{{ g.label }}</span>
+            <span class="tag-col-count num" (click)="openCrm(g)">{{ g.profileIds.length }}</span>
+          </div>
+          <div class="name-pill" *ngFor="let pid of g.profileIds.slice(0, 5)" (click)="openCrm(g)">{{ participantName(pid) }}</div>
+          <span class="more-link" *ngIf="g.profileIds.length > 5" (click)="openCrm(g)">+{{ g.profileIds.length - 5 }} more</span>
+          <div class="fu-empty" *ngIf="!g.profileIds.length" style="padding:6px 2px">No participants</div>
+        </div>
+        <div class="fu-empty" style="padding:10px 0 18px" *ngIf="!crmGroups.length">No CRM flags.</div>
+      </div>
+    </section>
 
   </main>
 
@@ -669,10 +739,11 @@
           <div class="sec-meta">who is where in the Arena right now &middot; zone setup lives in the Event Zones config screen</div>
           <div class="sec-right"><span class="live-pill"><span class="dot live"></span>{{ zonesLiveCount }} ZONES LIVE</span></div>
         </div>
-        <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
           <div class="kpi" (click)="openZonePresent()"><div class="kpi-num num">{{ zonePresentCount }}</div><div class="kpi-label">In the Arena today</div></div>
           <div class="kpi k-res" (click)="openZoneAllocated()"><div class="kpi-num num">{{ zoneAllocatedCount }}</div><div class="kpi-label">Allocated to zones</div></div>
           <div class="kpi k-open" (click)="openZoneUnassigned()"><div class="kpi-num num">{{ zoneUnassignedCount }}</div><div class="kpi-label">No zone yet</div></div>
+          <div class="kpi k-warn" (click)="openZoneNoCohort()"><div class="kpi-num num">{{ zoneNoCohortCount }}</div><div class="kpi-label">No cohort</div></div>
           <div class="kpi k-mute" (click)="openZoneAllocated()"><div class="kpi-num num">{{ zoneCoveragePct }}<small>%</small></div><div class="kpi-label">Coverage</div></div>
         </div>
         <div style="padding:0 22px 20px">
