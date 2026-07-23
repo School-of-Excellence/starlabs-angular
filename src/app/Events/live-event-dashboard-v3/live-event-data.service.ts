@@ -594,17 +594,15 @@ export class LiveEventDataService implements OnDestroy {
           const byDay: { [date: string]: Set<string> } = {};
           const taggedByDay: { [date: string]: Set<string> } = {};
           const partTags: { [pid: string]: Set<string> } = {};
-          // CHANGED (operator): "reviewed" = the submission carries a VIDEO-ASK
-          // PARTICIPANT TAG (participant-tags docid), matching how videoask-display
-          // tags submissions (participantvideoask.tags = tag docid). Not the
-          // classify/eventtags name list.
-          const validTagIds = new Set<string>(this.participantTags.map((t: any) => t['docid']));
           docs.forEach((d: any) => {
             const pid = d['profileid'] || '';
             if (!pid) { return; }
-            const matched = Array.isArray(d['tags']) ? d['tags'].filter((t: string) => validTagIds.has(t)) : [];
-            const isTagged = matched.length > 0;
-            if (isTagged) { const set = partTags[pid] = partTags[pid] || new Set<string>(); matched.forEach((t: string) => set.add(t)); }
+            // CHANGED (operator): "reviewed" = the reviewer has GIVEN the submission a
+            // tag. participantvideoask.tags holds participant-tag docids written by
+            // videoask-display, so any non-empty tags array means it's reviewed.
+            const tags: string[] = Array.isArray(d['tags']) ? d['tags'] : [];
+            const isTagged = tags.length > 0;
+            if (isTagged) { const set = partTags[pid] = partTags[pid] || new Set<string>(); tags.forEach((t: string) => set.add(t)); }
             const uploaded = d['uploaded']?.toDate ? d['uploaded'].toDate() : (d['uploaded'] ? new Date(d['uploaded']) : null);
             if (uploaded) {
               const ds = uploaded.toLocaleDateString('en-CA');
