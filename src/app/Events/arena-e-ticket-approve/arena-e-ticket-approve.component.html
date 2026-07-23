@@ -95,8 +95,10 @@
           <span style="flex:1;color:#2e7d32;font-weight:500;">{{importSelectedParticipants.length}} participant(s) selected</span>
         </div>
         <div *ngIf="importSelectedParticipants.length != 0" class="import-status-list">
-          <div *ngFor="let p of importSelectedParticipants.slice(0,5)">{{p.name}}</div>
-          <div *ngIf="importSelectedParticipants.length > 5" style="color:rgba(0,0,0,0.4);">+ {{importSelectedParticipants.length - 5}} more</div>
+          <div *ngFor="let p of (expandedImportSections.selected ? importSelectedParticipants : importSelectedParticipants.slice(0,5))">{{p.name}}</div>
+          <div *ngIf="importSelectedParticipants.length > 5" style="color:rgba(0,0,0,0.4);cursor:pointer;" (click)="expandedImportSections.selected = !expandedImportSections.selected">
+            {{expandedImportSections.selected ? 'Show less' : '+ ' + (importSelectedParticipants.length - 5) + ' more'}}
+          </div>
         </div>
 
         <div *ngIf="notEligibleParticipants.length != 0" class="import-status-band" style="background:#fff8e1;">
@@ -104,8 +106,10 @@
           <span style="flex:1;color:#f9a825;font-weight:500;">{{notEligibleParticipants.length}} matched but not eligible for approval</span>
         </div>
         <div *ngIf="notEligibleParticipants.length != 0" class="import-status-list">
-          <div *ngFor="let p of notEligibleParticipants.slice(0,5)">{{p.name}}</div>
-          <div *ngIf="notEligibleParticipants.length > 5" style="color:rgba(0,0,0,0.4);">+ {{notEligibleParticipants.length - 5}} more</div>
+          <div *ngFor="let p of (expandedImportSections.notEligible ? notEligibleParticipants : notEligibleParticipants.slice(0,5))">{{p.name}}</div>
+          <div *ngIf="notEligibleParticipants.length > 5" style="color:rgba(0,0,0,0.4);cursor:pointer;" (click)="expandedImportSections.notEligible = !expandedImportSections.notEligible">
+            {{expandedImportSections.notEligible ? 'Show less' : '+ ' + (notEligibleParticipants.length - 5) + ' more'}}
+          </div>
         </div>
 
         <div *ngIf="notFoundParticipants.length != 0" class="import-status-band" style="background:#ffebee;">
@@ -113,8 +117,10 @@
           <span style="flex:1;color:#c62828;font-weight:500;">{{notFoundParticipants.length}} not found in this event</span>
         </div>
         <div *ngIf="notFoundParticipants.length != 0" class="import-status-list">
-          <div *ngFor="let p of notFoundParticipants.slice(0,5)">{{p.name || p.email}}</div>
-          <div *ngIf="notFoundParticipants.length > 5" style="color:rgba(0,0,0,0.4);">+ {{notFoundParticipants.length - 5}} more</div>
+          <div *ngFor="let p of (expandedImportSections.notFound ? notFoundParticipants : notFoundParticipants.slice(0,5))">{{p.name || p.email}}</div>
+          <div *ngIf="notFoundParticipants.length > 5" style="color:rgba(0,0,0,0.4);cursor:pointer;" (click)="expandedImportSections.notFound = !expandedImportSections.notFound">
+            {{expandedImportSections.notFound ? 'Show less' : '+ ' + (notFoundParticipants.length - 5) + ' more'}}
+          </div>
         </div>
       </mat-dialog-content>
       <mat-dialog-actions align="end">
@@ -160,11 +166,13 @@
         <ng-container matColumnDef="select">
           <th mat-header-cell *matHeaderCellDef>Select</th>
           <td mat-cell *matCellDef="let row">
-            <mat-checkbox
-              [disabled]="!isRowSelectable(row)"
-              [checked]="selection.isSelected(row)"
-              (change)="selection.toggle(row)">
-            </mat-checkbox>
+            <span [matTooltip]="!isRowSelectable(row) ? 'Disabled' : ''" matTooltipPosition="above">
+              <mat-checkbox
+                [disabled]="!isRowSelectable(row)"
+                [checked]="selection.isSelected(row)"
+                (change)="selection.toggle(row)">
+              </mat-checkbox>
+            </span>
           </td>
         </ng-container>
         <ng-container matColumnDef="profileid">

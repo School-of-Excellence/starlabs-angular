@@ -66,6 +66,7 @@ export class ArenaETicketApproveComponent {
   notFoundParticipants: {name:string, email:string}[] = []
   notEligibleParticipants: {name:string, email:string}[] = []
   importSelectedParticipants: {name:string, email:string}[] = []
+  expandedImportSections: {selected:boolean, notEligible:boolean, notFound:boolean} = {selected:false, notEligible:false, notFound:false}
 
   mapProducts={}
   filterForm = {
@@ -454,6 +455,7 @@ export class ArenaETicketApproveComponent {
     this.notFoundParticipants = []
     this.notEligibleParticipants = []
     this.importSelectedParticipants = []
+    this.expandedImportSections = {selected:false, notEligible:false, notFound:false}
   }
 
   onProductAppend(row:any){
