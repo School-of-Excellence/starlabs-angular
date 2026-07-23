@@ -68,6 +68,10 @@ export class LiveEventDataService implements OnDestroy {
   notScannedProfileIds: string[] = [];
   notScannedCount = 0;
   eventParticipants: PanelParticipant[] = [];
+  // O(1) lookups for buildParticipantFromProfileId (was O(n) find/includes → O(n²)
+  // when called in per-participant loops). Same values, just indexed.
+  private eventParticipantSet: Set<string> = new Set();
+  private registeredByProfileId: { [id: string]: PanelParticipant } = {};
   // name fallback from the event participation request doc (V2 does this) — used
   // when a registered participant has no `participant metadata` doc.
   registeredNames: { [profileid: string]: string } = {};
@@ -410,10 +414,13 @@ export class LiveEventDataService implements OnDestroy {
         docs.push({ docref: d.id, profileid: profileId, ...data });
       });
       this.eventParticipantProfileIds = [...seen];
+      this.eventParticipantSet = new Set(this.eventParticipantProfileIds);
       this.registeredCount = this.eventParticipantProfileIds.length;
       this.registeredNames = {};
       docs.forEach(d => { const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; } });
       this.eventParticipants = docs.map(d => this.buildParticipantFromProfileId(d.profileid, false));
+      this.registeredByProfileId = {};
+      this.eventParticipants.forEach(p => { this.registeredByProfileId[p.profileid] = p; });
       const named = this.eventParticipantProfileIds.filter(id => this.participantMetadataMap[id]?.['name'] || this.registeredNames[id]).length;
       console.log('[v3][participants] event:', this.selectedEvent?.['name'],
         '| approved/attended (registered universe):', this.registeredCount, '| with a resolvable name:', named);
@@ -1024,7 +1031,10 @@ export class LiveEventDataService implements OnDestroy {
         const ids: string[] = [];
         let pendingDocs = 0;
         docs.forEach((d: any) => {
-          if (d['status'] !== 'validated') {
+          // view-prescribed-atc rule: a prescription is UNVALIDATED iff status ===
+          // 'atc given' (every other status is validated). Also mirror its doc
+          // filters: isdelete==false and type=='online'.
+          if (d['status'] === 'atc given' && d['isdelete'] !== true && d['type'] === 'online') {
             pendingDocs++;
             const profileId = d['profileid'] || '';
             if (profileId && this.eventParticipantProfileIds.includes(profileId) && !ids.includes(profileId)) { ids.push(profileId); }
@@ -1032,9 +1042,8 @@ export class LiveEventDataService implements OnDestroy {
         });
         this.atcToValidateProfileIds = ids;
         console.log('[v3][atc] atc_to_validate docs:', docs.length,
-          "| status!='validated' & in-range:", pendingDocs,
-          '| unvalidated profiles (event-participant):', ids.length,
-          '| models:', this.atcModels);
+          "| status=='atc given' (unvalidated) & online:", pendingDocs,
+          '| unvalidated profiles (event-participant):', ids.length);
         this.recomputeAtcBuckets();
         this.changed$.next();
       },
@@ -1427,8 +1436,8 @@ export class LiveEventDataService implements OnDestroy {
   // V2 buildParticipantFromProfileId
   buildParticipantFromProfileId(profileId: string, isPresent: boolean): PanelParticipant {
     const metadata = this.participantMetadataMap[profileId] || {};
-    const registered = this.eventParticipants.find(p => p.profileid === profileId);
-    const isNotRegistered = !this.eventParticipantProfileIds.includes(profileId);
+    const registered = this.registeredByProfileId[profileId];
+    const isNotRegistered = !this.eventParticipantSet.has(profileId);
     return {
       docref: registered?.docref || profileId,
       profileid: profileId,

@@ -227,13 +227,13 @@
           <table class="pt-table" id="ptTable">
             <tr>
               <th></th>
-              <th *ngFor="let col of journeyColumns">
+              <th *ngFor="let col of journeyColumns" [class.jcol-group]="col.isGroup">
                 <label class="jcol-head" *ngIf="groupEditMode">
                   <input type="checkbox" [checked]="isJourneySel(col.journeyIds[0])" (change)="toggleJourneySel(col.journeyIds[0])">
                   <span>{{ col.label }}</span>
                   <span class="jcol-tag" *ngIf="journeyGroupOf(col.journeyIds[0])">{{ journeyGroupOf(col.journeyIds[0]) }}</span>
                 </label>
-                <span *ngIf="!groupEditMode">{{ col.label }}</span>
+                <span *ngIf="!groupEditMode">{{ col.label }}<small class="jcol-total" *ngIf="col.isGroup"> &middot; {{ colCount(col, null) | number }}</small></span>
               </th>
               <th>Total</th>
             </tr>

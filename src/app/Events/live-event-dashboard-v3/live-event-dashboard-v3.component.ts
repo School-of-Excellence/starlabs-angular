@@ -97,8 +97,22 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
 
   constructor(public data: LiveEventDataService, private cdr: ChangeDetectorRef) {}
 
+  // Perf: memoize data-only derived collections so heavy getters (completionQuartiles,
+  // ptEntries, tagGroups, crmGroups) recompute once per data change instead of on every
+  // change-detection pass. viewVersion bumps on each service changed$ emission.
+  private viewVersion = 0;
+  private memoStore: { [key: string]: { v: number; val: any } } = {};
+  private memo<T>(key: string, fn: () => T): T {
+    const c = this.memoStore[key];
+    if (c && c.v === this.viewVersion) { return c.val; }
+    const val = fn();
+    this.memoStore[key] = { v: this.viewVersion, val };
+    return val;
+  }
+
   ngOnInit(): void {
     this.sub = this.data.changed$.subscribe(() => {
+      this.viewVersion++;   // invalidate memoized derived data (data changed)
       // Keep the service's first-timer set (used by procedure scope filter) in sync
       // with seam 3 so "First timers" resolves against the same registered universe.
       this.data.setFirstTimerIds(this.data.eventParticipantProfileIds.filter(id => this.isFirstTimer(id)));
@@ -288,7 +302,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
 
   // Quartile distribution (fed by SEAM 5). null ratios are excluded → zero counts.
-  get completionQuartiles(): QuartileRow[] {
+  get completionQuartiles(): QuartileRow[] { return this.memo('completionQuartiles', () => this.computeCompletionQuartiles()); }
+  private computeCompletionQuartiles(): QuartileRow[] {
     const parts = this.data.eventParticipantProfileIds.map(id => this.data.buildParticipantFromProfileId(id, false));
     const ratios = parts.map(p => ({ p, r: this.participantCompletionRatio(p) })).filter(x => x.r !== null) as { p: PanelParticipant; r: number }[];
     const total = this.data.eventParticipantProfileIds.length;
@@ -324,7 +339,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get participantTotal(): number { return this.data.eventParticipantProfileIds.length; }
 
   /** flat [{profileId, journeyId}] over registered participants that have a journey */
-  private ptEntries(): { profileId: string; journeyId: string }[] {
+  private ptEntries(): { profileId: string; journeyId: string }[] { return this.memo('ptEntries', () => this.computePtEntries()); }
+  private computePtEntries(): { profileId: string; journeyId: string }[] {
     const out: { profileId: string; journeyId: string }[] = [];
     this.participantJourneys.forEach(j => j.profileIds.forEach(pid => out.push({ profileId: pid, journeyId: j.journeyId })));
     return out;
@@ -419,10 +435,30 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.journeySel.clear();
   }
 
-  /** Matrix columns stay JOURNEY-WISE (one per journey, as before). Grouping does
-   *  NOT collapse columns — group totals are surfaced as header chips instead. */
+  /** Matrix columns: grouped journeys collapse into one aggregated column (total on
+   *  its header); ungrouped journeys stay journey-wise. In edit mode every journey
+   *  shows individually so it can be ticked and grouped. */
   get journeyColumns(): { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] {
-    return this.participantJourneys.map(j => ({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false }));
+    if (this.groupEditMode) {
+      return this.participantJourneys.map(j => ({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false }));
+    }
+    const countById: { [id: string]: number } = {};
+    this.participantJourneys.forEach(j => { countById[j.journeyId] = j.count; });
+    const groups = new Map<string, { key: string; label: string; journeyIds: string[]; isGroup: boolean }>();
+    const singles: { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] = [];
+    this.participantJourneys.forEach(j => {
+      const g = (this.journeyGroups[j.journeyId] || '').trim();
+      if (g) {
+        const key = 'grp:' + g;
+        const e = groups.get(key) || { key, label: g, journeyIds: [], isGroup: true };
+        e.journeyIds.push(j.journeyId);
+        groups.set(key, e);
+      } else {
+        singles.push({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false });
+      }
+    });
+    const total = (col: { journeyIds: string[] }) => col.journeyIds.reduce((s, id) => s + (countById[id] || 0), 0);
+    return [...groups.values(), ...singles].sort((a, b) => total(b) - total(a));
   }
   private ptFilterIds(journeyIds: string[], ft: boolean | null): { profileId: string; journeyId: string }[] {
     return this.ptEntries().filter(e => journeyIds.includes(e.journeyId) && (ft === null || this.isFirstTimer(e.profileId) === ft));
@@ -662,7 +698,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return null;
   }
 
-  get tagGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
+  get tagGroups(): { id: string; label: string; color: string; profileIds: string[] }[] { return this.memo('tagGroups', () => this.computeTagGroups()); }
+  private computeTagGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
     const tax = this.getTagTaxonomy();
     if (!tax.length) { return []; }
     const byTag: { [id: string]: string[] } = {};
@@ -686,7 +723,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   getCrmTaxonomy(): { id: string; label: string; color: string }[] {
     return this.data.crmTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: this.tagPalette[i % this.tagPalette.length] }));
   }
-  get crmGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
+  get crmGroups(): { id: string; label: string; color: string; profileIds: string[] }[] { return this.memo('crmGroups', () => this.computeCrmGroups()); }
+  private computeCrmGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
     const tax = this.getCrmTaxonomy();
     if (!tax.length) { return []; }
     const byTag: { [id: string]: string[] } = {};
