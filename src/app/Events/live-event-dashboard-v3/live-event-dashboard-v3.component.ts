@@ -389,6 +389,19 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   isJourneySel(journeyId: string): boolean { return this.journeySel.has(journeyId); }
   journeyGroupOf(journeyId: string): string { return this.journeyGroups[journeyId] || ''; }
   get existingGroupNames(): string[] { return [...new Set(Object.values(this.journeyGroups).map(g => (g || '').trim()).filter(Boolean))].sort(); }
+  /** Live participant total of the journeys currently ticked (edit mode). */
+  get selectedJourneyTotal(): number {
+    return this.participantJourneys.filter(j => this.journeySel.has(j.journeyId)).reduce((s, j) => s + j.count, 0);
+  }
+  /** Each defined group + its combined participant total — shown as header chips. */
+  get journeyGroupSummaries(): { name: string; count: number; journeyIds: string[] }[] {
+    const byName: { [name: string]: string[] } = {};
+    this.participantJourneys.forEach(j => {
+      const g = (this.journeyGroups[j.journeyId] || '').trim();
+      if (g) { (byName[g] = byName[g] || []).push(j.journeyId); }
+    });
+    return Object.keys(byName).sort().map(name => ({ name, count: this.colCount({ journeyIds: byName[name] }, null), journeyIds: byName[name] }));
+  }
   setGroupName(n: string): void { this.groupNameInput = n; }
   /** Group the ticked journeys under the typed name (create or add-to-existing). */
   groupSelected(): void {
@@ -406,29 +419,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.journeySel.clear();
   }
 
-  /** Columns for the matrix: grouped journeys collapse into one aggregated column;
-   *  in edit mode every journey shows individually (so it can be ticked/grouped). */
+  /** Matrix columns stay JOURNEY-WISE (one per journey, as before). Grouping does
+   *  NOT collapse columns — group totals are surfaced as header chips instead. */
   get journeyColumns(): { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] {
-    if (this.groupEditMode) {
-      return this.participantJourneys.map(j => ({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false }));
-    }
-    const countById: { [id: string]: number } = {};
-    this.participantJourneys.forEach(j => { countById[j.journeyId] = j.count; });
-    const groups = new Map<string, { key: string; label: string; journeyIds: string[]; isGroup: boolean }>();
-    const singles: { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] = [];
-    this.participantJourneys.forEach(j => {
-      const g = (this.journeyGroups[j.journeyId] || '').trim();
-      if (g) {
-        const key = 'grp:' + g;
-        const e = groups.get(key) || { key, label: g, journeyIds: [], isGroup: true };
-        e.journeyIds.push(j.journeyId);
-        groups.set(key, e);
-      } else {
-        singles.push({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false });
-      }
-    });
-    const total = (col: { journeyIds: string[] }) => col.journeyIds.reduce((s, id) => s + (countById[id] || 0), 0);
-    return [...groups.values(), ...singles].sort((a, b) => total(b) - total(a));
+    return this.participantJourneys.map(j => ({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false }));
   }
   private ptFilterIds(journeyIds: string[], ft: boolean | null): { profileId: string; journeyId: string }[] {
     return this.ptEntries().filter(e => journeyIds.includes(e.journeyId) && (ft === null || this.isFirstTimer(e.profileId) === ft));

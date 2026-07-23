@@ -202,6 +202,7 @@
         <div class="sec-title">Participants</div>
         <div class="sec-meta mono" id="ptTotalLabel">— {{ participantTotal | number }}</div>
         <div class="sec-right">
+          <span class="att-range pt-nojourney pt-grp" *ngFor="let g of journeyGroupSummaries" (click)="openPtCol({ label: g.name, journeyIds: g.journeyIds }, null)">{{ g.name }} &middot; {{ g.count | number }}</span>
           <span class="att-range pt-nojourney" *ngIf="hasNoJourney" (click)="openPtNoJourney()">No journey &middot; {{ noJourneyCount | number }}</span>
           <button class="pf-chip" [class.on-blue]="groupEditMode" (click)="toggleGroupEdit()">{{ groupEditMode ? 'Done' : 'Group journeys' }}</button>
         </div>
@@ -214,6 +215,7 @@
         <datalist id="jgroupNames"><option *ngFor="let n of existingGroupNames" [value]="n"></option></datalist>
         <button class="jgroup-apply" [disabled]="!groupNameInput.trim() || !journeySel.size" (click)="groupSelected()">Group{{ journeySel.size ? ' (' + journeySel.size + ')' : '' }}</button>
         <button class="jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
+        <span class="jgroup-seltotal" *ngIf="journeySel.size">{{ selectedJourneyTotal | number }} participants selected</span>
         <span class="jgroup-existing" *ngIf="existingGroupNames.length">
           <span class="jgroup-existing-lab">Groups:</span>
           <button class="jgroup-chip" *ngFor="let n of existingGroupNames" (click)="setGroupName(n)">{{ n }}</button>
@@ -225,7 +227,7 @@
           <table class="pt-table" id="ptTable">
             <tr>
               <th></th>
-              <th *ngFor="let col of journeyColumns" [class.jcol-group]="col.isGroup">
+              <th *ngFor="let col of journeyColumns">
                 <label class="jcol-head" *ngIf="groupEditMode">
                   <input type="checkbox" [checked]="isJourneySel(col.journeyIds[0])" (change)="toggleJourneySel(col.journeyIds[0])">
                   <span>{{ col.label }}</span>
