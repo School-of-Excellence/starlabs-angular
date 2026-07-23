@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import {
+  arrayUnion,
   collection,
   doc,
   Firestore,
@@ -7,13 +8,14 @@ import {
   limit,
   onSnapshot,
   query,
+  Timestamp,
   updateDoc,
   where,
 } from '@angular/fire/firestore';
 
 import { AuthguardService } from '../../authguard.service';
 import { AtcFirebaseService } from '../atc-firebase.service';
-import { AtcGenDoc, PodWorker, RebuildOk, RegenerateOk } from '../atc-ops.types';
+import { AtcGenDoc, OpsNote, PodWorker, RebuildOk, RegenerateOk } from '../atc-ops.types';
 import { toMillis } from '../ist-time.util';
 
 export interface QueueOption {
@@ -169,6 +171,20 @@ export class AtcGenDataService {
     await updateDoc(doc(this.svc.atcDb, 'queue_atc_generation', docid), {
       prompt,
       promptUpdatedAt: new Date(),
+    });
+  }
+
+  /**
+   * Append an operator note to a doc (append-only log via arrayUnion). Attributed
+   * to the signed-in operator. `Timestamp.now()` is used rather than
+   * serverTimestamp() because Firestore forbids sentinel values inside arrays.
+   */
+  async addNote(docid: string, text: string): Promise<void> {
+    const note: OpsNote = { text, at: Timestamp.now() };
+    if (this.guard.email) note.author = this.guard.email;
+    if (this.guard.uid) note.authorUid = this.guard.uid;
+    await updateDoc(doc(this.svc.atcDb, 'queue_atc_generation', docid), {
+      opsNotes: arrayUnion(note),
     });
   }
 

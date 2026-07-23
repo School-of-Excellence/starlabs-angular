@@ -451,9 +451,7 @@
         <h2 class="section-heading">CHANGEWORK BRIEF</h2>
         <div class="audio-container">
           <div *ngFor="let audio of audioBlobURL; let i = index" class="audio-item">
-            <audio controls class="audio-player">
-              <source [src]="sanitize(audio)" type="audio/wav">
-            </audio>
+            <audio controls class="audio-player" [src]="audio"></audio>
             <button class="remove-button" mat-icon-button (click)="removeAudio(i)">
               <mat-icon>close</mat-icon>
             </button>
@@ -467,7 +465,7 @@
             <button *ngIf="!recording" mat-stroked-button class="record-button" (click)="initiateRecording()">
               Add Recording <mat-icon>fiber_manual_record</mat-icon>
             </button>
-            <input #file type="file" accept="audio/*" #input (change)="audioUpload(input.value)" hidden multiple>
+            <input #file type="file" accept="audio/*" #input (change)="audioUpload(input.files)" hidden multiple>
             <button *ngIf="!recording" mat-stroked-button class="upload-button" (click)="file.click()">
               Upload Audio <mat-icon>record_voice_over</mat-icon>
             </button>

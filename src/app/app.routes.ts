@@ -341,9 +341,349 @@ import { roleGuard } from './role.guard';
 // ];
 
 export const routes: Routes = [
-  { path: 'delivery-dashboard', loadComponent: () => import('./Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component').then(m => m.DeliveryDashboardCloneComponent), canActivate: [authGuard] },
-  { path: 'bookappointment', loadComponent: () => import('./Scheduling/book-appointment/book-appointment.component').then(m => m.BookAppointmentComponent), canActivate: [authGuard] },
-]
+  {path: 'slackwebhookurls',loadComponent:()=> import('./slackwebhookurls/slackwebhookurls.component').then(m => m.SlackwebhookurlsComponent), canActivate:[authGuard]},
+  {path: 'journeyonboardingdetail', loadComponent: () => import('./journey-onboarding-detail/journey-onboarding-detail.component').then(m => m.JourneyOnboardingDetailComponent), canActivate:[authGuard]},
+  {path: '', redirectTo: '/EISDashboard', pathMatch:'full'},
+  {path: 'login', loadComponent: () => import('./login/login.component').then(m => m.LoginComponent)},
+  {path: 'routeconfiguration', loadComponent: () => import('./route-configuration-duplicate/route-configuration.component').then(m => m.RouteConfigurationComponent), canActivate:[authGuard]},
+  {path: 'addjourney', loadComponent: () => import('./Product Designer/addjourney/addjourney.component').then(m => m.AddjourneyComponent), canActivate:[authGuard]},
+  {path: 'addpackage', loadComponent: () => import('./Product Designer/addpackage/addpackage.component').then(m => m.AddpackageComponent), canActivate:[authGuard]},
+  {path: 'packagedesign', loadComponent: () => import('./Product Designer/package-design/package-design.component').then(m => m.PackageDesignComponent), canActivate:[authGuard]},
+  {path: 'atcmodel', loadComponent: () => import('./Product Designer/product-atcmodel/view-atcmodel/view-atcmodel.component').then(m => m.ViewAtcmodelComponent), canActivate: [authGuard]},
+  {path: 'journeyproductmap', loadComponent: () => import('./Product Designer/journey-product/journey-product/journey-product.component').then(m => m.JourneyProductComponent), canActivate: [authGuard]},
+  {path: 'createaelnames', loadComponent: () => import('./Product Designer/create-ael-names/create-ael-names.component').then(m => m.CreateAelNamesComponent), canActivate: [authGuard]},
+  {path: 'addproduct', loadComponent: () => import('./Product Designer/add-product/add-product.component').then(m => m.AddProductComponent), canActivate:[authGuard]},
+  {path: 'viewproductmodeplaylist', loadComponent: () => import('./Product Designer/view-product-mode-playlist/view-product-mode-playlist.component').then(m => m.ViewProductModePlaylistComponent), canActivate:[authGuard]},
+  {path: 'productdelivery', loadComponent: () => import('./Product Designer/product-delivery/product-delivery.component').then(m => m.ProductDeliveryComponent), canActivate:[authGuard]},
+  {path: 'deliverysequence', loadComponent: () => import('./Product Designer/delivery-sequence/delivery-sequence.component').then(m => m.DeliverySequenceComponent), canActivate:[authGuard]},
+  {path: 'profilelist', loadComponent: () => import('./Participants Profile Management/profilelist/profilelist.component').then(m => m.ProfilelistComponent), canActivate:[authGuard]},
+  {path: 'app-flow-breaks', loadComponent: () => import('./Participants Profile Management/app-flow-breaks/app-flow-breaks.component').then(m => m.AppFlowBreaksComponent), canActivate:[authGuard]},
+  {path: 'participantproduct', loadComponent: () => import('./Participants Profile Management/participant-product/participant-product.component').then(m => m.ParticipantProductComponent), canActivate:[authGuard]},
+  {path: 'ProfileScreen', loadComponent: () => import('./Participants Profile Management/new-profile/new-profile.component').then(m => m.NewProfileComponent), canActivate:[authGuard]},
+  {path: 'journeysupport/:pid', loadComponent: () => import('./Journey Onboarding/journeyplan/journeyplan.component').then(m => m.JourneyplanComponent), canActivate:[authGuard]},
+  {path: 'participantdeliverysequence/:pid', loadComponent: () => import('./Participants Profile Management/participant-delivery-sequence/participant-delivery-sequence.component').then(m => m.ParticipantDeliverySequenceComponent), canActivate:[authGuard]},
+  {path: 'participantpurchase/:pid', loadComponent: () => import('./Participants Profile Management/journey-product-purchase/journey-product-purchase.component').then(m => m.JourneyProductPurchaseComponent), canActivate:[authGuard]},
+  {path: 'profilesummary/:profileid', loadComponent: () => import('./Participants Profile Management/profile-summary/profile-summary.component').then(m => m.ProfileSummaryComponent), canActivate: [authGuard]},
+  {path: 'userprofile/:id', loadComponent: () => import('./Participants Profile Management/userprofile/userprofile.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
+  //userprofile_old
+  {path: 'userprofile_old', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
+  {path: 'deliveryactivities', loadComponent: () => import('./Product Designer/delivery-set/delivery-set.component').then(m => m.DeliverySetComponent), canActivate:[authGuard]},
+  {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
+  {path: 'arena/:queueid/:stage', loadComponent: () => import('./queue system/arena-board/arena-board.component').then(m => m.ArenaBoardComponent), canActivate:[authGuard]},
+  {path: 'formtemplate', loadComponent: () => import('./Product Designer/delivery-set/formtemplate/formtemplate.component').then(m => m.FormtemplateComponent), canActivate:[authGuard]},
+  {path: 'queuelist', loadComponent: () => import('./queue system/queue-list/queue-list.component').then(m => m.QueueListComponent), canActivate:[authGuard]},
+  // {path: 'content-upload-v2', loadComponent: () => import('./content-upload-version2/content-upload-version2.component').then(m => m.ContentUploadVersion2Component)},
+  // {path: 'userprofile_old/:id', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
+  {path: 'eiflixtelemetry', loadComponent: () => import('./eiflix-telemetry/eiflix-telemetry.component').then(m => m.EiflixTelemetryComponent), canActivate:[authGuard]},
+  {
+    path: 'content-upload-v2',
+    loadComponent: () =>
+      import('./content-upload-version2/content-upload-version2.component')
+        .then(m => m.ContentUploadVersion2Component),canActivate:[authGuard],
+    children: [
+
+      { path: 'audiodashboard',
+        loadComponent: () =>
+          import('./content/audio-dashboard/audio-dashboard.component')
+            .then(m => m.AudioDashboardComponent),canActivate:[authGuard]
+      },
+
+      { path: 'videodashboard',
+        loadComponent: () =>
+          import('./content/episodes-dashboard/episodes-dashboard.component')
+            .then(m => m.EpisodesDashboardComponent),canActivate:[authGuard]
+      },
+
+      { path: 'ads',
+        loadComponent: () =>
+          import('./content/click-ads/click-ads.component')
+            .then(m => m.ClickAdsComponent),canActivate:[authGuard]
+      },
+
+      { path: 'healthstories',
+        loadComponent: () =>
+          import('./content/health-stories/health-stories.component')
+            .then(m => m.HealthStoriesComponent),canActivate:[authGuard]
+      },
+
+      { path: 'contentupload',
+        loadComponent: () =>
+          import('./content/content-upload/content-upload.component')
+            .then(m => m.ContentUploadComponent),canActivate:[authGuard]
+      },
+      { path: 'learningmaterial',
+        loadComponent: () =>
+          import('./content/learning-material/learning-material.component')
+            .then(m => m.LearningMaterialComponent),canActivate:[authGuard]
+      },
+      {path: 'communitymanager', loadComponent: () => import('./AppEngagement/community-manager/community-manager.component').then(m => m.CommunityManagerComponent), canActivate:[authGuard]},
+      {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
+      {path: 'assigncategory', loadComponent: () => import('./content/series-dashboard/categoryassign/categoryassign.component').then(m => m.CategoryassignComponent), canActivate:[authGuard]},
+      {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard]},
+      // {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
+      // {path: 'tieraccessconfig', loadComponent: () => import('./content/tier-access-config/view-tier-access/view-tier-access.component').then(m => m.ViewTierAccessComponent), canActivate: [authGuard]},
+      {path: 'viewparticipantstieraccess', loadComponent: () => import('./content/eiflix_tier/viewparticipant-tier-access/viewparticipant-tier-access.component').then(m => m.ViewparticipantTierAccessComponent), canActivate:[authGuard]},
+      {path: 'playlistdashboard', loadComponent: () => import('./content/playlist-dashboard/playlist-dashboard.component').then(m => m.PlaylistDashboardComponent), canActivate:[authGuard], children:[
+        {path: 'edit-playlist', loadComponent: () => import('./content/playlist-dashboard/playlist-configuration/playlist-configuration.component').then(m => m.PlaylistConfigurationComponent), canActivate: [authGuard]},
+        {path: 'add-playlist', loadComponent: () => import('./content/playlist-dashboard/playlist-configuration/playlist-configuration.component').then(m => m.PlaylistConfigurationComponent), canActivate: [authGuard]},
+      ]},
+    ]
+  },
+  {path: 'content-upload-v2', loadComponent: () => import('./content-upload-version2/content-upload-version2.component').then(m => m.ContentUploadVersion2Component),canActivate:[authGuard]},
+  {path: 'learningmaterial', loadComponent: () => import('./content/learning-material/learning-material.component').then(m => m.LearningMaterialComponent),canActivate:[authGuard]},
+  {path: 'audiodashboard', loadComponent: () => import('./content/audio-dashboard/audio-dashboard.component').then(m => m.AudioDashboardComponent), canActivate:[authGuard]},
+  {path: 'playlistdashboard', loadComponent: () => import('./content/playlist-dashboard/playlist-dashboard.component').then(m => m.PlaylistDashboardComponent), canActivate:[authGuard], children:[
+    {path: 'edit-playlist', loadComponent: () => import('./content/playlist-dashboard/edit/edit.component').then(m => m.EditComponent), canActivate: [authGuard]},
+    {path: 'add-playlist', loadComponent: () => import('./content/playlist-dashboard/solar-playlist/solar-playlist.component').then(m => m.SolarPlaylistComponent), canActivate: [authGuard]},
+  ]},
+  {path: 'playlistads', loadComponent: () => import('./content/playlist-ads/playlist-ads.component').then(m => m.PlaylistAdsComponent), canActivate:[authGuard]},
+  {path: 'healthstories', loadComponent: () => import('./content/health-stories/health-stories.component').then(m => m.HealthStoriesComponent), canActivate:[authGuard]},
+  {path: 'ads', loadComponent: () => import('./content/click-ads/click-ads.component').then(m => m.ClickAdsComponent), canActivate:[authGuard]},
+  {path: 'queuevenue', loadComponent: () => import('./queue system/queue-venue/queue-venue.component').then(m => m.QueueVenueComponent), canActivate:[authGuard]},
+  {path: 'dynamicstudio', loadComponent: () => import('./queue system/dynamic-studio-v2/dynamic-studio-v2.component').then(m => m.DynamicStudioV2Component), canActivate:[authGuard]},
+  {path: 'view-participants-form', loadComponent: () => import('./Participants Profile Management/view-participants-form/view-participants-form.component').then(m => m.ViewParticipantsFormComponent), canActivate:[authGuard]},
+  {path: 'videodashboard', loadComponent: () => import('./content/episodes-dashboard/episodes-dashboard.component').then(m => m.EpisodesDashboardComponent), canActivate:[authGuard]},
+  {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics/content-analytics.component').then(m => m.ContentAnalyticsComponent), canActivate:[authGuard]},
+  {path: 'content-analytics-dashboard', loadComponent: () => import('./content/content-analytics-dashboard/content-analytics-dashboard.component').then(m => m.ContentAnalyticsDashboardComponent), canActivate:[authGuard]},
+  {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
+  {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard], children: [
+    {path:'addseries', loadComponent: () => import('./content/series-dashboard/add-series/add-series.component').then(m => m.AddSeriesComponent), canActivate: [authGuard]},
+    {path:'editseries', loadComponent: () => import('./content/series-dashboard/edit-series/edit-series.component').then(m => m.EditSeriesComponent), canActivate:[authGuard]},
+  ]},
+  {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
+  {path: 'zoomaccount', loadComponent: () => import('./queue system/zoom-account/zoom-account.component').then(m => m.ZoomAccountComponent), canActivate:[authGuard]},
+  {path: 'arenastudioactivity', loadComponent: () => import('./queue system/arenastudioactivity/arenastudioactivity.component').then(m => m.ArenastudioactivityComponent), canActivate:[authGuard, roleGuard(['developer','admin','ah'])]},
+  {path: 'queuetransfer', loadComponent: () => import('./queue system/queue-transfer/queue-transfer.component').then(m => m.QueueTransferComponent), canActivate:[authGuard]},
+  {path: 'viewparticipantstieraccess', loadComponent: () => import('./content/eiflix_tier/viewparticipant-tier-access/viewparticipant-tier-access.component').then(m => m.ViewparticipantTierAccessComponent), canActivate:[authGuard]},
+  {path: 'tieraccessconfig', loadComponent: () => import('./content/tier-access-config/view-tier-access/view-tier-access.component').then(m => m.ViewTierAccessComponent), canActivate: [authGuard]},
+  {path: 'event_participation_approve', loadComponent: () => import('./Events/event-participation-approve/event-participation-approve.component').then(m => m.EventParticipationApproveComponent), canActivate: [authGuard]},
+  {path: 'event-participation-confirmation', loadComponent: () => import('./Events/event-participation-confirmations/event-participation-confirmations.component').then(m => m.EventParticipationConfirmationsComponent), canActivate: [authGuard]},
+  {path: 'events-stage-data', loadComponent: () => import('./Events/events-stage-data/events-stage-data.component').then(m => m.EventsStageDataComponent), canActivate: [authGuard]},
+  {path: 'create_event', loadComponent: () => import('./Events/event-list/event-list.component').then(m => m.EventListComponent), canActivate: [authGuard]},
+  {path: 'arena_e_ticket_approve', loadComponent: () => import('./Events/arena-e-ticket-approve/arena-e-ticket-approve.component').then(m => m.ArenaETicketApproveComponent), canActivate: [authGuard]},
+  {path: 'qr-scanner', loadComponent: () => import('./Events/qr-scanner/qr-scanner.component').then(m => m.QrScannerComponent), canActivate: [authGuard]},
+  {path: 'event_attendance_log', loadComponent: () => import('./Events/event-attendance-log/event-attendance-log.component').then(m => m.EventAttendanceLogComponent), canActivate: [authGuard]},
+  {path: 'videoask-display', loadComponent: () => import('./Events/videoask-display/videoask-display.component').then(m => m.VideoaskDisplayComponent), canActivate:[authGuard]},
+  {path: 'overall_event_dashboard', loadComponent: () => import('./Events/live-event-dashboard/live-event-dashboard.component').then(m => m.LiveEventDashboardComponent), canActivate:[authGuard]},
+  {path: 'live_event_dashboard', loadComponent: () => import('./Events/live-event-dashboard-v2/live-event-dashboard-v2.component').then(m => m.LiveEventDashboardV2Component), canActivate:[authGuard]},
+  {path: 'first_timers_dashboard', loadComponent: () => import('./Events/first-timers-dashboard/first-timers-dashboard.component').then(m => m.FirstTimersDashboardComponent), canActivate:[authGuard]},
+  {path: 'live_event_dashboard_v3', loadComponent: () => import('./Events/live-event-dashboard-v3/live-event-dashboard-v3.component').then(m => m.LiveEventDashboardV3Component), canActivate:[authGuard]},
+  {path: 'contentupload', loadComponent: () => import('./content/content-upload/content-upload.component').then(m => m.ContentUploadComponent), canActivate: [authGuard]},
+  {path: 'createarenavideoasktemplate', loadComponent: () => import('./content/arena-video-ask-input/arena-video-ask-input.component').then(m => m.ArenaVideoAskInputComponent), canActivate: [authGuard]},
+
+  // Scheduling
+  {path: 'EISzoom', loadComponent: () => import('./Scheduling/eis-zoom-account/eis-zoom-account.component').then(m => m.EISZoomAccountComponent), canActivate:[authGuard]},
+  {path: 'appointmentavailability', loadComponent: () => import('./Scheduling/appointment-availability/appointment-availability.component').then(m => m.AppointmentAvailabilityComponent), canActivate:[authGuard]},
+  {path: 'bookappointment', loadComponent: () => import('./Scheduling/book-appointment/book-appointment.component').then(m => m.BookAppointmentComponent), canActivate:[authGuard]},
+  {path: 'appointmentcalendar', loadComponent: () => import('./Scheduling/appointment-calendar/appointment-calendar.component').then(m => m.AppointmentCalendarComponent), canActivate:[authGuard]},
+  {path: 'mycalendar', loadComponent: () => import('./Scheduling/appointment-calendar/appointment-calendar.component').then(m => m.AppointmentCalendarComponent), canActivate:[authGuard]},
+  {path: 'roster', loadComponent: () => import('./Scheduling/roaster/roaster.component').then(m => m.RoasterComponent), canActivate:[authGuard]},
+  {path: 'appointmentstatuspending', loadComponent: () => import('./Scheduling/appointment-status-pending/appointment-status-pending.component').then(m => m.AppointmentStatusPendingComponent), canActivate:[authGuard]},
+  {path: 'appointmentrole', loadComponent: () => import('./Scheduling/appointment-roles/appointment-roles.component').then(m => m.AppointmentRolesComponent), canActivate:[authGuard]},
+  {path: 'eisappointmentrole', loadComponent: () => import('./Scheduling/eis-appointment-role/eis-appointment-role.component').then(m => m.EisAppointmentRoleComponent), canActivate:[authGuard]},
+  {path: 'mapappointmentrole', loadComponent: () => import('./Scheduling/map-appointment-role/map-appointment-role.component').then(m => m.MapAppointmentRoleComponent), canActivate:[authGuard]},
+  {path: 'mapclienteis', loadComponent: () => import('./Scheduling/map-client-eis/map-client-eis.component').then(m => m.MapClientEisComponent), canActivate:[authGuard]},
+  {path: 'teamdeliveryhours', loadComponent: () => import('./Scheduling/team-delivery-hours/team-delivery-hours.component').then(m => m.TeamDeliveryHoursComponent), canActivate:[authGuard]},
+  {path: 'offtime', loadComponent: () => import('./Offtime/offtime-list/offtime-list.component').then(m => m.OfftimeListComponent), canActivate:[authGuard]},
+  {path: 'approveofftime', loadComponent: () => import('./Offtime/approve-offtime/approve-offtime.component').then(m => m.ApproveOfftimeComponent), canActivate:[authGuard]},
+  {path: 'capacityutilization', loadComponent: () => import('./Scheduling/capacity-utilization/capacity-utilization.component').then(m => m.CapacityUtilizationComponent), canActivate:[authGuard]},
+  {path: 'appointmentstudio', loadComponent: () => import('./Scheduling/appointment-studio/appointment-studio.component').then(m => m.AppointmentStudioComponent), canActivate:[authGuard]},
+  {path: 'openappointmentzoom/:id', loadComponent: () => import('./Scheduling/appointment-zoom-view/appointment-zoom-view.component').then(m => m.AppointmentZoomViewComponent), canActivate:[authGuard]},
+  {path: 'appointment-status-update', loadComponent: () => import('./Scheduling/appointment-zoom-view/appointment-status-update/appointment-status-update.component').then(m => m.AppointmentStatusUpdateComponent), canActivate:[authGuard]},
+
+  // App Engagement
+  {path: 'appactionpending', loadComponent: () => import('./AppEngagement/app-action-pending/app-action-pending.component').then(m => m.AppActionPendingComponent), canActivate: [authGuard]},
+  {path: 'interimreportlog', loadComponent: () => import('./AppEngagement/interim-report-log/interim-report-log.component').then(m => m.InterimReportLogComponent), canActivate: [authGuard]},
+  {path: 'evolutionwishlistlog', loadComponent: () => import('./AppEngagement/evolution-wishlist-log-screen/evolution-wishlist-log-screen.component').then(m => m.EvolutionWishlistLogScreenComponent), canActivate: [authGuard]},
+  {path: 'evolutionwishlist', loadComponent: () => import('./AppEngagement/evolution-wishlist-form/evolution-wishlist-form.component').then(m => m.EvolutionWishlistFormComponent)},
+  {path: 'modedashboard', loadComponent: () => import('./AppEngagement/mode-dashboard/mode-dashboard.component').then(m => m.ModeDashboardComponent), canActivate: [authGuard]},
+  {path: 'mode-dashboard-new', loadComponent: () => import('./AppEngagement/mode-dashboard-new/mode-dashboard-new.component').then(m => m.ModeDashboardNewComponent), canActivate: [authGuard]},
+  {path: 'participantAEL/:id', loadComponent: () => import('./AppEngagement/participant-ael/participant-ael.component').then(m => m.ParticipantAELComponent), canActivate: [authGuard]},
+  {path: 'participantAEL', loadComponent: () => import('./AppEngagement/participant-ael/participant-ael.component').then(m => m.ParticipantAELComponent), canActivate: [authGuard]},
+  {path: 'productmodeconfig', loadComponent: () => import('./AppEngagement/product-mode-config/product-mode-config.component').then(m => m.ProductModeConfigComponent), canActivate: [authGuard]},
+  {path: 'communitymanager', loadComponent: () => import('./AppEngagement/community-manager/community-manager.component').then(m => m.CommunityManagerComponent), canActivate:[authGuard]},
+  {path: 'recommendedplaylist', loadComponent: () => import('./AppEngagement/manage-recommended-playlist/manage-recommended-playlist-component').then(m => m.ManageRecommendedPlaylistComponent), canActivate: [authGuard]},
+  {path: 'bigwall', loadComponent: () => import('./AppEngagement/bigwall-data-adding/bigwall-data-adding.component').then(m => m.BigwallDataAddingComponent), canActivate: [authGuard]},
+  {path: 'arenadesigninsights', loadComponent: () => import('./arena-design-insights/arena-design-insights.component').then(m => m.ArenaDesignInsightsComponent)},
+  {path: 'atctaxonomy', loadComponent: () => import('./AppEngagement/taxonomy/view-tags/view-tags.component').then(m => m.ViewTagsComponent), canActivate: [authGuard]},
+  {path: 'layers-screen', loadComponent: () => import('./Events/layers-screen/layers-screen.component').then(m => m.LayersScreenComponent), canActivate: [authGuard]},
+  {path: 'viewUpgradedATC', loadComponent: () => import('./ATC/view-upgraded-atc/view-upgraded-atc.component').then(m => m.ViewUpgradedAtcComponent), canActivate: [authGuard]},
+  {path: 'atctrajectory', loadComponent: () => import('./ATC/eit-education-atc/eit-education-atc.component').then(m => m.EitEducationAtcComponent), canActivate:[authGuard]},
+  {path: 'createworkshop', loadComponent: () => import('./Workshop/eiflix-workshop/view-workshop/view-workshop.component').then(m => m.ViewWorkshopComponent), canActivate: [authGuard]},
+  {path: 'quiz', loadComponent: () => import('./quiz/quizscreen.component').then(m => m.QuizScreenComponent),canActivate: [authGuard]},
+  {path: 'viewquiz', loadComponent: () => import('./quiz/viewquizcohort/viewquizcohort.component').then(m => m.ViewquizcohortComponent),canActivate: [authGuard]},
+
+
+  // Queue System
+  {path: 'initiateeventproduct', loadComponent: () => import('./queue system/initiate-event-product/initiate-event-product.component').then(m => m.InitiateEventProductComponent), canActivate: [authGuard]},
+  {path: 'queue-planner', loadComponent: () => import('./queue system/queue-planning/queue-planning.component').then(m => m.QueuePlanningComponent), canActivate: [authGuard]},
+  {path: 'queue-planner-review', loadComponent: () => import('./queue system/queue-planning-review/queue-planning-review.component').then(m => m.QueuePlanningReviewComponent), canActivate: [authGuard]},
+  {path: 'queuebigplanner', loadComponent: () => import('./queue system/big-planner/big-planner.component').then(m => m.BigPlannerComponent), canActivate: [authGuard]},
+  // {path: 'dynamicqueuemanager', loadComponent: () => import('./queue system/dynamic-queue-manager/dynamic-queue-manager.component').then(m => m.DynamicQueueManagerComponent), canActivate: [authGuard]},
+  {path: 'dynamicqueuemanager', loadComponent: () => import('./queue system/dynamic-queue-manager-clone/dynamic-queue-manager-clone.component').then(m => m.DynamicQueueManagerCloneComponent), canActivate: [authGuard]},
+  {path: 'openmeeting/:id/:collectiontype', loadComponent: () => import('./queue system/zoom-clientview/zoom-clientview.component').then(m => m.ZoomClientviewComponent), canActivate:[authGuard]},
+  {path: 'viewrubrics_scoring_atc', loadComponent: () => import('./queue system/atc-generated-from-queue-stage/atc-generated-from-queue-stage.component').then(m => m.AtcGeneratedFromQueueStageComponent), canActivate:[authGuard]},
+
+  // ATC
+  {path: 'prescribeATC', loadComponent: () => import('./ATC/prescribe-atc/prescribe-atc.component').then(m => m.PrescribeATCComponent), canActivate: [authGuard]},
+  {path: 'editATC/:atc/:type', loadComponent: () => import('./ATC/edit-atc/edit-atc.component').then(m => m.EditAtcComponent), canActivate: [authGuard]},
+  {path: 'previewATC', loadComponent: () => import('./ATC/atc-preview/atc-preview.component').then(m => m.AtcPreviewComponent), canActivate: [authGuard]},
+  {path: 'viewprescribedATC', loadComponent: () => import('./ATC/view-prescribed-atc/view-prescribed-atc.component').then(m => m.ViewPrescribedATCComponent), canActivate: [authGuard]},
+  {path: 'view-participant-atc', loadComponent: () => import('./ATC/view-participant-atc/view-participant-atc.component').then(m => m.ViewParticipantAtcComponent)},
+  {path: 'viewassignedATC', loadComponent: () => import('./ATC/view-assigned-atc/view-assigned-atc.component').then(m => m.ViewAssignedATCComponent), canActivate: [authGuard]},
+  {path: 'reviewflagATC', loadComponent: () => import('./ATC/review-flag-atc/review-flag-atc.component').then(m => m.ReviewFlagATCComponent), canActivate: [authGuard]},
+  {path: 'pickformentoring', loadComponent: () => import('./ATC/pick-for-mentoring/pick-for-mentoring.component').then(m => m.PickForMentoringComponent), canActivate:[authGuard]},
+  {path: 'liveprescription/:draft', loadComponent: () => import('./ATC/live-prescription/live-prescription.component').then(m=>m.LivePrescriptionComponent), canActivate:[authGuard]},
+
+  // Triple ATC
+  {path: 'addtripleATC', loadComponent: () => import('./ATC/Triple ATC/add-triple-atc/add-triple-atc.component').then(m => m.AddTripleATCComponent), canActivate:[authGuard]},
+  {path: 'viewtripleATC', loadComponent: () => import('./ATC/Triple ATC/view-triple-atc/view-triple-atc.component').then(m => m.ViewTripleATCComponent), canActivate:[authGuard]},
+  {path: 'previewtripleATC', loadComponent: () => import('./ATC/Triple ATC/preview-triple-atc/preview-triple-atc.component').then(m => m.PreviewTripleATCComponent), canActivate:[authGuard]},
+  {path: 'edittripleATC/:atc', loadComponent: () => import('./ATC/Triple ATC/edit-triple-atc/edit-triple-atc.component').then(m => m.EditTripleATCComponent), canActivate:[authGuard]},
+
+  // Workshop
+  {path: 'workshopchallengecreation', loadComponent: () => import('./Workshop/challenge-view/challenge-view.component').then(m => m.ChallengeViewComponent), canActivate: [authGuard]},
+  {path: 'enrollment_config_view', loadComponent: () => import('./Workshop/enrollment-config-view/enrollment-config-view.component').then(m => m.EnrollmentConfigViewComponent), canActivate:[authGuard]},
+  {path: 'workshopchallengeparticipantdashboard', loadComponent: () => import('./Workshop/participant-enrollment-dashboard/participant-enrollment-dashboard.component').then(m => m.ParticipantEnrollmentDashboardComponent), canActivate:[authGuard]},
+  {path: 'workshop_image_upload', loadComponent: () => import('./Workshop/workshop-image-upload/workshop-image-upload.component').then(m => m.WorkshopImageUploadComponent), canActivate:[authGuard]},
+
+  // Customer Support
+  { path: 'customersupportdashboard', loadComponent: () => import('./Customer Support/customer-support-dashboard/customer-support-dashboard.component').then(m => m.CustomerSupportDashboardComponent), canActivate: [authGuard] },
+  { path: 'customersupportdashboard/ticket/:ticketid/:ticketno', loadComponent: () => import('./Customer Support/customer-chat-screen/customer-chat-screen.component').then(m => m.CustomerChatScreenComponent), canActivate: [authGuard] },
+  {path: 'customer-support-tickets', loadComponent: () => import('./Customer Support/customer-ticket-new/customer-ticket-new.component').then(m => m.CustomerTicketNewComponent), canActivate: [authGuard]},
+  {path: 'customertickets', loadComponent: () => import('./Customer Support/customertickets/customertickets.component').then(m => m.CustomerticketsComponent), canActivate:[authGuard]},
+
+  // Journey Onboarding
+  {path: 'salesleads', loadComponent: () => import('./Journey Onboarding/saleslead/saleslead.component').then(m => m.SalesleadComponent), canActivate:[authGuard]},
+  {path: 'sales-numbers', loadComponent: () => import('./Journey Onboarding/sales-numbers/sales-numbers.component').then(m => m.SalesNumbersComponent), canActivate:[authGuard]},
+  {path: 'sales-teams', loadComponent: () => import('./Journey Onboarding/sales-teams/sales-teams.component').then(m => m.SalesTeamsComponent), canActivate:[authGuard]},
+  {path: 'onboardingremarks', loadComponent: () => import('./Journey Onboarding/onboarding-remark/onboarding-remark.component').then(m => m.OnboardingRemarkComponent), canActivate: [authGuard]},
+  {path: 'opportunities', loadComponent: () => import('./Journey Onboarding/journeycoach-opportunities/journeycoach-opportunities.component').then(m => m.JourneycoachOpportunitiesComponent), canActivate: [authGuard]},
+  {path: 'JourneycoachDashboard-new', loadComponent: () => import('./Journey Onboarding/journeycoach-dashboard/journeycoach-dashboard.component').then(m => m.JourneycoachDashboardComponent), canActivate:[authGuard]},
+  {path: 'productinitiated-dashboard', loadComponent: () => import('./Journey Onboarding/product-initiation-dashboard/product-initiation-dashboard.component').then(m => m.ProductInitiationDashboardComponent), canActivate:[authGuard]},
+  {path: 'delivery-dashboard', loadComponent: () => import('./Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-clone.component').then(m => m.DeliveryDashboardCloneComponent), canActivate:[authGuard]},
+  {path: 'overall-dashboard', loadComponent: () => import('./Journey Onboarding/overall-dashboard/overall-dashboard.component').then(m => m.OverallDashboardComponent), canActivate:[authGuard]},
+  {path: 'journey-coach-health', loadComponent: () => import('./Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.component').then(m => m.JourneyCoachHealthDashboardComponent), canActivate:[authGuard]},
+  {path: 'sales-report', loadComponent: () => import('./Journey Onboarding/sales-dashboard-clone/sales-dashboard-clone.component').then(m => m.SalesDashboardCloneComponent), canActivate:[authGuard]},
+  {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
+  {path: 'onboarding-pipeline', loadComponent: () => import('./Journey Onboarding/onboarding-pipeline/onboarding-pipeline.component').then(m => m.OnboardingPipelineComponent), canActivate: [authGuard]},
+
+  // Participants Profile Management
+  {path: 'participants-analytics', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-analytics.component').then(m => m.ParticipantsAnalyticsComponent), canActivate: [authGuard]},
+  {path: 'participant-evolution-summary', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-evolution-summary/participants-evolution-summary.component').then(m => m.ParticipantsEvolutionSummaryComponent), canActivate:[authGuard]},
+  {path: 'participant-form-tracker', loadComponent: () => import('./Participants Profile Management/participant-form-tracker/participant-form-tracker.component').then(m => m.ParticipantFormTrackerComponent), canActivate:[authGuard]},
+
+  // BIG
+  {path: 'big-dashboard', loadComponent: () => import('./big/big-dashboard/big-dashboard.component').then(m => m.BigDashboardComponent), canActivate:[authGuard]},
+  {path: 'bigchatscreen', loadComponent: () => import('./big/big-chat-screen/big-chat-screen.component').then(m => m.BigChatScreenComponent), canActivate:[authGuard]},
+  {path: 'formbasedsubmission', loadComponent: () => import('./big/form-based-submission/form-based-submission.component').then(m => m.FormBasedSubmissionComponent), canActivate:[authGuard]},
+  {path: 'bigProfile', loadComponent: () => import('./big/big-profile/big-profile.component').then(m => m.BigProfileComponent), canActivate:[authGuard]},
+  {path: 'particiant_assignment_board', loadComponent: () => import('./big/participant-assignment-board/participant-assignment-board.component').then(m => m.ParticipantAssignmentBoardComponent), canActivate: [authGuard]},
+  {path: 'zoommeeting_bigparticipants', loadComponent: () => import('./big/zoom-meeting/zoom-meeting.component').then(m => m.ZoomMeetingComponent), canActivate: [authGuard]},
+  {path: 'bigcohorts', loadComponent: () => import('./big/big-cohort-clone-2/big-cohort-clone-2.component').then(m => m.BigCohortClone2Component), canActivate: [authGuard]},
+  {path: 'manualassignment', loadComponent: () => import('./big/manual-assignments/manual-assignments.component').then(m => m.ManualAssignmentsComponent), canActivate: [authGuard]},
+  {path: 'validateParticipantAssignments', loadComponent: () => import('./big/validate-participants-assignment/validate-participants-assignment.component').then(m => m.ValidateParticipantsAssignmentComponent), canActivate: [authGuard]},
+  {path: 'biglevel', loadComponent: () => import('./big/big-level/big-level.component').then(m => m.BigLevelComponent), canActivate: [authGuard]},
+  {path: 'modellevelconfig', loadComponent: () => import('./big/atcmodel-level-config/atcmodel-level-config.component').then(m => m.AtcmodelLevelConfigComponent), canActivate: [authGuard]},
+  {path: 'bigaggregateeventlevel', loadComponent: () => import('./big/big-aggregate-event-level/big-aggregate-event-level.component').then(m => m.BigAggregateEventLevelComponent), canActivate: [authGuard]},
+  {path: 'bigactivitymonitor', loadComponent: () => import('./big/monitor-activity-log/monitor-activity-log.component').then(m => m.MonitorActivityLogComponent), canActivate: [authGuard]},
+  {path: 'big_aggregate', loadComponent: () => import('./big/big-aggregate/big-aggregate.component').then(m => m.BigAggregateComponent), canActivate:[authGuard]},
+  {path: 'bigactivity', loadComponent: () => import('./big/big-activity/big-activity.component').then(m => m.BigActivityComponent), canActivate:[authGuard]},
+  {path: 'arena_space', loadComponent: () => import('./big/create-arena-space/create-arena-space.component').then(m => m.CreateArenaSpaceComponent), canActivate:[authGuard]},
+  {path: 'bigactivitylog', loadComponent: () => import('./big/big-activity-log/big-activity-log.component').then(m => m.BigActivityLogComponent), canActivate:[authGuard]},
+
+  // Notifications
+  {path: 'notificationlog', loadComponent: () => import('./AppEngagement/notifications-log/notifications-log.component').then(m => m.NotificationsLogComponent), canActivate:[authGuard]},
+  {path: 'notificationrecord', loadComponent: () => import('./AppEngagement/notification-record/notification-record.component').then(m => m.NotificationRecordComponent), canActivate:[authGuard]},
+
+  // Chat
+  {path: 'group-chat', loadComponent: () => import('./Events/Chat/chat-screen/chat-screen.component').then(m => m.ChatScreenComponent), canActivate:[authGuard]},
+
+  // Communication Center
+  {path: 'zoom-recording-dashboard', loadComponent: () => import('./Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component').then(m => m.ZoomRecordingDashboardComponent), canActivate:[authGuard]},
+  {path: 'email-templates', loadComponent: () => import('./Communication Center/create-email-template/create-email-template.component').then(m => m.CreateEmailTemplateComponent), canActivate:[authGuard]},
+  {path: 'communication', loadComponent: () => import('./Communication Center/communication/communication.component').then(m => m.CommunicationComponent), canActivate:[authGuard]},
+
+  // New Workshop
+  {path: 'create-workshop', loadComponent: () => import('./New-Workshop/create-workshop/create-workshop.component').then(m => m.CreateWorkshopComponent)},
+  {path: 'workshopconfig/:id', loadComponent: () => import('./New-Workshop/workshop-configuration/workshop-configuration.component').then(m => m.WorkshopConfigurationComponent)},
+  {path: 'workshops', loadComponent: () => import('./New-Workshop/workshops/workshops.component').then(m => m.WorkshopsComponent),canActivate:[authGuard]},
+  {path: 'eiflixhomeconfig', loadComponent: () => import('./New-Workshop/upcomingworkshops/upcomingworkshops.component').then(m => m.UpcomingworkshopsComponent)},
+  {path: 'newusersprofile', loadComponent: () => import('./New-Workshop/newusersprofile/newusersprofile.component').then(m => m.NewusersprofileComponent)},
+  {path: 'eiflixdiscoverpage', loadComponent: () => import('./New-Workshop/eiflixdiscoverpage/eiflixdiscoverpage.component').then(m => m.EiflixdiscoverpageComponent)},
+  {path: 'workshop_dashboard/:id', loadComponent: () => import('./New-Workshop/workshop-dashboard/workshop-dashboard.component').then(m => m.WorkshopDashboardComponent), canActivate:[authGuard]},
+  {path: 'formtemplateworkshop', loadComponent: () => import('./New-Workshop/form-assignment/form-assignment.component').then(m => m.FormAssignmentComponent), canActivate:[authGuard]},
+  {path: 'productpageworkshop', loadComponent: () => import('./New-Workshop/product-page/product-page.component').then(m => m.ProductPageComponent),canActivate:[authGuard]},
+  {path: 'engagementdashboard', loadComponent: () => import('./New-Workshop/engagement-dashboard/engagement-dashboard.component').then(m => m.EngagementDashboardComponent),canActivate:[authGuard]},
+  {path: 'bigengagementdashboard', loadComponent: () => import('./New-Workshop/capacity-dashboard/capacity-dashboard.component').then(m => m.CapacityDashboardComponent),canActivate:[authGuard]},
+  {path: 'bigeventmentor', loadComponent: () => import('./New-Workshop/bigeventmentor/bigeventmentor.component').then(m => m.BigeventmentorComponent),canActivate:[authGuard]},
+  // Evolution Mapping
+  {path: 'evolutionmapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping/evolution-mapping.component').then(m => m.EvolutionMappingComponent), canActivate:[authGuard]},
+  {path: 'participant_videos_mapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping-new/evolution-mapping-new.component').then(m => m.EvolutionMappingNewComponent), canActivate:[authGuard]},
+  {path: 'participantevolution', loadComponent: () => import('./EvolutionMapping/evolution-mapping/participant-evolution-mapping/participant-evolution-mapping.component').then(m => m.ParticipantEvolutionMappingComponent), canActivate:[authGuard]},
+  // Taxonomy
+  {path: 'updateprofiletaxonomy', loadComponent: () => import('./AppEngagement/taxonomy/update-adjustment-taxonomy/update-adjustment-taxonomy.component').then(m => m.UpdateAdjustmentTaxonomyComponent), canActivate:[authGuard]},
+
+  // Participant Touchpoint
+  {path: 'participanttouchpoint', loadComponent: () => import('./participant-touchpoint/participant-touchpoint.component').then(m => m.ParticipantTouchpointComponent), canActivate:[authGuard]},
+
+  // TV Auth
+  {path: 'tv-auth', loadComponent: () => import('./tv-auth.component').then(m => m.TvAuthComponent)},
+
+  // HPC
+  {path: 'hpc', loadComponent: () => import('./hpc/hpc.component').then(m => m.HPCComponent), canActivate:[authGuard]},
+
+  // Main Dashboard (lazy loaded)
+  {path: 'EISDashboard', loadComponent: () => import('./main-dashboard/main-dashboard.component').then(m => m.MainDashboardComponent), canActivate:[authGuard]},
+
+  // Business Dashboard
+  {path: 'expense-planner/:tab', loadComponent: () => import('./Business Dashboard/expense-planner/expense-planner.component').then(m => m.ExpensePlannerComponent), canActivate: [authGuard]},
+  {path: 'ads-entry', loadComponent: () => import('./Business Dashboard/AdsEntry/entry-management.component').then(m => m.EntryManagementComponent), canActivate:[authGuard]},
+  {path: 'profile-role-access', loadComponent: () => import('./Business Dashboard/profile-based-access/profile-based-access.component').then(m => m.ProfileBasedAccessComponent), canActivate:[authGuard]},
+
+  // OpenVidu
+  {path: 'monitorliveassignment', loadComponent: () => import('./OpenVidu/monitor-liveassignment/monitor-liveassignment.component').then(m => m.MonitorLiveassignmentComponent), canActivate: [authGuard]},
+  {path: 'joinroom/:roomid', loadComponent: () => import('./OpenVidu/join-openvidu-call/join-openvidu-call.component').then(m => m.JoinOpenviduCallComponent), canActivate: [authGuard]},
+
+  // LiveKit (new call flow with DeepFilterNet3 client-side noise suppression)
+  {path: 'joinlivekit/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},
+  {path: 'participantstudio', loadComponent: () => import('./OpenVidu/list-openvidu-room/list-openvidu-room.component').then(m => m.ListOpenviduRoomComponent), canActivate: [authGuard]},
+  {path: 'openvidurecordings', loadComponent: () => import('./OpenVidu/openvidu-recording/openvidu-recording.component').then(m => m.OpenviduRecordingComponent), canActivate: [authGuard]},
+
+  // Health System
+  {path: 'queueeventhealth', loadComponent: () => import('./Diagnostics Tool/queue-event-health/queue-event-health.component').then(m => m.QueueEventHealthComponent), canActivate: [authGuard]},
+  {path: 'liveeventhealth', loadComponent: () => import('./Diagnostics Tool/live-event-health/live-event-health.component').then(m => m.LiveEventHealthComponent), canActivate: [authGuard]},
+
+  {path: 'ahcrm',loadComponent: () => import('./AppEngagement/ahcrm_home/participant-list/participant-list.component').then(m => m.ParticipantListComponent), canActivate: [authGuard] },
+
+  {path: 'eventzonemanagement',loadComponent: () => import('./Zone Management/event-zone-management/event-zone-management.component').then(m => m.EventZoneManagementComponent), canActivate: [authGuard] },
+
+  {path: 'channel-templates',loadComponent: () => import('./Channel Communication/channeltemplates/channeltemplates.component').then(m => m.ChannelTemplatesComponent),canActivate: [authGuard]},
+
+  // ai generated atc view screen
+  {path: 'viewaigeneratedatc', loadComponent: () => import('./view-ai-generated-atc/view-ai-generated-atc.component').then(m => m.ViewAiGeneratedAtcComponent), canActivate: [authGuard]},
+
+  //Vadivel
+  {path: 'appointment-dashboard', loadComponent: () => import('./appointment-dashboard/appointment-dashboard.component').then(m => m.AppointmentDashboardComponent), canActivate: [authGuard]},
+
+  //ecosystem
+  {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
+
+  //queue-web
+  {path: 'queue-web', loadComponent: () => import('./queue system/QueueWebVerison1/queue-web-version1.component').then(m => m.QueueWebVersion1Component), canActivate: [authGuard] },
+  {path: 'evolution-prep-participants', loadComponent: () => import('./queue system/evolution-prep-participants/evolution-prep-participants.component').then(m => m.EvolutionPrepParticipantsComponent), canActivate: [authGuard]},
+  {path: 'evolution-prep-participants-v2', loadComponent: () => import('./queue system/evolution-prep-participants-v2/evolution-prep-participants-v2.component').then(m => m.EvolutionPrepParticipantsV2Component), canActivate: [authGuard]},
+
+  // Dev - Test
+  {path: 'devtestmic', loadComponent: () => import('./Test Component/dev-test-mic/dev-test-mic.component').then(m => m.DevTestMicComponent) },
+
+  // ATC generation pipeline ops
+  {path: 'queue-atc-generation', loadComponent: () => import('./ATC-Ops/atc-generation-ops/atc-generation-ops.component').then(m => m.AtcGenerationOpsComponent), canActivate: [authGuard]},
+  {path: 'queue-atc-usage', loadComponent: () => import('./ATC-Ops/atc-usage-dashboard/atc-usage-dashboard.component').then(m => m.AtcUsageDashboardComponent), canActivate: [authGuard]},
+
+  // Wildcard must stay LAST — it catches every unmatched path
+  {path: '**',loadComponent: () =>import('./exceptionalrouting/exceptionalrouting.component').then(m => m.ExceptionalroutingComponent)},
+];
 
 // import { Routes } from '@angular/router';
 // import { authGuard } from './auth.guard';

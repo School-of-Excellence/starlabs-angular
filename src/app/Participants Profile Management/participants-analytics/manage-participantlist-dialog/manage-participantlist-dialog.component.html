@@ -140,23 +140,33 @@
                     <span class="list-count">{{ filteredParticipantLists.length }} list(s)</span>
                   </div>
                   <div class="header-actions">
-                    <button
-                      mat-stroked-button
-                      class="history-btn"
-                      (click)="toggleHistoryPanel()"
-                      [disabled]="loading">
-                      <mat-icon>history</mat-icon>
-                      History
-                    </button>
-                    <button
-                      mat-raised-button
-                      color="primary"
-                      (click)="toggleCreateForm()"
-                      [disabled]="loading">
-                      <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
-                      {{ showCreateForm ? 'Cancel' : 'Create List' }}
-                    </button>
-                  </div>
+                  <button
+                    mat-stroked-button
+                    class="history-btn"
+                    (click)="toggleHistoryPanel()"
+                    [disabled]="loading">
+                    <mat-icon>history</mat-icon>
+                    History
+                  </button>
+                  <button
+                    mat-stroked-button
+                    color="primary"
+                    class="history-btn"
+                    (click)="exportLiveLists()"
+                    [disabled]="loading"
+                    matTooltip="Export participants from all live lists">
+                    <mat-icon>file_download</mat-icon>
+                    Export
+                  </button>
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    (click)="toggleCreateForm()"
+                    [disabled]="loading">
+                    <mat-icon>{{ showCreateForm ? 'close' : 'add' }}</mat-icon>
+                    {{ showCreateForm ? 'Cancel' : 'Create List' }}
+                  </button>
+                </div>
                 </div>
 
                 <!-- Filter Section -->

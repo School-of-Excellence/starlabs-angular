@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject , HostListener, ElementRef } from '@angular/core';
 import { DocumentReference, Firestore, doc, docData, collectionData, query, where, collection } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { AuthguardService } from '../../../authguard.service';
@@ -29,7 +29,7 @@ import * as XLSX from 'xlsx';
 import { MatChipInputEvent } from '@angular/material/chips';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { getDoc } from 'firebase/firestore';
+import { getDocs } from 'firebase/firestore';
 
 // Per-variable source type
 export type VariableSource = 'static' | 'analytics' | 'sheet';
@@ -130,10 +130,21 @@ export class EmailInputComponent {
   isSheetValid = false;
   isUploadingEmailAttachment = false;
 
-  ccRecipients: any[] = [];
-  bccRecipients: any[] = [];
-  customCcEmail = '';
-  customBccEmail = '';
+  // CC state
+  ccSearchQuery: string = '';
+  ccFilteredEmails: string[] = [];
+  ccSelectedChips: string[] = [];
+  ccDropdownOpen: boolean = false;
+
+  // BCC state
+  bccSearchQuery: string = '';
+  bccFilteredEmails: string[] = [];
+  bccSelectedChips: string[] = [];
+  bccDropdownOpen: boolean = false;
+
+  // All emails
+  allProfileEmails: string[] = [];
+  emailsLoading: boolean = false;
 
   /** Whether localStorage has saved variable configs for the current template */
   hasSavedVariables = false;
@@ -162,6 +173,7 @@ export class EmailInputComponent {
     private router: Router,
     private bottomSheet: MatBottomSheet,
     private http: HttpClient,
+    private elRef: ElementRef,
     private snackBar: MatSnackBar,
   ) {
     this.categoryCollectionSnapShot = doc(this.firestore, 'email validators', 'templateCategories');
@@ -194,6 +206,15 @@ export class EmailInputComponent {
       this.fetchQueuedEmails();
     } else {
       this.dialogRef.close();
+    }
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    const ccWrap = this.elRef.nativeElement.querySelector('.ps-cc-bcc-wrap');
+    if (ccWrap && !ccWrap.contains(event.target)) {
+      this.ccDropdownOpen = false;
+      this.bccDropdownOpen = false;
     }
   }
 
@@ -245,6 +266,13 @@ export class EmailInputComponent {
         email: p['email'],
         avatar: p['photoURL'] || null
       }));
+      const emails: string[] = [];
+      profiles.forEach(p => {
+        if (p['email'] && !emails.includes(p['email'])) emails.push(p['email']);
+      });
+      this.allProfileEmails = emails;
+      this.ccFilteredEmails = [...emails];
+      this.bccFilteredEmails = [...emails];
     });
   }
 
@@ -350,21 +378,85 @@ export class EmailInputComponent {
     return this.extractVariables(tpl).filter(v => this.isVariableConfigured(v)).length;
   }
 
-  removeCcRecipient(index: number): void { this.ccRecipients.splice(index, 1); }
-  addCustomCcEmail(): void {
-    const email = this.customCcEmail.trim();
-    if (email && this.isValidEmail(email) && !this.ccRecipients.find(r => r.email === email)) {
-      this.ccRecipients.push({ id: 'custom', name: email, email, avatar: null });
+  async loadProfileEmails() {
+    this.emailsLoading = true;
+    try {
+      const snap = await getDocs(collection(this.firestore, 'profile_data'));
+      const emails: string[] = [];
+      snap.docs.forEach(d => {
+        const email = d.data()['email'];
+        if (email && typeof email === 'string' && email.includes('@') && !emails.includes(email)) {
+          emails.push(email);
+        }
+      });
+      this.allProfileEmails = emails;
+      this.ccFilteredEmails = [...emails];
+      this.bccFilteredEmails = [...emails];
+    } catch (err) {
+      console.error('loadProfileEmails error:', err);
+    } finally {
+      this.emailsLoading = false;
     }
-    this.customCcEmail = '';
   }
-  removeBccRecipient(index: number): void { this.bccRecipients.splice(index, 1); }
-  addCustomBccEmail(): void {
-    const email = this.customBccEmail.trim();
-    if (email && this.isValidEmail(email) && !this.bccRecipients.find(r => r.email === email)) {
-      this.bccRecipients.push({ id: 'custom', name: email, email, avatar: null });
-    }
-    this.customBccEmail = '';
+
+  // CC
+  onCcInputFocus(event: MouseEvent) {
+    event.stopPropagation();
+    this.bccDropdownOpen = false;
+    this.ccDropdownOpen = true;
+    this.onCcSearchChange();
+  }
+
+  onCcSearchChange() {
+    const q = this.ccSearchQuery?.toLowerCase()?.trim();
+    this.ccFilteredEmails = (q
+      ? this.allProfileEmails.filter(e => e.toLowerCase().includes(q))
+      : [...this.allProfileEmails]
+    ).filter(e => !this.ccSelectedChips.includes(e));
+  }
+
+  addCcEmail(email: string, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    if (!email || this.ccSelectedChips.includes(email)) return;
+    this.ccSelectedChips = [...this.ccSelectedChips, email];
+    this.ccSearchQuery = '';
+    this.ccDropdownOpen = false;
+    this.onCcSearchChange();
+  }
+
+  removeCcChip(email: string) {
+    this.ccSelectedChips = this.ccSelectedChips.filter(e => e !== email);
+    this.onCcSearchChange();
+  }
+
+  // BCC
+  onBccInputFocus(event: MouseEvent) {
+    event.stopPropagation();
+    this.ccDropdownOpen = false;
+    this.bccDropdownOpen = true;
+    this.onBccSearchChange();
+  }
+
+  onBccSearchChange() {
+    const q = this.bccSearchQuery?.toLowerCase()?.trim();
+    this.bccFilteredEmails = (q
+      ? this.allProfileEmails.filter(e => e.toLowerCase().includes(q))
+      : [...this.allProfileEmails]
+    ).filter(e => !this.bccSelectedChips.includes(e));
+  }
+
+  addBccEmail(email: string, event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    if (!email || this.bccSelectedChips.includes(email)) return;
+    this.bccSelectedChips = [...this.bccSelectedChips, email];
+    this.bccSearchQuery = '';
+    this.bccDropdownOpen = false;
+    this.onBccSearchChange();
+  }
+
+  removeBccChip(email: string) {
+    this.bccSelectedChips = this.bccSelectedChips.filter(e => e !== email);
+    this.onBccSearchChange();
   }
 
   // ─── Template/queued selection ───────────────────────────────────────────────
@@ -402,8 +494,8 @@ export class EmailInputComponent {
     this.initVariableConfigs(queuedEmail.body || '');
     this.showPreview = true;
     this.selectedTabIndex = 2;
-    this.ccRecipients = (queuedEmail.cc || '').split(',').map((e: string) => e.trim()).filter(Boolean).map((email: string) => ({ id: 'custom', name: email, email, avatar: null }));
-    this.bccRecipients = (queuedEmail.bcc || '').split(',').map((e: string) => e.trim()).filter(Boolean).map((email: string) => ({ id: 'custom', name: email, email, avatar: null }));
+    this.ccSelectedChips = (queuedEmail.cc || '').split(',').map((e: string) => e.trim()).filter(Boolean);
+    this.bccSelectedChips = (queuedEmail.bcc || '').split(',').map((e: string) => e.trim()).filter(Boolean);
   }
 
   onQueuedEmailSearch(): void {
@@ -669,8 +761,8 @@ export class EmailInputComponent {
       servername: this.selectedTemplate['servername'] || '',
       attachments: this.emailAttachments,
       postmarkAttachments: this.buildPostmarkAttachments(),
-      cc: this.ccRecipients.map(r => r.email).join(', '),
-      bcc: this.bccRecipients.map(r => r.email).join(', '),
+      cc: this.ccSelectedChips.join(', '),
+      bcc: this.bccSelectedChips.join(', '),
     });
   }
 
@@ -1008,5 +1100,10 @@ export class EmailInputComponent {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  closeCcBccDropdowns(): void {
+    this.ccDropdownOpen = false;
+    this.bccDropdownOpen = false;
   }
 }
