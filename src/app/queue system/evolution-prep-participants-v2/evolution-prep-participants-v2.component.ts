@@ -1064,7 +1064,12 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (this.isBusy(r)) return 'transcribing…';
     if (this.studio(r).some((p) => this.pairingStatus(p) === 'failed')) return 'retry the recording';
     if (this.offLineageOnly(r)) return 'session exists off-lineage — link the token';
-    if (this.noSession(r)) return r.crossed ? 'no studio session logged — cannot fix here' : 'not in studio yet';
+    if (this.noSession(r)) {
+      if (!r.crossed) return 'not in studio yet';
+      return (r.genDocId && r.genIn === 'this')
+        ? 'no studio session logged — attach an offline recording'
+        : 'no studio session logged — no ATC doc here yet, cannot attach';
+    }
     if (this.supersededOnly(r)) return 're-attach to current session';
     if (!this.hasTranscript(r)) return 'attach a Dropbox recording';
     if (r.genIn === 'ancestor') return `ATC doc is in ${r.genInQueueName || 'the queue they came from'}`;
@@ -1111,6 +1116,17 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
   }
 
   /**
+   * A Dropbox FOLDER share link (scl/fo/... or legacy sh/...), as opposed to a
+   * link to one file (scl/fi/... or legacy s/...). The dl=1 rewrite only makes
+   * a single file directly downloadable — pointed at a folder it 404s at the
+   * transcription worker, wasting a RunPod job (seen live: job ef16f1fe-...
+   * failed on exactly this, 2026-07-23).
+   */
+  private isDropboxFolderLink(u: string): boolean {
+    return /\/(scl\/fo|sh)\//i.test(u);
+  }
+
+  /**
    * Write the pasted Dropbox URL onto the live-assignment doc resolved for ONE
    * studio pairing.
    *
@@ -1130,6 +1146,12 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     if (!pasted) { this.snackbar.open('Paste a Dropbox link first', 'Close', { duration: 3000 }); return; }
     if (!this.looksLikeDropbox(pasted)) {
       this.snackbar.open('That does not look like a Dropbox URL', 'Close', { duration: 5000 });
+      return;
+    }
+    if (this.isDropboxFolderLink(pasted)) {
+      this.snackbar.open(
+        'That’s a Dropbox FOLDER link — open it and copy the link to the specific recording FILE instead',
+        'Close', { duration: 7000 });
       return;
     }
     const url = this.normalizeDropboxUrl(pasted);
@@ -1158,6 +1180,76 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     } catch (e: any) {
       console.error('saveLink failed', e);
       this.snackbar.open(`Save failed: ${e?.message ?? e}`, 'Close', { duration: 5000 });
+    } finally {
+      p.saving = false;
+    }
+  }
+
+  /**
+   * Attach a Dropbox recording for a studio pairing that has NO session logged
+   * at all (`noSession(row)` — no `queue stage log` "instudio" entry anywhere
+   * on the lineage), because the session happened OFFLINE and was never run
+   * through Zoom. `saveLink()` cannot handle this case: it writes onto an
+   * EXISTING live-assignment doc found by the chain walk (`p.targetLaId`),
+   * and there is none here to write onto.
+   *
+   * Goes through the `attachOfflineStudioSession` callable rather than a
+   * direct Firestore write, for two reasons: (1) it must CREATE a new `live
+   * assignment` doc, which this screen has no client-side write path for, and
+   * (2) it also records a durable pointer on the gen doc
+   * (`offlineStudioOverride.<stage>`) that `regenerateAtcDoc` consults as a
+   * fallback — without it, the very next `regenerateAtcDoc` call (this one
+   * included, via the `hasTranscript` auto-rebuild below) would just re-hit
+   * NO_STUDIO_SESSION and stay dataincomplete forever.
+   *
+   * Once the callable returns, a synthetic hit is pushed into `p.hits` so this
+   * pairing flows through the EXACT SAME status/watch/auto-rebuild machinery
+   * as a normal attach from here on — no separate offline-specific polling.
+   */
+  async attachOffline(row: Row, p: PairingView): Promise<void> {
+    const pasted = (p.dropboxLink ?? '').trim();
+    if (!pasted) { this.snackbar.open('Paste a Dropbox link first', 'Close', { duration: 3000 }); return; }
+    if (!this.looksLikeDropbox(pasted)) {
+      this.snackbar.open('That does not look like a Dropbox URL', 'Close', { duration: 5000 });
+      return;
+    }
+    if (this.isDropboxFolderLink(pasted)) {
+      this.snackbar.open(
+        'That’s a Dropbox FOLDER link — open it and copy the link to the specific recording FILE instead',
+        'Close', { duration: 7000 });
+      return;
+    }
+    if (!row.genDocId || row.genIn !== 'this') {
+      this.snackbar.open(
+        row.genDocId
+          ? `ATC doc belongs to ${row.genInQueueName || 'another queue'} — attach it from there`
+          : 'No ATC generation doc exists for this participant yet — cannot attach',
+        'Close', { duration: 6000 });
+      return;
+    }
+    if (!confirm(
+      `${row.profile_name}'s ${p.stage} session has no studio-session log — confirm it happened OFFLINE ` +
+      `and this Dropbox link is a recording of it. This bypasses the normal session log.`)) return;
+
+    p.saving = true;
+    try {
+      const res = await this.atcSvc.attachOfflineStudioSession({
+        docid: row.genDocId, stage: p.stage, dropboxLink: pasted, profileName: row.profile_name,
+      });
+      const data: any = res?.data;
+      const url = this.normalizeDropboxUrl(pasted);
+      const hit: LiveAssignmentHit = {
+        laId: data.liveassignmentid, queueId: row.queueId, level: 0, primary: true,
+        exists: true, hasTranscript: false, status: 'queued', dropboxlink: url,
+      };
+      p.hits = [hit, ...p.hits];
+      p.targetLaId = hit.laId;
+      p.dropboxLink = url;
+      this.snackbar.open(`Submitted — transcribing ${row.profile_name} (offline session)`, 'Close', { duration: 4000 });
+      this.watch(row, p);
+    } catch (e: any) {
+      console.error('attachOffline failed', e);
+      this.snackbar.open(`Attach failed: ${e?.message ?? e}`, 'Close', { duration: 6000 });
     } finally {
       p.saving = false;
     }
