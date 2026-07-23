@@ -136,8 +136,8 @@ input,select{font:inherit}
 .sec-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .footnote{padding:12px 22px 0;font-size:11.5px;color:var(--z-400);}
 
-/* ---- overview 3-col ---- */
-.ov-grid{display:grid;grid-template-columns:0.85fr 1.55fr 0.95fr;gap:16px;margin-top:22px}
+/* ---- overview: ATC + Adjustments (Participants moved to its own full-width row) ---- */
+.ov-grid{display:grid;grid-template-columns:0.85fr 1.55fr;gap:16px;margin-top:22px}
 .ov-grid>.card{min-width:0}
 .panel-body{padding:16px 22px 20px}
 
@@ -159,6 +159,12 @@ input,select{font:inherit}
 .atc-label{color:var(--z-700)}
 .atc-val{margin-left:auto;font-family:var(--mono);font-weight:600;font-size:13px}
 .sq{width:9px;height:9px;border-radius:2.5px;flex:none}
+.atc-draft{
+  display:flex;align-items:center;gap:9px;padding:9px 2px 0;margin-top:8px;
+  border-top:1px solid var(--z-200);cursor:pointer;
+}
+.atc-draft:hover .atc-label{color:var(--accent)}
+.atc-draft .atc-val{color:var(--accent)}
 
 /* adjustments & procedures */
 .ap-block{padding:2px 0 10px}
@@ -167,16 +173,13 @@ input,select{font:inherit}
 .ap-total{margin-left:auto;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
 .ap-total small{font-size:11px;color:var(--z-400);font-weight:500;margin-left:3px}
 .ap-bar{display:flex;height:26px;border-radius:var(--r-xs);overflow:hidden;margin-top:8px;gap:2px;}
-.ap-bar .done{
-  background:var(--z-900);color:#fff;display:flex;align-items:center;padding:0 10px;
-  font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;
-}
-.ap-bar .pend{
-  background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn);
-  display:flex;align-items:center;justify-content:flex-end;padding:0 10px;
-  font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer;
-}
-.ap-sub{margin-top:5px;font-family:var(--mono);font-size:10.5px;color:var(--warn);letter-spacing:.03em}
+/* fills are purely proportional now — labels moved below so a 1%-done segment
+   reads as a 1% sliver instead of being inflated to fit its text (was misleading) */
+.ap-bar .done{background:var(--z-900);min-width:0}
+.ap-bar .pend{background:var(--warn-soft);border:1px solid var(--warn-line);min-width:0}
+.ap-sub{margin-top:6px;display:flex;gap:6px 14px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;letter-spacing:.03em}
+.ap-sub .ap-done-txt{color:var(--z-700)}
+.ap-sub .ap-pend-txt{color:var(--warn)}
 .ap-cols{display:grid;grid-template-columns:1.1fr 1fr;gap:20px}
 .ap-cols>div{min-width:0}
 .ap-right{border-left:1px dashed var(--z-200);padding-left:20px;display:flex;flex-direction:column;}
@@ -216,7 +219,31 @@ input,select{font:inherit}
 .live-banner .lb-num{margin-left:auto;font-family:var(--mono);font-size:16px;font-weight:700}
 
 /* participants matrix */
-.pt-table{width:100%;border-collapse:collapse;margin-top:4px}
+.pt-wrap{overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--z-300) transparent}
+.pt-wrap::-webkit-scrollbar{height:8px}
+.pt-wrap::-webkit-scrollbar-thumb{background:var(--z-300);border-radius:4px}
+.pt-table{width:100%;min-width:max-content;border-collapse:collapse;margin-top:4px}
+.pt-table th,.pt-table td{white-space:nowrap}
+.pt-table tr.no-journey-row td:first-child{color:var(--z-500);font-style:italic}
+.pt-nojourney{cursor:pointer;color:var(--z-600)}
+.pt-nojourney:hover{color:var(--accent)}
+/* journey grouping (mirrors product-funnel) */
+.jgroup-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 22px 2px}
+.jgroup-hint{font-size:11px;color:var(--z-500);flex:1 1 100%}
+.jgroup-input{font-size:12.5px;padding:6px 10px;border:1px solid var(--z-200);border-radius:var(--r-xs);background:var(--z-50);outline:none;min-width:160px}
+.jgroup-input:focus{border-color:var(--accent);background:var(--z-0)}
+.jgroup-apply,.jgroup-ungroup{font-size:12px;font-weight:600;padding:6px 12px;border-radius:var(--r-pill);border:1px solid var(--z-200);cursor:pointer}
+.jgroup-apply{background:var(--accent);border-color:var(--accent);color:#fff}
+.jgroup-ungroup{background:var(--alert-soft);border-color:var(--alert-line);color:var(--alert)}
+.jgroup-apply:disabled,.jgroup-ungroup:disabled{opacity:.4;cursor:default}
+.jgroup-existing{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.jgroup-existing-lab{font-size:11px;color:var(--z-500)}
+.jgroup-chip{font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r-pill);padding:3px 9px;cursor:pointer}
+.jgroup-chip:hover{filter:brightness(.97)}
+.jcol-head{display:inline-flex;align-items:center;gap:5px;cursor:pointer;justify-content:flex-end}
+.jcol-head input{cursor:pointer}
+.jcol-tag{font-family:var(--font);font-size:8.5px;font-weight:600;letter-spacing:.04em;text-transform:none;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:1px 5px}
+.pt-table th.jcol-group span{color:var(--accent)}
 .pt-table th{
   font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;
   text-transform:uppercase;color:var(--z-500);padding:8px 10px;text-align:right;
@@ -560,6 +587,9 @@ input,select{font:inherit}
   border-radius:var(--r-md);padding:10px;display:flex;flex-direction:column;min-height:230px;
   min-width:0;
 }
+/* Followup column headers ("Not doing changework", "Changework not received")
+   must show in full, not ellipsize inside the narrow column. */
+.fu-col .tag-col-name{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25}
 .fu-eyebrow{
   font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
   color:var(--z-500);padding:2px 2px 8px;

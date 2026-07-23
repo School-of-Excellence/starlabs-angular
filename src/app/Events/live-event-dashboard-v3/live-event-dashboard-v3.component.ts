@@ -62,7 +62,7 @@ interface TicketFeedEntry {
  * Video Ask Tags, Arena Followup, Backend view, Zones view.
  */
 
-interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; }
+interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; pctOp: '>=' | '<=' | '<'; pctVal: number; }
 
 @Component({
   selector: 'app-live-event-dashboard-v3',
@@ -102,6 +102,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       // Keep the service's first-timer set (used by procedure scope filter) in sync
       // with seam 3 so "First timers" resolves against the same registered universe.
       this.data.setFirstTimerIds(this.data.eventParticipantProfileIds.filter(id => this.isFirstTimer(id)));
+      // reload per-event journey grouping when the event changes
+      this.loadJourneyGroupsIfEventChanged();
       // Drop optimistic call statuses that the live log has now confirmed, and
       // refresh the cached call rows — only while the backend view is showing.
       this.reconcileCallOptimistic();
@@ -260,6 +262,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.openPanel(this.atcMeta[i].label, this.data.selectedEvent?.['name'] || '', this.atcBucketIds(i));
   }
 
+  // ATC in draft (V2 subscribeToDraftAtc) — unique participants with a temporary_ATC
+  // draft in scope. Not part of the 4-bucket partition; shown as a separate row.
+  get atcDraftCount(): number { return this.data.draftAtcProfileIds.length; }
+  openAtcDraft(): void { this.openPanel('ATC in draft', this.data.selectedEvent?.['name'] || '', this.data.draftAtcProfileIds); }
+
   // ==========================================================================
   // Adjustments & Procedures (apBody)
   // ==========================================================================
@@ -285,17 +292,29 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const parts = this.data.eventParticipantProfileIds.map(id => this.data.buildParticipantFromProfileId(id, false));
     const ratios = parts.map(p => ({ p, r: this.participantCompletionRatio(p) })).filter(x => x.r !== null) as { p: PanelParticipant; r: number }[];
     const total = this.data.eventParticipantProfileIds.length;
-    const defs: { cls: string; label: string; test: (r: number) => boolean }[] = [
-      { cls: 'q100', label: '100%', test: r => r >= 1 },
-      { cls: 'q75', label: '75%+', test: r => r >= 0.75 },
-      { cls: 'q50', label: '50%+', test: r => r >= 0.5 },
-      { cls: 'q25', label: '25%+', test: r => r >= 0.25 },
-      { cls: 'q0', label: 'Below 25%', test: r => r < 0.25 }
+    // pctOp/pctVal mirror each tier onto the Participant Data "ATC %" filter
+    // (cumulative >= for the top tiers, < 25 for the bottom).
+    const defs: { cls: string; label: string; test: (r: number) => boolean; pctOp: '>=' | '<=' | '<'; pctVal: number }[] = [
+      { cls: 'q100', label: '100%', test: r => r >= 1, pctOp: '>=', pctVal: 100 },
+      { cls: 'q75', label: '75%+', test: r => r >= 0.75, pctOp: '>=', pctVal: 75 },
+      { cls: 'q50', label: '50%+', test: r => r >= 0.5, pctOp: '>=', pctVal: 50 },
+      { cls: 'q25', label: '25%+', test: r => r >= 0.25, pctOp: '>=', pctVal: 25 },
+      { cls: 'q0', label: 'Below 25%', test: r => r < 0.25, pctOp: '<', pctVal: 25 }
     ];
     return defs.map(d => {
       const list = ratios.filter(x => d.test(x.r));
-      return { cls: d.cls, label: d.label, count: list.length, width: total ? Math.round((list.length / total) * 100) : 0, profileIds: list.map(x => x.p.profileid) };
+      return { cls: d.cls, label: d.label, count: list.length, width: total ? Math.round((list.length / total) * 100) : 0, profileIds: list.map(x => x.p.profileid), pctOp: d.pctOp, pctVal: d.pctVal };
     });
+  }
+
+  /** Task 1 — click an ATC-completion tier → apply it to the Participant Data
+   *  "ATC %" filter, expand that table, and scroll it into view. */
+  applyPctFilter(qt: QuartileRow): void {
+    this.pdFilter.pctOp = qt.pctOp;
+    this.pdFilter.pctVal = qt.pctVal;
+    this.pdShown = 15;
+    this.pdOpen = true;
+    setTimeout(() => document.getElementById('pdCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   }
 
   // ==========================================================================
@@ -323,6 +342,101 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const ids = this.ptFilter(journeyId, ft).map(e => e.profileId);
     const jLabel = journeyId === 'all' ? '' : ' · ' + this.journeyLabel(journeyId);
     const t = (ft === true ? 'First timers' : ft === false ? 'Repeat participants' : 'All participants') + jLabel;
+    this.openPanel(t, this.data.selectedEvent?.['name'] || '', ids);
+  }
+
+  // Registered participants with NO recognized journey (no activejourney, or one
+  // absent from the journey collection) — so they never appear in a journey column.
+  // Surfaced as a "No journey" row so the matrix reconciles to participantTotal.
+  get noJourneyProfileIds(): string[] {
+    const inJourney = new Set<string>();
+    this.data.journeyCounts.forEach(j => j.profileIds.forEach(id => inJourney.add(id)));
+    return this.data.eventParticipantProfileIds.filter(id => !inJourney.has(id));
+  }
+  get noJourneyCount(): number { return this.noJourneyProfileIds.length; }
+  get hasNoJourney(): boolean { return this.noJourneyProfileIds.length > 0; }
+  openPtNoJourney(): void { this.openPanel('No journey', this.data.selectedEvent?.['name'] || '', this.noJourneyProfileIds); }
+  /** Grand-total cell → the full registered universe (journeyed + no-journey). */
+  openPtAll(): void { this.openPanel('All participants', this.data.selectedEvent?.['name'] || '', this.data.eventParticipantProfileIds); }
+
+  // ==========================================================================
+  // Journey grouping (mirrors product-funnel in event-participation-confirmations)
+  // Per-event, journeyId→group name in localStorage; same-named journeys collapse
+  // into one aggregated column. Edit mode lets the operator tick + name groups.
+  // ==========================================================================
+  journeyGroups: { [journeyId: string]: string } = {};
+  groupEditMode = false;
+  journeySel = new Set<string>();
+  groupNameInput = '';
+  private loadedGroupsFor: string | null = null;
+
+  private groupsKey(): string { return 'v3_journey_groups_' + (this.data.selectedEvent?.docref?.id || 'unknown'); }
+  /** Reload the per-event grouping when the selected event changes (cheap-guarded). */
+  loadJourneyGroupsIfEventChanged(): void {
+    const id = this.data.selectedEvent?.docref?.id || null;
+    if (id === this.loadedGroupsFor) { return; }
+    this.loadedGroupsFor = id;
+    this.journeyGroups = {};
+    if (typeof localStorage === 'undefined') { return; }
+    try { const raw = localStorage.getItem(this.groupsKey()); this.journeyGroups = raw ? (JSON.parse(raw) || {}) : {}; } catch { this.journeyGroups = {}; }
+  }
+  private saveJourneyGroups(): void {
+    if (typeof localStorage === 'undefined') { return; }
+    try { localStorage.setItem(this.groupsKey(), JSON.stringify(this.journeyGroups)); } catch { /* storage unavailable — grouping just won't persist */ }
+  }
+  toggleGroupEdit(): void { this.groupEditMode = !this.groupEditMode; this.journeySel.clear(); this.groupNameInput = ''; }
+  toggleJourneySel(journeyId: string): void { if (this.journeySel.has(journeyId)) { this.journeySel.delete(journeyId); } else { this.journeySel.add(journeyId); } }
+  isJourneySel(journeyId: string): boolean { return this.journeySel.has(journeyId); }
+  journeyGroupOf(journeyId: string): string { return this.journeyGroups[journeyId] || ''; }
+  get existingGroupNames(): string[] { return [...new Set(Object.values(this.journeyGroups).map(g => (g || '').trim()).filter(Boolean))].sort(); }
+  setGroupName(n: string): void { this.groupNameInput = n; }
+  /** Group the ticked journeys under the typed name (create or add-to-existing). */
+  groupSelected(): void {
+    const name = (this.groupNameInput || '').trim();
+    if (!name || !this.journeySel.size) { return; }
+    this.journeySel.forEach(id => { this.journeyGroups[id] = name; });
+    this.saveJourneyGroups();
+    this.journeySel.clear(); this.groupNameInput = '';
+  }
+  /** Remove the ticked journeys from whatever group they're in. */
+  ungroupSelected(): void {
+    if (!this.journeySel.size) { return; }
+    this.journeySel.forEach(id => { delete this.journeyGroups[id]; });
+    this.saveJourneyGroups();
+    this.journeySel.clear();
+  }
+
+  /** Columns for the matrix: grouped journeys collapse into one aggregated column;
+   *  in edit mode every journey shows individually (so it can be ticked/grouped). */
+  get journeyColumns(): { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] {
+    if (this.groupEditMode) {
+      return this.participantJourneys.map(j => ({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false }));
+    }
+    const countById: { [id: string]: number } = {};
+    this.participantJourneys.forEach(j => { countById[j.journeyId] = j.count; });
+    const groups = new Map<string, { key: string; label: string; journeyIds: string[]; isGroup: boolean }>();
+    const singles: { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] = [];
+    this.participantJourneys.forEach(j => {
+      const g = (this.journeyGroups[j.journeyId] || '').trim();
+      if (g) {
+        const key = 'grp:' + g;
+        const e = groups.get(key) || { key, label: g, journeyIds: [], isGroup: true };
+        e.journeyIds.push(j.journeyId);
+        groups.set(key, e);
+      } else {
+        singles.push({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false });
+      }
+    });
+    const total = (col: { journeyIds: string[] }) => col.journeyIds.reduce((s, id) => s + (countById[id] || 0), 0);
+    return [...groups.values(), ...singles].sort((a, b) => total(b) - total(a));
+  }
+  private ptFilterIds(journeyIds: string[], ft: boolean | null): { profileId: string; journeyId: string }[] {
+    return this.ptEntries().filter(e => journeyIds.includes(e.journeyId) && (ft === null || this.isFirstTimer(e.profileId) === ft));
+  }
+  colCount(col: { journeyIds: string[] }, ft: boolean | null): number { return this.ptFilterIds(col.journeyIds, ft).length; }
+  openPtCol(col: { label: string; journeyIds: string[] }, ft: boolean | null): void {
+    const ids = this.ptFilterIds(col.journeyIds, ft).map(e => e.profileId);
+    const t = (ft === true ? 'First timers' : ft === false ? 'Repeat participants' : 'All participants') + ' · ' + col.label;
     this.openPanel(t, this.data.selectedEvent?.['name'] || '', ids);
   }
 
@@ -420,7 +534,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   setProcDay(value: string): void { this.data.setProcedureDay(value); }
   get procScope(): 'all' | 'firstTimers' { return this.data.participantFilter; }
-  setProcScope(scope: 'all' | 'firstTimers'): void { this.data.setProcedureScope(scope); }
+  setProcScope(scope: 'all' | 'firstTimers'): void {
+    this.data.setProcedureScope(scope);
+    // Task 2 — mirror the procedure scope onto the Participant Data "Type" filter.
+    this.pdFilter.type = scope === 'firstTimers' ? 'ft' : 'all';
+    this.pdShown = 15;
+  }
   get procScopeAllCount(): number { return this.data.eventParticipantProfileIds.length; }
   get procScopeFtCount(): number { return this.data.eventParticipantProfileIds.filter(id => this.isFirstTimer(id)).length; }
 
@@ -532,19 +651,20 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // ==========================================================================
   private readonly tagPalette = ['var(--alert)', 'var(--warn)', 'var(--ok)', 'var(--accent)', 'var(--z-500)', '#c7366f', 'var(--ok-2)'];
 
-  /** CONFIRMED (C-7) — taxonomy = V2: classify/eventtags.videoasktags, loaded in
-   *  the service. Colors cycle a fixed palette (taxonomy is dynamic). */
+  /** CHANGED (operator) — taxonomy = V2 "participant tags" collection (docid→name),
+   *  loaded in the service. Colors cycle a fixed palette. */
   getTagTaxonomy(): { id: string; label: string; color: string }[] {
-    return this.data.videoAskTags.map((t, i) => ({ id: t, label: t, color: this.tagPalette[i % this.tagPalette.length] }));
+    return this.data.participantTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: this.tagPalette[i % this.tagPalette.length] }));
   }
 
-  /** CONFIRMED (C-7) — one tag per participant via TAXONOMY-ORDER PRIORITY. Source
-   *  is now the participantvideoask SUBMISSION tags (∩ taxonomy) — the SAME source
-   *  the backend review uses — so the two sections reconcile. */
+  /** CHANGED (operator) — one tag per participant from metadata `profiletags`
+   *  (V2's source), resolved against the participant-tags taxonomy by TAXONOMY-ORDER
+   *  PRIORITY (first taxonomy tag the participant carries). */
   getParticipantTag(profileId: string): string | null {
-    const tags = this.data.participantVideoAskTags[profileId] || [];
+    const meta = this.data.participantMetadataMap[profileId];
+    const tags: string[] = (meta && meta['profiletags']) || [];
     if (!tags.length) { return null; }
-    for (const t of this.data.videoAskTags) { if (tags.includes(t)) { return t; } }
+    for (const t of this.data.participantTags) { if (tags.includes(t['docid'])) { return t['docid']; } }
     return null;
   }
 
@@ -557,10 +677,35 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       const tag = this.getParticipantTag(pid);
       if (tag && byTag[tag]) { byTag[tag].push(pid); }
     });
-    return tax.filter(t => byTag[t.id].length > 0).map(t => ({ ...t, profileIds: byTag[t.id] }));
+    // Show every video-ask tag, including those with no participants (operator).
+    return tax.map(t => ({ ...t, profileIds: byTag[t.id] }));
   }
   openTag(g: { label: string; profileIds: string[] }): void {
     this.openPanel(`Tag · ${g.label}`, `${this.data.selectedEvent?.['name'] || ''} · daily Video Ask review`, g.profileIds);
+  }
+
+  // ==========================================================================
+  // A&H CRM — flag status (first-timers-dashboard "A&H CRM — flag status")
+  // participant tags (tagsfor 'live event') grouped by metadata `profiletags`.
+  // A participant appears under EVERY flag they carry (multi-tag, per first-timers).
+  // ==========================================================================
+  getCrmTaxonomy(): { id: string; label: string; color: string }[] {
+    return this.data.crmTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: this.tagPalette[i % this.tagPalette.length] }));
+  }
+  get crmGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
+    const tax = this.getCrmTaxonomy();
+    if (!tax.length) { return []; }
+    const byTag: { [id: string]: string[] } = {};
+    tax.forEach(t => { byTag[t.id] = []; });
+    this.data.eventParticipantProfileIds.forEach(pid => {
+      const meta = this.data.participantMetadataMap[pid];
+      const tags: string[] = (meta && meta['profiletags']) || [];
+      tax.forEach(t => { if (tags.includes(t.id)) { byTag[t.id].push(pid); } });
+    });
+    return tax.map(t => ({ ...t, profileIds: byTag[t.id] }));   // include empty flags
+  }
+  openCrm(g: { label: string; profileIds: string[] }): void {
+    this.openPanel(`Flag · ${g.label}`, `${this.data.selectedEvent?.['name'] || ''} · A&H CRM`, g.profileIds);
   }
   participantName(profileId: string): string { return this.data.participantMetadataMap[profileId]?.['name'] || this.data.registeredNames[profileId] || 'Unknown'; }
 
@@ -779,18 +924,26 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // staff names reused from event-zone-management; allocations + no-zone from V2,
   // all via LiveEventDataService. This view WRITES NOTHING (no toggle/allocation).
   // ==========================================================================
-  private get zoneToday(): DayAttendance | undefined { return this.data.dayWiseAttendance.find(d => d.isToday); }
-  /** Zones go live with the event — a "today" inside the event range. */
-  get zonesLive(): boolean { return !!this.zoneToday; }
+  /** Show the zones view whenever zones are configured for the event — NOT gated
+   *  on "today" being inside the event range (a live/open zone must still render
+   *  even when the event's day structure has no calendar-today). */
+  get zonesLive(): boolean { return this.data.eventZoneList.length > 0; }
   get zones(): any[] { return this.data.eventZoneList; }
   get zonesLiveCount(): number { return this.data.eventZoneList.filter(z => z['status'] === 'open').length; }
 
-  // present TODAY, scoped to the registered universe so the KPIs reconcile
-  // (present = allocated + no-zone). Walk-ins outside the universe are excluded.
+  // present TODAY = participants with a scan today (from mapAttendence), scoped to
+  // the registered universe. Derived straight from the scan log so it works even
+  // when dayWiseAttendance has no calendar-today entry. 0 if nobody scanned today.
   private get zonePresentIds(): string[] {
-    const t = this.zoneToday; if (!t) { return []; }
     const uni = new Set(this.data.eventParticipantProfileIds);
-    return t.presentProfileIds.filter(id => uni.has(id));
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    return Object.keys(this.data.mapAttendence).filter(id => {
+      if (!uni.has(id)) { return false; }
+      return (this.data.mapAttendence[id] || []).some(r => {
+        const ld = r['logdate']?.toDate ? r['logdate'].toDate() : new Date(r['logdate']);
+        return ld.toLocaleDateString('en-CA') === todayStr;
+      });
+    });
   }
   get zonePresentCount(): number { return this.zonePresentIds.length; }
   private get zoneAllocatedIds(): string[] { return this.zonePresentIds.filter(id => this.data.zoneParticipantIds.has(id)); }
@@ -798,6 +951,22 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get zoneAllocatedCount(): number { return this.zoneAllocatedIds.length; }
   get zoneUnassignedCount(): number { return this.zoneUnassignedIds.length; }
   get zoneCoveragePct(): number { const p = this.zonePresentIds.length; return p ? Math.round((this.zoneAllocatedIds.length / p) * 100) : 0; }
+
+  // No cohort (Zone Configuration basis) — registered participants who are in NO
+  // "big cohorts" participantidlist. Scoped to the whole event universe (a roster
+  // attribute, independent of today's attendance), not present-today.
+  private get cohortMemberSet(): Set<string> {
+    const s = new Set<string>();
+    Object.keys(this.data.mapCohortParticipants).forEach(cid =>
+      (this.data.mapCohortParticipants[cid] || []).forEach(id => s.add(id)));
+    return s;
+  }
+  private get zoneNoCohortIds(): string[] {
+    const members = this.cohortMemberSet;
+    return this.data.eventParticipantProfileIds.filter(id => !members.has(id));
+  }
+  get zoneNoCohortCount(): number { return this.zoneNoCohortIds.length; }
+  openZoneNoCohort(): void { this.openZoneList('No cohort', this.data.selectedEvent?.['name'] || '', this.zoneNoCohortIds, id => this.zoneNameOf(id) || 'no zone'); }
 
   zoneIsLive(zone: any): boolean { return zone['status'] === 'open'; }
   zoneCoordinators(zone: any): string { return this.staffNames(zone['coordinators']); }
