@@ -332,11 +332,13 @@ export class FormtemplateComponent {
         if(['video'].includes(form.type)){
           let url = form.options[0];
           url += (url.includes('?')?'&':'?') + 'ngsw-bypass';
+          url = this.sanitizer.bypassSecurityTrustResourceUrl(url);
           form.options = [url]
         }
         return form
       })
       // console.log('modified : ',this.submittedClientForm)
+
     })
   }
   // url + (url.includes('?')?'&':'?') + 'ngsw-bypass';
