@@ -27,11 +27,11 @@
       <div class="summary-group">
         <div class="summary-group-title">Venue Fee</div>
         <div class="summary-pair">
-          <button type="button" class="summary-card paid" [class.active]="cardFilter === 'venue_paid'" (click)="toggleCard('venue_paid')">
+          <button type="button" class="summary-card paid" [class.active]="activeCards.venue === 'venue_paid'" (click)="toggleCard('venue_paid')">
             <span class="summary-count">{{summary.venuePaid}}</span>
             <span class="summary-label">Paid</span>
           </button>
-          <button type="button" class="summary-card unpaid" [class.active]="cardFilter === 'venue_notpaid'" (click)="toggleCard('venue_notpaid')">
+          <button type="button" class="summary-card unpaid" [class.active]="activeCards.venue === 'venue_notpaid'" (click)="toggleCard('venue_notpaid')">
             <span class="summary-count">{{summary.venueNotPaid}}</span>
             <span class="summary-label">Not Paid</span>
           </button>
@@ -40,11 +40,11 @@
       <div class="summary-group">
         <div class="summary-group-title">Contract</div>
         <div class="summary-pair">
-          <button type="button" class="summary-card paid" [class.active]="cardFilter === 'contract_signed'" (click)="toggleCard('contract_signed')">
+          <button type="button" class="summary-card paid" [class.active]="activeCards.contract === 'contract_signed'" (click)="toggleCard('contract_signed')">
             <span class="summary-count">{{summary.contractSigned}}</span>
             <span class="summary-label">Signed</span>
           </button>
-          <button type="button" class="summary-card unpaid" [class.active]="cardFilter === 'contract_notsigned'" (click)="toggleCard('contract_notsigned')">
+          <button type="button" class="summary-card unpaid" [class.active]="activeCards.contract === 'contract_notsigned'" (click)="toggleCard('contract_notsigned')">
             <span class="summary-count">{{summary.contractNotSigned}}</span>
             <span class="summary-label">Not Signed</span>
           </button>
@@ -53,11 +53,11 @@
       <div class="summary-group">
         <div class="summary-group-title">E-Ticket</div>
         <div class="summary-pair">
-          <button type="button" class="summary-card paid" [class.active]="cardFilter === 'eticket_approved'" (click)="toggleCard('eticket_approved')">
+          <button type="button" class="summary-card paid" [class.active]="activeCards.eticket === 'eticket_approved'" (click)="toggleCard('eticket_approved')">
             <span class="summary-count">{{summary.eticketApproved}}</span>
             <span class="summary-label">Approved</span>
           </button>
-          <button type="button" class="summary-card unpaid" [class.active]="cardFilter === 'eticket_notapproved'" (click)="toggleCard('eticket_notapproved')">
+          <button type="button" class="summary-card unpaid" [class.active]="activeCards.eticket === 'eticket_notapproved'" (click)="toggleCard('eticket_notapproved')">
             <span class="summary-count">{{summary.eticketNotApproved}}</span>
             <span class="summary-label">Not Approved</span>
           </button>
@@ -68,6 +68,62 @@
       <mat-label>Filter</mat-label>
       <input matInput (keyup)="applyFilter($event)" placeholder="Ex....." #input>
     </mat-form-field> -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="d-flex align-items-center">
+        <span *ngIf="selection.selected.length != 0">{{selectedParticipantCount}} participant(s) can be approved.</span>&nbsp;&nbsp;
+        <button *ngIf="selection.selected.length != 0" mat-raised-button color="primary" type="button" [disabled]="approving" (click)="bulkApprove()">
+            {{approving ? 'Approving...' : 'Approve (' + selectedParticipantCount + ') Participants'}}
+        </button>
+      </div>
+      <div class="d-flex align-items-center">
+        <button mat-mini-fab type="button" matTooltip="Download Sample Excel" (click)="downloadSampleExcel()">
+          <mat-icon>download</mat-icon>
+        </button>&nbsp;&nbsp;
+        <button mat-stroked-button color="primary" type="button" [disabled]="importing" (click)="importParticipant()">
+          {{importing ? 'Importing...' : 'Import Participants'}}
+        </button>
+      </div>
+    </div>
+    <ng-template #importSummaryDialog>
+      <h2 mat-dialog-title style="margin-bottom:0;">Import Summary</h2>
+      <p style="font-size:13px;color:rgba(0,0,0,0.6);margin:4px 24px 0;">
+        {{importSelectedParticipants.length + notFoundParticipants.length + notEligibleParticipants.length}} row(s) processed from your file.
+      </p>
+      <mat-dialog-content>
+        <div *ngIf="importSelectedParticipants.length != 0" class="import-status-band" style="background:#e8f5e9;">
+          <mat-icon style="color:#2e7d32;">check_circle</mat-icon>
+          <span style="flex:1;color:#2e7d32;font-weight:500;">{{importSelectedParticipants.length}} participant(s) selected</span>
+        </div>
+        <div *ngIf="importSelectedParticipants.length != 0" class="import-status-list">
+          <div *ngFor="let p of importSelectedParticipants.slice(0,5)">{{p.name}}</div>
+          <div *ngIf="importSelectedParticipants.length > 5" style="color:rgba(0,0,0,0.4);">+ {{importSelectedParticipants.length - 5}} more</div>
+        </div>
+
+        <div *ngIf="notEligibleParticipants.length != 0" class="import-status-band" style="background:#fff8e1;">
+          <mat-icon style="color:#f9a825;">warning</mat-icon>
+          <span style="flex:1;color:#f9a825;font-weight:500;">{{notEligibleParticipants.length}} matched but not eligible for approval</span>
+        </div>
+        <div *ngIf="notEligibleParticipants.length != 0" class="import-status-list">
+          <div *ngFor="let p of notEligibleParticipants.slice(0,5)">{{p.name}}</div>
+          <div *ngIf="notEligibleParticipants.length > 5" style="color:rgba(0,0,0,0.4);">+ {{notEligibleParticipants.length - 5}} more</div>
+        </div>
+
+        <div *ngIf="notFoundParticipants.length != 0" class="import-status-band" style="background:#ffebee;">
+          <mat-icon style="color:#c62828;">person_search</mat-icon>
+          <span style="flex:1;color:#c62828;font-weight:500;">{{notFoundParticipants.length}} not found in this event</span>
+        </div>
+        <div *ngIf="notFoundParticipants.length != 0" class="import-status-list">
+          <div *ngFor="let p of notFoundParticipants.slice(0,5)">{{p.name || p.email}}</div>
+          <div *ngIf="notFoundParticipants.length > 5" style="color:rgba(0,0,0,0.4);">+ {{notFoundParticipants.length - 5}} more</div>
+        </div>
+      </mat-dialog-content>
+      <mat-dialog-actions align="end">
+        <button mat-stroked-button mat-dialog-close (click)="dismissImportPanel()">Close</button>
+        <button *ngIf="selection.selected.length != 0" mat-flat-button color="primary" mat-dialog-close [disabled]="approving" (click)="dismissImportPanel(); bulkApprove()">
+          {{approving ? 'Approving...' : 'Approve (' + selectedParticipantCount + ') Participants'}}
+        </button>
+      </mat-dialog-actions>
+    </ng-template>
     <h5>Filter By :-</h5>&nbsp;&nbsp;&nbsp;&nbsp;
     <mat-form-field class="w-25" appearance="outline">
       <mat-label> Profile </mat-label>
@@ -86,8 +142,31 @@
         <mat-icon>close</mat-icon>
       </button>
     </mat-form-field>
+    &nbsp;&nbsp;
+    <mat-form-field class="w-25" appearance="outline">
+      <mat-label> Product </mat-label>
+      <mat-select [(ngModel)]="filterForm.productids" (selectionChange)="onFilter()" multiple>
+        <mat-option>
+          <ngx-mat-select-search [(ngModel)]="filterProductText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+        </mat-option>
+        <mat-option *ngFor="let option of filterProduct()" [value]="option.id">{{option['product']}}</mat-option>
+      </mat-select>
+      <button *ngIf="filterForm.productids.length" matSuffix mat-icon-button aria-label="Clear product filter" (click)="clearProductFilter($event)">
+        <mat-icon>close</mat-icon>
+      </button>
+    </mat-form-field>
     <div class="mat-elevation-z8">
       <table mat-table [dataSource]="dataSource" matSort matSortActive="profileid" matSortDirection="asc">
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef>Select</th>
+          <td mat-cell *matCellDef="let row">
+            <mat-checkbox
+              [disabled]="!isRowSelectable(row)"
+              [checked]="selection.isSelected(row)"
+              (change)="selection.toggle(row)">
+            </mat-checkbox>
+          </td>
+        </ng-container>
         <ng-container matColumnDef="profileid">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
           <td mat-cell *matCellDef="let row"> {{mapProfile[row.profileid]?.['name']}} </td>
@@ -118,8 +197,7 @@
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Action</th>
           <td mat-cell *matCellDef="let row" >
-            <button *ngIf="mapArenaETicket[row['profileid']] === undefined" mat-stroked-button type="button" [disabled]="!canApprove(row)" (click)="onSubmit(row)">Approve</button>
-            <span *ngIf="mapArenaETicket[row['profileid']] != undefined">Generated</span>&nbsp;&nbsp;
+          <button *ngIf="mapArenaETicket[row['profileid']] === undefined" mat-stroked-button type="button" [disabled]="!isProfileEligible(row['profileid'])" (click)="onSubmit(row)">Approve</button>            <span *ngIf="mapArenaETicket[row['profileid']] != undefined">Generated</span>&nbsp;&nbsp;
             <span *ngIf="mapArenaETicket[row['profileid']] != undefined">
               <span *ngIf="!mapArenaETicket[row['profileid']]['producteligible']?.includes(row['productref']?.id)">
                 <button mat-stroked-button type="button" (click)="onProductAppend(row)">Append Product</button>

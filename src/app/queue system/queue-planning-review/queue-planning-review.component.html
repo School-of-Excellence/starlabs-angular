@@ -1608,9 +1608,9 @@
             {{ (entry.log['createdon']?.toDate ? entry.log['createdon'].toDate() : entry.log['createdon']) | date:'dd MMM yyyy, HH:mm' }}
           </span>
         </div>
-        <div class="revert-history-entry-row" *ngIf="entry.type === 'reverted'">
+        <div class="revert-history-entry-row" *ngIf="entry.log['updatedby']">
           <mat-icon>admin_panel_settings</mat-icon>
-          <span><b>Reverted by:</b> {{ getProfileName(entry.log['revertedby']) }}</span>
+          <span><b>{{ entry.type === 'booked' ? 'Booked by:' : 'Reverted by:' }}</b> {{ getProfileName(entry.log['updatedby']) }}</span>
         </div>
       </div>
     </div>

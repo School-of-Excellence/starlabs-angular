@@ -5509,7 +5509,8 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
           stagename: stageName,
           segmentid: segmentId,
           variationid: variationId,
-          slotconfirmation: new Date().toISOString()
+          slotconfirmation: new Date().toISOString(),
+          updatedby: this.profileid
         };
 
         // Update selectedstageslot in queue_token
@@ -5683,7 +5684,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
           tokenid:    tokenId,
           queueid:    this.selectedQueue['docid'],
           type:       'reverted',
-          revertedby: this.profileid,
+          updatedby:  this.profileid,
           createdon:  Timestamp.fromDate(new Date())
         })
       ]);
@@ -5747,6 +5748,7 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
             stagename: stageName,
             type:      'booked',
             createdon: slot.slotconfirmation,
+            updatedby: slot.updatedby,
             segmentName: this.segmentList.find((s: any) => s.docid === slot.segmentid)?.segmentname || 'N/A'
           }
         });
