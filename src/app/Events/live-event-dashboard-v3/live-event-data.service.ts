@@ -107,6 +107,12 @@ export class LiveEventDataService implements OnDestroy {
   // ---- video ask (V2 subscribeToVideoAsk) -------------------------------------
   // Tag taxonomy (C-7 = V2): classify/eventtags.videoasktags (global, loaded once).
   videoAskTags: string[] = [];
+  // Participant-tag taxonomy (V2 "participant tags" collection): {docid, name, …}.
+  // Source for the Video Ask Tags section (grouped by metadata `profiletags`).
+  participantTags: any[] = [];
+  // A&H CRM flag-status tags — "participant tags" with tagsfor 'live event'
+  // (first-timers-dashboard source). Grouped by metadata `profiletags`.
+  crmTags: any[] = [];
   // participantvideoask submissions bucketed by uploaded date → submitter profileids.
   videoAskByDay: { [date: string]: string[] } = {};
   // same, but only TAGGED submissions (participantvideoask.tags ∩ taxonomy) — a
@@ -160,6 +166,13 @@ export class LiveEventDataService implements OnDestroy {
   atcToValidateProfileIds: string[] = [];
   atcBuckets: AtcBuckets = { full: 0, partial: 0, unvalidated: 0, none: 0, fullIds: [], partialIds: [], unvalidatedIds: [], noneIds: [] };
 
+  // ---- ATC in draft (V2 subscribeToDraftAtc) — temporary_ATC drafts -----------
+  // A "draft" = a temporary_ATC doc (delete==false) whose transcript[0] carries an
+  // adjustment and whose lastupdated falls in the queue range; counted as UNIQUE
+  // participants in the registered universe. Read from the firestore-atc DB.
+  draftAtcProfileIds: string[] = [];
+  draftAtcCount = 0;
+
   isLoading = true;
 
   private eventSub: Subscription | null = null;
@@ -173,6 +186,7 @@ export class LiveEventDataService implements OnDestroy {
   private videoAskSub: Subscription | null = null;
   private clientIssuesSub: Subscription | null = null;
   private callLogSub: Subscription | null = null;
+  private draftAtcSub: Subscription | null = null;
   private eventZonesSub: Subscription | null = null;
   private bigCohortsSub: Subscription | null = null;
   private participantZonesSub: Subscription | null = null;
@@ -210,6 +224,28 @@ export class LiveEventDataService implements OnDestroy {
       if (snap.exists()) { this.videoAskTags = snap.data()['videoasktags'] || []; }
     }).catch(err => console.error('Error loading classify/eventtags:', err));
     console.log('[v3][init] videoask tag taxonomy:', this.videoAskTags);
+
+    // participant-tag taxonomy — VIDEO-ASK tags only (videoask-display pattern):
+    // tagsfor array-contains 'video ask' AND isActive. docid→name; the Video Ask
+    // Tags section groups participants by their `profiletags`.
+    await getDocs(query(
+      collection(this.firestoreDefault, 'participant tags'),
+      where('tagsfor', 'array-contains', 'video ask'),
+      where('isActive', '==', true)
+    )).then(snap => {
+      this.participantTags = snap.docs.map(d => ({ docid: d.id, ...d.data() }));
+    }).catch(err => console.error('Error loading participant tags:', err));
+    console.log('[v3][init] video-ask participant tags:', this.participantTags.length);
+
+    // A&H CRM flag-status tags — "participant tags" with tagsfor 'live event'
+    // (first-timers-dashboard pattern). Grouped by participants' `profiletags`.
+    await getDocs(query(
+      collection(this.firestoreDefault, 'participant tags'),
+      where('tagsfor', 'array-contains', 'live event')
+    )).then(snap => {
+      this.crmTags = snap.docs.map(d => ({ docid: d.id, ...d.data() }));
+    }).catch(err => console.error('Error loading A&H CRM tags:', err));
+    console.log('[v3][init] A&H CRM flag tags:', this.crmTags.length);
 
     // participant metadata (V2 loadParticipantMetadata)
     await this.loadParticipantMetadata();
@@ -915,13 +951,47 @@ export class LiveEventDataService implements OnDestroy {
   private subscribeToArenaOverview(): void {
     this.liveChangeWorkData = [];
     this.liveChangeworkLiveData = [];
-    if (this.selectedQueues.length === 0 || !this.selectedEvent || this.atcModels.length === 0) return;
+    // atcModels no longer gates ATC — atc_alpha/atc_to_validate now scope by queueid.
+    if (this.selectedQueues.length === 0 || !this.selectedEvent) return;
     if (!this.filterStartDate || !this.filterEndDate) return;
     this.unsubscribeQueuePipeline();
     this.subscribeToAtcAlpha();
     this.subscribeToAtcToValidate();
+    this.subscribeToDraftAtc();
     this.subscribeToLiveChangeWork();
     this.subscribeToLiveChangeworkLive();
+  }
+
+  // V2 subscribeToDraftAtc — temporary_ATC drafts (delete==false) whose transcript[0]
+  // has an adjustment and whose lastupdated is within the queue range; scoped to the
+  // registered universe, counted as UNIQUE participants. Read from firestore-atc.
+  private subscribeToDraftAtc(): void {
+    if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
+    if (!this.selectedEvent || !this.queueRangeStartDate) { this.draftAtcProfileIds = []; this.draftAtcCount = 0; return; }
+    this.draftAtcSub = collectionData(query(
+      collection(this.firestoreATC, 'temporary_ATC'), where('delete', '==', false)
+    )).subscribe({
+      next: (docs: any[]) => {
+        const ids: string[] = [];
+        docs.forEach((d: any) => {
+          const transcript = d['transcript'] || [];
+          if (transcript.length > 0 && ![null, undefined, ''].includes(transcript[0]['adjustment'])) {
+            if (this.isDateInQueueRange(d['lastupdated'])) {
+              const profileId = d['profileid'] || '';
+              if (profileId && this.eventParticipantProfileIds.includes(profileId)) {
+                const lastUpdated = d['lastupdated']?.toDate ? d['lastupdated'].toDate() : new Date(d['lastupdated']);
+                if (this.queueRangeStartDate && lastUpdated >= this.queueRangeStartDate && !ids.includes(profileId)) { ids.push(profileId); }
+              }
+            }
+          }
+        });
+        this.draftAtcProfileIds = ids;
+        this.draftAtcCount = ids.length;
+        console.log('[v3][atc] temporary_ATC draft docs:', docs.length, '| draft participants (event):', ids.length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to temporary_ATC drafts:', error)
+    });
   }
 
   // V2 isDateInQueueRange
@@ -931,20 +1001,30 @@ export class LiveEventDataService implements OnDestroy {
     return prescDate >= this.queueRangeStartDate && prescDate <= this.queueRangeEndDate;
   }
 
+  // Selected queue doc ids (queue generation ids) — the value stamped on ATC docs
+  // as `queueid` (prescribe-atc). Basis for scoping ATC by the SELECTED QUEUE(S).
+  private selectedQueueIds(): string[] {
+    return this.selectedQueues.map(q => q.docref?.id).filter((id): id is string => !!id);
+  }
+
   // atc_to_validate half → atcToValidateProfileIds.
   // Query from V2 (product in atcModels). Unvalidated = any atc_to_validate doc
   // whose status is NOT 'validated' (operator-confirmed): the collection holds many
   // statuses, and only 'validated' ones are done — everything else is still pending.
   private subscribeToAtcToValidate(): void {
     if (this.atcToValidateSub) { this.atcToValidateSub.unsubscribe(); this.atcToValidateSub = null; }
+    const queueIds = this.selectedQueueIds();
+    if (queueIds.length === 0) { this.atcToValidateProfileIds = []; this.recomputeAtcBuckets(); return; }
+    // CHANGED (operator): scope by the SELECTED QUEUE ID(s) — atc_to_validate.queueid
+    // — instead of product-in-atcModels + queue date range.
     this.atcToValidateSub = collectionData(query(
-      collection(this.firestoreATC, 'atc_to_validate'), where('product', 'in', this.atcModels)
+      collection(this.firestoreATC, 'atc_to_validate'), where('queueid', 'in', queueIds)
     )).subscribe({
       next: (docs: any[]) => {
         const ids: string[] = [];
         let pendingDocs = 0;
         docs.forEach((d: any) => {
-          if (d['status'] !== 'validated' && this.isDateInQueueRange(d['prescription_date'])) {
+          if (d['status'] !== 'validated') {
             pendingDocs++;
             const profileId = d['profileid'] || '';
             if (profileId && this.eventParticipantProfileIds.includes(profileId) && !ids.includes(profileId)) { ids.push(profileId); }
@@ -990,21 +1070,23 @@ export class LiveEventDataService implements OnDestroy {
 
   // FT subscribeToAtcAlpha (adjustments sums added from V1, applied to the same docs)
   private subscribeToAtcAlpha(): void {
+    const queueIds = this.selectedQueueIds();
+    if (queueIds.length === 0) { return; }
+    // CHANGED (operator): scope ATC by the SELECTED QUEUE ID(s) — atc_alpha.queueid —
+    // instead of product-in-atcModels + queue date range. queueid is stamped on
+    // submit (prescribe-atc) and is the read pattern eit-education-atc uses. isdelete
+    // and latest-doc-per-profile are applied client-side to keep the query index-light.
     const atcQuery = query(collection(this.firestoreATC, 'atc_alpha'),
-      where('product', 'in', this.atcModels),
-      where('isdelete', '==', false),
-      where('prescription_date', '>=', this.queueRangeStartDate),
-      where('prescription_date', '<=', this.queueRangeEndDate),
-      orderBy('prescription_date', 'desc'));
+      where('queueid', 'in', queueIds));
     this.atcSub = collectionData(atcQuery).subscribe({
       next: (docs: any[]) => {
-        this.atcDocs = docs;
+        this.atcDocs = docs.filter((d: any) => d['isdelete'] !== true);
         this.profileAtcMap = {};
-        docs.forEach((d: any) => {
+        this.atcDocs.forEach((d: any) => {
           const profileId: string = d['profileid'] || '';
           if (!profileId || !this.eventParticipantProfileIds.includes(profileId)) return;
           const prescriptionDate = d['prescription_date']?.toDate ? d['prescription_date'].toDate() : new Date(d['prescription_date']);
-          if (!this.profileAtcMap[profileId]) { this.profileAtcMap[profileId] = { ...d, _date: prescriptionDate }; }
+          if (!this.profileAtcMap[profileId] || prescriptionDate > this.profileAtcMap[profileId]._date) { this.profileAtcMap[profileId] = { ...d, _date: prescriptionDate }; }
         });
         this.beneficierProfileIds = [];
         Object.keys(this.profileAtcMap).forEach(profileId => {
@@ -1414,6 +1496,8 @@ export class LiveEventDataService implements OnDestroy {
     this.profileAtcMap = {};
     this.atcToValidateProfileIds = [];
     this.atcBuckets = { full: 0, partial: 0, unvalidated: 0, none: 0, fullIds: [], partialIds: [], unvalidatedIds: [], noneIds: [] };
+    this.draftAtcProfileIds = [];
+    this.draftAtcCount = 0;
     this.liveChangeWorkData = [];
     this.liveChangeworkLiveData = [];
     this.liveChangeworkTotal = 0;
@@ -1429,6 +1513,7 @@ export class LiveEventDataService implements OnDestroy {
   private unsubscribeQueuePipeline(): void {
     if (this.atcSub) { this.atcSub.unsubscribe(); this.atcSub = null; }
     if (this.atcToValidateSub) { this.atcToValidateSub.unsubscribe(); this.atcToValidateSub = null; }
+    if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
     if (this.lcwSub) { this.lcwSub.unsubscribe(); this.lcwSub = null; }
     if (this.lcwLiveSub) { this.lcwLiveSub.unsubscribe(); this.lcwLiveSub = null; }
   }
