@@ -274,6 +274,7 @@ export class DeliveryDashboardCloneComponent {
         ],
         'EI Custom Solutions': [
             'EI Solution',
+            'EI Custom Solutions',
             'EI Solution for Wife',
             'EI Solution for Husband',
             'EI for Entrepreneurs',
