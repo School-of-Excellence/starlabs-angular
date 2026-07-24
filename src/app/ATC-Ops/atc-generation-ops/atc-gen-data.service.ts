@@ -7,6 +7,7 @@ import {
   getDocs,
   limit,
   onSnapshot,
+  orderBy,
   query,
   Timestamp,
   updateDoc,
@@ -60,6 +61,16 @@ export class AtcGenDataService {
     } catch {
       return {};
     }
+  }
+
+  /**
+   * Live `procedures.name` values (default DB) — the real-name side of the
+   * pseudo-code → real-name resolution used for adjustment procedures in the
+   * ATC preview (see `resolveProcedurePseudonym`).
+   */
+  async loadProcedureNames(): Promise<string[]> {
+    const snap = await getDocs(query(collection(this.firestore, 'procedures'), orderBy('name')));
+    return snap.docs.map((d) => (d.data() as any)?.name).filter((n) => !!n);
   }
 
   /**

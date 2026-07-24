@@ -412,6 +412,30 @@
                 </a>
               </div>
 
+              <!-- No session logged anywhere on the lineage (studio session happened
+                   OFFLINE, no Zoom) — attachOffline() creates the live-assignment doc
+                   AND the gen-doc override pointer; saveLink() above can't, since it
+                   only writes onto an already-discovered target. -->
+              <div class="link-cell offline-cell"
+                   *ngIf="!row.walking && !row.walkError && !p.hits.length && !p.offLineage.length && row.genDocId && row.genIn === 'this'">
+                <input class="link-input" type="url" placeholder="Offline session — paste Dropbox link…"
+                       [(ngModel)]="p.dropboxLink"
+                       [disabled]="p.saving"
+                       (keyup.enter)="attachOffline(row, p)">
+                <button mat-icon-button class="link-save-btn"
+                        matTooltip="No studio-session log exists — confirm this was an OFFLINE session and attach the recording directly"
+                        [disabled]="p.saving"
+                        (click)="attachOffline(row, p)">
+                  <mat-spinner *ngIf="p.saving" diameter="16" strokeWidth="2"></mat-spinner>
+                  <mat-icon *ngIf="!p.saving">cloud_upload</mat-icon>
+                </button>
+              </div>
+              <div class="offline-hint"
+                   *ngIf="!row.walking && !row.walkError && !p.hits.length && !p.offLineage.length && (!row.genDocId || row.genIn !== 'this')"
+                   [matTooltip]="row.genDocId ? ('ATC doc belongs to ' + (row.genInQueueName || 'another queue') + ' — attach it from there') : 'No ATC generation doc exists here yet for this participant'">
+                no ATC doc here — cannot attach offline recording
+              </div>
+
               <div class="trail" *ngIf="!row.walking && p.trail.length"
                    matTooltip="queue[stage-type-at-that-level]:sessions found, nearest level first">
                 {{ p.trail.join('  →  ') }}

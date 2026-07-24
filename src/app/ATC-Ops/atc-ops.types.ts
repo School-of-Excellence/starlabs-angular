@@ -193,6 +193,30 @@ export interface RebuildOk {
   promptChars: number;
 }
 
+/**
+ * attachOfflineStudioSession({docid, stage, dropboxLink, profileName?}) — for a
+ * stage with NO queue-stage-log "instudio" entry at all (the session happened
+ * OFFLINE, no Zoom). Creates a `live assignment` doc carrying dropboxLink
+ * (fires the deployed seLiveTranscribeSubmit pipeline, same WhisperX/RunPod
+ * path as the normal paste-a-link flow) and records a durable pointer
+ * (`offlineStudioOverride.<stage>`) on the gen doc. regenerateAtcDoc then
+ * resolves that stage from the pointer whenever the real queue-stage-log path
+ * is still empty — a genuine queue-stage-log entry, if one later appears,
+ * always takes precedence.
+ */
+export interface AttachOfflineReq {
+  docid: string;
+  stage: string;
+  dropboxLink: string;
+  profileName?: string;
+}
+export interface AttachOfflineOk {
+  ok: true;
+  liveassignmentid: string;
+  stage: string;
+  profileName: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Usage / monitoring rollup docs (default DB: scope_enhancement_atc_usage_*)
 // ---------------------------------------------------------------------------
