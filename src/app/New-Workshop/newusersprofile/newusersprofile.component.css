@@ -721,6 +721,20 @@
   line-height: 18px;
 }
 
+/* toolbar tags manager button */
+.tags-manage-btn {
+  height: 44px;
+  border-radius: 10px;
+  font-weight: 600;
+  color: #4f46e5;
+  white-space: nowrap;
+}
+
+.tags-manage-btn mat-icon {
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
 .no-match-cell {
   padding: 28px 14px;
   text-align: center;
