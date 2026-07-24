@@ -87,6 +87,11 @@
         </mat-form-field>
       </div>
 
+      <button mat-stroked-button class="tags-manage-btn" (click)="openTagsManager()">
+        <mat-icon>sell</mat-icon>
+        Tags
+      </button>
+
       <button mat-button type="button" class="clear-filters-btn" *ngIf="hasAnyFilter"
         (click)="clearAllFilters()" matTooltip="Clear all filters">
         <mat-icon>filter_alt_off</mat-icon>

@@ -227,6 +227,7 @@ input,select{font:inherit}
 .pt-table tr.no-journey-row td:first-child{color:var(--z-500);font-style:italic}
 .pt-nojourney{cursor:pointer;color:var(--z-600)}
 .pt-nojourney:hover{color:var(--accent)}
+.pt-grp{color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r-pill);padding:2px 9px}
 /* journey grouping (mirrors product-funnel) */
 .jgroup-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 22px 2px}
 .jgroup-hint{font-size:11px;color:var(--z-500);flex:1 1 100%}
@@ -244,6 +245,8 @@ input,select{font:inherit}
 .jcol-head input{cursor:pointer}
 .jcol-tag{font-family:var(--font);font-size:8.5px;font-weight:600;letter-spacing:.04em;text-transform:none;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:1px 5px}
 .pt-table th.jcol-group span{color:var(--accent)}
+.jcol-total{font-family:var(--mono);font-weight:700;color:var(--accent);letter-spacing:0}
+.jgroup-seltotal{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--accent)}
 .pt-table th{
   font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;
   text-transform:uppercase;color:var(--z-500);padding:8px 10px;text-align:right;
