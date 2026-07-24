@@ -287,6 +287,8 @@ mat-paginator { flex: 0 0 auto; border-top: 1px solid #e2e8f0; }
 .adj-r > span { flex: 1 1 auto; color: #334155; }
 .tag { display: inline-block; background: #f1f5f9; color: #475569; border-radius: 6px; padding: 1px 8px; font-size: 11px; margin: 0 4px 4px 0; }
 .tag.purple { background: #f5f3ff; color: #6d28d9; }
+.tag-real { color: #0f766e; font-style: italic; margin-left: 4px; }
+.tag-unmapped { color: #b45309; font-style: normal; }
 .er { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; background: #fcfdff; }
 .er-r { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12.5px; }
 .er-r > label { flex: 0 0 130px; color: #94a3b8; font-size: 11.5px; }
