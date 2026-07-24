@@ -2,12 +2,16 @@
   <div class="tags-head">
     <div class="tags-head-text">
       <div class="avatar">
-        <mat-icon *ngIf="mode === 'bulk'">sell</mat-icon>
+        <mat-icon *ngIf="mode !== 'single'">sell</mat-icon>
         <ng-container *ngIf="mode === 'single'">{{ (userName || 'U').charAt(0) | uppercase }}</ng-container>
       </div>
       <div>
-        <h2>{{ mode === 'bulk' ? 'Manage Tags' : 'Assign Tags' }}</h2>
-        <p>{{ mode === 'bulk' ? (bulkCount + ' user' + (bulkCount === 1 ? '' : 's') + ' selected') : userName }}</p>
+        <h2>{{ mode === 'single' ? 'Assign Tags' : (mode === 'bulk' ? 'Manage Tags' : 'Tags') }}</h2>
+        <p>
+          {{ mode === 'single' ? userName
+             : (mode === 'bulk' ? (bulkCount + ' user' + (bulkCount === 1 ? '' : 's') + ' selected')
+             : 'Create tags & copy segments') }}
+        </p>
       </div>
     </div>
     <button mat-icon-button type="button" (click)="cancel()" aria-label="Close">
@@ -20,43 +24,112 @@
       <mat-spinner diameter="30"></mat-spinner>
     </div>
 
-    <ng-container *ngIf="!loading">
-      <div class="search-box">
-        <mat-icon>search</mat-icon>
-        <input [(ngModel)]="search" placeholder="Search or create a tag…"
-          (keyup.enter)="canCreate() && createTag()" />
-        <button *ngIf="search" class="clear-search" type="button" (click)="search = ''" aria-label="Clear">
-          <mat-icon>close</mat-icon>
-        </button>
-      </div>
+    <mat-tab-group *ngIf="!loading" class="tags-tabs" [(selectedIndex)]="activeTab" animationDuration="150ms">
 
-      <button class="create-chip" type="button" *ngIf="canCreate()" (click)="createTag()" [disabled]="isCreating">
-        <mat-icon>add</mat-icon>
-        <span>Create <strong>"{{ search.trim() }}"</strong></span>
-        <mat-spinner *ngIf="isCreating" diameter="16"></mat-spinner>
-      </button>
+      <!-- ===== Tab 1: Assign ===== -->
+      <mat-tab label="Assign">
+        <div class="tab-pane">
+          <div class="search-box">
+            <mat-icon>search</mat-icon>
+            <input [(ngModel)]="search" placeholder="Search or create a tag…"
+              (keyup.enter)="canCreate() && createTag()" />
+            <button *ngIf="search" class="clear-search" type="button" (click)="search = ''" aria-label="Clear">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
 
-      <div class="section-label" *ngIf="filteredTags().length > 0">
-        Tags <span class="muted">· tap to {{ selected.size ? 'toggle' : 'add' }}</span>
-      </div>
+          <button class="create-chip" type="button" *ngIf="canCreate()" (click)="createTag()" [disabled]="isCreating">
+            <mat-icon>add</mat-icon>
+            <span>Create <strong>"{{ search.trim() }}"</strong></span>
+            <mat-spinner *ngIf="isCreating" diameter="16"></mat-spinner>
+          </button>
 
-      <div class="chip-cloud">
-        <button type="button" class="chip" *ngFor="let t of filteredTags()"
-          [class.selected]="isSelected(t.id)" (click)="toggle(t.id)">
-          <mat-icon class="chip-ic">{{ isSelected(t.id) ? 'check' : 'add' }}</mat-icon>
-          <span class="chip-name">{{ t.name }}</span>
-        </button>
-      </div>
+          <div class="section-label" *ngIf="filteredTags().length > 0">
+            Tags <span class="muted" *ngIf="mode !== 'manage'">· tap to {{ selected.size ? 'toggle' : 'add' }}</span>
+            <span class="muted" *ngIf="mode === 'manage'">· existing tags</span>
+          </div>
 
-      <div class="cloud-empty" *ngIf="filteredTags().length === 0 && !canCreate()">
-        <mat-icon>sell</mat-icon>
-        <p>No tags yet — type a name above to create your first one.</p>
-      </div>
-    </ng-container>
+          <div class="chip-cloud">
+            <button type="button" class="chip" *ngFor="let t of filteredTags()"
+              [class.selected]="isSelected(t.id)" (click)="toggle(t.id)">
+              <mat-icon class="chip-ic">{{ isSelected(t.id) ? 'check' : 'add' }}</mat-icon>
+              <span class="chip-name">{{ t.name }}</span>
+            </button>
+          </div>
+
+          <div class="cloud-empty" *ngIf="filteredTags().length === 0 && !canCreate()">
+            <mat-icon>sell</mat-icon>
+            <p>No tags yet — type a name above to create your first one.</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- ===== Tab 2: All Tags / Copy segment ===== -->
+      <mat-tab label="All Tags">
+        <div class="tab-pane">
+          <div class="segment-hint">
+            <mat-icon>link</mat-icon>
+            <div class="hint-body">
+              <span class="hint-title">Segment link example</span>
+              <code class="hint-url">{{ segmentHint }}</code>
+            </div>
+          </div>
+
+          <div class="segment-toolbar">
+            <span class="seg-count">{{ copySelection.selected.length }} selected</span>
+            <button mat-flat-button color="primary" type="button" (click)="copySelectedSegments()"
+              [disabled]="copySelection.selected.length === 0">
+              <mat-icon>content_copy</mat-icon> Copy selected segment
+            </button>
+          </div>
+
+          <div class="segment-table-wrap">
+            <table mat-table [dataSource]="tags" class="segment-table">
+              <ng-container matColumnDef="select">
+                <th mat-header-cell *matHeaderCellDef class="seg-select-col">
+                  <mat-checkbox (change)="masterToggleTags()" [checked]="isAllTagsSelected()"
+                    [indeterminate]="someTagsSelected()"></mat-checkbox>
+                </th>
+                <td mat-cell *matCellDef="let t" class="seg-select-col">
+                  <mat-checkbox (change)="copySelection.toggle(t.id)"
+                    [checked]="copySelection.isSelected(t.id)"></mat-checkbox>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef>Tag</th>
+                <td mat-cell *matCellDef="let t"><span class="seg-name">{{ t.name }}</span></td>
+              </ng-container>
+
+              <ng-container matColumnDef="id">
+                <th mat-header-cell *matHeaderCellDef>Segment ID</th>
+                <td mat-cell *matCellDef="let t"><code class="id-code">{{ t.id }}</code></td>
+              </ng-container>
+
+              <ng-container matColumnDef="copy">
+                <th mat-header-cell *matHeaderCellDef class="seg-copy-col">Copy Segment</th>
+                <td mat-cell *matCellDef="let t" class="seg-copy-col">
+                  <button mat-icon-button type="button" class="seg-copy-btn" (click)="copySegment(t.id)"
+                    matTooltip="Copy ?segment={{ t.id }}">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="segmentColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: segmentColumns"></tr>
+            </table>
+
+            <div class="seg-empty" *ngIf="tags.length === 0">No tags available.</div>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
   </mat-dialog-content>
 
-  <mat-dialog-actions class="tags-actions">
-    <span class="count" *ngIf="!loading">
+  <!-- Assign footer (tab 1, when assigning to user(s)) -->
+  <mat-dialog-actions class="tags-actions" *ngIf="showAssignFooter">
+    <span class="count">
       <mat-icon>sell</mat-icon>{{ selected.size }} selected
     </span>
     <span class="spacer"></span>
@@ -65,5 +138,11 @@
       <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
       <span *ngIf="!isSaving">{{ mode === 'bulk' ? 'Apply' : 'Save' }}</span>
     </button>
+  </mat-dialog-actions>
+
+  <!-- Close footer (All Tags tab, or manage mode) -->
+  <mat-dialog-actions class="tags-actions" *ngIf="showCloseFooter">
+    <span class="spacer"></span>
+    <button mat-stroked-button type="button" (click)="cancel()">Close</button>
   </mat-dialog-actions>
 </div>
