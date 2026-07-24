@@ -5513,10 +5513,25 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
           updatedby: this.profileid
         };
 
-        // Update selectedstageslot in queue_token
-        await updateDoc(tokenRef, {
-          [`selectedstageslot.${stageName}`]: slotData
-        });
+        const logRef = doc(collection(this.firestore, 'queue_slot_log'));
+        await Promise.all([
+          updateDoc(tokenRef, {
+            [`selectedstageslot.${stageName}`]: slotData
+          }),
+          setDoc(logRef, {
+            docid:       logRef.id,
+            ...selectedSlot,
+            profileid:   profileId,
+            tokenid:     tokenId,
+            queueid:     this.selectedQueue['docid'],
+            stagename:   stageName,
+            segmentid:   segmentId,
+            variationid: variationId,
+            type:        'confirmed',
+            updatedby:   this.profileid,
+            createdon:   Timestamp.fromDate(new Date())
+          })
+        ]);
 
         const tokenIndex = this.queueTokenList.findIndex(t => t.tokenid === tokenId || t.id === tokenId);
         if (tokenIndex !== -1) {
@@ -5727,35 +5742,22 @@ getConfirmedCountForSlot(slot: MergedSlot, stage: string): number {
       where('queueid', '==', this.selectedQueue['docid']),
       orderBy('createdon', 'desc')
     ));
-    const revertedEntries = snap.docs.map(d => ({
-      profileId: d.data()['profileid'],
-      stageName: d.data()['stagename'],
-      type:      'reverted',
-      log:       d.data()
-    }));
-    const bookedEntries: any[] = [];
-    (this.queueTokenList || []).forEach((t: any) => {
-      const pid = t.profile_id || t.profileid;
-      Object.entries(t.selectedstageslot || {}).forEach(([stageName, slot]: [string, any]) => {
-        if (!slot.slotconfirmation) return;
-        bookedEntries.push({
-          profileId: pid,
-          stageName,
-          type:      'booked',
-          log: {
-            ...slot,
-            profileid: pid,
-            stagename: stageName,
-            type:      'booked',
-            createdon: slot.slotconfirmation,
-            updatedby: slot.updatedby,
-            segmentName: this.segmentList.find((s: any) => s.docid === slot.segmentid)?.segmentname || 'N/A'
-          }
-        });
-      });
+
+    this.revertHistoryAllEntries = snap.docs.map(d => {
+      const data = d.data();
+      const entryType = data['type'] === 'confirmed' ? 'booked' : 'reverted';
+
+      return {
+        profileId: data['profileid'],
+        stageName: data['stagename'],
+        type:      entryType,
+        log: {
+          ...data,
+          segmentName: this.getSegmentName(data['segmentid'])
+        }
+      };
     });
 
-    this.revertHistoryAllEntries = [...revertedEntries, ...bookedEntries];
     this.revertHistoryLoading = false;
     this.filterRevertHistory();
   }
