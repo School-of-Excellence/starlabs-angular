@@ -1,0 +1,814 @@
+<!--
+  live-event-dashboard-v3 — Phase 1 (shell + Frontend Row 1).
+  Structure mirrors live-event-dashboard.html from `.ongoing` downward.
+  The prototype `.top` app-chrome header is intentionally NOT ported (rule 4);
+  the app renders its own global nav outside this component.
+-->
+<div class="app">
+
+  <!-- ================= EVENT + QUEUE SELECTORS (FT-style, v3-styled) ================= -->
+  <div class="selectors">
+    <!-- Event (single-select) -->
+    <div class="event-select" (click)="$event.stopPropagation()">
+      <span class="es-label">Event</span>
+      <div class="es-box">
+        <button class="es-trigger" [class.open]="eventDropdownOpen" (click)="toggleEventDropdown()">
+          <span class="dot live" *ngIf="data.selectedEvent && isOngoingEvent(data.selectedEvent)"></span>
+          <span class="es-name">{{ data.selectedEvent?.['name'] || 'Select event…' }}</span>
+          <span class="es-arrow" [class.open]="eventDropdownOpen">&#9662;</span>
+        </button>
+        <div class="es-dropdown" *ngIf="eventDropdownOpen">
+          <input class="es-search" type="text" [(ngModel)]="eventSearch" placeholder="Search events…" autocomplete="off">
+          <div class="es-section" *ngIf="data.ongoingEvents.length && !eventSearch">
+            <div class="es-section-h"><span class="dot live"></span>Ongoing</div>
+            <button class="es-item" *ngFor="let e of data.ongoingEvents" [class.on]="isActiveEvent(e)" (click)="pickEvent(e)">
+              <span class="es-item-name">{{ e.name }}</span>
+            </button>
+          </div>
+          <div class="es-section">
+            <div class="es-section-h">{{ eventSearch ? 'Results (' + filteredEvents.length + ')' : 'All events' }}</div>
+            <div class="es-items">
+              <button class="es-item" *ngFor="let e of filteredEvents" [class.on]="isActiveEvent(e)" (click)="pickEvent(e)">
+                <span class="dot" [style.background]="isOngoingEvent(e) ? 'var(--live)' : 'var(--z-300)'"></span>
+                <span class="es-item-name">{{ e.name }}</span>
+              </button>
+            </div>
+            <div class="es-empty" *ngIf="!filteredEvents.length">No events found</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue (multi-select) -->
+    <div class="event-select" (click)="$event.stopPropagation()">
+      <span class="es-label">Queue</span>
+      <div class="es-box">
+        <button class="es-trigger" [class.open]="queueDropdownOpen" (click)="toggleQueueDropdown()">
+          <span class="es-name">{{ selectedQueueLabel }}</span>
+          <span class="es-arrow" [class.open]="queueDropdownOpen">&#9662;</span>
+        </button>
+        <div class="es-dropdown" *ngIf="queueDropdownOpen">
+          <input class="es-search" type="text" [(ngModel)]="queueSearch" placeholder="Search queues…" autocomplete="off">
+          <div class="es-section" *ngIf="data.ongoingQueues.length && !queueSearch">
+            <div class="es-section-h"><span class="dot" style="background:var(--ok)"></span>Ongoing</div>
+            <button class="es-item" *ngFor="let q of data.ongoingQueues" [class.on]="isActiveQueue(q)" (click)="pickQueue(q)">
+              <span class="es-check">{{ isActiveQueue(q) ? '✓' : '' }}</span>
+              <span class="es-item-name">{{ queueName(q) }}</span>
+            </button>
+          </div>
+          <div class="es-section">
+            <div class="es-section-h">{{ queueSearch ? 'Results (' + filteredQueues.length + ')' : 'All queues' }}</div>
+            <div class="es-items">
+              <button class="es-item" *ngFor="let q of filteredQueues" [class.on]="isActiveQueue(q)" (click)="pickQueue(q)">
+                <span class="es-check">{{ isActiveQueue(q) ? '✓' : '' }}</span>
+                <span class="es-item-name">{{ queueName(q) }}</span>
+              </button>
+            </div>
+            <div class="es-empty" *ngIf="!filteredQueues.length">No queues found</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ONGOING STRIP ================= -->
+  <div class="ongoing">
+    <div class="ongoing-label">Ongoing ({{ ongoingCount }})</div>
+    <div class="chips" id="chips">
+      <button class="chip" *ngFor="let ev of data.ongoingEvents"
+              [class.active]="isActiveEvent(ev)" (click)="selectEventChip(ev)">
+        <span class="dot" style="background:var(--live)"></span>
+        <span class="chip-name">{{ ev.name }}</span>
+        <span class="chip-kind event">EVENT</span>
+        <span class="chip-count num">{{ isActiveEvent(ev) ? data.registeredCount : '' }}</span>
+      </button>
+      <button class="chip" *ngFor="let q of data.ongoingQueues"
+              [class.active]="isActiveQueue(q)" (click)="toggleQueueChip(q)">
+        <span class="dot" style="background:var(--ok)"></span>
+        <span class="chip-name">{{ q.name || q['queuename'] }}</span>
+        <span class="chip-kind queue">QUEUE</span>
+        <!-- per-queue count MISSING in Phase 0 → intentionally blank -->
+        <span class="chip-count num"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= HERO + TABS ================= -->
+  <div class="hero">
+    <div class="hero-num num" id="heroNum" title="Approved &amp; attended participants" (click)="openHero()">{{ getHeroApprovedAttended() ?? '—' }}</div>
+    <div class="hero-label">Approved &amp; attended participants</div>
+    <div class="hero-right">
+      <div class="tabs" id="tabs">
+        <button class="tab" [class.active]="activeView === 'frontend'" (click)="setView('frontend')">Frontend Dashboard</button>
+        <button class="tab" [class.active]="activeView === 'backend'" (click)="setView('backend')">Backend Dashboard</button>
+        <button class="tab" [class.active]="activeView === 'zones'" (click)="setView('zones')">Zones
+          <span class="live-tag" *ngIf="zonesLiveCount > 0"><span class="dot live"></span>LIVE</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRONTEND VIEW ================= -->
+  <main class="view active" *ngIf="activeView === 'frontend'" id="view-frontend">
+
+    <!-- Row 1: ATC / Adjustments & Procedures / Participants -->
+    <div class="ov-grid">
+
+      <!-- ATC (SEAM 2 — getAtcBuckets) -->
+      <section class="card">
+        <div class="sec-head"><div class="sec-title">ATC</div></div>
+        <div class="panel-body">
+          <div class="atc-bar" id="atcBar">
+            <div class="seg" *ngFor="let m of atcMeta; let i = index"
+                 [style.flex]="atcBucketValue(i) + ' 0 0'" [style.background]="m.color"
+                 (click)="openAtcBucket(i)">{{ atcBucketValue(i) }}</div>
+          </div>
+          <div class="atc-legend" id="atcLegend">
+            <div class="atc-row" *ngFor="let m of atcMeta; let i = index" (click)="openAtcBucket(i)">
+              <span class="sq" [style.background]="m.color"></span>
+              <span class="atc-label">{{ m.label }}</span>
+              <span class="atc-val num">{{ atcBucketValue(i) }}</span>
+            </div>
+          </div>
+          <!-- ATC in draft (temporary_ATC) — separate from the 4-bucket partition -->
+          <div class="atc-draft" (click)="openAtcDraft()">
+            <span class="sq" style="background:var(--accent)"></span>
+            <span class="atc-label">ATC in draft &middot; not yet submitted</span>
+            <span class="atc-val num">{{ atcDraftCount }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Adjustments & Procedures -->
+      <section class="card">
+        <div class="sec-head"><div class="sec-title">Adjustments &amp; Procedures</div></div>
+        <div class="panel-body" id="apBody">
+          <div class="ap-cols">
+            <div class="ap-left">
+              <!-- Adjustments (V1 scalar-field sums) -->
+              <div class="ap-block">
+                <div class="ap-head"><span class="ap-name">Adjustments</span>
+                  <span class="ap-total num">{{ adjTotal | number }}<small>total</small></span></div>
+                <div class="ap-bar">
+                  <div class="done" [style.flex]="adjDone + ' 0 0'"></div>
+                  <div class="pend" [style.flex]="adjPending + ' 0 0'"></div>
+                </div>
+                <div class="ap-sub num">
+                  <span class="ap-done-txt">{{ adjDone | number }} done &middot; {{ adjPct }}%</span>
+                  <span class="ap-pend-txt">{{ adjPending | number }} pending &middot; {{ 100 - adjPct }}%</span>
+                </div>
+              </div>
+              <!-- Procedures (FT calculateProcedureData / overallProgressPct) -->
+              <div class="ap-block">
+                <div class="ap-head"><span class="ap-name">Procedures</span>
+                  <span class="ap-total num">{{ procTotal | number }}<small>total</small></span></div>
+                <div class="ap-bar">
+                  <div class="done" [style.flex]="procDone + ' 0 0'"></div>
+                  <div class="pend" [style.flex]="procPending + ' 0 0'"></div>
+                </div>
+                <div class="ap-sub num">
+                  <span class="ap-done-txt">{{ procDone | number }} done &middot; {{ procPct }}%</span>
+                  <span class="ap-pend-txt">{{ procPending | number }} pending &middot; {{ 100 - procPct }}%</span>
+                </div>
+              </div>
+              <!-- LIVE banner (FT liveChangeworkTotal + list) -->
+              <div class="live-banner" *ngIf="liveCount" (click)="openLive()">
+                <span class="dot live"></span>LIVE procedures in the Arena
+                <span class="lb-num num">{{ liveCount }}</span>
+              </div>
+            </div>
+            <!-- ATC completion quartiles (SEAM 5 — participantCompletionRatio) -->
+            <div class="ap-right">
+              <div class="ap-split-title">ATC completion per participant</div>
+              <div class="q-row" *ngFor="let qt of completionQuartiles" [ngClass]="qt.cls" (click)="applyPctFilter(qt)" title="Filter Participant Data by this ATC %">
+                <span class="q-label">{{ qt.label }}</span>
+                <div class="q-track"><i [style.width.%]="qt.width"></i></div>
+                <span class="q-count num">{{ qt.count }}</span>
+              </div>
+              <div class="q-foot">100–25%+ are cumulative &middot; Below 25% needs attention</div>
+            </div>
+          </div>
+        </div>
+        <div class="footnote" style="padding-top:0;padding-bottom:16px">
+          Work items generated from participants' ATCs &middot; click LIVE for who's running what, for whom
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Participants (full-width, above Daily Attendance) — journeys dynamic (C-5), first-timer via SEAM 3 -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">Participants</div>
+        <div class="sec-meta mono" id="ptTotalLabel">— {{ participantTotal | number }}</div>
+        <div class="sec-right">
+          <span class="att-range pt-nojourney pt-grp" *ngFor="let g of journeyGroupSummaries" (click)="openPtCol({ label: g.name, journeyIds: g.journeyIds }, null)">{{ g.name }} &middot; {{ g.count | number }}</span>
+          <span class="att-range pt-nojourney" *ngIf="hasNoJourney" (click)="openPtNoJourney()">No journey &middot; {{ noJourneyCount | number }}</span>
+          <button class="pf-chip" [class.on-blue]="groupEditMode" (click)="toggleGroupEdit()">{{ groupEditMode ? 'Done' : 'Group journeys' }}</button>
+        </div>
+      </div>
+
+      <!-- Group edit bar: tick journey columns below, name them, then Group -->
+      <div class="jgroup-bar" *ngIf="groupEditMode">
+        <span class="jgroup-hint">Tick journeys, type a group name, then Group. Grouped journeys collapse into one column.</span>
+        <input class="jgroup-input" type="text" [(ngModel)]="groupNameInput" placeholder="Group name…" list="jgroupNames" autocomplete="off">
+        <datalist id="jgroupNames"><option *ngFor="let n of existingGroupNames" [value]="n"></option></datalist>
+        <button class="jgroup-apply" [disabled]="!groupNameInput.trim() || !journeySel.size" (click)="groupSelected()">Group{{ journeySel.size ? ' (' + journeySel.size + ')' : '' }}</button>
+        <button class="jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
+        <span class="jgroup-seltotal" *ngIf="journeySel.size">{{ selectedJourneyTotal | number }} participants selected</span>
+        <span class="jgroup-existing" *ngIf="existingGroupNames.length">
+          <span class="jgroup-existing-lab">Groups:</span>
+          <button class="jgroup-chip" *ngFor="let n of existingGroupNames" (click)="setGroupName(n)">{{ n }}</button>
+        </span>
+      </div>
+
+      <div class="panel-body" style="padding-top:8px">
+        <div class="pt-wrap">
+          <table class="pt-table" id="ptTable">
+            <tr>
+              <th></th>
+              <th *ngFor="let col of journeyColumns" [class.jcol-group]="col.isGroup">
+                <label class="jcol-head" *ngIf="groupEditMode">
+                  <input type="checkbox" [checked]="isJourneySel(col.journeyIds[0])" (change)="toggleJourneySel(col.journeyIds[0])">
+                  <span>{{ col.label }}</span>
+                  <span class="jcol-tag" *ngIf="journeyGroupOf(col.journeyIds[0])">{{ journeyGroupOf(col.journeyIds[0]) }}</span>
+                </label>
+                <span *ngIf="!groupEditMode">{{ col.label }}<small class="jcol-total" *ngIf="col.isGroup"> &middot; {{ colCount(col, null) | number }}</small></span>
+              </th>
+              <th>Total</th>
+            </tr>
+            <tr class="ft">
+              <td (click)="openPt('all', true)">First timer</td>
+              <td *ngFor="let col of journeyColumns" class="num" (click)="openPtCol(col, true)">{{ colCount(col, true) }}</td>
+              <td class="num tot" (click)="openPt('all', true)">{{ ptCount('all', true) }}</td>
+            </tr>
+            <tr>
+              <td (click)="openPt('all', false)">Repeat</td>
+              <td *ngFor="let col of journeyColumns" class="num" (click)="openPtCol(col, false)">{{ colCount(col, false) }}</td>
+              <td class="num tot" (click)="openPt('all', false)">{{ ptCount('all', false) }}</td>
+            </tr>
+            <!-- Registered but no recognized journey — kept so the matrix reconciles to Total -->
+            <tr class="no-journey-row" *ngIf="hasNoJourney">
+              <td (click)="openPtNoJourney()">No journey</td>
+              <td *ngFor="let col of journeyColumns" class="num pd-dim">&mdash;</td>
+              <td class="num tot" (click)="openPtNoJourney()">{{ noJourneyCount }}</td>
+            </tr>
+            <tr class="total-row">
+              <td (click)="openPtAll()">Total</td>
+              <td *ngFor="let col of journeyColumns" class="num" (click)="openPtCol(col, null)">{{ colCount(col, null) }}</td>
+              <td class="num tot" (click)="openPtAll()">{{ participantTotal }}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="footnote" style="padding-top:0;padding-bottom:16px">
+        First timer vs repeat, split by journey &middot; &ldquo;No journey&rdquo; = registered with no journey set &middot; click a cell for the list
+      </div>
+    </section>
+
+    <!-- Row 2: Daily Attendance (V2 dayWiseAttendance / subscribeToAttendance) -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">Daily Attendance</div>
+        <div class="sec-right">
+          <span class="att-range">{{ attRange }}</span>
+          <span class="att-track">
+            <i *ngFor="let d of attDays" [class.done]="d.isPast" [class.today]="d.isToday"></i>
+          </span>
+        </div>
+      </div>
+      <div class="att-grid" id="attGrid">
+        <!-- Total approved -->
+        <div class="day-card total" (click)="openAttTotal()">
+          <div class="day-eyebrow"><span>Total approved</span></div>
+          <div class="day-num num">{{ attTotalApproved | number }}</div>
+          <div class="day-sub" (click)="$event.stopPropagation(); openAttAbsentToday()"><span>Absent today</span><b class="num">{{ attAbsentToday }}</b></div>
+        </div>
+        <!-- day cards -->
+        <ng-container *ngFor="let d of attDays">
+          <div class="day-card upcoming" *ngIf="d.isFuture">
+            <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span></div>
+            <div class="day-line"></div>
+            <div class="day-sub">upcoming</div>
+          </div>
+          <div class="day-card" *ngIf="!d.isFuture" [class.today]="d.isToday" (click)="openAttDay(d)">
+            <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span>
+              <span class="delta" *ngIf="attendanceDelta(d) !== null"
+                    [class.up]="(attendanceDelta(d) || 0) > 0" [class.down]="(attendanceDelta(d) || 0) < 0" [class.flat]="attendanceDelta(d) === 0">
+                {{ (attendanceDelta(d) || 0) > 0 ? '+' : '' }}{{ attendanceDelta(d) }}
+              </span>
+            </div>
+            <div class="day-num num">{{ d.count }}</div>
+            <div class="day-bar" *ngIf="d.isToday && getVideoAskByDay(d) !== null"><i [style.width.%]="attTodayBarPct(d)"></i></div>
+            <div class="day-sub" (click)="$event.stopPropagation(); openAttVideo(d)"><span>Video Ask</span><span><b class="num">{{ getVideoAskByDay(d) ?? '—' }}</b></span></div>
+          </div>
+        </ng-container>
+        <!-- Never attended -->
+        <div class="day-card never" (click)="openAttNever()">
+          <div class="day-eyebrow"><span>Never attended</span></div>
+          <div class="day-num num">{{ attNeverAttended }}</div>
+          <div class="day-sub"><span>any day &middot; critical</span></div>
+        </div>
+      </div>
+      <div class="footnote" style="padding-top:0;padding-bottom:16px">
+        Video Ask = daily recordings vs that day's attendance &middot; click a card for attendance, the Video Ask row for recordings
+      </div>
+    </section>
+
+    <!-- Procedure Tracking (FT calculateProcedureData — registered universe) -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">Procedure Tracking</div>
+        <div class="sec-meta">{{ procMeta }}</div>
+        <div class="sec-right">
+          <span class="live-pill" (click)="openProcLive()"><span class="dot live"></span>{{ procLiveTotal }} LIVE</span>
+          <button class="collapse-btn" [class.closed]="!procOpen" (click)="toggleProc()" title="Collapse">&#9662;</button>
+        </div>
+      </div>
+      <div id="procBody" *ngIf="procOpen">
+        <div class="proc-filters">
+          <span class="pf-label">Day</span>
+          <div class="pf-group">
+            <button class="pf-chip" *ngFor="let c of procDayChips" [class.on]="c.active" (click)="setProcDay(c.value)">{{ c.label }}</button>
+          </div>
+          <div class="pf-sep"></div>
+          <span class="pf-label">Participants</span>
+          <div class="pf-group">
+            <button class="pf-chip" [class.on-blue]="procScope === 'all'" (click)="setProcScope('all')">Overall &middot; {{ procScopeAllCount | number }}</button>
+            <button class="pf-chip" [class.on-blue]="procScope === 'firstTimers'" (click)="setProcScope('firstTimers')">First Timers &middot; {{ procScopeFtCount | number }}</button>
+          </div>
+        </div>
+        <div class="proc-table">
+          <div class="proc-group-h">
+            <span></span>
+            <span class="proc-col-h">As Doer</span>
+            <span class="proc-col-h">As Beneficiary</span>
+            <span class="proc-col-h">Live Changework</span>
+          </div>
+          <div id="procRows">
+            <div class="proc-row" *ngFor="let id of procIds">
+              <div>
+                <div class="proc-name">{{ procName(id) }}</div>
+                <div class="proc-sub">Total opportunities: <b>{{ procOpp(id) | number }}</b><br>Completed: <b>{{ procCompleted(id) | number }}</b></div>
+              </div>
+              <div class="pcell ns" (click)="openProcCell(id, 'dns')"><div class="pv">{{ procDoerNotStarted(id) }}</div><div class="pl">Not started</div></div>
+              <div class="pcell done" (click)="openProcCell(id, 'dc')"><div class="pv">{{ procDoerCompleted(id) }}</div><div class="pl">Completed</div></div>
+              <div class="pcell ns" (click)="openProcCell(id, 'bns')"><div class="pv">{{ procBenNotStarted(id) }}</div><div class="pl">Not started</div></div>
+              <div class="pcell done" (click)="openProcCell(id, 'bc')"><div class="pv">{{ procBenCompleted(id) }}</div><div class="pl">Completed</div></div>
+              <div class="pcell plive" [class.none]="!procLive(id)" (click)="openProcCell(id, 'live')">
+                <div class="pv"><span class="dot live" *ngIf="procLive(id)"></span>{{ procLive(id) }}</div><div class="pl">Live</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Participant Data (V1 aggregateData + customfilter + exportCSV) -->
+    <section class="card section" id="pdCard">
+      <div class="sec-head">
+        <div class="sec-title">Participant Data</div>
+        <div class="sec-meta">filter, sort &amp; export &middot; every participant in scope</div>
+        <div class="sec-right">
+          <button class="pf-chip" (click)="pdExport()">Export CSV</button>
+          <button class="pf-chip" (click)="pdClear()">Clear filters</button>
+          <button class="collapse-btn" [class.closed]="!pdOpen" (click)="togglePd()" title="Expand">&#9662;</button>
+        </div>
+      </div>
+      <div id="pdBody" *ngIf="pdOpen">
+        <div class="pd-filters">
+          <input class="pd-in" type="text" [(ngModel)]="pdFilter.q" (ngModelChange)="pdOnFilterChange()" placeholder="Search participant…">
+          <!-- Journey filter commented out per request (pdFilter.journey stays 'all' → no journey filtering)
+          <span class="pd-lbl">Journey</span>
+          <select class="pd-sel" [(ngModel)]="pdFilter.journey" (ngModelChange)="pdOnFilterChange()">
+            <option value="all">All</option>
+            <option *ngFor="let j of participantJourneys" [value]="j.journeyId">{{ journeyLabel(j.journeyId) }}</option>
+          </select>
+          -->
+          <span class="pd-lbl">Type</span>
+          <select class="pd-sel" [(ngModel)]="pdFilter.type" (ngModelChange)="pdOnFilterChange()">
+            <option value="all">All</option>
+            <option value="ft">First timers</option>
+            <option value="rp">Repeat</option>
+          </select>
+          <span class="pd-lbl">ATC</span>
+          <select class="pd-sel" [(ngModel)]="pdFilter.atc" (ngModelChange)="pdOnFilterChange()">
+            <option value="all">All</option>
+            <option *ngFor="let l of atcShort; let i = index" [value]="i">{{ l }}</option>
+          </select>
+          <span class="pd-lbl">ATC %</span>
+          <select class="pd-sel" [(ngModel)]="pdFilter.pctOp" (ngModelChange)="pdOnFilterChange()">
+            <option value=">=">&ge;</option>
+            <option value="<=">&le;</option>
+            <option value="<">&lt;</option>
+          </select>
+          <input class="pd-in pd-num" type="number" min="0" max="100" [(ngModel)]="pdFilter.pctVal" (ngModelChange)="pdOnFilterChange()">
+          <span class="pd-lbl">Present on</span>
+          <select class="pd-sel" [(ngModel)]="pdFilter.presentOn" (ngModelChange)="pdOnFilterChange()">
+            <option value="any">Any day</option>
+            <option *ngFor="let d of pdDayOptions" [value]="d.date">D{{ d.day }}{{ d.isToday ? ' · Today' : '' }}</option>
+          </select>
+          <span class="pd-lbl">Absent on</span>
+          <select class="pd-sel" [(ngModel)]="pdFilter.absentOn" (ngModelChange)="pdOnFilterChange()">
+            <option value="any">Any day</option>
+            <option *ngFor="let d of pdDayOptions" [value]="d.date">D{{ d.day }}{{ d.isToday ? ' · Today' : '' }}</option>
+          </select>
+        </div>
+        <div class="pd-tablewrap">
+          <table class="pd-table" id="pdTable">
+            <tr>
+              <th *ngFor="let c of pdCols" [class.on]="pdSortK === c.k" (click)="pdSort(c.k)">{{ c.label }}<span *ngIf="pdSortK === c.k">{{ pdSortD > 0 ? ' ↑' : ' ↓' }}</span></th>
+              <th>Video Ask</th>
+            </tr>
+            <tr *ngFor="let r of pdVisibleRows" (click)="openPdRow(r)">
+              <td>
+                <div class="pd-name">{{ r.name }}</div>
+                <div class="pd-chips">
+                  <span class="j-badge">{{ journeyLabel(r.journeyId) }}</span>
+                  <span class="j-badge">{{ r.ft ? '1ST' : 'RPT' }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="atc-chip" [ngClass]="'a' + r.atcBucket" *ngIf="r.atcBucket >= 0">{{ pdAtcLabel(r.atcBucket) }}</span>
+                <span class="pd-dim" *ngIf="r.atcBucket < 0">—</span>
+              </td>
+              <td class="pd-pct num">{{ r.atcPct === null ? '—' : r.atcPct + '%' }}</td>
+              <td class="num">{{ r.adjDone }}</td>
+              <td class="num" [class.pd-dim]="!r.adjPending">{{ r.adjPending }}</td>
+              <td class="num">{{ r.procDone }}</td>
+              <td class="num" [class.pd-dim]="!r.procPending">{{ r.procPending }}</td>
+              <td class="num">{{ pdTotalDays ? r.attd + '/' + pdTotalDays : '—' }}</td>
+              <!-- Video Ask per participant: MISSING (per-day video-ask by person) → stub "—" -->
+              <td class="num pd-dim">—</td>
+            </tr>
+          </table>
+        </div>
+        <div class="pd-foot">
+          <span>{{ pdFilteredRows.length | number }} unique participants &middot; showing {{ pdVisibleRows.length }}</span>
+          <button class="more-link" style="margin-left:auto" *ngIf="pdFilteredRows.length > pdShown" (click)="pdMore()">Show more</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Video Ask Tags (SEAM C-7) + Arena Followup -->
+    <div class="bottom-grid">
+      <!-- Video Ask Tags — whole section fed by the two tag seams (empty until filled) -->
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Video Ask Tags</div>
+          <div class="sec-right"><span class="sec-meta">tagged by the daily Video Ask reviewer &middot; one tag per participant &middot; click a count for the list</span></div>
+        </div>
+        <div class="tag-scroll" id="tagScroll">
+          <div class="tag-col" *ngFor="let g of tagGroups">
+            <div class="tag-col-h">
+              <span class="dot" [style.background]="g.color"></span>
+              <span class="tag-col-name" [title]="g.label">{{ g.label }}</span>
+              <span class="tag-col-count num" (click)="openTag(g)">{{ g.profileIds.length }}</span>
+            </div>
+            <div class="name-pill" *ngFor="let pid of g.profileIds.slice(0, 5)" (click)="openTag(g)">{{ participantName(pid) }}</div>
+            <span class="more-link" *ngIf="g.profileIds.length > 5" (click)="openTag(g)">+{{ g.profileIds.length - 5 }} more</span>
+            <div class="fu-empty" *ngIf="!g.profileIds.length" style="padding:6px 2px">None</div>
+          </div>
+          <div class="fu-empty" style="padding:10px 0 18px" *ngIf="!tagGroups.length">No video ask tags.</div>
+        </div>
+      </section>
+
+      <!-- Arena Followup -->
+      <section class="card">
+        <div class="sec-head"><div class="sec-title">Arena Followup</div></div>
+        <div class="fu-grid" id="fuGrid">
+          <!-- Irregular (V2 calculateIrregularParticipants) — carries day + time controls -->
+          <div class="fu-col">
+            <div class="tag-col-h" style="border-bottom-color:var(--beige-line)">
+              <span class="dot" style="background:var(--alert)"></span>
+              <span class="tag-col-name">Irregular</span>
+              <span class="tag-col-count num" (click)="openFu('Irregular attendance', fuIrregular)">{{ fuIrregular.length }}</span>
+            </div>
+            <div class="fu-controls">
+              <select class="fu-select" [(ngModel)]="fuDay">
+                <option value="">Today</option>
+                <option *ngFor="let d of fuPastDays" [value]="d.date">D{{ d.day }}</option>
+              </select>
+              <input class="fu-time" type="time" [(ngModel)]="fuTime">
+            </div>
+            <ng-container *ngIf="fuIrregular.length; else irrEmpty">
+              <div class="name-pill" *ngFor="let pid of fuIrregular.slice(0, 6)" (click)="openFu('Irregular attendance', fuIrregular)">{{ participantName(pid) }}</div>
+              <span class="more-link" *ngIf="fuIrregular.length > 6" (click)="openFu('Irregular attendance', fuIrregular)">+{{ fuIrregular.length - 6 }} more</span>
+            </ng-container>
+            <ng-template #irrEmpty><div class="fu-empty">No irregular participants</div></ng-template>
+          </div>
+          <!-- Not Doing CW + CW Not Received (V2 changeWorkOverview) -->
+          <div class="fu-col" *ngFor="let c of fuCards">
+            <div class="tag-col-h" style="border-bottom-color:var(--beige-line)">
+              <span class="dot" [style.background]="c.color"></span>
+              <span class="tag-col-name">{{ c.label }}</span>
+              <span class="tag-col-count num" (click)="openFu(c.title, c.ids)">{{ c.ids.length }}</span>
+            </div>
+            <div class="fu-eyebrow">{{ c.eyebrow }}</div>
+            <ng-container *ngIf="c.ids.length; else fuEmpty">
+              <div class="name-pill" *ngFor="let pid of c.ids.slice(0, 6)" (click)="openFu(c.title, c.ids)">{{ participantName(pid) }}</div>
+              <span class="more-link" *ngIf="c.ids.length > 6" (click)="openFu(c.title, c.ids)">+{{ c.ids.length - 6 }} more</span>
+            </ng-container>
+            <ng-template #fuEmpty><div class="fu-empty">None</div></ng-template>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- A&H CRM — flag status (first-timers-dashboard; participant tags tagsfor 'live event') -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">A&amp;H CRM &mdash; flag status</div>
+        <div class="sec-right"><span class="sec-meta">participants by CRM flag &middot; click a count for the list</span></div>
+      </div>
+      <div class="tag-scroll" id="crmScroll">
+        <div class="tag-col" *ngFor="let g of crmGroups">
+          <div class="tag-col-h">
+            <span class="dot" [style.background]="g.color"></span>
+            <span class="tag-col-name" [title]="g.label">{{ g.label }}</span>
+            <span class="tag-col-count num" (click)="openCrm(g)">{{ g.profileIds.length }}</span>
+          </div>
+          <div class="name-pill" *ngFor="let pid of g.profileIds.slice(0, 5)" (click)="openCrm(g)">{{ participantName(pid) }}</div>
+          <span class="more-link" *ngIf="g.profileIds.length > 5" (click)="openCrm(g)">+{{ g.profileIds.length - 5 }} more</span>
+          <div class="fu-empty" *ngIf="!g.profileIds.length" style="padding:6px 2px">No participants</div>
+        </div>
+        <div class="fu-empty" style="padding:10px 0 18px" *ngIf="!crmGroups.length">No CRM flags.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= BACKEND VIEW ================= -->
+  <main class="view active" *ngIf="activeView === 'backend'" id="view-backend">
+
+    <!-- Row 1: Daily Attendance (mirror of frontend — same dayWiseAttendance) -->
+    <section class="card section">
+      <div class="sec-head">
+        <div class="sec-title">Daily Attendance</div>
+        <div class="sec-meta">same live view the frontend team sees</div>
+        <div class="sec-right">
+          <span class="att-range">{{ attRange }}</span>
+          <span class="att-track">
+            <i *ngFor="let d of attDays" [class.done]="d.isPast" [class.today]="d.isToday"></i>
+          </span>
+        </div>
+      </div>
+      <div class="att-grid" id="attGridB">
+        <div class="day-card total" (click)="openAttTotal()">
+          <div class="day-eyebrow"><span>Total approved</span></div>
+          <div class="day-num num">{{ attTotalApproved | number }}</div>
+          <div class="day-sub" (click)="$event.stopPropagation(); openAttAbsentToday()"><span>Absent today</span><b class="num">{{ attAbsentToday }}</b></div>
+        </div>
+        <ng-container *ngFor="let d of attDays">
+          <div class="day-card upcoming" *ngIf="d.isFuture">
+            <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span></div>
+            <div class="day-line"></div>
+            <div class="day-sub">upcoming</div>
+          </div>
+          <div class="day-card" *ngIf="!d.isFuture" [class.today]="d.isToday" (click)="openAttDay(d)">
+            <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span>
+              <span class="delta" *ngIf="attendanceDelta(d) !== null"
+                    [class.up]="(attendanceDelta(d) || 0) > 0" [class.down]="(attendanceDelta(d) || 0) < 0" [class.flat]="attendanceDelta(d) === 0">
+                {{ (attendanceDelta(d) || 0) > 0 ? '+' : '' }}{{ attendanceDelta(d) }}
+              </span>
+            </div>
+            <div class="day-num num">{{ d.count }}</div>
+            <div class="day-bar" *ngIf="d.isToday && getVideoAskByDay(d) !== null"><i [style.width.%]="attTodayBarPct(d)"></i></div>
+            <div class="day-sub" (click)="$event.stopPropagation(); openAttVideo(d)"><span>Video Ask</span><span><b class="num">{{ getVideoAskByDay(d) ?? '—' }}</b></span></div>
+          </div>
+        </ng-container>
+        <div class="day-card never" (click)="openAttNever()">
+          <div class="day-eyebrow"><span>Never attended</span></div>
+          <div class="day-num num">{{ attNeverAttended }}</div>
+          <div class="day-sub"><span>any day &middot; critical</span></div>
+        </div>
+      </div>
+      <div class="footnote" style="padding-top:0;padding-bottom:16px">
+        Video Ask = daily recordings vs that day's attendance &middot; click a card for attendance, the Video Ask row for recordings
+      </div>
+    </section>
+
+    <!-- Row 2: Video Ask Review + Arena Calling -->
+    <div class="b-grid">
+      <!-- Video Ask Review (V2 review state; per-day via existing seams) -->
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Video Ask Review</div>
+          <div class="sec-meta">daily recordings &middot; review before tagging</div>
+        </div>
+        <div class="proc-filters">
+          <span class="pf-label">Day</span>
+          <div class="pf-group" id="vaDayChips">
+            <button class="pf-chip" *ngFor="let c of vaDayChips" [class.on]="c.active" (click)="setVaDay(c.value)">{{ c.label }}</button>
+          </div>
+        </div>
+        <ng-container *ngIf="hasEventDays; else vaEmpty">
+          <div class="kpi-grid" id="vaKpis">
+            <div class="kpi" (click)="openVa('Recordings received', vaReceivedIds)"><div class="kpi-num num">{{ vaReceivedIds.length }}</div><div class="kpi-label">Received</div></div>
+            <div class="kpi k-open" (click)="openVa('Missing recording', vaMissingIds)"><div class="kpi-num num">{{ vaMissingIds.length }}</div><div class="kpi-label">Missing</div></div>
+            <div class="kpi k-res" (click)="openVa('Reviewed', vaReviewedIds)"><div class="kpi-num num">{{ vaReviewedIds.length }}</div><div class="kpi-label">Reviewed</div></div>
+            <div class="kpi k-warn" (click)="openVa('Review queue', vaToReviewIds)"><div class="kpi-num num">{{ vaToReviewIds.length }}</div><div class="kpi-label">To review</div></div>
+          </div>
+          <div class="trays" id="vaTrays">
+            <div class="tray">
+              <div class="tag-col-h"><span class="dot" style="background:var(--warn)"></span><span class="tag-col-name">Review queue</span>
+                <span class="tag-col-count num" (click)="openVa('Review queue', vaToReviewIds)">{{ vaToReviewIds.length }}</span></div>
+              <div class="name-pill" *ngFor="let pid of vaToReviewIds.slice(0, 5)" (click)="openVa('Review queue', vaToReviewIds)">{{ participantName(pid) }}</div>
+              <span class="more-link" *ngIf="vaToReviewIds.length > 5" (click)="openVa('Review queue', vaToReviewIds)">+{{ vaToReviewIds.length - 5 }} more</span>
+              <div class="fu-empty" *ngIf="!vaToReviewIds.length">All clear</div>
+            </div>
+            <div class="tray">
+              <div class="tag-col-h"><span class="dot" style="background:var(--alert)"></span><span class="tag-col-name">Missing recording</span>
+                <span class="tag-col-count num" (click)="openVa('Missing recording', vaMissingIds)">{{ vaMissingIds.length }}</span></div>
+              <div class="name-pill" *ngFor="let pid of vaMissingIds.slice(0, 5)" (click)="openVa('Missing recording', vaMissingIds)">{{ participantName(pid) }}</div>
+              <span class="more-link" *ngIf="vaMissingIds.length > 5" (click)="openVa('Missing recording', vaMissingIds)">+{{ vaMissingIds.length - 5 }} more</span>
+              <div class="fu-empty" *ngIf="!vaMissingIds.length">All clear</div>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #vaEmpty><div class="tk-empty">No daily Video Ask for prep queues.</div></ng-template>
+      </section>
+
+      <!-- Arena Calling (absentees real; outcomes via getCallLog stub, C-9) -->
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Arena Calling</div>
+          <div class="sec-meta">not in the Arena &middot; backend team calls</div>
+          <div class="sec-right"><span class="live-pill" (click)="openCallStatus('pending', 'To call')"><span class="dot live"></span>{{ callPending }} TO CALL</span></div>
+        </div>
+        <div class="proc-filters">
+          <span class="pf-label">Day</span>
+          <div class="pf-group" id="callDayChips">
+            <button class="pf-chip" *ngFor="let c of callDayChips" [class.on]="c.active" (click)="setCallDay(c.value)">{{ c.label }}</button>
+          </div>
+        </div>
+        <ng-container *ngIf="hasEventDays; else callEmpty">
+          <div class="kpi-grid" id="callKpis">
+            <div class="kpi k-open" (click)="openCallStatus('pending', 'To call')"><div class="kpi-num num">{{ callPending }}</div><div class="kpi-label">To call</div></div>
+            <div class="kpi k-res" (click)="openCallStatus('coming', 'Confirmed coming')"><div class="kpi-num num">{{ callComing }}</div><div class="kpi-label">Coming</div></div>
+            <div class="kpi k-warn" (click)="openCallStatus('no-answer', 'No answer')"><div class="kpi-num num">{{ callNoAnswer }}</div><div class="kpi-label">No answer</div></div>
+            <div class="kpi k-mute" (click)="openCallStatus('not-coming', 'Not coming')"><div class="kpi-num num">{{ callNotComing }}</div><div class="kpi-label">Not coming</div></div>
+          </div>
+          <div class="tk-list" id="callList" style="max-height:420px">
+            <div class="tk-row" *ngFor="let r of callVisibleRows">
+              <span class="tk-main">
+                <div class="tk-name">{{ r.name }}<span class="never-chip" *ngIf="isNever(r.profileId)">Never</span></div>
+                <div class="tk-cat">
+                  {{ callDay === 'all' ? (r.day + ' · ') : '' }}{{ journeyLabel(r.journeyId) }}<ng-container *ngIf="!isNever(r.profileId)"> &middot; attended {{ attendedDays(r.profileId) }}/{{ elapsedDays() }} days</ng-container>
+                </div>
+              </span>
+              <span class="call-meta num">{{ r.status === 'pending' ? '—' : (fmtTime(r.calledAt) + (callerName(r.callerId) ? (' · ' + callerName(r.callerId)) : '')) }}</span>
+              <select class="call-select" [ngModel]="r.status" (ngModelChange)="setCallOutcome(r, $event)" [ngClass]="'st-' + callStatusClass(r.status)">
+                <option *ngFor="let o of callOptions" [value]="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+            <span class="more-link" *ngIf="callRows.length > callShown" (click)="callMore()">+{{ callRows.length - callShown }} more</span>
+            <div class="tk-empty" *ngIf="!callRows.length">Everyone is in the Arena.</div>
+          </div>
+        </ng-container>
+        <ng-template #callEmpty><div class="tk-empty">Calling starts with the live event.</div></ng-template>
+      </section>
+    </div>
+
+    <!-- Row 3: Customer Support + Ticket Feed -->
+    <div class="cs-grid">
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Customer Support</div>
+          <div class="sec-meta">open vs resolved &middot; click any count for the list</div>
+          <div class="sec-right"><span class="live-pill" (click)="openCsOpen()"><span class="dot live"></span>{{ getSupportStatusCounts().open }} OPEN</span></div>
+        </div>
+        <ng-container *ngIf="csHasTickets; else csEmpty">
+          <div class="kpi-grid" id="csKpis">
+            <div class="kpi k-open" (click)="openCsOpen()"><div class="kpi-num num">{{ getSupportStatusCounts().open }}</div><div class="kpi-label">Open now</div></div>
+            <div class="kpi k-prog"><div class="kpi-num num">{{ getSupportStatusCounts().inProgress }}</div><div class="kpi-label">In progress</div></div>
+            <div class="kpi k-res"><div class="kpi-num num">{{ getSupportStatusCounts().resolved }}</div><div class="kpi-label">Resolved today</div></div>
+            <div class="kpi"><div class="kpi-num num">{{ getSupportResolutionHours() }}<small>h</small></div><div class="kpi-label">Median resolution</div></div>
+          </div>
+          <div class="cs-list" id="csCats">
+            <div class="cs-row" *ngFor="let c of csCats" (click)="openCsCat(c)">
+              <div class="cs-name">{{ c.category }}</div>
+              <div class="cs-bar">
+                <div class="seg-res" *ngIf="c.resolved" [style.flex]="c.resolved + ' 0 0'" [title]="c.resolved + ' resolved'"></div>
+                <div class="seg-prog" *ngIf="c.inProgress" [style.flex]="c.inProgress + ' 0 0'" [title]="c.inProgress + ' in progress'"></div>
+                <div class="seg-open" *ngIf="c.open" [style.flex]="c.open + ' 0 0'" [title]="c.open + ' open'"></div>
+              </div>
+              <div class="cs-meta num"><b *ngIf="c.open">{{ c.open }} open</b><span *ngIf="!c.open">clear</span> &middot; {{ c.resolved }} done</div>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #csEmpty>
+          <div class="tk-empty">No tickets yet — support opens when the queue starts.</div>
+        </ng-template>
+      </section>
+
+      <section class="card">
+        <div class="sec-head">
+          <div class="sec-title">Ticket Feed</div>
+          <div class="sec-meta">latest first</div>
+        </div>
+        <div class="tk-list" id="tkList">
+          <div class="tk-row" *ngFor="let t of getTicketFeed()">
+            <span class="tk-time num">{{ fmtTime(t.time) }}</span>
+            <span class="tk-main">
+              <div class="tk-name">{{ t.name }}</div>
+              <div class="tk-cat">{{ t.category }}{{ t.status === 'Resolved' && t.resolutionHours != null ? ' · ' + t.resolutionHours + 'h' : '' }}</div>
+            </span>
+            <span class="tk-status" [ngClass]="feedStatusClass(t.status)">{{ t.status }}</span>
+            <span class="tk-assignee" *ngIf="assigneeInitials(t.assigneeId)" [title]="assigneeName(t.assigneeId)">{{ assigneeInitials(t.assigneeId) }}</span>
+          </div>
+          <div class="tk-empty" *ngIf="!getTicketFeed().length">Nothing in the feed.</div>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- ================= ZONES VIEW (Phase 5) — live occupancy, READ-ONLY ================= -->
+  <main class="view active" *ngIf="activeView === 'zones'" id="view-zones">
+    <div id="zonesBody">
+
+      <!-- Not live yet — zones go live with the event -->
+      <div class="placeholder" *ngIf="!zonesLive">
+        <b>Zones are not live</b>
+        Zones go live with the event &mdash; occupancy appears here the moment participants are allocated.<br>
+        Zone setup itself lives in the Event Zones config screen.
+      </div>
+
+      <section class="card section" *ngIf="zonesLive">
+        <div class="sec-head">
+          <div class="sec-title">Zones &middot; Live</div>
+          <div class="sec-meta">who is where in the Arena right now &middot; zone setup lives in the Event Zones config screen</div>
+          <div class="sec-right"><span class="live-pill"><span class="dot live"></span>{{ zonesLiveCount }} ZONES LIVE</span></div>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+          <div class="kpi" (click)="openZonePresent()"><div class="kpi-num num">{{ zonePresentCount }}</div><div class="kpi-label">In the Arena today</div></div>
+          <div class="kpi k-res" (click)="openZoneAllocated()"><div class="kpi-num num">{{ zoneAllocatedCount }}</div><div class="kpi-label">Allocated to zones</div></div>
+          <div class="kpi k-open" (click)="openZoneUnassigned()"><div class="kpi-num num">{{ zoneUnassignedCount }}</div><div class="kpi-label">No zone yet</div></div>
+          <div class="kpi k-warn" (click)="openZoneNoCohort()"><div class="kpi-num num">{{ zoneNoCohortCount }}</div><div class="kpi-label">No cohort</div></div>
+          <div class="kpi k-mute" (click)="openZoneAllocated()"><div class="kpi-num num">{{ zoneCoveragePct }}<small>%</small></div><div class="kpi-label">Coverage</div></div>
+        </div>
+        <div style="padding:0 22px 20px">
+          <div class="zones-grid">
+            <div class="zone-card" *ngFor="let z of zones" [class.standby]="!zoneIsLive(z)">
+              <div class="zone-head">
+                <span class="zone-name">{{ z['zonename'] }}</span>
+                <span class="zone-live" *ngIf="zoneIsLive(z)"><span class="dot live"></span>LIVE</span>
+                <span class="zone-standby-tag" *ngIf="!zoneIsLive(z)">Standby</span>
+              </div>
+              <div class="zone-num num" *ngIf="zoneIsLive(z)" (click)="openZone(z)">{{ zoneOccupantCount(z) }}<small>participants now</small></div>
+              <div class="zone-roles">
+                <div class="zone-role"><b>Coordinator</b><span>{{ zoneCoordinators(z) }}</span></div>
+                <div class="zone-role"><b>Mentors</b><span>{{ zoneMentors(z) }}</span></div>
+              </div>
+              <ng-container *ngIf="zoneIsLive(z)">
+                <div class="zone-cohorts">
+                  <div class="cohort-row" *ngFor="let c of zoneCohorts(z)" (click)="openZoneCohort(z, c)">
+                    <span class="cohort-name">{{ c.name }}</span><span class="cohort-count num">{{ c.count }}</span>
+                  </div>
+                </div>
+                <div class="zone-foot" (click)="openZone(z)">{{ zoneCohorts(z).length }} cohorts &middot; {{ zoneOccupantCount(z) }} participants</div>
+              </ng-container>
+              <ng-container *ngIf="!zoneIsLive(z)">
+                <div class="zone-empty">Not live &mdash; opens from the config screen</div>
+                <div class="zone-foot">0 cohorts &middot; 0 participants</div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+        <div class="footnote" style="padding-top:0;padding-bottom:16px">
+          Occupancy counts participants scanned in today &middot; click a zone, cohort or count for the list
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+<!-- ================= DRILL-DOWN PANEL ================= -->
+<div class="scrim" [class.open]="panelOpen" (click)="closePanel()"></div>
+<aside class="panel" [class.open]="panelOpen">
+  <div class="panel-head">
+    <div class="panel-eyebrow"><span>{{ panelEyebrow }}</span>
+      <button class="panel-close" (click)="closePanel()">&times;</button>
+    </div>
+    <div class="panel-title">{{ panelTitle }}</div>
+    <div class="panel-sub">{{ panelSub }}</div>
+  </div>
+  <div class="panel-search"><input type="text" [(ngModel)]="panelSearch" placeholder="Search name or email…"></div>
+  <div class="panel-count">{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</div>
+  <div class="panel-list">
+    <div class="p-row" *ngFor="let p of panelParticipants">
+      <span class="p-avatar">{{ initials(p.name) }}</span>
+      <span style="min-width:0">
+        <div class="p-name">{{ p.name }}</div>
+        <div class="p-meta">{{ p.email }}</div>
+      </span>
+      <span class="p-right">
+        <div class="p-flag" *ngIf="p['_meta']">{{ p['_meta'] }}</div>
+      </span>
+    </div>
+    <div class="fu-empty" style="padding:14px 12px" *ngIf="panelCount === 0">No participants match.</div>
+  </div>
+</aside>

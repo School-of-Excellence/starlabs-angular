@@ -38,11 +38,23 @@ export function istDateWindow(days: number, now: number = Date.now()): string[] 
   return out;
 }
 
-/** Normalize a Firestore Timestamp | Date | millis to millis (or null). */
+/** Matches an IST day id (`YYYY-MM-DD`) — the rollup writes `firstSeen` in this form. */
+const IST_DAY_ID = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Normalize a Firestore Timestamp | Date | millis | IST day id to millis (or null). */
 export function toMillis(v: any): number | null {
   if (v == null) return null;
   if (typeof v === 'number') return v;
   if (v instanceof Date) return v.getTime();
+  // `scope_enhancement_atc_usage_lifetime.firstSeen` is a plain IST day string,
+  // not a Timestamp (se_atc_usage.js writes `firstSeen = dateStr`). Resolve it to
+  // IST midnight so it agrees with todayStartIST() rather than rendering as null.
+  if (typeof v === 'string') {
+    const m = IST_DAY_ID.exec(v);
+    if (!m) return null;
+    const utcMidnight = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(utcMidnight) ? null : utcMidnight - IST_OFFSET_MS;
+  }
   if (typeof v.toMillis === 'function') return v.toMillis();
   if (typeof v.toDate === 'function') return v.toDate().getTime();
   if (typeof v.seconds === 'number') return v.seconds * 1000;
