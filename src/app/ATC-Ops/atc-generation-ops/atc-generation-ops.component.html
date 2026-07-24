@@ -27,9 +27,9 @@
       <button mat-icon-button matTooltip="Reload queues" (click)="loadQueues()">
         <mat-icon>refresh</mat-icon>
       </button>
-      <a mat-stroked-button routerLink="/queue-atc-usage" matTooltip="Pipeline usage & health dashboard" class="usage-link">
+      <!-- <a mat-stroked-button routerLink="/queue-atc-usage" matTooltip="Pipeline usage & health dashboard" class="usage-link">
         <mat-icon>monitoring</mat-icon> Usage
-      </a>
+      </a> -->
     </div>
   </header>
 
@@ -383,7 +383,16 @@
                         </div>
                         <div class="adj-r" *ngIf="a.outcome"><label>Outcome</label><span>{{ a.outcome }}</span></div>
                         <div class="adj-r" *ngIf="a.procedures?.length">
-                          <label>Procedures</label><span><span class="tag" *ngFor="let p of a.procedures">{{ p }}</span></span>
+                          <label>Procedures</label>
+                          <span>
+                            <span class="tag" *ngFor="let p of a.procedures">
+                              {{ p }}
+                              <ng-container *ngIf="resolveProcedureName(p) as real; else unmapped">
+                                <span class="tag-real">→ {{ real }}</span>
+                              </ng-container>
+                              <ng-template #unmapped><span class="tag-real tag-unmapped">(unmapped)</span></ng-template>
+                            </span>
+                          </span>
                         </div>
                         <div class="adj-r" *ngIf="a.tags?.length">
                           <label>Tags</label><span><span class="tag purple" *ngFor="let t of a.tags">{{ t }}</span></span>

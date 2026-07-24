@@ -35,6 +35,7 @@ import {
   StageData,
 } from '../atc-ops.types';
 import { toDate, toMillis } from '../ist-time.util';
+import { resolveProcedurePseudonym } from '../procedure-pseudonyms';
 import { AtcGenDataService, DocLite, QueueOption } from './atc-gen-data.service';
 
 type ChipKind = 'own' | 'resolved' | 'missing-mandatory' | 'atleastone';
@@ -175,6 +176,7 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   authExpired = false;
 
   private mapProfileData: Record<string, string> = {};
+  private procedureNames: string[] = []; // live `procedures.name` values, for pseudo-code resolution
   private queueUnsubs: Array<() => void> = []; // one live listener per selected queue
   private queueDocs = new Map<string, DocLite[]>(); // latest docs per queue id
   private queuesReported = new Set<string>(); // queues that have delivered a snapshot
@@ -204,6 +206,10 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
         this.podLoaded = true;
       },
       () => (this.podLoaded = true),
+    );
+    this.data.loadProcedureNames().then(
+      (names) => (this.procedureNames = names),
+      () => {}, // preview still works, just without live-name resolution
     );
     this.loadQueues();
   }
@@ -573,6 +579,25 @@ export class AtcGenerationOpsComponent implements OnInit, OnDestroy {
   // trajectory-shift tag check (quality signal)
   isTrajectory(tags?: string[]): boolean {
     return !!tags?.some((t) => /trajectory_shift/i.test(t));
+  }
+
+  /**
+   * Resolve an adjustment's procedure pseudo-code ("A&H Procedure24",
+   * "procedure24", "A&H_procedure24" — spacing/casing varies, the digits are
+   * the stable key) to its real `procedures.name`. Same static-glossary →
+   * live-collection strategy as prescribe-atc.component.ts's
+   * patchAIAdjustments. Returns null when the code has no resolvable number.
+   */
+  resolveProcedureName(code: string): string | null {
+    const realName = resolveProcedurePseudonym(code);
+    if (!realName) return null;
+    if (!this.procedureNames.length) return realName;
+    const target = realName.toLowerCase().trim();
+    return (
+      this.procedureNames.find((n) => n.toLowerCase().trim() === target) ??
+      this.procedureNames.find((n) => n.toLowerCase().includes(target)) ??
+      realName
+    );
   }
 
   // -------------------------------------------------------------------------
