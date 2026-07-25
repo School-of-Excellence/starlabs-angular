@@ -90,6 +90,15 @@ export class EventZoneManagementComponent implements OnDestroy {
   participantZoneSearchTerm: string = ''
   isLoadingParticipantZones: boolean = false
 
+  // Drift detection — reminds the user to click "Update Participant Zone" when
+  // the current zone/cohort layout no longer matches the submitted participant
+  // zone records. `storedParticipantZones` is the last-submitted { profileid ->
+  // selectedZoneId } snapshot, loaded once per event and refreshed on submit.
+  storedParticipantZones: { [profileId: string]: string } = {}
+  storedZonesLoaded: boolean = false
+  needsSubmission: boolean = false
+  driftCount: number = 0
+
   constructor(
     public firestore: Firestore,
     public dialog: MatDialog,
@@ -164,6 +173,13 @@ export class EventZoneManagementComponent implements OnDestroy {
     this.selectedCohortIds.clear()
     this.participantZoneList = []
     this.showParticipantZoneOverlay = false
+
+    // Reset drift state and load the last-submitted participant zone snapshot
+    this.storedParticipantZones = {}
+    this.storedZonesLoaded = false
+    this.needsSubmission = false
+    this.driftCount = 0
+    this.loadStoredParticipantZones()
 
     // Create reference to selected event document
     const eventRef = doc(this.firestore, "event collection", this.selectedEvent["docid"])
@@ -278,7 +294,90 @@ export class EventZoneManagementComponent implements OnDestroy {
       zone['_participantlist'] = participantIds
       zone['_assignedCohorts'] = cohortDetails
     })
+    // Re-check whether the current layout drifted from the submitted state
+    this.evaluateDriftStatus()
     this.cdr.detectChanges()
+  }
+
+  // ============================================================================
+  // DRIFT DETECTION ("Update Participant Zone" reminder)
+  // ============================================================================
+
+  /**
+   * Load the last-submitted participant zone snapshot for the selected event —
+   * a silent read (no loading dialog) used as the "actual" side of drift
+   * detection. Caches { profileid -> selectedZoneId } and re-evaluates drift.
+   */
+  private async loadStoredParticipantZones(): Promise<void> {
+    try {
+      const eventRef = doc(this.firestore, "event collection", this.selectedEvent["docid"])
+      const participantZonesCollection = collection(this.firestore, "event participant zones")
+      const participantZonesQuery = query(participantZonesCollection, where("eventref", "==", eventRef))
+
+      const record = await getDocs(participantZonesQuery)
+      const map: { [profileId: string]: string } = {}
+      record.docs.forEach(d => {
+        const data = d.data()
+        map[data["profileid"]] = data["selectedzone"]
+      })
+
+      this.storedParticipantZones = map
+      this.storedZonesLoaded = true
+      this.evaluateDriftStatus()
+    } catch (error) {
+      console.error("Error loading stored participant zones:", error)
+    }
+  }
+
+  /**
+   * Compare the current zone/cohort layout against the last-submitted snapshot
+   * and set `needsSubmission` / `driftCount`.
+   *
+   * Scope: only MAPPED participants' selectedzone correctness is considered.
+   * Orphaned docs of now-unmapped participants are intentionally ignored — the
+   * submit flow never deletes, so flagging them would make the reminder
+   * impossible to clear. Eligibility metadata is not compared; only the zone.
+   */
+  private evaluateDriftStatus(): void {
+    // Wait until the submitted snapshot has loaded to avoid a false reminder
+    if (!this.storedZonesLoaded) return
+
+    const stored = this.storedParticipantZones
+    const analysis = this.analyzeParticipantAssignments(stored)
+    let count = 0
+
+    // Assigned to exactly one zone -> stored zone must match that zone
+    analysis.assigned.forEach((p: any) => {
+      if (stored[p.participantId] !== p.zoneId) count++ // undefined (new) or wrong zone
+    })
+
+    // Eligible for multiple zones -> in sync only if a stored choice still valid
+    analysis.conflicts.forEach((p: any) => {
+      const chosen = stored[p.participantId]
+      if (!chosen || !(p.eligibleZones || []).includes(chosen)) count++
+    })
+
+    // Unassigned (eligible for no zone) is ignored — orphan scope-out
+
+    this.driftCount = count
+    this.needsSubmission = count > 0
+  }
+
+  // ============================================================================
+  // *ngFor trackBy — reuse DOM by stable key so the cohort/zone lists don't
+  // rebuild (and flicker) on every change-detection cycle
+  // ============================================================================
+
+  trackByZoneId(index: number, zone: any): string {
+    return zone['docid']
+  }
+
+  trackByCohortId(index: number, cohort: any): string {
+    return cohort['docid']
+  }
+
+  trackByCategory(index: number, group: any): string {
+    return group.category
   }
 
   // ============================================================================
@@ -895,6 +994,12 @@ export class EventZoneManagementComponent implements OnDestroy {
       }
 
       await batch.commit().then(() =>{
+        // Update the in-memory snapshot from what we just wrote so drift clears
+        allAssigned.forEach((a: any) => {
+          this.storedParticipantZones[a["participantId"]] = a["zoneId"]
+        })
+        this.storedZonesLoaded = true
+        this.evaluateDriftStatus()
         alert("Success!")
       })
     } catch (error) {
