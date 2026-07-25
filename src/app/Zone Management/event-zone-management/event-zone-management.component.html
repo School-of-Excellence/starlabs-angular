@@ -59,7 +59,7 @@
               <div class="stat-value">{{ unassignedCohortsCount }}</div>
               <div class="stat-label">Unassigned</div>
             </div>
-            <div class="stat-mini highlight" (click)="returnMappedParticipants()">
+            <div class="stat-mini highlight" [class.all-mapped]="isAllMapped" (click)="openUnmappedParticipants()">
               <div class="stat-value">{{ participantsMapped }}/{{ totalParticipants }}</div>
               <div class="stat-label">Mapped</div>
             </div>

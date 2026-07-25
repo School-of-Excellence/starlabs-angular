@@ -16,7 +16,6 @@ import { AuthguardService } from '../../authguard.service';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ResolveParticipantZoneComponent } from '../resolve-participant-zone/resolve-participant-zone.component';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { Clipboard } from '@angular/cdk/clipboard';
 import * as XLSX from 'xlsx';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
@@ -96,7 +95,6 @@ export class EventZoneManagementComponent implements OnDestroy {
     public dialog: MatDialog,
     public authguard: AuthguardService,
     public cdr: ChangeDetectorRef,
-    public clipboard: Clipboard
   ) {
     // this.authguard.getRoles().then(value =>{
     //   console.log("Loggedin Profile", value)
@@ -323,7 +321,22 @@ export class EventZoneManagementComponent implements OnDestroy {
     return mappedParticipantIds.size
   }
 
-  returnMappedParticipants(){
+  // Open the read-only "Unassigned Participants" dialog listing everyone who is
+  // in a cohort but NOT in any zone yet (i.e. the unmapped participants — the
+  // difference behind the "Mapped" stat). Reuses the exact same analysis and
+  // dialog as the submit flow; no extra Firestore read is needed since the
+  // unassigned bucket is derived entirely from in-memory cohort/zone data.
+  // True when every participant across all cohorts is mapped to a zone. Drives
+  // the green "success" styling on the Mapped stat and makes it non-interactive.
+  get isAllMapped(): boolean {
+    return this.totalParticipants > 0 && this.participantsMapped >= this.totalParticipants
+  }
+
+  // Open the read-only "Unassigned Participants" dialog listing everyone who is
+  // in a cohort but NOT in any zone yet (the unmapped participants behind the
+  // "Mapped" stat). When all are mapped, the click is a no-op (no alert).
+  openUnmappedParticipants(){
+    // Log the mapped participant names grouped by zone (debugging aid)
     const mappedParticipantIds = {}
     this.eventZoneList.forEach(zone => {
       const cohorts = zone['cohorts'] || []
@@ -338,7 +351,17 @@ export class EventZoneManagementComponent implements OnDestroy {
     })
     console.log(mappedParticipantIds)
 
-    this.clipboard.copy(JSON.stringify(mappedParticipantIds))
+    if (this.isAllMapped) {
+      return
+    }
+
+    const analysis = this.analyzeParticipantAssignments()
+
+    if (analysis.unassigned.length === 0) {
+      return
+    }
+
+    this.showUnassignedDialog(analysis.unassigned)
   }
 
   // Total number of unique participants across all cohorts
@@ -707,7 +730,7 @@ export class EventZoneManagementComponent implements OnDestroy {
     allParticipants.forEach(participantId => {
       const zones = participantZoneMap[participantId] || [];
       const participantName = this.mapProfile[participantId] || participantId;
-      const participantEmail = this.mapProfileData[participantId]['email']
+      const participantEmail = this.mapProfileData[participantId]?.['email']
       if (zones.length === 0) {
         // Not in any zone
         unassigned.push({
