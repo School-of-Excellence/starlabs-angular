@@ -18,6 +18,7 @@ import { ResolveParticipantZoneComponent } from '../resolve-participant-zone/res
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import * as XLSX from 'xlsx';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+import { CohortParticipantsDialogComponent } from '../cohort-participants-dialog/cohort-participants-dialog.component';
 
 @Component({
   selector: 'app-event-zone-management',
@@ -656,6 +657,27 @@ export class EventZoneManagementComponent implements OnDestroy {
    */
   getCohortParticipantCount(cohort: any): number {
     return (cohort['participantidlist'] || []).length
+  }
+
+  /**
+   * Open a dialog listing the participants of a cohort (picture, name, email).
+   * Built from the in-memory participantidlist — no Firestore read.
+   */
+  openCohortParticipants(cohort: any): void {
+    const ids: string[] = cohort['participantidlist'] || []
+    const participants = ids.map(id => ({
+      profileid: id,
+      name: this.mapProfile[id] || id,
+      email: this.mapProfileData[id]?.['email'] || 'N/A'
+    })).sort((a, b) => a.name.localeCompare(b.name))
+
+    this.dialog.open(CohortParticipantsDialogComponent, {
+      width: '480px',
+      data: {
+        cohortName: cohort['name'],
+        participants: participants
+      }
+    })
   }
 
   /**

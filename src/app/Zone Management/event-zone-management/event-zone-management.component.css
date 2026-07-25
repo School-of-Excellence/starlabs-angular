@@ -315,6 +315,18 @@
   color: #718096;
 }
 
+/* Clickable participant count -> opens the cohort participants dialog */
+.clickable-count {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.clickable-count:hover {
+  color: #4285f4;
+}
+
 .cohort-remove-btn {
   width: 24px;
   height: 24px;

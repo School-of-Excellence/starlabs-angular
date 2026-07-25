@@ -182,7 +182,7 @@
                           <span class="cohort-badge" [ngClass]="getCategoryBadgeClass(cohort['cohortCategory'])">
                             {{ cohort["cohortCategory"] | uppercase }}
                           </span>
-                          <span class="cohort-count">{{ getCohortParticipantCount(cohort) }} participants</span>
+                          <span class="cohort-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">{{ getCohortParticipantCount(cohort) }} participants</span>
                         </div>
                       </div>
                     </div>
@@ -293,7 +293,7 @@
                   <div class="cohort-item-details">
                     <div class="cohort-item-name">{{ cohort["name"] }}</div>
                     <div class="cohort-item-meta">
-                      <span class="cohort-item-count">
+                      <span class="cohort-item-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">
                         {{ getCohortParticipantCount(cohort) }} participants
                       </span>
                     </div>
