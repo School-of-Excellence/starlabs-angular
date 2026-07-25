@@ -1,0 +1,292 @@
+<div class="mainscreen">
+
+  <h2 class="heading">Participant Video Ask</h2>
+
+  <!-- ------------------------------------------------------------- filters -->
+  <div class="filterbar mat-elevation-z1">
+
+    <form [formGroup]="form">
+
+      <!-- ---- filter from event ---- -->
+      <div class="fgroup">
+        <div class="fgrouphead">Filter by any of these events</div>
+
+        <div class="filterfields">
+
+          <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
+            <mat-label>Live Event</mat-label>
+            <mat-select formControlName="live" multiple panelClass="filterpanel"
+                        placeholder="Any" (closed)="onPanelClosed('live')">
+              <mat-select-trigger *ngIf="selectedCount('live')">
+                {{selectedLabel('live', eventTitle)}}
+              </mat-select-trigger>
+              <div class="panelsearch">
+                <input type="text" placeholder="Type to search"
+                       [(ngModel)]="searchText.live" [ngModelOptions]="{standalone: true}"
+                       (keydown)="$event.stopPropagation()" (input)="onOptionSearch('live')">
+              </div>
+              <mat-option *ngFor="let option of visibleOptions(filteredLiveEventList, liveEventList, 'live', 'docid')"
+                          [value]="option.docid">{{option.title}}</mat-option>
+              <div *ngIf="filteredLiveEventList.length === 0" class="panelhint">No match</div>
+              <div *ngIf="hiddenCount(filteredLiveEventList, 'live', 'docid')" class="panelhint">
+                +{{hiddenCount(filteredLiveEventList, 'live', 'docid')}} more — keep typing to narrow
+              </div>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
+            <mat-label>Queue Event</mat-label>
+            <mat-select formControlName="queue" multiple panelClass="filterpanel"
+                        placeholder="Any" (closed)="onPanelClosed('queue')">
+              <mat-select-trigger *ngIf="selectedCount('queue')">
+                {{selectedLabel('queue', eventTitle)}}
+              </mat-select-trigger>
+              <div class="panelsearch">
+                <input type="text" placeholder="Type to search"
+                       [(ngModel)]="searchText.queue" [ngModelOptions]="{standalone: true}"
+                       (keydown)="$event.stopPropagation()" (input)="onOptionSearch('queue')">
+              </div>
+              <mat-option *ngFor="let option of visibleOptions(filteredQueueEventList, queueEventList, 'queue', 'docid')"
+                          [value]="option.docid">{{option.title}}</mat-option>
+              <div *ngIf="filteredQueueEventList.length === 0" class="panelhint">No match</div>
+              <div *ngIf="hiddenCount(filteredQueueEventList, 'queue', 'docid')" class="panelhint">
+                +{{hiddenCount(filteredQueueEventList, 'queue', 'docid')}} more — keep typing to narrow
+              </div>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
+            <mat-label>Workshop</mat-label>
+            <mat-select formControlName="workshop" multiple panelClass="filterpanel"
+                        placeholder="Any" (closed)="onPanelClosed('workshop')">
+              <mat-select-trigger *ngIf="selectedCount('workshop')">
+                {{selectedLabel('workshop', eventTitle)}}
+              </mat-select-trigger>
+              <div class="panelsearch">
+                <input type="text" placeholder="Type to search"
+                       [(ngModel)]="searchText.workshop" [ngModelOptions]="{standalone: true}"
+                       (keydown)="$event.stopPropagation()" (input)="onOptionSearch('workshop')">
+              </div>
+              <mat-option *ngFor="let option of visibleOptions(filteredWorkshopList, workshopList, 'workshop', 'docid')"
+                          [value]="option.docid">{{option.title}}</mat-option>
+              <div *ngIf="filteredWorkshopList.length === 0" class="panelhint">No match</div>
+              <div *ngIf="hiddenCount(filteredWorkshopList, 'workshop', 'docid')" class="panelhint">
+                +{{hiddenCount(filteredWorkshopList, 'workshop', 'docid')}} more — keep typing to narrow
+              </div>
+            </mat-select>
+          </mat-form-field>
+
+        </div>
+      </div>
+
+      <!-- ---- filter ---- -->
+      <div class="fgroup">
+        <div class="fgrouphead">Then narrow to specific participants, templates or dates</div>
+
+        <div class="filterfields">
+
+          <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
+            <mat-label>Participant Name</mat-label>
+            <mat-select formControlName="profileid" multiple panelClass="filterpanel"
+                        placeholder="All participants" (closed)="onPanelClosed('profileid')">
+              <mat-select-trigger *ngIf="selectedCount('profileid')">
+                {{selectedLabel('profileid', participantName)}}
+              </mat-select-trigger>
+              <div class="panelsearch">
+                <input type="text" placeholder="Type to search"
+                       [(ngModel)]="searchText.profileid" [ngModelOptions]="{standalone: true}"
+                       (keydown)="$event.stopPropagation()" (input)="onOptionSearch('profileid')">
+              </div>
+              <mat-option *ngFor="let option of visibleOptions(filteredParticipantList, participantList, 'profileid', 'id')"
+                          [value]="option.id">{{option.name}}</mat-option>
+              <div *ngIf="filteredParticipantList.length === 0" class="panelhint">No match</div>
+              <div *ngIf="hiddenCount(filteredParticipantList, 'profileid', 'id')" class="panelhint">
+                +{{hiddenCount(filteredParticipantList, 'profileid', 'id')}} more — keep typing to narrow
+              </div>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
+            <mat-label>Video Ask Template</mat-label>
+            <mat-select formControlName="template" multiple panelClass="filterpanel"
+                        placeholder="All templates" (closed)="onPanelClosed('template')">
+              <mat-select-trigger *ngIf="selectedCount('template')">
+                {{selectedLabel('template', templateTitle)}}
+              </mat-select-trigger>
+              <div class="panelsearch">
+                <input type="text" placeholder="Type to search"
+                       [(ngModel)]="searchText.template" [ngModelOptions]="{standalone: true}"
+                       (keydown)="$event.stopPropagation()" (input)="onOptionSearch('template')">
+              </div>
+              <mat-option *ngFor="let option of visibleOptions(filteredTemplateList, templateList, 'template', 'docid')"
+                          [value]="option.docid">{{option.title}}</mat-option>
+              <div *ngIf="filteredTemplateList.length === 0" class="panelhint">No match</div>
+              <div *ngIf="hiddenCount(filteredTemplateList, 'template', 'docid')" class="panelhint">
+                +{{hiddenCount(filteredTemplateList, 'template', 'docid')}} more — keep typing to narrow
+              </div>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
+            <mat-label>Date range</mat-label>
+            <mat-date-range-input formGroupName="range" [rangePicker]="picker">
+              <input matStartDate formControlName="start" placeholder="Start date">
+              <input matEndDate formControlName="end" placeholder="End date">
+            </mat-date-range-input>
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-date-range-picker #picker></mat-date-range-picker>
+          </mat-form-field>
+
+        </div>
+      </div>
+
+    </form>
+
+    <!-- ---- what will actually be queried ---- -->
+    <div class="summary" *ngIf="activeFilterCount()">
+      <span class="summarylabel">Searching for:</span>
+
+      <span class="groupwrap" *ngIf="eventPills().length">
+        <ng-container *ngFor="let pill of eventPills(); let i = index">
+          <span class="conn" *ngIf="i > 0">or</span>
+          <span class="pill">{{pill.label}}<mat-icon (click)="clearPill(pill)">close</mat-icon></span>
+        </ng-container>
+      </span>
+
+      <span class="conn" *ngIf="eventPills().length && narrowPills().length">and</span>
+
+      <ng-container *ngFor="let pill of narrowPills(); let i = index">
+        <span class="conn" *ngIf="i > 0">and</span>
+        <span class="pill">{{pill.label}}<mat-icon (click)="clearPill(pill)">close</mat-icon></span>
+      </ng-container>
+    </div>
+
+    <!-- ---- actions, right aligned, hint under the Search button ---- -->
+    <div class="filteractions">
+      <div class="actionstack">
+        <div class="buttonrow">
+          <button mat-stroked-button type="button"
+                  (click)="onResetForm()" [disabled]="bootstrapping || fetching || !activeFilterCount()">
+            Clear filters
+          </button>
+          <button mat-flat-button color="primary" type="button"
+                  (click)="onSearch()" [disabled]="bootstrapping || fetching">
+            <mat-icon>search</mat-icon>&nbsp;Search
+          </button>
+        </div>
+        <div class="dirtyhint" *ngIf="filtersDirty">
+          <mat-icon class="dirtyicon">info</mat-icon>&nbsp;Not applied yet — click Search
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- --------------------------------------------------------- table toolbar -->
+  <div class="tabletoolbar">
+
+    <div class="statusbar">
+      <mat-spinner *ngIf="bootstrapping || fetching" diameter="20"></mat-spinner>
+      <span *ngIf="bootstrapping">Loading events, workshops and templates...</span>
+      <span *ngIf="!bootstrapping && fetching">Loading videos...</span>
+      <span *ngIf="!bootstrapping && !fetching && isDefaultView">
+        Showing newest {{rowCount}} — apply a filter to search all submissions
+      </span>
+      <span *ngIf="!bootstrapping && !fetching && !isDefaultView">Loaded {{rowCount}} videos</span>
+      <span *ngIf="!bootstrapping && !fetching && tagFilter !== 'all'" class="subtle">
+        &nbsp;· showing {{visibleCount()}}
+      </span>
+      <span *ngIf="!bootstrapping && !fetching && rowCount > 1000" class="warn">
+        &nbsp;· large result, sorting and scrolling may be slow
+      </span>
+    </div>
+
+    <div class="tagfilter">
+      <span class="tagfilterlabel">Tags</span>
+      <mat-button-toggle-group [value]="tagFilter" (change)="onTagFilterChange($event.value)" hideSingleSelectionIndicator>
+        <mat-button-toggle value="all">Both ({{rowCount}})</mat-button-toggle>
+        <mat-button-toggle value="tagged">Tagged ({{taggedCount}})</mat-button-toggle>
+        <mat-button-toggle value="untagged">Untagged ({{untaggedCount}})</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+  </div>
+
+  <!-- ---------------------------------------------------------------- table -->
+  <div class="body mat-elevation-z2">
+    <table mat-table #table [dataSource]="dataSource" matSort>
+
+      <ng-container matColumnDef="profileid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+        <td mat-cell *matCellDef="let row">
+          {{participantMap[row['profileid']] || row['profileid']}}
+          <span *ngIf="isNewUser(row['profileid'])" class="newuser">&nbsp;(New User)</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="videoaskid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>videoAsk Template</th>
+        <td mat-cell *matCellDef="let row">{{templateMap[row['videoaskid']] || row['videoaskid']}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="event">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Event</th>
+        <td mat-cell *matCellDef="let row">
+          <span>{{eventLabel(row)}}</span>
+          <span *ngIf="eventKind(row)" class="kindtag">&nbsp;({{eventKind(row)}})</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="fileurl">
+        <th mat-header-cell *matHeaderCellDef>Video</th>
+        <td mat-cell *matCellDef="let row">
+          <ng-container *ngIf="row.fileurl; else novideo">
+            <div *ngIf="!isPlaying(row.docid)" class="videoplaceholder" (click)="playVideo(row)" title="Click to play">
+              <mat-icon class="playicon">play_circle_filled</mat-icon>
+            </div>
+            <video *ngIf="isPlaying(row.docid)" controls autoplay preload="none" width="170" height="300">
+              <source [src]="row.fileurl" type="video/mp4">
+            </video>
+          </ng-container>
+          <ng-template #novideo><span class="emptytext">No video</span></ng-template>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="uploaded">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Uploaded</th>
+        <td mat-cell *matCellDef="let row">{{row.uploaded != undefined ? (row.uploaded.toDate() | date: 'mediumDate') : null}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="addtohighlights">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Add to Highlights</th>
+        <td mat-cell *matCellDef="let row">{{row.addtohighlights != undefined ? (row.addtohighlights ? "Public" : "Private") : null}}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="tag">
+        <th mat-header-cell *matHeaderCellDef>Tags</th>
+        <td mat-cell *matCellDef="let row">
+          <div class="tag-checklist-container">
+            <label *ngFor="let tag of videoAskTags" class="tag-checkbox-row">
+              <input type="checkbox"
+                     [checked]="row.tags?.includes(tag.id)"
+                     (change)="updateVideoAsk(row, tag.id)">
+              <span class="checkmark"></span>
+              <span class="tag-checkbox-label">{{ tag.name }}</span>
+            </label>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+    </table>
+
+    <p *ngIf="!bootstrapping && !fetching && visibleCount() === 0" class="emptytext">
+      No videos match these filters.
+    </p>
+
+    <mat-paginator [pageSizeOptions]="[5,10,25,50,100]"></mat-paginator>
+  </div>
+
+</div>
