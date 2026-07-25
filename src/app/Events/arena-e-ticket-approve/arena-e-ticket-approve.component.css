@@ -79,3 +79,18 @@ table{
 .summary-card.active .summary-label{
   color: #111827;
 }
+.import-status-band {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+.import-status-list {
+  padding: 4px 12px 8px 40px;
+  font-size: 13px;
+}
+.import-status-list > div {
+  padding: 2px 0;
+}
