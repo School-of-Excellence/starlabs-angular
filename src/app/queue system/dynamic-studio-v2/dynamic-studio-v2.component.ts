@@ -3904,38 +3904,66 @@ export class DynamicStudioV2Component {
   }
 
   /**
-   * The current queue_token id plus every ancestor it was transferred from.
+   * The current queue_token id plus every token it is linked to in BOTH transfer
+   * directions, tagged with which direction it came from.
    *
-   * A participant who moved queues gets a NEW queue_token, but the AI generation
-   * that ran in the earlier queue is stamped with the OLD token id. Matching only
-   * the current token therefore hides a perfectly good generation the moment the
-   * participant is transferred — which is exactly what `evolution-prep-participants-v2`
-   * walks lineage for (`walkPairings`, up to 12 levels). Same walk, same cap.
+   * A participant who moves queues gets a NEW queue_token, but a generation stays
+   * stamped with the token that was current when it ran — so the doc can sit on
+   * either side of the token we are holding:
    *
-   * Failures are swallowed: an unreadable ancestor just shortens the chain, it must
-   * never take down the availability check.
+   *   - `tokentransferredfrom` **ancestors** — they transferred IN, and the doc was
+   *     generated back in the queue they came from.
+   *   - `tokentransferredto` **descendants** — they transferred OUT, and the doc was
+   *     generated in the queue they went to (a studio can still be open on the older
+   *     token while the pipeline attributes to the newer one).
+   *
+   * Both happen, so both are walked; `evolution-prep-participants-v2` resolves the
+   * same two directions for the same reason (`applyGenDoc`, `:917-930`). Forward hops
+   * require the `transferredto` + `tokentransferredto` PAIR, matching that component's
+   * `isTransferredOut` (`:524`) — a half-written transfer is not a transfer.
+   *
+   * Same 12-level cap as `walkPairings`, and the shared `seen` map doubles as the
+   * cycle guard. Failures are swallowed: an unreadable hop just shortens that
+   * direction, it must never take down the availability check.
    */
-  private async aiAtcTokenLineage(token: any): Promise<string[]> {
-    const ids: string[] = [];
+  private async aiAtcTokenLineage(
+    token: any,
+  ): Promise<Map<string, 'self' | 'ancestor' | 'descendant'>> {
+    const seen = new Map<string, 'self' | 'ancestor' | 'descendant'>();
     const first = token?.['docid'];
-    if (first) ids.push(first);
-    let cursor: DocumentReference | null = token?.['tokentransferredfrom'] ?? null;
-    let level = 0;
-    while (cursor && level < 12) {
-      level++;
-      try {
-        const snap = await getDoc(doc(this.firestore, cursor.path));
-        if (!snap.exists()) break;
-        const data: any = snap.data();
-        const id = data?.['docid'] || snap.id;
-        if (ids.includes(id)) break;  // cycle guard
-        ids.push(id);
-        cursor = data?.['tokentransferredfrom'] ?? null;
-      } catch {
-        break;
+    if (first) seen.set(first, 'self');
+
+    // Forward hops need the pair; backward hops are a single ref (the from-side has
+    // no such convention — `walkPairings` climbs `tokentransferredfrom` alone).
+    const nextOf = (data: any, dir: 'ancestor' | 'descendant'): DocumentReference | null =>
+      dir === 'ancestor'
+        ? (data?.['tokentransferredfrom'] ?? null)
+        : (data?.['transferredto'] && data?.['tokentransferredto'] ? data['tokentransferredto'] : null);
+
+    const walk = async (start: DocumentReference | null, dir: 'ancestor' | 'descendant') => {
+      let cursor: DocumentReference | null = start;
+      let level = 0;
+      while (cursor && level < 12) {
+        level++;
+        try {
+          const snap = await getDoc(doc(this.firestore, cursor.path));
+          if (!snap.exists()) break;
+          const data: any = snap.data();
+          const id = data?.['docid'] || snap.id;
+          if (seen.has(id)) break;  // cycle, or the other direction already claimed it
+          seen.set(id, dir);
+          cursor = nextOf(data, dir);
+        } catch {
+          break;
+        }
       }
-    }
-    return ids;
+    };
+
+    await Promise.all([
+      walk(token?.['tokentransferredfrom'] ?? null, 'ancestor'),
+      walk(nextOf(token, 'descendant'), 'descendant'),
+    ]);
+    return seen;
   }
 
   async checkAiAtcAvailability() {
@@ -3996,12 +4024,18 @@ export class DynamicStudioV2Component {
       if (this.aiAtcCheckedKey !== key) return;
 
       const rows = aiSnap.docs.map(d => ({ id: d.id, data: d.data() as any }));
-      // Scope score — 0 means "belongs to some other queue", never offered:
-      //   3 this exact token · 2 an ancestor token (transferred) · 1 same queue, other token
+      // Scope score — 0 means "belongs to some other queue", never offered. The order
+      // mirrors how evolution-prep-participants-v2 resolves the same question
+      // (`applyGenDoc`, `:917-930`): a doc generated HERE always beats an inherited one,
+      // and an ancestor beats a destination.
+      //   4 this exact token · 3 transferredfrom ancestor · 2 transferredto descendant
+      //   · 1 same queue, other token
       const scopeOf = (r: { data: any }): number => {
         const t = r.data?.['queue_token_id'];
-        if (t && t === queueTokenId) return 3;
-        if (t && lineage.includes(t)) return 2;
+        if (t && t === queueTokenId) return 4;
+        const via = t ? lineage.get(t) : undefined;
+        if (via === 'ancestor') return 3;
+        if (via === 'descendant') return 2;
         if (this.aiAtcRefId(r.data?.['queueref']) === tokenQueueRef.id) return 1;
         return 0;
       };
@@ -4022,12 +4056,13 @@ export class DynamicStudioV2Component {
         participantProfileId: profileid,
         studioTokenId: queueTokenId,
         studioQueueId: tokenQueueRef.id,
-        tokenLineage: lineage,
+        tokenLineage: [...lineage].map(([id, dir]) => `${dir}:${id}`),
         docsForParticipant: rows.length,
         candidates: rows.map(r => ({
           id: r.id,
           status: r.data?.['status'],
           queue_token_id: r.data?.['queue_token_id'] ?? '(none)',
+          via: (r.data?.['queue_token_id'] ? lineage.get(r.data['queue_token_id']) : undefined) ?? '(off-lineage)',
           queueref: this.aiAtcRefId(r.data?.['queueref']) || '(none)',
           hasCreatedAt: !!r.data?.['createdAt'],
           scope: scopeOf(r),
