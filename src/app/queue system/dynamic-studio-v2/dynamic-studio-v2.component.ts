@@ -4052,7 +4052,10 @@ export class DynamicStudioV2Component {
         this.aiAtcAvailable = true;
       }
 
-      console.log('[AI-ATC] availability check', {
+      // Stringified, not an object: Chrome collapses a logged object to
+      // `{…}` + `Array(2)`, so a pasted console dump loses exactly the fields
+      // (candidates / chosen) the log exists to show.
+      console.log('[AI-ATC] availability check ' + JSON.stringify({
         participantProfileId: profileid,
         studioTokenId: queueTokenId,
         studioQueueId: tokenQueueRef.id,
@@ -4069,7 +4072,7 @@ export class DynamicStudioV2Component {
         })),
         chosen: chosen ? { id: chosen.id, scope: chosen.scope } : null,
         aiAtcAvailable: this.aiAtcAvailable,
-      });
+      }, null, 2));
     } catch (err) {
       console.error('[AI-ATC] availability check failed; hiding AI button', err);
       this.aiAtcCheckedKey = null;  // allow a retry on the next entry
