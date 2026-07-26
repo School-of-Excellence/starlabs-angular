@@ -4072,7 +4072,7 @@ export class DynamicStudioV2Component {
         })),
         chosen: chosen ? { id: chosen.id, scope: chosen.scope } : null,
         aiAtcAvailable: this.aiAtcAvailable,
-      }, null, 2));
+      }));
     } catch (err) {
       console.error('[AI-ATC] availability check failed; hiding AI button', err);
       this.aiAtcCheckedKey = null;  // allow a retry on the next entry
