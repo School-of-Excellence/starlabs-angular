@@ -560,6 +560,11 @@ export class DynamicStudioV2Component {
         const tok: any = snap.docs[0].data()
         if (this.liveAssignment?.['docid'] === la['docid']) {
           this.liveAssignment = { ...this.liveAssignment, token: tok }
+          // The AI-ATC check needs token.docid + token.queueref. On the deep-link
+          // path (`?step=prescribe-atc`) the step activates — and runs the check —
+          // BEFORE this hydration lands, so that first run bails and nothing ever
+          // re-ran it. Re-fire it here now the token exists.
+          if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
         }
       }
     } catch (err) {
@@ -2267,7 +2272,14 @@ export class DynamicStudioV2Component {
       this.tokenSubscription = collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
         console.log(token)
         if(this.liveAssignment != null && token.length != 0){
-          this.liveAssignment["token"] = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
+          // Only overwrite when this emission actually contains OUR token. The query is
+          // scoped (this queue + Approved + Active + currentstage in studioStage), so a
+          // participant whose token falls outside it makes `find` return undefined — and
+          // the old unconditional assignment then WIPED a token ensureTokenForAssignment
+          // had already hydrated, taking the AI-ATC check (and the sidebar's product /
+          // queue-position fields) down with it.
+          const matchedToken = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
+          if (matchedToken) this.liveAssignment["token"] = matchedToken
           console.log(this.liveAssignment['docid']);
           console.log(this.liveAssignment['token']);
           // If the specialist is already on the prescribe step, refresh the AI-ATC button for the
@@ -3835,6 +3847,17 @@ export class DynamicStudioV2Component {
     try {
       const cfgSnap = await getDoc(doc(this.firestore, 'classify', 'queue-atc-edit-config'));
       const cfg: any = cfgSnap.exists() ? cfgSnap.data() : null;
+      // One line that answers "is the gate open, and which mode am I in" — the config
+      // is fail-closed on several fields at once (doc exists / enabled / global), and
+      // `profileid` here is the ?profileid= OVERRIDE when one is present, which is what
+      // the allowlist branch below matches on.
+      console.log('[AI-ATC] access config', {
+        exists: cfgSnap.exists(),
+        enabled: cfg?.enabled,
+        global: cfg?.global,
+        specialistProfileId: this.profileid,
+        project: environment.firebase.projectId,
+      });
       if (!cfg || cfg.enabled !== true) { this.aiAtcAllowedForUser = false; return; }  // feature off
       if (cfg.global === true) { this.aiAtcAllowedForUser = true; this.maybeRecheckAiAtc(); return; }  // enabled globally for everyone
       // Not global → restrict to the configured allowed users (by profileid / email / role).
@@ -3859,15 +3882,83 @@ export class DynamicStudioV2Component {
     }
   }
 
+  /**
+   * Millis for a Firestore Timestamp / Date / epoch number — null when absent.
+   * `createdAt` is OPTIONAL on queue_atc_generation, so every use must tolerate
+   * its absence (see the ranking sort below).
+   */
+  private aiAtcTsMs(v: any): number | null {
+    if (!v) return null;
+    if (typeof v === 'number') return v;
+    if (typeof v?.toMillis === 'function') return v.toMillis();
+    if (typeof v?.toDate === 'function') return v.toDate().getTime();
+    if (v instanceof Date) return v.getTime();
+    return null;
+  }
+
+  /** Doc id of a queueref stored either as a DocumentReference or as a path string. */
+  private aiAtcRefId(v: any): string {
+    if (!v) return '';
+    if (typeof v === 'string') return v.split('/').pop() || '';
+    return v.id || '';
+  }
+
+  /**
+   * The current queue_token id plus every ancestor it was transferred from.
+   *
+   * A participant who moved queues gets a NEW queue_token, but the AI generation
+   * that ran in the earlier queue is stamped with the OLD token id. Matching only
+   * the current token therefore hides a perfectly good generation the moment the
+   * participant is transferred — which is exactly what `evolution-prep-participants-v2`
+   * walks lineage for (`walkPairings`, up to 12 levels). Same walk, same cap.
+   *
+   * Failures are swallowed: an unreadable ancestor just shortens the chain, it must
+   * never take down the availability check.
+   */
+  private async aiAtcTokenLineage(token: any): Promise<string[]> {
+    const ids: string[] = [];
+    const first = token?.['docid'];
+    if (first) ids.push(first);
+    let cursor: DocumentReference | null = token?.['tokentransferredfrom'] ?? null;
+    let level = 0;
+    while (cursor && level < 12) {
+      level++;
+      try {
+        const snap = await getDoc(doc(this.firestore, cursor.path));
+        if (!snap.exists()) break;
+        const data: any = snap.data();
+        const id = data?.['docid'] || snap.id;
+        if (ids.includes(id)) break;  // cycle guard
+        ids.push(id);
+        cursor = data?.['tokentransferredfrom'] ?? null;
+      } catch {
+        break;
+      }
+    }
+    return ids;
+  }
+
   async checkAiAtcAvailability() {
-    if (!this.aiAtcAllowedForUser) { this.aiAtcAvailable = false; return; }  // not configured for this user — no query, no buttons
+    if (!this.aiAtcAllowedForUser) {
+      console.log('[AI-ATC] skipped — feature not enabled for this user (classify/queue-atc-edit-config)');
+      this.aiAtcAvailable = false;
+      return;
+    }
     const token = this.liveAssignment?.['token'];
     const profileid = this.participantProfileId;
     const queueTokenId = token?.['docid'];
     const tokenQueueRef = token?.['queueref'];
 
     if (!profileid || !queueTokenId || !tokenQueueRef?.id) {
-      // token not hydrated yet — reset so a later token update re-checks.
+      // Token not hydrated yet — reset so a later token update re-checks. This is the
+      // silent path that used to strand the button on the `?step=prescribe-atc`
+      // deep-link (the step activates before the token lands); ensureTokenForAssignment
+      // and the queue_token subscription both re-fire the check now.
+      console.log('[AI-ATC] deferred — waiting for token hydration', {
+        profileid: profileid || '(none)',
+        queueTokenId: queueTokenId || '(none)',
+        tokenQueueId: tokenQueueRef?.id || '(none)',
+      });
       this.aiAtcAvailable = false;
       this.aiAtcDocId = null;
       this.aiAtcCheckedKey = null;
@@ -3885,33 +3976,67 @@ export class DynamicStudioV2Component {
 
     try {
       const firestoreATC = getFirestore("firestore-atc");
-      // queue_atc_generation stores queueref as a firestore-atc reference
-      // (cloud fn: adminATC.doc(queueRef.path)); the studio token's queueref points at the default
-      // DB, so rebuild it against firestore-atc for the equality query to match.
-      const atcQueueRef = doc(firestoreATC, 'queue generation', tokenQueueRef.id);
-      // Match on participant + token + queue, newest first (stage filter removed, no limit). Take the
-      // latest generation that has actually COMPLETED — an incomplete doc (pending/processing/error)
-      // has no usable `output`, so offering it would open prescribe-ATC with nothing to prefill and
-      // draft creation fails. Status is filtered client-side to reuse the existing composite index.
+      const lineage = await this.aiAtcTokenLineage(token);
+
+      // ONE equality filter (participant), then rank client-side.
+      //
+      // The previous query pinned profileid + queue_token_id + queueref AND ordered by
+      // createdAt. Three ways that hid a real generation: an orderBy silently drops docs
+      // missing the field (createdAt is optional on this collection), the composite index
+      // it needs can be absent, and a transferred participant's doc carries an ANCESTOR
+      // token id so the equality never matched. A participant has a handful of generations
+      // at most, so reading them all and scoring in memory is both cheaper to reason about
+      // and fully observable in the log below.
       const aiSnap = await getDocs(query(
         collection(firestoreATC, 'queue_atc_generation'),
         where('profileid', '==', profileid),
-        where('queue_token_id', '==', queueTokenId),
-        where('queueref', '==', atcQueueRef),
-        orderBy('createdAt', 'desc')
       ));
 
       // Guard against a participant switch that happened while this query was awaiting.
       if (this.aiAtcCheckedKey !== key) return;
 
-      // docs are newest-first, so the first completed one is the latest completed generation.
-      const completedDoc = aiSnap.docs.find(d => d.data()?.['status'] === 'completed');
-      if (completedDoc) {
-        this.aiAtcDocId = completedDoc.id;
+      const rows = aiSnap.docs.map(d => ({ id: d.id, data: d.data() as any }));
+      // Scope score — 0 means "belongs to some other queue", never offered:
+      //   3 this exact token · 2 an ancestor token (transferred) · 1 same queue, other token
+      const scopeOf = (r: { data: any }): number => {
+        const t = r.data?.['queue_token_id'];
+        if (t && t === queueTokenId) return 3;
+        if (t && lineage.includes(t)) return 2;
+        if (this.aiAtcRefId(r.data?.['queueref']) === tokenQueueRef.id) return 1;
+        return 0;
+      };
+      // Only COMPLETED docs are usable: pending/processing/error have no `output`, so the
+      // prescribe form would open with nothing to prefill and draft creation fails.
+      const usable = rows
+        .map(r => ({ ...r, scope: scopeOf(r), ms: this.aiAtcTsMs(r.data?.['createdAt']) }))
+        .filter(r => r.data?.['status'] === 'completed' && r.scope > 0)
+        .sort((a, b) => (b.scope - a.scope) || ((b.ms ?? 0) - (a.ms ?? 0)));
+
+      const chosen = usable[0];
+      if (chosen) {
+        this.aiAtcDocId = chosen.id;
         this.aiAtcAvailable = true;
       }
+
+      console.log('[AI-ATC] availability check', {
+        participantProfileId: profileid,
+        studioTokenId: queueTokenId,
+        studioQueueId: tokenQueueRef.id,
+        tokenLineage: lineage,
+        docsForParticipant: rows.length,
+        candidates: rows.map(r => ({
+          id: r.id,
+          status: r.data?.['status'],
+          queue_token_id: r.data?.['queue_token_id'] ?? '(none)',
+          queueref: this.aiAtcRefId(r.data?.['queueref']) || '(none)',
+          hasCreatedAt: !!r.data?.['createdAt'],
+          scope: scopeOf(r),
+        })),
+        chosen: chosen ? { id: chosen.id, scope: chosen.scope } : null,
+        aiAtcAvailable: this.aiAtcAvailable,
+      });
     } catch (err) {
-      console.error('AI ATC availability check failed; hiding AI button', err);
+      console.error('[AI-ATC] availability check failed; hiding AI button', err);
       this.aiAtcCheckedKey = null;  // allow a retry on the next entry
     }
   }
