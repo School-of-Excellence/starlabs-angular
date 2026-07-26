@@ -3851,13 +3851,13 @@ export class DynamicStudioV2Component {
       // is fail-closed on several fields at once (doc exists / enabled / global), and
       // `profileid` here is the ?profileid= OVERRIDE when one is present, which is what
       // the allowlist branch below matches on.
-      console.log('[AI-ATC] access config', {
-        exists: cfgSnap.exists(),
-        enabled: cfg?.enabled,
-        global: cfg?.global,
-        specialistProfileId: this.profileid,
-        project: environment.firebase.projectId,
-      });
+      // console.log('[AI-ATC] access config', {
+      //   exists: cfgSnap.exists(),
+      //   enabled: cfg?.enabled,
+      //   global: cfg?.global,
+      //   specialistProfileId: this.profileid,
+      //   project: environment.firebase.projectId,
+      // });
       if (!cfg || cfg.enabled !== true) { this.aiAtcAllowedForUser = false; return; }  // feature off
       if (cfg.global === true) { this.aiAtcAllowedForUser = true; this.maybeRecheckAiAtc(); return; }  // enabled globally for everyone
       // Not global → restrict to the configured allowed users (by profileid / email / role).
@@ -3968,7 +3968,7 @@ export class DynamicStudioV2Component {
 
   async checkAiAtcAvailability() {
     if (!this.aiAtcAllowedForUser) {
-      console.log('[AI-ATC] skipped — feature not enabled for this user (classify/queue-atc-edit-config)');
+      // console.log('[AI-ATC] skipped — feature not enabled for this user (classify/queue-atc-edit-config)');
       this.aiAtcAvailable = false;
       return;
     }
@@ -3982,11 +3982,11 @@ export class DynamicStudioV2Component {
       // silent path that used to strand the button on the `?step=prescribe-atc`
       // deep-link (the step activates before the token lands); ensureTokenForAssignment
       // and the queue_token subscription both re-fire the check now.
-      console.log('[AI-ATC] deferred — waiting for token hydration', {
-        profileid: profileid || '(none)',
-        queueTokenId: queueTokenId || '(none)',
-        tokenQueueId: tokenQueueRef?.id || '(none)',
-      });
+      // console.log('[AI-ATC] deferred — waiting for token hydration', {
+      //   profileid: profileid || '(none)',
+      //   queueTokenId: queueTokenId || '(none)',
+      //   tokenQueueId: tokenQueueRef?.id || '(none)',
+      // });
       this.aiAtcAvailable = false;
       this.aiAtcDocId = null;
       this.aiAtcCheckedKey = null;
@@ -4052,27 +4052,27 @@ export class DynamicStudioV2Component {
         this.aiAtcAvailable = true;
       }
 
-      // Stringified, not an object: Chrome collapses a logged object to
-      // `{…}` + `Array(2)`, so a pasted console dump loses exactly the fields
-      // (candidates / chosen) the log exists to show.
-      console.log('[AI-ATC] availability check ' + JSON.stringify({
-        participantProfileId: profileid,
-        studioTokenId: queueTokenId,
-        studioQueueId: tokenQueueRef.id,
-        tokenLineage: [...lineage].map(([id, dir]) => `${dir}:${id}`),
-        docsForParticipant: rows.length,
-        candidates: rows.map(r => ({
-          id: r.id,
-          status: r.data?.['status'],
-          queue_token_id: r.data?.['queue_token_id'] ?? '(none)',
-          via: (r.data?.['queue_token_id'] ? lineage.get(r.data['queue_token_id']) : undefined) ?? '(off-lineage)',
-          queueref: this.aiAtcRefId(r.data?.['queueref']) || '(none)',
-          hasCreatedAt: !!r.data?.['createdAt'],
-          scope: scopeOf(r),
-        })),
-        chosen: chosen ? { id: chosen.id, scope: chosen.scope } : null,
-        aiAtcAvailable: this.aiAtcAvailable,
-      }));
+      // Diagnostic — uncomment when a "the doc exists but the button is hidden" report
+      // comes in. Prints every candidate with the gate that rejected it. Stringified
+      // because Chrome collapses a logged object to `{…}`, losing exactly these fields.
+      // console.log('[AI-ATC] availability check ' + JSON.stringify({
+      //   participantProfileId: profileid,
+      //   studioTokenId: queueTokenId,
+      //   studioQueueId: tokenQueueRef.id,
+      //   tokenLineage: [...lineage].map(([id, dir]) => `${dir}:${id}`),
+      //   docsForParticipant: rows.length,
+      //   candidates: rows.map(r => ({
+      //     id: r.id,
+      //     status: r.data?.['status'],
+      //     queue_token_id: r.data?.['queue_token_id'] ?? '(none)',
+      //     via: (r.data?.['queue_token_id'] ? lineage.get(r.data['queue_token_id']) : undefined) ?? '(off-lineage)',
+      //     queueref: this.aiAtcRefId(r.data?.['queueref']) || '(none)',
+      //     hasCreatedAt: !!r.data?.['createdAt'],
+      //     scope: scopeOf(r),
+      //   })),
+      //   chosen: chosen ? { id: chosen.id, scope: chosen.scope } : null,
+      //   aiAtcAvailable: this.aiAtcAvailable,
+      // }));
     } catch (err) {
       console.error('[AI-ATC] availability check failed; hiding AI button', err);
       this.aiAtcCheckedKey = null;  // allow a retry on the next entry
