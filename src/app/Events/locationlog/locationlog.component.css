@@ -1,5 +1,5 @@
 /* =============================================================================
-   Live Location Tracking dashboard — light theme only.
+   Live Location Tracking dashboard — light theme only
    -----------------------------------------------------------------------------
    There is deliberately no `prefers-color-scheme: dark` block: the dashboard
    ships a single light appearance, so every surface below can assume a white
