@@ -188,7 +188,6 @@ export class CreateWatsonProfileComponent {
                   number: newUser['phonenumber'],
                 });
                 console.log("new to user_data", newUser['uid']);
-
                 await setDoc(rolesRef, {
                   name: newUser['name'],
                   participant: true,
