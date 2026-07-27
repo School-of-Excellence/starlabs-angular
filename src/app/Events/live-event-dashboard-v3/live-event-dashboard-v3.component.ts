@@ -92,6 +92,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   panelSub = '';
   panelSearch = '';
   private panelRows: PanelParticipant[] = [];
+  // manual attendance marking (only enabled for the per-day Unattended list)
+  panelMarkable = false;
+  markedIds = new Set<string>();
+  markingId: string | null = null;
 
   private sub: Subscription | null = null;
 
@@ -296,9 +300,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
 
   get liveCount(): number { return this.data.liveChangeworkTotal; }
   openLive(): void {
-    const list = this.data.liveChangeworkList;
-    this.openPanelRows('LIVE in the Arena', "Running right now · who's doing what",
-      list.map(x => ({ ...this.data.buildParticipantFromProfileId(x.profileId, true), _meta: x.proc })));
+    // doer↔beneficiary pairs across every procedure's live changework, kept as sets.
+    const rows: PanelParticipant[] = [];
+    for (const id of this.data.sortedProcedureIds) {
+      const s = this.data.mapProcedureData[id];
+      rows.push(...this.procPairRows(s?.liveChangework?.data || [], this.procName(id), true));
+    }
+    this.openPanelRows('LIVE in the Arena', "Running right now · who's doing what · doer & beneficiary", rows, true);
   }
 
   // Quartile distribution (fed by SEAM 5). null ratios are excluded → zero counts.
@@ -309,11 +317,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const total = this.data.eventParticipantProfileIds.length;
     // pctOp/pctVal mirror each tier onto the Participant Data "ATC %" filter
     // (cumulative >= for the top tiers, < 25 for the bottom).
+    // UNIQUE (non-cumulative) tiers — each participant falls in exactly one band.
     const defs: { cls: string; label: string; test: (r: number) => boolean; pctOp: '>=' | '<=' | '<'; pctVal: number }[] = [
       { cls: 'q100', label: '100%', test: r => r >= 1, pctOp: '>=', pctVal: 100 },
-      { cls: 'q75', label: '75%+', test: r => r >= 0.75, pctOp: '>=', pctVal: 75 },
-      { cls: 'q50', label: '50%+', test: r => r >= 0.5, pctOp: '>=', pctVal: 50 },
-      { cls: 'q25', label: '25%+', test: r => r >= 0.25, pctOp: '>=', pctVal: 25 },
+      { cls: 'q75', label: '75–99%', test: r => r >= 0.75 && r < 1, pctOp: '>=', pctVal: 75 },
+      { cls: 'q50', label: '50–74%', test: r => r >= 0.5 && r < 0.75, pctOp: '>=', pctVal: 50 },
+      { cls: 'q25', label: '25–49%', test: r => r >= 0.25 && r < 0.5, pctOp: '>=', pctVal: 25 },
       { cls: 'q0', label: 'Below 25%', test: r => r < 0.25, pctOp: '<', pctVal: 25 }
     ];
     return defs.map(d => {
@@ -531,6 +540,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   openAttAbsentToday(): void { const t = this.data.dayWiseAttendance.find(d => d.isToday); this.openPanel('Absent today', this.data.selectedEvent?.['name'] || '', t ? t.absentProfileIds : []); }
   openAttNever(): void { this.openPanel('Never attended', 'Approved but no scan on any day · critical', this.data.allDayAbsentProfileIds); }
   openAttVideo(day: DayAttendance): void { this.openPanel(`Video Ask · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', this.getVideoAskIdsByDay(day)); }
+  // Per-day: unattended (absent) + Video Ask submitted / unsubmitted (missing), with lists.
+  attAbsentCount(day: DayAttendance): number { return day.absentProfileIds.length; }
+  openAttAbsent(day: DayAttendance): void {
+    this.openPanel(`Unattended · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', day.absentProfileIds);
+    this.panelMarkable = true;   // allow manual attendance marking from this list
+  }
+  attMissingVACount(day: DayAttendance): number { return this.getMissingRecordingByDay(day).length; }
+  openAttMissingVA(day: DayAttendance): void { this.openPanel(`Video Ask not submitted · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', this.getMissingRecordingByDay(day)); }
 
   // ==========================================================================
   // Procedure Tracking (#procRows) — FT calculateProcedureData (registered universe)
@@ -575,15 +592,20 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
 
   openProcCell(id: string, kind: 'dns' | 'dc' | 'bns' | 'bc' | 'live'): void {
     const s = this.procStat(id); if (!s) { return; }
-    let ids: string[] = []; let label = '';
-    if (kind === 'dns') { ids = s.doerNotStarted.data as string[]; label = 'As Doer · Not started'; }
-    else if (kind === 'dc') { ids = (s.doerCompleted.data as any[]).map(d => d.doerId); label = 'As Doer · Completed'; }
-    else if (kind === 'bns') { ids = s.beneficierNotStarted.data as string[]; label = 'As Beneficiary · Not started'; }
-    else if (kind === 'bc') { ids = (s.beneficierCompleted.data as any[]).map(d => d.beneficiaryId); label = 'As Beneficiary · Completed'; }
-    else { ids = (s.liveChangework.data as any[]).map(d => d.doerId); label = 'Live now'; }
     const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
     const dayL = this.procDayFilter === 'all' ? 'All Days' : this.procDayFilter;
-    this.openPanel(`${this.procName(id)} · ${label}`, `${scopeL} · ${dayL}`, ids.filter(Boolean));
+    const sub = `${scopeL} · ${dayL}`;
+    // Completed & Live: show the doer↔beneficiary PAIR as a set (kept together).
+    if (kind === 'dc' || kind === 'bc' || kind === 'live') {
+      const data = kind === 'dc' ? s.doerCompleted.data : kind === 'bc' ? s.beneficierCompleted.data : s.liveChangework.data;
+      const label = kind === 'dc' ? 'As Doer · Completed' : kind === 'bc' ? 'As Beneficiary · Completed' : 'Live now';
+      this.openPanelRows(`${this.procName(id)} · ${label}`, sub, this.procPairRows(data as any[], this.procName(id), false), true);
+      return;
+    }
+    // Not-started: a plain list (no counterpart yet).
+    const ids = kind === 'dns' ? (s.doerNotStarted.data as string[]) : (s.beneficierNotStarted.data as string[]);
+    const label = kind === 'dns' ? 'As Doer · Not started' : 'As Beneficiary · Not started';
+    this.openPanel(`${this.procName(id)} · ${label}`, sub, ids.filter(Boolean));
   }
   openProcLive(): void { this.openLive(); }
 
@@ -740,6 +762,17 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.openPanel(`Flag · ${g.label}`, `${this.data.selectedEvent?.['name'] || ''} · A&H CRM`, g.profileIds);
   }
   participantName(profileId: string): string { return this.data.participantMetadataMap[profileId]?.['name'] || this.data.registeredNames[profileId] || 'Unknown'; }
+  /** All eligible products (from the participant's event participation request
+   *  docs), resolved to names. */
+  productNames(profileId: string): string[] {
+    return (this.data.registeredProductIds[profileId] || []).map(id => this.data.productMap[id] || id).filter(Boolean);
+  }
+  /** Colour class per journey (cycles the prototype palette) so journey badges are
+   *  colour-coded even though journeys are dynamic. */
+  journeyBadgeClass(journeyId: string): string {
+    const idx = this.data.journeyCounts.findIndex(j => j.journeyId === journeyId);
+    return 'jc' + ((idx >= 0 ? idx : 0) % 6);
+  }
 
   // ==========================================================================
   // Arena Followup (#fuGrid) — 3 cards: Irregular, Not Doing CW, CW Not Received
@@ -765,7 +798,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get fuCards(): { label: string; title: string; color: string; eyebrow: string; ids: string[] }[] {
     return [
       { label: 'Not Doing CW', title: 'Not doing changework', color: 'var(--warn)', eyebrow: 'Throughout event', ids: this.fuNotDoingCW },
-      { label: 'CW Not Received', title: 'Changework not received', color: 'var(--warn)', eyebrow: 'Throughout event', ids: this.fuCWNotReceived }
+      { label: 'CW Not Received', title: 'Changework not received', color: 'var(--warn)', eyebrow: 'Throughout event', ids: this.fuCWNotReceived },
+      { label: 'No cohort', title: 'No cohort assigned', color: 'var(--alert)', eyebrow: 'Not in any cohort', ids: this.noCohortProfileIds }
     ];
   }
   openFu(title: string, ids: string[]): void { this.openPanel(title, this.data.selectedEvent?.['name'] || '', ids); }
@@ -993,12 +1027,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       (this.data.mapCohortParticipants[cid] || []).forEach(id => s.add(id)));
     return s;
   }
-  private get zoneNoCohortIds(): string[] {
+  /** Registered participants in NO "big cohorts" participantidlist (Zone Config
+   *  basis). Reused by the Zones "No cohort" tile and the Arena Followup column. */
+  get noCohortProfileIds(): string[] {
     const members = this.cohortMemberSet;
     return this.data.eventParticipantProfileIds.filter(id => !members.has(id));
   }
-  get zoneNoCohortCount(): number { return this.zoneNoCohortIds.length; }
-  openZoneNoCohort(): void { this.openZoneList('No cohort', this.data.selectedEvent?.['name'] || '', this.zoneNoCohortIds, id => this.zoneNameOf(id) || 'no zone'); }
+  get zoneNoCohortCount(): number { return this.noCohortProfileIds.length; }
+  openZoneNoCohort(): void { this.openZoneList('No cohort', this.data.selectedEvent?.['name'] || '', this.noCohortProfileIds, id => this.zoneNameOf(id) || 'no zone'); }
 
   zoneIsLive(zone: any): boolean { return zone['status'] === 'open'; }
   zoneCoordinators(zone: any): string { return this.staffNames(zone['coordinators']); }
@@ -1054,20 +1090,110 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   openPanel(title: string, sub: string, profileIds: string[]): void {
     this.openPanelRows(title, sub, profileIds.map(id => this.data.buildParticipantFromProfileId(id, false)));
   }
-  private openPanelRows(title: string, sub: string, rows: PanelParticipant[]): void {
+  private openPanelRows(title: string, sub: string, rows: PanelParticipant[], preserveOrder = false): void {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelRows = rows.slice().sort((a, b) => a.name.localeCompare(b.name));
+    this.panelFilter = { type: 'all', unattended: false };
+    this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
+    this.markedIds = new Set<string>();
+    // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
+    this.panelRows = preserveOrder ? rows.slice() : rows.slice().sort((a, b) => a.name.localeCompare(b.name));
     this.panelOpen = true;
+  }
+
+  /** Build one PAIR row per changework — doer and beneficiary shown side-by-side on
+   *  the same row so the relationship is unambiguous. `name`/`email` are combined so
+   *  the panel search still matches either party. */
+  private procPairRows(data: any[], procName: string, showProc: boolean): PanelParticipant[] {
+    const rows: PanelParticipant[] = [];
+    (data || []).forEach((cw: any) => {
+      if (!cw.doerId && !cw.beneficiaryId) { return; }
+      const doer = cw.doerId ? this.data.buildParticipantFromProfileId(cw.doerId, true) : null;
+      const beneficiary = cw.beneficiaryId ? this.data.buildParticipantFromProfileId(cw.beneficiaryId, true) : null;
+      rows.push({
+        _pair: true, doer, beneficiary,
+        proc: showProc ? (cw.procedureName || procName || '') : '',
+        profileid: doer?.profileid || beneficiary?.profileid || '',
+        name: `${doer?.name || ''} ${beneficiary?.name || ''}`.trim(),
+        email: `${doer?.email || ''} ${beneficiary?.email || ''}`.trim(),
+      } as any);
+    });
+    return rows;
+  }
+  // list filters: first-timer / repeat (mutually exclusive) + no-attendance-log.
+  panelFilter: { type: 'all' | 'ft' | 'rp'; unattended: boolean } = { type: 'all', unattended: false };
+  togglePanelType(t: 'ft' | 'rp'): void { this.panelFilter.type = this.panelFilter.type === t ? 'all' : t; }
+  togglePanelUnattended(): void { this.panelFilter.unattended = !this.panelFilter.unattended; }
+  get panelFilterActive(): boolean { return this.panelFilter.type !== 'all' || this.panelFilter.unattended; }
+  private hasAttendanceLog(profileid: string): boolean { const r = this.data.mapAttendence[profileid]; return !!r && r.length > 0; }
+  private matchesPanelFilter(profileid: string): boolean {
+    if (this.panelFilter.type === 'ft' && !this.isFirstTimer(profileid)) { return false; }
+    if (this.panelFilter.type === 'rp' && this.isFirstTimer(profileid)) { return false; }
+    if (this.panelFilter.unattended && this.hasAttendanceLog(profileid)) { return false; }
+    return true;
   }
   get panelParticipants(): PanelParticipant[] {
     const q = this.panelSearch.toLowerCase().trim();
-    if (!q) { return this.panelRows; }
-    return this.panelRows.filter(p => p.name.toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q));
+    const active = this.panelFilterActive;
+    if (!q && !active) { return this.panelRows; }
+    return this.panelRows.filter((p: any) => {
+      if (q && !((p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))) { return false; }
+      if (!active) { return true; }
+      if (p['_pair']) {
+        const d = p['doer'] && this.matchesPanelFilter(p['doer'].profileid);
+        const b = p['beneficiary'] && this.matchesPanelFilter(p['beneficiary'].profileid);
+        return !!(d || b);
+      }
+      return this.matchesPanelFilter(p.profileid);
+    });
   }
   get panelCount(): number { return this.panelParticipants.length; }
   closePanel(): void { this.panelOpen = false; }
+
+  /** Manual attendance marking (Unattended list). Confirms, then writes an
+   *  `arena e-ticket log` doc via the service so the person becomes present today. */
+  markAttendance(p: PanelParticipant): void {
+    if (!p?.profileid || this.markingId || this.markedIds.has(p.profileid)) { return; }
+    if (!window.confirm(`Are you sure you want to mark the attendance for ${p.name}?`)) { return; }
+    this.markingId = p.profileid;
+    this.data.markAttendance(p.profileid)
+      .then(() => { this.markedIds.add(p.profileid); this.markingId = null; this.cdr.detectChanges(); })
+      .catch((err: any) => {
+        this.markingId = null;
+        console.error('[v3][attendance] mark failed:', err);
+        window.alert('Could not mark attendance. Please try again.');
+        this.cdr.detectChanges();
+      });
+  }
+
+  /** Export the currently-open list to a CSV (opens in Excel). Handles both
+   *  normal participant rows and doer↔beneficiary pair rows. */
+  panelExport(): void {
+    const esc = (s: any) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const row = (p: any, detail: string) => [
+      esc(p.name), esc(p.email || ''),
+      esc(this.journeyLabel(p.activejourney) || ''),
+      esc(this.isFirstTimer(p.profileid) ? 'First timer' : 'Repeat'),
+      esc(this.productNames(p.profileid).join(' | ')),
+      esc(detail)
+    ].join(',');
+    const lines = [['Name', 'Email', 'Journey', 'Type', 'Products', 'Detail'].join(',')];
+    this.panelParticipants.forEach((p: any) => {
+      if (p['_pair']) {
+        const proc = p['proc'] ? `${p['proc']} · ` : '';
+        if (p['doer']) { lines.push(row(p['doer'], `${proc}Doer · with ${p['beneficiary']?.name || '—'}`)); }
+        if (p['beneficiary']) { lines.push(row(p['beneficiary'], `${proc}Beneficiary · with ${p['doer']?.name || '—'}`)); }
+      } else {
+        lines.push(row(p, p['_meta'] || ''));
+      }
+    });
+    const fname = ((this.panelTitle || 'list') + ' ' + (this.data.selectedEvent?.['name'] || '')).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' }));
+    a.download = (fname || 'list') + '.csv';
+    a.click(); URL.revokeObjectURL(a.href);
+  }
 
   initials(name: string): string {
     return (name || '').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
