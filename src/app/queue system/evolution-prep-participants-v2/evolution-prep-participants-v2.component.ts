@@ -3,7 +3,7 @@ import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   collection, doc, DocumentReference, Firestore, getDoc, getDocs, onSnapshot,
-  query, setDoc, where,
+  query, serverTimestamp, setDoc, where,
 } from '@angular/fire/firestore';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -109,6 +109,16 @@ export interface LiveAssignmentHit {
   status: CaptureStatus;
   dropboxlink: string;
   lastError?: string;
+  /**
+   * When the last failure was recorded, in ms (`transcriptCaptureFailedAt`).
+   *
+   * This is what distinguishes a STALE failure — left on the doc by a previous
+   * attempt, because nothing clears it until the pipeline's own "queued" write
+   * lands — from a genuinely NEW one. Both are `status: 'failed'`; only the
+   * timestamp tells them apart. Compared server-value against server-value, so
+   * client clock skew cannot corrupt the test.
+   */
+  failedAtMs?: number | null;
 }
 
 /**
@@ -143,6 +153,18 @@ export interface PairingView {
   offLineageProbed: boolean;
   dropboxLink: string;
   saving: boolean;
+  /**
+   * Submit-in-flight markers, both null when idle.
+   *
+   * A submit writes only `dropboxlink`/`retranscribeAt` — it deliberately does not
+   * touch `transcriptCaptureStatus`, so between the click and the Cloud Function's
+   * "queued" write (1-3s of function start-up) the doc STILL says 'failed' from the
+   * previous attempt. `staleFailedAtMs` records which failure that was, so the
+   * leftover can be recognised and ignored until the pipeline actually responds.
+   * `pendingSince` bounds the suppression in time.
+   */
+  pendingSince?: number | null;
+  staleFailedAtMs?: number | null;
 }
 
 export interface Row {
@@ -542,7 +564,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    */
   private async walkPairings(
     queueRef: DocumentReference, queueData: any, tokenData: any, tokenId: string,
-    pairings: PairingCfg[],
+    pairings: PairingCfg[], fresh = false,
   ): Promise<{
     views: Map<string, { hits: LiveAssignmentHit[]; trail: string[] }>;
     crossed: boolean;
@@ -606,7 +628,10 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
       if (!aq || !at || level >= 12 || visited.has(at.id)) break;
       visited.add(at.id);
 
-      let prevToken = this.tokenCache.get(at.id);
+      // `fresh` bypasses the ancestor-token cache: a single-row refresh exists
+      // precisely to pick up a token whose transfer links were just repaired, and a
+      // cached ancestor would hand back the stale chain the refresh is replacing.
+      let prevToken = fresh ? undefined : this.tokenCache.get(at.id);
       if (prevToken === undefined) {
         try { const snap2 = await getDoc(at); prevToken = snap2.exists() ? snap2.data() : null; }
         catch { prevToken = null; }
@@ -688,6 +713,7 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         h.status = (d?.transcriptCaptureStatus ?? null) as CaptureStatus;
         h.dropboxlink = d?.dropboxlink ?? '';
         h.lastError = d?.transcriptCaptureLastError;
+        h.failedAtMs = this.tsMs(d?.transcriptCaptureFailedAt);
       } catch {
         h.exists = false;
       }
@@ -736,6 +762,97 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     this.genQueueLoads.clear();
     this.ownFormProfiles.clear();
     this.ownFormLoaded = false;
+  }
+
+  /**
+   * Gen-doc read for ONE row's token lineage — the single-row counterpart of
+   * loadQueueGenDocs.
+   *
+   * The bulk loader pulls every doc of a queue once and shares it across all rows.
+   * That is right for a 700-row load and wrong for refreshing one row: leaving it
+   * cached hands back the exact stale answer the refresh was meant to replace, and
+   * busting it re-downloads hundreds of docs to learn about one participant. So a
+   * refresh asks only about this lineage's tokens — one `in` query (a lineage is
+   * capped at 13 levels, well under Firestore's 30-value limit) plus one profile
+   * query, which also answers genOtherToken precisely instead of from a set that
+   * only knows the queues already scanned.
+   *
+   * Stale entries are dropped BEFORE the read so a doc that has since been deleted
+   * disappears rather than lingering. Results are written back into genByToken, so
+   * the rest of the table stays consistent with what this row now shows.
+   *
+   * Returns whether a doc exists for this profile under a token that is NOT on the
+   * lineage.
+   */
+  private async refreshGenDocsFor(
+    row: Row, chain: Array<{ queueId: string; tokenId: string }>,
+  ): Promise<boolean> {
+    const queueOfToken = new Map(chain.map((c) => [c.tokenId, c.queueId]));
+    const ids = [...new Set(chain.map((c) => c.tokenId))].filter(Boolean).slice(0, 30);
+    ids.forEach((id) => this.genByToken.delete(id));
+    if (!ids.length) return false;
+
+    const col = collection(this.atcSvc.atcDb, 'queue_atc_generation');
+    const rank = (x?: string | null) =>
+      ['error', 'dataincomplete', 'pending', 'processing', 'completed'].indexOf(String(x));
+
+    const [tokenSnap, profileSnap] = await Promise.all([
+      getDocs(query(col, where('queue_token_id', 'in', ids))),
+      row.profile_id
+        ? getDocs(query(col, where('profileid', '==', row.profile_id)))
+        : Promise.resolve(null),
+    ]);
+
+    tokenSnap.docs.forEach((d) => {
+      const data: any = d.data();
+      if (!data.queue_token_id) return;
+      const prev = this.genByToken.get(data.queue_token_id);
+      if (!prev || rank(data.status) > rank(prev.data.status)) {
+        this.genByToken.set(data.queue_token_id, {
+          id: d.id, data,
+          // queueref is the doc's own answer; the chain step is the fallback for a
+          // doc written without one.
+          queueId: data.queueref?.id ?? queueOfToken.get(data.queue_token_id) ?? '',
+        });
+      }
+    });
+
+    if (!profileSnap) return false;
+    profileSnap.docs.forEach((d) => {
+      const pid = (d.data() as any)?.profileid;
+      if (pid) this.genProfiles.add(pid);
+    });
+    return profileSnap.docs.some((d) => !ids.includes((d.data() as any)?.queue_token_id));
+  }
+
+  /**
+   * Did THIS participant submit the config stage's own form in the selected queue?
+   *
+   * loadOwnFormProfiles answers this for the whole table with one query at load
+   * time; a row refresh re-asks for the single profile so a form submitted since
+   * then is picked up. Three equality filters, same as the bulk query — Firestore
+   * serves those from single-field indexes, no composite needed.
+   *
+   * Returns null when the own source is not a form or the query fails, so the
+   * caller keeps the bulk-set answer rather than downgrading a known value to a
+   * guess.
+   */
+  private async probeOwnForm(profileId: string): Promise<boolean | null> {
+    const cfg = this.atcCfg;
+    if (!cfg || cfg.ownType !== 'form' || !cfg.ownFormId || !profileId) return null;
+    try {
+      const snap = await getDocs(query(
+        collection(this.atcSvc.formsDb, 'formsByClient'),
+        where('formid', '==', cfg.ownFormId),
+        where('queueref', '==', doc(this.atcSvc.formsDb, 'queue generation', this.selectedQueueId)),
+        where('profileid', '==', profileId),
+      ));
+      if (!snap.empty) this.ownFormProfiles.add(profileId);
+      return !snap.empty;
+    } catch (e) {
+      console.error('probeOwnForm failed', e);
+      return null;
+    }
   }
 
   /**
@@ -817,15 +934,21 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
    * participants pass through it.
    */
   private async applyGenDoc(
-    row: Row, lineage: Array<{ queueId: string; tokenId: string }>,
+    row: Row, lineage: Array<{ queueId: string; tokenId: string }>, fresh = false,
   ): Promise<void> {
     // The ordered list of (queue, token) to check: own lineage, then destination.
     const chain = [...lineage];
     if (row.transferredOut && row.toQueueId && row.toTokenId) {
       chain.push({ queueId: row.toQueueId, tokenId: row.toTokenId });
     }
-    // Load every queue involved (cached / shared).
-    await Promise.all([...new Set(chain.map((c) => c.queueId))].map((q) => this.loadQueueGenDocs(q)));
+    // Load every queue involved (cached / shared) — or, on a single-row refresh,
+    // re-read only this lineage's own docs (see refreshGenDocsFor).
+    let freshOtherToken: boolean | null = null;
+    if (fresh) {
+      freshOtherToken = await this.refreshGenDocsFor(row, chain);
+    } else {
+      await Promise.all([...new Set(chain.map((c) => c.queueId))].map((q) => this.loadQueueGenDocs(q)));
+    }
 
     let hit: { id: string; data: AtcGenDoc; queueId: string } | undefined;
     let where: 'this' | 'ancestor' | 'destination' | null = null;
@@ -841,10 +964,16 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     row.genDocId = hit?.id ?? null;
     row.genStatus = (hit?.data.status ?? null) as AtcStatus | null;
     row.genIn = where;
-    row.genOtherToken = !hit && this.genProfiles.has(row.profile_id);
+    row.genOtherToken = !hit && (freshOtherToken ?? this.genProfiles.has(row.profile_id));
     // Only explanatory for a crossed row with NO doc anywhere; otherwise n/a.
     row.ownFormPresent = (!hit && row.crossed && this.ownFormLoaded)
       ? this.ownFormProfiles.has(row.profile_id) : null;
+    // A refresh re-asks for this one profile, so a form submitted since the page
+    // loaded is seen. Only when it would actually change the verdict.
+    if (fresh && !hit && row.crossed) {
+      const present = await this.probeOwnForm(row.profile_id);
+      if (present !== null) row.ownFormPresent = present;
+    }
     if (hit && where !== 'this') row.genInQueueName = this.queueLabel(hit.queueId);
     const sd: any = hit ? (hit.data as any).stagedata ?? {} : null;
     row.genMissing = hit ? this.blockingMissing(sd) : [];
@@ -952,51 +1081,123 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
     const worker = async (): Promise<void> => {
       while (cursor < rows.length && !this.destroyed) {
-        const row = rows[cursor++];
-        try {
-          const qref = doc(this.firestore, 'queue generation', row.queueId);
-          const { views, crossed, lineage } = await this.walkPairings(
-            qref, this.queueDataCache.get(row.queueId), row._token, row.tokenId,
-            this.zoomPairings);
-          row.crossed = crossed;
-
-          // Resolve the ATC doc across the full token lineage (this token → every
-          // transferredfrom ancestor → transferredto destination). lineage was
-          // collected by the walk above, so this adds only the gen-doc reads.
-          await this.applyGenDoc(row, lineage);
-
-          for (const pv of row.pairings) {
-            const v = views.get(pv.stage);
-            if (!v) continue;                       // form pairing — status came from the gen doc
-            await this.hydrateHits(v.hits);
-            pv.hits = v.hits;
-            pv.trail = v.trail;
-            pv.source = 'walk';
-            pv.status = v.hits.some((h) => h.primary && h.hasTranscript) ? 'resolved' : 'missing';
-            // Paste target = the nearest PRIMARY session still lacking a transcript.
-            // Primary because that is the only doc the resolver reads at a level;
-            // nearest because that is the level the resolver reaches first. Writing
-            // to a superseded session yields a transcript the pipeline ignores.
-            pv.targetLaId = (
-              v.hits.find((h) => h.primary && !h.hasTranscript) ??
-              v.hits.find((h) => h.primary) ??
-              v.hits[0]
-            )?.laId ?? null;
-            pv.dropboxLink = v.hits.find((h) => h.dropboxlink)?.dropboxlink ?? '';
-            // nothing on the lineage — is there a session off it?
-            if (!v.hits.length) await this.probeOffLineage(row, pv);
-          }
-        } catch (e: any) {
-          row.walkError = e?.message ?? 'walk failed';
-        } finally {
-          row.walking = false;
-          if (++this.walkProgress % 10 === 0) this.applyFilters();
-        }
+        await this.walkOne(rows[cursor++]);
+        if (++this.walkProgress % 10 === 0) this.applyFilters();
       }
     };
 
     await Promise.all(Array.from({ length: POOL }, worker));
     this.applyFilters();
+  }
+
+  /**
+   * Resolve ONE row end-to-end: chain walk → ATC doc → per-pairing hydration.
+   *
+   * Shared by the bulk load and by refreshRow(), so a refreshed row is produced by
+   * exactly the same code as a freshly loaded one — a second implementation would
+   * be free to drift from the resolver the walk deliberately mirrors.
+   *
+   * `fresh` makes the read bypass the caches that hold participant STATE (ancestor
+   * tokens, gen docs, the own-form set). Queue and variation config stay cached
+   * either way: changing those changes the pairing set for the whole table, which
+   * needs a full reload regardless.
+   */
+  private async walkOne(row: Row, fresh = false): Promise<void> {
+    row.walking = true;
+    row.walkError = null;
+    try {
+      const qref = doc(this.firestore, 'queue generation', row.queueId);
+      const { views, crossed, lineage } = await this.walkPairings(
+        qref, this.queueDataCache.get(row.queueId), row._token, row.tokenId,
+        this.zoomPairings, fresh);
+      row.crossed = crossed;
+
+      // Resolve the ATC doc across the full token lineage (this token → every
+      // transferredfrom ancestor → transferredto destination). lineage was
+      // collected by the walk above, so this adds only the gen-doc reads.
+      await this.applyGenDoc(row, lineage, fresh);
+
+      for (const pv of row.pairings) {
+        const v = views.get(pv.stage);
+        if (!v) continue;                       // form pairing — status came from the gen doc
+        await this.hydrateHits(v.hits);
+        pv.hits = v.hits;
+        pv.trail = v.trail;
+        pv.source = 'walk';
+        pv.status = v.hits.some((h) => h.primary && h.hasTranscript) ? 'resolved' : 'missing';
+        // Paste target = the nearest PRIMARY session still lacking a transcript.
+        // Primary because that is the only doc the resolver reads at a level;
+        // nearest because that is the level the resolver reaches first. Writing
+        // to a superseded session yields a transcript the pipeline ignores.
+        pv.targetLaId = (
+          v.hits.find((h) => h.primary && !h.hasTranscript) ??
+          v.hits.find((h) => h.primary) ??
+          v.hits[0]
+        )?.laId ?? null;
+        pv.dropboxLink = v.hits.find((h) => h.dropboxlink)?.dropboxlink ?? '';
+        // probeOffLineage PUSHES, so a re-walk would otherwise accumulate the same
+        // sessions twice. Cleared here rather than in refreshRow so every path that
+        // re-walks a row gets it.
+        pv.offLineage = [];
+        pv.offLineageProbed = false;
+        // nothing on the lineage — is there a session off it?
+        if (!v.hits.length) await this.probeOffLineage(row, pv);
+      }
+    } catch (e: any) {
+      row.walkError = e?.message ?? 'walk failed';
+    } finally {
+      row.walking = false;
+    }
+  }
+
+  /**
+   * Re-resolve ONE participant, without re-walking the other ~700.
+   *
+   * A row is the product of several reads — the token, its transferredfrom chain,
+   * the studio sessions at every level, the live-assignment docs, the ATC doc —
+   * and any of them can change while the operator is looking at the table (a
+   * transcript lands, a transfer is repaired, a doc is rebuilt from elsewhere).
+   * Re-running load() to see one of those costs a full 700-row walk, so the row's
+   * own reads are re-issued instead.
+   *
+   * The token is re-read first because it is the input to everything else: the
+   * chain walk climbs its transfer refs and `crossed` is computed from its
+   * currentstage, so refreshing the walk while reusing the row's original token
+   * snapshot would just re-derive the same answer from stale input.
+   *
+   * Live transcript watchers are deliberately NOT torn down — an in-flight
+   * transcription keeps reporting, and the walk re-discovers its live assignment.
+   */
+  async refreshRow(row: Row): Promise<void> {
+    if (row.walking) return;
+    row.walking = true;
+    this.applyFilters();
+    try {
+      const snap = await getDoc(doc(this.firestore, 'queue_token', row.tokenId));
+      const t: any = snap.exists() ? snap.data() : null;
+      if (!t) {
+        row.walkError = 'this queue_token no longer exists — reload the table';
+        return;
+      }
+      row._token = t;
+      this.tokenCache.set(row.tokenId, t);
+      row.profile_id = t.profile_id ?? row.profile_id;
+      row.profile_name = t.profile_name ?? row.profile_name;
+      row.currentstage = t.currentstage ?? '';
+      row.origin = (t.transferredfrom && t.tokentransferredfrom) ? 'transferred' : 'here';
+      row.transferredOut = this.isTransferredOut(t);
+      row.toQueueId = t.transferredto?.id ?? null;
+      row.toQueueName = t.transferredto?.id ? this.queueLabel(t.transferredto.id) : '';
+      row.toTokenId = t.tokentransferredto?.id ?? null;
+
+      await this.walkOne(row, true);
+    } catch (e: any) {
+      console.error('refreshRow failed', e);
+      row.walkError = e?.message ?? 'refresh failed';
+    } finally {
+      row.walking = false;
+      this.applyFilters();
+    }
   }
 
   // ── row helpers (used by the template) ─────────────────────────────────────
@@ -1040,8 +1241,49 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
     return this.studio(r).some((p) => !p.hits.length && p.offLineage.length > 0);
   }
 
+  /**
+   * How long to keep ignoring a stale 'failed' before giving up and showing the
+   * doc's real state. If the pipeline never answers — the trigger is not deployed,
+   * the function errored before its first write — the row must revert to the truth
+   * rather than sit on a "queued" that will never resolve.
+   */
+  private readonly ackGraceMs = 60_000;
+
+  /** Firestore Timestamp | Date | millis → millis. */
+  private tsMs(v: any): number | null {
+    if (!v) return null;
+    if (typeof v.toMillis === 'function') return v.toMillis();
+    if (v instanceof Date) return v.getTime();
+    return typeof v === 'number' && isFinite(v) ? v : null;
+  }
+
+  /**
+   * Is this 'failed' the PREVIOUS attempt's, left on a doc we have just re-submitted
+   * and whose pipeline has not answered yet? True only while a submit is in flight,
+   * within the grace window, and the failure timestamp is still the exact one that
+   * was there when we submitted. A NEW failure has a NEW timestamp and so is
+   * reported normally.
+   */
+  private isStaleFailure(p: PairingView, status: CaptureStatus, failedAtMs: number | null): boolean {
+    if (p.pendingSince == null) return false;
+    if (Date.now() - p.pendingSince > this.ackGraceMs) return false;
+    return status === 'failed' && failedAtMs === (p.staleFailedAtMs ?? null);
+  }
+
+  private clearPending(p: PairingView): void {
+    p.pendingSince = null;
+    p.staleFailedAtMs = null;
+  }
+
   pairingStatus(p: PairingView): CaptureStatus {
-    return p.hits.find((h) => h.laId === p.targetLaId)?.status ?? null;
+    const hit = p.hits.find((h) => h.laId === p.targetLaId);
+    const raw = hit?.status ?? null;
+    // Report a just-submitted pairing as busy rather than flashing "Failed" at the
+    // operator who just clicked retry. Everything downstream — the busy badge, the
+    // disabled input and button, pairingBusy(), nextAction() — follows from this one
+    // substitution, so no template branch needs to know about it.
+    if (this.isStaleFailure(p, raw, hit?.failedAtMs ?? null)) return 'queued';
+    return raw;
   }
   pairingBusy(p: PairingView): boolean {
     const st = this.pairingStatus(p);
@@ -1128,14 +1370,25 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
 
   /**
    * Write the pasted Dropbox URL onto the live-assignment doc resolved for ONE
-   * studio pairing.
+   * studio pairing — and (re)submit it for transcription.
    *
-   * Only `dropboxlink` (plus `profile_name`) is written. `dropboxlink` CHANGING is
-   * what seLiveTranscribeSubmit gates on, and nothing the pipeline writes back
-   * touches it — that is what prevents a resubmit loop, so no status field may be
-   * set here. `profile_name` is written because assignSpeakers() uses it to decide
-   * which diarized speaker is the coach; V1 never wrote it, which is why some
-   * backfilled transcripts came back with coach and participant swapped.
+   * Three fields are written, and no status field may be set here:
+   *
+   *  - `dropboxlink` — the recording. Its CHANGING is one of the two things
+   *    seLiveTranscribeSubmit gates on.
+   *  - `retranscribeAt` — an advancing serverTimestamp, the OTHER thing that gate
+   *    fires on. This is what makes a RETRY possible. On a failed job (RunPod
+   *    "CUDA out of memory" is the common transient one) the doc keeps the very
+   *    same dropboxlink, and the same recording is precisely what we want to
+   *    re-run — so re-sending the identical URL used to change nothing and the
+   *    button silently did nothing. Writing it unconditionally means this button
+   *    always means "submit", whether the operator changed the link or not.
+   *  - `profile_name` — assignSpeakers() uses it to decide which diarized speaker
+   *    is the coach; V1 never wrote it, which is why some backfilled transcripts
+   *    came back with coach and participant swapped.
+   *
+   * The no-resubmit-loop invariant is intact: nothing the pipeline writes back
+   * (queued / processing / captured / failed) touches EITHER trigger field.
    *
    * V1 also wrote `needtranscriptsforse: true`. That flag was the trigger condition
    * before 712edc8 changed it to fire on dropboxlink change; it is now vestigial and
@@ -1161,21 +1414,52 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         'Close', { duration: 6000 });
       return;
     }
+    // A job is already in flight for this pairing — a second submit would burn
+    // another RunPod job on the same recording. The template disables the input
+    // and button while busy; this guards the keyup.enter path and any future
+    // template drift.
+    if (this.pairingBusy(p)) {
+      this.snackbar.open(
+        `Already transcribing ${row.profile_name} — wait for it to finish or fail`, 'Close', { duration: 4000 });
+      return;
+    }
     const target = p.hits.find((h) => h.laId === p.targetLaId);
     if (target?.hasTranscript &&
         !confirm(`${row.profile_name} already has a ${p.stage} transcript. Replace it with a new one from this recording?`)) {
       return;
     }
+    const isRetry = this.pairingStatus(p) === 'failed' && (target?.dropboxlink ?? '') === url;
 
     p.saving = true;
     try {
       await setDoc(
         doc(this.firestore, 'live assignment', p.targetLaId),
-        { dropboxlink: url, profile_name: row.profile_name ?? '' },
+        {
+          dropboxlink: url,
+          profile_name: row.profile_name ?? '',
+          // Advancing marker — see the method comment. Without it, re-sending an
+          // unchanged link after a failure is a silent no-op.
+          retranscribeAt: serverTimestamp(),
+        },
         { merge: true },
       );
       p.dropboxLink = url;   // show the operator what was actually stored
-      this.snackbar.open(`Submitted — transcribing ${row.profile_name}`, 'Close', { duration: 3000 });
+      // Enter "awaiting pipeline acknowledgement", remembering WHICH failure was
+      // already on the doc. Until the Cloud Function replaces it, that leftover
+      // 'failed' is suppressed — see pairingStatus() and watch(). This also marks the
+      // pairing busy immediately, so a fast second click cannot stamp retranscribeAt
+      // again and burn a second RunPod job on the same recording.
+      p.staleFailedAtMs = target?.failedAtMs ?? null;
+      p.pendingSince = Date.now();
+      if (target) target.lastError = undefined;
+      // Bounded, so a pipeline that never answers cannot leave the row stuck on a
+      // "queued" it will never leave.
+      setTimeout(() => { if (p.pendingSince != null) this.clearPending(p); }, this.ackGraceMs);
+      this.snackbar.open(
+        isRetry
+          ? `Retrying — re-transcribing ${row.profile_name}`
+          : `Submitted — transcribing ${row.profile_name}`,
+        'Close', { duration: 3000 });
       this.watch(row, p);
     } catch (e: any) {
       console.error('saveLink failed', e);
@@ -1266,7 +1550,21 @@ export class EvolutionPrepParticipantsV2Component implements OnInit, OnDestroy {
         const d: any = snap.exists() ? snap.data() : null;
         const hit = p.hits.find((h) => h.laId === laId);
         if (!hit || !d) return;
-        hit.status = (d.transcriptCaptureStatus ?? null) as CaptureStatus;
+        const rawStatus = (d.transcriptCaptureStatus ?? null) as CaptureStatus;
+        const failedAtMs = this.tsMs(d.transcriptCaptureFailedAt);
+
+        // A submit does not clear transcriptCaptureStatus, so this listener's FIRST
+        // snapshot still carries the previous attempt's 'failed'. Acting on it was the
+        // bug: the terminal-state branch below tore down this very listener and fired
+        // a false "Transcription FAILED" toast, so the real queued → processing →
+        // captured updates that followed were never received and the row stayed
+        // "Failed" until the operator refreshed it manually. Wait for the pipeline to
+        // actually answer before believing a failure.
+        if (this.isStaleFailure(p, rawStatus, failedAtMs)) return;
+        this.clearPending(p);
+
+        hit.status = rawStatus;
+        hit.failedAtMs = failedAtMs;
         hit.hasTranscript = !!(d.transcript_text && String(d.transcript_text).trim());
         hit.dropboxlink = d.dropboxlink ?? '';
         hit.lastError = d.transcriptCaptureLastError;

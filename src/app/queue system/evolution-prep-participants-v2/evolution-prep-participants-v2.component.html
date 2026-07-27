@@ -289,6 +289,17 @@
                 </span>
                 <span class="next-action" [matTooltip]="'Suggested next step'">{{ nextAction(row) }}</span>
               </div>
+              <!-- Re-resolve just this participant. Everything on a row comes from
+                   reads that can change while the table is open (a transcript
+                   lands, a transfer is repaired, a doc is rebuilt elsewhere) —
+                   without this the only way to see that is a full 700-row walk. -->
+              <button mat-icon-button class="row-refresh-btn"
+                      [disabled]="row.walking"
+                      (click)="refreshRow(row)"
+                      matTooltip="Refresh this row only — re-reads the token, re-walks its transfer chain, re-checks the studio sessions and the ATC doc. The rest of the table is left alone.">
+                <mat-spinner *ngIf="row.walking" diameter="14" strokeWidth="2"></mat-spinner>
+                <mat-icon *ngIf="!row.walking">refresh</mat-icon>
+              </button>
             </div>
           </td>
         </ng-container>
@@ -399,12 +410,18 @@
                        [(ngModel)]="p.dropboxLink"
                        [disabled]="p.saving || pairingBusy(p)"
                        (keyup.enter)="saveLink(row, p)">
+                <!-- On a FAILED job the stored link is unchanged and is exactly what
+                     we want to re-run, so this same button IS the retry: saveLink()
+                     stamps retranscribeAt, which re-fires seLiveTranscribeSubmit. -->
                 <button mat-icon-button class="link-save-btn"
-                        [matTooltip]="p.status === 'resolved' ? 'Replace transcript' : 'Attach & transcribe'"
+                        [matTooltip]="pairingStatus(p) === 'failed'
+                                        ? 'Retry transcription with this recording'
+                                        : (p.status === 'resolved' ? 'Replace transcript' : 'Attach & transcribe')"
                         [disabled]="p.saving || pairingBusy(p)"
                         (click)="saveLink(row, p)">
                   <mat-spinner *ngIf="p.saving" diameter="16" strokeWidth="2"></mat-spinner>
-                  <mat-icon *ngIf="!p.saving">{{ p.status === 'resolved' ? 'autorenew' : 'send' }}</mat-icon>
+                  <mat-icon *ngIf="!p.saving">{{ pairingStatus(p) === 'failed' ? 'refresh'
+                                                 : (p.status === 'resolved' ? 'autorenew' : 'send') }}</mat-icon>
                 </button>
                 <a *ngIf="p.dropboxLink" [href]="p.dropboxLink" target="_blank"
                    class="link-open-btn" matTooltip="Open recording">

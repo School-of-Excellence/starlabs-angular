@@ -266,3 +266,112 @@
 .tags-actions .spacer {
   flex: 1;
 }
+
+/* ---- tabs ---- */
+.tags-tabs {
+  --mat-tab-header-active-label-text-color: #4f46e5;
+  --mat-tab-header-active-indicator-color: #4f46e5;
+  --mdc-tab-indicator-active-indicator-color: #4f46e5;
+}
+.tab-pane {
+  padding-top: 14px;
+}
+
+/* ---- segment hint ---- */
+.segment-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #dfe4fb;
+  border-radius: 10px;
+  background: #eef2ff;
+  margin-bottom: 12px;
+}
+.segment-hint > mat-icon {
+  color: #4f46e5;
+  flex: 0 0 auto;
+}
+.hint-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hint-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #4338ca;
+}
+.hint-url {
+  font-size: 0.78rem;
+  color: #4b5563;
+  word-break: break-all;
+  margin-top: 2px;
+}
+
+/* ---- segment toolbar ---- */
+.segment-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.seg-count {
+  font-size: 0.82rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+.segment-toolbar button mat-icon {
+  vertical-align: middle;
+  margin-right: 4px;
+  font-size: 18px;
+  height: 18px;
+  width: 18px;
+}
+
+/* ---- segment table ---- */
+.segment-table-wrap {
+  border: 1px solid #eceff4;
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.segment-table {
+  width: 100%;
+  background: transparent;
+}
+.segment-table th.mat-mdc-header-cell {
+  background: #f9fafb;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.segment-table td.mat-mdc-cell {
+  color: #374151;
+  font-size: 0.88rem;
+  border-bottom-color: #f0f2f6;
+}
+.seg-select-col { width: 44px; }
+.seg-copy-col { width: 120px; text-align: center; }
+.seg-name { font-weight: 600; color: #1f2937; }
+.id-code {
+  font-size: 0.78rem;
+  color: #4f46e5;
+  background: #f5f6fb;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+.seg-copy-btn { color: #4f46e5; }
+.seg-empty {
+  padding: 24px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.86rem;
+}

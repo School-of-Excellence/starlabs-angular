@@ -4,7 +4,7 @@ import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTable, MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { AuthguardService } from '../../authguard.service';
-import { arrayRemove, arrayUnion, collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where } from '@angular/fire/firestore';
+import { arrayRemove, arrayUnion, collection, collectionData, doc, Firestore, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where } from '@angular/fire/firestore';
 import { Subject, takeUntil } from 'rxjs';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -162,10 +162,11 @@ export class VideoaskDisplayComponent {
     });
 
     // Workshop Data
-    getDocs(collection(this.firestore,"eiflix workshop")).then(snapshot => {
+    getDocs(collection(this.firestore,"workshopconfiguration")).then(snapshot => {
       for (let j = 0; j < snapshot.docs.length; j++) {
         const element = snapshot.docs[j];
         const elementData = snapshot.docs[j].data()
+        elementData["title"] = (elementData["detailpage"] ?? {})["title"]
         this.mapWorkshop[element.id] = elementData
         this.workshopList.push(elementData)
       }
@@ -199,7 +200,7 @@ export class VideoaskDisplayComponent {
     })
 
     // Participant Video Ask
-    collectionData(query(collection(this.firestore,"participantvideoask"),orderBy("uploaded","desc")))
+    collectionData(query(collection(this.firestore,"participantvideoask"),orderBy("uploaded","desc"), limit(500)))
     .pipe(takeUntil(this.destroy$))
     .subscribe(snap => {
       this.tableData = snap
