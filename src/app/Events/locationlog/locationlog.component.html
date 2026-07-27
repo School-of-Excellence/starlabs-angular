@@ -532,6 +532,75 @@
                   </button>
                 }
               </div>
+
+              <!--
+                Hand-entered radius. Only rendered for the 'custom' band, and it
+                filters as you type — the debounce lives in the component.
+              -->
+              @if (active.distance === 'custom') {
+                <div class="ll-custom-distance" @fadeIn>
+                  <div class="ll-seg" role="group" aria-label="Direction">
+                    <button
+                      type="button"
+                      class="ll-seg-btn"
+                      [class.ll-seg-on]="active.customDistance.direction === 'within'"
+                      [attr.aria-pressed]="active.customDistance.direction === 'within'"
+                      (click)="setCustomDirection('within')">
+                      Within
+                    </button>
+                    <button
+                      type="button"
+                      class="ll-seg-btn"
+                      [class.ll-seg-on]="active.customDistance.direction === 'beyond'"
+                      [attr.aria-pressed]="active.customDistance.direction === 'beyond'"
+                      (click)="setCustomDirection('beyond')">
+                      Farther than
+                    </button>
+                  </div>
+
+                  <mat-form-field
+                    appearance="outline"
+                    subscriptSizing="dynamic"
+                    class="ll-custom-value">
+                    <mat-label>Distance</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputmode="decimal"
+                      placeholder="750"
+                      [formControl]="customDistanceControl"
+                      aria-label="Custom distance value" />
+                  </mat-form-field>
+
+                  <div class="ll-seg" role="group" aria-label="Unit">
+                    @for (unit of unitOptions; track unit) {
+                      <button
+                        type="button"
+                        class="ll-seg-btn"
+                        [class.ll-seg-on]="active.customDistance.unit === unit"
+                        [attr.aria-pressed]="active.customDistance.unit === unit"
+                        (click)="setCustomUnit(unit)">
+                        {{ unit }}
+                      </button>
+                    }
+                  </div>
+
+                  @if (describeCustomDistance(active.customDistance); as summary) {
+                    <span class="ll-custom-summary">
+                      <mat-icon inline>filter_alt</mat-icon>
+                      {{ summary }} · {{ view.filteredCount }} match{{
+                        view.filteredCount === 1 ? '' : 'es'
+                      }}
+                    </span>
+                  } @else {
+                    <span class="ll-custom-summary ll-custom-summary-idle">
+                      Enter a distance to filter.
+                    </span>
+                  }
+                </div>
+              }
             }
           </section>
 

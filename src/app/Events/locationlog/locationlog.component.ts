@@ -76,9 +76,12 @@ import {
 
 import {
   Coordinates,
+  CustomDistance,
   DEFAULT_FILTERS,
   DashboardStats,
   DistanceBand,
+  DistanceDirection,
+  DistanceUnit,
   FreshnessFilter,
   DeviceLocationState,
   LocationFilters,
@@ -95,6 +98,8 @@ import {
   SORT_TO_HEADER,
   calculateDistance,
   clampPageIndex,
+  customDistanceBounds,
+  describeCustomDistance,
   deriveStatus,
   distanceBounds,
   formatCoordinate,
@@ -254,6 +259,7 @@ export class LocationlogComponent {
   readonly formatDistance = formatDistance;
   readonly formatCoordinate = formatCoordinate;
   readonly getStatusText = getStatusText;
+  readonly describeCustomDistance = describeCustomDistance;
   readonly getStatusHint = getStatusHint;
   readonly getAvatarInitials = getAvatarInitials;
   readonly getAvatarGradient = getAvatarGradient;
@@ -304,7 +310,22 @@ export class LocationlogComponent {
     { value: 'beyond25', label: 'Farther than 25 km' },
     { value: 'beyond50', label: 'Farther than 50 km' },
     { value: 'unknown', label: 'Distance unknown' },
+    { value: 'custom', label: 'Custom distance…' },
   ];
+
+  /**
+   * Hand-entered radius.
+   *
+   * Typed `number | null`, not string: the input is `type="number"`, so Angular
+   * binds it with NumberValueAccessor, which writes a parsed number (or null
+   * when the box is empty) into the control. Typing it as a string compiles
+   * fine and then throws at runtime on the first keystroke — and because the
+   * throw escapes a `valueChanges` subscription, it tears that subscription
+   * down for good, so the filter silently stops responding for the rest of the
+   * session.
+   */
+  readonly customDistanceControl = new FormControl<number | null>(null);
+  readonly unitOptions: readonly DistanceUnit[] = ['m', 'km'];
 
   readonly sortOptions: readonly FilterOption<SortKey>[] = [
     { value: 'newest', label: 'Newest first' },
@@ -585,6 +606,12 @@ export class LocationlogComponent {
       )
       .subscribe((search) => this.patchFilters({ search }));
 
+    // Same treatment for the typed radius: debounced so the table is not
+    // re-filtered on every keystroke of "1500".
+    this.customDistanceControl.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => this.applyCustomDistanceValue(value));
+
     // Restore the previously chosen reference point. Nothing is requested from
     // the browser automatically — picking the point is the operator's call.
     const stored = this.readStoredReference();
@@ -619,6 +646,40 @@ export class LocationlogComponent {
 
   setDistance(distance: DistanceBand): void {
     this.patchFilters({ distance });
+    this.pageIndex$.next(0);
+  }
+
+  /** Switch the hand-entered radius between metres and kilometres. */
+  setCustomUnit(unit: DistanceUnit): void {
+    this.patchCustomDistance({ unit });
+  }
+
+  /** Flip between "within this radius" and "farther than this radius". */
+  setCustomDirection(direction: DistanceDirection): void {
+    this.patchCustomDistance({ direction });
+  }
+
+  /**
+   * Apply the typed radius.
+   *
+   * A blank or unparseable box parks `value` at null, which
+   * `customDistanceBounds` reads as "no radius yet" and the filter ignores —
+   * so a half-typed number never empties the table underneath the operator.
+   */
+  private applyCustomDistanceValue(raw: number | null): void {
+    const value = raw !== null && Number.isFinite(raw) && raw > 0 ? raw : null;
+    this.patchCustomDistance({ value });
+  }
+
+  private patchCustomDistance(patch: Partial<CustomDistance>): void {
+    const current = this.filters$.value;
+    this.patchFilters({
+      customDistance: { ...current.customDistance, ...patch },
+      // Typing a radius clearly means "use it", so select the band implicitly
+      // rather than making the operator also change the dropdown.
+      distance: 'custom',
+    });
+    this.pageIndex$.next(0);
   }
 
   /** Sort from the dropdown. Returns to page 1 — page 4 of the old order is
@@ -646,6 +707,7 @@ export class LocationlogComponent {
 
   clearFilters(): void {
     this.searchControl.setValue('');
+    this.customDistanceControl.setValue(null);
     this.filters$.next(DEFAULT_FILTERS);
     this.pageIndex$.next(0);
   }
@@ -923,7 +985,10 @@ export class LocationlogComponent {
     filters: LocationFilters,
     now: number,
   ): ParticipantLocation[] {
-    const bounds = distanceBounds(filters.distance);
+    const bounds =
+      filters.distance === 'custom'
+        ? customDistanceBounds(filters.customDistance)
+        : distanceBounds(filters.distance);
     const window = timeWindowBounds(filters.timeWindow, now);
 
     return participants.filter((p) => {

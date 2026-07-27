@@ -692,6 +692,76 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Custom distance radius ────────────────────────────────────────────── */
+
+.ll-custom-distance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--ll-radius-sm);
+  border: 1px solid var(--ll-border);
+  background: var(--ll-surface-2);
+}
+
+/* Shared segmented control, used for both direction and unit. */
+.ll-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--ll-surface-3);
+  border: 1px solid var(--ll-border);
+}
+
+.ll-seg-btn {
+  padding: 6px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ll-text-muted);
+  font: 600 0.78rem/1 'Inter', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.ll-seg-btn:hover {
+  color: var(--ll-text);
+}
+
+.ll-seg-on {
+  background: var(--ll-surface);
+  color: var(--ll-text);
+  box-shadow: var(--ll-shadow-xs);
+}
+
+.ll-seg-btn:focus-visible {
+  outline: 2px solid var(--ll-primary);
+  outline-offset: 1px;
+}
+
+.ll-custom-value {
+  flex: 0 1 130px;
+  min-width: 104px;
+}
+
+.ll-custom-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 0.79rem;
+  font-weight: 650;
+  color: var(--ll-primary);
+}
+
+.ll-custom-summary-idle {
+  font-weight: 500;
+  color: var(--ll-text-muted);
+}
+
 /* ── Table ─────────────────────────────────────────────────────────────── */
 
 .ll-table-wrap {
