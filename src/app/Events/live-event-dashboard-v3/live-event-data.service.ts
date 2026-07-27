@@ -740,31 +740,63 @@ export class LiveEventDataService implements OnDestroy {
   }
 
   // ==========================================================================
-  // Manual attendance marking — writes an `arena e-ticket log` doc (QR-scanner
-  // shape: docid/product/logdate/profileid/eventref/eticketref). The doc id is the
-  // participant's arena e-ticket id when they have one (idempotent per ticket);
-  // otherwise an auto-generated id. product/eticketref are included only when an
-  // e-ticket exists.
+  // Manual attendance marking — writes `arena e-ticket log` docs in the QR-scanner
+  // shape (docid/product/logdate/profileid/eventref/eticketref).
+  //
+  // OPERATOR RULE (2026-07-27): a manual mark REQUIRES an active arena e-ticket,
+  // so `eticketref` and `product` are never null. No ticket → no write at all
+  // (the old bare-log fallback is gone). The operator multi-selects from the
+  // ticket's `producteligible`; ONE doc is written per selected product, with an
+  // auto-generated id — repeat marks are allowed to create additional docs
+  // (the attendance reader dedupes by calendar date, so per-day counts are safe).
   // ==========================================================================
-  async markAttendance(profileId: string): Promise<void> {
+
+  /** The participant's ACTIVE e-ticket for the selected event, or null. Fetched
+   *  fresh at click time (authoritative) rather than read from the in-memory
+   *  `arenaETicketByProfile` map. `active == true` mirrors the QR scanner, which
+   *  refuses an inactive ticket. */
+  async fetchActiveETicket(profileId: string): Promise<{ id: string; data: any } | null> {
     if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
-    const ticket = this.arenaETicketByProfile[profileId];   // active e-ticket, if any
-    const col = collection(this.firestoreDefault, 'arena e-ticket log');
-    const id = ticket?.['docid'] || doc(col).id;            // e-ticket id, else auto id
-    const data: any = {
-      docid: id,
-      logdate: Timestamp.now(),                 // client now (avoids the pending serverTimestamp null the attendance read can't handle)
-      profileid: profileId,
-      eventref: this.selectedEvent.docref,
-      markedmanually: true,                      // audit flag — distinguishes manual marks from QR scans
-    };
-    if (ticket) {
-      data.eticketref = doc(this.firestoreDefault, 'arena e-ticket', ticket['docid']);
-      const products: string[] = ticket['producteligible'] || [];
-      if (products.length) { data.product = doc(this.firestoreDefault, 'products', products[0]); }
+    const snap = await getDocs(query(
+      collection(this.firestoreDefault, 'arena e-ticket'),
+      where('eventref', '==', this.selectedEvent.docref),
+      where('profileid', '==', profileId),
+      where('active', '==', true)
+    ));
+    if (snap.empty) {
+      console.log('[v3][attendance] no active e-ticket for', profileId);
+      return null;
     }
-    await setDoc(doc(col, id), data);
-    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', !!ticket, '| doc:', id);
+    // The approve flow upserts one ticket per participant per event; if more than
+    // one somehow exists, use the first and surface it rather than failing.
+    if (snap.docs.length > 1) {
+      console.warn('[v3][attendance] multiple active e-tickets for', profileId, '— using the first of', snap.docs.length);
+    }
+    const d = snap.docs[0];
+    return { id: d.id, data: { docid: d.id, ...d.data() } };
+  }
+
+  /** One `arena e-ticket log` doc per selected product. Ids are pre-generated so
+   *  `docid` can carry the real id in the same single write. */
+  async markAttendanceForProducts(profileId: string, eticketDocId: string, productIds: string[]): Promise<void> {
+    if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
+    if (!eticketDocId) { throw new Error('NO_ETICKET'); }
+    if (!productIds.length) { throw new Error('NO_PRODUCT'); }
+    const col = collection(this.firestoreDefault, 'arena e-ticket log');
+    const eticketref = doc(this.firestoreDefault, 'arena e-ticket', eticketDocId);
+    await Promise.all(productIds.map(productId => {
+      const id = doc(col).id;                     // auto id, known before the write
+      return setDoc(doc(col, id), {
+        docid: id,
+        product: doc(this.firestoreDefault, 'products', productId),
+        logdate: Timestamp.now(),                 // client now (avoids the pending serverTimestamp null the attendance read can't handle)
+        profileid: profileId,
+        eventref: this.selectedEvent!.docref,
+        eticketref,
+        markedmanually: true,                     // audit flag — distinguishes manual marks from QR scans
+      });
+    }));
+    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', eticketDocId, '| products:', productIds);
   }
 
   // ==========================================================================
