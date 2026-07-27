@@ -936,12 +936,22 @@ export class PrescribeATCComponent {
       //     }
       //   }
         if(atcStudio != null){
+          this.arenamode = true
           this.liveassignmentid = atcStudio.id
           this.liveassignmentdata = atcStudio.data()
           console.log("Live assignment", this.liveassignmentdata)
           this.stagename = this.liveassignmentdata['stagename']
           this.queueid = this.liveassignmentdata['queueid']
           this.validationnotrequired = this.mentor || this.queryparam["validation"] == "true" // this.liveassignmentdata['stagetype'] == 'consultation' || this.liveassignmentdata['stagetype'] == 'ah' || (this.ongoingQueue["isconsultationrequired"] ?? []).length == 0
+          
+          if(this.liveassignmentdata['queuename'] == null || this.liveassignmentdata['queuename'] == undefined){
+            getDoc(doc(this.firestoreDefault, "queue generation", this.queueid)).then(queueDoc =>{
+              if(queueDoc.exists()){
+                this.liveassignmentdata['queuename'] = queueDoc.data()["queuename"]
+              }
+            })
+          }
+          
           getDocs(query(collection(this.firestoreDefault,"queue stage log"), where("liveassignmentid", "==", this.liveassignmentid),limit(1))).then(queuetoken=>{
             console.log("queue Token", queuetoken.size)
             console.log("Live Assignment", this.liveassignmentdata)
@@ -2209,8 +2219,7 @@ async removeATCImage(index: number) {
     var firebaseATCBatch = writeBatch(this.firestoreATC)
     // var firebaseBatch = writeBatch(this.firestore);
     var selectedProfile = this.mapProfile[this.participantProfileid]["name"]
-    var queueNameForConfirm = this.liveassignmentdata?.['queuename'] // this.ongoingQueue?.['queuename'] ?? 
-    var confirmationMessage = this.liveassignmentdata != null ? `You are sumbitting this ATC for the Queue '${queueNameForConfirm}' for the stage '${this.liveassignmentdata?.stagename}'. After submission you can move the participant to the next stage` : `Sure do you want to submit this ATC to the participant '${selectedProfile}'?`
+    var confirmationMessage = this.liveassignmentdata != null ? `You are sumbitting this ATC for the Queue '${this.liveassignmentdata["queuename"]}' for the stage '${this.liveassignmentdata?.stagename}'. After submission you can move the participant to the next stage` : `Sure do you want to submit this ATC to the participant '${selectedProfile}'?`
     var aelConfirm = this.matDialog.open(AtcAelConfirmComponent, {
       maxHeight: "90vh",
       maxWidth: "60vw",
