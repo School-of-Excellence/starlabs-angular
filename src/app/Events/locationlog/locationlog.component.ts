@@ -19,7 +19,6 @@
  */
 
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
-import { ScrollingModule } from '@angular/cdk/scrolling';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -45,7 +44,9 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -84,7 +85,9 @@ import {
 } from './location.model';
 import { LatestLocationsResult, LocationlogService, SCAN_LIMIT } from './locationlog.service';
 import {
+  SORT_TO_HEADER,
   calculateDistance,
+  clampPageIndex,
   deriveStatus,
   distanceBounds,
   formatCoordinate,
@@ -95,6 +98,8 @@ import {
   getStatusHint,
   getStatusText,
   googleMapsUrl,
+  sortKeyFromHeader,
+  sortParticipants,
   startOfDay,
   timeWindowBounds,
   trackByProfile,
@@ -106,11 +111,9 @@ const AUTO_REFRESH_MS = 30_000;
 /** Relative timestamps and status chips are recomputed on this cadence. */
 const CLOCK_TICK_MS = 30_000;
 
-/** Above this many rows the table is swapped for a virtualised card list. */
-const VIRTUAL_SCROLL_THRESHOLD = 100;
-
-/** Row height used by the virtual scroll viewport, in px. Must match the CSS. */
-export const VIRTUAL_ROW_HEIGHT = 88;
+/** Rows per page, and the choices offered in the paginator. */
+const DEFAULT_PAGE_SIZE = 25;
+export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 /** A pickable option in one of the filter dropdowns. */
 interface FilterOption<T> {
@@ -121,11 +124,18 @@ interface FilterOption<T> {
 
 /** What the template renders, assembled in one place to keep the HTML dumb. */
 interface DashboardView {
+  /** The current page only — this is what the table and card list render. */
   readonly participants: readonly ParticipantLocation[];
   readonly stats: DashboardStats;
-  readonly virtualise: boolean;
+  /** Rows surviving the filters, across all pages. Drives the paginator. */
+  readonly filteredCount: number;
+  readonly pageIndex: number;
+  readonly pageSize: number;
   /** How many facets are narrowing the list — drives the "Clear" affordance. */
   readonly activeFilterCount: number;
+  /** Sort state in the shape a Material sort header expects. */
+  readonly sortActive: string;
+  readonly sortDirection: 'asc' | 'desc';
 }
 
 @Component({
@@ -134,7 +144,6 @@ interface DashboardView {
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    ScrollingModule,
     MatButtonModule,
     MatButtonToggleModule,
     MatCardModule,
@@ -142,7 +151,9 @@ interface DashboardView {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatPaginatorModule,
     MatSelectModule,
+    MatSortModule,
     MatSidenavModule,
     MatSlideToggleModule,
     MatTableModule,
@@ -199,7 +210,7 @@ export class LocationlogComponent {
   readonly getAvatarGradient = getAvatarGradient;
   readonly googleMapsUrl = googleMapsUrl;
   readonly trackByProfile = trackByProfile;
-  readonly virtualRowHeight = VIRTUAL_ROW_HEIGHT;
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   readonly scanLimit = SCAN_LIMIT;
 
   readonly displayedColumns: readonly string[] = [
@@ -253,6 +264,8 @@ export class LocationlogComponent {
     { value: 'farthest', label: 'Farthest first' },
     { value: 'nameAsc', label: 'Name A → Z' },
     { value: 'nameDesc', label: 'Name Z → A' },
+    { value: 'statusFresh', label: 'Status · live first' },
+    { value: 'statusStale', label: 'Status · stale first' },
   ];
 
   readonly searchControl = new FormControl<string>('', { nonNullable: true });
@@ -262,6 +275,8 @@ export class LocationlogComponent {
   private readonly autoRefreshOn$ = new BehaviorSubject<boolean>(false);
   private readonly filters$ = new BehaviorSubject<LocationFilters>(DEFAULT_FILTERS);
   private readonly sortKey$ = new BehaviorSubject<SortKey>('newest');
+  private readonly pageIndex$ = new BehaviorSubject<number>(0);
+  private readonly pageSize$ = new BehaviorSubject<number>(DEFAULT_PAGE_SIZE);
   private readonly adminLocation$ = new BehaviorSubject<GeolocationState>({
     coords: null,
     error: null,
@@ -410,21 +425,34 @@ export class LocationlogComponent {
     }),
   );
 
-  /** Everything the list and map render, in one subscription. */
+  /** Everything the list renders, in one subscription. */
   readonly view$: Observable<DashboardView> = combineLatest([
     this.participants$,
     this.filters$,
     this.sortKey$,
     this.stats$,
     this.clock$,
+    this.pageIndex$,
+    this.pageSize$,
   ]).pipe(
-    map(([participants, filters, sortKey, stats, now]) => {
+    map(([participants, filters, sortKey, stats, now, pageIndex, pageSize]) => {
       const filtered = this.applyFilters(participants, filters, now);
+      const sorted = sortParticipants(filtered, sortKey);
+
+      const safeIndex = clampPageIndex(pageIndex, sorted.length, pageSize);
+      const start = safeIndex * pageSize;
+
+      const header = SORT_TO_HEADER[sortKey];
+
       return {
-        participants: this.applySort(filtered, sortKey),
+        participants: sorted.slice(start, start + pageSize),
         stats,
-        virtualise: filtered.length > VIRTUAL_SCROLL_THRESHOLD,
+        filteredCount: sorted.length,
+        pageIndex: safeIndex,
+        pageSize,
         activeFilterCount: countActiveFilters(filters),
+        sortActive: header.active,
+        sortDirection: header.direction,
       };
     }),
     shareReplay({ bufferSize: 1, refCount: true }),
@@ -482,13 +510,33 @@ export class LocationlogComponent {
     this.patchFilters({ distance });
   }
 
+  /** Sort from the dropdown. Returns to page 1 — page 4 of the old order is
+   *  meaningless once the order changes. */
   setSort(sortKey: SortKey): void {
     this.sortKey$.next(sortKey);
+    this.pageIndex$.next(0);
+  }
+
+  /**
+   * Sort from a clickable table header. Translates the (column, direction) pair
+   * back into the same `SortKey` state the dropdown writes, so the two controls
+   * stay in lockstep. Clearing a sort (Material's third click) falls back to
+   * newest-first rather than leaving the list in an arbitrary order.
+   */
+  onSortChange(sort: Sort): void {
+    this.setSort(sortKeyFromHeader(sort.active, sort.direction) ?? 'newest');
+  }
+
+  /** Paginator moved, or the page size changed. */
+  onPage(event: PageEvent): void {
+    this.pageSize$.next(event.pageSize);
+    this.pageIndex$.next(event.pageIndex);
   }
 
   clearFilters(): void {
     this.searchControl.setValue('');
     this.filters$.next(DEFAULT_FILTERS);
+    this.pageIndex$.next(0);
   }
 
   /** Shortcut used by the "Farthest" stat card — jump straight to the outliers. */
@@ -565,8 +613,11 @@ export class LocationlogComponent {
 
   // ── Pure view logic ───────────────────────────────────────────────────────
 
+  /** Any filter change returns to page 1 — the old page number no longer
+   *  refers to the same rows. */
   private patchFilters(patch: Partial<LocationFilters>): void {
     this.filters$.next({ ...this.filters$.value, ...patch });
+    this.pageIndex$.next(0);
   }
 
   private applyFilters(
@@ -604,31 +655,6 @@ export class LocationlogComponent {
 
       return true;
     });
-  }
-
-  private applySort(
-    participants: readonly ParticipantLocation[],
-    sortKey: SortKey,
-  ): ParticipantLocation[] {
-    const sorted = [...participants];
-
-    switch (sortKey) {
-      case 'oldest':
-        return sorted.sort((a, b) => a.created.getTime() - b.created.getTime());
-      case 'nearest':
-        // Unknown distances sink to the bottom rather than sorting as zero.
-        return sorted.sort(
-          (a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity),
-        );
-      case 'farthest':
-        return sorted.sort((a, b) => (b.distanceMeters ?? -1) - (a.distanceMeters ?? -1));
-      case 'nameAsc':
-        return sorted.sort((a, b) => a.name.localeCompare(b.name));
-      case 'nameDesc':
-        return sorted.sort((a, b) => b.name.localeCompare(a.name));
-      default:
-        return sorted.sort((a, b) => b.created.getTime() - a.created.getTime());
-    }
   }
 }
 

@@ -11,6 +11,7 @@ import {
   DistanceBounds,
   LocationStatus,
   ParticipantLocation,
+  SortKey,
   TimeWindow,
 } from './location.model';
 
@@ -119,6 +120,21 @@ export function getStatusText(status: LocationStatus): string {
   }
 }
 
+/**
+ * Freshness rank for sorting: live (0) → recent (1) → stale (2).
+ * Kept next to `deriveStatus` so the two orderings can never drift apart.
+ */
+export function statusRank(status: LocationStatus): number {
+  switch (status) {
+    case 'live':
+      return 0;
+    case 'recent':
+      return 1;
+    default:
+      return 2;
+  }
+}
+
 /** Tooltip spelling out what the status actually means. */
 export function getStatusHint(status: LocationStatus): string {
   switch (status) {
@@ -149,6 +165,89 @@ export function getAvatarInitials(name: string): string {
 export function getAvatarGradient(profileid: string): string {
   const hue = hashHue(profileid);
   return `linear-gradient(135deg, hsl(${hue} 68% 56%), hsl(${(hue + 38) % 360} 68% 44%))`;
+}
+
+/**
+ * Two-way map between the single `SortKey` state and the (column, direction)
+ * pair a Material sort header speaks.
+ *
+ * One source of truth is what keeps the "Sort by" dropdown and the clickable
+ * table headers from contradicting each other — change one and the other
+ * visibly follows.
+ */
+export const SORT_TO_HEADER: Readonly<
+  Record<SortKey, { readonly active: string; readonly direction: 'asc' | 'desc' }>
+> = {
+  newest: { active: 'lastUpdated', direction: 'desc' },
+  oldest: { active: 'lastUpdated', direction: 'asc' },
+  nearest: { active: 'distance', direction: 'asc' },
+  farthest: { active: 'distance', direction: 'desc' },
+  nameAsc: { active: 'name', direction: 'asc' },
+  nameDesc: { active: 'name', direction: 'desc' },
+  statusFresh: { active: 'status', direction: 'asc' },
+  statusStale: { active: 'status', direction: 'desc' },
+};
+
+/** Reverse lookup: a clicked header back to the sort state it represents. */
+export function sortKeyFromHeader(active: string, direction: 'asc' | 'desc' | ''): SortKey | null {
+  if (!direction) return null;
+  return (
+    (Object.keys(SORT_TO_HEADER) as SortKey[]).find(
+      (key) =>
+        SORT_TO_HEADER[key].active === active && SORT_TO_HEADER[key].direction === direction,
+    ) ?? null
+  );
+}
+
+/**
+ * Order participants by the given key. Returns a new array — the input may be
+ * a shared, frozen slice of dashboard state.
+ *
+ * Unknown distances sink to the bottom of *both* distance orders rather than
+ * sorting as zero, and status ties break by recency so the order is stable
+ * rather than arbitrary.
+ */
+export function sortParticipants(
+  participants: readonly ParticipantLocation[],
+  sortKey: SortKey,
+): ParticipantLocation[] {
+  const sorted = [...participants];
+
+  switch (sortKey) {
+    case 'oldest':
+      return sorted.sort((a, b) => a.created.getTime() - b.created.getTime());
+    case 'nearest':
+      return sorted.sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity));
+    case 'farthest':
+      return sorted.sort((a, b) => (b.distanceMeters ?? -1) - (a.distanceMeters ?? -1));
+    case 'nameAsc':
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'nameDesc':
+      return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    case 'statusFresh':
+      return sorted.sort(
+        (a, b) =>
+          statusRank(a.status) - statusRank(b.status) || b.created.getTime() - a.created.getTime(),
+      );
+    case 'statusStale':
+      return sorted.sort(
+        (a, b) =>
+          statusRank(b.status) - statusRank(a.status) || a.created.getTime() - b.created.getTime(),
+      );
+    default:
+      return sorted.sort((a, b) => b.created.getTime() - a.created.getTime());
+  }
+}
+
+/**
+ * Clamp a page index against a list that may have shrunk under it.
+ *
+ * A filter change or a refresh can leave the stored index past the end, and an
+ * out-of-range page renders as empty with no obvious way back.
+ */
+export function clampPageIndex(pageIndex: number, totalRows: number, pageSize: number): number {
+  const lastPage = Math.max(0, Math.ceil(totalRows / pageSize) - 1);
+  return Math.min(Math.max(0, pageIndex), lastPage);
 }
 
 /** `trackBy` for every participant list/table in the dashboard. */

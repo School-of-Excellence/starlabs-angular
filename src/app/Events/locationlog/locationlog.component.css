@@ -482,6 +482,34 @@
 .ll-col-avatar { width: 60px; }
 .ll-col-action { width: 104px; white-space: nowrap; }
 
+/* ── Paginator ─────────────────────────────────────────────────────────── */
+
+.ll-paginator {
+  margin-top: 10px;
+  border-radius: var(--ll-radius);
+  border: 1px solid var(--ll-border);
+  background: var(--ll-surface);
+  box-shadow: var(--ll-shadow-xs);
+  overflow: hidden;
+}
+
+.ll-paginator .mat-mdc-paginator-container {
+  min-height: 52px;
+  padding: 0 10px;
+}
+
+/* ── Sort headers ──────────────────────────────────────────────────────── */
+
+/* The arrow is the only affordance that a header is clickable, so make the
+   whole cell read as interactive rather than relying on the icon alone. */
+.ll-table th.mat-mdc-header-cell .mat-sort-header-container {
+  cursor: pointer;
+}
+
+.ll-table th.mat-mdc-header-cell.mat-sort-header-sorted {
+  color: var(--ll-primary);
+}
+
 /* ── Avatar ────────────────────────────────────────────────────────────── */
 
 .ll-avatar {
@@ -619,20 +647,6 @@
   font-weight: 700;
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
-}
-
-.ll-virtual-viewport {
-  height: 58vh;
-  border-radius: var(--ll-radius);
-  border: 1px solid var(--ll-border);
-  background: var(--ll-surface-2);
-}
-
-/* Height must match VIRTUAL_ROW_HEIGHT in the component. */
-.ll-card-virtual {
-  height: 76px;
-  margin: 6px 10px;
-  box-sizing: border-box;
 }
 
 /* ── Skeletons ─────────────────────────────────────────────────────────── */
@@ -975,7 +989,6 @@
 
   .ll-drawer { width: 100vw; }
   .ll-drawer-metrics { grid-template-columns: 1fr; }
-  .ll-virtual-viewport { height: 66vh; }
 }
 
 @media (max-width: 420px) {

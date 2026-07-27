@@ -302,7 +302,7 @@
                 </mat-form-field>
 
                 <span class="ll-result-count">
-                  {{ view.participants.length }} of {{ view.stats.total }}
+                  {{ view.filteredCount }} of {{ view.stats.total }}
                 </span>
 
                 @if (view.activeFilterCount > 0) {
@@ -353,10 +353,19 @@
             <!-- Participant list -->
             <section class="ll-list-section" aria-label="Participants">
 
-              <!-- Desktop / laptop: Material table -->
-              @if (!(isHandset$ | async) && !view.virtualise) {
+              <!-- Desktop / laptop: Material table with sortable headers -->
+              @if (!(isHandset$ | async)) {
                 <div class="ll-table-wrap" @fadeIn>
-                  <table mat-table [dataSource]="view.participants" [trackBy]="trackByProfile" class="ll-table">
+                  <table
+                    mat-table
+                    matSort
+                    [dataSource]="view.participants"
+                    [trackBy]="trackByProfile"
+                    [matSortActive]="view.sortActive"
+                    [matSortDirection]="view.sortDirection"
+                    matSortDisableClear
+                    (matSortChange)="onSortChange($event)"
+                    class="ll-table">
 
                     <ng-container matColumnDef="avatar">
                       <th mat-header-cell *matHeaderCellDef class="ll-col-avatar">
@@ -370,19 +379,19 @@
                     </ng-container>
 
                     <ng-container matColumnDef="name">
-                      <th mat-header-cell *matHeaderCellDef>Participant</th>
+                      <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
                       <td mat-cell *matCellDef="let p" class="ll-cell-name">{{ p.name }}</td>
                     </ng-container>
 
                     <ng-container matColumnDef="lastUpdated">
-                      <th mat-header-cell *matHeaderCellDef>Last updated</th>
+                      <th mat-header-cell *matHeaderCellDef mat-sort-header>Last updated</th>
                       <td mat-cell *matCellDef="let p" [matTooltip]="absoluteTime(p.created)">
                         {{ relativeTime(p.created, now) }}
                       </td>
                     </ng-container>
 
                     <ng-container matColumnDef="distance">
-                      <th mat-header-cell *matHeaderCellDef>Distance</th>
+                      <th mat-header-cell *matHeaderCellDef mat-sort-header>Distance</th>
                       <td mat-cell *matCellDef="let p" class="ll-cell-distance">
                         {{ formatDistance(p.distanceMeters) }}
                       </td>
@@ -396,7 +405,7 @@
                     </ng-container>
 
                     <ng-container matColumnDef="status">
-                      <th mat-header-cell *matHeaderCellDef>Status</th>
+                      <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
                       <td mat-cell *matCellDef="let p">
                         <span
                           class="ll-status-chip"
@@ -440,38 +449,8 @@
                       (keydown.enter)="select(p)"></tr>
                   </table>
                 </div>
-              } @else if (view.virtualise) {
-                <!--
-                  Past the virtualisation threshold: card list inside a CDK
-                  virtual scroll viewport, so only visible rows exist in the DOM.
-                -->
-                <cdk-virtual-scroll-viewport
-                  [itemSize]="virtualRowHeight"
-                  class="ll-virtual-viewport"
-                  @fadeIn>
-                  <div
-                    *cdkVirtualFor="let p of view.participants; trackBy: trackByProfile"
-                    class="ll-card ll-card-virtual"
-                    [class.ll-card-selected]="(selectedId | async) === p.profileid"
-                    tabindex="0"
-                    (click)="select(p)"
-                    (keydown.enter)="select(p)">
-                    <div class="ll-avatar" [style.background]="getAvatarGradient(p.profileid)">
-                      {{ p.initials }}
-                    </div>
-                    <div class="ll-card-main">
-                      <span class="ll-card-name">{{ p.name }}</span>
-                      <span class="ll-card-meta">
-                        {{ relativeTime(p.created, now) }} · {{ formatDistance(p.distanceMeters) }}
-                      </span>
-                    </div>
-                    <span class="ll-status-chip" [class]="'ll-status-' + p.status">
-                      <span class="ll-status-dot"></span>
-                      {{ getStatusText(p.status) }}
-                    </span>
-                  </div>
-                </cdk-virtual-scroll-viewport>
               } @else {
+                <!-- Handset / tablet portrait: card list, same page of rows. -->
                 <div class="ll-cards" @fadeIn>
                   @for (p of view.participants; track p.profileid) {
                     <article
@@ -503,6 +482,20 @@
                   }
                 </div>
               }
+
+              <!--
+                One paginator for both layouts — the table and the card list
+                render the same page of the same sorted array.
+              -->
+              <mat-paginator
+                class="ll-paginator"
+                [length]="view.filteredCount"
+                [pageSize]="view.pageSize"
+                [pageIndex]="view.pageIndex"
+                [pageSizeOptions]="pageSizeOptions"
+                showFirstLastButtons
+                aria-label="Select page of participants"
+                (page)="onPage($event)"></mat-paginator>
             </section>
           }
 

@@ -74,8 +74,22 @@ export interface Coordinates {
   readonly longitude: number;
 }
 
-/** How the participant list is ordered. */
-export type SortKey = 'newest' | 'oldest' | 'nearest' | 'farthest' | 'nameAsc' | 'nameDesc';
+/**
+ * How the participant list is ordered.
+ *
+ * Each key is a (column, direction) pair rather than a bare column, so the
+ * "Sort by" dropdown and the sortable table headers can drive the same single
+ * piece of state and never disagree with each other.
+ */
+export type SortKey =
+  | 'newest'
+  | 'oldest'
+  | 'nearest'
+  | 'farthest'
+  | 'nameAsc'
+  | 'nameDesc'
+  | 'statusFresh'
+  | 'statusStale';
 
 /** Freshness facet. Mirrors LocationStatus plus an "any" option. */
 export type FreshnessFilter = 'all' | 'live' | 'recent' | 'stale';
