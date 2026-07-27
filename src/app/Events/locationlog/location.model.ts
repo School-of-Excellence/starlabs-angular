@@ -127,7 +127,18 @@ export interface LocationFilters {
 }
 
 /** Where the reference point came from. Shown so the number is never mystery. */
-export type ReferenceSource = 'manual' | 'device' | 'participant';
+export type ReferenceSource = 'manual' | 'device' | 'participant' | 'place';
+
+/** One hit from the place search. */
+export interface PlaceResult {
+  /** Short name for the primary line, e.g. "Vettuvankeni". */
+  readonly label: string;
+  /** Full comma-separated address, shown underneath to disambiguate. */
+  readonly displayName: string;
+  /** Nominatim's category, e.g. "suburb" / "city" — shown as a small chip. */
+  readonly kind: string;
+  readonly coords: Coordinates;
+}
 
 /**
  * The point every distance on the dashboard is measured *from*.

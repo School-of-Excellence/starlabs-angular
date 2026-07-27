@@ -82,10 +82,12 @@ import {
   DeviceLocationState,
   LocationFilters,
   ParticipantLocation,
+  PlaceResult,
   ReferencePoint,
   SortKey,
   TimeWindow,
 } from './location.model';
+import { GeocodingService } from './geocoding.service';
 import { LatestLocationsResult, LocationlogService, SCAN_LIMIT } from './locationlog.service';
 import {
   SORT_TO_HEADER,
@@ -116,6 +118,12 @@ const AUTO_REFRESH_MS = 30_000;
 
 /** Relative timestamps and status chips are recomputed on this cadence. */
 const CLOCK_TICK_MS = 30_000;
+
+/** Place search: wait this long after typing stops before querying. */
+const PLACE_SEARCH_DEBOUNCE_MS = 500;
+
+/** Shorter queries are too vague to spend a geocoder request on. */
+const MIN_PLACE_QUERY_LENGTH = 3;
 
 /** Where the chosen reference point is remembered between visits. */
 const REFERENCE_STORAGE_KEY = 'locationlog_reference_point';
@@ -205,6 +213,7 @@ interface DashboardView {
 })
 export class LocationlogComponent {
   private readonly service = inject(LocationlogService);
+  private readonly geocoding = inject(GeocodingService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly breakpoints = inject(BreakpointObserver);
   private readonly destroyRef = inject(DestroyRef);
@@ -353,6 +362,41 @@ export class LocationlogComponent {
   readonly latControl = new FormControl<string>('', { nonNullable: true });
   readonly lngControl = new FormControl<string>('', { nonNullable: true });
   readonly pickerError = signal<string | null>(null);
+
+  /** Place search — the primary way to pick a location. */
+  readonly placeSearchControl = new FormControl<string>('', { nonNullable: true });
+  readonly searching = signal(false);
+  readonly searched = signal(false);
+  readonly manualEntryOpen = signal(false);
+
+  /**
+   * Place-search results.
+   *
+   * Debounced and length-gated to stay inside Nominatim's usage policy, and
+   * `switchMap` cancels a superseded request so a slow early query can never
+   * overwrite the results of a later one.
+   */
+  readonly placeResults$: Observable<readonly PlaceResult[]> =
+    this.placeSearchControl.valueChanges.pipe(
+      map((value) => value.trim()),
+      debounceTime(PLACE_SEARCH_DEBOUNCE_MS),
+      distinctUntilChanged(),
+      tap((query) => {
+        this.searching.set(query.length >= MIN_PLACE_QUERY_LENGTH);
+        if (query.length < MIN_PLACE_QUERY_LENGTH) this.searched.set(false);
+      }),
+      switchMap((query) =>
+        query.length < MIN_PLACE_QUERY_LENGTH
+          ? of([] as readonly PlaceResult[])
+          : this.geocoding.search(query),
+      ),
+      tap(() => {
+        this.searching.set(false);
+        this.searched.set(true);
+      }),
+      startWith([] as readonly PlaceResult[]),
+      shareReplay({ bufferSize: 1, refCount: true }),
+    );
 
   /** Handset + portrait tablet get the card layout instead of the table. */
   readonly isHandset$ = this.breakpoints
@@ -655,7 +699,25 @@ export class LocationlogComponent {
       this.latControl.setValue(current ? String(current.coords.latitude) : '');
       this.lngControl.setValue(current ? String(current.coords.longitude) : '');
       this.pickerError.set(null);
+      this.placeSearchControl.setValue('');
+      this.searched.set(false);
+      this.manualEntryOpen.set(false);
     }
+  }
+
+  /** Reveal the coordinate boxes — the escape hatch, not the main path. */
+  toggleManualEntry(): void {
+    this.manualEntryOpen.update((open) => !open);
+    this.pickerError.set(null);
+  }
+
+  /** Pick a searched place as the reference point. */
+  usePlaceAsReference(place: PlaceResult): void {
+    this.setReference({
+      coords: place.coords,
+      source: 'place',
+      label: place.label,
+    });
   }
 
   /**

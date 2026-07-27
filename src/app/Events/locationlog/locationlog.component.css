@@ -254,6 +254,112 @@
   background: var(--ll-surface-2);
 }
 
+.ll-place-field {
+  width: 100%;
+}
+
+.ll-mini-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border: 2px solid var(--ll-border-strong);
+  border-top-color: var(--ll-primary);
+  border-radius: 50%;
+  animation: ll-spin 0.8s linear infinite;
+}
+
+@keyframes ll-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ll-place-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 290px;
+  overflow-y: auto;
+}
+
+.ll-place {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--ll-border);
+  border-radius: var(--ll-radius-sm);
+  background: var(--ll-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.ll-place:hover,
+.ll-place:focus-visible {
+  border-color: var(--ll-primary);
+  background: var(--ll-primary-soft);
+  box-shadow: var(--ll-shadow-xs);
+  outline: none;
+}
+
+.ll-place > mat-icon {
+  flex: none;
+  color: var(--ll-primary);
+}
+
+.ll-place-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ll-place-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--ll-text);
+}
+
+.ll-place-kind {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ll-surface-3);
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ll-text-muted);
+}
+
+.ll-place-address {
+  font-size: 0.75rem;
+  color: var(--ll-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ll-place-coords {
+  flex: none;
+  color: var(--ll-text-faint);
+  font-size: 0.72rem;
+}
+
+.ll-manual {
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px dashed var(--ll-border);
+}
+
 .ll-picker-row {
   display: flex;
   flex-wrap: wrap;
@@ -1164,6 +1270,9 @@
   }
 
   .ll-picker-row > button { width: 100%; }
+
+  .ll-place-coords { display: none; }
+  .ll-picker-alt > button { flex: 1 1 auto; }
   .ll-toggle-group { width: 100%; justify-content: space-between; }
   .ll-toggle { flex: 1; justify-content: center; padding: 7px 8px; }
 
