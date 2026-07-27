@@ -1094,6 +1094,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
+    this.panelFilter = { type: 'all', unattended: false };
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.markedIds = new Set<string>();
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
@@ -1120,10 +1121,32 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     });
     return rows;
   }
+  // list filters: first-timer / repeat (mutually exclusive) + no-attendance-log.
+  panelFilter: { type: 'all' | 'ft' | 'rp'; unattended: boolean } = { type: 'all', unattended: false };
+  togglePanelType(t: 'ft' | 'rp'): void { this.panelFilter.type = this.panelFilter.type === t ? 'all' : t; }
+  togglePanelUnattended(): void { this.panelFilter.unattended = !this.panelFilter.unattended; }
+  get panelFilterActive(): boolean { return this.panelFilter.type !== 'all' || this.panelFilter.unattended; }
+  private hasAttendanceLog(profileid: string): boolean { const r = this.data.mapAttendence[profileid]; return !!r && r.length > 0; }
+  private matchesPanelFilter(profileid: string): boolean {
+    if (this.panelFilter.type === 'ft' && !this.isFirstTimer(profileid)) { return false; }
+    if (this.panelFilter.type === 'rp' && this.isFirstTimer(profileid)) { return false; }
+    if (this.panelFilter.unattended && this.hasAttendanceLog(profileid)) { return false; }
+    return true;
+  }
   get panelParticipants(): PanelParticipant[] {
     const q = this.panelSearch.toLowerCase().trim();
-    if (!q) { return this.panelRows; }
-    return this.panelRows.filter(p => p.name.toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q));
+    const active = this.panelFilterActive;
+    if (!q && !active) { return this.panelRows; }
+    return this.panelRows.filter((p: any) => {
+      if (q && !((p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))) { return false; }
+      if (!active) { return true; }
+      if (p['_pair']) {
+        const d = p['doer'] && this.matchesPanelFilter(p['doer'].profileid);
+        const b = p['beneficiary'] && this.matchesPanelFilter(p['beneficiary'].profileid);
+        return !!(d || b);
+      }
+      return this.matchesPanelFilter(p.profileid);
+    });
   }
   get panelCount(): number { return this.panelParticipants.length; }
   closePanel(): void { this.panelOpen = false; }
