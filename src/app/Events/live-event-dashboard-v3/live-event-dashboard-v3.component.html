@@ -799,14 +799,21 @@
 <aside class="panel" [class.open]="panelOpen">
   <div class="panel-head">
     <div class="panel-eyebrow"><span>{{ panelEyebrow }}</span>
-      <button class="panel-export" *ngIf="panelCount" (click)="panelExport()" title="Export this list to Excel (CSV)">Export</button>
       <button class="panel-close" (click)="closePanel()">&times;</button>
     </div>
     <div class="panel-title">{{ panelTitle }}</div>
     <div class="panel-sub">{{ panelSub }}</div>
   </div>
   <div class="panel-search"><input type="text" [(ngModel)]="panelSearch" placeholder="Search name or email…"></div>
-  <div class="panel-count">{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</div>
+  <div class="panel-filters">
+    <button class="pf-chip" [class.on-blue]="panelFilter.type === 'ft'" (click)="togglePanelType('ft')">First timers</button>
+    <button class="pf-chip" [class.on-blue]="panelFilter.type === 'rp'" (click)="togglePanelType('rp')">Repeat</button>
+    <button class="pf-chip" [class.on]="panelFilter.unattended" (click)="togglePanelUnattended()">No attendance log</button>
+  </div>
+  <div class="panel-count">
+    <span>{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</span>
+    <button class="panel-export" *ngIf="panelCount" (click)="panelExport()" title="Export this list to Excel (CSV)">⭳ Export</button>
+  </div>
   <div class="panel-list">
     <ng-container *ngFor="let p of panelParticipants">
       <!-- changework pair: doer and beneficiary on one row -->
