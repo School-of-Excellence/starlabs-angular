@@ -132,6 +132,7 @@ export const routes: Routes = [
   {path: 'live_event_dashboard_v3', loadComponent: () => import('./Events/live-event-dashboard-v3/live-event-dashboard-v3.component').then(m => m.LiveEventDashboardV3Component), canActivate:[authGuard]},
   {path: 'contentupload', loadComponent: () => import('./content/content-upload/content-upload.component').then(m => m.ContentUploadComponent), canActivate: [authGuard]},
   {path: 'createarenavideoasktemplate', loadComponent: () => import('./content/arena-video-ask-input/arena-video-ask-input.component').then(m => m.ArenaVideoAskInputComponent), canActivate: [authGuard]},
+  {path: 'locationlog', loadComponent: () => import('./Events/locationlog/locationlog.component').then(m => m.LocationlogComponent)},
 
   // Scheduling
   {path: 'EISzoom', loadComponent: () => import('./Scheduling/eis-zoom-account/eis-zoom-account.component').then(m => m.EISZoomAccountComponent), canActivate:[authGuard]},
