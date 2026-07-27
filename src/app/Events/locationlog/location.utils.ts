@@ -107,18 +107,6 @@ export function deriveStatus(created: Date, now: number = Date.now()): LocationS
   return 'stale';
 }
 
-/** Colour token for a status. Used by chips, dots and map markers alike. */
-export function getStatusColor(status: LocationStatus): string {
-  switch (status) {
-    case 'live':
-      return '#10b981';
-    case 'recent':
-      return '#f59e0b';
-    default:
-      return '#ef4444';
-  }
-}
-
 /** Label shown on the status chip. */
 export function getStatusText(status: LocationStatus): string {
   switch (status) {
@@ -161,11 +149,6 @@ export function getAvatarInitials(name: string): string {
 export function getAvatarGradient(profileid: string): string {
   const hue = hashHue(profileid);
   return `linear-gradient(135deg, hsl(${hue} 68% 56%), hsl(${(hue + 38) % 360} 68% 44%))`;
-}
-
-/** Flat version of the avatar colour, for map marker pins. */
-export function getAvatarColor(profileid: string): string {
-  return `hsl(${hashHue(profileid)} 68% 50%)`;
 }
 
 /** `trackBy` for every participant list/table in the dashboard. */

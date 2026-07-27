@@ -3,7 +3,10 @@
  *
  * Shows one row per participant — their *latest* reported position — with
  * distance from the admin's own device, freshness status, filtering, sorting,
- * a details drawer and a free (Leaflet/OpenStreetMap) map.
+ * and a details drawer.
+ *
+ * There is no embedded map by design — coordinates are shown as text and the
+ * "Open in Google Maps" action hands off to a real map application.
  *
  * Architecture notes:
  *  - All state is RxJS, consumed through the async pipe under OnPush. There are
@@ -67,7 +70,6 @@ import {
   timer,
 } from 'rxjs';
 
-import { LocationMapComponent } from './location-map.component';
 import {
   Coordinates,
   DEFAULT_FILTERS,
@@ -90,7 +92,6 @@ import {
   formatRelativeTime,
   getAvatarGradient,
   getAvatarInitials,
-  getStatusColor,
   getStatusHint,
   getStatusText,
   googleMapsUrl,
@@ -134,7 +135,6 @@ interface DashboardView {
     CommonModule,
     ReactiveFormsModule,
     ScrollingModule,
-    LocationMapComponent,
     MatButtonModule,
     MatButtonToggleModule,
     MatCardModule,
@@ -193,7 +193,6 @@ export class LocationlogComponent {
   /** Template-visible helpers (Angular templates cannot call bare imports). */
   readonly formatDistance = formatDistance;
   readonly formatCoordinate = formatCoordinate;
-  readonly getStatusColor = getStatusColor;
   readonly getStatusText = getStatusText;
   readonly getStatusHint = getStatusHint;
   readonly getAvatarInitials = getAvatarInitials;
@@ -498,14 +497,9 @@ export class LocationlogComponent {
     this.setSort('farthest');
   }
 
-  /** "Locate" action — highlights the row, centres the map, opens the drawer. */
+  /** "Locate" action — highlights the row and opens the details drawer. */
   select(participant: ParticipantLocation): void {
     this.selectedProfileId$.next(participant.profileid);
-  }
-
-  /** Marker click: centre and highlight, but do not open the drawer over the map. */
-  selectFromMap(profileid: string): void {
-    this.selectedProfileId$.next(profileid);
   }
 
   closeDetails(): void {

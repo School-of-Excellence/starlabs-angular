@@ -635,61 +635,6 @@
   box-sizing: border-box;
 }
 
-/* ── Map ───────────────────────────────────────────────────────────────── */
-
-.ll-map-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px;
-  border-radius: var(--ll-radius-lg);
-  border: 1px solid var(--ll-border);
-  background: var(--ll-surface);
-  box-shadow: var(--ll-shadow-xs);
-}
-
-.ll-map-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.ll-map-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--ll-text);
-}
-
-.ll-map-sub {
-  margin: 3px 0 0;
-  font-size: 0.8rem;
-  color: var(--ll-text-muted);
-}
-
-.ll-map-badge {
-  flex: none;
-  padding: 4px 11px;
-  border-radius: 999px;
-  background: var(--ll-surface-3);
-  border: 1px solid var(--ll-border);
-  font-size: 0.7rem;
-  font-weight: 650;
-  color: var(--ll-text-muted);
-}
-
-.ll-map {
-  display: block;
-  height: 460px;
-}
-
-.ll-drawer-map {
-  display: block;
-  height: 190px;
-}
-
 /* ── Skeletons ─────────────────────────────────────────────────────────── */
 
 .ll-skeletons {
@@ -987,10 +932,6 @@
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
 
-@media (max-width: 1180px) {
-  .ll-map { height: 400px; }
-}
-
 @media (max-width: 1024px) {
   .ll-table-wrap { max-height: 52vh; }
   .ll-result-count { margin-left: 0; }
@@ -1031,9 +972,6 @@
   .ll-select-field { flex: 1 1 45%; }
   .ll-toggle-group { width: 100%; justify-content: space-between; }
   .ll-toggle { flex: 1; justify-content: center; padding: 7px 8px; }
-
-  .ll-map-section { padding: 14px; }
-  .ll-map { height: 340px; }
 
   .ll-drawer { width: 100vw; }
   .ll-drawer-metrics { grid-template-columns: 1fr; }

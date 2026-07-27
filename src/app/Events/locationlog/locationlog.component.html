@@ -81,19 +81,6 @@
           <mat-divider></mat-divider>
 
           <section class="ll-drawer-section">
-            <h3 class="ll-section-title">Location</h3>
-            <app-location-map
-              class="ll-drawer-map"
-              [participants]="[participant]"
-              [admin]="adminCoords | async"
-              [focusedProfileId]="participant.profileid"
-              [showFitControl]="false"
-              [now]="now"></app-location-map>
-          </section>
-
-          <mat-divider></mat-divider>
-
-          <section class="ll-drawer-section">
             <h3 class="ll-section-title">Timeline</h3>
             <!-- One entry today; the markup is a list so extra logs slot in. -->
             <ol class="ll-timeline">
@@ -520,33 +507,9 @@
           }
 
           <!--
-            Map and footer sit outside the list branches on purpose: with no
-            participants (or none matching the filters) the map still answers
-            "where am I", which is more use than hiding it.
+            Footer sits outside the list branches so the scan cost is stated
+            whether or not anything matched the current filters.
           -->
-          <section class="ll-map-section" aria-label="Map">
-            <div class="ll-map-head">
-              <div>
-                <h2 class="ll-map-title">Map</h2>
-                <p class="ll-map-sub">
-                  {{ view.participants.length }} participant{{
-                    view.participants.length === 1 ? '' : 's'
-                  }}
-                  plotted. Click a pin for details.
-                </p>
-              </div>
-              <span class="ll-map-badge">OpenStreetMap</span>
-            </div>
-
-            <app-location-map
-              class="ll-map"
-              [participants]="view.participants"
-              [admin]="adminCoords | async"
-              [focusedProfileId]="selectedId | async"
-              [now]="now"
-              (participantSelected)="selectFromMap($event)"></app-location-map>
-          </section>
-
           <!-- Read-cost footer: never let the scan cap be silent. -->
           <footer class="ll-footer">
             <span>
