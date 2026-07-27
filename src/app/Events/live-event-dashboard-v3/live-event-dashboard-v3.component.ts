@@ -92,6 +92,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   panelSub = '';
   panelSearch = '';
   private panelRows: PanelParticipant[] = [];
+  // manual attendance marking (only enabled for the per-day Unattended list)
+  panelMarkable = false;
+  markedIds = new Set<string>();
+  markingId: string | null = null;
 
   private sub: Subscription | null = null;
 
@@ -538,7 +542,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   openAttVideo(day: DayAttendance): void { this.openPanel(`Video Ask · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', this.getVideoAskIdsByDay(day)); }
   // Per-day: unattended (absent) + Video Ask submitted / unsubmitted (missing), with lists.
   attAbsentCount(day: DayAttendance): number { return day.absentProfileIds.length; }
-  openAttAbsent(day: DayAttendance): void { this.openPanel(`Unattended · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', day.absentProfileIds); }
+  openAttAbsent(day: DayAttendance): void {
+    this.openPanel(`Unattended · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', day.absentProfileIds);
+    this.panelMarkable = true;   // allow manual attendance marking from this list
+  }
   attMissingVACount(day: DayAttendance): number { return this.getMissingRecordingByDay(day).length; }
   openAttMissingVA(day: DayAttendance): void { this.openPanel(`Video Ask not submitted · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', this.getMissingRecordingByDay(day)); }
 
@@ -755,8 +762,17 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.openPanel(`Flag · ${g.label}`, `${this.data.selectedEvent?.['name'] || ''} · A&H CRM`, g.profileIds);
   }
   participantName(profileId: string): string { return this.data.participantMetadataMap[profileId]?.['name'] || this.data.registeredNames[profileId] || 'Unknown'; }
-  /** Product (from event participation request `productref`) resolved to its name. */
-  productName(profileId: string): string { return this.data.productMap[this.data.registeredProductRefId[profileId]] || ''; }
+  /** All eligible products (from the participant's event participation request
+   *  docs), resolved to names. */
+  productNames(profileId: string): string[] {
+    return (this.data.registeredProductIds[profileId] || []).map(id => this.data.productMap[id] || id).filter(Boolean);
+  }
+  /** Colour class per journey (cycles the prototype palette) so journey badges are
+   *  colour-coded even though journeys are dynamic. */
+  journeyBadgeClass(journeyId: string): string {
+    const idx = this.data.journeyCounts.findIndex(j => j.journeyId === journeyId);
+    return 'jc' + ((idx >= 0 ? idx : 0) % 6);
+  }
 
   // ==========================================================================
   // Arena Followup (#fuGrid) — 3 cards: Irregular, Not Doing CW, CW Not Received
@@ -1078,6 +1094,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
+    this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
+    this.markedIds = new Set<string>();
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
     this.panelRows = preserveOrder ? rows.slice() : rows.slice().sort((a, b) => a.name.localeCompare(b.name));
     this.panelOpen = true;
@@ -1109,6 +1127,50 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   get panelCount(): number { return this.panelParticipants.length; }
   closePanel(): void { this.panelOpen = false; }
+
+  /** Manual attendance marking (Unattended list). Confirms, then writes an
+   *  `arena e-ticket log` doc via the service so the person becomes present today. */
+  markAttendance(p: PanelParticipant): void {
+    if (!p?.profileid || this.markingId || this.markedIds.has(p.profileid)) { return; }
+    if (!window.confirm(`Are you sure you want to mark the attendance for ${p.name}?`)) { return; }
+    this.markingId = p.profileid;
+    this.data.markAttendance(p.profileid)
+      .then(() => { this.markedIds.add(p.profileid); this.markingId = null; this.cdr.detectChanges(); })
+      .catch((err: any) => {
+        this.markingId = null;
+        if (err?.message === 'NO_ETICKET') { window.alert(`${p.name} has no active e-ticket for this event — attendance can't be marked here.`); }
+        else { console.error('[v3][attendance] mark failed:', err); window.alert('Could not mark attendance. Please try again.'); }
+        this.cdr.detectChanges();
+      });
+  }
+
+  /** Export the currently-open list to a CSV (opens in Excel). Handles both
+   *  normal participant rows and doer↔beneficiary pair rows. */
+  panelExport(): void {
+    const esc = (s: any) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const row = (p: any, detail: string) => [
+      esc(p.name), esc(p.email || ''),
+      esc(this.journeyLabel(p.activejourney) || ''),
+      esc(this.isFirstTimer(p.profileid) ? 'First timer' : 'Repeat'),
+      esc(this.productNames(p.profileid).join(' | ')),
+      esc(detail)
+    ].join(',');
+    const lines = [['Name', 'Email', 'Journey', 'Type', 'Products', 'Detail'].join(',')];
+    this.panelParticipants.forEach((p: any) => {
+      if (p['_pair']) {
+        const proc = p['proc'] ? `${p['proc']} · ` : '';
+        if (p['doer']) { lines.push(row(p['doer'], `${proc}Doer · with ${p['beneficiary']?.name || '—'}`)); }
+        if (p['beneficiary']) { lines.push(row(p['beneficiary'], `${proc}Beneficiary · with ${p['doer']?.name || '—'}`)); }
+      } else {
+        lines.push(row(p, p['_meta'] || ''));
+      }
+    });
+    const fname = ((this.panelTitle || 'list') + ' ' + (this.data.selectedEvent?.['name'] || '')).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' }));
+    a.download = (fname || 'list') + '.csv';
+    a.click(); URL.revokeObjectURL(a.href);
+  }
 
   initials(name: string): string {
     return (name || '').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
