@@ -289,6 +289,13 @@ input,select{font:inherit}
   font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--z-500);display:flex;align-items:center;
 }
+.panel-export{
+  margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line);
+  border-radius:var(--r-pill);padding:4px 12px;cursor:pointer;
+}
+.panel-export:hover{filter:brightness(.97)}
+.panel-eyebrow .panel-export + .panel-close{margin-left:8px}
 .panel-close{
   margin-left:auto;width:28px;height:28px;border-radius:var(--r-xs);
   border:1px solid var(--z-200);display:grid;place-items:center;color:var(--z-500);
@@ -320,8 +327,25 @@ input,select{font:inherit}
 .p-name{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .p-meta{font-size:11px;color:var(--z-400);margin-top:1px}
 .p-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+/* colour-coded journey + first-timer badges (prototype palette; journeys cycle) */
+.j-badge.jc0{background:var(--accent-soft);color:var(--accent)}
+.j-badge.jc1{background:var(--ok-soft);color:var(--ok)}
+.j-badge.jc2{background:var(--alert-soft);color:var(--alert)}
+.j-badge.jc3{background:#fdf0f5;color:#c7366f}
+.j-badge.jc4{background:var(--warn-soft);color:var(--warn)}
+.j-badge.jc5{background:#eef;color:#5b57c9}
+.j-badge.ft1st{background:var(--accent-soft);color:var(--accent)}
+.j-badge.ftrpt{background:var(--ok-soft);color:var(--ok)}
+.j-badge.prod{background:var(--z-100);color:var(--z-600)}
 .p-right{margin-left:auto;text-align:right;flex:none}
 .p-flag{font-size:10px;color:var(--z-400);margin-top:2px;font-family:var(--mono)}
+.mark-att{
+  font-size:10px;font-weight:600;letter-spacing:.03em;color:#fff;background:var(--ok);
+  border:1px solid var(--ok);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;white-space:nowrap;
+}
+.mark-att:hover{filter:brightness(.96)}
+.mark-att:disabled{opacity:.5;cursor:default}
+.mark-done{font-size:10px;font-weight:600;color:var(--ok)}
 /* doer vs beneficiary role pill — clear, colour-coded */
 .p-role{font-size:8.5px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:var(--r-pill);display:inline-block;white-space:nowrap}
 .p-role.doer{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}

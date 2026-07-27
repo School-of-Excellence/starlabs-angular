@@ -799,6 +799,7 @@
 <aside class="panel" [class.open]="panelOpen">
   <div class="panel-head">
     <div class="panel-eyebrow"><span>{{ panelEyebrow }}</span>
+      <button class="panel-export" *ngIf="panelCount" (click)="panelExport()" title="Export this list to Excel (CSV)">Export</button>
       <button class="panel-close" (click)="closePanel()">&times;</button>
     </div>
     <div class="panel-title">{{ panelTitle }}</div>
@@ -817,8 +818,9 @@
             <div class="p-pair-name p-dim" *ngIf="!p['doer']">&mdash;</div>
             <div class="p-meta" *ngIf="p['doer']?.email">{{ p['doer'].email }}</div>
             <div class="p-badges" *ngIf="p['doer']">
-              <span class="j-badge" *ngIf="p['doer'].activejourney">{{ journeyLabel(p['doer'].activejourney) }}</span>
-              <span class="j-badge">{{ isFirstTimer(p['doer'].profileid) ? '1ST' : 'RPT' }}</span>
+              <span class="j-badge" [ngClass]="journeyBadgeClass(p['doer'].activejourney)" *ngIf="p['doer'].activejourney">{{ journeyLabel(p['doer'].activejourney) }}</span>
+              <span class="j-badge" [ngClass]="isFirstTimer(p['doer'].profileid) ? 'ft1st' : 'ftrpt'">{{ isFirstTimer(p['doer'].profileid) ? '1ST' : 'RPT' }}</span>
+              <span class="j-badge prod" *ngFor="let pr of productNames(p['doer'].profileid)">{{ pr }}</span>
             </div>
           </div>
           <span class="p-pair-arrow">&rarr;</span>
@@ -828,8 +830,9 @@
             <div class="p-pair-name p-dim" *ngIf="!p['beneficiary']">&mdash;</div>
             <div class="p-meta" *ngIf="p['beneficiary']?.email">{{ p['beneficiary'].email }}</div>
             <div class="p-badges" *ngIf="p['beneficiary']">
-              <span class="j-badge" *ngIf="p['beneficiary'].activejourney">{{ journeyLabel(p['beneficiary'].activejourney) }}</span>
-              <span class="j-badge">{{ isFirstTimer(p['beneficiary'].profileid) ? '1ST' : 'RPT' }}</span>
+              <span class="j-badge" [ngClass]="journeyBadgeClass(p['beneficiary'].activejourney)" *ngIf="p['beneficiary'].activejourney">{{ journeyLabel(p['beneficiary'].activejourney) }}</span>
+              <span class="j-badge" [ngClass]="isFirstTimer(p['beneficiary'].profileid) ? 'ft1st' : 'ftrpt'">{{ isFirstTimer(p['beneficiary'].profileid) ? '1ST' : 'RPT' }}</span>
+              <span class="j-badge prod" *ngFor="let pr of productNames(p['beneficiary'].profileid)">{{ pr }}</span>
             </div>
           </div>
         </div>
@@ -844,12 +847,14 @@
             <div class="p-name">{{ p.name }}</div>
             <div class="p-meta">{{ p.email }}</div>
             <div class="p-badges">
-              <span class="j-badge" *ngIf="p.activejourney">{{ journeyLabel(p.activejourney) }}</span>
-              <span class="j-badge">{{ isFirstTimer(p.profileid) ? '1ST' : 'RPT' }}</span>
-              <span class="j-badge" *ngIf="productName(p.profileid)">{{ productName(p.profileid) }}</span>
+              <span class="j-badge" [ngClass]="journeyBadgeClass(p.activejourney)" *ngIf="p.activejourney">{{ journeyLabel(p.activejourney) }}</span>
+              <span class="j-badge" [ngClass]="isFirstTimer(p.profileid) ? 'ft1st' : 'ftrpt'">{{ isFirstTimer(p.profileid) ? '1ST' : 'RPT' }}</span>
+              <span class="j-badge prod" *ngFor="let pr of productNames(p.profileid)">{{ pr }}</span>
             </div>
           </span>
           <span class="p-right">
+            <button class="mark-att" *ngIf="panelMarkable && !markedIds.has(p.profileid)" [disabled]="markingId === p.profileid" (click)="markAttendance(p)">{{ markingId === p.profileid ? 'Marking…' : 'Mark attendance' }}</button>
+            <span class="mark-done" *ngIf="markedIds.has(p.profileid)">&checkmark; Marked</span>
             <div class="p-flag" *ngIf="p['_meta']">{{ p['_meta'] }}</div>
           </span>
         </div>
