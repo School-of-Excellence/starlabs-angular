@@ -28,6 +28,7 @@ import {
   inject,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import {
   animate,
@@ -199,7 +200,35 @@ export class LocationlogComponent {
   private readonly snackBar = inject(MatSnackBar);
   private readonly breakpoints = inject(BreakpointObserver);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly sanitizer = inject(DomSanitizer);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+
+  /**
+   * Whether the drawer can show an embedded map.
+   *
+   * The embed is a plain Google Maps iframe — no API key, no billing, no SDK.
+   * The one thing that stops it is cross-origin isolation: under
+   * `COEP: require-corp` *or* `credentialless` the browser blocks every
+   * third-party iframe, and it does so **silently** — no console error, just a
+   * blank rectangle. This app opts into isolation app-wide via
+   * coi-serviceworker.js (the Zoom SDK needs SharedArrayBuffer), so on the
+   * deployed site the embed cannot render and the drawer shows a fallback
+   * instead of a mystery blank box.
+   *
+   * Verified both ways with a local probe: COEP credentialless -> blocked,
+   * no COEP -> the map renders.
+   */
+  readonly canEmbedMap = this.isBrowser && window.crossOriginIsolated !== true;
+
+  /**
+   * Memoised iframe URLs, keyed by coordinates.
+   *
+   * The template must not build a fresh SafeResourceUrl per change detection
+   * pass: a new object identity re-assigns the iframe `src`, which reloads the
+   * map. The clock ticks every 30s, so an unmemoised URL would visibly reload
+   * the drawer map twice a minute.
+   */
+  private readonly embedUrlCache = new Map<string, SafeResourceUrl>();
 
   /** Template-visible helpers (Angular templates cannot call bare imports). */
   readonly formatDistance = formatDistance;
@@ -552,6 +581,28 @@ export class LocationlogComponent {
 
   closeDetails(): void {
     this.selectedProfileId$.next(null);
+  }
+
+  /**
+   * Keyless Google Maps embed for the drawer.
+   *
+   * `output=embed` on the plain maps.google.com URL renders an interactive map
+   * in an iframe with no API key and no billing account — unlike the official
+   * Maps Embed API, which requires both. It is a long-standing but undocumented
+   * URL, so if Google ever retires it the drawer degrades to the same fallback
+   * that cross-origin isolation triggers, and the "Open in Google Maps" button
+   * keeps working regardless.
+   */
+  mapEmbedUrl(participant: ParticipantLocation): SafeResourceUrl {
+    const key = `${participant.latitude},${participant.longitude}`;
+    const cached = this.embedUrlCache.get(key);
+    if (cached) return cached;
+
+    const url = this.sanitizer.bypassSecurityTrustResourceUrl(
+      `https://maps.google.com/maps?q=${key}&z=16&hl=en&output=embed`,
+    );
+    this.embedUrlCache.set(key, url);
+    return url;
   }
 
   /** Opens the coordinates in Google Maps in a new tab. */

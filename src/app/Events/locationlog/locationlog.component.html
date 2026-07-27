@@ -80,6 +80,39 @@
 
           <mat-divider></mat-divider>
 
+          <!--
+            Keyless Google Maps embed. Blocked outright when the page is
+            cross-origin isolated, so the fallback below is not decoration —
+            without it this is a silent blank rectangle. See `canEmbedMap`.
+          -->
+          <section class="ll-drawer-section">
+            <h3 class="ll-section-title">Map</h3>
+
+            @if (canEmbedMap) {
+              <iframe
+                class="ll-embed-map"
+                [src]="mapEmbedUrl(participant)"
+                [title]="'Map showing ' + participant.name + '\'s latest location'"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"></iframe>
+            } @else {
+              <div class="ll-embed-fallback">
+                <mat-icon>map</mat-icon>
+                <p class="ll-embed-fallback-title">Map preview unavailable here</p>
+                <p class="ll-embed-fallback-note">
+                  This page runs cross-origin isolated for the Zoom SDK, which blocks embedded
+                  maps. The button above opens the exact coordinates in Google Maps.
+                </p>
+                <span class="ll-mono">
+                  {{ formatCoordinate(participant.latitude) }},
+                  {{ formatCoordinate(participant.longitude) }}
+                </span>
+              </div>
+            }
+          </section>
+
+          <mat-divider></mat-divider>
+
           <section class="ll-drawer-section">
             <h3 class="ll-section-title">Timeline</h3>
             <!-- One entry today; the markup is a list so extra logs slot in. -->
