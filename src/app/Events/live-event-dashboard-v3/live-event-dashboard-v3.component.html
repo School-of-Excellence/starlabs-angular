@@ -185,7 +185,7 @@
                 <div class="q-track"><i [style.width.%]="qt.width"></i></div>
                 <span class="q-count num">{{ qt.count }}</span>
               </div>
-              <div class="q-foot">100–25%+ are cumulative &middot; Below 25% needs attention</div>
+              <div class="q-foot">Each participant counted once, in one band &middot; Below 25% needs attention</div>
             </div>
           </div>
         </div>
@@ -300,7 +300,11 @@
             </div>
             <div class="day-num num">{{ d.count }}</div>
             <div class="day-bar" *ngIf="d.isToday && getVideoAskByDay(d) !== null"><i [style.width.%]="attTodayBarPct(d)"></i></div>
-            <div class="day-sub" (click)="$event.stopPropagation(); openAttVideo(d)"><span>Video Ask</span><span><b class="num">{{ getVideoAskByDay(d) ?? '—' }}</b></span></div>
+            <div class="day-subs">
+              <div class="day-stat" (click)="$event.stopPropagation(); openAttAbsent(d)"><span>Unattended</span><b class="num">{{ attAbsentCount(d) }}</b></div>
+              <div class="day-stat" (click)="$event.stopPropagation(); openAttVideo(d)"><span>Video Ask</span><b class="num">{{ getVideoAskByDay(d) ?? '—' }}</b></div>
+              <div class="day-stat" (click)="$event.stopPropagation(); openAttMissingVA(d)"><span>VA not submitted</span><b class="num">{{ getVideoAskByDay(d) === null ? '—' : attMissingVACount(d) }}</b></div>
+            </div>
           </div>
         </ng-container>
         <!-- Never attended -->
@@ -574,7 +578,11 @@
             </div>
             <div class="day-num num">{{ d.count }}</div>
             <div class="day-bar" *ngIf="d.isToday && getVideoAskByDay(d) !== null"><i [style.width.%]="attTodayBarPct(d)"></i></div>
-            <div class="day-sub" (click)="$event.stopPropagation(); openAttVideo(d)"><span>Video Ask</span><span><b class="num">{{ getVideoAskByDay(d) ?? '—' }}</b></span></div>
+            <div class="day-subs">
+              <div class="day-stat" (click)="$event.stopPropagation(); openAttAbsent(d)"><span>Unattended</span><b class="num">{{ attAbsentCount(d) }}</b></div>
+              <div class="day-stat" (click)="$event.stopPropagation(); openAttVideo(d)"><span>Video Ask</span><b class="num">{{ getVideoAskByDay(d) ?? '—' }}</b></div>
+              <div class="day-stat" (click)="$event.stopPropagation(); openAttMissingVA(d)"><span>VA not submitted</span><b class="num">{{ getVideoAskByDay(d) === null ? '—' : attMissingVACount(d) }}</b></div>
+            </div>
           </div>
         </ng-container>
         <div class="day-card never" (click)="openAttNever()">
@@ -799,16 +807,54 @@
   <div class="panel-search"><input type="text" [(ngModel)]="panelSearch" placeholder="Search name or email…"></div>
   <div class="panel-count">{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</div>
   <div class="panel-list">
-    <div class="p-row" *ngFor="let p of panelParticipants">
-      <span class="p-avatar">{{ initials(p.name) }}</span>
-      <span style="min-width:0">
-        <div class="p-name">{{ p.name }}</div>
-        <div class="p-meta">{{ p.email }}</div>
-      </span>
-      <span class="p-right">
-        <div class="p-flag" *ngIf="p['_meta']">{{ p['_meta'] }}</div>
-      </span>
-    </div>
+    <ng-container *ngFor="let p of panelParticipants">
+      <!-- changework pair: doer and beneficiary on one row -->
+      <div class="p-pair-row" *ngIf="p['_pair']; else singleRow">
+        <div class="p-pair">
+          <div class="p-pair-side">
+            <span class="p-role doer">DOER</span>
+            <div class="p-pair-name" *ngIf="p['doer']">{{ p['doer'].name }}</div>
+            <div class="p-pair-name p-dim" *ngIf="!p['doer']">&mdash;</div>
+            <div class="p-meta" *ngIf="p['doer']?.email">{{ p['doer'].email }}</div>
+            <div class="p-badges" *ngIf="p['doer']">
+              <span class="j-badge" *ngIf="p['doer'].activejourney">{{ journeyLabel(p['doer'].activejourney) }}</span>
+              <span class="j-badge">{{ isFirstTimer(p['doer'].profileid) ? '1ST' : 'RPT' }}</span>
+            </div>
+          </div>
+          <span class="p-pair-arrow">&rarr;</span>
+          <div class="p-pair-side">
+            <span class="p-role beneficiary">BENEFICIARY</span>
+            <div class="p-pair-name" *ngIf="p['beneficiary']">{{ p['beneficiary'].name }}</div>
+            <div class="p-pair-name p-dim" *ngIf="!p['beneficiary']">&mdash;</div>
+            <div class="p-meta" *ngIf="p['beneficiary']?.email">{{ p['beneficiary'].email }}</div>
+            <div class="p-badges" *ngIf="p['beneficiary']">
+              <span class="j-badge" *ngIf="p['beneficiary'].activejourney">{{ journeyLabel(p['beneficiary'].activejourney) }}</span>
+              <span class="j-badge">{{ isFirstTimer(p['beneficiary'].profileid) ? '1ST' : 'RPT' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="p-pair-proc" *ngIf="p['proc']">{{ p['proc'] }}</div>
+      </div>
+
+      <!-- standard single-participant row -->
+      <ng-template #singleRow>
+        <div class="p-row">
+          <span class="p-avatar">{{ initials(p.name) }}</span>
+          <span style="min-width:0">
+            <div class="p-name">{{ p.name }}</div>
+            <div class="p-meta">{{ p.email }}</div>
+            <div class="p-badges">
+              <span class="j-badge" *ngIf="p.activejourney">{{ journeyLabel(p.activejourney) }}</span>
+              <span class="j-badge">{{ isFirstTimer(p.profileid) ? '1ST' : 'RPT' }}</span>
+              <span class="j-badge" *ngIf="productName(p.profileid)">{{ productName(p.profileid) }}</span>
+            </div>
+          </span>
+          <span class="p-right">
+            <div class="p-flag" *ngIf="p['_meta']">{{ p['_meta'] }}</div>
+          </span>
+        </div>
+      </ng-template>
+    </ng-container>
     <div class="fu-empty" style="padding:14px 12px" *ngIf="panelCount === 0">No participants match.</div>
   </div>
 </aside>

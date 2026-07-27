@@ -75,6 +75,10 @@ export class LiveEventDataService implements OnDestroy {
   // name fallback from the event participation request doc (V2 does this) — used
   // when a registered participant has no `participant metadata` doc.
   registeredNames: { [profileid: string]: string } = {};
+  // product per participant from `event participation request` (productref → name via
+  // authguard.getProductMap()). Surfaced in every drill-down list.
+  productMap: { [productDocId: string]: string } = {};
+  registeredProductRefId: { [profileid: string]: string } = {};
   participantMetadataMap: { [profileid: string]: any } = {};
   mapJourneyData: { [key: string]: any } = {};
   journeyCounts: JourneyCount[] = [];
@@ -273,6 +277,12 @@ export class LiveEventDataService implements OnDestroy {
     } catch (err) { console.error('Error loading profile map:', err); }
     console.log('[v3][zones] staff name-map entries:', Object.keys(this.staffNameMap).length);
 
+    // product id→name map (authguard.getProductMap) for the drill-down lists.
+    try {
+      this.productMap = (await this.authguard.getProductMap()) || {};
+    } catch (err) { console.error('Error loading product map:', err); }
+    console.log('[v3][init] product map entries:', Object.keys(this.productMap).length);
+
     // events (FT loadData events block / V2 identical)
     try {
       const eventsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'event collection'), orderBy('end_date', 'desc')));
@@ -417,7 +427,11 @@ export class LiveEventDataService implements OnDestroy {
       this.eventParticipantSet = new Set(this.eventParticipantProfileIds);
       this.registeredCount = this.eventParticipantProfileIds.length;
       this.registeredNames = {};
-      docs.forEach(d => { const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; } });
+      this.registeredProductRefId = {};
+      docs.forEach(d => {
+        const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; }
+        const pref = d['productref']; if (pref?.id) { this.registeredProductRefId[d.profileid] = pref.id; }
+      });
       this.eventParticipants = docs.map(d => this.buildParticipantFromProfileId(d.profileid, false));
       this.registeredByProfileId = {};
       this.eventParticipants.forEach(p => { this.registeredByProfileId[p.profileid] = p; });
@@ -1386,13 +1400,17 @@ export class LiveEventDataService implements OnDestroy {
     return { total: opp + done, done, pending: opp };
   }
 
-  /** Flattened LIVE-now who/what list from FT's live pipeline (mapProcedureData). */
+  /** Flattened LIVE-now who/what list from FT's live pipeline (mapProcedureData).
+   *  Both parties of each live changework are listed — the doer AND the beneficiary
+   *  — each tagged with its role + procedure. */
   get liveChangeworkList(): { profileId: string; name: string; proc: string }[] {
     const out: { profileId: string; name: string; proc: string }[] = [];
     for (const id of Object.keys(this.mapProcedureData)) {
       const d = this.mapProcedureData[id];
       (d.liveChangework.data || []).forEach((row: any) => {
-        out.push({ profileId: row.doerId, name: row.doerName, proc: row.displayText || this.mapProcedureNames[id] || '' });
+        const procName = row.procedureName || this.mapProcedureNames[id] || '';
+        if (row.doerId) { out.push({ profileId: row.doerId, name: row.doerName, proc: `Doer · ${procName}` }); }
+        if (row.beneficiaryId) { out.push({ profileId: row.beneficiaryId, name: row.beneficiaryName, proc: `Beneficiary · ${procName}` }); }
       });
     }
     return out;
