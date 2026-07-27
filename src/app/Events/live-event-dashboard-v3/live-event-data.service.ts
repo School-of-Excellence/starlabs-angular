@@ -1386,13 +1386,17 @@ export class LiveEventDataService implements OnDestroy {
     return { total: opp + done, done, pending: opp };
   }
 
-  /** Flattened LIVE-now who/what list from FT's live pipeline (mapProcedureData). */
+  /** Flattened LIVE-now who/what list from FT's live pipeline (mapProcedureData).
+   *  Both parties of each live changework are listed — the doer AND the beneficiary
+   *  — each tagged with its role + procedure. */
   get liveChangeworkList(): { profileId: string; name: string; proc: string }[] {
     const out: { profileId: string; name: string; proc: string }[] = [];
     for (const id of Object.keys(this.mapProcedureData)) {
       const d = this.mapProcedureData[id];
       (d.liveChangework.data || []).forEach((row: any) => {
-        out.push({ profileId: row.doerId, name: row.doerName, proc: row.displayText || this.mapProcedureNames[id] || '' });
+        const procName = row.procedureName || this.mapProcedureNames[id] || '';
+        if (row.doerId) { out.push({ profileId: row.doerId, name: row.doerName, proc: `Doer · ${procName}` }); }
+        if (row.beneficiaryId) { out.push({ profileId: row.beneficiaryId, name: row.beneficiaryName, proc: `Beneficiary · ${procName}` }); }
       });
     }
     return out;
