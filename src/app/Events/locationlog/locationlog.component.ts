@@ -26,6 +26,7 @@ import {
   DestroyRef,
   PLATFORM_ID,
   inject,
+  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -78,9 +79,10 @@ import {
   DashboardStats,
   DistanceBand,
   FreshnessFilter,
-  GeolocationState,
+  DeviceLocationState,
   LocationFilters,
   ParticipantLocation,
+  ReferencePoint,
   SortKey,
   TimeWindow,
 } from './location.model';
@@ -99,6 +101,9 @@ import {
   getStatusHint,
   getStatusText,
   googleMapsUrl,
+  isValidLatitude,
+  isValidLongitude,
+  parseCoordinatePair,
   sortKeyFromHeader,
   sortParticipants,
   startOfDay,
@@ -111,6 +116,9 @@ const AUTO_REFRESH_MS = 30_000;
 
 /** Relative timestamps and status chips are recomputed on this cadence. */
 const CLOCK_TICK_MS = 30_000;
+
+/** Where the chosen reference point is remembered between visits. */
+const REFERENCE_STORAGE_KEY = 'locationlog_reference_point';
 
 /** Rows per page, and the choices offered in the paginator. */
 const DEFAULT_PAGE_SIZE = 25;
@@ -306,11 +314,12 @@ export class LocationlogComponent {
   private readonly sortKey$ = new BehaviorSubject<SortKey>('newest');
   private readonly pageIndex$ = new BehaviorSubject<number>(0);
   private readonly pageSize$ = new BehaviorSubject<number>(DEFAULT_PAGE_SIZE);
-  private readonly adminLocation$ = new BehaviorSubject<GeolocationState>({
-    coords: null,
+  private readonly reference$ = new BehaviorSubject<ReferencePoint | null>(null);
+  private readonly deviceState$ = new BehaviorSubject<DeviceLocationState>({
     error: null,
     loading: false,
   });
+  private readonly pickerOpen$ = new BehaviorSubject<boolean>(false);
   private readonly selectedProfileId$ = new BehaviorSubject<string | null>(null);
   private readonly loadingState$ = new BehaviorSubject<boolean>(true);
   private readonly errorState$ = new BehaviorSubject<string | null>(null);
@@ -329,14 +338,21 @@ export class LocationlogComponent {
   readonly autoRefresh = this.autoRefreshOn$.asObservable();
   readonly filters = this.filters$.asObservable();
   readonly sortKey = this.sortKey$.asObservable();
-  readonly adminLocation = this.adminLocation$.asObservable();
+  readonly reference = this.reference$.asObservable();
+  readonly deviceState = this.deviceState$.asObservable();
+  readonly pickerOpen = this.pickerOpen$.asObservable();
   readonly now$ = this.clock$;
   readonly selectedId = this.selectedProfileId$.asObservable();
 
-  /** Just the coordinates, for the map's admin marker. */
-  readonly adminCoords: Observable<Coordinates | null> = this.adminLocation$.pipe(
-    map((state) => state.coords),
+  /** Just the coordinates of the reference point, or null while unset. */
+  readonly referenceCoords: Observable<Coordinates | null> = this.reference$.pipe(
+    map((point) => point?.coords ?? null),
   );
+
+  /** Inputs for the manual coordinate entry form. */
+  readonly latControl = new FormControl<string>('', { nonNullable: true });
+  readonly lngControl = new FormControl<string>('', { nonNullable: true });
+  readonly pickerError = signal<string | null>(null);
 
   /** Handset + portrait tablet get the card layout instead of the table. */
   readonly isHandset$ = this.breakpoints
@@ -403,10 +419,10 @@ export class LocationlogComponent {
   /** Latest position per participant, enriched with name, distance and status. */
   private readonly participants$: Observable<readonly ParticipantLocation[]> = combineLatest([
     this.latest$,
-    this.adminLocation$,
+    this.reference$,
     this.clock$,
   ]).pipe(
-    map(([{ result, names }, admin, now]) =>
+    map(([{ result, names }, reference, now]) =>
       result.logs.map<ParticipantLocation>((log) => {
         const coords: Coordinates = { latitude: log.latitude, longitude: log.longitude };
         const name = names.get(log.profileid) ?? log.profileid;
@@ -417,7 +433,7 @@ export class LocationlogComponent {
           latitude: log.latitude,
           longitude: log.longitude,
           created: log.created,
-          distanceMeters: admin.coords ? calculateDistance(admin.coords, coords) : null,
+          distanceMeters: reference ? calculateDistance(reference.coords, coords) : null,
           status: deriveStatus(log.created, now),
         };
       }),
@@ -508,7 +524,12 @@ export class LocationlogComponent {
       )
       .subscribe((search) => this.patchFilters({ search }));
 
-    this.requestAdminLocation();
+    // Restore the previously chosen reference point. Nothing is requested from
+    // the browser automatically — picking the point is the operator's call.
+    const stored = this.readStoredReference();
+    if (stored) {
+      this.reference$.next(stored);
+    }
   }
 
   // ── Commands ──────────────────────────────────────────────────────────────
@@ -622,44 +643,165 @@ export class LocationlogComponent {
     return date.toLocaleString();
   }
 
+  // ── Reference point ───────────────────────────────────────────────────────
+
+  togglePicker(): void {
+    const opening = !this.pickerOpen$.value;
+    this.pickerOpen$.next(opening);
+
+    if (opening) {
+      // Seed the inputs with the current point so "adjust slightly" is easy.
+      const current = this.reference$.value;
+      this.latControl.setValue(current ? String(current.coords.latitude) : '');
+      this.lngControl.setValue(current ? String(current.coords.longitude) : '');
+      this.pickerError.set(null);
+    }
+  }
+
   /**
-   * Ask the browser for the admin's position. Guarded for SSR — there is no
-   * `navigator` on the server — and a denied prompt degrades to "distance
-   * unknown" rather than an empty dashboard.
+   * Accept a pasted "lat, lng" pair in either field and split it across both.
+   *
+   * Copying a coordinate pair out of Google Maps — or out of this dashboard's
+   * own coordinates column — puts both numbers on the clipboard together, and
+   * having to hand-split them is a needless papercut.
    */
-  requestAdminLocation(): void {
+  onCoordinatePaste(event: ClipboardEvent): void {
+    const text = event.clipboardData?.getData('text') ?? '';
+    const parsed = parseCoordinatePair(text);
+    if (!parsed) return;
+
+    event.preventDefault();
+    this.latControl.setValue(String(parsed.latitude));
+    this.lngControl.setValue(String(parsed.longitude));
+    this.pickerError.set(null);
+  }
+
+  /** Commit the manually typed coordinates as the reference point. */
+  applyManualReference(): void {
+    const parsed = parseCoordinatePair(`${this.latControl.value}, ${this.lngControl.value}`);
+
+    if (!parsed) {
+      this.pickerError.set(
+        'Enter a valid latitude (-90 to 90) and longitude (-180 to 180).',
+      );
+      return;
+    }
+
+    this.setReference({
+      coords: parsed,
+      source: 'manual',
+      label: 'Custom location',
+    });
+  }
+
+  /** Use a participant's own latest position as the reference point. */
+  useParticipantAsReference(participant: ParticipantLocation): void {
+    this.setReference({
+      coords: { latitude: participant.latitude, longitude: participant.longitude },
+      source: 'participant',
+      label: participant.name,
+    });
+  }
+
+  /**
+   * Ask the browser for a device fix — only ever on an explicit click.
+   *
+   * This is no longer done automatically on load: the browser reports wherever
+   * the admin's machine happens to be, which is regularly not the place the
+   * distances should be measured from (reviewing from home, a different city,
+   * behind a VPN). Silently anchoring every distance to that was wrong.
+   */
+  useDeviceAsReference(): void {
     if (!this.isBrowser || !('geolocation' in navigator)) {
-      this.adminLocation$.next({
-        coords: null,
+      this.deviceState$.next({
         error: 'Geolocation is not available in this browser.',
         loading: false,
       });
       return;
     }
 
-    this.adminLocation$.next({ coords: null, error: null, loading: true });
+    this.deviceState$.next({ error: null, loading: true });
 
     navigator.geolocation.getCurrentPosition(
-      (position) =>
-        this.adminLocation$.next({
+      (position) => {
+        this.deviceState$.next({ error: null, loading: false });
+        this.setReference({
           coords: {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           },
-          error: null,
-          loading: false,
-        }),
+          source: 'device',
+          label: 'This device',
+        });
+      },
       (error) =>
-        this.adminLocation$.next({
-          coords: null,
+        this.deviceState$.next({
           error:
             error.code === error.PERMISSION_DENIED
-              ? 'Location permission denied — distances and distance filters are unavailable.'
-              : 'Could not determine your location.',
+              ? 'Location permission denied. Enter coordinates manually instead.'
+              : 'Could not read this device’s location. Enter coordinates manually instead.',
           loading: false,
         }),
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
     );
+  }
+
+  /** Drop the reference point — distances and distance filters go unavailable. */
+  clearReference(): void {
+    this.reference$.next(null);
+    this.deviceState$.next({ error: null, loading: false });
+    this.patchFilters({ distance: 'all' });
+    this.writeStoredReference(null);
+    this.snackBar.open('Reference location cleared', undefined, { duration: 2200 });
+  }
+
+  private setReference(point: ReferencePoint): void {
+    this.reference$.next(point);
+    this.pickerOpen$.next(false);
+    this.pickerError.set(null);
+    this.pageIndex$.next(0);
+    this.writeStoredReference(point);
+    this.snackBar.open(`Measuring distances from ${point.label}`, undefined, { duration: 2600 });
+  }
+
+  /**
+   * Persist the choice. Re-picking a location on every page load would defeat
+   * the point of choosing it manually.
+   */
+  private writeStoredReference(point: ReferencePoint | null): void {
+    if (!this.isBrowser) return;
+    try {
+      if (point) {
+        localStorage.setItem(REFERENCE_STORAGE_KEY, JSON.stringify(point));
+      } else {
+        localStorage.removeItem(REFERENCE_STORAGE_KEY);
+      }
+    } catch {
+      // Private browsing or a full quota — the dashboard still works, the
+      // choice just will not survive a reload.
+    }
+  }
+
+  private readStoredReference(): ReferencePoint | null {
+    if (!this.isBrowser) return null;
+    try {
+      const raw = localStorage.getItem(REFERENCE_STORAGE_KEY);
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw) as ReferencePoint;
+      // Validate rather than trust: storage is user-writable and a bad value
+      // would poison every distance on the page.
+      if (
+        !parsed?.coords ||
+        !isValidLatitude(parsed.coords.latitude) ||
+        !isValidLongitude(parsed.coords.longitude)
+      ) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
   }
 
   // ── Pure view logic ───────────────────────────────────────────────────────

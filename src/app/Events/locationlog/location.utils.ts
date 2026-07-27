@@ -265,6 +265,66 @@ export function formatCoordinate(value: number): string {
   return value.toFixed(6);
 }
 
+export const isValidLatitude = (value: number): boolean =>
+  Number.isFinite(value) && value >= -90 && value <= 90;
+
+export const isValidLongitude = (value: number): boolean =>
+  Number.isFinite(value) && value >= -180 && value <= 180;
+
+/**
+ * Parse a pasted coordinate pair into latitude/longitude.
+ *
+ * Accepts what people actually paste out of Google Maps and out of this very
+ * dashboard: `12.940029, 80.253343`, whitespace- or semicolon-separated, and
+ * optional N/S/E/W suffixes as Firestore's own console renders them
+ * (`12.94° N, 80.25° E`). Returns null on anything it cannot read with
+ * confidence — a silently wrong reference point would corrupt every distance
+ * on the page.
+ */
+export function parseCoordinatePair(input: string): Coordinates | null {
+  const cleaned = input.trim().replace(/[°]/g, ' ');
+  if (!cleaned) return null;
+
+  const parts = cleaned
+    .split(/[,;]|\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length < 2 || parts.length > 4) return null;
+
+  const numbers: number[] = [];
+  const hemispheres: string[] = [];
+
+  for (const part of parts) {
+    const hemisphere = /^[NSEW]$/i.exec(part);
+    if (hemisphere) {
+      hemispheres.push(part.toUpperCase());
+      continue;
+    }
+    const value = Number(part);
+    if (!Number.isFinite(value)) return null;
+    numbers.push(value);
+  }
+
+  if (numbers.length !== 2) return null;
+
+  let [latitude, longitude] = numbers;
+
+  // "12.94 N, 80.25 E" — apply the sign the hemisphere implies.
+  if (hemispheres.length === 2) {
+    if (hemispheres[0] === 'S') latitude = -Math.abs(latitude);
+    if (hemispheres[0] === 'N') latitude = Math.abs(latitude);
+    if (hemispheres[1] === 'W') longitude = -Math.abs(longitude);
+    if (hemispheres[1] === 'E') longitude = Math.abs(longitude);
+  } else if (hemispheres.length !== 0) {
+    return null;
+  }
+
+  if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) return null;
+
+  return { latitude, longitude };
+}
+
 /**
  * Metre bounds for a distance band. Outward bands ("beyond 10 km") are open at
  * the top; `all` and `unknown` are handled by the caller, not by bounds.

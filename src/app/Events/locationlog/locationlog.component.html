@@ -76,6 +76,14 @@
               <mat-icon>open_in_new</mat-icon>
               Open in Google Maps
             </button>
+
+            <button
+              mat-stroked-button
+              class="ll-maps-btn"
+              (click)="useParticipantAsReference(participant)">
+              <mat-icon>my_location</mat-icon>
+              Measure distances from here
+            </button>
           </section>
 
           <mat-divider></mat-divider>
@@ -182,16 +190,105 @@
         </p>
       </aside>
 
-      <!-- Admin location banner: only when geolocation is unavailable -->
-      @if (adminLocation | async; as admin) {
-        @if (admin.error) {
-          <div class="ll-banner ll-banner-warn" role="status">
-            <mat-icon>location_off</mat-icon>
-            <span>{{ admin.error }}</span>
-            <button mat-button (click)="requestAdminLocation()">Retry</button>
+      <!--
+        Reference point. Every distance on this page is measured from here, and
+        it is chosen explicitly — nothing is read from the browser on load.
+      -->
+      <section class="ll-reference" aria-label="Reference location">
+        <div class="ll-reference-bar">
+          <mat-icon class="ll-reference-icon">my_location</mat-icon>
+
+          <div class="ll-reference-text">
+            @if (reference | async; as point) {
+              <span class="ll-reference-label">
+                Measuring from <strong>{{ point.label }}</strong>
+              </span>
+              <span class="ll-reference-coords ll-mono">
+                {{ formatCoordinate(point.coords.latitude) }},
+                {{ formatCoordinate(point.coords.longitude) }}
+              </span>
+            } @else {
+              <span class="ll-reference-label">No reference location set</span>
+              <span class="ll-reference-coords">
+                Pick one to show distances and enable the distance filters.
+              </span>
+            }
+          </div>
+
+          <div class="ll-reference-actions">
+            @if (reference | async) {
+              <button mat-button class="ll-reference-clear" (click)="clearReference()">Clear</button>
+            }
+            <button mat-stroked-button (click)="togglePicker()">
+              <mat-icon>{{ (pickerOpen | async) ? 'expand_less' : 'edit_location_alt' }}</mat-icon>
+              {{ (reference | async) ? 'Change' : 'Set location' }}
+            </button>
+          </div>
+        </div>
+
+        @if (pickerOpen | async) {
+          <div class="ll-picker" @fadeIn>
+            <div class="ll-picker-row">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ll-picker-field">
+                <mat-label>Latitude</mat-label>
+                <input
+                  matInput
+                  inputmode="decimal"
+                  placeholder="12.940029"
+                  [formControl]="latControl"
+                  (paste)="onCoordinatePaste($event)" />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ll-picker-field">
+                <mat-label>Longitude</mat-label>
+                <input
+                  matInput
+                  inputmode="decimal"
+                  placeholder="80.253343"
+                  [formControl]="lngControl"
+                  (paste)="onCoordinatePaste($event)" />
+              </mat-form-field>
+
+              <button mat-flat-button color="primary" (click)="applyManualReference()">
+                Use this location
+              </button>
+            </div>
+
+            <p class="ll-picker-hint">
+              Paste a <code>latitude, longitude</code> pair into either box and it splits itself —
+              copy one straight from Google Maps or from the Coordinates column below.
+            </p>
+
+            @if (pickerError()) {
+              <p class="ll-picker-error" role="alert">
+                <mat-icon inline>error_outline</mat-icon>
+                {{ pickerError() }}
+              </p>
+            }
+
+            <div class="ll-picker-alt">
+              <span class="ll-picker-alt-label">Or</span>
+              <button
+                mat-stroked-button
+                [disabled]="(deviceState | async)?.loading"
+                (click)="useDeviceAsReference()">
+                <mat-icon>gps_fixed</mat-icon>
+                {{ (deviceState | async)?.loading ? 'Locating…' : 'Use this device' }}
+              </button>
+              <span class="ll-picker-alt-note">
+                You can also click <strong>Set as reference</strong> on any participant row.
+              </span>
+            </div>
+
+            @if ((deviceState | async)?.error; as deviceError) {
+              <p class="ll-picker-error" role="alert">
+                <mat-icon inline>location_off</mat-icon>
+                {{ deviceError }}
+              </p>
+            }
           </div>
         }
-      }
+      </section>
 
       @if (error | async; as loadError) {
         <div class="ll-banner ll-banner-error" role="alert">
@@ -326,7 +423,7 @@
                   <mat-label>Distance</mat-label>
                   <mat-select
                     [value]="active.distance"
-                    [disabled]="!(adminCoords | async)"
+                    [disabled]="!(referenceCoords | async)"
                     (valueChange)="setDistance($event)">
                     @for (option of distanceOptions; track option.value) {
                       <mat-option [value]="option.value">{{ option.label }}</mat-option>
@@ -459,6 +556,13 @@
                           matTooltip="Locate"
                           [attr.aria-label]="'Locate ' + p.name"
                           (click)="select(p)">
+                          <mat-icon>my_location</mat-icon>
+                        </button>
+                        <button
+                          mat-icon-button
+                          matTooltip="Measure distances from here"
+                          [attr.aria-label]="'Set ' + p.name + '\'s location as the reference'"
+                          (click)="useParticipantAsReference(p); $event.stopPropagation()">
                           <mat-icon>my_location</mat-icon>
                         </button>
                         <button

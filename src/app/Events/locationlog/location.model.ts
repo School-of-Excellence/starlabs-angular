@@ -126,9 +126,26 @@ export interface LocationFilters {
   readonly distance: DistanceBand;
 }
 
-/** Result of asking the browser for the admin's position. */
-export interface GeolocationState {
-  readonly coords: Coordinates | null;
+/** Where the reference point came from. Shown so the number is never mystery. */
+export type ReferenceSource = 'manual' | 'device' | 'participant';
+
+/**
+ * The point every distance on the dashboard is measured *from*.
+ *
+ * Deliberately explicit rather than "wherever this browser happens to be": an
+ * admin reviewing participants is often nowhere near the place that matters
+ * (reviewing from home, from a different city, on a VPN), so a device fix is
+ * one option among several rather than the automatic default.
+ */
+export interface ReferencePoint {
+  readonly coords: Coordinates;
+  readonly source: ReferenceSource;
+  /** Human label for the source, e.g. a participant's name. */
+  readonly label: string;
+}
+
+/** Transient state while asking the browser for a device fix. */
+export interface DeviceLocationState {
   readonly error: string | null;
   readonly loading: boolean;
 }
