@@ -740,29 +740,31 @@ export class LiveEventDataService implements OnDestroy {
   }
 
   // ==========================================================================
-  // Manual attendance marking — writes an `arena e-ticket log` doc (same shape as
-  // the QR scanner: docid/product/logdate/profileid/eventref/eticketref). Requires
-  // an active arena e-ticket (the QR flow's precondition). id is deterministic per
-  // participant-per-day so re-marking the same day is idempotent (won't dupe).
+  // Manual attendance marking — writes an `arena e-ticket log` doc (QR-scanner
+  // shape: docid/product/logdate/profileid/eventref/eticketref). The doc id is the
+  // participant's arena e-ticket id when they have one (idempotent per ticket);
+  // otherwise an auto-generated id. product/eticketref are included only when an
+  // e-ticket exists.
   // ==========================================================================
   async markAttendance(profileId: string): Promise<void> {
     if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
-    const ticket = this.arenaETicketByProfile[profileId];
-    if (!ticket || ticket['active'] !== true) { throw new Error('NO_ETICKET'); }
-    const todayKey = new Date().toLocaleDateString('en-CA');
-    const id = `manual_${profileId}_${todayKey}`;
+    const ticket = this.arenaETicketByProfile[profileId];   // active e-ticket, if any
+    const col = collection(this.firestoreDefault, 'arena e-ticket log');
+    const id = ticket?.['docid'] || doc(col).id;            // e-ticket id, else auto id
     const data: any = {
       docid: id,
       logdate: Timestamp.now(),                 // client now (avoids the pending serverTimestamp null the attendance read can't handle)
       profileid: profileId,
       eventref: this.selectedEvent.docref,
-      eticketref: doc(this.firestoreDefault, 'arena e-ticket', ticket['docid']),
       markedmanually: true,                      // audit flag — distinguishes manual marks from QR scans
     };
-    const products: string[] = ticket['producteligible'] || [];
-    if (products.length) { data.product = doc(this.firestoreDefault, 'products', products[0]); }
-    await setDoc(doc(this.firestoreDefault, 'arena e-ticket log', id), data);
-    console.log('[v3][attendance] manual mark:', profileId, '| doc:', id);
+    if (ticket) {
+      data.eticketref = doc(this.firestoreDefault, 'arena e-ticket', ticket['docid']);
+      const products: string[] = ticket['producteligible'] || [];
+      if (products.length) { data.product = doc(this.firestoreDefault, 'products', products[0]); }
+    }
+    await setDoc(doc(col, id), data);
+    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', !!ticket, '| doc:', id);
   }
 
   // ==========================================================================

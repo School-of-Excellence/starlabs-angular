@@ -1138,8 +1138,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       .then(() => { this.markedIds.add(p.profileid); this.markingId = null; this.cdr.detectChanges(); })
       .catch((err: any) => {
         this.markingId = null;
-        if (err?.message === 'NO_ETICKET') { window.alert(`${p.name} has no active e-ticket for this event — attendance can't be marked here.`); }
-        else { console.error('[v3][attendance] mark failed:', err); window.alert('Could not mark attendance. Please try again.'); }
+        console.error('[v3][attendance] mark failed:', err);
+        window.alert('Could not mark attendance. Please try again.');
         this.cdr.detectChanges();
       });
   }
