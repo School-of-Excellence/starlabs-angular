@@ -37,7 +37,10 @@
 
             <h2 class="ll-drawer-name">{{ participant.name }}</h2>
 
-            <span class="ll-status-chip" [class]="'ll-status-' + participant.status">
+            <span
+              class="ll-status-chip"
+              [class]="'ll-status-' + participant.status"
+              [matTooltip]="getStatusHint(participant.status)">
               <span class="ll-status-dot"></span>
               {{ getStatusText(participant.status) }}
             </span>
@@ -77,21 +80,14 @@
 
           <mat-divider></mat-divider>
 
-          <!--
-            Map placeholder. The dashboard ships without a map provider by
-            decision; drop @angular/google-maps (or Leaflet) in here and the
-            surrounding data is already shaped for it.
-          -->
           <section class="ll-drawer-section">
-            <h3 class="ll-section-title">Map</h3>
-            <div class="ll-map-placeholder ll-map-placeholder-sm">
-              <mat-icon>map</mat-icon>
-              <p>Map view not configured</p>
-              <span class="ll-mono">
-                {{ formatCoordinate(participant.latitude) }},
-                {{ formatCoordinate(participant.longitude) }}
-              </span>
-            </div>
+            <h3 class="ll-section-title">Location</h3>
+            <app-location-map
+              class="ll-drawer-map"
+              [participants]="[participant]"
+              [admin]="adminCoords | async"
+              [focusedProfileId]="participant.profileid"
+              [now]="now"></app-location-map>
           </section>
 
           <mat-divider></mat-divider>
@@ -122,8 +118,12 @@
       <!-- Header -->
       <header class="ll-header">
         <div class="ll-header-text">
-          <h1 class="ll-title">📍 Live Location Tracking</h1>
-          <p class="ll-subtitle">Shows latest location reported by every participant.</p>
+          <span class="ll-eyebrow">
+            <span class="ll-eyebrow-dot"></span>
+            Location tracking
+          </span>
+          <h1 class="ll-title">Live Location Tracking</h1>
+          <p class="ll-subtitle">Shows the latest location reported by every participant.</p>
         </div>
 
         <div class="ll-header-actions">
@@ -146,6 +146,20 @@
           </button>
         </div>
       </header>
+
+      <!--
+        Status is derived, not stored. Saying so in the UI stops "Live" being
+        read as "connected" — a location log cannot know that.
+      -->
+      <aside class="ll-explainer" role="note">
+        <mat-icon>info</mat-icon>
+        <p>
+          Status is derived from each participant's latest <code>created</code> timestamp —
+          <strong>Live</strong> is under 10 minutes old, <strong>Recent</strong> under an hour,
+          <strong>Stale</strong> older. It reflects when a device last reported, not whether it is
+          currently connected.
+        </p>
+      </aside>
 
       <!-- Admin location banner: only when geolocation is unavailable -->
       @if (adminLocation | async; as admin) {
@@ -171,7 +185,7 @@
 
           <!-- Statistics cards -->
           <section class="ll-stats" @staggerCards aria-label="Summary statistics">
-            <article class="ll-stat-card ll-stat-total">
+            <article class="ll-stat-card ll-accent-indigo">
               <div class="ll-stat-icon"><mat-icon>groups</mat-icon></div>
               <div class="ll-stat-body">
                 <span class="ll-stat-value">{{ view.stats.total }}</span>
@@ -179,15 +193,15 @@
               </div>
             </article>
 
-            <article class="ll-stat-card ll-stat-online">
+            <article class="ll-stat-card ll-accent-green">
               <div class="ll-stat-icon"><mat-icon>wifi_tethering</mat-icon></div>
               <div class="ll-stat-body">
-                <span class="ll-stat-value">{{ view.stats.online }}</span>
-                <span class="ll-stat-label">Online <em>· last 10 min</em></span>
+                <span class="ll-stat-value">{{ view.stats.live }}</span>
+                <span class="ll-stat-label">Live <em>· last 10 min</em></span>
               </div>
             </article>
 
-            <article class="ll-stat-card ll-stat-today">
+            <article class="ll-stat-card ll-accent-amber">
               <div class="ll-stat-icon"><mat-icon>today</mat-icon></div>
               <div class="ll-stat-body">
                 <span class="ll-stat-value">{{ view.stats.updatedToday }}</span>
@@ -195,7 +209,7 @@
               </div>
             </article>
 
-            <article class="ll-stat-card ll-stat-distance">
+            <article class="ll-stat-card ll-accent-sky">
               <div class="ll-stat-icon"><mat-icon>social_distance</mat-icon></div>
               <div class="ll-stat-body">
                 <span class="ll-stat-value">
@@ -204,71 +218,112 @@
                 <span class="ll-stat-label">Average distance</span>
               </div>
             </article>
+
+            <!-- Doubles as a shortcut: click to sort the outliers to the top. -->
+            <article
+              class="ll-stat-card ll-accent-rose ll-stat-clickable"
+              tabindex="0"
+              role="button"
+              matTooltip="Sort by farthest first"
+              (click)="showFarthest()"
+              (keydown.enter)="showFarthest()">
+              <div class="ll-stat-icon"><mat-icon>explore</mat-icon></div>
+              <div class="ll-stat-body">
+                <span class="ll-stat-value">{{ formatDistance(view.stats.farthestMeters) }}</span>
+                <span class="ll-stat-label">
+                  Farthest away
+                  @if (view.stats.farthestName) {
+                    <em>· {{ view.stats.farthestName }}</em>
+                  }
+                </span>
+              </div>
+            </article>
           </section>
 
           <!-- Search, sort and filters -->
           <section class="ll-toolbar" aria-label="Search and filters">
-            <mat-form-field appearance="outline" class="ll-search-field" subscriptSizing="dynamic">
-              <mat-icon matPrefix>search</mat-icon>
-              <input
-                matInput
-                type="search"
-                placeholder="Search participant by name"
-                autocomplete="off"
-                [formControl]="searchControl"
-                aria-label="Search participant by name" />
-              @if (searchControl.value) {
-                <button
-                  mat-icon-button
-                  matSuffix
-                  aria-label="Clear search"
-                  (click)="searchControl.setValue('')">
-                  <mat-icon>close</mat-icon>
-                </button>
-              }
-            </mat-form-field>
+            <div class="ll-toolbar-row">
+              <mat-form-field appearance="outline" class="ll-search-field" subscriptSizing="dynamic">
+                <mat-icon matPrefix>search</mat-icon>
+                <input
+                  matInput
+                  type="search"
+                  placeholder="Search participant by name"
+                  autocomplete="off"
+                  [formControl]="searchControl"
+                  aria-label="Search participant by name" />
+                @if (searchControl.value) {
+                  <button
+                    mat-icon-button
+                    matSuffix
+                    aria-label="Clear search"
+                    (click)="searchControl.setValue('')">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
+              </mat-form-field>
 
-            @if (filters | async; as active) {
               <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
                 <mat-label>Sort by</mat-label>
-                <mat-select
-                  [value]="(sortKey | async) ?? 'newest'"
-                  (valueChange)="setSort($event)">
-                  <mat-option value="newest">Newest first</mat-option>
-                  <mat-option value="distance">Distance</mat-option>
-                  <mat-option value="name">Alphabetical</mat-option>
+                <mat-select [value]="(sortKey | async) ?? 'newest'" (valueChange)="setSort($event)">
+                  @for (option of sortOptions; track option.value) {
+                    <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                  }
                 </mat-select>
               </mat-form-field>
+            </div>
 
-              <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
-                <mat-label>Status</mat-label>
-                <mat-select [value]="active.status" (valueChange)="setStatusFilter($event)">
-                  <mat-option value="all">All</mat-option>
-                  <mat-option value="online">Online</mat-option>
-                  <mat-option value="offline">Offline</mat-option>
-                  <mat-option value="today">Updated today</mat-option>
-                </mat-select>
-              </mat-form-field>
+            @if (filters | async; as active) {
+              <div class="ll-toolbar-row ll-filter-row">
+                <div class="ll-toggle-group" role="group" aria-label="Filter by freshness">
+                  @for (option of freshnessOptions; track option.value) {
+                    <button
+                      type="button"
+                      class="ll-toggle"
+                      [class.ll-toggle-on]="active.freshness === option.value"
+                      [matTooltip]="option.hint ?? ''"
+                      [attr.aria-pressed]="active.freshness === option.value"
+                      (click)="setFreshness(option.value)">
+                      @if (option.value !== 'all') {
+                        <span class="ll-toggle-dot" [class]="'ll-status-' + option.value"></span>
+                      }
+                      {{ option.label }}
+                    </button>
+                  }
+                </div>
 
-              <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
-                <mat-label>Distance</mat-label>
-                <mat-select
-                  [value]="active.radiusKm"
-                  [disabled]="!((adminLocation | async)?.coords)"
-                  (valueChange)="setRadiusFilter($event)">
-                  <mat-option [value]="null">Any distance</mat-option>
-                  <mat-option [value]="1">Within 1 km</mat-option>
-                  <mat-option [value]="5">Within 5 km</mat-option>
-                  <mat-option [value]="10">Within 10 km</mat-option>
-                </mat-select>
-              </mat-form-field>
+                <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
+                  <mat-label>Reported</mat-label>
+                  <mat-select [value]="active.timeWindow" (valueChange)="setTimeWindow($event)">
+                    @for (option of timeWindowOptions; track option.value) {
+                      <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
 
-              @if (active.search || active.status !== 'all' || active.radiusKm !== null) {
-                <button mat-stroked-button class="ll-clear-btn" (click)="clearFilters()">
-                  <mat-icon>filter_alt_off</mat-icon>
-                  Clear
-                </button>
-              }
+                <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
+                  <mat-label>Distance</mat-label>
+                  <mat-select
+                    [value]="active.distance"
+                    [disabled]="!(adminCoords | async)"
+                    (valueChange)="setDistance($event)">
+                    @for (option of distanceOptions; track option.value) {
+                      <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+
+                <span class="ll-result-count">
+                  {{ view.participants.length }} of {{ view.stats.total }}
+                </span>
+
+                @if (view.activeFilterCount > 0) {
+                  <button mat-stroked-button class="ll-clear-btn" (click)="clearFilters()">
+                    <mat-icon>filter_alt_off</mat-icon>
+                    Clear ({{ view.activeFilterCount }})
+                  </button>
+                }
+              </div>
             }
           </section>
 
@@ -345,24 +400,20 @@
                       </td>
                     </ng-container>
 
-                    <ng-container matColumnDef="latitude">
-                      <th mat-header-cell *matHeaderCellDef>Latitude</th>
-                      <td mat-cell *matCellDef="let p" class="ll-mono">
-                        {{ formatCoordinate(p.latitude) }}
-                      </td>
-                    </ng-container>
-
-                    <ng-container matColumnDef="longitude">
-                      <th mat-header-cell *matHeaderCellDef>Longitude</th>
-                      <td mat-cell *matCellDef="let p" class="ll-mono">
-                        {{ formatCoordinate(p.longitude) }}
+                    <ng-container matColumnDef="coordinates">
+                      <th mat-header-cell *matHeaderCellDef>Coordinates</th>
+                      <td mat-cell *matCellDef="let p" class="ll-mono ll-cell-coords">
+                        {{ formatCoordinate(p.latitude) }}, {{ formatCoordinate(p.longitude) }}
                       </td>
                     </ng-container>
 
                     <ng-container matColumnDef="status">
                       <th mat-header-cell *matHeaderCellDef>Status</th>
                       <td mat-cell *matCellDef="let p">
-                        <span class="ll-status-chip" [class]="'ll-status-' + p.status">
+                        <span
+                          class="ll-status-chip"
+                          [class]="'ll-status-' + p.status"
+                          [matTooltip]="getStatusHint(p.status)">
                           <span class="ll-status-dot"></span>
                           {{ getStatusText(p.status) }}
                         </span>
@@ -396,7 +447,7 @@
                       *matRowDef="let p; columns: displayedColumns"
                       class="ll-row"
                       tabindex="0"
-                      [class.ll-row-selected]="(selected$ | async)?.profileid === p.profileid"
+                      [class.ll-row-selected]="(selectedId | async) === p.profileid"
                       (click)="select(p)"
                       (keydown.enter)="select(p)"></tr>
                   </table>
@@ -413,7 +464,7 @@
                   <div
                     *cdkVirtualFor="let p of view.participants; trackBy: trackByProfile"
                     class="ll-card ll-card-virtual"
-                    [class.ll-card-selected]="(selected$ | async)?.profileid === p.profileid"
+                    [class.ll-card-selected]="(selectedId | async) === p.profileid"
                     tabindex="0"
                     (click)="select(p)"
                     (keydown.enter)="select(p)">
@@ -432,14 +483,12 @@
                     </span>
                   </div>
                 </cdk-virtual-scroll-viewport>
-              }
-
-              @else {
+              } @else {
                 <div class="ll-cards" @fadeIn>
                   @for (p of view.participants; track p.profileid) {
                     <article
                       class="ll-card"
-                      [class.ll-card-selected]="(selected$ | async)?.profileid === p.profileid"
+                      [class.ll-card-selected]="(selectedId | async) === p.profileid"
                       tabindex="0"
                       (click)="select(p)"
                       (keydown.enter)="select(p)">
@@ -467,38 +516,50 @@
                 </div>
               }
             </section>
+          }
 
-            <!--
-              Map slot. Left as an explicit placeholder: no maps provider is
-              configured in this project (no @angular/google-maps, no API key).
-            -->
-            <section class="ll-map-section" aria-label="Map">
-              <div class="ll-map-placeholder">
-                <mat-icon>map</mat-icon>
-                <h3>Map view not configured</h3>
-                <p>
-                  Add a maps provider to plot the {{ view.participants.length }} location{{
+          <!--
+            Map and footer sit outside the list branches on purpose: with no
+            participants (or none matching the filters) the map still answers
+            "where am I", which is more use than hiding it.
+          -->
+          <section class="ll-map-section" aria-label="Map">
+            <div class="ll-map-head">
+              <div>
+                <h2 class="ll-map-title">Map</h2>
+                <p class="ll-map-sub">
+                  {{ view.participants.length }} participant{{
                     view.participants.length === 1 ? '' : 's'
-                  }} above.
+                  }}
+                  plotted. Click a pin for details.
                 </p>
               </div>
-            </section>
+              <span class="ll-map-badge">OpenStreetMap</span>
+            </div>
 
-            <!-- Read-cost footer: never let the scan cap be silent. -->
-            <footer class="ll-footer">
-              <span>
-                Showing the latest report per participant from the newest
-                {{ documentsScanned | async }} log{{ (documentsScanned | async) === 1 ? '' : 's' }}.
+            <app-location-map
+              class="ll-map"
+              [participants]="view.participants"
+              [admin]="adminCoords | async"
+              [focusedProfileId]="selectedId | async"
+              [now]="now"
+              (participantSelected)="selectFromMap($event)"></app-location-map>
+          </section>
+
+          <!-- Read-cost footer: never let the scan cap be silent. -->
+          <footer class="ll-footer">
+            <span>
+              Showing the latest report per participant from the newest
+              {{ documentsScanned | async }} log{{ (documentsScanned | async) === 1 ? '' : 's' }}.
+            </span>
+            @if (truncated | async) {
+              <span class="ll-footer-warn">
+                <mat-icon inline>info</mat-icon>
+                Scan capped at {{ scanLimit }} documents — participants whose last report is older
+                than that window are not listed.
               </span>
-              @if (truncated | async) {
-                <span class="ll-footer-warn">
-                  <mat-icon inline>info</mat-icon>
-                  Scan capped at {{ scanLimit }} documents — participants whose last report is older
-                  than that window are not listed.
-                </span>
-              }
-            </footer>
-          }
+            }
+          </footer>
         }
       }
     </div>

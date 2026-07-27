@@ -2,8 +2,8 @@
  * Live Location Tracking dashboard.
  *
  * Shows one row per participant — their *latest* reported position — with
- * distance from the admin's own device, freshness status, filtering, sorting
- * and a details drawer.
+ * distance from the admin's own device, freshness status, filtering, sorting,
+ * a details drawer and a free (Leaflet/OpenStreetMap) map.
  *
  * Architecture notes:
  *  - All state is RxJS, consumed through the async pipe under OnPush. There are
@@ -36,13 +36,12 @@ import {
   trigger,
 } from '@angular/animations';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -68,32 +67,39 @@ import {
   timer,
 } from 'rxjs';
 
+import { LocationMapComponent } from './location-map.component';
 import {
   Coordinates,
+  DEFAULT_FILTERS,
   DashboardStats,
+  DistanceBand,
+  FreshnessFilter,
   GeolocationState,
   LocationFilters,
   ParticipantLocation,
   SortKey,
-  StatusFilter,
+  TimeWindow,
 } from './location.model';
 import { LatestLocationsResult, LocationlogService, SCAN_LIMIT } from './locationlog.service';
 import {
   calculateDistance,
   deriveStatus,
+  distanceBounds,
   formatCoordinate,
   formatDistance,
   formatRelativeTime,
   getAvatarGradient,
   getAvatarInitials,
   getStatusColor,
+  getStatusHint,
   getStatusText,
   googleMapsUrl,
   startOfDay,
+  timeWindowBounds,
   trackByProfile,
 } from './location.utils';
 
-/** Auto-refresh cadence, per spec. */
+/** Auto-refresh cadence. */
 const AUTO_REFRESH_MS = 30_000;
 
 /** Relative timestamps and status chips are recomputed on this cadence. */
@@ -105,11 +111,20 @@ const VIRTUAL_SCROLL_THRESHOLD = 100;
 /** Row height used by the virtual scroll viewport, in px. Must match the CSS. */
 export const VIRTUAL_ROW_HEIGHT = 88;
 
+/** A pickable option in one of the filter dropdowns. */
+interface FilterOption<T> {
+  readonly value: T;
+  readonly label: string;
+  readonly hint?: string;
+}
+
 /** What the template renders, assembled in one place to keep the HTML dumb. */
 interface DashboardView {
   readonly participants: readonly ParticipantLocation[];
   readonly stats: DashboardStats;
   readonly virtualise: boolean;
+  /** How many facets are narrowing the list — drives the "Clear" affordance. */
+  readonly activeFilterCount: number;
 }
 
 @Component({
@@ -119,14 +134,14 @@ interface DashboardView {
     CommonModule,
     ReactiveFormsModule,
     ScrollingModule,
+    LocationMapComponent,
     MatButtonModule,
+    MatButtonToggleModule,
     MatCardModule,
-    MatChipsModule,
     MatDividerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatProgressSpinnerModule,
     MatSelectModule,
     MatSidenavModule,
     MatSlideToggleModule,
@@ -155,7 +170,7 @@ interface DashboardView {
           '.ll-stat-card',
           [
             style({ opacity: 0, transform: 'translateY(16px)' }),
-            stagger(70, [
+            stagger(60, [
               animate(
                 '340ms cubic-bezier(0.22, 1, 0.36, 1)',
                 style({ opacity: 1, transform: 'none' }),
@@ -180,6 +195,7 @@ export class LocationlogComponent {
   readonly formatCoordinate = formatCoordinate;
   readonly getStatusColor = getStatusColor;
   readonly getStatusText = getStatusText;
+  readonly getStatusHint = getStatusHint;
   readonly getAvatarInitials = getAvatarInitials;
   readonly getAvatarGradient = getAvatarGradient;
   readonly googleMapsUrl = googleMapsUrl;
@@ -192,10 +208,52 @@ export class LocationlogComponent {
     'name',
     'lastUpdated',
     'distance',
-    'latitude',
-    'longitude',
+    'coordinates',
     'status',
     'action',
+  ];
+
+  /**
+   * Filter vocabulary.
+   *
+   * Every option here is derivable from the three fields a location document
+   * actually has (`created`, `geopoint`, `profileid`) — nothing assumes a
+   * status flag, a device state or any other stored signal.
+   */
+  readonly freshnessOptions: readonly FilterOption<FreshnessFilter>[] = [
+    { value: 'all', label: 'Any' },
+    { value: 'live', label: 'Live', hint: 'Reported in the last 10 minutes' },
+    { value: 'recent', label: 'Recent', hint: 'Reported in the last hour' },
+    { value: 'stale', label: 'Stale', hint: 'Last report is over an hour old' },
+  ];
+
+  readonly timeWindowOptions: readonly FilterOption<TimeWindow>[] = [
+    { value: 'all', label: 'Any time' },
+    { value: 'hour', label: 'Last hour' },
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'week', label: 'Last 7 days' },
+    { value: 'older', label: 'Older than 7 days' },
+  ];
+
+  readonly distanceOptions: readonly FilterOption<DistanceBand>[] = [
+    { value: 'all', label: 'Any distance' },
+    { value: 'within1', label: 'Within 1 km' },
+    { value: 'within5', label: 'Within 5 km' },
+    { value: 'within10', label: 'Within 10 km' },
+    { value: 'beyond10', label: 'Farther than 10 km' },
+    { value: 'beyond25', label: 'Farther than 25 km' },
+    { value: 'beyond50', label: 'Farther than 50 km' },
+    { value: 'unknown', label: 'Distance unknown' },
+  ];
+
+  readonly sortOptions: readonly FilterOption<SortKey>[] = [
+    { value: 'newest', label: 'Newest first' },
+    { value: 'oldest', label: 'Oldest first' },
+    { value: 'nearest', label: 'Nearest first' },
+    { value: 'farthest', label: 'Farthest first' },
+    { value: 'nameAsc', label: 'Name A → Z' },
+    { value: 'nameDesc', label: 'Name Z → A' },
   ];
 
   readonly searchControl = new FormControl<string>('', { nonNullable: true });
@@ -203,11 +261,7 @@ export class LocationlogComponent {
   // ── Inputs ────────────────────────────────────────────────────────────────
   private readonly manualRefresh$ = new BehaviorSubject<void>(undefined);
   private readonly autoRefreshOn$ = new BehaviorSubject<boolean>(false);
-  private readonly filters$ = new BehaviorSubject<LocationFilters>({
-    search: '',
-    status: 'all',
-    radiusKm: null,
-  });
+  private readonly filters$ = new BehaviorSubject<LocationFilters>(DEFAULT_FILTERS);
   private readonly sortKey$ = new BehaviorSubject<SortKey>('newest');
   private readonly adminLocation$ = new BehaviorSubject<GeolocationState>({
     coords: null,
@@ -234,6 +288,12 @@ export class LocationlogComponent {
   readonly sortKey = this.sortKey$.asObservable();
   readonly adminLocation = this.adminLocation$.asObservable();
   readonly now$ = this.clock$;
+  readonly selectedId = this.selectedProfileId$.asObservable();
+
+  /** Just the coordinates, for the map's admin marker. */
+  readonly adminCoords: Observable<Coordinates | null> = this.adminLocation$.pipe(
+    map((state) => state.coords),
+  );
 
   /** Handset + portrait tablet get the card layout instead of the table. */
   readonly isHandset$ = this.breakpoints
@@ -329,22 +389,29 @@ export class LocationlogComponent {
   ]).pipe(
     map(([participants, now]) => {
       const midnight = startOfDay(now);
-      const known = participants
-        .map((p) => p.distanceMeters)
-        .filter((d): d is number => d !== null);
+      const withDistance = participants.filter(
+        (p): p is ParticipantLocation & { distanceMeters: number } => p.distanceMeters !== null,
+      );
+
+      const farthest = withDistance.reduce<(ParticipantLocation & { distanceMeters: number }) | null>(
+        (best, p) => (best === null || p.distanceMeters > best.distanceMeters ? p : best),
+        null,
+      );
 
       return {
         total: participants.length,
-        online: participants.filter((p) => p.status === 'online').length,
+        live: participants.filter((p) => p.status === 'live').length,
         updatedToday: participants.filter((p) => p.created.getTime() >= midnight).length,
-        averageDistanceMeters: known.length
-          ? known.reduce((sum, d) => sum + d, 0) / known.length
+        averageDistanceMeters: withDistance.length
+          ? withDistance.reduce((sum, p) => sum + p.distanceMeters, 0) / withDistance.length
           : null,
+        farthestMeters: farthest?.distanceMeters ?? null,
+        farthestName: farthest?.name ?? null,
       };
     }),
   );
 
-  /** Everything the list section renders, in one subscription. */
+  /** Everything the list and map render, in one subscription. */
   readonly view$: Observable<DashboardView> = combineLatest([
     this.participants$,
     this.filters$,
@@ -358,8 +425,10 @@ export class LocationlogComponent {
         participants: this.applySort(filtered, sortKey),
         stats,
         virtualise: filtered.length > VIRTUAL_SCROLL_THRESHOLD,
+        activeFilterCount: countActiveFilters(filters),
       };
     }),
+    shareReplay({ bufferSize: 1, refCount: true }),
   );
 
   /** The participant behind the details drawer, kept in sync with refreshes. */
@@ -402,12 +471,16 @@ export class LocationlogComponent {
     );
   }
 
-  setStatusFilter(status: StatusFilter): void {
-    this.patchFilters({ status });
+  setFreshness(freshness: FreshnessFilter): void {
+    this.patchFilters({ freshness });
   }
 
-  setRadiusFilter(radiusKm: number | null): void {
-    this.patchFilters({ radiusKm });
+  setTimeWindow(timeWindow: TimeWindow): void {
+    this.patchFilters({ timeWindow });
+  }
+
+  setDistance(distance: DistanceBand): void {
+    this.patchFilters({ distance });
   }
 
   setSort(sortKey: SortKey): void {
@@ -416,12 +489,23 @@ export class LocationlogComponent {
 
   clearFilters(): void {
     this.searchControl.setValue('');
-    this.filters$.next({ search: '', status: 'all', radiusKm: null });
+    this.filters$.next(DEFAULT_FILTERS);
   }
 
-  /** "Locate" action — highlights the row and opens the details drawer. */
+  /** Shortcut used by the "Farthest" stat card — jump straight to the outliers. */
+  showFarthest(): void {
+    this.patchFilters({ distance: 'all' });
+    this.setSort('farthest');
+  }
+
+  /** "Locate" action — highlights the row, centres the map, opens the drawer. */
   select(participant: ParticipantLocation): void {
     this.selectedProfileId$.next(participant.profileid);
+  }
+
+  /** Marker click: centre and highlight, but do not open the drawer over the map. */
+  selectFromMap(profileid: string): void {
+    this.selectedProfileId$.next(profileid);
   }
 
   closeDetails(): void {
@@ -477,7 +561,7 @@ export class LocationlogComponent {
           coords: null,
           error:
             error.code === error.PERMISSION_DENIED
-              ? 'Location permission denied — distances are unavailable.'
+              ? 'Location permission denied — distances and distance filters are unavailable.'
               : 'Could not determine your location.',
           loading: false,
         }),
@@ -496,32 +580,32 @@ export class LocationlogComponent {
     filters: LocationFilters,
     now: number,
   ): ParticipantLocation[] {
-    const midnight = startOfDay(now);
-    const radiusMeters = filters.radiusKm === null ? null : filters.radiusKm * 1000;
+    const bounds = distanceBounds(filters.distance);
+    const window = timeWindowBounds(filters.timeWindow, now);
 
     return participants.filter((p) => {
       if (filters.search && !p.name.toLowerCase().includes(filters.search)) {
         return false;
       }
 
-      switch (filters.status) {
-        case 'online':
-          if (p.status !== 'online') return false;
-          break;
-        case 'offline':
-          if (p.status === 'online') return false;
-          break;
-        case 'today':
-          if (p.created.getTime() < midnight) return false;
-          break;
-        default:
-          break;
+      if (filters.freshness !== 'all' && p.status !== filters.freshness) {
+        return false;
       }
 
-      // Without an admin position every distance is null; the radius facet is
-      // disabled in the UI, but guard anyway so it can never empty the list.
-      if (radiusMeters !== null && p.distanceMeters !== null && p.distanceMeters > radiusMeters) {
-        return false;
+      if (window) {
+        const at = p.created.getTime();
+        if (at < window.from || at >= window.to) return false;
+      }
+
+      if (filters.distance === 'unknown') {
+        return p.distanceMeters === null;
+      }
+
+      if (bounds) {
+        // Rows with no distance cannot satisfy a distance band — with the admin
+        // position unknown there is nothing to measure against.
+        if (p.distanceMeters === null) return false;
+        if (p.distanceMeters < bounds.min || p.distanceMeters >= bounds.max) return false;
       }
 
       return true;
@@ -535,15 +619,31 @@ export class LocationlogComponent {
     const sorted = [...participants];
 
     switch (sortKey) {
-      case 'distance':
+      case 'oldest':
+        return sorted.sort((a, b) => a.created.getTime() - b.created.getTime());
+      case 'nearest':
         // Unknown distances sink to the bottom rather than sorting as zero.
         return sorted.sort(
           (a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity),
         );
-      case 'name':
+      case 'farthest':
+        return sorted.sort((a, b) => (b.distanceMeters ?? -1) - (a.distanceMeters ?? -1));
+      case 'nameAsc':
         return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'nameDesc':
+        return sorted.sort((a, b) => b.name.localeCompare(a.name));
       default:
         return sorted.sort((a, b) => b.created.getTime() - a.created.getTime());
     }
   }
+}
+
+/** How many facets are currently narrowing the list. */
+function countActiveFilters(filters: LocationFilters): number {
+  let count = 0;
+  if (filters.search) count++;
+  if (filters.freshness !== 'all') count++;
+  if (filters.timeWindow !== 'all') count++;
+  if (filters.distance !== 'all') count++;
+  return count;
 }

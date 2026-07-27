@@ -5,15 +5,22 @@
  * no Angular, no DOM. Keep it that way.
  */
 
-import { Coordinates, LocationStatus, ParticipantLocation } from './location.model';
+import {
+  Coordinates,
+  DistanceBand,
+  DistanceBounds,
+  LocationStatus,
+  ParticipantLocation,
+  TimeWindow,
+} from './location.model';
 
 /** Mean Earth radius in metres (IUGG). */
 const EARTH_RADIUS_M = 6_371_008.8;
 
-/** A participant is "online" if they reported within this window. */
-export const ONLINE_WINDOW_MS = 10 * 60 * 1000;
+/** A participant is "live" if their latest report landed within this window. */
+export const LIVE_WINDOW_MS = 10 * 60 * 1000;
 
-/** Between the online window and this, the participant is "recent" (amber). */
+/** Between the live window and this, the participant is "recent" (amber). */
 export const RECENT_WINDOW_MS = 60 * 60 * 1000;
 
 const toRadians = (degrees: number): number => (degrees * Math.PI) / 180;
@@ -61,7 +68,6 @@ export function formatDistance(meters: number | null): string {
 export function formatRelativeTime(date: Date, now: number = Date.now()): string {
   const elapsed = now - date.getTime();
 
-  if (elapsed < 0) return 'just now';
   if (elapsed < 60_000) return 'just now';
 
   const minutes = Math.floor(elapsed / 60_000);
@@ -86,35 +92,54 @@ export function formatRelativeTime(date: Date, now: number = Date.now()): string
   });
 }
 
-/** Freshness bucket for a report timestamp. */
+/**
+ * Freshness bucket for a report timestamp.
+ *
+ * This is the *entire* mechanism behind the status column and the Live/Recent/
+ * Stale filter. A location document stores only `created`, `geopoint` and
+ * `profileid` — there is no connectivity signal to read — so status answers
+ * "how long ago did this device last report?" and nothing more.
+ */
 export function deriveStatus(created: Date, now: number = Date.now()): LocationStatus {
   const elapsed = now - created.getTime();
-  if (elapsed <= ONLINE_WINDOW_MS) return 'online';
+  if (elapsed <= LIVE_WINDOW_MS) return 'live';
   if (elapsed <= RECENT_WINDOW_MS) return 'recent';
-  return 'offline';
+  return 'stale';
 }
 
-/** CSS custom-property-friendly colour token for a status. */
+/** Colour token for a status. Used by chips, dots and map markers alike. */
 export function getStatusColor(status: LocationStatus): string {
   switch (status) {
-    case 'online':
-      return 'var(--ll-success)';
+    case 'live':
+      return '#10b981';
     case 'recent':
-      return 'var(--ll-warning)';
+      return '#f59e0b';
     default:
-      return 'var(--ll-danger)';
+      return '#ef4444';
   }
 }
 
 /** Label shown on the status chip. */
 export function getStatusText(status: LocationStatus): string {
   switch (status) {
-    case 'online':
-      return 'Online';
+    case 'live':
+      return 'Live';
     case 'recent':
       return 'Recent';
     default:
-      return 'Offline';
+      return 'Stale';
+  }
+}
+
+/** Tooltip spelling out what the status actually means. */
+export function getStatusHint(status: LocationStatus): string {
+  switch (status) {
+    case 'live':
+      return 'Reported within the last 10 minutes';
+    case 'recent':
+      return 'Reported within the last hour';
+    default:
+      return 'Last reported over an hour ago';
   }
 }
 
@@ -134,12 +159,13 @@ export function getAvatarInitials(name: string): string {
  * renders and refreshes. Hue is derived from the profile id, not the index.
  */
 export function getAvatarGradient(profileid: string): string {
-  let hash = 0;
-  for (let i = 0; i < profileid.length; i++) {
-    hash = (hash * 31 + profileid.charCodeAt(i)) >>> 0;
-  }
-  const hue = hash % 360;
-  return `linear-gradient(135deg, hsl(${hue} 72% 58%), hsl(${(hue + 38) % 360} 72% 46%))`;
+  const hue = hashHue(profileid);
+  return `linear-gradient(135deg, hsl(${hue} 68% 56%), hsl(${(hue + 38) % 360} 68% 44%))`;
+}
+
+/** Flat version of the avatar colour, for map marker pins. */
+export function getAvatarColor(profileid: string): string {
+  return `hsl(${hashHue(profileid)} 68% 50%)`;
 }
 
 /** `trackBy` for every participant list/table in the dashboard. */
@@ -157,6 +183,70 @@ export function formatCoordinate(value: number): string {
   return value.toFixed(6);
 }
 
+/**
+ * Metre bounds for a distance band. Outward bands ("beyond 10 km") are open at
+ * the top; `all` and `unknown` are handled by the caller, not by bounds.
+ */
+export function distanceBounds(band: DistanceBand): DistanceBounds | null {
+  switch (band) {
+    case 'within1':
+      return { min: 0, max: 1_000 };
+    case 'within5':
+      return { min: 0, max: 5_000 };
+    case 'within10':
+      return { min: 0, max: 10_000 };
+    case 'beyond10':
+      return { min: 10_000, max: Infinity };
+    case 'beyond25':
+      return { min: 25_000, max: Infinity };
+    case 'beyond50':
+      return { min: 50_000, max: Infinity };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Millisecond bounds for a time window, relative to `now`.
+ * Returns `null` for "any time".
+ */
+export function timeWindowBounds(
+  window: TimeWindow,
+  now: number = Date.now(),
+): { from: number; to: number } | null {
+  const midnight = startOfDay(now);
+
+  switch (window) {
+    case 'hour':
+      return { from: now - 60 * 60 * 1000, to: Infinity };
+    case 'today':
+      return { from: midnight, to: Infinity };
+    case 'yesterday':
+      return { from: midnight - 24 * 60 * 60 * 1000, to: midnight };
+    case 'week':
+      return { from: now - 7 * 24 * 60 * 60 * 1000, to: Infinity };
+    case 'older':
+      return { from: -Infinity, to: now - 7 * 24 * 60 * 60 * 1000 };
+    default:
+      return null;
+  }
+}
+
+/** Local midnight for the given clock — the boundary for "updated today". */
+export function startOfDay(now: number = Date.now()): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function hashHue(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return hash % 360;
+}
+
 function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -169,11 +259,4 @@ function isYesterday(date: Date, now: Date): boolean {
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   return isSameDay(date, yesterday);
-}
-
-/** Local midnight for the given clock — the boundary for "updated today". */
-export function startOfDay(now: number = Date.now()): number {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
 }
