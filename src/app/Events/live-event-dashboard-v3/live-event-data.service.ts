@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import {
   addDoc, collection, collectionData, doc, documentId, DocumentReference, getDoc, getDocs, getFirestore,
-  limit, orderBy, query, serverTimestamp, Timestamp, updateDoc, where
+  limit, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, where
 } from '@angular/fire/firestore';
 import { Subject, Subscription } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -65,6 +65,8 @@ export class LiveEventDataService implements OnDestroy {
   // (arena e-ticket, active==true) for this event.
   scannedProfileIds: string[] = [];
   scannedCount = 0;
+  // full arena e-ticket doc per participant (for manual attendance marking).
+  arenaETicketByProfile: { [profileid: string]: any } = {};
   notScannedProfileIds: string[] = [];
   notScannedCount = 0;
   eventParticipants: PanelParticipant[] = [];
@@ -78,7 +80,7 @@ export class LiveEventDataService implements OnDestroy {
   // product per participant from `event participation request` (productref → name via
   // authguard.getProductMap()). Surfaced in every drill-down list.
   productMap: { [productDocId: string]: string } = {};
-  registeredProductRefId: { [profileid: string]: string } = {};
+  registeredProductIds: { [profileid: string]: string[] } = {};   // all eligible product ids
   participantMetadataMap: { [profileid: string]: any } = {};
   mapJourneyData: { [key: string]: any } = {};
   journeyCounts: JourneyCount[] = [];
@@ -416,10 +418,16 @@ export class LiveEventDataService implements OnDestroy {
       ));
       const seen = new Set<string>();
       const docs: any[] = [];
+      // A participant can have MULTIPLE request docs — one per eligible product.
+      // Dedup the universe by profileid, but collect ALL productrefs per person.
+      const productSets: { [pid: string]: Set<string> } = {};
       snap.docs.forEach(d => {
         const data = d.data();
         const profileId = data['profileid'] || '';
-        if (!profileId || seen.has(profileId)) return;
+        if (!profileId) return;
+        const pref = data['productref']?.id;
+        if (pref) { (productSets[profileId] = productSets[profileId] || new Set<string>()).add(pref); }
+        if (seen.has(profileId)) return;
         seen.add(profileId);
         docs.push({ docref: d.id, profileid: profileId, ...data });
       });
@@ -427,10 +435,10 @@ export class LiveEventDataService implements OnDestroy {
       this.eventParticipantSet = new Set(this.eventParticipantProfileIds);
       this.registeredCount = this.eventParticipantProfileIds.length;
       this.registeredNames = {};
-      this.registeredProductRefId = {};
+      this.registeredProductIds = {};
+      Object.keys(productSets).forEach(pid => { this.registeredProductIds[pid] = [...productSets[pid]]; });
       docs.forEach(d => {
         const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; }
-        const pref = d['productref']; if (pref?.id) { this.registeredProductRefId[d.profileid] = pref.id; }
       });
       this.eventParticipants = docs.map(d => this.buildParticipantFromProfileId(d.profileid, false));
       this.registeredByProfileId = {};
@@ -455,7 +463,8 @@ export class LiveEventDataService implements OnDestroy {
     )).subscribe({
       next: (list: any[]) => {
         const scanned = new Set<string>();
-        list.forEach((d: any) => { const pid = d['profileid']; if (pid) { scanned.add(pid); } });
+        this.arenaETicketByProfile = {};
+        list.forEach((d: any) => { const pid = d['profileid']; if (pid) { scanned.add(pid); this.arenaETicketByProfile[pid] = d; } });
         this.scannedProfileIds = [...scanned];
         this.scannedCount = this.scannedProfileIds.length;
         this.recomputeNotScanned();
@@ -728,6 +737,34 @@ export class LiveEventDataService implements OnDestroy {
     const categorized = this.issueCategories.map((c: any) => c.category);
     const uncategorized = this.clientIssues.filter(i => !categorized.includes(i['category']));
     if (uncategorized.length > 0) { this.categoryCounts.push(build('Uncategorized', uncategorized)); }
+  }
+
+  // ==========================================================================
+  // Manual attendance marking — writes an `arena e-ticket log` doc (QR-scanner
+  // shape: docid/product/logdate/profileid/eventref/eticketref). The doc id is the
+  // participant's arena e-ticket id when they have one (idempotent per ticket);
+  // otherwise an auto-generated id. product/eticketref are included only when an
+  // e-ticket exists.
+  // ==========================================================================
+  async markAttendance(profileId: string): Promise<void> {
+    if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
+    const ticket = this.arenaETicketByProfile[profileId];   // active e-ticket, if any
+    const col = collection(this.firestoreDefault, 'arena e-ticket log');
+    const id = ticket?.['docid'] || doc(col).id;            // e-ticket id, else auto id
+    const data: any = {
+      docid: id,
+      logdate: Timestamp.now(),                 // client now (avoids the pending serverTimestamp null the attendance read can't handle)
+      profileid: profileId,
+      eventref: this.selectedEvent.docref,
+      markedmanually: true,                      // audit flag — distinguishes manual marks from QR scans
+    };
+    if (ticket) {
+      data.eticketref = doc(this.firestoreDefault, 'arena e-ticket', ticket['docid']);
+      const products: string[] = ticket['producteligible'] || [];
+      if (products.length) { data.product = doc(this.firestoreDefault, 'products', products[0]); }
+    }
+    await setDoc(doc(col, id), data);
+    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', !!ticket, '| doc:', id);
   }
 
   // ==========================================================================
