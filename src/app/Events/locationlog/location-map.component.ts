@@ -4,14 +4,20 @@
  * Leaflet + OpenStreetMap tiles: no API key, no billing account, no usage quota
  * to blow through — which is why it is here instead of Google Maps.
  *
- * Two implementation details worth knowing:
+ * Implementation details worth knowing:
  *  - Leaflet touches `window` at import time, so it is loaded via a dynamic
- *    `import()` inside `afterNextRender`. That keeps SSR working and keeps
- *    ~150 kB out of the initial bundle for everyone who never opens this page.
+ *    `import()`. That keeps SSR working and keeps ~150 kB out of the initial
+ *    bundle for everyone who never opens this page. The import is deferred
+ *    further until the map scrolls near the viewport (IntersectionObserver).
  *  - Tiles are requested with `crossOrigin: 'anonymous'`. This app serves
  *    COEP: require-corp (for the Zoom SDK's cross-origin isolation), under
  *    which a plain cross-origin <img> is blocked. OSM sends
  *    `Access-Control-Allow-Origin: *`, so CORS-mode requests load fine.
+ *  - A ResizeObserver drives `invalidateSize()`. Leaflet caches the container
+ *    size at init and positions every tile against it; if the element is later
+ *    resized (drawer animating open, sidenav collapsing, window resize, or
+ *    simply a layout that settles after init) the tile grid tears into a
+ *    staircase of offset and missing tiles. This is *the* classic Leaflet bug.
  */
 
 import { CommonModule } from '@angular/common';
@@ -43,13 +49,26 @@ import {
   googleMapsUrl,
 } from './location.utils';
 
-/** OpenStreetMap standard tiles — free, and attribution is mandatory. */
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+/**
+ * OpenStreetMap standard tiles — free, and attribution is mandatory.
+ *
+ * Deliberately the single `tile.openstreetmap.org` host rather than the old
+ * `{s}` subdomain rotation: OSM deprecated the subdomains, and over HTTP/2 one
+ * host multiplexes every tile on a single connection, where three hosts force
+ * three TLS handshakes before the first tile can even start downloading.
+ */
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
 
 /** Zoom used when centring on a single participant. */
 const FOCUS_ZOOM = 15;
+
+/** How early (in px) the map starts loading before it scrolls into view. */
+const LAZY_ROOT_MARGIN_PX = 400;
+
+/** When to hand-check visibility, in case IntersectionObserver delivery stalls. */
+const VISIBILITY_FALLBACK_MS = 1200;
 
 /** Fallback view when there is nothing at all to show (world view). */
 const FALLBACK_CENTER: [number, number] = [20, 0];
@@ -77,6 +96,10 @@ const FALLBACK_ZOOM = 2;
         <span><i class="lm-key lm-key-recent"></i>Recent</span>
         <span><i class="lm-key lm-key-stale"></i>Stale</span>
       </div>
+
+      @if (ready() && showFitControl) {
+        <button type="button" class="lm-fit" (click)="fitToMarkers()">Fit all</button>
+      }
     </div>
   `,
   styles: [
@@ -167,6 +190,26 @@ const FALLBACK_ZOOM = 2;
       }
       .lm-key-stale {
         background: #ef4444;
+      }
+
+      .lm-fit {
+        position: absolute;
+        right: 12px;
+        top: 12px;
+        z-index: 500;
+        padding: 7px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.16);
+        color: #334155;
+        font: 600 0.75rem/1 'Inter', system-ui, sans-serif;
+        cursor: pointer;
+      }
+
+      .lm-fit:hover {
+        background: #fff;
+        color: #0f172a;
       }
 
       @media (max-width: 620px) {
@@ -355,6 +398,12 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
   /** Clock value, so popup timestamps agree with the rest of the dashboard. */
   @Input() now: number = Date.now();
 
+  /**
+   * Show the "Fit all" control. On by default for the dashboard map, off for
+   * the drawer's single-participant mini map where it would be meaningless.
+   */
+  @Input() showFitControl = true;
+
   /** Emitted when a participant marker is clicked. */
   @Output() readonly participantSelected = new EventEmitter<string>();
 
@@ -382,12 +431,26 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
   /** Changes that arrive before Leaflet finishes loading are replayed after. */
   private pendingRender = false;
 
+  /**
+   * Identity of the currently plotted marker set. Markers are rebuilt only when
+   * this changes — see `renderMarkers()` for why that matters.
+   */
+  private markerSignature = '';
+
+  private resizeObserver: ResizeObserver | null = null;
+  private intersectionObserver: IntersectionObserver | null = null;
+  private resizeTimer: ReturnType<typeof setTimeout> | undefined;
+  private visibilityTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Guards against IntersectionObserver and the fallback both firing. */
+  private initialising = false;
+
   constructor() {
     // afterNextRender only runs in the browser, which is exactly the guard we
     // need: Leaflet dereferences `window` as soon as it is imported.
     afterNextRender(
       () => {
-        void this.initialise();
+        this.scheduleInitialisation();
       },
       { injector: this.injector },
     );
@@ -399,7 +462,11 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
       return;
     }
 
-    if (changes['participants'] || changes['admin'] || changes['now']) {
+    // `now` is deliberately absent: it ticks every 30s and only affects popup
+    // text, which is generated lazily on open. Rebuilding markers for it would
+    // destroy and recreate every layer twice a minute — and slam shut whatever
+    // popup the user was reading.
+    if (changes['participants'] || changes['admin']) {
       this.renderMarkers();
     }
 
@@ -409,6 +476,10 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    clearTimeout(this.resizeTimer);
+    clearTimeout(this.visibilityTimer);
+    this.resizeObserver?.disconnect();
+    this.intersectionObserver?.disconnect();
     this.map?.remove();
     this.map = null;
     this.clusterGroup = null;
@@ -419,6 +490,11 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
   /** Re-frames the map around everything currently plotted. */
   fitToMarkers(): void {
     if (!this.leaflet || !this.map) return;
+
+    // Frame against the container's *current* size. Fitting bounds with a
+    // stale size is the other half of the torn-tile bug: Leaflet picks a zoom
+    // and centre for a box that is not the one on screen.
+    this.map.invalidateSize({ animate: false });
 
     const points: LeafletNS.LatLngExpression[] = this.participants.map((p) => [
       p.latitude,
@@ -441,7 +517,59 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
     this.map.fitBounds(this.leaflet.latLngBounds(points), { padding: [40, 40], maxZoom: 16 });
   }
 
+  /**
+   * Hold the Leaflet download until the map is actually about to be seen.
+   *
+   * The map sits below the table, so on a normal page load it is off-screen —
+   * fetching ~150 kB of library plus a dozen tiles right then competes with the
+   * Firestore round trip the user is actually waiting on. `rootMargin` starts
+   * the work 400px early, so scrolling still lands on a ready map.
+   */
+  private scheduleInitialisation(): void {
+    if (typeof IntersectionObserver === 'undefined') {
+      void this.initialise();
+      return;
+    }
+
+    this.intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void this.initialise();
+        }
+      },
+      { rootMargin: LAZY_ROOT_MARGIN_PX + 'px' },
+    );
+    this.intersectionObserver.observe(this.mapHost.nativeElement);
+
+    // Safety net. IntersectionObserver delivery can stall — notably while the
+    // tab is hidden or backgrounded — and a map that never loads is a far worse
+    // failure than one that loads slightly eagerly. Re-check by hand shortly
+    // after mount and initialise if the host is on screen anyway.
+    this.visibilityTimer = setTimeout(() => {
+      if (!this.map && this.isNearViewport()) {
+        void this.initialise();
+      }
+    }, VISIBILITY_FALLBACK_MS);
+  }
+
+  /** Manual equivalent of the IntersectionObserver test, same margin. */
+  private isNearViewport(): boolean {
+    const rect = this.mapHost.nativeElement.getBoundingClientRect();
+    return (
+      rect.bottom > -LAZY_ROOT_MARGIN_PX &&
+      rect.top < window.innerHeight + LAZY_ROOT_MARGIN_PX &&
+      rect.width > 0
+    );
+  }
+
   private async initialise(): Promise<void> {
+    if (this.initialising || this.map) return;
+    this.initialising = true;
+
+    clearTimeout(this.visibilityTimer);
+    this.intersectionObserver?.disconnect();
+    this.intersectionObserver = null;
+
     // Leaflet ships UMD; the ESM interop shape differs between bundlers, so
     // accept either. markercluster is a plugin that mutates the global `L`,
     // hence the assignment before its import.
@@ -468,6 +596,13 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
         attribution: TILE_ATTRIBUTION,
         maxZoom: 19,
         crossOrigin: 'anonymous',
+        // Keep a ring of off-screen tiles so a small pan is instant instead of
+        // showing grey while the next row downloads.
+        keepBuffer: 3,
+        // Request tiles continuously while panning/zooming rather than waiting
+        // for the gesture to finish — fewer visible grey gaps.
+        updateWhenIdle: false,
+        updateWhenZooming: false,
       })
       .addTo(this.map);
 
@@ -475,8 +610,14 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
       showCoverageOnHover: false,
       maxClusterRadius: 55,
       spiderfyOnMaxZoom: true,
+      // Skip the fly-in animations; on a refresh the whole layer is replaced
+      // and the animation just delays the result.
+      animateAddingMarkers: false,
+      chunkedLoading: true,
     });
     this.map.addLayer(this.clusterGroup);
+
+    this.observeResize();
 
     this.ready.set(true);
     this.renderMarkers();
@@ -488,15 +629,54 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
   }
 
   /**
-   * Rebuilds the marker layer. Markers are cheap and the set is bounded by the
-   * scan limit, so a full rebuild per refresh is simpler — and measurably
-   * faster — than diffing Leaflet layers by hand.
+   * Keep Leaflet's cached container size honest.
+   *
+   * Leaflet measures the container once at init and lays every tile out against
+   * that size. This component is mounted inside a mat-sidenav-content that
+   * reflows when the details drawer opens, and the drawer's own mini map is
+   * created *while the drawer is still animating* — at which point the element
+   * is a fraction of its final width. Without this the tile grid tears into
+   * offset rows with holes, which is exactly the breakage reported.
+   */
+  private observeResize(): void {
+    if (typeof ResizeObserver === 'undefined') return;
+
+    this.resizeObserver = new ResizeObserver(() => {
+      // Coalesce bursts — a drawer animation fires dozens of these — into one
+      // invalidateSize. A timer rather than requestAnimationFrame on purpose:
+      // rAF is paused entirely in a hidden/background tab, so a resize that
+      // happened while the tab was in the background would never be applied
+      // and the map would still be torn when the user came back to it.
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = setTimeout(() => {
+        this.map?.invalidateSize({ animate: false });
+      }, 60);
+    });
+
+    this.resizeObserver.observe(this.mapHost.nativeElement);
+  }
+
+  /**
+   * Rebuilds the marker layer — but only when the plotted set actually changed.
+   *
+   * The guard matters more than it looks. Inputs change on every 30s clock tick
+   * and on every auto-refresh, and a rebuild tears down and recreates every
+   * marker, every cluster and every popup. Without the signature check the map
+   * visibly flickers twice a minute and any popup the user is reading snaps
+   * shut. Position, status and name are all that can affect a marker, so they
+   * are all the signature needs to cover.
    */
   private renderMarkers(): void {
     const leaflet = this.leaflet;
     const map = this.map;
     const cluster = this.clusterGroup;
     if (!leaflet || !map || !cluster) return;
+
+    const signature = this.computeSignature();
+    if (signature === this.markerSignature && this.markers.size > 0) {
+      return;
+    }
+    this.markerSignature = signature;
 
     cluster.clearLayers();
     this.markers.clear();
@@ -508,7 +688,10 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
         riseOnHover: true,
       });
 
-      marker.bindPopup(this.popupHtml(participant), {
+      // Content is a function, not a string: it is evaluated when the popup
+      // opens, so "12 minutes ago" is correct on open without the marker
+      // needing to be rebuilt every time the clock ticks.
+      marker.bindPopup(() => this.popupHtml(participant), {
         className: 'lm-popup',
         minWidth: 210,
         closeButton: true,
@@ -543,6 +726,15 @@ export class LocationMapComponent implements OnChanges, OnDestroy {
     }
 
     this.focusOnSelection();
+  }
+
+  /** Everything that can change a marker's appearance or position. */
+  private computeSignature(): string {
+    const admin = this.admin ? `${this.admin.latitude},${this.admin.longitude}` : 'none';
+    const rows = this.participants
+      .map((p) => `${p.profileid}:${p.latitude}:${p.longitude}:${p.status}:${p.name}`)
+      .join('|');
+    return `${admin}#${rows}`;
   }
 
   private focusOnSelection(): void {

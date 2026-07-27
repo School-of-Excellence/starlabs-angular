@@ -28,6 +28,9 @@
       }
     })();
   </script>
+  <!-- OpenStreetMap tiles (location dashboard): warm the TLS handshake so the
+       first tile request does not pay for connection setup. -->
+  <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin="anonymous">
   <link crossorigin="anonymous" href="https://unpkg.com/@angular/material/prebuilt-themes/indigo-pink.css" rel="stylesheet">
   <link crossorigin="anonymous" href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script src="coi-serviceworker.js"></script>
