@@ -127,7 +127,7 @@ export interface LocationFilters {
 }
 
 /** Where the reference point came from. Shown so the number is never mystery. */
-export type ReferenceSource = 'manual' | 'device' | 'participant' | 'place';
+export type ReferenceSource = 'manual' | 'device' | 'participant' | 'place' | 'map';
 
 /** One hit from the place search. */
 export interface PlaceResult {

@@ -25,6 +25,7 @@ import {
   Component,
   DestroyRef,
   PLATFORM_ID,
+  ViewChild,
   inject,
   signal,
 } from '@angular/core';
@@ -88,6 +89,7 @@ import {
   TimeWindow,
 } from './location.model';
 import { GeocodingService } from './geocoding.service';
+import { MapPickerComponent } from './map-picker.component';
 import { LatestLocationsResult, LocationlogService, SCAN_LIMIT } from './locationlog.service';
 import {
   SORT_TO_HEADER,
@@ -175,6 +177,7 @@ interface DashboardView {
     MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
+    MapPickerComponent,
   ],
   templateUrl: './locationlog.component.html',
   styleUrl: './locationlog.component.css',
@@ -368,6 +371,20 @@ export class LocationlogComponent {
   readonly searching = signal(false);
   readonly searched = signal(false);
   readonly manualEntryOpen = signal(false);
+
+  /**
+   * The point the map is currently pointing at, before it is committed.
+   *
+   * Held separately from the reference point so clicking around the map does
+   * not repeatedly re-anchor every distance on the page mid-decision — the
+   * dashboard only moves when "Use this location" is pressed.
+   */
+  readonly pendingPoint = signal<Coordinates | null>(null);
+
+  /** Name for the pending point, when it came from a search rather than a click. */
+  readonly pendingLabel = signal<string | null>(null);
+
+  @ViewChild(MapPickerComponent) private mapPicker?: MapPickerComponent;
 
   /**
    * Place-search results.
@@ -702,6 +719,8 @@ export class LocationlogComponent {
       this.placeSearchControl.setValue('');
       this.searched.set(false);
       this.manualEntryOpen.set(false);
+      this.pendingPoint.set(current ? current.coords : null);
+      this.pendingLabel.set(null);
     }
   }
 
@@ -711,12 +730,36 @@ export class LocationlogComponent {
     this.pickerError.set(null);
   }
 
-  /** Pick a searched place as the reference point. */
+  /**
+   * A place chosen from the search results.
+   *
+   * This recentres the map rather than committing straight away: the search is
+   * how you *get* to the right area, the map click is how you land on the exact
+   * spot. Committing on search would make the map pointless.
+   */
   usePlaceAsReference(place: PlaceResult): void {
+    this.pendingPoint.set(place.coords);
+    this.pendingLabel.set(place.label);
+    this.mapPicker?.focusOn(place.coords);
+  }
+
+  /** The map reported a new pin position — click or drag. */
+  onMapPointPicked(coords: Coordinates): void {
+    this.pendingPoint.set(coords);
+    // A hand-placed pin is no longer "Vettuvankeni", it is a point on the map.
+    this.pendingLabel.set(null);
+  }
+
+  /** Commit whatever the map is currently pointing at. */
+  usePendingPoint(): void {
+    const point = this.pendingPoint();
+    if (!point) return;
+
+    const label = this.pendingLabel();
     this.setReference({
-      coords: place.coords,
-      source: 'place',
-      label: place.label,
+      coords: point,
+      source: label ? 'place' : 'map',
+      label: label ?? 'Picked on map',
     });
   }
 

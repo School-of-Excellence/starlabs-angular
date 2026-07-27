@@ -277,9 +277,34 @@
 
             @if (!searched() && !searching()) {
               <p class="ll-picker-hint">
-                Type a place, area or landmark — results come from OpenStreetMap.
+                Search to jump the map to an area — then click the exact spot below.
               </p>
             }
+
+            <!-- The map: click to drop the pin, drag to fine-tune. -->
+            <app-map-picker
+              class="ll-picker-map"
+              [initial]="pendingPoint()"
+              (pointPicked)="onMapPointPicked($event)"></app-map-picker>
+
+            <div class="ll-pending">
+              @if (pendingPoint(); as point) {
+                <div class="ll-pending-text">
+                  <span class="ll-pending-label">
+                    {{ pendingLabel() ?? 'Selected point' }}
+                  </span>
+                  <span class="ll-pending-coords ll-mono">
+                    {{ formatCoordinate(point.latitude) }}, {{ formatCoordinate(point.longitude) }}
+                  </span>
+                </div>
+                <button mat-flat-button color="primary" (click)="usePendingPoint()">
+                  <mat-icon>check</mat-icon>
+                  Use this location
+                </button>
+              } @else {
+                <span class="ll-pending-empty">Click the map to choose a point.</span>
+              }
+            </div>
 
             <!-- Secondary paths. -->
             <div class="ll-picker-alt">

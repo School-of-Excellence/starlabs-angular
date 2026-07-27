@@ -354,6 +354,51 @@
   font-size: 0.72rem;
 }
 
+.ll-picker-map {
+  display: block;
+  margin-top: 11px;
+}
+
+.ll-pending {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  margin-top: 11px;
+  padding: 11px 14px;
+  border-radius: var(--ll-radius-sm);
+  border: 1px solid var(--ll-border);
+  background: var(--ll-surface);
+}
+
+.ll-pending-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ll-pending-label {
+  font-size: 0.87rem;
+  font-weight: 650;
+  color: var(--ll-text);
+}
+
+.ll-pending-coords {
+  font-size: 0.75rem;
+  color: var(--ll-text-muted);
+}
+
+.ll-pending-empty {
+  font-size: 0.8rem;
+  color: var(--ll-text-muted);
+}
+
+.ll-pending mat-icon {
+  margin-right: 5px;
+}
+
 .ll-manual {
   margin-top: 13px;
   padding-top: 13px;
