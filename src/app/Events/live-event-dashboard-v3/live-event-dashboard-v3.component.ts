@@ -2,9 +2,20 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
-import { Subscription } from 'rxjs';
-import { Timestamp } from '@angular/fire/firestore';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Subject, Subscription, takeUntil } from 'rxjs';
+import { collection, doc, Firestore, setDoc, Timestamp, updateDoc } from '@angular/fire/firestore';
+import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { environment } from '../../../environments/environment';
+import { AuthguardService } from '../../authguard.service';
+// Communication dialogs — reused VERBATIM from Participants Analytics, which owns
+// them. Only the afterClosed() handling is duplicated here (this component decides
+// what happens on close); the dialogs themselves are untouched shared components.
+import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import {
   AtcBuckets, DayAttendance, EventData, JourneyCount, LiveEventDataService, PanelParticipant, QueueData
 } from './live-event-data.service';
@@ -113,8 +124,18 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   markSelected = new Set<string>();
 
   private sub: Subscription | null = null;
+  private destroy$ = new Subject<void>();
 
-  constructor(public data: LiveEventDataService, private cdr: ChangeDetectorRef) {}
+  constructor(
+    public data: LiveEventDataService,
+    private cdr: ChangeDetectorRef,
+    private dialog: MatDialog,
+    private firestore: Firestore,
+    private http: HttpClient,
+    private storage: Storage,
+    private authguard: AuthguardService,
+    private snackBar: MatSnackBar,
+  ) {}
 
   // Perf: memoize data-only derived collections so heavy getters (completionQuartiles,
   // ptEntries, tagGroups, crmGroups) recompute once per data change instead of on every
@@ -158,6 +179,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     // ngOnDestroy (which tears down the Firestore subscriptions). We only
     // release our view subscription here.
     if (this.sub) { this.sub.unsubscribe(); this.sub = null; }
+    this.destroy$.next(); this.destroy$.complete();   // drops any open dialog's afterClosed()
   }
 
   // ==========================================================================
@@ -264,7 +286,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // its own ESC handler closes it, so swallow this one or the panel would go too.
   // The panel's multi-selects render in a CDK overlay ABOVE the drill-down panel;
   // their own ESC handler closes them, so swallow this one or the panel would go too.
-  onEscape(): void { if (this.panelSelectOpen) { return; } this.closePanel(); this.closeDropdowns(); }
+  // A communication dialog also renders above the panel and opens with
+  // disableClose, so ESC must not yank the panel out from under it.
+  onEscape(): void {
+    if (this.panelSelectOpen || this.dialog.openDialogs.length) { return; }
+    this.closePanel(); this.closeDropdowns();
+  }
 
   // Event (single-select)
   toggleEventDropdown(): void { this.queueDropdownOpen = false; this.eventDropdownOpen = !this.eventDropdownOpen; if (this.eventDropdownOpen) { this.eventSearch = ''; } }
@@ -1174,6 +1201,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
+    this.exitCommMode();                        // a selection is only ever about ONE list
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
     this.panelRows = preserveOrder ? rows.slice() : rows.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -1591,6 +1619,253 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' }));
     a.download = (fname || 'list') + '.csv';
     a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ==========================================================================
+  // Communication from the drill-down panel (notification · WhatsApp · email)
+  //
+  // The three dialogs are Participants Analytics' own components, opened here with
+  // the same options and the same afterClosed() handling — deliberately duplicated
+  // rather than extracted, because that component is the owner and a shared service
+  // would make its behaviour this panel's problem to keep in step. What differs is
+  // only WHERE the recipients come from: the panel's checkbox selection instead of
+  // that table's SelectionModel.
+  // ==========================================================================
+
+  /** Channel currently chosen — null while the operator is picking one. */
+  commMode: 'notification' | 'wati' | 'email' | null = null;
+  /** Selection mode: checkboxes are on the rows. Held separately from commMode so the
+   *  channel can be re-picked without losing a selection that took work to build. */
+  commOn = false;
+  commSelected = new Set<string>();
+
+  /** Enter selection mode on the chosen channel (or just switch channel). */
+  setCommMode(mode: 'notification' | 'wati' | 'email'): void {
+    this.commMode = mode; this.commOn = true;
+  }
+  /** Back to the three icons WITHOUT dropping the selection — the same people often
+   *  need the message on more than one channel. */
+  pickCommChannel(): void { this.commMode = null; }
+  /** Leave selection mode entirely. Clearing here is what keeps the selection from
+   *  becoming invisible state: no checkboxes on screen, nothing selected. */
+  exitCommMode(): void { this.commOn = false; this.commMode = null; this.commSelected.clear(); }
+
+  get commModeLabel(): string {
+    return this.commMode === 'notification' ? 'Notification'
+      : this.commMode === 'wati' ? 'WhatsApp' : 'Email';
+  }
+
+  /** Profile ids of the rows a checkbox is actually offered on, in list order.
+   *
+   *  Grouped Procedure Tracking rows offer the LEAD ONLY — the side the clicked cell
+   *  was about. "As Doer · Completed" is a list of doers, so only doers can be picked;
+   *  "As Beneficiary · Completed" groups by beneficiary, so only beneficiaries can.
+   *  Counterparts are context for the lead, not recipients: selecting them would send
+   *  to whoever happened to appear under someone who matched the filters. */
+  get commSelectableIds(): string[] {
+    const out: string[] = [];
+    (this.panelParticipants as any[]).forEach(p => {
+      const id = p['_pair'] ? p['lead']?.profileid : p.profileid;
+      if (id) { out.push(id); }
+    });
+    return out;
+  }
+  /** "doers only" / "beneficiaries only" — says why the counterparts have no checkbox. */
+  get commRoleNote(): string {
+    const rows: any[] = this.panelParticipants as any[];
+    if (!rows.length || !rows[0]['_pair']) { return ''; }
+    return rows[0]['leadRole'] === 'beneficiary' ? 'beneficiaries only' : 'doers only';
+  }
+  get commSubLabel(): string {
+    const n = this.commSelected.size;
+    const note = this.commRoleNote;
+    return `${n} selected${note ? ' · ' + note : ''}`;
+  }
+  isCommSelected(profileid: string): boolean { return this.commSelected.has(profileid); }
+  toggleCommOne(profileid: string): void {
+    if (!profileid) { return; }
+    if (this.commSelected.has(profileid)) { this.commSelected.delete(profileid); }
+    else { this.commSelected.add(profileid); }
+  }
+  /** Select-all is over the VISIBLE rows, so it composes with the search and filters
+   *  above it rather than quietly reaching past them. */
+  get commAllChecked(): boolean {
+    const ids = this.commSelectableIds;
+    return ids.length > 0 && ids.every(id => this.commSelected.has(id));
+  }
+  get commSomeChecked(): boolean {
+    return !this.commAllChecked && this.commSelectableIds.some(id => this.commSelected.has(id));
+  }
+  toggleCommAll(): void {
+    const ids = this.commSelectableIds;
+    if (this.commAllChecked) { ids.forEach(id => this.commSelected.delete(id)); }
+    else { ids.forEach(id => this.commSelected.add(id)); }
+  }
+
+  /** One recipient in the shape the dialogs expect — the raw `participant metadata`
+   *  doc, which is exactly what Participants Analytics passes them (email uses
+   *  `email`, WhatsApp `number`/`phonenumber`, notification `firebaseuserref`). A
+   *  participant with no metadata doc still gets the normalized fields so they are
+   *  not silently dropped from the recipient list. */
+  private commRecipient(profileid: string): any {
+    const meta = this.data.participantMetadataMap[profileid];
+    // Copied, and profileid forced back to the key it was looked up by: the map spreads
+    // the raw doc last, so a doc carrying its own `profileid` field would otherwise
+    // decide who this recipient is. Copying also keeps a dialog from writing through
+    // to the service's cached metadata.
+    if (meta) { return { ...meta, profileid }; }
+    const p = this.data.buildParticipantFromProfileId(profileid, false);
+    return { profileid, name: p.name, email: p.email, phone: p.phone, number: p.phone };
+  }
+  private get commRecipients(): any[] { return [...this.commSelected].map(id => this.commRecipient(id)); }
+
+  sendComm(): void {
+    if (!this.commMode || !this.commSelected.size) { return; }
+    const selected = this.commRecipients;
+    if (this.commMode === 'notification') { this.sendNotificationinBreakthrough(selected); }
+    else if (this.commMode === 'email') { this.sendEmailToSelectedParicipant(selected); }
+    else { this.sendWatiMessage(selected); }
+  }
+
+  private openSnackBar(message: string, action: string): void { this.snackBar.open(message, action); }
+
+  /** Verbatim from ParticipantsAnalyticsComponent.sendEmailToSelectedParicipant. */
+  private sendEmailToSelectedParicipant(selected: any[]): void {
+    let dialogRef = this.dialog.open(EmailInputComponent, {
+      data: selected,
+      minWidth: "600px",
+      disableClose: true
+    });
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        console.log(result);
+
+        const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
+        if (result['status'] == 'queued' || result['status'] == 'send') {
+          await setDoc(docRef, result, { merge: true }).then(() => {
+            this.openSnackBar(result['status'] == 'queued' ? 'Successfully Added to Queue' : "Email Sent Successfully", "OK");
+          }).catch(err => {
+            console.log(err);
+            this.openSnackBar("Error Sending Email", "OK");
+          });
+        } else if (result['status'] == 'validated') {
+          let url: string;
+          if (environment.firebase.projectId == 'starlabs-test') {
+            url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
+          } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+            url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail"
+          }
+          console.log("EMAIL :", url);
+          let data = result;
+          data['archiveid'] = result['docid'];
+          this.http.post(url, JSON.stringify(data), {
+            responseType: 'text',
+            headers: new HttpHeaders().set('Content-Type', 'application/json'),
+          }).subscribe({
+            next: (response) => {
+              console.log('response', response);
+            },
+            error: (err) => {
+              console.log(err);
+              console.log("Error: " + err);
+            }
+          });
+        }
+
+      }
+    })
+  }
+
+  /** Verbatim from ParticipantsAnalyticsComponent.sendWatiMessage. */
+  private sendWatiMessage(selected: any[]): void {
+    let dialogRef = this.dialog.open(WatiInputComponent, {
+      data: selected,
+      width: "70vw",
+      height: "80vh",
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        if (result == 'success') {
+          this.openSnackBar("Wati Message Sent Successfully", "OK");
+          if (result['status'] == 'sendtoparticipants') {
+            let url: string;
+
+            if (environment.firebase.projectId == 'starlabs-test') {
+              url = "https://us-central1-starlabs-test.cloudfunctions.net/sendWhatsAppBroadcast";
+            } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+              url = ""
+            }
+
+            const docRef = doc(collection(this.firestore, 'wati archive'), result['archiveid']);
+            await updateDoc(docRef, {
+              templatestatus: "created",
+              templatevalidated: true,
+            }).then(() => {
+              console.log("Wati Archive Document Created");
+            }).catch((error) => {
+              console.log("Error Creating Wati Archive");
+            });
+
+            const response = await this.http.post(url, { archiveid: result['archiveid'] }).toPromise();
+            console.log("Response : ", response)
+
+          }
+        } else if (result == 'failed') {
+          this.openSnackBar("Sending Wati Message Failed", "OK");
+        }
+      }
+    });
+  }
+
+  /** Verbatim from ParticipantsAnalyticsComponent.sendNotificationinBreakthrough. */
+  private sendNotificationinBreakthrough(selected: any[]): void {
+    let dialogRef = this.dialog.open(AhNotificationComponent, {
+      data: selected,
+      width: "80vw",
+      maxHeight: "90vh",
+      disableClose: true,
+      autoFocus: false,
+    })
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      console.log(result, 'send app notificationssss');
+      if (result != null && result != undefined) {
+        var profileID = [];
+        for (let i = 0; i < selected.length; i++) {
+          const s = selected[i];
+          if (s["firebaseuserref"] != null) {
+            profileID.push(s["profileid"])
+          }
+        }
+
+        var notificationimage = null
+        if (result["notificationimage"] != null) {
+          const filepath = "Notification Images/" + new Date().toISOString() + result["notificationimage"].name;
+          try {
+            const storageRef = ref(this.storage, filepath)
+            const uploadResult = await uploadBytes(storageRef, result["notificationimage"])
+            notificationimage = await getDownloadURL(uploadResult.ref)
+          } catch (error) {
+            console.log("file upload error", error);
+          }
+        }
+        this.authguard.saveNotificationRecord({
+          title: result["title"],
+          message: result["message"],
+          subtitle: result["subtitle"] ?? null,
+          notificationtype: "ahupdate",
+          notificationimage: notificationimage,
+          sticky: result["sticky"],
+          logged: true,
+          landingpage: result["landingpage"],
+          profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
+        }).then(() => {
+          alert("A&H Update sent to App user " + profileID.length.toString())
+        })
+      }
+    })
   }
 
   initials(name: string): string {

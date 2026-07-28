@@ -1301,7 +1301,7 @@ export class LiveEventDataService implements OnDestroy {
 
   /** ALL changework for the event — no `createdon` window and no status filter, so
    *  it survives the Procedure Tracking day chips. Feeds only the Arena Followup
-   *  "Not Doing CW" / "CW Not Received" cards, which are event-wide by definition.
+   *  "Not Doing CW" / "CW Not Received" cards, which are event-wide by definition
    *  Subscribed once per event (setProcedureDay does NOT touch it). */
   private subscribeToEventChangeWork(): void {
     if (!this.selectedEvent) return;

@@ -303,6 +303,56 @@ input,select{font:inherit}
 .panel-close:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-title{font-size:17px;font-weight:700;letter-spacing:-.015em;margin-top:8px}
 .panel-sub{font-size:12px;color:var(--z-500);margin-top:3px}
+/* ---- send to this list ---------------------------------------------------------
+   Sits under .panel-count, so it is read together with Export: both act on the list
+   as it currently stands. Three channels, then one — picked, it becomes the bar that
+   owns the selection (channel badge, count, select-all, Send), so the panel never
+   shows two competing sets of controls.
+   Black, not the grey used by the filter chrome above: this is the panel's only
+   outbound action, and grey read as another passive label. */
+.panel-comm{display:flex;align-items:center;gap:8px;padding:2px 22px 12px}
+.pc-label{
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-900);margin-right:auto;
+}
+.pc-picked{
+  font-size:11px;font-weight:600;color:var(--accent);
+  background:var(--accent-soft);border-radius:var(--r-pill);padding:3px 9px;white-space:nowrap;
+}
+.pc-btn{
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);
+  border:1px solid var(--z-300);background:var(--z-0);color:var(--z-900);
+  display:grid;place-items:center;transition:all .15s var(--ease);
+}
+.pc-btn:hover{border-color:var(--z-900);background:var(--z-900);color:#fff}
+.pc-btn svg{width:21px;height:21px;display:block}
+.pc-big{
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;
+  border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent);
+}
+.pc-big svg{width:21px;height:21px;display:block}
+.pc-big.wati{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok)}
+.pc-meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.pc-title{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
+.pc-sub{font-size:10.5px;color:var(--z-500);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-all{
+  display:flex;align-items:center;gap:5px;flex:none;cursor:pointer;
+  font-size:11px;font-weight:500;color:var(--z-600);white-space:nowrap;
+}
+.pc-all input{cursor:pointer;accent-color:var(--accent)}
+.pc-send{
+  flex:none;font-size:11.5px;font-weight:600;letter-spacing:.03em;color:#fff;
+  background:var(--accent);border:1px solid var(--accent);border-radius:var(--r-pill);
+  padding:8px 16px;white-space:nowrap;
+}
+.pc-send:hover:not(:disabled){filter:brightness(.96)}
+.pc-send:disabled{opacity:.45;cursor:default}
+.pc-exit{
+  width:30px;height:30px;flex:none;border-radius:var(--r-xs);
+  border:1px solid var(--z-200);display:grid;place-items:center;
+  color:var(--z-500);font-size:15px;line-height:1;
+}
+.pc-exit:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-search{padding:14px 22px 0}
 .panel-search input{
   width:100%;padding:8px 12px;border:1px solid var(--z-200);border-radius:var(--r-sm);
@@ -406,15 +456,21 @@ mat-select.pf-select.on{
 ::ng-deep .pf-select-searchable .pf-search input:focus{border-color:#cfcef3;background:#fff}
 ::ng-deep .pf-select-searchable .pf-search input::placeholder{color:#aeaeb2}
 ::ng-deep .pf-select-searchable .pf-none{padding:10px 12px 8px;font-size:12px;color:#8e8e93}
+/* Same treatment as .pc-label directly below it — the count and "Send to" are one
+   band of controls over the list, so they read at one weight. */
 .panel-count{
   padding:12px 22px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-900);
 }
 .panel-list{flex:1;overflow-y:auto;padding:0 12px 20px}
 .p-row{
   display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--r-sm);
 }
 .p-row:hover{background:var(--z-50)}
+/* row selection checkbox — only rendered in selection mode */
+.p-check{width:15px;height:15px;flex:none;cursor:pointer;accent-color:var(--accent)}
+.p-grp-lead .p-check{margin-top:7px}   /* the group lead aligns to flex-start */
 .p-avatar{
   width:30px;height:30px;border-radius:50%;flex:none;
   display:grid;place-items:center;font-size:10.5px;font-weight:600;
