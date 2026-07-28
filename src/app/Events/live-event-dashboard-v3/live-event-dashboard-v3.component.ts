@@ -1401,7 +1401,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const ids = new Set<string>();
     const add = (pid: string) => { if (pid) { ids.add(pid); } };
     rows.forEach((r: any) => {
-      if (r['_pair']) { add(r['lead']?.profileid); (r['others'] || []).forEach((o: any) => add(o.profileid)); }
+      // Leads only for grouped rows, so the Products/Cohorts/Journeys dropdowns offer
+      // exactly what the lead-only filter can actually match — a counterpart-only
+      // value would sit in the list promising rows and then return none.
+      if (r['_pair']) { add(r['lead']?.profileid); }
       else { add(r.profileid); }
     });
     return ids;
@@ -1450,9 +1453,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       if (q && !((p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))) { return false; }
       if (!active) { return true; }
       if (p['_pair']) {
-        // keep the whole group when the lead OR any counterpart matches
-        if (p['lead'] && this.matchesPanelFilter(p['lead'].profileid)) { return true; }
-        return (p['others'] || []).some((o: any) => this.matchesPanelFilter(o.profileid));
+        // Changework groups filter on the LEAD ONLY — the side the clicked cell was
+        // about. "As Doer · Completed" filtered by First timers means first-timer
+        // DOERS; matching on counterparts too kept groups whose lead fails the filter
+        // and made the list mostly non-matching people. Counterparts are still
+        // rendered in full, as context for the lead that did match.
+        return !!(p['lead'] && this.matchesPanelFilter(p['lead'].profileid));
       }
       return this.matchesPanelFilter(p.profileid);
     });
