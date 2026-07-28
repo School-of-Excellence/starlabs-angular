@@ -115,6 +115,9 @@ export class ParticipantVideoaskComponent {
   taggedCount = 0
   untaggedCount = 0
 
+  /** Second, independent table-level filter: show rows carrying ANY of these tag ids. */
+  selectedTags: string[] = []
+
   private destroy$ = new Subject<void>()
   private firestore = inject(Firestore)
 
@@ -148,10 +151,19 @@ export class ParticipantVideoaskComponent {
   }
 
   ngOnInit(): void {
-    // Tagged / Untagged / All runs over the rows already in the table.
-    this.dataSource.filterPredicate = (row: any, mode: string) => {
-      if (mode === 'tagged') return this.isTagged(row)
-      if (mode === 'untagged') return !this.isTagged(row)
+    // Two independent table-level controls resolve in one pass. MatTableDataSource
+    // types `filter` as a string, so both ride together as JSON and are decoded here.
+    this.dataSource.filterPredicate = (row: any, encoded: string) => {
+      const state = JSON.parse(encoded)
+
+      if (state.mode === 'tagged' && !this.isTagged(row)) return false
+      if (state.mode === 'untagged' && this.isTagged(row)) return false
+
+      // ANY: the row needs at least one of the selected tags.
+      if (state.tags.length) {
+        const rowtags = Array.isArray(row['tags']) ? row['tags'] : []
+        if (!state.tags.some((t: string) => rowtags.includes(t))) return false
+      }
       return true
     }
 
@@ -337,7 +349,7 @@ export class ParticipantVideoaskComponent {
     this.taggedCount = rows.filter(r => this.isTagged(r)).length
     this.untaggedCount = rows.length - this.taggedCount
     this.dataSource.data = rows
-    this.dataSource.filter = this.tagFilter
+    this.applyTableFilter()
     this.dataSource.sort = this.sort
     this.dataSource.paginator = this.paginator
     if (this.paginator) this.paginator.firstPage()
@@ -347,11 +359,37 @@ export class ParticipantVideoaskComponent {
     return Array.isArray(row['tags']) && row['tags'].length > 0
   }
 
+  /** Pushes both table-level controls into the datasource as one filter value. */
+  private applyTableFilter() {
+    this.dataSource.filter = JSON.stringify({ mode: this.tagFilter, tags: this.selectedTags })
+  }
+
   /** Re-filters the loaded rows. No Firestore read. */
   onTagFilterChange(mode: 'all' | 'tagged' | 'untagged') {
     this.tagFilter = mode
-    this.dataSource.filter = mode
+    this.applyTableFilter()
     if (this.paginator) this.paginator.firstPage()
+  }
+
+  /**
+   * The tag dropdown is independent of the mode buttons, but a tag chosen while
+   * Untagged is active could only ever match zero rows — so picking one moves the
+   * mode to Tagged.
+   */
+  onSelectedTagsChange(tags: string[]) {
+    this.selectedTags = tags || []
+    if (this.selectedTags.length && this.tagFilter === 'untagged') this.tagFilter = 'tagged'
+    this.applyTableFilter()
+    if (this.paginator) this.paginator.firstPage()
+  }
+
+  clearSelectedTags() {
+    this.onSelectedTagsChange([])
+  }
+
+  tagName(tagid: string): string {
+    const tag = this.videoAskTags.find(t => t['id'] === tagid)
+    return tag ? tag['name'] : tagid
   }
 
   /** Rows passing the table-level filter. */
@@ -610,7 +648,7 @@ export class ParticipantVideoaskComponent {
       const rows = this.dataSource.data as any[]
       this.taggedCount = rows.filter(r => this.isTagged(r)).length
       this.untaggedCount = rows.length - this.taggedCount
-      this.dataSource.filter = this.tagFilter
+      this.applyTableFilter()
     } catch (error) {
       console.log(error)
     }
