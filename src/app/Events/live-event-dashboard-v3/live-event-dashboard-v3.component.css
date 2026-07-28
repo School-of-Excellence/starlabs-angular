@@ -459,15 +459,34 @@ mat-select.pf-select.on{
 .p-role{font-size:8.5px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:var(--r-pill);display:inline-block;white-space:nowrap}
 .p-role.doer{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
 .p-role.beneficiary{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
-/* changework pair row — doer and beneficiary side by side on one row */
-.p-pair-row{padding:10px;border-radius:var(--r-sm);border:1px dashed var(--z-200);margin-bottom:6px}
-.p-pair-row:hover{background:var(--z-50)}
-.p-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start}
-.p-pair-side{min-width:0}
-.p-pair-name{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
-.p-pair-name.p-dim{color:var(--z-400);font-weight:500}
-.p-pair-arrow{align-self:center;color:var(--z-400);font-size:15px;flex:none;padding-top:12px}
-.p-pair-proc{margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--z-500);letter-spacing:.03em}
+/* changework group — the lead once, its counterparts indented under a rail. Replaces
+   the old side-by-side pair row, which repeated the doer once per beneficiary. */
+.p-grp{padding:10px;border-radius:var(--r-sm);border:1px dashed var(--z-200);margin-bottom:6px}
+.p-grp:hover{background:var(--z-50)}
+.p-grp-lead{display:flex;align-items:flex-start;gap:10px}
+.p-grp-lead .p-role{margin-bottom:3px}
+.p-grp-lead .p-name{font-weight:600;font-size:12.5px}
+.p-name.p-dim{color:var(--z-400);font-weight:500}
+.p-avatar.p-dim{background:var(--z-100);color:var(--z-400)}
+.p-grp-kids{
+  margin:8px 0 0 14px;padding-left:12px;border-left:1.5px solid var(--z-200);
+  display:flex;flex-direction:column;gap:7px;
+}
+.p-grp-eyebrow{
+  font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--z-400);
+}
+.p-grp-kid{display:flex;align-items:flex-start;gap:9px}
+.p-avatar.sm{width:24px;height:24px;font-size:9px}
+.p-grp-kid .p-name{font-size:12px;font-weight:500}
+/* repeat count — the pair share more than one changework */
+.p-rep{
+  margin-left:6px;padding:1px 6px;border-radius:var(--r-pill);
+  background:var(--accent-soft);color:var(--accent);
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.02em;
+  vertical-align:1px;
+}
+.p-grp-proc{margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--z-500);letter-spacing:.03em}
 .fu-empty{font-size:11.5px;color:var(--z-400);font-style:italic;padding:8px 2px}
 
 /* placeholder views */
@@ -516,6 +535,11 @@ mat-select.pf-select.on{
 .day-card.total{background:var(--beige);border-color:var(--beige-line)}
 .day-card.total .day-sub{border-top-color:var(--beige-line);color:var(--alert);font-weight:500}
 .day-card.total .day-sub b{color:var(--alert)}
+.day-card.total .day-subs{border-top-color:var(--beige-line)}
+/* the total card stacks a neutral stat over a negative one, so the red is carried
+   by the row that earns it rather than by the card */
+.day-stat.alert,.day-stat.alert b{color:var(--alert)}
+.day-stat.alert:hover{opacity:.72}
 .day-card.today{background:var(--z-900);border-color:var(--z-900);color:#fff}
 .day-card.today .day-eyebrow{color:var(--z-400)}
 .day-subs{margin-top:auto;padding-top:6px;border-top:1px dashed var(--z-200);display:flex;flex-direction:column;gap:3px}
