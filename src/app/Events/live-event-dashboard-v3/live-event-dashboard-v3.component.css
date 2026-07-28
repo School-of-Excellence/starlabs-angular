@@ -333,8 +333,9 @@ input,select{font:inherit}
    height and radius as the search box above, so they do not look like bare text.
    mat-select is used WITHOUT mat-form-field (it does not need one), which is what
    lets the trigger be styled directly instead of through an MDC notched outline. */
-.pf-adv{display:flex;gap:8px;align-items:center;padding:8px 22px 0}
-.pf-field{position:relative;flex:1;min-width:0;display:flex}
+.pf-adv{display:flex;gap:7px;align-items:center;padding:8px 22px 0}
+/* flex:1 1 0 keeps the three equal and lets them expand when one is absent */
+.pf-field{position:relative;flex:1 1 0;min-width:0;display:flex}
 mat-select.pf-select{
   flex:1;min-width:0;height:34px;padding:0 8px 0 12px;
   display:inline-flex;align-items:center;cursor:pointer;

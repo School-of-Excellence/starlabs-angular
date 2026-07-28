@@ -66,6 +66,10 @@ interface TicketFeedEntry {
 
 interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; }
 
+/** Option id for the journey filter's "No journey" entry. Not a real journey id —
+ *  it stands for "in no journey bucket at all". */
+const NO_JOURNEY = '__no_journey__';
+
 @Component({
   selector: 'app-live-event-dashboard-v3',
   standalone: true,
@@ -1140,9 +1144,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelFilter = { type: 'all', attendance: 'all', products: [], cohorts: [] };
+    this.panelFilter = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
     this.panelProductSet.clear();
     this.panelCohortMemberSet.clear();
+    this.panelJourneyMemberSet.clear();
+    this.panelJourneyNone = false;
     this.panelRowIds = this.panelRowProfileIds(rows);
     this.refreshPanelOptions();
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
@@ -1179,8 +1185,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // mutually exclusive — together they would match nobody.
   panelFilter: {
     type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has';
-    products: string[]; cohorts: string[];
-  } = { type: 'all', attendance: 'all', products: [], cohorts: [] };
+    products: string[]; cohorts: string[]; journeys: string[];
+  } = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
   /** Products actually present in the OPEN list (not the whole catalogue), so the
    *  dropdown only ever offers options that can match something. `count` = how many
    *  distinct participants in this list hold that product. */
@@ -1188,6 +1194,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   private panelProductSet = new Set<string>();
   /** "big cohorts" for this event that have at least one member in the OPEN list. */
   panelCohortOptions: { id: string; name: string; count: number }[] = [];
+  /** Active journeys represented in the OPEN list, plus a "No journey" entry when
+   *  anyone in it falls outside every journey bucket. */
+  panelJourneyOptions: { id: string; name: string; count: number }[] = [];
+  private panelJourneyMemberSet = new Set<string>();
+  private panelJourneyNone = false;          // is the "No journey" option picked?
   /** What the cohort dropdown actually renders — panelCohortOptions narrowed by the
    *  in-dropdown search. Held as a field, not a getter, so the *ngFor is not handed a
    *  fresh array (and MatSelect a churning option list) on every change detection. */
@@ -1212,7 +1223,29 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       (this.data.mapCohortParticipants[cid] || []).forEach(pid => this.panelCohortMemberSet.add(pid)));
   }
   clearPanelCohorts(): void { this.panelFilter.cohorts = []; this.panelCohortMemberSet.clear(); }
+  onPanelJourneyChange(): void {
+    this.panelJourneyMemberSet = new Set<string>();
+    this.panelJourneyNone = false;
+    this.panelFilter.journeys.forEach(jid => {
+      if (jid === NO_JOURNEY) { this.panelJourneyNone = true; return; }
+      const j = this.data.journeyCounts.find(x => x.journeyId === jid);
+      (j?.profileIds || []).forEach(pid => this.panelJourneyMemberSet.add(pid));
+    });
+  }
+  clearPanelJourneys(): void {
+    this.panelFilter.journeys = []; this.panelJourneyMemberSet.clear(); this.panelJourneyNone = false;
+  }
   trackOptId(_: number, o: { id: string }): string { return o.id; }
+  /** Everyone who sits in SOME journey bucket — the complement is "No journey", the
+   *  same definition noJourneyProfileIds uses (missing activejourney OR one absent
+   *  from the journey collection, so it never formed a bucket). */
+  private get journeyedIds(): Set<string> {
+    return this.memo('journeyedIds', () => {
+      const s = new Set<string>();
+      this.data.journeyCounts.forEach(j => j.profileIds.forEach(pid => s.add(pid)));
+      return s;
+    });
+  }
 
   // ---- cohort dropdown search ---------------------------------------------------
   /** Narrow the rendered cohorts. ALREADY-PICKED cohorts always stay rendered even
@@ -1248,9 +1281,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   get panelProductTriggerLabel(): string { return this.triggerLabel(this.panelFilter.products, this.panelProductOptions, 'product'); }
   get panelCohortTriggerLabel(): string { return this.triggerLabel(this.panelFilter.cohorts, this.panelCohortOptions, 'cohort'); }
+  get panelJourneyTriggerLabel(): string { return this.triggerLabel(this.panelFilter.journeys, this.panelJourneyOptions, 'journey'); }
   get panelFilterActive(): boolean {
     return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all'
-      || this.panelProductSet.size > 0 || this.panelFilter.cohorts.length > 0;
+      || this.panelProductSet.size > 0 || this.panelFilter.cohorts.length > 0
+      || this.panelFilter.journeys.length > 0;
   }
   private hasAttendanceLog(profileid: string): boolean { const r = this.data.mapAttendence[profileid]; return !!r && r.length > 0; }
   private matchesPanelFilter(profileid: string): boolean {
@@ -1266,6 +1301,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     // cohort membership is the participantidlist on the "big cohorts" doc — NOT the
     // per-participant `eligiliblecohorts` that cohortNameOf()/the Zones view read.
     if (this.panelFilter.cohorts.length && !this.panelCohortMemberSet.has(profileid)) { return false; }
+    if (this.panelFilter.journeys.length) {
+      const inPicked = this.panelJourneyMemberSet.has(profileid);
+      const isNone = this.panelJourneyNone && !this.journeyedIds.has(profileid);
+      if (!inPicked && !isNone) { return false; }
+    }
     return true;
   }
   /** Distinct profile ids of the open list, and the data version its option lists
@@ -1275,6 +1315,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   private refreshPanelOptions(): void {
     this.panelProductOptions = this.computePanelProductOptions(this.panelRowIds);
     this.panelCohortOptions = this.computePanelCohortOptions(this.panelRowIds);
+    this.panelJourneyOptions = this.computePanelJourneyOptions(this.panelRowIds);
     this.onCohortSearch();                      // re-apply any live search term
     this.panelOptionsVersion = this.viewVersion;
   }
@@ -1308,6 +1349,22 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       })
       .filter(o => o.count > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  /** Journeys represented in the open list, name-sorted, with "No journey" appended
+   *  last when anyone in the list sits outside every bucket. */
+  private computePanelJourneyOptions(ids: Set<string>): { id: string; name: string; count: number }[] {
+    const opts = this.data.journeyCounts
+      .map(j => {
+        const members = new Set(j.profileIds.filter(pid => ids.has(pid)));
+        return { id: j.journeyId, name: this.journeyLabel(j.journeyId), count: members.size };
+      })
+      .filter(o => o.count > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const journeyed = this.journeyedIds;
+    let none = 0;
+    ids.forEach(pid => { if (!journeyed.has(pid)) { none++; } });
+    if (none) { opts.push({ id: NO_JOURNEY, name: 'No journey', count: none }); }
+    return opts;
   }
   get panelParticipants(): PanelParticipant[] {
     const q = this.panelSearch.toLowerCase().trim();

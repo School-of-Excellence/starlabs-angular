@@ -820,19 +820,19 @@
     </div>
     <div class="pf-seg" role="group" aria-label="Attendance log">
       <button [class.on]="panelFilter.attendance === 'all'" (click)="setPanelAttendance('all')">All</button>
-      <button [class.on]="panelFilter.attendance === 'none'" (click)="setPanelAttendance('none')">No log</button>
-      <button [class.on]="panelFilter.attendance === 'has'" (click)="setPanelAttendance('has')">Logged</button>
+      <button [class.on]="panelFilter.attendance === 'none'" (click)="setPanelAttendance('none')">No Attendance log</button>
+      <button [class.on]="panelFilter.attendance === 'has'" (click)="setPanelAttendance('has')">Attendance Logged</button>
     </div>
   </div>
 
-  <!-- Products / cohorts share one row as bordered fields. Both are multi-select
-       with OR semantics; each is dropped when the open list has nothing to offer
-       for it, and the other then takes the full width. -->
-  <div class="pf-adv" *ngIf="panelProductOptions.length || panelCohortOptions.length">
+  <!-- Products / cohorts / journeys share one row as bordered fields. All three are
+       multi-select with OR semantics; each is dropped when the open list has nothing
+       to offer for it, and the survivors share the width. -->
+  <div class="pf-adv" *ngIf="panelProductOptions.length || panelCohortOptions.length || panelJourneyOptions.length">
 
     <div class="pf-field" *ngIf="panelProductOptions.length">
       <mat-select class="pf-select" [class.on]="panelFilter.products.length" multiple
-                  placeholder="Select products" aria-label="Filter this list by product"
+                  placeholder="Products" aria-label="Filter this list by product"
                   [(ngModel)]="panelFilter.products"
                   (selectionChange)="onPanelProductChange()"
                   (openedChange)="panelSelectOpen = $event"
@@ -853,7 +853,7 @@
     <!-- cohort = membership of a "big cohorts" participantidlist for this event -->
     <div class="pf-field" *ngIf="panelCohortOptions.length">
       <mat-select class="pf-select" [class.on]="panelFilter.cohorts.length" multiple
-                  placeholder="Select cohorts" aria-label="Filter this list by cohort"
+                  placeholder="Cohorts" aria-label="Filter this list by cohort"
                   [(ngModel)]="panelFilter.cohorts"
                   (selectionChange)="onPanelCohortChange()"
                   (openedChange)="onCohortSelectOpened($event)"
@@ -875,6 +875,27 @@
         <div class="pf-none" *ngIf="!panelCohortView.length">No cohort matches that search</div>
       </mat-select>
       <button class="pf-x" *ngIf="panelFilter.cohorts.length" (click)="clearPanelCohorts()" title="Clear the cohort filter">&times;</button>
+    </div>
+
+    <!-- journey = the participant's activejourney, resolved through journeyCounts so
+         "No journey" means the same here as it does on the Participants card -->
+    <div class="pf-field" *ngIf="panelJourneyOptions.length">
+      <mat-select class="pf-select" [class.on]="panelFilter.journeys.length" multiple
+                  placeholder="Journeys" aria-label="Filter this list by active journey"
+                  [(ngModel)]="panelFilter.journeys"
+                  (selectionChange)="onPanelJourneyChange()"
+                  (openedChange)="panelSelectOpen = $event"
+                  [panelWidth]="null"
+                  panelClass="pf-select-panel">
+        <mat-select-trigger>{{ panelJourneyTriggerLabel }}</mat-select-trigger>
+        <mat-option *ngFor="let opt of panelJourneyOptions; trackBy: trackOptId" [value]="opt.id">
+          <span class="pf-opt">
+            <span class="pf-opt-n">{{ opt.name }}</span>
+            <span class="pf-opt-c">{{ opt.count }}</span>
+          </span>
+        </mat-option>
+      </mat-select>
+      <button class="pf-x" *ngIf="panelFilter.journeys.length" (click)="clearPanelJourneys()" title="Clear the journey filter">&times;</button>
     </div>
 
   </div>
