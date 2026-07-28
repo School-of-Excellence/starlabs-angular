@@ -304,31 +304,33 @@ input,select{font:inherit}
 .panel-title{font-size:17px;font-weight:700;letter-spacing:-.015em;margin-top:8px}
 .panel-sub{font-size:12px;color:var(--z-500);margin-top:3px}
 /* ---- send to this list ---------------------------------------------------------
-   Three channels, then one. Idle it is a quiet icon row (an action available, not
-   one being asked for); picked, it becomes the bar that owns the selection — big
-   channel badge, count, select-all, Send — so the panel never shows two competing
-   sets of controls. */
-.panel-comm{display:flex;align-items:center;gap:7px;padding:14px 22px 0}
+   Sits under .panel-count, so it is read together with Export: both act on the list
+   as it currently stands. Three channels, then one — picked, it becomes the bar that
+   owns the selection (channel badge, count, select-all, Send), so the panel never
+   shows two competing sets of controls.
+   Black, not the grey used by the filter chrome above: this is the panel's only
+   outbound action, and grey read as another passive label. */
+.panel-comm{display:flex;align-items:center;gap:8px;padding:2px 22px 12px}
 .pc-label{
-  font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--z-400);margin-right:auto;
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-900);margin-right:auto;
 }
 .pc-picked{
-  font-size:10.5px;font-weight:600;color:var(--accent);
+  font-size:11px;font-weight:600;color:var(--accent);
   background:var(--accent-soft);border-radius:var(--r-pill);padding:3px 9px;white-space:nowrap;
 }
 .pc-btn{
-  width:32px;height:32px;flex:none;border-radius:var(--r-sm);
-  border:1px solid var(--z-200);background:var(--z-50);color:var(--z-600);
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);
+  border:1px solid var(--z-300);background:var(--z-0);color:var(--z-900);
   display:grid;place-items:center;transition:all .15s var(--ease);
 }
-.pc-btn:hover{border-color:var(--z-300);background:var(--z-0);color:var(--z-900)}
-.pc-btn svg{width:16px;height:16px;display:block}
+.pc-btn:hover{border-color:var(--z-900);background:var(--z-900);color:#fff}
+.pc-btn svg{width:21px;height:21px;display:block}
 .pc-big{
-  width:38px;height:38px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;
   border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent);
 }
-.pc-big svg{width:19px;height:19px;display:block}
+.pc-big svg{width:21px;height:21px;display:block}
 .pc-big.wati{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok)}
 .pc-meta{display:flex;flex-direction:column;min-width:0;flex:1}
 .pc-title{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
@@ -339,16 +341,16 @@ input,select{font:inherit}
 }
 .pc-all input{cursor:pointer;accent-color:var(--accent)}
 .pc-send{
-  flex:none;font-size:11px;font-weight:600;letter-spacing:.03em;color:#fff;
+  flex:none;font-size:11.5px;font-weight:600;letter-spacing:.03em;color:#fff;
   background:var(--accent);border:1px solid var(--accent);border-radius:var(--r-pill);
-  padding:6px 14px;white-space:nowrap;
+  padding:8px 16px;white-space:nowrap;
 }
 .pc-send:hover:not(:disabled){filter:brightness(.96)}
 .pc-send:disabled{opacity:.45;cursor:default}
 .pc-exit{
-  width:26px;height:26px;flex:none;border-radius:var(--r-xs);
+  width:30px;height:30px;flex:none;border-radius:var(--r-xs);
   border:1px solid var(--z-200);display:grid;place-items:center;
-  color:var(--z-500);font-size:14px;line-height:1;
+  color:var(--z-500);font-size:15px;line-height:1;
 }
 .pc-exit:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-search{padding:14px 22px 0}
