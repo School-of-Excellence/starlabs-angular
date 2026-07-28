@@ -30,6 +30,7 @@ interface PdRow {
 interface PdFilter {
   q: string; journey: string; type: string; atc: string;
   pctOp: '>=' | '<=' | '<'; pctVal: number; presentOn: string; absentOn: string;
+  band: string;   // QuartileRow.cls of a clicked ATC-completion tier ('' = none)
 }
 
 // ---- Arena Calling contract (C-9) — the call-outcome log exists in NO collection
@@ -63,7 +64,7 @@ interface TicketFeedEntry {
  * Video Ask Tags, Arena Followup, Backend view, Zones view.
  */
 
-interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; pctOp: '>=' | '<=' | '<'; pctVal: number; }
+interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; }
 
 @Component({
   selector: 'app-live-event-dashboard-v3',
@@ -333,31 +334,43 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const parts = this.data.eventParticipantProfileIds.map(id => this.data.buildParticipantFromProfileId(id, false));
     const ratios = parts.map(p => ({ p, r: this.participantCompletionRatio(p) })).filter(x => x.r !== null) as { p: PanelParticipant; r: number }[];
     const total = this.data.eventParticipantProfileIds.length;
-    // pctOp/pctVal mirror each tier onto the Participant Data "ATC %" filter
-    // (cumulative >= for the top tiers, < 25 for the bottom).
     // UNIQUE (non-cumulative) tiers — each participant falls in exactly one band.
-    const defs: { cls: string; label: string; test: (r: number) => boolean; pctOp: '>=' | '<=' | '<'; pctVal: number }[] = [
-      { cls: 'q100', label: '100%', test: r => r >= 1, pctOp: '>=', pctVal: 100 },
-      { cls: 'q75', label: '75–99%', test: r => r >= 0.75 && r < 1, pctOp: '>=', pctVal: 75 },
-      { cls: 'q50', label: '50–74%', test: r => r >= 0.5 && r < 0.75, pctOp: '>=', pctVal: 50 },
-      { cls: 'q25', label: '25–49%', test: r => r >= 0.25 && r < 0.5, pctOp: '>=', pctVal: 25 },
-      { cls: 'q0', label: 'Below 25%', test: r => r < 0.25, pctOp: '<', pctVal: 25 }
+    // `cls` doubles as the band id the Participant Data table filters by; see
+    // applyPctFilter for why the band is not expressed as a % threshold.
+    const defs: { cls: string; label: string; test: (r: number) => boolean }[] = [
+      { cls: 'q100', label: '100%', test: r => r >= 1 },
+      { cls: 'q75', label: '75–99%', test: r => r >= 0.75 && r < 1 },
+      { cls: 'q50', label: '50–74%', test: r => r >= 0.5 && r < 0.75 },
+      { cls: 'q25', label: '25–49%', test: r => r >= 0.25 && r < 0.5 },
+      { cls: 'q0', label: 'Below 25%', test: r => r < 0.25 }
     ];
     return defs.map(d => {
       const list = ratios.filter(x => d.test(x.r));
-      return { cls: d.cls, label: d.label, count: list.length, width: total ? Math.round((list.length / total) * 100) : 0, profileIds: list.map(x => x.p.profileid), pctOp: d.pctOp, pctVal: d.pctVal };
+      return { cls: d.cls, label: d.label, count: list.length, width: total ? Math.round((list.length / total) * 100) : 0, profileIds: list.map(x => x.p.profileid) };
     });
   }
 
   /** Task 1 — click an ATC-completion tier → apply it to the Participant Data
-   *  "ATC %" filter, expand that table, and scroll it into view. */
+   *  table, expand that table, and scroll it into view.
+   *
+   *  The tiers are BANDS (25–49% is 0.25 <= r < 0.5), so they cannot be expressed
+   *  as the single op+value the "ATC %" control carries — that filtered from 25%
+   *  upwards with no ceiling. Nor can they be expressed as a numeric range over the
+   *  table's ATC % column: that column is Math.round(ratio * 100) while the tiers
+   *  band on the raw ratio, so a participant on 0.497 sits in the 25–49% tier but
+   *  renders as "50%". Filtering by the tier's own membership is exact by
+   *  construction, and storing the tier id (not its ids) keeps it live as the
+   *  underlying data changes. */
   applyPctFilter(qt: QuartileRow): void {
-    this.pdFilter.pctOp = qt.pctOp;
-    this.pdFilter.pctVal = qt.pctVal;
+    this.pdFilter.band = qt.cls;
+    this.pdFilter.pctOp = '>=';           // clear the manual % control so the two
+    this.pdFilter.pctVal = 0;             // do not silently stack
     this.pdShown = 15;
     this.pdOpen = true;
     setTimeout(() => document.getElementById('pdCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   }
+  get pdBandLabel(): string { return this.completionQuartiles.find(q => q.cls === this.pdFilter.band)?.label || ''; }
+  clearPdBand(): void { this.pdFilter.band = ''; this.pdShown = 15; }
 
   // ==========================================================================
   // Participants split (ptTable) — journeys dynamic (C-5), ft via SEAM 3
@@ -641,7 +654,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     { k: 'adjDone', label: 'Adj. Done' }, { k: 'adjPending', label: 'Adj. Pending' },
     { k: 'procDone', label: 'Proc. Done' }, { k: 'procPending', label: 'Proc. Pending' }, { k: 'attd', label: 'Attd' }
   ];
-  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, presentOn: 'any', absentOn: 'any' }; }
+  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, presentOn: 'any', absentOn: 'any', band: '' }; }
   togglePd(): void { this.pdOpen = !this.pdOpen; }
   pdClear(): void { this.pdFilter = this.defaultPdFilter(); this.pdShown = 15; }
   pdMore(): void { this.pdShown += 25; }
@@ -668,6 +681,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     };
   }
   get pdAllRows(): PdRow[] { return this.data.eventParticipantProfileIds.map(id => this.buildPdRow(id)); }
+  /** Members of one ATC-completion tier as a Set — memoised per data version so the
+   *  per-row test stays a hash lookup. */
+  private pdBandIds(cls: string): Set<string> {
+    return this.memo('pdBandIds:' + cls, () =>
+      new Set(this.completionQuartiles.find(q => q.cls === cls)?.profileIds || []));
+  }
 
   private pdMatch(r: PdRow): boolean {
     const f = this.pdFilter;
@@ -676,6 +695,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (f.journey !== 'all' && r.journeyId !== f.journey) { return false; }
     if (f.type !== 'all' && r.ft !== (f.type === 'ft')) { return false; }
     if (f.atc !== 'all' && r.atcBucket !== +f.atc) { return false; }
+    // a clicked ATC-completion tier — membership in that exact band, see applyPctFilter
+    if (f.band && !this.pdBandIds(f.band).has(r.profileId)) { return false; }
     if (r.atcPct !== null) {
       if (f.pctOp === '>=' && !(r.atcPct >= f.pctVal)) { return false; }
       if (f.pctOp === '<=' && !(r.atcPct <= f.pctVal)) { return false; }

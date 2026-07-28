@@ -407,6 +407,11 @@
             <option value="<">&lt;</option>
           </select>
           <input class="pd-in pd-num" type="number" min="0" max="100" [(ngModel)]="pdFilter.pctVal" (ngModelChange)="pdOnFilterChange()">
+          <!-- set by clicking an ATC-completion tier; a band, not a threshold -->
+          <span class="pd-band" *ngIf="pdFilter.band">
+            {{ pdBandLabel }}
+            <button class="pd-band-x" (click)="clearPdBand()" title="Clear the ATC completion band">&times;</button>
+          </span>
           <span class="pd-lbl">Present on</span>
           <select class="pd-sel" [(ngModel)]="pdFilter.presentOn" (ngModelChange)="pdOnFilterChange()">
             <option value="any">Any day</option>

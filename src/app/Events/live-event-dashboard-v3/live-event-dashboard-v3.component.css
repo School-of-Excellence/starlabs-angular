@@ -596,6 +596,17 @@ mat-select.pf-select.on{background:var(--accent-soft);border-color:var(--accent-
 .pd-in:focus,.pd-sel:focus{border-color:var(--accent);background:var(--z-0)}
 .pd-sel{appearance:auto}
 .pd-num{width:54px;text-align:right}
+/* active ATC-completion band (set by clicking a tier) */
+.pd-band{
+  display:inline-flex;align-items:center;gap:4px;padding:5px 6px 5px 11px;
+  border-radius:var(--r-pill);background:var(--accent-soft);border:1px solid var(--accent-line);
+  font-size:12px;font-weight:500;color:var(--accent);
+}
+.pd-band-x{
+  width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
+  font-size:13px;line-height:1;color:var(--accent);opacity:.75;
+}
+.pd-band-x:hover{background:var(--z-0);opacity:1}
 .pd-tablewrap{overflow-x:auto;padding:8px 22px 4px}
 .pd-table{width:100%;border-collapse:collapse;min-width:860px}
 .pd-table th{
