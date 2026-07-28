@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatSelectModule } from '@angular/material/select';
 import { Subscription } from 'rxjs';
 import { Timestamp } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
@@ -29,6 +30,7 @@ interface PdRow {
 interface PdFilter {
   q: string; journey: string; type: string; atc: string;
   pctOp: '>=' | '<=' | '<'; pctVal: number; presentOn: string; absentOn: string;
+  band: string;   // QuartileRow.cls of a clicked ATC-completion tier ('' = none)
 }
 
 // ---- Arena Calling contract (C-9) — the call-outcome log exists in NO collection
@@ -62,12 +64,16 @@ interface TicketFeedEntry {
  * Video Ask Tags, Arena Followup, Backend view, Zones view.
  */
 
-interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; pctOp: '>=' | '<=' | '<'; pctVal: number; }
+interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; }
+
+/** Option id for the journey filter's "No journey" entry. Not a real journey id —
+ *  it stands for "in no journey bucket at all". */
+const NO_JOURNEY = '__no_journey__';
 
 @Component({
   selector: 'app-live-event-dashboard-v3',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatSelectModule],
   providers: [LiveEventDataService],
   templateUrl: './live-event-dashboard-v3.component.html',
   styleUrl: './live-event-dashboard-v3.component.css',
@@ -94,6 +100,9 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   private panelRows: PanelParticipant[] = [];
   // manual attendance marking (only enabled for the per-day Unattended list)
   panelMarkable = false;
+  /** 'yyyy-mm-dd' the mark is credited to — '' = today. Set from the day card the
+   *  list was opened from, so marking off a PAST day backdates the log. */
+  panelMarkDate = '';
   markedIds = new Set<string>();
   markingId: string | null = null;
   // inline product picker: which row is expanded, that participant's active
@@ -132,6 +141,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       // refresh the cached call rows — only while the backend view is showing.
       this.reconcileCallOptimistic();
       if (this.activeView === 'backend') { this.rebuildCalls(); }
+      // "big cohorts" / e-tickets stream in, so a panel opened moments after the
+      // event was picked can compute its filter options before the data lands.
+      // Refresh them once per data version — but never while a dropdown is open,
+      // which would shuffle the options under the operator's cursor.
+      if (this.panelOpen && !this.panelSelectOpen && this.panelOptionsVersion !== this.viewVersion) {
+        this.refreshPanelOptions();
+      }
       this.cdr.detectChanges();
     });
     this.data.init();
@@ -244,7 +260,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   queueSearch = '';
 
   closeDropdowns(): void { this.eventDropdownOpen = false; this.queueDropdownOpen = false; }
-  onEscape(): void { this.closePanel(); this.closeDropdowns(); }
+  // The product multi-select renders in a CDK overlay ABOVE the drill-down panel;
+  // its own ESC handler closes it, so swallow this one or the panel would go too.
+  // The panel's multi-selects render in a CDK overlay ABOVE the drill-down panel;
+  // their own ESC handler closes them, so swallow this one or the panel would go too.
+  onEscape(): void { if (this.panelSelectOpen) { return; } this.closePanel(); this.closeDropdowns(); }
 
   // Event (single-select)
   toggleEventDropdown(): void { this.queueDropdownOpen = false; this.eventDropdownOpen = !this.eventDropdownOpen; if (this.eventDropdownOpen) { this.eventSearch = ''; } }
@@ -321,31 +341,43 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const parts = this.data.eventParticipantProfileIds.map(id => this.data.buildParticipantFromProfileId(id, false));
     const ratios = parts.map(p => ({ p, r: this.participantCompletionRatio(p) })).filter(x => x.r !== null) as { p: PanelParticipant; r: number }[];
     const total = this.data.eventParticipantProfileIds.length;
-    // pctOp/pctVal mirror each tier onto the Participant Data "ATC %" filter
-    // (cumulative >= for the top tiers, < 25 for the bottom).
     // UNIQUE (non-cumulative) tiers — each participant falls in exactly one band.
-    const defs: { cls: string; label: string; test: (r: number) => boolean; pctOp: '>=' | '<=' | '<'; pctVal: number }[] = [
-      { cls: 'q100', label: '100%', test: r => r >= 1, pctOp: '>=', pctVal: 100 },
-      { cls: 'q75', label: '75–99%', test: r => r >= 0.75 && r < 1, pctOp: '>=', pctVal: 75 },
-      { cls: 'q50', label: '50–74%', test: r => r >= 0.5 && r < 0.75, pctOp: '>=', pctVal: 50 },
-      { cls: 'q25', label: '25–49%', test: r => r >= 0.25 && r < 0.5, pctOp: '>=', pctVal: 25 },
-      { cls: 'q0', label: 'Below 25%', test: r => r < 0.25, pctOp: '<', pctVal: 25 }
+    // `cls` doubles as the band id the Participant Data table filters by; see
+    // applyPctFilter for why the band is not expressed as a % threshold.
+    const defs: { cls: string; label: string; test: (r: number) => boolean }[] = [
+      { cls: 'q100', label: '100%', test: r => r >= 1 },
+      { cls: 'q75', label: '75–99%', test: r => r >= 0.75 && r < 1 },
+      { cls: 'q50', label: '50–74%', test: r => r >= 0.5 && r < 0.75 },
+      { cls: 'q25', label: '25–49%', test: r => r >= 0.25 && r < 0.5 },
+      { cls: 'q0', label: 'Below 25%', test: r => r < 0.25 }
     ];
     return defs.map(d => {
       const list = ratios.filter(x => d.test(x.r));
-      return { cls: d.cls, label: d.label, count: list.length, width: total ? Math.round((list.length / total) * 100) : 0, profileIds: list.map(x => x.p.profileid), pctOp: d.pctOp, pctVal: d.pctVal };
+      return { cls: d.cls, label: d.label, count: list.length, width: total ? Math.round((list.length / total) * 100) : 0, profileIds: list.map(x => x.p.profileid) };
     });
   }
 
   /** Task 1 — click an ATC-completion tier → apply it to the Participant Data
-   *  "ATC %" filter, expand that table, and scroll it into view. */
+   *  table, expand that table, and scroll it into view.
+   *
+   *  The tiers are BANDS (25–49% is 0.25 <= r < 0.5), so they cannot be expressed
+   *  as the single op+value the "ATC %" control carries — that filtered from 25%
+   *  upwards with no ceiling. Nor can they be expressed as a numeric range over the
+   *  table's ATC % column: that column is Math.round(ratio * 100) while the tiers
+   *  band on the raw ratio, so a participant on 0.497 sits in the 25–49% tier but
+   *  renders as "50%". Filtering by the tier's own membership is exact by
+   *  construction, and storing the tier id (not its ids) keeps it live as the
+   *  underlying data changes. */
   applyPctFilter(qt: QuartileRow): void {
-    this.pdFilter.pctOp = qt.pctOp;
-    this.pdFilter.pctVal = qt.pctVal;
+    this.pdFilter.band = qt.cls;
+    this.pdFilter.pctOp = '>=';           // clear the manual % control so the two
+    this.pdFilter.pctVal = 0;             // do not silently stack
     this.pdShown = 15;
     this.pdOpen = true;
     setTimeout(() => document.getElementById('pdCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   }
+  get pdBandLabel(): string { return this.completionQuartiles.find(q => q.cls === this.pdFilter.band)?.label || ''; }
+  clearPdBand(): void { this.pdFilter.band = ''; this.pdShown = 15; }
 
   // ==========================================================================
   // Participants split (ptTable) — journeys dynamic (C-5), ft via SEAM 3
@@ -551,6 +583,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   openAttAbsent(day: DayAttendance): void {
     this.openPanel(`Unattended · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', day.absentProfileIds);
     this.panelMarkable = true;   // allow manual attendance marking from this list
+    // Credit the mark to the day the operator is looking at. Today stays undated so
+    // the log keeps the real click time; a past day must be backdated or the mark
+    // lands on today and that day's Unattended count never moves.
+    this.panelMarkDate = day.isToday ? '' : day.date;
   }
   attMissingVACount(day: DayAttendance): number { return this.getMissingRecordingByDay(day).length; }
   openAttMissingVA(day: DayAttendance): void { this.openPanel(`Video Ask not submitted · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', this.getMissingRecordingByDay(day)); }
@@ -629,7 +665,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     { k: 'adjDone', label: 'Adj. Done' }, { k: 'adjPending', label: 'Adj. Pending' },
     { k: 'procDone', label: 'Proc. Done' }, { k: 'procPending', label: 'Proc. Pending' }, { k: 'attd', label: 'Attd' }
   ];
-  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, presentOn: 'any', absentOn: 'any' }; }
+  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, presentOn: 'any', absentOn: 'any', band: '' }; }
   togglePd(): void { this.pdOpen = !this.pdOpen; }
   pdClear(): void { this.pdFilter = this.defaultPdFilter(); this.pdShown = 15; }
   pdMore(): void { this.pdShown += 25; }
@@ -656,6 +692,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     };
   }
   get pdAllRows(): PdRow[] { return this.data.eventParticipantProfileIds.map(id => this.buildPdRow(id)); }
+  /** Members of one ATC-completion tier as a Set — memoised per data version so the
+   *  per-row test stays a hash lookup. */
+  private pdBandIds(cls: string): Set<string> {
+    return this.memo('pdBandIds:' + cls, () =>
+      new Set(this.completionQuartiles.find(q => q.cls === cls)?.profileIds || []));
+  }
 
   private pdMatch(r: PdRow): boolean {
     const f = this.pdFilter;
@@ -664,6 +706,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (f.journey !== 'all' && r.journeyId !== f.journey) { return false; }
     if (f.type !== 'all' && r.ft !== (f.type === 'ft')) { return false; }
     if (f.atc !== 'all' && r.atcBucket !== +f.atc) { return false; }
+    // a clicked ATC-completion tier — membership in that exact band, see applyPctFilter
+    if (f.band && !this.pdBandIds(f.band).has(r.profileId)) { return false; }
     if (r.atcPct !== null) {
       if (f.pctOp === '>=' && !(r.atcPct >= f.pctVal)) { return false; }
       if (f.pctOp === '<=' && !(r.atcPct <= f.pctVal)) { return false; }
@@ -1100,8 +1144,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelFilter = { type: 'all', attendance: 'all' };
+    this.panelFilter = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
+    this.panelProductSet.clear();
+    this.panelCohortMemberSet.clear();
+    this.panelJourneyMemberSet.clear();
+    this.panelJourneyNone = false;
+    this.panelRowIds = this.panelRowProfileIds(rows);
+    this.refreshPanelOptions();
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
+    this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
@@ -1129,19 +1180,191 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return rows;
   }
   // list filters: first-timer / repeat (mutually exclusive) + attendance-log
-  // presence ('none' = no scan on any day · 'has' = at least one scan). The two
-  // attendance chips are mutually exclusive — together they would match nobody.
-  panelFilter: { type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has' } = { type: 'all', attendance: 'all' };
-  togglePanelType(t: 'ft' | 'rp'): void { this.panelFilter.type = this.panelFilter.type === t ? 'all' : t; }
-  togglePanelAttendance(a: 'none' | 'has'): void { this.panelFilter.attendance = this.panelFilter.attendance === a ? 'all' : a; }
-  get panelFilterActive(): boolean { return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all'; }
+  // presence ('none' = no scan on any day · 'has' = at least one scan) + products
+  // + cohorts (both multi-select, OR semantics). The two attendance chips are
+  // mutually exclusive — together they would match nobody.
+  panelFilter: {
+    type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has';
+    products: string[]; cohorts: string[]; journeys: string[];
+  } = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
+  /** Products actually present in the OPEN list (not the whole catalogue), so the
+   *  dropdown only ever offers options that can match something. `count` = how many
+   *  distinct participants in this list hold that product. */
+  panelProductOptions: { id: string; name: string; count: number }[] = [];
+  private panelProductSet = new Set<string>();
+  /** "big cohorts" for this event that have at least one member in the OPEN list. */
+  panelCohortOptions: { id: string; name: string; count: number }[] = [];
+  /** Active journeys represented in the OPEN list, plus a "No journey" entry when
+   *  anyone in it falls outside every journey bucket. */
+  panelJourneyOptions: { id: string; name: string; count: number }[] = [];
+  private panelJourneyMemberSet = new Set<string>();
+  private panelJourneyNone = false;          // is the "No journey" option picked?
+  /** What the cohort dropdown actually renders — panelCohortOptions narrowed by the
+   *  in-dropdown search. Held as a field, not a getter, so the *ngFor is not handed a
+   *  fresh array (and MatSelect a churning option list) on every change detection. */
+  panelCohortView: { id: string; name: string; count: number }[] = [];
+  cohortSearch = '';
+  @ViewChild('cohortSearchBox') private cohortSearchBox?: ElementRef<HTMLInputElement>;
+  /** Union of the picked cohorts' participantidlist — membership is then an O(1)
+   *  lookup per row instead of re-scanning every cohort's array. */
+  private panelCohortMemberSet = new Set<string>();
+  /** True while a dropdown overlay is open — ESC must close the dropdown only, not
+   *  the whole drill-down panel underneath it. */
+  panelSelectOpen = false;
+  // Segmented controls, so these are explicit picks — 'all' IS the off position and
+  // there is nothing to toggle back to.
+  setPanelType(t: 'all' | 'ft' | 'rp'): void { this.panelFilter.type = t; }
+  setPanelAttendance(a: 'all' | 'none' | 'has'): void { this.panelFilter.attendance = a; }
+  onPanelProductChange(): void { this.panelProductSet = new Set(this.panelFilter.products); }
+  clearPanelProducts(): void { this.panelFilter.products = []; this.panelProductSet.clear(); }
+  onPanelCohortChange(): void {
+    this.panelCohortMemberSet = new Set<string>();
+    this.panelFilter.cohorts.forEach(cid =>
+      (this.data.mapCohortParticipants[cid] || []).forEach(pid => this.panelCohortMemberSet.add(pid)));
+  }
+  clearPanelCohorts(): void { this.panelFilter.cohorts = []; this.panelCohortMemberSet.clear(); }
+  onPanelJourneyChange(): void {
+    this.panelJourneyMemberSet = new Set<string>();
+    this.panelJourneyNone = false;
+    this.panelFilter.journeys.forEach(jid => {
+      if (jid === NO_JOURNEY) { this.panelJourneyNone = true; return; }
+      const j = this.data.journeyCounts.find(x => x.journeyId === jid);
+      (j?.profileIds || []).forEach(pid => this.panelJourneyMemberSet.add(pid));
+    });
+  }
+  clearPanelJourneys(): void {
+    this.panelFilter.journeys = []; this.panelJourneyMemberSet.clear(); this.panelJourneyNone = false;
+  }
+  trackOptId(_: number, o: { id: string }): string { return o.id; }
+  /** Everyone who sits in SOME journey bucket — the complement is "No journey", the
+   *  same definition noJourneyProfileIds uses (missing activejourney OR one absent
+   *  from the journey collection, so it never formed a bucket). */
+  private get journeyedIds(): Set<string> {
+    return this.memo('journeyedIds', () => {
+      const s = new Set<string>();
+      this.data.journeyCounts.forEach(j => j.profileIds.forEach(pid => s.add(pid)));
+      return s;
+    });
+  }
+
+  // ---- cohort dropdown search ---------------------------------------------------
+  /** Narrow the rendered cohorts. ALREADY-PICKED cohorts always stay rendered even
+   *  when they do not match: MatSelect rebuilds its selection from the options in the
+   *  DOM, so a selected option that is filtered away is dropped from the value the
+   *  next time anything is toggled. Keeping them also lets you undo a pick without
+   *  clearing the search first. */
+  onCohortSearch(): void {
+    const q = this.cohortSearch.toLowerCase().trim();
+    if (!q) { this.panelCohortView = this.panelCohortOptions; return; }
+    const picked = new Set(this.panelFilter.cohorts);
+    this.panelCohortView = this.panelCohortOptions.filter(o =>
+      picked.has(o.id) || o.name.toLowerCase().includes(q));
+  }
+  /** MatSelect's own typeahead would hijack the letters and space would toggle the
+   *  active option, so those keys stop here; navigation and close keys pass through
+   *  to the panel as usual. */
+  onCohortSearchKeydown(e: KeyboardEvent): void {
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', 'Escape', 'Tab'].includes(e.key)) { return; }
+    e.stopPropagation();
+  }
+  onCohortSelectOpened(open: boolean): void {
+    this.panelSelectOpen = open;
+    this.cohortSearch = '';                     // every open starts from the full list
+    this.panelCohortView = this.panelCohortOptions;
+    if (open) { setTimeout(() => this.cohortSearchBox?.nativeElement?.focus()); }
+  }
+  /** Trigger text — one pick shows its name, several collapse to a count, because
+   *  Material's default comma-joined list overflows a 440px panel. */
+  private triggerLabel(picked: string[], opts: { id: string; name: string }[], noun: string): string {
+    if (picked.length === 1) { return opts.find(o => o.id === picked[0])?.name || `1 ${noun}`; }
+    return `${picked.length} ${noun}s`;
+  }
+  get panelProductTriggerLabel(): string { return this.triggerLabel(this.panelFilter.products, this.panelProductOptions, 'product'); }
+  get panelCohortTriggerLabel(): string { return this.triggerLabel(this.panelFilter.cohorts, this.panelCohortOptions, 'cohort'); }
+  get panelJourneyTriggerLabel(): string { return this.triggerLabel(this.panelFilter.journeys, this.panelJourneyOptions, 'journey'); }
+  get panelFilterActive(): boolean {
+    return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all'
+      || this.panelProductSet.size > 0 || this.panelFilter.cohorts.length > 0
+      || this.panelFilter.journeys.length > 0;
+  }
   private hasAttendanceLog(profileid: string): boolean { const r = this.data.mapAttendence[profileid]; return !!r && r.length > 0; }
   private matchesPanelFilter(profileid: string): boolean {
     if (this.panelFilter.type === 'ft' && !this.isFirstTimer(profileid)) { return false; }
     if (this.panelFilter.type === 'rp' && this.isFirstTimer(profileid)) { return false; }
     if (this.panelFilter.attendance === 'none' && this.hasAttendanceLog(profileid)) { return false; }
     if (this.panelFilter.attendance === 'has' && !this.hasAttendanceLog(profileid)) { return false; }
+    if (this.panelProductSet.size) {
+      // keep the participant when they hold at least one of the picked products
+      const ids = this.data.registeredProductIds[profileid] || [];
+      if (!ids.some(id => this.panelProductSet.has(id))) { return false; }
+    }
+    // cohort membership is the participantidlist on the "big cohorts" doc — NOT the
+    // per-participant `eligiliblecohorts` that cohortNameOf()/the Zones view read.
+    if (this.panelFilter.cohorts.length && !this.panelCohortMemberSet.has(profileid)) { return false; }
+    if (this.panelFilter.journeys.length) {
+      const inPicked = this.panelJourneyMemberSet.has(profileid);
+      const isNone = this.panelJourneyNone && !this.journeyedIds.has(profileid);
+      if (!inPicked && !isNone) { return false; }
+    }
     return true;
+  }
+  /** Distinct profile ids of the open list, and the data version its option lists
+   *  were built from (so late-arriving snapshots can refresh them — see ngOnInit). */
+  private panelRowIds = new Set<string>();
+  private panelOptionsVersion = -1;
+  private refreshPanelOptions(): void {
+    this.panelProductOptions = this.computePanelProductOptions(this.panelRowIds);
+    this.panelCohortOptions = this.computePanelCohortOptions(this.panelRowIds);
+    this.panelJourneyOptions = this.computePanelJourneyOptions(this.panelRowIds);
+    this.onCohortSearch();                      // re-apply any live search term
+    this.panelOptionsVersion = this.viewVersion;
+  }
+  /** Distinct profile ids across the rows of the open list (a profile on several pair
+   *  rows counts once) — the basis for both option lists' counts. */
+  private panelRowProfileIds(rows: PanelParticipant[]): Set<string> {
+    const ids = new Set<string>();
+    const add = (pid: string) => { if (pid) { ids.add(pid); } };
+    rows.forEach((r: any) => {
+      if (r['_pair']) { add(r['doer']?.profileid); add(r['beneficiary']?.profileid); }
+      else { add(r.profileid); }
+    });
+    return ids;
+  }
+  /** Eligible products held by anyone in the open list, name-sorted with counts. */
+  private computePanelProductOptions(ids: Set<string>): { id: string; name: string; count: number }[] {
+    const counts: { [id: string]: number } = {};
+    ids.forEach(pid => (this.data.registeredProductIds[pid] || [])
+      .forEach(id => { counts[id] = (counts[id] || 0) + 1; }));
+    return Object.keys(counts)
+      .map(id => ({ id, name: this.data.productMap[id] || id, count: counts[id] }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  /** "big cohorts" of this event, kept only where participantidlist overlaps the open
+   *  list; count = distinct members of that cohort present in the list. */
+  private computePanelCohortOptions(ids: Set<string>): { id: string; name: string; count: number }[] {
+    return Object.keys(this.data.mapCohortParticipants)
+      .map(cid => {
+        const members = new Set((this.data.mapCohortParticipants[cid] || []).filter(pid => ids.has(pid)));
+        return { id: cid, name: this.data.mapCohortsData[cid]?.['name'] || cid, count: members.size };
+      })
+      .filter(o => o.count > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  /** Journeys represented in the open list, name-sorted, with "No journey" appended
+   *  last when anyone in the list sits outside every bucket. */
+  private computePanelJourneyOptions(ids: Set<string>): { id: string; name: string; count: number }[] {
+    const opts = this.data.journeyCounts
+      .map(j => {
+        const members = new Set(j.profileIds.filter(pid => ids.has(pid)));
+        return { id: j.journeyId, name: this.journeyLabel(j.journeyId), count: members.size };
+      })
+      .filter(o => o.count > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const journeyed = this.journeyedIds;
+    let none = 0;
+    ids.forEach(pid => { if (!journeyed.has(pid)) { none++; } });
+    if (none) { opts.push({ id: NO_JOURNEY, name: 'No journey', count: none }); }
+    return opts;
   }
   get panelParticipants(): PanelParticipant[] {
     const q = this.panelSearch.toLowerCase().trim();
@@ -1206,13 +1429,20 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.markPickerId = null; this.markTicketId = null; this.markOptions = []; this.markSelected = new Set<string>();
   }
 
+  /** The day a mark will be credited to, spelled out for the confirm dialog — the
+   *  operator has to be able to see they are backdating. */
+  get markDateLabel(): string {
+    if (!this.panelMarkDate) { return 'today'; }
+    const [y, m, d] = this.panelMarkDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
   confirmMark(p: PanelParticipant): void {
     if (this.markingId || !this.markTicketId || !this.markSelected.size) { return; }
-    if (!window.confirm(`Are you sure you want to mark the attendance for ${p.name}?`)) { return; }
+    if (!window.confirm(`Mark ${p.name} present for ${this.markDateLabel}?`)) { return; }
     const ticketId = this.markTicketId;
     const productIds = [...this.markSelected];
     this.markingId = p.profileid;
-    this.data.markAttendanceForProducts(p.profileid, ticketId, productIds)
+    this.data.markAttendanceForProducts(p.profileid, ticketId, productIds, this.panelMarkDate || undefined)
       .then(() => {
         this.markedIds.add(p.profileid); this.markingId = null; this.closeMarkPicker(); this.cdr.detectChanges();
       })
