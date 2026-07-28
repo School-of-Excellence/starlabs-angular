@@ -810,18 +810,59 @@
     <button class="pf-chip" [class.on-blue]="panelFilter.type === 'rp'" (click)="togglePanelType('rp')">Repeat</button>
     <button class="pf-chip" [class.on]="panelFilter.attendance === 'none'" (click)="togglePanelAttendance('none')">No attendance log</button>
     <button class="pf-chip" [class.on]="panelFilter.attendance === 'has'" (click)="togglePanelAttendance('has')">Only attendance log</button>
-    <!-- product filter — multi-select over the products present in THIS list (OR) -->
-    <mat-form-field *ngIf="panelProductOptions.length" class="pf-select" appearance="outline" subscriptSizing="dynamic">
-      <mat-label>Products</mat-label>
-      <mat-select multiple
-                  [(ngModel)]="panelFilter.products"
-                  (selectionChange)="onPanelProductChange()"
-                  (openedChange)="panelProductSelectOpen = $event"
-                  panelClass="pf-select-panel">
-        <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">{{ opt.name }}</mat-option>
-      </mat-select>
-    </mat-form-field>
-    <button class="pf-chip" *ngIf="panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">Clear products</button>
+  </div>
+
+  <!-- Product filter — a compound control (match mode + multi-select), so it gets
+       its own row rather than crowding the boolean chips above. Hidden entirely
+       when nobody in the open list has a product. -->
+  <div class="pf-prod" *ngIf="panelProductOptions.length">
+    <span class="pf-prod-label">Products</span>
+
+    <!-- match mode: how MULTIPLE selected products combine -->
+    <button class="pf-mode" [class.on]="panelFilter.products.length"
+            [matMenuTriggerFor]="prodModeMenu"
+            (menuOpened)="panelProductMenuOpen = true" (menuClosed)="panelProductMenuOpen = false"
+            title="How the selected products are matched">
+      {{ panelProductModeLabel }}<span class="pf-caret" aria-hidden="true">&#9662;</span>
+    </button>
+    <mat-menu #prodModeMenu="matMenu" class="pf-menu" xPosition="after">
+      <button mat-menu-item type="button" (click)="setPanelProductMode('any')">
+        <span class="pf-mi">
+          <span class="pf-mi-tick" [class.on]="panelFilter.productMode === 'any'">&checkmark;</span>
+          <span class="pf-mi-txt">
+            <span class="pf-mi-t">Has any of the selected products</span>
+            <span class="pf-mi-s">Keeps a participant who has at least one of them</span>
+          </span>
+        </span>
+      </button>
+      <button mat-menu-item type="button" (click)="setPanelProductMode('all')">
+        <span class="pf-mi">
+          <span class="pf-mi-tick" [class.on]="panelFilter.productMode === 'all'">&checkmark;</span>
+          <span class="pf-mi-txt">
+            <span class="pf-mi-t">Has all of the selected products</span>
+            <span class="pf-mi-s">Keeps a participant only if they have every one of them</span>
+          </span>
+        </span>
+      </button>
+    </mat-menu>
+
+    <!-- the products themselves (multi-select) -->
+    <mat-select class="pf-select" [class.on]="panelFilter.products.length" multiple
+                placeholder="Select products" aria-label="Filter this list by product"
+                [(ngModel)]="panelFilter.products"
+                (selectionChange)="onPanelProductChange()"
+                (openedChange)="panelProductSelectOpen = $event"
+                panelClass="pf-select-panel">
+      <mat-select-trigger>{{ panelProductTriggerLabel }}</mat-select-trigger>
+      <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">
+        <span class="pf-opt">
+          <span class="pf-opt-n">{{ opt.name }}</span>
+          <span class="pf-opt-c">{{ opt.count }}</span>
+        </span>
+      </mat-option>
+    </mat-select>
+
+    <button class="pf-x" *ngIf="panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">&times;</button>
   </div>
   <div class="panel-count">
     <span>{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</span>

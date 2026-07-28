@@ -310,13 +310,77 @@ input,select{font:inherit}
 }
 .panel-search input:focus{border-color:var(--accent);background:var(--z-0)}
 .panel-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:12px 22px 0}
-/* product multi-select — compacted to chip height so it lines up with .pf-chip */
-.pf-select{width:190px;font-size:12px}
-.pf-select ::ng-deep .mat-mdc-text-field-wrapper{height:34px}
-.pf-select ::ng-deep .mat-mdc-form-field-infix{min-height:34px;padding:6px 0;font-size:12px}
-.pf-select ::ng-deep .mat-mdc-form-field-flex{align-items:center}
-.pf-select ::ng-deep .mat-mdc-floating-label{top:17px}
-.pf-select ::ng-deep .mdc-notched-outline__notch{border-right:none}
+
+/* ---- product filter row: [PRODUCTS] [match mode ▾] [multi-select ▾] [×] --------
+   Both controls are Material (mat-menu / mat-select) but re-skinned to the panel's
+   flat pill language. mat-select is used WITHOUT mat-form-field — it does not need
+   one — so the trigger can be styled as a .pf-chip instead of an MDC outline. */
+.pf-prod{display:flex;align-items:center;gap:8px;padding:10px 22px 0}
+.pf-prod-label{
+  flex:none;font-family:var(--mono);font-size:10.5px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);
+}
+.pf-mode{
+  flex:none;display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 11px;
+  border:1px solid var(--z-200);border-radius:var(--r-pill);background:var(--z-0);
+  font-size:12px;font-weight:500;color:var(--z-600);transition:all .15s var(--ease);
+}
+.pf-mode:hover{border-color:var(--z-400)}
+.pf-mode.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+.pf-caret{font-size:9px;line-height:1;opacity:.55}
+
+mat-select.pf-select{
+  flex:1;min-width:0;height:30px;padding:0 8px 0 12px;
+  display:inline-flex;align-items:center;cursor:pointer;
+  border:1px solid var(--z-200);border-radius:var(--r-pill);background:var(--z-0);
+  font-family:var(--font);font-size:12px;font-weight:500;line-height:1;
+  letter-spacing:normal;color:var(--z-900);transition:all .15s var(--ease);
+}
+mat-select.pf-select:hover{border-color:var(--z-400)}
+mat-select.pf-select.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+.pf-select ::ng-deep .mat-mdc-select-trigger{height:100%}
+.pf-select ::ng-deep .mat-mdc-select-value{color:inherit}
+.pf-select ::ng-deep .mat-mdc-select-placeholder{color:var(--z-500)}
+.pf-select ::ng-deep .mat-mdc-select-arrow-wrapper{height:auto}
+.pf-select ::ng-deep .mat-mdc-select-arrow{color:currentColor;opacity:.55}
+.pf-x{
+  flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
+  font-size:17px;line-height:1;color:var(--z-500);transition:all .15s var(--ease);
+}
+.pf-x:hover{background:var(--z-100);color:var(--z-900)}
+
+/* ---- overlay panels ------------------------------------------------------------
+   These render in the CDK overlay container, OUTSIDE :host, so the design tokens
+   above do not resolve there — hence the literal values (kept in sync by hand with
+   the :host token block). Namespaced by panelClass so the ::ng-deep leak is inert. */
+::ng-deep .pf-select-panel.mat-mdc-select-panel{
+  padding:6px !important;border:1px solid #e3e3e8;background:#fff;
+  border-radius:12px !important;
+  box-shadow:0 1px 2px rgba(28,28,30,.04),0 10px 30px rgba(28,28,30,.06) !important;
+  --mat-option-selected-state-label-text-color:#5856d6;
+  --mat-option-selected-state-layer-color:#eeeefb;
+  --mat-full-pseudo-checkbox-selected-icon-color:#5856d6;
+  --mat-full-pseudo-checkbox-selected-checkmark-color:#fff;
+  --mat-full-pseudo-checkbox-unselected-icon-color:#aeaeb2;
+}
+::ng-deep .pf-select-panel .mat-mdc-option{min-height:36px;border-radius:8px}
+::ng-deep .pf-select-panel .mat-mdc-option .mdc-list-item__primary-text{width:100%;font-size:12.5px}
+::ng-deep .pf-select-panel .pf-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
+::ng-deep .pf-select-panel .pf-opt-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+::ng-deep .pf-select-panel .pf-opt-c{flex:none;font-size:10.5px;color:#8e8e93;font-variant-numeric:tabular-nums}
+
+::ng-deep .pf-menu.mat-mdc-menu-panel{
+  max-width:320px;border:1px solid #e3e3e8;border-radius:12px;
+  box-shadow:0 1px 2px rgba(28,28,30,.04),0 10px 30px rgba(28,28,30,.06);
+}
+::ng-deep .pf-menu .mat-mdc-menu-content{padding:6px}
+::ng-deep .pf-menu .mat-mdc-menu-item{min-height:0;height:auto;padding:8px 10px;border-radius:8px}
+::ng-deep .pf-menu .mat-mdc-menu-item .mat-mdc-menu-item-text{display:block;white-space:normal}
+::ng-deep .pf-menu .pf-mi{display:flex;align-items:flex-start;gap:8px}
+::ng-deep .pf-menu .pf-mi-tick{flex:none;width:11px;font-size:11px;line-height:17px;color:#5856d6;visibility:hidden}
+::ng-deep .pf-menu .pf-mi-tick.on{visibility:visible}
+::ng-deep .pf-menu .pf-mi-t{display:block;font-size:12.5px;font-weight:500;line-height:1.35;color:#1c1c1e}
+::ng-deep .pf-menu .pf-mi-s{display:block;font-size:11px;line-height:1.35;color:#8e8e93;margin-top:1px}
 .panel-count{
   padding:12px 22px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;
   font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);

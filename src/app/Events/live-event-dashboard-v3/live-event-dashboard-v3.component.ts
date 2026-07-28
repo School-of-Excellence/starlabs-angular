@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatSelectModule } from '@angular/material/select';
 import { Subscription } from 'rxjs';
 import { Timestamp } from '@angular/fire/firestore';
@@ -69,7 +69,7 @@ interface QuartileRow { cls: string; label: string; count: number; width: number
 @Component({
   selector: 'app-live-event-dashboard-v3',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatFormFieldModule, MatSelectModule],
+  imports: [CommonModule, FormsModule, MatMenuModule, MatSelectModule],
   providers: [LiveEventDataService],
   templateUrl: './live-event-dashboard-v3.component.html',
   styleUrl: './live-event-dashboard-v3.component.css',
@@ -248,7 +248,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   closeDropdowns(): void { this.eventDropdownOpen = false; this.queueDropdownOpen = false; }
   // The product multi-select renders in a CDK overlay ABOVE the drill-down panel;
   // its own ESC handler closes it, so swallow this one or the panel would go too.
-  onEscape(): void { if (this.panelProductSelectOpen) { return; } this.closePanel(); this.closeDropdowns(); }
+  onEscape(): void {
+    if (this.panelProductSelectOpen || this.panelProductMenuOpen) { return; }
+    this.closePanel(); this.closeDropdowns();
+  }
 
   // Event (single-select)
   toggleEventDropdown(): void { this.queueDropdownOpen = false; this.eventDropdownOpen = !this.eventDropdownOpen; if (this.eventDropdownOpen) { this.eventSearch = ''; } }
@@ -1104,7 +1107,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelFilter = { type: 'all', attendance: 'all', products: [] };
+    this.panelFilter = { type: 'all', attendance: 'all', products: [], productMode: 'any' };
     this.panelProductSet.clear();
     this.panelProductOptions = this.computePanelProductOptions(rows);
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
@@ -1138,19 +1141,32 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // presence ('none' = no scan on any day · 'has' = at least one scan) + products
   // (multi-select, OR semantics). The two attendance chips are mutually exclusive
   // — together they would match nobody.
-  panelFilter: { type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has'; products: string[] } =
-    { type: 'all', attendance: 'all', products: [] };
+  panelFilter: {
+    type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has';
+    products: string[]; productMode: 'any' | 'all';
+  } = { type: 'all', attendance: 'all', products: [], productMode: 'any' };
   /** Products actually present in the OPEN list (not the whole catalogue), so the
-   *  dropdown only ever offers options that can match something. */
-  panelProductOptions: { id: string; name: string }[] = [];
+   *  dropdown only ever offers options that can match something. `count` = how many
+   *  distinct participants in this list hold that product. */
+  panelProductOptions: { id: string; name: string; count: number }[] = [];
   private panelProductSet = new Set<string>();
-  /** True while the product dropdown overlay is open — ESC must close the dropdown
-   *  only, not the whole drill-down panel underneath it. */
+  /** True while the product dropdown / match-mode menu overlay is open — ESC must
+   *  close the overlay only, not the whole drill-down panel underneath it. */
   panelProductSelectOpen = false;
+  panelProductMenuOpen = false;
   togglePanelType(t: 'ft' | 'rp'): void { this.panelFilter.type = this.panelFilter.type === t ? 'all' : t; }
   togglePanelAttendance(a: 'none' | 'has'): void { this.panelFilter.attendance = this.panelFilter.attendance === a ? 'all' : a; }
   onPanelProductChange(): void { this.panelProductSet = new Set(this.panelFilter.products); }
   clearPanelProducts(): void { this.panelFilter.products = []; this.panelProductSet.clear(); }
+  setPanelProductMode(mode: 'any' | 'all'): void { this.panelFilter.productMode = mode; }
+  get panelProductModeLabel(): string { return this.panelFilter.productMode === 'all' ? 'Has all' : 'Has any'; }
+  /** Trigger text — one product shows its name, several collapse to a count, because
+   *  Material's default comma-joined list overflows a 440px panel. */
+  get panelProductTriggerLabel(): string {
+    const picked = this.panelFilter.products;
+    if (picked.length === 1) { return this.panelProductOptions.find(o => o.id === picked[0])?.name || '1 product'; }
+    return `${picked.length} products`;
+  }
   get panelFilterActive(): boolean {
     return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all' || this.panelProductSet.size > 0;
   }
@@ -1162,22 +1178,32 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (this.panelFilter.attendance === 'has' && !this.hasAttendanceLog(profileid)) { return false; }
     if (this.panelProductSet.size) {
       const ids = this.data.registeredProductIds[profileid] || [];
-      if (!ids.some(id => this.panelProductSet.has(id))) { return false; }
+      if (this.panelFilter.productMode === 'all') {
+        // every selected product must be held
+        for (const want of this.panelProductSet) { if (!ids.includes(want)) { return false; } }
+      } else if (!ids.some(id => this.panelProductSet.has(id))) {
+        return false;                                   // 'any' — at least one
+      }
     }
     return true;
   }
-  /** Distinct eligible products across the rows of the open list, name-sorted. */
-  private computePanelProductOptions(rows: PanelParticipant[]): { id: string; name: string }[] {
-    const ids = new Set<string>();
-    const add = (pid: string) => { (this.data.registeredProductIds[pid] || []).forEach(id => ids.add(id)); };
+  /** Distinct eligible products across the rows of the open list, name-sorted, each
+   *  with a distinct-participant count (a profile appearing on several pair rows is
+   *  counted once). */
+  private computePanelProductOptions(rows: PanelParticipant[]): { id: string; name: string; count: number }[] {
+    const counts: { [id: string]: number } = {};
+    const seen = new Set<string>();
+    const add = (pid: string) => {
+      if (!pid || seen.has(pid)) { return; }
+      seen.add(pid);
+      (this.data.registeredProductIds[pid] || []).forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+    };
     rows.forEach((r: any) => {
-      if (r['_pair']) {
-        if (r['doer']?.profileid) { add(r['doer'].profileid); }
-        if (r['beneficiary']?.profileid) { add(r['beneficiary'].profileid); }
-      } else if (r.profileid) { add(r.profileid); }
+      if (r['_pair']) { add(r['doer']?.profileid); add(r['beneficiary']?.profileid); }
+      else { add(r.profileid); }
     });
-    return [...ids]
-      .map(id => ({ id, name: this.data.productMap[id] || id }))
+    return Object.keys(counts)
+      .map(id => ({ id, name: this.data.productMap[id] || id, count: counts[id] }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
   get panelParticipants(): PanelParticipant[] {
