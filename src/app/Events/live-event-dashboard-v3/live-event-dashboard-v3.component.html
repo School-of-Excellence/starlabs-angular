@@ -877,7 +877,7 @@
       <button class="pf-x" *ngIf="panelFilter.cohorts.length" (click)="clearPanelCohorts()" title="Clear the cohort filter">&times;</button>
     </div>
 
-    <!-- journey = the participant's activejourney, resolved through journeyCounts so
+    <!-- journey = the participant's activejourney, resolved through journeyCounts 
          "No journey" means the same here as it does on the Participants card -->
     <div class="pf-field" *ngIf="panelJourneyOptions.length">
       <mat-select class="pf-select" [class.on]="panelFilter.journeys.length" multiple
