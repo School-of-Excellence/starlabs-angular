@@ -479,6 +479,13 @@ mat-select.pf-select.on{
 .p-grp-kid{display:flex;align-items:flex-start;gap:9px}
 .p-avatar.sm{width:24px;height:24px;font-size:9px}
 .p-grp-kid .p-name{font-size:12px;font-weight:500}
+/* repeat count — the pair share more than one changework */
+.p-rep{
+  margin-left:6px;padding:1px 6px;border-radius:var(--r-pill);
+  background:var(--accent-soft);color:var(--accent);
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.02em;
+  vertical-align:1px;
+}
 .p-grp-proc{margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--z-500);letter-spacing:.03em}
 .fu-empty{font-size:11.5px;color:var(--z-400);font-style:italic;padding:8px 2px}
 

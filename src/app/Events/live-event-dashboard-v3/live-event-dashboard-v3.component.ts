@@ -1223,13 +1223,22 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         groups.set(key, g);
       }
       otherIds.forEach((oid, i) => {
-        if (!oid || g!.seen.has(oid)) { return; }
+        if (!oid) { return; }
+        // `_n` = how many changeworks the pair share. The completed lists arrive
+        // pre-tallied; live docs are one apiece, so repeats accumulate here.
+        const inc = Number(cw.counterpartCounts?.[i]) || 1;
+        if (g!.seen.has(oid)) {
+          const prev: any = g!.others.find(o => o.profileid === oid);
+          if (prev) { prev._n = (prev._n || 1) + inc; }
+          return;
+        }
         g!.seen.add(oid);
-        const p = this.data.buildParticipantFromProfileId(oid, true);
+        const p: any = this.data.buildParticipantFromProfileId(oid, true);
         // A counterpart need not be a registered event participant, in which case the
         // builder only has 'Unknown'. The changework doc carries a real name — prefer it.
         const hinted = cw.counterpartNames?.[i] || (groupBy === 'doer' ? cw.beneficiaryName : cw.doerName);
         if (hinted && (!p.name || p.name === 'Unknown')) { p.name = hinted; }
+        p._n = inc;
         g!.others.push(p);
       });
     });
@@ -1561,10 +1570,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         const leadRole = p['leadRole'] === 'beneficiary' ? 'Beneficiary' : 'Doer';
         const otherRole = p['leadRole'] === 'beneficiary' ? 'Doer' : 'Beneficiary';
         const others: any[] = p['others'] || [];
+        const withCount = (o: any) => o.name + (o._n > 1 ? ` x${o._n}` : '');
         if (p['lead']) {
-          lines.push(row(p['lead'], `${proc}${leadRole} · with ${others.map(o => o.name).join(' | ') || '—'}`));
+          lines.push(row(p['lead'], `${proc}${leadRole} · with ${others.map(withCount).join(' | ') || '—'}`));
         }
-        others.forEach(o => lines.push(row(o, `${proc}${otherRole} · with ${p['lead']?.name || '—'}`)));
+        others.forEach((o: any) => lines.push(
+          row(o, `${proc}${otherRole} · with ${p['lead']?.name || '—'}${o._n > 1 ? ` x${o._n}` : ''}`)));
       } else {
         lines.push(row(p, p['_meta'] || ''));
       }

@@ -1427,12 +1427,16 @@ export class LiveEventDataService implements OnDestroy {
         let e = doerCompletedMap[procedureId].get(doerId);
         if (!e) {
           e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
-                counterpartIds: [] as string[], counterpartNames: [] as string[],
+                counterpartIds: [] as string[], counterpartNames: [] as string[], counterpartCounts: [] as number[],
                 displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
           doerCompletedMap[procedureId].set(doerId, e);
         }
-        if (beneficiaryId && !e.counterpartIds.includes(beneficiaryId)) {
-          e.counterpartIds.push(beneficiaryId); e.counterpartNames.push(beneficiaryName);
+        // one slot per distinct counterpart, carrying HOW MANY changeworks they share
+        if (beneficiaryId) {
+          const j = e.counterpartIds.indexOf(beneficiaryId);
+          if (j === -1) {
+            e.counterpartIds.push(beneficiaryId); e.counterpartNames.push(beneficiaryName); e.counterpartCounts.push(1);
+          } else { e.counterpartCounts[j]++; }
         }
       }
       if (beneficiaryId && completedBeneficiaryScope.has(beneficiaryId)) {
@@ -1440,12 +1444,15 @@ export class LiveEventDataService implements OnDestroy {
         let e = beneficierCompletedMap[procedureId].get(beneficiaryId);
         if (!e) {
           e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
-                counterpartIds: [] as string[], counterpartNames: [] as string[],
+                counterpartIds: [] as string[], counterpartNames: [] as string[], counterpartCounts: [] as number[],
                 displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
           beneficierCompletedMap[procedureId].set(beneficiaryId, e);
         }
-        if (doerId && !e.counterpartIds.includes(doerId)) {
-          e.counterpartIds.push(doerId); e.counterpartNames.push(doerName);
+        if (doerId) {
+          const j = e.counterpartIds.indexOf(doerId);
+          if (j === -1) {
+            e.counterpartIds.push(doerId); e.counterpartNames.push(doerName); e.counterpartCounts.push(1);
+          } else { e.counterpartCounts[j]++; }
         }
       }
     });

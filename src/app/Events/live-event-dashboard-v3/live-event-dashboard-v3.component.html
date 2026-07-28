@@ -940,7 +940,8 @@
           <div class="p-grp-kid" *ngFor="let c of p['others']">
             <span class="p-avatar sm">{{ initials(c.name) }}</span>
             <span style="min-width:0">
-              <div class="p-name">{{ c.name }}</div>
+              <!-- x3 = three changeworks with this same person, not three people -->
+              <div class="p-name">{{ c.name }}<span class="p-rep" *ngIf="c['_n'] > 1" [title]="c['_n'] + ' changeworks with this person'">&times;{{ c['_n'] }}</span></div>
               <div class="p-meta" *ngIf="c.email">{{ c.email }}</div>
               <div class="p-badges">
                 <span class="j-badge" [ngClass]="journeyBadgeClass(c.activejourney)" *ngIf="c.activejourney">{{ journeyLabel(c.activejourney) }}</span>
