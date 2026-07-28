@@ -1404,16 +1404,35 @@ export class LiveEventDataService implements OnDestroy {
       if (!procedureId || !tempMap[procedureId]) return;
       const doerName = this.participantMetadataMap[doerId]?.['name'] || 'Unknown';
       const beneficiaryName = this.participantMetadataMap?.[beneficiaryId]?.['name'] ?? lcw['beneficiaryname'] ?? 'Unknown';
+      // ONE entry per lead (the map is keyed by them, and `count` is its size — the
+      // number the procedure cell shows), but every counterpart is accumulated onto
+      // that entry. The old `if (!has(id))` guard kept the first changework and threw
+      // the rest away, so a doer who ran the procedure for four people surfaced with
+      // only the first of them and no sign the others existed.
       if (doerId && filteredDoerIds.includes(doerId)) {
         if (!doerCompletedMap[procedureId]) { doerCompletedMap[procedureId] = new Map<string, any>(); }
-        if (!doerCompletedMap[procedureId].has(doerId)) {
-          doerCompletedMap[procedureId].set(doerId, { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes, displayText: `${doerName} - ${beneficiaryName} (${procedureName})` });
+        let e = doerCompletedMap[procedureId].get(doerId);
+        if (!e) {
+          e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
+                counterpartIds: [] as string[], counterpartNames: [] as string[],
+                displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
+          doerCompletedMap[procedureId].set(doerId, e);
+        }
+        if (beneficiaryId && !e.counterpartIds.includes(beneficiaryId)) {
+          e.counterpartIds.push(beneficiaryId); e.counterpartNames.push(beneficiaryName);
         }
       }
       if (beneficiaryId && filteredBeneficierIds.includes(beneficiaryId)) {
         if (!beneficierCompletedMap[procedureId]) { beneficierCompletedMap[procedureId] = new Map<string, any>(); }
-        if (!beneficierCompletedMap[procedureId].has(beneficiaryId)) {
-          beneficierCompletedMap[procedureId].set(beneficiaryId, { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes, displayText: `${doerName} - ${beneficiaryName} (${procedureName})` });
+        let e = beneficierCompletedMap[procedureId].get(beneficiaryId);
+        if (!e) {
+          e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
+                counterpartIds: [] as string[], counterpartNames: [] as string[],
+                displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
+          beneficierCompletedMap[procedureId].set(beneficiaryId, e);
+        }
+        if (doerId && !e.counterpartIds.includes(doerId)) {
+          e.counterpartIds.push(doerId); e.counterpartNames.push(doerName);
         }
       }
     });
