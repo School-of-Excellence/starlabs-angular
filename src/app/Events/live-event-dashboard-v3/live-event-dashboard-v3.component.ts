@@ -2,9 +2,20 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
-import { Subscription } from 'rxjs';
-import { Timestamp } from '@angular/fire/firestore';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Subject, Subscription, takeUntil } from 'rxjs';
+import { collection, doc, Firestore, setDoc, Timestamp, updateDoc } from '@angular/fire/firestore';
+import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { environment } from '../../../environments/environment';
+import { AuthguardService } from '../../authguard.service';
+// Communication dialogs — reused VERBATIM from Participants Analytics, which owns
+// them. Only the afterClosed() handling is duplicated here (this component decides
+// what happens on close); the dialogs themselves are untouched shared components.
+import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import {
   AtcBuckets, DayAttendance, EventData, JourneyCount, LiveEventDataService, PanelParticipant, QueueData
 } from './live-event-data.service';
@@ -113,8 +124,18 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   markSelected = new Set<string>();
 
   private sub: Subscription | null = null;
+  private destroy$ = new Subject<void>();
 
-  constructor(public data: LiveEventDataService, private cdr: ChangeDetectorRef) {}
+  constructor(
+    public data: LiveEventDataService,
+    private cdr: ChangeDetectorRef,
+    private dialog: MatDialog,
+    private firestore: Firestore,
+    private http: HttpClient,
+    private storage: Storage,
+    private authguard: AuthguardService,
+    private snackBar: MatSnackBar,
+  ) {}
 
   // Perf: memoize data-only derived collections so heavy getters (completionQuartiles,
   // ptEntries, tagGroups, crmGroups) recompute once per data change instead of on every
@@ -158,6 +179,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     // ngOnDestroy (which tears down the Firestore subscriptions). We only
     // release our view subscription here.
     if (this.sub) { this.sub.unsubscribe(); this.sub = null; }
+    this.destroy$.next(); this.destroy$.complete();   // drops any open dialog's afterClosed()
   }
 
   // ==========================================================================
@@ -264,7 +286,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // its own ESC handler closes it, so swallow this one or the panel would go too.
   // The panel's multi-selects render in a CDK overlay ABOVE the drill-down panel;
   // their own ESC handler closes them, so swallow this one or the panel would go too.
-  onEscape(): void { if (this.panelSelectOpen) { return; } this.closePanel(); this.closeDropdowns(); }
+  // A communication dialog also renders above the panel and opens with
+  // disableClose, so ESC must not yank the panel out from under it.
+  onEscape(): void {
+    if (this.panelSelectOpen || this.dialog.openDialogs.length) { return; }
+    this.closePanel(); this.closeDropdowns();
+  }
 
   // Event (single-select)
   toggleEventDropdown(): void { this.queueDropdownOpen = false; this.eventDropdownOpen = !this.eventDropdownOpen; if (this.eventDropdownOpen) { this.eventSearch = ''; } }
@@ -326,11 +353,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
 
   get liveCount(): number { return this.data.liveChangeworkTotal; }
   openLive(): void {
-    // doer↔beneficiary pairs across every procedure's live changework, kept as sets.
+    // Every procedure's live changework, grouped by doer WITHIN each procedure — so a
+    // doer running two procedures gets a group per procedure, each labelled with it.
     const rows: PanelParticipant[] = [];
     for (const id of this.data.sortedProcedureIds) {
       const s = this.data.mapProcedureData[id];
-      rows.push(...this.procPairRows(s?.liveChangework?.data || [], this.procName(id), true));
+      rows.push(...this.procGroupRows(s?.liveChangework?.data || [], this.procName(id), true, 'doer'));
     }
     this.openPanelRows('LIVE in the Arena', "Running right now · who's doing what · doer & beneficiary", rows, true);
   }
@@ -558,6 +586,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get attTotalApproved(): number { return this.data.eventParticipantProfileIds.length; }
   get attAbsentToday(): number { const t = this.data.dayWiseAttendance.find(d => d.isToday); return t ? t.absentProfileIds.length : 0; }
   get attNeverAttended(): number { return this.data.allDayAbsentProfileIds.length; }
+  /** Distinct people who have turned up on ANY day so far = Total approved − Never
+   *  attended. Sound as a subtraction because allDayAbsentProfileIds is filtered out
+   *  of eventParticipantProfileIds, so the two partition the universe. */
+  get attUniqueParticipants(): number { return this.attTotalApproved - this.attNeverAttended; }
+  private get attUniqueProfileIds(): string[] {
+    const never = new Set(this.data.allDayAbsentProfileIds);
+    return this.data.eventParticipantProfileIds.filter(id => !never.has(id));
+  }
+  openAttUnique(): void { this.openPanel('Unique participants', 'Attended on at least one day', this.attUniqueProfileIds); }
 
   attWeekday(day: DayAttendance): string {
     const [y, m, d] = day.date.split('-').map(Number);
@@ -637,11 +674,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
     const dayL = this.procDayFilter === 'all' ? 'All Days' : this.procDayFilter;
     const sub = `${scopeL} · ${dayL}`;
-    // Completed & Live: show the doer↔beneficiary PAIR as a set (kept together).
+    // Completed & Live: group by the side the cell is ABOUT, with every counterpart
+    // listed under it — one doer typically works with several beneficiaries.
     if (kind === 'dc' || kind === 'bc' || kind === 'live') {
       const data = kind === 'dc' ? s.doerCompleted.data : kind === 'bc' ? s.beneficierCompleted.data : s.liveChangework.data;
       const label = kind === 'dc' ? 'As Doer · Completed' : kind === 'bc' ? 'As Beneficiary · Completed' : 'Live now';
-      this.openPanelRows(`${this.procName(id)} · ${label}`, sub, this.procPairRows(data as any[], this.procName(id), false), true);
+      const groupBy: 'doer' | 'beneficiary' = kind === 'bc' ? 'beneficiary' : 'doer';
+      this.openPanelRows(`${this.procName(id)} · ${label}`, sub, this.procGroupRows(data as any[], this.procName(id), false, groupBy), true);
       return;
     }
     // Not-started: a plain list (no counterpart yet).
@@ -731,7 +770,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get pdDayOptions(): DayAttendance[] { return this.data.dayWiseAttendance.filter(d => !d.isFuture); }
   pdSort(k: keyof PdRow): void { if (this.pdSortK === k) { this.pdSortD *= -1; } else { this.pdSortK = k; this.pdSortD = k === 'name' ? 1 : -1; } }
   pdAtcLabel(b: number): string { return b >= 0 ? this.atcShort[b] : '—'; }
-  openPdRow(r: PdRow): void { this.openPanel(r.name, this.data.selectedEvent?.['name'] || '', [r.profileId]); }
+  /** A row click opens the WHOLE table in the panel, not just that participant —
+   *  in the table's current sort order (preserveOrder), and narrowed by whatever
+   *  filters the table has applied. */
+  openPdRow(): void {
+    const rows = this.pdFilteredRows.map(r => this.data.buildParticipantFromProfileId(r.profileId, false));
+    const narrowed = rows.length !== this.data.eventParticipantProfileIds.length;
+    const sub = (this.data.selectedEvent?.['name'] || '') + (narrowed ? ' · as filtered in the table' : '');
+    this.openPanelRows('Participant Data', sub, rows, true);
+  }
 
   pdExport(): void {
     const esc = (s: any) => `"${String(s).replace(/"/g, '""')}"`;
@@ -1154,30 +1201,87 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
+    this.exitCommMode();                        // a selection is only ever about ONE list
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
     this.panelRows = preserveOrder ? rows.slice() : rows.slice().sort((a, b) => a.name.localeCompare(b.name));
     this.panelOpen = true;
   }
 
-  /** Build one PAIR row per changework — doer and beneficiary shown side-by-side on
-   *  the same row so the relationship is unambiguous. `name`/`email` are combined so
-   *  the panel search still matches either party. */
-  private procPairRows(data: any[], procName: string, showProc: boolean): PanelParticipant[] {
-    const rows: PanelParticipant[] = [];
-    (data || []).forEach((cw: any) => {
+  /** ONE row per lead participant, carrying every counterpart they worked with.
+   *
+   *  Changework is one-to-many in practice — a doer runs the same procedure for
+   *  several beneficiaries — and a row per changework doc repeated that doer once
+   *  per counterpart with nothing to say the other rows were the same person. Rows
+   *  are grouped instead: the lead once, their counterparts listed under them.
+   *
+   *  `groupBy` follows the cell that was clicked, so the lead is always the side the
+   *  operator asked about: an "As Doer" list groups by doer, "As Beneficiary" by
+   *  beneficiary. Counterparts are de-duplicated by profileid — repeat docs for the
+   *  same pair are noise in a "who did this for whom" list.
+   *
+   *  `name`/`email` concatenate the whole group so the panel search still matches
+   *  any member of it. */
+  private procGroupRows(
+    data: any[], procName: string, showProc: boolean, groupBy: 'doer' | 'beneficiary'
+  ): PanelParticipant[] {
+    const groups = new Map<string, {
+      lead: PanelParticipant | null; others: PanelParticipant[]; seen: Set<string>; proc: string;
+    }>();
+    (data || []).forEach((cw: any, idx: number) => {
       if (!cw.doerId && !cw.beneficiaryId) { return; }
-      const doer = cw.doerId ? this.data.buildParticipantFromProfileId(cw.doerId, true) : null;
-      const beneficiary = cw.beneficiaryId ? this.data.buildParticipantFromProfileId(cw.beneficiaryId, true) : null;
-      rows.push({
-        _pair: true, doer, beneficiary,
-        proc: showProc ? (cw.procedureName || procName || '') : '',
-        profileid: doer?.profileid || beneficiary?.profileid || '',
-        name: `${doer?.name || ''} ${beneficiary?.name || ''}`.trim(),
-        email: `${doer?.email || ''} ${beneficiary?.email || ''}`.trim(),
-      } as any);
+      const leadId = groupBy === 'doer' ? cw.doerId : cw.beneficiaryId;
+      // Completed entries already carry every counterpart (calculateProcedureData
+      // accumulates them per lead); live changework is a flat list of pairs, so fall
+      // back to the single opposite id and let the grouping below merge them.
+      const otherIds: string[] = cw.counterpartIds?.length
+        ? cw.counterpartIds
+        : [groupBy === 'doer' ? cw.beneficiaryId : cw.doerId].filter(Boolean);
+      // A doc can arrive with the lead side blank (live changework is kept when
+      // EITHER side is in scope). Those must not share a key, or unrelated docs merge
+      // into one "—" group that asserts a doer relationship the data never had.
+      const key = leadId || `__nolead__${idx}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          lead: leadId ? this.data.buildParticipantFromProfileId(leadId, true) : null,
+          others: [], seen: new Set<string>(),
+          proc: showProc ? (cw.procedureName || procName || '') : ''
+        };
+        groups.set(key, g);
+      }
+      otherIds.forEach((oid, i) => {
+        if (!oid) { return; }
+        // `_n` = how many changeworks the pair share. The completed lists arrive
+        // pre-tallied; live docs are one apiece, so repeats accumulate here.
+        const inc = Number(cw.counterpartCounts?.[i]) || 1;
+        if (g!.seen.has(oid)) {
+          const prev: any = g!.others.find(o => o.profileid === oid);
+          if (prev) { prev._n = (prev._n || 1) + inc; }
+          return;
+        }
+        g!.seen.add(oid);
+        const p: any = this.data.buildParticipantFromProfileId(oid, true);
+        // A counterpart need not be a registered event participant, in which case the
+        // builder only has 'Unknown'. The changework doc carries a real name — prefer it.
+        const hinted = cw.counterpartNames?.[i] || (groupBy === 'doer' ? cw.beneficiaryName : cw.doerName);
+        if (hinted && (!p.name || p.name === 'Unknown')) { p.name = hinted; }
+        p._n = inc;
+        g!.others.push(p);
+      });
     });
-    return rows;
+    return [...groups.values()]
+      .map(g => ({
+        _pair: true,
+        lead: g.lead,
+        leadRole: groupBy,
+        others: g.others,
+        proc: g.proc,
+        profileid: g.lead?.profileid || g.others[0]?.profileid || '',
+        name: [g.lead?.name, ...g.others.map(o => o.name)].filter(Boolean).join(' '),
+        email: [g.lead?.email, ...g.others.map(o => o.email)].filter(Boolean).join(' '),
+      } as any))
+      .sort((a, b) => (a.lead?.name || '').localeCompare(b.lead?.name || ''));
   }
   // list filters: first-timer / repeat (mutually exclusive) + attendance-log
   // presence ('none' = no scan on any day · 'has' = at least one scan) + products
@@ -1325,7 +1429,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const ids = new Set<string>();
     const add = (pid: string) => { if (pid) { ids.add(pid); } };
     rows.forEach((r: any) => {
-      if (r['_pair']) { add(r['doer']?.profileid); add(r['beneficiary']?.profileid); }
+      // Leads only for grouped rows, so the Products/Cohorts/Journeys dropdowns offer
+      // exactly what the lead-only filter can actually match — a counterpart-only
+      // value would sit in the list promising rows and then return none.
+      if (r['_pair']) { add(r['lead']?.profileid); }
       else { add(r.profileid); }
     });
     return ids;
@@ -1374,14 +1481,37 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       if (q && !((p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))) { return false; }
       if (!active) { return true; }
       if (p['_pair']) {
-        const d = p['doer'] && this.matchesPanelFilter(p['doer'].profileid);
-        const b = p['beneficiary'] && this.matchesPanelFilter(p['beneficiary'].profileid);
-        return !!(d || b);
+        // Changework groups filter on the LEAD ONLY — the side the clicked cell was
+        // about. "As Doer · Completed" filtered by First timers means first-timer
+        // DOERS; matching on counterparts too kept groups whose lead fails the filter
+        // and made the list mostly non-matching people. Counterparts are still
+        // rendered in full, as context for the lead that did match.
+        return !!(p['lead'] && this.matchesPanelFilter(p['lead'].profileid));
       }
       return this.matchesPanelFilter(p.profileid);
     });
   }
   get panelCount(): number { return this.panelParticipants.length; }
+  /** A grouped row is 1 lead + N counterparts, so the row count is NOT a headcount —
+   *  calling it "N participants" under-reported the people on screen and contradicted
+   *  the filter dropdowns, whose counts are per person. Grouped lists state both. */
+  get panelCountLabel(): string {
+    const rows: any[] = this.panelParticipants as any[];
+    if (!rows.length || !rows[0]['_pair']) {
+      return `${rows.length.toLocaleString()} participant${rows.length === 1 ? '' : 's'}`;
+    }
+    const ids = new Set<string>();
+    let role = 'doer';
+    rows.forEach(p => {
+      if (p['lead']) { ids.add(p['lead'].profileid); role = p['leadRole'] || role; }
+      (p['others'] || []).forEach((o: any) => ids.add(o.profileid));
+    });
+    const n = rows.length;
+    const lead = role === 'beneficiary'
+      ? `${n} ${n === 1 ? 'beneficiary' : 'beneficiaries'}`
+      : `${n} ${n === 1 ? 'doer' : 'doers'}`;
+    return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
+  }
   closePanel(): void { this.panelOpen = false; }
 
   /** Manual attendance marking (Unattended list) — two steps.
@@ -1468,9 +1598,18 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const lines = [['Name', 'Email', 'Journey', 'Type', 'Products', 'Detail'].join(',')];
     this.panelParticipants.forEach((p: any) => {
       if (p['_pair']) {
+        // one line per person; the lead's line names every counterpart, and each
+        // counterpart's line names the lead back
         const proc = p['proc'] ? `${p['proc']} · ` : '';
-        if (p['doer']) { lines.push(row(p['doer'], `${proc}Doer · with ${p['beneficiary']?.name || '—'}`)); }
-        if (p['beneficiary']) { lines.push(row(p['beneficiary'], `${proc}Beneficiary · with ${p['doer']?.name || '—'}`)); }
+        const leadRole = p['leadRole'] === 'beneficiary' ? 'Beneficiary' : 'Doer';
+        const otherRole = p['leadRole'] === 'beneficiary' ? 'Doer' : 'Beneficiary';
+        const others: any[] = p['others'] || [];
+        const withCount = (o: any) => o.name + (o._n > 1 ? ` x${o._n}` : '');
+        if (p['lead']) {
+          lines.push(row(p['lead'], `${proc}${leadRole} · with ${others.map(withCount).join(' | ') || '—'}`));
+        }
+        others.forEach((o: any) => lines.push(
+          row(o, `${proc}${otherRole} · with ${p['lead']?.name || '—'}${o._n > 1 ? ` x${o._n}` : ''}`)));
       } else {
         lines.push(row(p, p['_meta'] || ''));
       }
@@ -1480,6 +1619,253 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' }));
     a.download = (fname || 'list') + '.csv';
     a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ==========================================================================
+  // Communication from the drill-down panel (notification · WhatsApp · email)
+  //
+  // The three dialogs are Participants Analytics' own components, opened here with
+  // the same options and the same afterClosed() handling — deliberately duplicated
+  // rather than extracted, because that component is the owner and a shared service
+  // would make its behaviour this panel's problem to keep in step. What differs is
+  // only WHERE the recipients come from: the panel's checkbox selection instead of
+  // that table's SelectionModel.
+  // ==========================================================================
+
+  /** Channel currently chosen — null while the operator is picking one. */
+  commMode: 'notification' | 'wati' | 'email' | null = null;
+  /** Selection mode: checkboxes are on the rows. Held separately from commMode so the
+   *  channel can be re-picked without losing a selection that took work to build. */
+  commOn = false;
+  commSelected = new Set<string>();
+
+  /** Enter selection mode on the chosen channel (or just switch channel). */
+  setCommMode(mode: 'notification' | 'wati' | 'email'): void {
+    this.commMode = mode; this.commOn = true;
+  }
+  /** Back to the three icons WITHOUT dropping the selection — the same people often
+   *  need the message on more than one channel. */
+  pickCommChannel(): void { this.commMode = null; }
+  /** Leave selection mode entirely. Clearing here is what keeps the selection from
+   *  becoming invisible state: no checkboxes on screen, nothing selected. */
+  exitCommMode(): void { this.commOn = false; this.commMode = null; this.commSelected.clear(); }
+
+  get commModeLabel(): string {
+    return this.commMode === 'notification' ? 'Notification'
+      : this.commMode === 'wati' ? 'WhatsApp' : 'Email';
+  }
+
+  /** Profile ids of the rows a checkbox is actually offered on, in list order.
+   *
+   *  Grouped Procedure Tracking rows offer the LEAD ONLY — the side the clicked cell
+   *  was about. "As Doer · Completed" is a list of doers, so only doers can be picked;
+   *  "As Beneficiary · Completed" groups by beneficiary, so only beneficiaries can.
+   *  Counterparts are context for the lead, not recipients: selecting them would send
+   *  to whoever happened to appear under someone who matched the filters. */
+  get commSelectableIds(): string[] {
+    const out: string[] = [];
+    (this.panelParticipants as any[]).forEach(p => {
+      const id = p['_pair'] ? p['lead']?.profileid : p.profileid;
+      if (id) { out.push(id); }
+    });
+    return out;
+  }
+  /** "doers only" / "beneficiaries only" — says why the counterparts have no checkbox. */
+  get commRoleNote(): string {
+    const rows: any[] = this.panelParticipants as any[];
+    if (!rows.length || !rows[0]['_pair']) { return ''; }
+    return rows[0]['leadRole'] === 'beneficiary' ? 'beneficiaries only' : 'doers only';
+  }
+  get commSubLabel(): string {
+    const n = this.commSelected.size;
+    const note = this.commRoleNote;
+    return `${n} selected${note ? ' · ' + note : ''}`;
+  }
+  isCommSelected(profileid: string): boolean { return this.commSelected.has(profileid); }
+  toggleCommOne(profileid: string): void {
+    if (!profileid) { return; }
+    if (this.commSelected.has(profileid)) { this.commSelected.delete(profileid); }
+    else { this.commSelected.add(profileid); }
+  }
+  /** Select-all is over the VISIBLE rows, so it composes with the search and filters
+   *  above it rather than quietly reaching past them. */
+  get commAllChecked(): boolean {
+    const ids = this.commSelectableIds;
+    return ids.length > 0 && ids.every(id => this.commSelected.has(id));
+  }
+  get commSomeChecked(): boolean {
+    return !this.commAllChecked && this.commSelectableIds.some(id => this.commSelected.has(id));
+  }
+  toggleCommAll(): void {
+    const ids = this.commSelectableIds;
+    if (this.commAllChecked) { ids.forEach(id => this.commSelected.delete(id)); }
+    else { ids.forEach(id => this.commSelected.add(id)); }
+  }
+
+  /** One recipient in the shape the dialogs expect — the raw `participant metadata`
+   *  doc, which is exactly what Participants Analytics passes them (email uses
+   *  `email`, WhatsApp `number`/`phonenumber`, notification `firebaseuserref`). A
+   *  participant with no metadata doc still gets the normalized fields so they are
+   *  not silently dropped from the recipient list. */
+  private commRecipient(profileid: string): any {
+    const meta = this.data.participantMetadataMap[profileid];
+    // Copied, and profileid forced back to the key it was looked up by: the map spreads
+    // the raw doc last, so a doc carrying its own `profileid` field would otherwise
+    // decide who this recipient is. Copying also keeps a dialog from writing through
+    // to the service's cached metadata.
+    if (meta) { return { ...meta, profileid }; }
+    const p = this.data.buildParticipantFromProfileId(profileid, false);
+    return { profileid, name: p.name, email: p.email, phone: p.phone, number: p.phone };
+  }
+  private get commRecipients(): any[] { return [...this.commSelected].map(id => this.commRecipient(id)); }
+
+  sendComm(): void {
+    if (!this.commMode || !this.commSelected.size) { return; }
+    const selected = this.commRecipients;
+    if (this.commMode === 'notification') { this.sendNotificationinBreakthrough(selected); }
+    else if (this.commMode === 'email') { this.sendEmailToSelectedParicipant(selected); }
+    else { this.sendWatiMessage(selected); }
+  }
+
+  private openSnackBar(message: string, action: string): void { this.snackBar.open(message, action); }
+
+  /** Verbatim from ParticipantsAnalyticsComponent.sendEmailToSelectedParicipant. */
+  private sendEmailToSelectedParicipant(selected: any[]): void {
+    let dialogRef = this.dialog.open(EmailInputComponent, {
+      data: selected,
+      minWidth: "600px",
+      disableClose: true
+    });
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        console.log(result);
+
+        const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
+        if (result['status'] == 'queued' || result['status'] == 'send') {
+          await setDoc(docRef, result, { merge: true }).then(() => {
+            this.openSnackBar(result['status'] == 'queued' ? 'Successfully Added to Queue' : "Email Sent Successfully", "OK");
+          }).catch(err => {
+            console.log(err);
+            this.openSnackBar("Error Sending Email", "OK");
+          });
+        } else if (result['status'] == 'validated') {
+          let url: string;
+          if (environment.firebase.projectId == 'starlabs-test') {
+            url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
+          } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+            url = "https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail"
+          }
+          console.log("EMAIL :", url);
+          let data = result;
+          data['archiveid'] = result['docid'];
+          this.http.post(url, JSON.stringify(data), {
+            responseType: 'text',
+            headers: new HttpHeaders().set('Content-Type', 'application/json'),
+          }).subscribe({
+            next: (response) => {
+              console.log('response', response);
+            },
+            error: (err) => {
+              console.log(err);
+              console.log("Error: " + err);
+            }
+          });
+        }
+
+      }
+    })
+  }
+
+  /** Verbatim from ParticipantsAnalyticsComponent.sendWatiMessage. */
+  private sendWatiMessage(selected: any[]): void {
+    let dialogRef = this.dialog.open(WatiInputComponent, {
+      data: selected,
+      width: "70vw",
+      height: "80vh",
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      if (result != null && result != undefined) {
+        if (result == 'success') {
+          this.openSnackBar("Wati Message Sent Successfully", "OK");
+          if (result['status'] == 'sendtoparticipants') {
+            let url: string;
+
+            if (environment.firebase.projectId == 'starlabs-test') {
+              url = "https://us-central1-starlabs-test.cloudfunctions.net/sendWhatsAppBroadcast";
+            } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+              url = ""
+            }
+
+            const docRef = doc(collection(this.firestore, 'wati archive'), result['archiveid']);
+            await updateDoc(docRef, {
+              templatestatus: "created",
+              templatevalidated: true,
+            }).then(() => {
+              console.log("Wati Archive Document Created");
+            }).catch((error) => {
+              console.log("Error Creating Wati Archive");
+            });
+
+            const response = await this.http.post(url, { archiveid: result['archiveid'] }).toPromise();
+            console.log("Response : ", response)
+
+          }
+        } else if (result == 'failed') {
+          this.openSnackBar("Sending Wati Message Failed", "OK");
+        }
+      }
+    });
+  }
+
+  /** Verbatim from ParticipantsAnalyticsComponent.sendNotificationinBreakthrough. */
+  private sendNotificationinBreakthrough(selected: any[]): void {
+    let dialogRef = this.dialog.open(AhNotificationComponent, {
+      data: selected,
+      width: "80vw",
+      maxHeight: "90vh",
+      disableClose: true,
+      autoFocus: false,
+    })
+    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
+      console.log(result, 'send app notificationssss');
+      if (result != null && result != undefined) {
+        var profileID = [];
+        for (let i = 0; i < selected.length; i++) {
+          const s = selected[i];
+          if (s["firebaseuserref"] != null) {
+            profileID.push(s["profileid"])
+          }
+        }
+
+        var notificationimage = null
+        if (result["notificationimage"] != null) {
+          const filepath = "Notification Images/" + new Date().toISOString() + result["notificationimage"].name;
+          try {
+            const storageRef = ref(this.storage, filepath)
+            const uploadResult = await uploadBytes(storageRef, result["notificationimage"])
+            notificationimage = await getDownloadURL(uploadResult.ref)
+          } catch (error) {
+            console.log("file upload error", error);
+          }
+        }
+        this.authguard.saveNotificationRecord({
+          title: result["title"],
+          message: result["message"],
+          subtitle: result["subtitle"] ?? null,
+          notificationtype: "ahupdate",
+          notificationimage: notificationimage,
+          sticky: result["sticky"],
+          logged: true,
+          landingpage: result["landingpage"],
+          profileid: profileID,
+          receivingapp: result["receivingapp"] ?? "breakthroughsapp",
+        }).then(() => {
+          alert("A&H Update sent to App user " + profileID.length.toString())
+        })
+      }
+    })
   }
 
   initials(name: string): string {

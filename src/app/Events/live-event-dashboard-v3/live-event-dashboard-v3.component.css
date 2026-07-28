@@ -303,6 +303,56 @@ input,select{font:inherit}
 .panel-close:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-title{font-size:17px;font-weight:700;letter-spacing:-.015em;margin-top:8px}
 .panel-sub{font-size:12px;color:var(--z-500);margin-top:3px}
+/* ---- send to this list ---------------------------------------------------------
+   Sits under .panel-count, so it is read together with Export: both act on the list
+   as it currently stands. Three channels, then one — picked, it becomes the bar that
+   owns the selection (channel badge, count, select-all, Send), so the panel never
+   shows two competing sets of controls.
+   Black, not the grey used by the filter chrome above: this is the panel's only
+   outbound action, and grey read as another passive label. */
+.panel-comm{display:flex;align-items:center;gap:8px;padding:2px 22px 12px}
+.pc-label{
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-900);margin-right:auto;
+}
+.pc-picked{
+  font-size:11px;font-weight:600;color:var(--accent);
+  background:var(--accent-soft);border-radius:var(--r-pill);padding:3px 9px;white-space:nowrap;
+}
+.pc-btn{
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);
+  border:1px solid var(--z-300);background:var(--z-0);color:var(--z-900);
+  display:grid;place-items:center;transition:all .15s var(--ease);
+}
+.pc-btn:hover{border-color:var(--z-900);background:var(--z-900);color:#fff}
+.pc-btn svg{width:21px;height:21px;display:block}
+.pc-big{
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;
+  border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent);
+}
+.pc-big svg{width:21px;height:21px;display:block}
+.pc-big.wati{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok)}
+.pc-meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.pc-title{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
+.pc-sub{font-size:10.5px;color:var(--z-500);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-all{
+  display:flex;align-items:center;gap:5px;flex:none;cursor:pointer;
+  font-size:11px;font-weight:500;color:var(--z-600);white-space:nowrap;
+}
+.pc-all input{cursor:pointer;accent-color:var(--accent)}
+.pc-send{
+  flex:none;font-size:11.5px;font-weight:600;letter-spacing:.03em;color:#fff;
+  background:var(--accent);border:1px solid var(--accent);border-radius:var(--r-pill);
+  padding:8px 16px;white-space:nowrap;
+}
+.pc-send:hover:not(:disabled){filter:brightness(.96)}
+.pc-send:disabled{opacity:.45;cursor:default}
+.pc-exit{
+  width:30px;height:30px;flex:none;border-radius:var(--r-xs);
+  border:1px solid var(--z-200);display:grid;place-items:center;
+  color:var(--z-500);font-size:15px;line-height:1;
+}
+.pc-exit:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-search{padding:14px 22px 0}
 .panel-search input{
   width:100%;padding:8px 12px;border:1px solid var(--z-200);border-radius:var(--r-sm);
@@ -406,15 +456,21 @@ mat-select.pf-select.on{
 ::ng-deep .pf-select-searchable .pf-search input:focus{border-color:#cfcef3;background:#fff}
 ::ng-deep .pf-select-searchable .pf-search input::placeholder{color:#aeaeb2}
 ::ng-deep .pf-select-searchable .pf-none{padding:10px 12px 8px;font-size:12px;color:#8e8e93}
+/* Same treatment as .pc-label directly below it — the count and "Send to" are one
+   band of controls over the list, so they read at one weight. */
 .panel-count{
   padding:12px 22px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-900);
 }
 .panel-list{flex:1;overflow-y:auto;padding:0 12px 20px}
 .p-row{
   display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--r-sm);
 }
 .p-row:hover{background:var(--z-50)}
+/* row selection checkbox — only rendered in selection mode */
+.p-check{width:15px;height:15px;flex:none;cursor:pointer;accent-color:var(--accent)}
+.p-grp-lead .p-check{margin-top:7px}   /* the group lead aligns to flex-start */
 .p-avatar{
   width:30px;height:30px;border-radius:50%;flex:none;
   display:grid;place-items:center;font-size:10.5px;font-weight:600;
@@ -459,15 +515,34 @@ mat-select.pf-select.on{
 .p-role{font-size:8.5px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:var(--r-pill);display:inline-block;white-space:nowrap}
 .p-role.doer{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
 .p-role.beneficiary{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
-/* changework pair row — doer and beneficiary side by side on one row */
-.p-pair-row{padding:10px;border-radius:var(--r-sm);border:1px dashed var(--z-200);margin-bottom:6px}
-.p-pair-row:hover{background:var(--z-50)}
-.p-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start}
-.p-pair-side{min-width:0}
-.p-pair-name{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
-.p-pair-name.p-dim{color:var(--z-400);font-weight:500}
-.p-pair-arrow{align-self:center;color:var(--z-400);font-size:15px;flex:none;padding-top:12px}
-.p-pair-proc{margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--z-500);letter-spacing:.03em}
+/* changework group — the lead once, its counterparts indented under a rail. Replaces
+   the old side-by-side pair row, which repeated the doer once per beneficiary. */
+.p-grp{padding:10px;border-radius:var(--r-sm);border:1px dashed var(--z-200);margin-bottom:6px}
+.p-grp:hover{background:var(--z-50)}
+.p-grp-lead{display:flex;align-items:flex-start;gap:10px}
+.p-grp-lead .p-role{margin-bottom:3px}
+.p-grp-lead .p-name{font-weight:600;font-size:12.5px}
+.p-name.p-dim{color:var(--z-400);font-weight:500}
+.p-avatar.p-dim{background:var(--z-100);color:var(--z-400)}
+.p-grp-kids{
+  margin:8px 0 0 14px;padding-left:12px;border-left:1.5px solid var(--z-200);
+  display:flex;flex-direction:column;gap:7px;
+}
+.p-grp-eyebrow{
+  font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--z-400);
+}
+.p-grp-kid{display:flex;align-items:flex-start;gap:9px}
+.p-avatar.sm{width:24px;height:24px;font-size:9px}
+.p-grp-kid .p-name{font-size:12px;font-weight:500}
+/* repeat count — the pair share more than one changework */
+.p-rep{
+  margin-left:6px;padding:1px 6px;border-radius:var(--r-pill);
+  background:var(--accent-soft);color:var(--accent);
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.02em;
+  vertical-align:1px;
+}
+.p-grp-proc{margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--z-500);letter-spacing:.03em}
 .fu-empty{font-size:11.5px;color:var(--z-400);font-style:italic;padding:8px 2px}
 
 /* placeholder views */
@@ -516,6 +591,11 @@ mat-select.pf-select.on{
 .day-card.total{background:var(--beige);border-color:var(--beige-line)}
 .day-card.total .day-sub{border-top-color:var(--beige-line);color:var(--alert);font-weight:500}
 .day-card.total .day-sub b{color:var(--alert)}
+.day-card.total .day-subs{border-top-color:var(--beige-line)}
+/* the total card stacks a neutral stat over a negative one, so the red is carried
+   by the row that earns it rather than by the card */
+.day-stat.alert,.day-stat.alert b{color:var(--alert)}
+.day-stat.alert:hover{opacity:.72}
 .day-card.today{background:var(--z-900);border-color:var(--z-900);color:#fff}
 .day-card.today .day-eyebrow{color:var(--z-400)}
 .day-subs{margin-top:auto;padding-top:6px;border-top:1px dashed var(--z-200);display:flex;flex-direction:column;gap:3px}
