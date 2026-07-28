@@ -95,8 +95,14 @@ export class LiveEventDataService implements OnDestroy {
   beneficierProfileIds: string[] = [];
   firstTimerProfileIds: string[] = [];         // only consulted when participantFilter==='firstTimers'
   participantFilter: 'all' | 'firstTimers' = 'all';
+  // Day-scoped by the Procedure Tracking day chips (setProcedureDay re-subscribes).
   liveChangeWorkData: any[] = [];
   liveChangeworkLiveData: any[] = [];
+  // Event-wide changework, NO day window — the Arena Followup "Not Doing CW" /
+  // "CW Not Received" cards are "Throughout event" and must not move when the
+  // Procedure Tracking day filter changes. Kept separate rather than reusing the
+  // two above, which are deliberately day-scoped.
+  eventChangeWorkDocs: any[] = [];
   liveChangeworkTotal = 0;
   doerTotal = 0;
   beneficierTotal = 0;
@@ -191,6 +197,7 @@ export class LiveEventDataService implements OnDestroy {
   private atcToValidateSub: Subscription | null = null;
   private lcwSub: Subscription | null = null;
   private lcwLiveSub: Subscription | null = null;
+  private lcwEventSub: Subscription | null = null;
   private attendanceSub: Subscription | null = null;
   private eTicketSub: Subscription | null = null;
   private videoAskSub: Subscription | null = null;
@@ -378,6 +385,7 @@ export class LiveEventDataService implements OnDestroy {
     this.subscribeToEventZones();
     this.subscribeToBigCohorts();
     this.subscribeToParticipantZones();
+    this.subscribeToEventChangeWork();
 
     // auto-select this event's ongoing queues → derives atcModels (FT/V2 default)
     this.selectedQueues = this.ongoingQueues.filter(q => q['eventref'] && this.selectedEvent && this.pathOf(q['eventref']) === this.pathOf(this.selectedEvent.docref));
@@ -1291,6 +1299,26 @@ export class LiveEventDataService implements OnDestroy {
     });
   }
 
+  /** ALL changework for the event — no `createdon` window and no status filter, so
+   *  it survives the Procedure Tracking day chips. Feeds only the Arena Followup
+   *  "Not Doing CW" / "CW Not Received" cards, which are event-wide by definition.
+   *  Subscribed once per event (setProcedureDay does NOT touch it). */
+  private subscribeToEventChangeWork(): void {
+    if (!this.selectedEvent) return;
+    if (this.lcwEventSub) { this.lcwEventSub.unsubscribe(); this.lcwEventSub = null; }
+    this.eventChangeWorkDocs = [];
+    const q = query(collection(this.firestoreDefault, 'livechangework'),
+      where('eventref', '==', this.selectedEvent.docref));
+    this.lcwEventSub = collectionData(q, { idField: 'id' }).subscribe({
+      next: (docs: any[]) => {
+        this.eventChangeWorkDocs = docs;
+        console.log('[v3][lcw event-wide] docs:', docs.length, '(followup CW cards)');
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to event-wide livechangework:', error)
+    });
+  }
+
   private getFilteredDoerIds(): string[] {
     if (this.participantFilter === 'all') return this.eventParticipantProfileIds;
     return this.eventParticipantProfileIds.filter(id => this.firstTimerProfileIds.includes(id));
@@ -1580,12 +1608,16 @@ export class LiveEventDataService implements OnDestroy {
     });
   }
 
-  // doer / beneficiary id sets over already-subscribed livechangework
-  // (completed ∪ live — both Phase-1 subscriptions). "Throughout event" scope,
-  // matching the prototype's Followup cards (no today/overall toggle there).
+  // doer / beneficiary id sets for the Followup cards. "Throughout event" scope,
+  // matching the prototype (no today/overall toggle there) — so these read the
+  // event-wide docs, NOT liveChangeWorkData/liveChangeworkLiveData, which the
+  // Procedure Tracking day chips narrow to a single day. Statuses are filtered
+  // here to the same completed ∪ live the day-scoped subscriptions query for.
   private changeworkDoerBeneficiarySets(): { doers: Set<string>; beneficiaries: Set<string> } {
     const doers = new Set<string>(); const beneficiaries = new Set<string>();
-    [...this.liveChangeWorkData, ...this.liveChangeworkLiveData].forEach((d: any) => {
+    this.eventChangeWorkDocs.forEach((d: any) => {
+      const st = d['procedurestatus'];
+      if (st !== 'completed' && st !== 'live') { return; }
       if (d['doerid']) { doers.add(d['doerid']); }
       if (d['beneficiaryid']) { beneficiaries.add(d['beneficiaryid']); }
     });
@@ -1641,6 +1673,8 @@ export class LiveEventDataService implements OnDestroy {
     if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
     if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
     if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
+    // event-scoped, not queue-scoped — the day chips must never tear this down
+    if (this.lcwEventSub) { this.lcwEventSub.unsubscribe(); this.lcwEventSub = null; }
     this.unsubscribeZonePipeline();
   }
 
@@ -1653,13 +1687,9 @@ export class LiveEventDataService implements OnDestroy {
   private pathOf(ref: any): string { return ref && ref.path ? ref.path : String(ref); }
 
   ngOnDestroy(): void {
-    this.unsubscribeQueuePipeline();
-    if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
-    if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
-    if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
-    if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
-    if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
-    this.unsubscribeZonePipeline();
+    // Was an inline copy of unsubscribeEventPipeline — which is how a subscription
+    // added to that method leaks here. Call it instead of restating it.
+    this.unsubscribeEventPipeline();
     if (this.eventSub) { this.eventSub.unsubscribe(); this.eventSub = null; }
     if (this.metadataSub) { this.metadataSub.unsubscribe(); this.metadataSub = null; }
     this.changed$.complete();
