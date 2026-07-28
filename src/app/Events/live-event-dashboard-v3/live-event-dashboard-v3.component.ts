@@ -731,7 +731,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get pdDayOptions(): DayAttendance[] { return this.data.dayWiseAttendance.filter(d => !d.isFuture); }
   pdSort(k: keyof PdRow): void { if (this.pdSortK === k) { this.pdSortD *= -1; } else { this.pdSortK = k; this.pdSortD = k === 'name' ? 1 : -1; } }
   pdAtcLabel(b: number): string { return b >= 0 ? this.atcShort[b] : '—'; }
-  openPdRow(r: PdRow): void { this.openPanel(r.name, this.data.selectedEvent?.['name'] || '', [r.profileId]); }
+  /** A row click opens the WHOLE table in the panel, not just that participant —
+   *  in the table's current sort order (preserveOrder), and narrowed by whatever
+   *  filters the table has applied. */
+  openPdRow(): void {
+    const rows = this.pdFilteredRows.map(r => this.data.buildParticipantFromProfileId(r.profileId, false));
+    const narrowed = rows.length !== this.data.eventParticipantProfileIds.length;
+    const sub = (this.data.selectedEvent?.['name'] || '') + (narrowed ? ' · as filtered in the table' : '');
+    this.openPanelRows('Participant Data', sub, rows, true);
+  }
 
   pdExport(): void {
     const esc = (s: any) => `"${String(s).replace(/"/g, '""')}"`;
