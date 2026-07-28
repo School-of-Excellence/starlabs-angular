@@ -326,11 +326,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
 
   get liveCount(): number { return this.data.liveChangeworkTotal; }
   openLive(): void {
-    // doer↔beneficiary pairs across every procedure's live changework, kept as sets.
+    // Every procedure's live changework, grouped by doer WITHIN each procedure — so a
+    // doer running two procedures gets a group per procedure, each labelled with it.
     const rows: PanelParticipant[] = [];
     for (const id of this.data.sortedProcedureIds) {
       const s = this.data.mapProcedureData[id];
-      rows.push(...this.procPairRows(s?.liveChangework?.data || [], this.procName(id), true));
+      rows.push(...this.procGroupRows(s?.liveChangework?.data || [], this.procName(id), true, 'doer'));
     }
     this.openPanelRows('LIVE in the Arena', "Running right now · who's doing what · doer & beneficiary", rows, true);
   }
@@ -558,6 +559,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get attTotalApproved(): number { return this.data.eventParticipantProfileIds.length; }
   get attAbsentToday(): number { const t = this.data.dayWiseAttendance.find(d => d.isToday); return t ? t.absentProfileIds.length : 0; }
   get attNeverAttended(): number { return this.data.allDayAbsentProfileIds.length; }
+  /** Distinct people who have turned up on ANY day so far = Total approved − Never
+   *  attended. Sound as a subtraction because allDayAbsentProfileIds is filtered out
+   *  of eventParticipantProfileIds, so the two partition the universe. */
+  get attUniqueParticipants(): number { return this.attTotalApproved - this.attNeverAttended; }
+  private get attUniqueProfileIds(): string[] {
+    const never = new Set(this.data.allDayAbsentProfileIds);
+    return this.data.eventParticipantProfileIds.filter(id => !never.has(id));
+  }
+  openAttUnique(): void { this.openPanel('Unique participants', 'Attended on at least one day', this.attUniqueProfileIds); }
 
   attWeekday(day: DayAttendance): string {
     const [y, m, d] = day.date.split('-').map(Number);
@@ -637,11 +647,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
     const dayL = this.procDayFilter === 'all' ? 'All Days' : this.procDayFilter;
     const sub = `${scopeL} · ${dayL}`;
-    // Completed & Live: show the doer↔beneficiary PAIR as a set (kept together).
+    // Completed & Live: group by the side the cell is ABOUT, with every counterpart
+    // listed under it — one doer typically works with several beneficiaries.
     if (kind === 'dc' || kind === 'bc' || kind === 'live') {
       const data = kind === 'dc' ? s.doerCompleted.data : kind === 'bc' ? s.beneficierCompleted.data : s.liveChangework.data;
       const label = kind === 'dc' ? 'As Doer · Completed' : kind === 'bc' ? 'As Beneficiary · Completed' : 'Live now';
-      this.openPanelRows(`${this.procName(id)} · ${label}`, sub, this.procPairRows(data as any[], this.procName(id), false), true);
+      const groupBy: 'doer' | 'beneficiary' = kind === 'bc' ? 'beneficiary' : 'doer';
+      this.openPanelRows(`${this.procName(id)} · ${label}`, sub, this.procGroupRows(data as any[], this.procName(id), false, groupBy), true);
       return;
     }
     // Not-started: a plain list (no counterpart yet).
@@ -731,7 +743,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get pdDayOptions(): DayAttendance[] { return this.data.dayWiseAttendance.filter(d => !d.isFuture); }
   pdSort(k: keyof PdRow): void { if (this.pdSortK === k) { this.pdSortD *= -1; } else { this.pdSortK = k; this.pdSortD = k === 'name' ? 1 : -1; } }
   pdAtcLabel(b: number): string { return b >= 0 ? this.atcShort[b] : '—'; }
-  openPdRow(r: PdRow): void { this.openPanel(r.name, this.data.selectedEvent?.['name'] || '', [r.profileId]); }
+  /** A row click opens the WHOLE table in the panel, not just that participant —
+   *  in the table's current sort order (preserveOrder), and narrowed by whatever
+   *  filters the table has applied. */
+  openPdRow(): void {
+    const rows = this.pdFilteredRows.map(r => this.data.buildParticipantFromProfileId(r.profileId, false));
+    const narrowed = rows.length !== this.data.eventParticipantProfileIds.length;
+    const sub = (this.data.selectedEvent?.['name'] || '') + (narrowed ? ' · as filtered in the table' : '');
+    this.openPanelRows('Participant Data', sub, rows, true);
+  }
 
   pdExport(): void {
     const esc = (s: any) => `"${String(s).replace(/"/g, '""')}"`;
@@ -1160,24 +1180,80 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelOpen = true;
   }
 
-  /** Build one PAIR row per changework — doer and beneficiary shown side-by-side on
-   *  the same row so the relationship is unambiguous. `name`/`email` are combined so
-   *  the panel search still matches either party. */
-  private procPairRows(data: any[], procName: string, showProc: boolean): PanelParticipant[] {
-    const rows: PanelParticipant[] = [];
-    (data || []).forEach((cw: any) => {
+  /** ONE row per lead participant, carrying every counterpart they worked with.
+   *
+   *  Changework is one-to-many in practice — a doer runs the same procedure for
+   *  several beneficiaries — and a row per changework doc repeated that doer once
+   *  per counterpart with nothing to say the other rows were the same person. Rows
+   *  are grouped instead: the lead once, their counterparts listed under them.
+   *
+   *  `groupBy` follows the cell that was clicked, so the lead is always the side the
+   *  operator asked about: an "As Doer" list groups by doer, "As Beneficiary" by
+   *  beneficiary. Counterparts are de-duplicated by profileid — repeat docs for the
+   *  same pair are noise in a "who did this for whom" list.
+   *
+   *  `name`/`email` concatenate the whole group so the panel search still matches
+   *  any member of it. */
+  private procGroupRows(
+    data: any[], procName: string, showProc: boolean, groupBy: 'doer' | 'beneficiary'
+  ): PanelParticipant[] {
+    const groups = new Map<string, {
+      lead: PanelParticipant | null; others: PanelParticipant[]; seen: Set<string>; proc: string;
+    }>();
+    (data || []).forEach((cw: any, idx: number) => {
       if (!cw.doerId && !cw.beneficiaryId) { return; }
-      const doer = cw.doerId ? this.data.buildParticipantFromProfileId(cw.doerId, true) : null;
-      const beneficiary = cw.beneficiaryId ? this.data.buildParticipantFromProfileId(cw.beneficiaryId, true) : null;
-      rows.push({
-        _pair: true, doer, beneficiary,
-        proc: showProc ? (cw.procedureName || procName || '') : '',
-        profileid: doer?.profileid || beneficiary?.profileid || '',
-        name: `${doer?.name || ''} ${beneficiary?.name || ''}`.trim(),
-        email: `${doer?.email || ''} ${beneficiary?.email || ''}`.trim(),
-      } as any);
+      const leadId = groupBy === 'doer' ? cw.doerId : cw.beneficiaryId;
+      // Completed entries already carry every counterpart (calculateProcedureData
+      // accumulates them per lead); live changework is a flat list of pairs, so fall
+      // back to the single opposite id and let the grouping below merge them.
+      const otherIds: string[] = cw.counterpartIds?.length
+        ? cw.counterpartIds
+        : [groupBy === 'doer' ? cw.beneficiaryId : cw.doerId].filter(Boolean);
+      // A doc can arrive with the lead side blank (live changework is kept when
+      // EITHER side is in scope). Those must not share a key, or unrelated docs merge
+      // into one "—" group that asserts a doer relationship the data never had.
+      const key = leadId || `__nolead__${idx}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          lead: leadId ? this.data.buildParticipantFromProfileId(leadId, true) : null,
+          others: [], seen: new Set<string>(),
+          proc: showProc ? (cw.procedureName || procName || '') : ''
+        };
+        groups.set(key, g);
+      }
+      otherIds.forEach((oid, i) => {
+        if (!oid) { return; }
+        // `_n` = how many changeworks the pair share. The completed lists arrive
+        // pre-tallied; live docs are one apiece, so repeats accumulate here.
+        const inc = Number(cw.counterpartCounts?.[i]) || 1;
+        if (g!.seen.has(oid)) {
+          const prev: any = g!.others.find(o => o.profileid === oid);
+          if (prev) { prev._n = (prev._n || 1) + inc; }
+          return;
+        }
+        g!.seen.add(oid);
+        const p: any = this.data.buildParticipantFromProfileId(oid, true);
+        // A counterpart need not be a registered event participant, in which case the
+        // builder only has 'Unknown'. The changework doc carries a real name — prefer it.
+        const hinted = cw.counterpartNames?.[i] || (groupBy === 'doer' ? cw.beneficiaryName : cw.doerName);
+        if (hinted && (!p.name || p.name === 'Unknown')) { p.name = hinted; }
+        p._n = inc;
+        g!.others.push(p);
+      });
     });
-    return rows;
+    return [...groups.values()]
+      .map(g => ({
+        _pair: true,
+        lead: g.lead,
+        leadRole: groupBy,
+        others: g.others,
+        proc: g.proc,
+        profileid: g.lead?.profileid || g.others[0]?.profileid || '',
+        name: [g.lead?.name, ...g.others.map(o => o.name)].filter(Boolean).join(' '),
+        email: [g.lead?.email, ...g.others.map(o => o.email)].filter(Boolean).join(' '),
+      } as any))
+      .sort((a, b) => (a.lead?.name || '').localeCompare(b.lead?.name || ''));
   }
   // list filters: first-timer / repeat (mutually exclusive) + attendance-log
   // presence ('none' = no scan on any day · 'has' = at least one scan) + products
@@ -1325,7 +1401,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const ids = new Set<string>();
     const add = (pid: string) => { if (pid) { ids.add(pid); } };
     rows.forEach((r: any) => {
-      if (r['_pair']) { add(r['doer']?.profileid); add(r['beneficiary']?.profileid); }
+      // Leads only for grouped rows, so the Products/Cohorts/Journeys dropdowns offer
+      // exactly what the lead-only filter can actually match — a counterpart-only
+      // value would sit in the list promising rows and then return none.
+      if (r['_pair']) { add(r['lead']?.profileid); }
       else { add(r.profileid); }
     });
     return ids;
@@ -1374,14 +1453,37 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       if (q && !((p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))) { return false; }
       if (!active) { return true; }
       if (p['_pair']) {
-        const d = p['doer'] && this.matchesPanelFilter(p['doer'].profileid);
-        const b = p['beneficiary'] && this.matchesPanelFilter(p['beneficiary'].profileid);
-        return !!(d || b);
+        // Changework groups filter on the LEAD ONLY — the side the clicked cell was
+        // about. "As Doer · Completed" filtered by First timers means first-timer
+        // DOERS; matching on counterparts too kept groups whose lead fails the filter
+        // and made the list mostly non-matching people. Counterparts are still
+        // rendered in full, as context for the lead that did match.
+        return !!(p['lead'] && this.matchesPanelFilter(p['lead'].profileid));
       }
       return this.matchesPanelFilter(p.profileid);
     });
   }
   get panelCount(): number { return this.panelParticipants.length; }
+  /** A grouped row is 1 lead + N counterparts, so the row count is NOT a headcount —
+   *  calling it "N participants" under-reported the people on screen and contradicted
+   *  the filter dropdowns, whose counts are per person. Grouped lists state both. */
+  get panelCountLabel(): string {
+    const rows: any[] = this.panelParticipants as any[];
+    if (!rows.length || !rows[0]['_pair']) {
+      return `${rows.length.toLocaleString()} participant${rows.length === 1 ? '' : 's'}`;
+    }
+    const ids = new Set<string>();
+    let role = 'doer';
+    rows.forEach(p => {
+      if (p['lead']) { ids.add(p['lead'].profileid); role = p['leadRole'] || role; }
+      (p['others'] || []).forEach((o: any) => ids.add(o.profileid));
+    });
+    const n = rows.length;
+    const lead = role === 'beneficiary'
+      ? `${n} ${n === 1 ? 'beneficiary' : 'beneficiaries'}`
+      : `${n} ${n === 1 ? 'doer' : 'doers'}`;
+    return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
+  }
   closePanel(): void { this.panelOpen = false; }
 
   /** Manual attendance marking (Unattended list) — two steps.
@@ -1468,9 +1570,18 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const lines = [['Name', 'Email', 'Journey', 'Type', 'Products', 'Detail'].join(',')];
     this.panelParticipants.forEach((p: any) => {
       if (p['_pair']) {
+        // one line per person; the lead's line names every counterpart, and each
+        // counterpart's line names the lead back
         const proc = p['proc'] ? `${p['proc']} · ` : '';
-        if (p['doer']) { lines.push(row(p['doer'], `${proc}Doer · with ${p['beneficiary']?.name || '—'}`)); }
-        if (p['beneficiary']) { lines.push(row(p['beneficiary'], `${proc}Beneficiary · with ${p['doer']?.name || '—'}`)); }
+        const leadRole = p['leadRole'] === 'beneficiary' ? 'Beneficiary' : 'Doer';
+        const otherRole = p['leadRole'] === 'beneficiary' ? 'Doer' : 'Beneficiary';
+        const others: any[] = p['others'] || [];
+        const withCount = (o: any) => o.name + (o._n > 1 ? ` x${o._n}` : '');
+        if (p['lead']) {
+          lines.push(row(p['lead'], `${proc}${leadRole} · with ${others.map(withCount).join(' | ') || '—'}`));
+        }
+        others.forEach((o: any) => lines.push(
+          row(o, `${proc}${otherRole} · with ${p['lead']?.name || '—'}${o._n > 1 ? ` x${o._n}` : ''}`)));
       } else {
         lines.push(row(p, p['_meta'] || ''));
       }
