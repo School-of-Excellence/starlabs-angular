@@ -817,6 +817,66 @@
     <div class="panel-title">{{ panelTitle }}</div>
     <div class="panel-sub">{{ panelSub }}</div>
   </div>
+  <!-- ---- send to this list: notification · WhatsApp · email ----------------------
+       Picking a channel turns the rows into a checkbox list; the row then collapses
+       to the one chosen channel so the bar can carry the selection controls instead
+       of two icons that are no longer the question. -->
+  <ng-template #icoBell>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  </ng-template>
+  <ng-template #icoWhatsapp>
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.45 9.91-9.91a9.85 9.85 0 0 0-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.67c2.2 0 4.27.86 5.82 2.42a8.16 8.16 0 0 1 2.41 5.82c0 4.54-3.7 8.23-8.24 8.23-1.48 0-2.94-.4-4.21-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.37c0-4.54 3.7-8.24 8.27-8.24z"/>
+      <path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.06 2.88 1.21 3.08c.15.2 2.09 3.2 5.07 4.49.71.3 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.42-.07-.13-.27-.2-.57-.35z"/>
+    </svg>
+  </ng-template>
+  <ng-template #icoMail>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/>
+      <path d="m3 7 9 5.5L21 7"/>
+    </svg>
+  </ng-template>
+
+  <!-- nothing in the list = nobody to send to, so the row is dropped rather than left
+       as an affordance that can only fail -->
+  <div class="panel-comm" *ngIf="panelCount || commOn">
+    <!-- channel chooser: shown before a channel is picked, and again if the operator
+         goes back to change it (the selection survives that trip) -->
+    <ng-container *ngIf="!commMode">
+      <span class="pc-label">Send to</span>
+      <span class="pc-picked" *ngIf="commOn && commSelected.size">{{ commSelected.size }} selected</span>
+      <button class="pc-btn" (click)="setCommMode('notification')" title="Send an in-app notification" aria-label="Send an in-app notification">
+        <ng-container *ngTemplateOutlet="icoBell"></ng-container>
+      </button>
+      <button class="pc-btn" (click)="setCommMode('wati')" title="Send a WhatsApp message" aria-label="Send a WhatsApp message">
+        <ng-container *ngTemplateOutlet="icoWhatsapp"></ng-container>
+      </button>
+      <button class="pc-btn" (click)="setCommMode('email')" title="Send an email" aria-label="Send an email">
+        <ng-container *ngTemplateOutlet="icoMail"></ng-container>
+      </button>
+      <button class="pc-exit" *ngIf="commOn" (click)="exitCommMode()" title="Leave selection mode">&times;</button>
+    </ng-container>
+
+    <ng-container *ngIf="commMode">
+      <button class="pc-big" [class.wati]="commMode === 'wati'" (click)="pickCommChannel()" title="Change channel">
+        <ng-container *ngTemplateOutlet="commMode === 'notification' ? icoBell : commMode === 'wati' ? icoWhatsapp : icoMail"></ng-container>
+      </button>
+      <span class="pc-meta">
+        <span class="pc-title">{{ commModeLabel }}</span>
+        <span class="pc-sub">{{ commSubLabel }}</span>
+      </span>
+      <label class="pc-all" title="Select every row currently shown">
+        <input type="checkbox" [checked]="commAllChecked" [indeterminate]="commSomeChecked" (change)="toggleCommAll()">
+        <span>All</span>
+      </label>
+      <button class="pc-send" [disabled]="!commSelected.size" (click)="sendComm()">Send</button>
+      <button class="pc-exit" (click)="exitCommMode()" title="Cancel">&times;</button>
+    </ng-container>
+  </div>
+
   <div class="panel-search"><input type="text" [(ngModel)]="panelSearch" placeholder="Search name or email…"></div>
   <!-- Two either/or questions, so two segmented controls — as four independent
        chips they wrapped to a second row at the panel's 440px. -->
@@ -916,6 +976,12 @@
       <!-- changework group: the lead once, every counterpart listed beneath it -->
       <div class="p-grp" *ngIf="p['_pair']; else singleRow">
         <div class="p-grp-lead">
+          <!-- the LEAD is the only selectable side: a doer in an "As Doer" list, a
+               beneficiary in an "As Beneficiary" one. Counterparts below are context. -->
+          <input type="checkbox" class="p-check" *ngIf="commOn && p['lead']"
+                 [checked]="isCommSelected(p['lead'].profileid)"
+                 (change)="toggleCommOne(p['lead'].profileid)"
+                 [attr.aria-label]="'Select ' + p['lead'].name">
           <span class="p-avatar" *ngIf="p['lead']">{{ initials(p['lead'].name) }}</span>
           <span class="p-avatar p-dim" *ngIf="!p['lead']">&mdash;</span>
           <span style="min-width:0;flex:1">
@@ -958,6 +1024,10 @@
       <!-- standard single-participant row -->
       <ng-template #singleRow>
         <div class="p-row" [class.p-row-picking]="markPickerId === p.profileid">
+          <input type="checkbox" class="p-check" *ngIf="commOn"
+                 [checked]="isCommSelected(p.profileid)"
+                 (change)="toggleCommOne(p.profileid)"
+                 [attr.aria-label]="'Select ' + p.name">
           <span class="p-avatar">{{ initials(p.name) }}</span>
           <span style="min-width:0">
             <div class="p-name">{{ p.name }}</div>

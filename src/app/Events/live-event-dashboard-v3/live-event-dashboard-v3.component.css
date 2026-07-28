@@ -303,6 +303,54 @@ input,select{font:inherit}
 .panel-close:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-title{font-size:17px;font-weight:700;letter-spacing:-.015em;margin-top:8px}
 .panel-sub{font-size:12px;color:var(--z-500);margin-top:3px}
+/* ---- send to this list ---------------------------------------------------------
+   Three channels, then one. Idle it is a quiet icon row (an action available, not
+   one being asked for); picked, it becomes the bar that owns the selection — big
+   channel badge, count, select-all, Send — so the panel never shows two competing
+   sets of controls. */
+.panel-comm{display:flex;align-items:center;gap:7px;padding:14px 22px 0}
+.pc-label{
+  font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--z-400);margin-right:auto;
+}
+.pc-picked{
+  font-size:10.5px;font-weight:600;color:var(--accent);
+  background:var(--accent-soft);border-radius:var(--r-pill);padding:3px 9px;white-space:nowrap;
+}
+.pc-btn{
+  width:32px;height:32px;flex:none;border-radius:var(--r-sm);
+  border:1px solid var(--z-200);background:var(--z-50);color:var(--z-600);
+  display:grid;place-items:center;transition:all .15s var(--ease);
+}
+.pc-btn:hover{border-color:var(--z-300);background:var(--z-0);color:var(--z-900)}
+.pc-btn svg{width:16px;height:16px;display:block}
+.pc-big{
+  width:38px;height:38px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;
+  border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent);
+}
+.pc-big svg{width:19px;height:19px;display:block}
+.pc-big.wati{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok)}
+.pc-meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.pc-title{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
+.pc-sub{font-size:10.5px;color:var(--z-500);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-all{
+  display:flex;align-items:center;gap:5px;flex:none;cursor:pointer;
+  font-size:11px;font-weight:500;color:var(--z-600);white-space:nowrap;
+}
+.pc-all input{cursor:pointer;accent-color:var(--accent)}
+.pc-send{
+  flex:none;font-size:11px;font-weight:600;letter-spacing:.03em;color:#fff;
+  background:var(--accent);border:1px solid var(--accent);border-radius:var(--r-pill);
+  padding:6px 14px;white-space:nowrap;
+}
+.pc-send:hover:not(:disabled){filter:brightness(.96)}
+.pc-send:disabled{opacity:.45;cursor:default}
+.pc-exit{
+  width:26px;height:26px;flex:none;border-radius:var(--r-xs);
+  border:1px solid var(--z-200);display:grid;place-items:center;
+  color:var(--z-500);font-size:14px;line-height:1;
+}
+.pc-exit:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-search{padding:14px 22px 0}
 .panel-search input{
   width:100%;padding:8px 12px;border:1px solid var(--z-200);border-radius:var(--r-sm);
@@ -415,6 +463,9 @@ mat-select.pf-select.on{
   display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--r-sm);
 }
 .p-row:hover{background:var(--z-50)}
+/* row selection checkbox — only rendered in selection mode */
+.p-check{width:15px;height:15px;flex:none;cursor:pointer;accent-color:var(--accent)}
+.p-grp-lead .p-check{margin-top:7px}   /* the group lead aligns to flex-start */
 .p-avatar{
   width:30px;height:30px;border-radius:50%;flex:none;
   display:grid;place-items:center;font-size:10.5px;font-weight:600;
