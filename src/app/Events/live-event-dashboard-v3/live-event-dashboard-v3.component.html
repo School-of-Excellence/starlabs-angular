@@ -810,6 +810,18 @@
     <button class="pf-chip" [class.on-blue]="panelFilter.type === 'rp'" (click)="togglePanelType('rp')">Repeat</button>
     <button class="pf-chip" [class.on]="panelFilter.attendance === 'none'" (click)="togglePanelAttendance('none')">No attendance log</button>
     <button class="pf-chip" [class.on]="panelFilter.attendance === 'has'" (click)="togglePanelAttendance('has')">Only attendance log</button>
+    <!-- product filter — multi-select over the products present in THIS list (OR) -->
+    <mat-form-field *ngIf="panelProductOptions.length" class="pf-select" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Products</mat-label>
+      <mat-select multiple
+                  [(ngModel)]="panelFilter.products"
+                  (selectionChange)="onPanelProductChange()"
+                  (openedChange)="panelProductSelectOpen = $event"
+                  panelClass="pf-select-panel">
+        <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">{{ opt.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <button class="pf-chip" *ngIf="panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">Clear products</button>
   </div>
   <div class="panel-count">
     <span>{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</span>
