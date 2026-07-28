@@ -1319,10 +1319,16 @@ export class LiveEventDataService implements OnDestroy {
     });
   }
 
-  private getFilteredDoerIds(): string[] {
+  /** Event participants narrowed by the Overall / First Timers scope. The doer column
+   *  works off this, and so does beneficiary-COMPLETED (see calculateProcedureData). */
+  private getScopedParticipantIds(): string[] {
     if (this.participantFilter === 'all') return this.eventParticipantProfileIds;
     return this.eventParticipantProfileIds.filter(id => this.firstTimerProfileIds.includes(id));
   }
+  private getFilteredDoerIds(): string[] { return this.getScopedParticipantIds(); }
+  /** The ATC-PRESCRIBED beneficiary universe — people whose latest atc_alpha in the
+   *  selected queue lists procedures. Basis for beneficiary "not started" (and the
+   *  live cell), NOT for "completed". */
   private getFilteredBeneficierIds(): string[] {
     if (this.participantFilter === 'all') return this.beneficierProfileIds;
     return this.beneficierProfileIds.filter(id => this.firstTimerProfileIds.includes(id));
@@ -1338,6 +1344,13 @@ export class LiveEventDataService implements OnDestroy {
     const tempMap = { ...this.mapProcedureData };
     const filteredDoerIds = this.getFilteredDoerIds();
     const filteredBeneficierIds = this.getFilteredBeneficierIds();
+    // OPERATOR RULE: beneficiary "completed" comes from livechangework, not atc_alpha.
+    // A participant can RECEIVE changework without an ATC prescribing that procedure,
+    // and gating on the prescribed universe silently dropped those — a procedure could
+    // read 4 completed as doer and 0 as beneficiary for the very same changework.
+    // "Not started" still comes from the ATC pending list (that is a prescription, and
+    // only a prescription can be outstanding). Scope still applies, as on the doer side.
+    const completedBeneficiaryScope = new Set(this.getScopedParticipantIds());
     this.doerTotal = filteredDoerIds.length;
     this.beneficierTotal = filteredBeneficierIds.length;
 
@@ -1422,7 +1435,7 @@ export class LiveEventDataService implements OnDestroy {
           e.counterpartIds.push(beneficiaryId); e.counterpartNames.push(beneficiaryName);
         }
       }
-      if (beneficiaryId && filteredBeneficierIds.includes(beneficiaryId)) {
+      if (beneficiaryId && completedBeneficiaryScope.has(beneficiaryId)) {
         if (!beneficierCompletedMap[procedureId]) { beneficierCompletedMap[procedureId] = new Map<string, any>(); }
         let e = beneficierCompletedMap[procedureId].get(beneficiaryId);
         if (!e) {
