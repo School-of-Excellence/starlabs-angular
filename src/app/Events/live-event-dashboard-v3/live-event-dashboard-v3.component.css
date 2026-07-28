@@ -309,40 +309,57 @@ input,select{font:inherit}
   font-size:13px;background:var(--z-50);outline:none;
 }
 .panel-search input:focus{border-color:var(--accent);background:var(--z-0)}
-.panel-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:12px 22px 0}
-
-/* ---- multi-select filter rows: [LABEL] [multi-select ▾] [×] --------------------
-   mat-select re-skinned to the panel's flat pill language. It is used WITHOUT
-   mat-form-field — it does not need one — so the trigger can be styled as a
-   .pf-chip instead of an MDC notched outline. The fixed-width label keeps the
-   selects of stacked rows aligned in a column. */
-.pf-adv{display:flex;flex-direction:column;gap:6px;padding:10px 22px 0}
-.pf-row{display:flex;align-items:center;gap:8px}
-.pf-row-label{
-  flex:none;width:64px;font-family:var(--mono);font-size:10.5px;font-weight:600;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);
+/* ---- panel filters: 2 rows, not 4 ---------------------------------------------
+   The four chips were two either/or questions (type · attendance log) wearing the
+   wrong control, so at 440px they wrapped to a second row. Segmented controls say
+   pick-one, and both fit on one line. */
+.panel-filters{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:11px 22px 0}
+.pf-seg{
+  display:inline-flex;align-items:center;gap:2px;padding:2px;
+  background:var(--z-100);border:1px solid var(--z-200);border-radius:var(--r-pill);
 }
+.pf-seg button{
+  padding:5px 11px;border-radius:var(--r-pill);font-size:11.5px;font-weight:500;
+  color:var(--z-600);white-space:nowrap;transition:all .18s var(--ease);
+}
+.pf-seg button:hover:not(.on){color:var(--z-900)}
+.pf-seg button.on{
+  background:var(--z-0);color:var(--z-900);font-weight:600;
+  box-shadow:0 1px 2px rgba(28,28,30,.12);
+}
+.pf-seg.acc button.on{color:var(--accent)}
 
+/* Products / cohorts share one row and read as FIELDS — bordered and filled, same
+   height and radius as the search box above, so they do not look like bare text.
+   mat-select is used WITHOUT mat-form-field (it does not need one), which is what
+   lets the trigger be styled directly instead of through an MDC notched outline. */
+.pf-adv{display:flex;gap:8px;align-items:center;padding:8px 22px 0}
+.pf-field{position:relative;flex:1;min-width:0;display:flex}
 mat-select.pf-select{
-  flex:1;min-width:0;height:30px;padding:0 8px 0 12px;
+  flex:1;min-width:0;height:34px;padding:0 8px 0 12px;
   display:inline-flex;align-items:center;cursor:pointer;
-  border:1px solid var(--z-200);border-radius:var(--r-pill);background:var(--z-0);
-  font-family:var(--font);font-size:12px;font-weight:500;line-height:1;
+  border:1px solid var(--z-200);border-radius:var(--r-sm);background:var(--z-50);
+  font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1;
   letter-spacing:normal;color:var(--z-900);transition:all .15s var(--ease);
 }
-mat-select.pf-select:hover{border-color:var(--z-400)}
-mat-select.pf-select.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+mat-select.pf-select:hover{border-color:var(--z-300);background:var(--z-0)}
+mat-select.pf-select.on{
+  background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
+  padding-right:26px;                 /* room for the clear button over the caret */
+}
 .pf-select ::ng-deep .mat-mdc-select-trigger{height:100%}
 .pf-select ::ng-deep .mat-mdc-select-value{color:inherit}
 .pf-select ::ng-deep .mat-mdc-select-placeholder{color:var(--z-500)}
 .pf-select ::ng-deep .mat-mdc-select-arrow-wrapper{height:auto}
-.pf-select ::ng-deep .mat-mdc-select-arrow{color:currentColor;opacity:.55}
+.pf-select ::ng-deep .mat-mdc-select-arrow{color:currentColor;opacity:.5}
+.pf-select.on ::ng-deep .mat-mdc-select-arrow-wrapper{display:none}
 .pf-x{
-  flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;
-  font-size:17px;line-height:1;color:var(--z-500);transition:all .15s var(--ease);
+  position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+  font-size:15px;line-height:1;color:var(--accent);opacity:.75;
+  transition:all .15s var(--ease);
 }
-.pf-x:hover{background:var(--z-100);color:var(--z-900)}
-.pf-x-off{visibility:hidden;pointer-events:none}
+.pf-x:hover{background:var(--z-0);opacity:1}
 
 /* ---- dropdown panel -------------------------------------------------------------
    Renders in the CDK overlay container, OUTSIDE :host, so the design tokens above do

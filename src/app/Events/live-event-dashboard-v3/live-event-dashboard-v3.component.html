@@ -810,20 +810,27 @@
     <div class="panel-sub">{{ panelSub }}</div>
   </div>
   <div class="panel-search"><input type="text" [(ngModel)]="panelSearch" placeholder="Search name or email…"></div>
+  <!-- Two either/or questions, so two segmented controls — as four independent
+       chips they wrapped to a second row at the panel's 440px. -->
   <div class="panel-filters">
-    <button class="pf-chip" [class.on-blue]="panelFilter.type === 'ft'" (click)="togglePanelType('ft')">First timers</button>
-    <button class="pf-chip" [class.on-blue]="panelFilter.type === 'rp'" (click)="togglePanelType('rp')">Repeat</button>
-    <button class="pf-chip" [class.on]="panelFilter.attendance === 'none'" (click)="togglePanelAttendance('none')">No attendance log</button>
-    <button class="pf-chip" [class.on]="panelFilter.attendance === 'has'" (click)="togglePanelAttendance('has')">Only attendance log</button>
+    <div class="pf-seg acc" role="group" aria-label="Participant type">
+      <button [class.on]="panelFilter.type === 'all'" (click)="setPanelType('all')">All</button>
+      <button [class.on]="panelFilter.type === 'ft'" (click)="setPanelType('ft')">1st</button>
+      <button [class.on]="panelFilter.type === 'rp'" (click)="setPanelType('rp')">Repeat</button>
+    </div>
+    <div class="pf-seg" role="group" aria-label="Attendance log">
+      <button [class.on]="panelFilter.attendance === 'all'" (click)="setPanelAttendance('all')">All</button>
+      <button [class.on]="panelFilter.attendance === 'none'" (click)="setPanelAttendance('none')">No log</button>
+      <button [class.on]="panelFilter.attendance === 'has'" (click)="setPanelAttendance('has')">Logged</button>
+    </div>
   </div>
 
-  <!-- Product / cohort filters — their own rows rather than crowding the boolean
-       chips above. Both are multi-select with OR semantics, and each row is hidden
-       when the open list has nothing to offer for it. -->
+  <!-- Products / cohorts share one row as bordered fields. Both are multi-select
+       with OR semantics; each is dropped when the open list has nothing to offer
+       for it, and the other then takes the full width. -->
   <div class="pf-adv" *ngIf="panelProductOptions.length || panelCohortOptions.length">
 
-    <div class="pf-row" *ngIf="panelProductOptions.length">
-      <span class="pf-row-label">Products</span>
+    <div class="pf-field" *ngIf="panelProductOptions.length">
       <mat-select class="pf-select" [class.on]="panelFilter.products.length" multiple
                   placeholder="Select products" aria-label="Filter this list by product"
                   [(ngModel)]="panelFilter.products"
@@ -838,13 +845,12 @@
           </span>
         </mat-option>
       </mat-select>
-      <!-- kept in the layout when idle so both rows' selects stay the same width -->
-      <button class="pf-x" [class.pf-x-off]="!panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">&times;</button>
+      <!-- sits over the caret once active, so the field never changes width -->
+      <button class="pf-x" *ngIf="panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">&times;</button>
     </div>
 
     <!-- cohort = membership of a "big cohorts" participantidlist for this event -->
-    <div class="pf-row" *ngIf="panelCohortOptions.length">
-      <span class="pf-row-label">Cohorts</span>
+    <div class="pf-field" *ngIf="panelCohortOptions.length">
       <mat-select class="pf-select" [class.on]="panelFilter.cohorts.length" multiple
                   placeholder="Select cohorts" aria-label="Filter this list by cohort"
                   [(ngModel)]="panelFilter.cohorts"
@@ -866,7 +872,7 @@
         </mat-option>
         <div class="pf-none" *ngIf="!panelCohortView.length">No cohort matches that search</div>
       </mat-select>
-      <button class="pf-x" [class.pf-x-off]="!panelFilter.cohorts.length" (click)="clearPanelCohorts()" title="Clear the cohort filter">&times;</button>
+      <button class="pf-x" *ngIf="panelFilter.cohorts.length" (click)="clearPanelCohorts()" title="Clear the cohort filter">&times;</button>
     </div>
 
   </div>

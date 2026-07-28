@@ -1200,8 +1200,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** True while a dropdown overlay is open — ESC must close the dropdown only, not
    *  the whole drill-down panel underneath it. */
   panelSelectOpen = false;
-  togglePanelType(t: 'ft' | 'rp'): void { this.panelFilter.type = this.panelFilter.type === t ? 'all' : t; }
-  togglePanelAttendance(a: 'none' | 'has'): void { this.panelFilter.attendance = this.panelFilter.attendance === a ? 'all' : a; }
+  // Segmented controls, so these are explicit picks — 'all' IS the off position and
+  // there is nothing to toggle back to.
+  setPanelType(t: 'all' | 'ft' | 'rp'): void { this.panelFilter.type = t; }
+  setPanelAttendance(a: 'all' | 'none' | 'has'): void { this.panelFilter.attendance = a; }
   onPanelProductChange(): void { this.panelProductSet = new Set(this.panelFilter.products); }
   clearPanelProducts(): void { this.panelFilter.products = []; this.panelProductSet.clear(); }
   onPanelCohortChange(): void {
