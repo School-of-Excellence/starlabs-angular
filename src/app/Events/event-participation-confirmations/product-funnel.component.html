@@ -208,10 +208,16 @@
           [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
           <mat-icon>check</mat-icon> Approve {{ readyCount }}
         </button>
+        <button mat-stroked-button class="sx-danger" [disabled]="selectedToRevokeRequested.length===0"
+          matTooltipClass="sx-tip" matTooltip="Revoke: cancel the selected participation request(s)"
+          (click)="markRevokedRequested(selectedToRevokeRequested)">
+          <mat-icon>block</mat-icon> Revoke {{ selectedToRevokeRequested.length }}
+        </button>
         <span class="sx-hint" *ngIf="approveDisabledReason()">{{ approveDisabledReason() }}</span>
       </ng-container>
 
       <ng-container *ngIf="selectionMode==='attend'">
+        <!-- Mark attended / Not attended bulk buttons hidden per operator request
         <button mat-flat-button class="sx-approve" [disabled]="selectedToMark.length===0" (click)="markAttended(selectedToMark)">
           <mat-icon>task_alt</mat-icon> Mark {{ selectedToMark.length }} attended
         </button>
@@ -219,6 +225,7 @@
           matTooltipClass="sx-tip" matTooltip="Mark not attended and cancel the product (destructive)">
           <mat-icon>person_off</mat-icon> Mark {{ selectedToUnattend.length }} not attended
         </button>
+        -->
         <button mat-stroked-button class="sx-danger" [disabled]="selectedToRevoke.length===0" (click)="markRevoked(selectedToRevoke)"
           matTooltipClass="sx-tip" matTooltip="Revoke: cancel the product, then assign a new one (destructive)">
           <mat-icon>block</mat-icon> Revoke {{ selectedToRevoke.length }}
@@ -361,9 +368,13 @@
                 </span>
                 <ng-container *ngIf="!row.attended">
                   <span class="sx-noshow" *ngIf="row.attendanceState==='no_show'">No-show</span>
+                  <!-- Mark attended button hidden per operator request
                   <button mat-button class="sx-mark" (click)="markAttended([row])">Mark attended</button>
+                  -->
                 </ng-container>
+                <!-- Not attended button hidden per operator request
                 <button mat-button class="sx-mark-danger" (click)="markUnattended([row])">Not attended</button>
+                -->
                 <button mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
               </ng-container>
               <!-- Unattended segment -->
@@ -382,6 +393,9 @@
                 <ng-container *ngIf="segment==='overallRequested'; else stdStatus">{{ row.isUnattended ? 'unattended' : (row.isRevoked ? 'revoked' : (row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested')) }}</ng-container>
                 <ng-template #stdStatus>{{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
               </span>
+              <!-- Revoke: requested -> status-only, approved -> full product-cancel path -->
+              <button mat-button class="sx-mark-danger" *ngIf="selectionMode!=='attend' && segment!=='unattended' && segment!=='revoked' && ((row.isApproved && row.approvedRequestId) || (row.isRequested && !row.isApproved && row.requestData?.docid))"
+                (click)="revoke(row)">Revoke</button>
             </td>
           </tr>
           <tr *ngIf="segmentRows.length === 0">

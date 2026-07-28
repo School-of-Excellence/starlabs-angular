@@ -136,6 +136,140 @@
                 </mat-form-field>
               </div>
             </div>
+            <mat-divider class="section-divider"></mat-divider>
+            <div class="form-section" formArrayName="dynamicenrollment">
+              <div class="de-section-head">
+                <h3 class="section-title">Dynamic Enrollment Configuration</h3>
+                <button mat-stroked-button type="button" class="btn-primary-outline" (click)="addDynBlock()">
+                  <mat-icon>add</mat-icon> Add block
+                </button>
+              </div>
+
+              <div class="de-blocks" cdkDropList (cdkDropListDropped)="drop($event, 'dynamicenrollment')">
+              <div class="de-block" *ngFor="let block of dynamicBlocks.controls; let bi = index; trackBy: trackDynBlock"
+                [formGroupName]="bi" cdkDrag>
+                <div class="de-drag-preview" *cdkDragPreview>
+                  {{ block.get('type')?.value === 'icontext' ? 'Icon Text' : 'Rich Text' }} · {{ blockSummary(block) }}
+                </div>
+
+                <div class="de-block-head" (click)="toggleBlockCollapsed(block)">
+                  <button mat-icon-button type="button" class="de-drag" cdkDragHandle
+                    (click)="$event.stopPropagation()" matTooltip="Drag to reorder"><mat-icon>drag_indicator</mat-icon></button>
+                  <button mat-icon-button type="button" class="de-collapse"
+                    (click)="$event.stopPropagation(); toggleBlockCollapsed(block)"
+                    [matTooltip]="isBlockCollapsed(block) ? 'Expand' : 'Collapse'">
+                    <mat-icon>{{ isBlockCollapsed(block) ? 'chevron_right' : 'expand_more' }}</mat-icon>
+                  </button>
+                  <span class="de-title-wrap">
+                    <span class="de-type-badge" [class.icontext]="block.get('type')?.value === 'icontext'">
+                      {{ block.get('type')?.value === 'icontext' ? 'Icon Text' : 'Rich Text' }}
+                    </span>
+                    <span class="de-summary" *ngIf="isBlockCollapsed(block)">{{ blockSummary(block) }}</span>
+                  </span>
+                  <span class="de-spacer"></span>
+                  <button mat-icon-button type="button" class="de-remove"
+                    (click)="$event.stopPropagation(); removeDynBlock(bi)"
+                    matTooltip="Remove block"><mat-icon>delete</mat-icon></button>
+                </div>
+
+                <div class="de-block-body" [hidden]="isBlockCollapsed(block)">
+                <mat-form-field appearance="outline" class="w-100 de-type" subscriptSizing="dynamic">
+                  <mat-label>Type</mat-label>
+                  <mat-select formControlName="type" (selectionChange)="onDynTypeChange(bi)">
+                    <mat-option value="richtext">Rich Text</mat-option>
+                    <mat-option value="icontext">Icon Text</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <!-- Title 1 & Title 2 (both types) -->
+                <label class="editor-label">Title 1</label>
+                <div class="NgxEditor__Wrapper">
+                  <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'title1'))" [toolbar]="toolbar"></ngx-editor-menu>
+                  <ngx-editor [editor]="getDynEditor(deKey(block, 'title1'))" formControlName="title1"
+                    [outputFormat]="'html'" placeholder="Title 1"></ngx-editor>
+                </div>
+
+                <label class="editor-label">Title 2</label>
+                <div class="NgxEditor__Wrapper">
+                  <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'title2'))" [toolbar]="toolbar"></ngx-editor-menu>
+                  <ngx-editor [editor]="getDynEditor(deKey(block, 'title2'))" formControlName="title2"
+                    [outputFormat]="'html'" placeholder="Title 2"></ngx-editor>
+                </div>
+
+                <div class="de-toggle-row">
+                  <div class="de-toggle-text">
+                    <span class="de-toggle-title">Enable Full Border</span>
+                    <span class="de-toggle-desc">Show a full border around this block.</span>
+                  </div>
+                  <mat-slide-toggle formControlName="border" color="primary"></mat-slide-toggle>
+                </div>
+
+                <!-- Rich Text: content -->
+                <ng-container *ngIf="block.get('type')?.value === 'richtext'">
+                  <label class="editor-label">Content</label>
+                  <div class="NgxEditor__Wrapper">
+                    <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'content'))" [toolbar]="toolbar"></ngx-editor-menu>
+                    <ngx-editor [editor]="getDynEditor(deKey(block, 'content'))" formControlName="content"
+                      [outputFormat]="'html'" placeholder="Content"></ngx-editor>
+                  </div>
+                </ng-container>
+
+                <!-- Icon Text: array of { value1, value2 } -->
+                <ng-container *ngIf="block.get('type')?.value === 'icontext'">
+                  <div class="de-ic-head">
+                    <span class="editor-label">Icon Text Items</span>
+                    <button mat-stroked-button type="button" (click)="addDynIcon(bi)">
+                      <mat-icon>add</mat-icon> Add item
+                    </button>
+                  </div>
+
+                  <div formArrayName="icontext">
+                    <div class="de-ic-item" *ngFor="let item of dynIcons(bi).controls; let ii = index; trackBy: trackDynIcon" [formGroupName]="ii">
+                      <div class="de-ic-item-head">
+                        <span class="de-ic-index">Item {{ ii + 1 }}</span>
+                        <button mat-icon-button type="button" class="de-remove" (click)="removeDynIcon(bi, ii)"
+                          matTooltip="Remove item"><mat-icon>close</mat-icon></button>
+                      </div>
+
+                      <label class="editor-label">Value 1 (Icon)</label>
+                      <mat-form-field appearance="outline" class="w-100 de-icon-select" subscriptSizing="dynamic">
+                        <mat-label>Choose Icon</mat-label>
+                        <img *ngIf="item.get('value1')?.value" matPrefix [src]="item.get('value1')?.value" alt=""
+                          width="22" height="22" style="margin: 0 6px 0 10px; border-radius: 4px;" />
+                        <mat-select formControlName="value1">
+                          <mat-option *ngFor="let option of iconData" [value]="option['imageUrl']">
+                            <img [src]="option['imageUrl']" alt="icon" width="40" height="40"
+                              style="margin-right:8px;vertical-align:middle;" />
+                            {{ option['description'] }}
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+
+                      <label class="editor-label">Value 2</label>
+                      <div class="NgxEditor__Wrapper">
+                        <ngx-editor-menu [editor]="getDynEditor(deIconKey(block, item, 'value2'))" [toolbar]="toolbar"></ngx-editor-menu>
+                        <ngx-editor [editor]="getDynEditor(deIconKey(block, item, 'value2'))" formControlName="value2"
+                          [outputFormat]="'html'" placeholder="Value 2"></ngx-editor>
+                      </div>
+                    </div>
+                  </div>
+                </ng-container>
+                </div><!-- /de-block-body -->
+              </div>
+              </div><!-- /de-blocks -->
+
+              <div class="de-empty" *ngIf="dynamicBlocks.length === 0">
+                No blocks yet. Click "Add block" to create a Rich Text or Icon Text block.
+              </div>
+
+              <div class="de-add-bottom" *ngIf="dynamicBlocks.length > 0">
+                <button mat-stroked-button type="button" class="btn-primary-outline" (click)="addDynBlock()">
+                  <mat-icon>add</mat-icon> Add block
+                </button>
+              </div>
+            </div>
+
+            <mat-divider class="section-divider"></mat-divider>
             <div class="form-section">
               <h3 class="section-title">Content Sections</h3>
               <div *ngFor="let richTextField of richTextFields" class="rich-text-section">
@@ -391,7 +525,7 @@
                   </div>
                   <button mat-stroked-button class="btn-primary-outline" type="button"
                     (click)="addField('hometags')" *ngIf="isAllFilled('hometags')">
-                    <mat-icon>add</mat-icon> Add to your response
+                    <mat-icon>add</mat-icon> Add Home Tags
                   </button>
                 </div>
               </div>
@@ -1406,6 +1540,18 @@
                             <mat-label>ID</mat-label>
                             <input matInput type="text" formControlName="id" placeholder="Enter ID" />
                           </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Payment For</mat-label>
+                            <mat-select formControlName="paymentfor">
+                              <mat-option value="new">New</mat-option>
+                              <mat-option value="exist">Exist</mat-option>
+                              <mat-option value="both">Both</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Hint</mat-label>
+                            <input matInput type="text" formControlName="hint" placeholder="Enter hint" />
+                          </mat-form-field>
                         </div>
 
                         <!-- Who can refer this workshop -->
@@ -1618,6 +1764,16 @@
                             <mat-icon>delete</mat-icon> Remove
                           </button>
                         </div>
+
+                        <mat-form-field appearance="outline" class="w-100 hero-accent-field">
+                          <mat-label>Hero Accent Color</mat-label>
+                          <input matInput formControlName="heroAccent" placeholder="#FFFFFF" maxlength="7" />
+                          <input matSuffix type="color" class="color-swatch" [value]="heroAccentSwatch"
+                            (input)="onHeroAccentSwatch($event)" matTooltip="Pick a colour" aria-label="Pick a colour" />
+                          <mat-error *ngIf="heroAccentControl?.hasError('pattern')">
+                            Use a hex code like #FFFFFF.
+                          </mat-error>
+                        </mat-form-field>
                       </div>
                       <div class="upload-block">
                         <p class="upload-label">Choose Mobile Hero Image — Recommended Size: EiFlix Series Image Size</p>

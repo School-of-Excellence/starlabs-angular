@@ -126,7 +126,7 @@ export class UpcomingworkshopresponsesComponent implements OnInit {
     try {
       // upcomingworkshopref is a DocumentReference field pointing at the
       // /upcomingworkshops/{id} document of the clicked row.
-      const workshopRef = doc(this.firestore, 'upcomingworkshops', workshopId);
+      const workshopRef = doc(this.firestore, 'eiflixhomewidgets', workshopId);
       const q = query(
         collection(this.firestore, 'upcomingworkshopsresponse'),
         where('upcomingworkshopref', '==', workshopRef)

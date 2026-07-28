@@ -71,6 +71,9 @@ input[type="radio"], input[type="checkbox"] { accent-color: #007aff; }
 .seg-none { background: rgba(60,60,67,.22); }
 .t-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: rgba(60,60,67,.7); }
 .t-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 0px; }
+.t-legend .t-clk { cursor: pointer; border-radius: 6px; padding: 1px 5px; margin: -1px -1px; transition: background .12s; }
+.t-legend .t-clk:hover { background: rgba(60,60,67,.08); }
+.t-legend .t-clk.on { background: rgba(0,122,255,.14); color: #0a63c9; font-weight: 600; }
 .d-done { background: #34c759; } .d-book { background: #007aff; } .d-none { background: rgba(60,60,67,.3); }
 .tile-hint { display: flex; align-items: center; gap: 8px; color: rgba(60,60,67,.5); font-size: 13px; font-style: italic;
   border-style: dashed; }
@@ -168,6 +171,12 @@ tbody tr:hover td { background: #fafafd; }
 .cs-cfg-chip { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 500; border: .5px solid rgba(60,60,67,.2); border-radius: 999px; padding: 5px 12px; background: #fff; color: rgba(60,60,67,.85); cursor: pointer; font-family: inherit; }
 .cs-cfg-chip:hover { background: #fafafd; }
 .cs-cfg-chip.on { border-color: #34c759; background: rgba(52,199,89,.14); color: #248a3d; font-weight: 600; }
+.cs-elig-q { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; width: 100%; margin-top: 6px; }
+.cs-elig-qn { font-size: 12.5px; font-weight: 600; color: rgba(60,60,67,.85); min-width: 96px; }
+.cs-sd { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; width: 100%; margin-top: 6px; }
+.cs-sd-name { min-width: 120px; }
+.cs-sd-q { display: inline-flex; align-items: center; gap: 4px; }
+.cs-sd-qn { font-size: 12px; font-weight: 600; color: rgba(60,60,67,.6); }
 .cs-config-hint { font-size: 12px; color: rgba(60,60,67,.5); font-style: italic; }
 /* Ready-for-the-event per-queue stage picker (collapsible) */
 .cs-readycfg { margin: 0 0 14px; }

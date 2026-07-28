@@ -139,6 +139,7 @@ export class ChatConfigComponent {
 
             this.categories.at(i).patchValue({
               category: e['category'],
+              description: e['description'] ?? '',
               assignto: e['assignto'],
               show: e['show'],
               subcategories: e['subcategories']
@@ -429,6 +430,11 @@ export class ChatConfigComponent {
     return this.categories.at(index).get('category').value || 'Unnamed Category';
   }
 
+  // Get category description
+  getCategoryDescription(index: number): string {
+    return this.categories.at(index).get('description').value || '';
+  }
+
   // Get subcategories for preview
   getSubcategories(index: number): string[] {
     const subcategories = this.categories.at(index).get('subcategories').value || [];
@@ -447,6 +453,7 @@ export class ChatConfigComponent {
       const element = formValue['categories'][i];
       var map = {};
       map['category'] = element['category']
+      map['description'] = element['description'] ?? ''
       map['assignto'] = element['assignto']
       map['show'] = element['show']
       if (element['subcategories'][0]['subcategory'] === '') {
@@ -485,6 +492,7 @@ export class ChatConfigComponent {
   createFormCategory() {
     return this.formbuilder.group({
       category: ['', { validators: [Validators.required], updateOn: "change" }],
+      description: [''],
       subcategories: this.formbuilder.array([
         this.formbuilder.group({
           subcategory: ['']
@@ -616,6 +624,7 @@ export class ChatConfigComponent {
       const element = formValue['categories'][i];
       var map = {};
       map['category'] = element['category']
+      map['description'] = element['description'] ?? ''
       map['assignto'] = element['assignto']
       map['show'] = element['show']
       if (element['subcategories'][0]['subcategory'] === '') {
