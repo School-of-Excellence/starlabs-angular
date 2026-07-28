@@ -908,7 +908,7 @@
 
   </div>
   <div class="panel-count">
-    <span>{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</span>
+    <span>{{ panelCountLabel }}</span>
     <button class="panel-export" *ngIf="panelCount" (click)="panelExport()" title="Export this list to Excel (CSV)">⭳ Export</button>
   </div>
   <div class="panel-list">

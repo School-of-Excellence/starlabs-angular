@@ -1200,7 +1200,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const groups = new Map<string, {
       lead: PanelParticipant | null; others: PanelParticipant[]; seen: Set<string>; proc: string;
     }>();
-    (data || []).forEach((cw: any) => {
+    (data || []).forEach((cw: any, idx: number) => {
       if (!cw.doerId && !cw.beneficiaryId) { return; }
       const leadId = groupBy === 'doer' ? cw.doerId : cw.beneficiaryId;
       // Completed entries already carry every counterpart (calculateProcedureData
@@ -1209,7 +1209,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       const otherIds: string[] = cw.counterpartIds?.length
         ? cw.counterpartIds
         : [groupBy === 'doer' ? cw.beneficiaryId : cw.doerId].filter(Boolean);
-      const key = leadId || '';                       // '' groups the lead-less docs
+      // A doc can arrive with the lead side blank (live changework is kept when
+      // EITHER side is in scope). Those must not share a key, or unrelated docs merge
+      // into one "—" group that asserts a doer relationship the data never had.
+      const key = leadId || `__nolead__${idx}`;
       let g = groups.get(key);
       if (!g) {
         g = {
@@ -1219,10 +1222,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         };
         groups.set(key, g);
       }
-      otherIds.forEach(oid => {
+      otherIds.forEach((oid, i) => {
         if (!oid || g!.seen.has(oid)) { return; }
         g!.seen.add(oid);
-        g!.others.push(this.data.buildParticipantFromProfileId(oid, true));
+        const p = this.data.buildParticipantFromProfileId(oid, true);
+        // A counterpart need not be a registered event participant, in which case the
+        // builder only has 'Unknown'. The changework doc carries a real name — prefer it.
+        const hinted = cw.counterpartNames?.[i] || (groupBy === 'doer' ? cw.beneficiaryName : cw.doerName);
+        if (hinted && (!p.name || p.name === 'Unknown')) { p.name = hinted; }
+        g!.others.push(p);
       });
     });
     return [...groups.values()]
@@ -1441,6 +1449,26 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     });
   }
   get panelCount(): number { return this.panelParticipants.length; }
+  /** A grouped row is 1 lead + N counterparts, so the row count is NOT a headcount —
+   *  calling it "N participants" under-reported the people on screen and contradicted
+   *  the filter dropdowns, whose counts are per person. Grouped lists state both. */
+  get panelCountLabel(): string {
+    const rows: any[] = this.panelParticipants as any[];
+    if (!rows.length || !rows[0]['_pair']) {
+      return `${rows.length.toLocaleString()} participant${rows.length === 1 ? '' : 's'}`;
+    }
+    const ids = new Set<string>();
+    let role = 'doer';
+    rows.forEach(p => {
+      if (p['lead']) { ids.add(p['lead'].profileid); role = p['leadRole'] || role; }
+      (p['others'] || []).forEach((o: any) => ids.add(o.profileid));
+    });
+    const n = rows.length;
+    const lead = role === 'beneficiary'
+      ? `${n} ${n === 1 ? 'beneficiary' : 'beneficiaries'}`
+      : `${n} ${n === 1 ? 'doer' : 'doers'}`;
+    return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
+  }
   closePanel(): void { this.panelOpen = false; }
 
   /** Manual attendance marking (Unattended list) — two steps.
