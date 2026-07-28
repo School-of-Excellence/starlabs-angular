@@ -289,6 +289,17 @@
                 </span>
                 <span class="next-action" [matTooltip]="'Suggested next step'">{{ nextAction(row) }}</span>
               </div>
+              <!-- Re-resolve just this participant. Everything on a row comes from
+                   reads that can change while the table is open (a transcript
+                   lands, a transfer is repaired, a doc is rebuilt elsewhere) —
+                   without this the only way to see that is a full 700-row walk. -->
+              <button mat-icon-button class="row-refresh-btn"
+                      [disabled]="row.walking"
+                      (click)="refreshRow(row)"
+                      matTooltip="Refresh this row only — re-reads the token, re-walks its transfer chain, re-checks the studio sessions and the ATC doc. The rest of the table is left alone.">
+                <mat-spinner *ngIf="row.walking" diameter="14" strokeWidth="2"></mat-spinner>
+                <mat-icon *ngIf="!row.walking">refresh</mat-icon>
+              </button>
             </div>
           </td>
         </ng-container>
@@ -399,17 +410,47 @@
                        [(ngModel)]="p.dropboxLink"
                        [disabled]="p.saving || pairingBusy(p)"
                        (keyup.enter)="saveLink(row, p)">
+                <!-- On a FAILED job the stored link is unchanged and is exactly what
+                     we want to re-run, so this same button IS the retry: saveLink()
+                     stamps retranscribeAt, which re-fires seLiveTranscribeSubmit. -->
                 <button mat-icon-button class="link-save-btn"
-                        [matTooltip]="p.status === 'resolved' ? 'Replace transcript' : 'Attach & transcribe'"
+                        [matTooltip]="pairingStatus(p) === 'failed'
+                                        ? 'Retry transcription with this recording'
+                                        : (p.status === 'resolved' ? 'Replace transcript' : 'Attach & transcribe')"
                         [disabled]="p.saving || pairingBusy(p)"
                         (click)="saveLink(row, p)">
                   <mat-spinner *ngIf="p.saving" diameter="16" strokeWidth="2"></mat-spinner>
-                  <mat-icon *ngIf="!p.saving">{{ p.status === 'resolved' ? 'autorenew' : 'send' }}</mat-icon>
+                  <mat-icon *ngIf="!p.saving">{{ pairingStatus(p) === 'failed' ? 'refresh'
+                                                 : (p.status === 'resolved' ? 'autorenew' : 'send') }}</mat-icon>
                 </button>
                 <a *ngIf="p.dropboxLink" [href]="p.dropboxLink" target="_blank"
                    class="link-open-btn" matTooltip="Open recording">
                   <mat-icon>open_in_new</mat-icon>
                 </a>
+              </div>
+
+              <!-- No session logged anywhere on the lineage (studio session happened
+                   OFFLINE, no Zoom) — attachOffline() creates the live-assignment doc
+                   AND the gen-doc override pointer; saveLink() above can't, since it
+                   only writes onto an already-discovered target. -->
+              <div class="link-cell offline-cell"
+                   *ngIf="!row.walking && !row.walkError && !p.hits.length && !p.offLineage.length && row.genDocId && row.genIn === 'this'">
+                <input class="link-input" type="url" placeholder="Offline session — paste Dropbox link…"
+                       [(ngModel)]="p.dropboxLink"
+                       [disabled]="p.saving"
+                       (keyup.enter)="attachOffline(row, p)">
+                <button mat-icon-button class="link-save-btn"
+                        matTooltip="No studio-session log exists — confirm this was an OFFLINE session and attach the recording directly"
+                        [disabled]="p.saving"
+                        (click)="attachOffline(row, p)">
+                  <mat-spinner *ngIf="p.saving" diameter="16" strokeWidth="2"></mat-spinner>
+                  <mat-icon *ngIf="!p.saving">cloud_upload</mat-icon>
+                </button>
+              </div>
+              <div class="offline-hint"
+                   *ngIf="!row.walking && !row.walkError && !p.hits.length && !p.offLineage.length && (!row.genDocId || row.genIn !== 'this')"
+                   [matTooltip]="row.genDocId ? ('ATC doc belongs to ' + (row.genInQueueName || 'another queue') + ' — attach it from there') : 'No ATC generation doc exists here yet for this participant'">
+                no ATC doc here — cannot attach offline recording
               </div>
 
               <div class="trail" *ngIf="!row.walking && p.trail.length"

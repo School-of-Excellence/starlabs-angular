@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import {
   addDoc, collection, collectionData, doc, documentId, DocumentReference, getDoc, getDocs, getFirestore,
-  limit, orderBy, query, serverTimestamp, Timestamp, updateDoc, where
+  limit, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, where
 } from '@angular/fire/firestore';
 import { Subject, Subscription } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -65,12 +65,22 @@ export class LiveEventDataService implements OnDestroy {
   // (arena e-ticket, active==true) for this event.
   scannedProfileIds: string[] = [];
   scannedCount = 0;
+  // full arena e-ticket doc per participant (for manual attendance marking).
+  arenaETicketByProfile: { [profileid: string]: any } = {};
   notScannedProfileIds: string[] = [];
   notScannedCount = 0;
   eventParticipants: PanelParticipant[] = [];
+  // O(1) lookups for buildParticipantFromProfileId (was O(n) find/includes → O(n²)
+  // when called in per-participant loops). Same values, just indexed.
+  private eventParticipantSet: Set<string> = new Set();
+  private registeredByProfileId: { [id: string]: PanelParticipant } = {};
   // name fallback from the event participation request doc (V2 does this) — used
   // when a registered participant has no `participant metadata` doc.
   registeredNames: { [profileid: string]: string } = {};
+  // product per participant from `event participation request` (productref → name via
+  // authguard.getProductMap()). Surfaced in every drill-down list.
+  productMap: { [productDocId: string]: string } = {};
+  registeredProductIds: { [profileid: string]: string[] } = {};   // all eligible product ids
   participantMetadataMap: { [profileid: string]: any } = {};
   mapJourneyData: { [key: string]: any } = {};
   journeyCounts: JourneyCount[] = [];
@@ -107,6 +117,12 @@ export class LiveEventDataService implements OnDestroy {
   // ---- video ask (V2 subscribeToVideoAsk) -------------------------------------
   // Tag taxonomy (C-7 = V2): classify/eventtags.videoasktags (global, loaded once).
   videoAskTags: string[] = [];
+  // Participant-tag taxonomy (V2 "participant tags" collection): {docid, name, …}.
+  // Source for the Video Ask Tags section (grouped by metadata `profiletags`).
+  participantTags: any[] = [];
+  // A&H CRM flag-status tags — "participant tags" with tagsfor 'live event'
+  // (first-timers-dashboard source). Grouped by metadata `profiletags`.
+  crmTags: any[] = [];
   // participantvideoask submissions bucketed by uploaded date → submitter profileids.
   videoAskByDay: { [date: string]: string[] } = {};
   // same, but only TAGGED submissions (participantvideoask.tags ∩ taxonomy) — a
@@ -160,6 +176,13 @@ export class LiveEventDataService implements OnDestroy {
   atcToValidateProfileIds: string[] = [];
   atcBuckets: AtcBuckets = { full: 0, partial: 0, unvalidated: 0, none: 0, fullIds: [], partialIds: [], unvalidatedIds: [], noneIds: [] };
 
+  // ---- ATC in draft (V2 subscribeToDraftAtc) — temporary_ATC drafts -----------
+  // A "draft" = a temporary_ATC doc (delete==false) whose transcript[0] carries an
+  // adjustment and whose lastupdated falls in the queue range; counted as UNIQUE
+  // participants in the registered universe. Read from the firestore-atc DB.
+  draftAtcProfileIds: string[] = [];
+  draftAtcCount = 0;
+
   isLoading = true;
 
   private eventSub: Subscription | null = null;
@@ -173,6 +196,7 @@ export class LiveEventDataService implements OnDestroy {
   private videoAskSub: Subscription | null = null;
   private clientIssuesSub: Subscription | null = null;
   private callLogSub: Subscription | null = null;
+  private draftAtcSub: Subscription | null = null;
   private eventZonesSub: Subscription | null = null;
   private bigCohortsSub: Subscription | null = null;
   private participantZonesSub: Subscription | null = null;
@@ -211,6 +235,28 @@ export class LiveEventDataService implements OnDestroy {
     }).catch(err => console.error('Error loading classify/eventtags:', err));
     console.log('[v3][init] videoask tag taxonomy:', this.videoAskTags);
 
+    // participant-tag taxonomy — VIDEO-ASK tags only (videoask-display pattern):
+    // tagsfor array-contains 'video ask' AND isActive. docid→name; the Video Ask
+    // Tags section groups participants by their `profiletags`.
+    await getDocs(query(
+      collection(this.firestoreDefault, 'participant tags'),
+      where('tagsfor', 'array-contains', 'video ask'),
+      where('isActive', '==', true)
+    )).then(snap => {
+      this.participantTags = snap.docs.map(d => ({ docid: d.id, ...d.data() }));
+    }).catch(err => console.error('Error loading participant tags:', err));
+    console.log('[v3][init] video-ask participant tags:', this.participantTags.length);
+
+    // A&H CRM flag-status tags — "participant tags" with tagsfor 'live event'
+    // (first-timers-dashboard pattern). Grouped by participants' `profiletags`.
+    await getDocs(query(
+      collection(this.firestoreDefault, 'participant tags'),
+      where('tagsfor', 'array-contains', 'live event')
+    )).then(snap => {
+      this.crmTags = snap.docs.map(d => ({ docid: d.id, ...d.data() }));
+    }).catch(err => console.error('Error loading A&H CRM tags:', err));
+    console.log('[v3][init] A&H CRM flag tags:', this.crmTags.length);
+
     // participant metadata (V2 loadParticipantMetadata)
     await this.loadParticipantMetadata();
 
@@ -232,6 +278,12 @@ export class LiveEventDataService implements OnDestroy {
       this.staffNameMap = pm?.['map'] || {};
     } catch (err) { console.error('Error loading profile map:', err); }
     console.log('[v3][zones] staff name-map entries:', Object.keys(this.staffNameMap).length);
+
+    // product id→name map (authguard.getProductMap) for the drill-down lists.
+    try {
+      this.productMap = (await this.authguard.getProductMap()) || {};
+    } catch (err) { console.error('Error loading product map:', err); }
+    console.log('[v3][init] product map entries:', Object.keys(this.productMap).length);
 
     // events (FT loadData events block / V2 identical)
     try {
@@ -366,18 +418,31 @@ export class LiveEventDataService implements OnDestroy {
       ));
       const seen = new Set<string>();
       const docs: any[] = [];
+      // A participant can have MULTIPLE request docs — one per eligible product.
+      // Dedup the universe by profileid, but collect ALL productrefs per person.
+      const productSets: { [pid: string]: Set<string> } = {};
       snap.docs.forEach(d => {
         const data = d.data();
         const profileId = data['profileid'] || '';
-        if (!profileId || seen.has(profileId)) return;
+        if (!profileId) return;
+        const pref = data['productref']?.id;
+        if (pref) { (productSets[profileId] = productSets[profileId] || new Set<string>()).add(pref); }
+        if (seen.has(profileId)) return;
         seen.add(profileId);
         docs.push({ docref: d.id, profileid: profileId, ...data });
       });
       this.eventParticipantProfileIds = [...seen];
+      this.eventParticipantSet = new Set(this.eventParticipantProfileIds);
       this.registeredCount = this.eventParticipantProfileIds.length;
       this.registeredNames = {};
-      docs.forEach(d => { const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; } });
+      this.registeredProductIds = {};
+      Object.keys(productSets).forEach(pid => { this.registeredProductIds[pid] = [...productSets[pid]]; });
+      docs.forEach(d => {
+        const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; }
+      });
       this.eventParticipants = docs.map(d => this.buildParticipantFromProfileId(d.profileid, false));
+      this.registeredByProfileId = {};
+      this.eventParticipants.forEach(p => { this.registeredByProfileId[p.profileid] = p; });
       const named = this.eventParticipantProfileIds.filter(id => this.participantMetadataMap[id]?.['name'] || this.registeredNames[id]).length;
       console.log('[v3][participants] event:', this.selectedEvent?.['name'],
         '| approved/attended (registered universe):', this.registeredCount, '| with a resolvable name:', named);
@@ -398,7 +463,8 @@ export class LiveEventDataService implements OnDestroy {
     )).subscribe({
       next: (list: any[]) => {
         const scanned = new Set<string>();
-        list.forEach((d: any) => { const pid = d['profileid']; if (pid) { scanned.add(pid); } });
+        this.arenaETicketByProfile = {};
+        list.forEach((d: any) => { const pid = d['profileid']; if (pid) { scanned.add(pid); this.arenaETicketByProfile[pid] = d; } });
         this.scannedProfileIds = [...scanned];
         this.scannedCount = this.scannedProfileIds.length;
         this.recomputeNotScanned();
@@ -554,10 +620,12 @@ export class LiveEventDataService implements OnDestroy {
           docs.forEach((d: any) => {
             const pid = d['profileid'] || '';
             if (!pid) { return; }
-            // a tag counts only if it's in the classify/eventtags taxonomy
-            const matched = Array.isArray(d['tags']) ? d['tags'].filter((t: string) => this.videoAskTags.includes(t)) : [];
-            const isTagged = matched.length > 0;
-            if (isTagged) { const set = partTags[pid] = partTags[pid] || new Set<string>(); matched.forEach((t: string) => set.add(t)); }
+            // CHANGED (operator): "reviewed" = the reviewer has GIVEN the submission a
+            // tag. participantvideoask.tags holds participant-tag docids written by
+            // videoask-display, so any non-empty tags array means it's reviewed.
+            const tags: string[] = Array.isArray(d['tags']) ? d['tags'] : [];
+            const isTagged = tags.length > 0;
+            if (isTagged) { const set = partTags[pid] = partTags[pid] || new Set<string>(); tags.forEach((t: string) => set.add(t)); }
             const uploaded = d['uploaded']?.toDate ? d['uploaded'].toDate() : (d['uploaded'] ? new Date(d['uploaded']) : null);
             if (uploaded) {
               const ds = uploaded.toLocaleDateString('en-CA');
@@ -669,6 +737,66 @@ export class LiveEventDataService implements OnDestroy {
     const categorized = this.issueCategories.map((c: any) => c.category);
     const uncategorized = this.clientIssues.filter(i => !categorized.includes(i['category']));
     if (uncategorized.length > 0) { this.categoryCounts.push(build('Uncategorized', uncategorized)); }
+  }
+
+  // ==========================================================================
+  // Manual attendance marking — writes `arena e-ticket log` docs in the QR-scanner
+  // shape (docid/product/logdate/profileid/eventref/eticketref).
+  //
+  // OPERATOR RULE (2026-07-27): a manual mark REQUIRES an active arena e-ticket,
+  // so `eticketref` and `product` are never null. No ticket → no write at all
+  // (the old bare-log fallback is gone). The operator multi-selects from the
+  // ticket's `producteligible`; ONE doc is written per selected product, with an
+  // auto-generated id — repeat marks are allowed to create additional docs
+  // (the attendance reader dedupes by calendar date, so per-day counts are safe).
+  // ==========================================================================
+
+  /** The participant's ACTIVE e-ticket for the selected event, or null. Fetched
+   *  fresh at click time (authoritative) rather than read from the in-memory
+   *  `arenaETicketByProfile` map. `active == true` mirrors the QR scanner, which
+   *  refuses an inactive ticket. */
+  async fetchActiveETicket(profileId: string): Promise<{ id: string; data: any } | null> {
+    if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
+    const snap = await getDocs(query(
+      collection(this.firestoreDefault, 'arena e-ticket'),
+      where('eventref', '==', this.selectedEvent.docref),
+      where('profileid', '==', profileId),
+      where('active', '==', true)
+    ));
+    if (snap.empty) {
+      console.log('[v3][attendance] no active e-ticket for', profileId);
+      return null;
+    }
+    // The approve flow upserts one ticket per participant per event; if more than
+    // one somehow exists, use the first and surface it rather than failing.
+    if (snap.docs.length > 1) {
+      console.warn('[v3][attendance] multiple active e-tickets for', profileId, '— using the first of', snap.docs.length);
+    }
+    const d = snap.docs[0];
+    return { id: d.id, data: { docid: d.id, ...d.data() } };
+  }
+
+  /** One `arena e-ticket log` doc per selected product. Ids are pre-generated so
+   *  `docid` can carry the real id in the same single write. */
+  async markAttendanceForProducts(profileId: string, eticketDocId: string, productIds: string[]): Promise<void> {
+    if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
+    if (!eticketDocId) { throw new Error('NO_ETICKET'); }
+    if (!productIds.length) { throw new Error('NO_PRODUCT'); }
+    const col = collection(this.firestoreDefault, 'arena e-ticket log');
+    const eticketref = doc(this.firestoreDefault, 'arena e-ticket', eticketDocId);
+    await Promise.all(productIds.map(productId => {
+      const id = doc(col).id;                     // auto id, known before the write
+      return setDoc(doc(col, id), {
+        docid: id,
+        product: doc(this.firestoreDefault, 'products', productId),
+        logdate: Timestamp.now(),                 // client now (avoids the pending serverTimestamp null the attendance read can't handle)
+        profileid: profileId,
+        eventref: this.selectedEvent!.docref,
+        eticketref,
+        markedmanually: true,                     // audit flag — distinguishes manual marks from QR scans
+      });
+    }));
+    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', eticketDocId, '| products:', productIds);
   }
 
   // ==========================================================================
@@ -915,13 +1043,47 @@ export class LiveEventDataService implements OnDestroy {
   private subscribeToArenaOverview(): void {
     this.liveChangeWorkData = [];
     this.liveChangeworkLiveData = [];
-    if (this.selectedQueues.length === 0 || !this.selectedEvent || this.atcModels.length === 0) return;
+    // atcModels no longer gates ATC — atc_alpha/atc_to_validate now scope by queueid.
+    if (this.selectedQueues.length === 0 || !this.selectedEvent) return;
     if (!this.filterStartDate || !this.filterEndDate) return;
     this.unsubscribeQueuePipeline();
     this.subscribeToAtcAlpha();
     this.subscribeToAtcToValidate();
+    this.subscribeToDraftAtc();
     this.subscribeToLiveChangeWork();
     this.subscribeToLiveChangeworkLive();
+  }
+
+  // V2 subscribeToDraftAtc — temporary_ATC drafts (delete==false) whose transcript[0]
+  // has an adjustment and whose lastupdated is within the queue range; scoped to the
+  // registered universe, counted as UNIQUE participants. Read from firestore-atc.
+  private subscribeToDraftAtc(): void {
+    if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
+    if (!this.selectedEvent || !this.queueRangeStartDate) { this.draftAtcProfileIds = []; this.draftAtcCount = 0; return; }
+    this.draftAtcSub = collectionData(query(
+      collection(this.firestoreATC, 'temporary_ATC'), where('delete', '==', false)
+    )).subscribe({
+      next: (docs: any[]) => {
+        const ids: string[] = [];
+        docs.forEach((d: any) => {
+          const transcript = d['transcript'] || [];
+          if (transcript.length > 0 && ![null, undefined, ''].includes(transcript[0]['adjustment'])) {
+            if (this.isDateInQueueRange(d['lastupdated'])) {
+              const profileId = d['profileid'] || '';
+              if (profileId && this.eventParticipantProfileIds.includes(profileId)) {
+                const lastUpdated = d['lastupdated']?.toDate ? d['lastupdated'].toDate() : new Date(d['lastupdated']);
+                if (this.queueRangeStartDate && lastUpdated >= this.queueRangeStartDate && !ids.includes(profileId)) { ids.push(profileId); }
+              }
+            }
+          }
+        });
+        this.draftAtcProfileIds = ids;
+        this.draftAtcCount = ids.length;
+        console.log('[v3][atc] temporary_ATC draft docs:', docs.length, '| draft participants (event):', ids.length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to temporary_ATC drafts:', error)
+    });
   }
 
   // V2 isDateInQueueRange
@@ -931,20 +1093,33 @@ export class LiveEventDataService implements OnDestroy {
     return prescDate >= this.queueRangeStartDate && prescDate <= this.queueRangeEndDate;
   }
 
+  // Selected queue doc ids (queue generation ids) — the value stamped on ATC docs
+  // as `queueid` (prescribe-atc). Basis for scoping ATC by the SELECTED QUEUE(S).
+  private selectedQueueIds(): string[] {
+    return this.selectedQueues.map(q => q.docref?.id).filter((id): id is string => !!id);
+  }
+
   // atc_to_validate half → atcToValidateProfileIds.
   // Query from V2 (product in atcModels). Unvalidated = any atc_to_validate doc
   // whose status is NOT 'validated' (operator-confirmed): the collection holds many
   // statuses, and only 'validated' ones are done — everything else is still pending.
   private subscribeToAtcToValidate(): void {
     if (this.atcToValidateSub) { this.atcToValidateSub.unsubscribe(); this.atcToValidateSub = null; }
+    const queueIds = this.selectedQueueIds();
+    if (queueIds.length === 0) { this.atcToValidateProfileIds = []; this.recomputeAtcBuckets(); return; }
+    // CHANGED (operator): scope by the SELECTED QUEUE ID(s) — atc_to_validate.queueid
+    // — instead of product-in-atcModels + queue date range.
     this.atcToValidateSub = collectionData(query(
-      collection(this.firestoreATC, 'atc_to_validate'), where('product', 'in', this.atcModels)
+      collection(this.firestoreATC, 'atc_to_validate'), where('queueid', 'in', queueIds)
     )).subscribe({
       next: (docs: any[]) => {
         const ids: string[] = [];
         let pendingDocs = 0;
         docs.forEach((d: any) => {
-          if (d['status'] !== 'validated' && this.isDateInQueueRange(d['prescription_date'])) {
+          // view-prescribed-atc rule: a prescription is UNVALIDATED iff status ===
+          // 'atc given' (every other status is validated). Also mirror its doc
+          // filters: isdelete==false and type=='online'.
+          if (d['status'] === 'atc given' && d['isdelete'] !== true && d['type'] === 'online') {
             pendingDocs++;
             const profileId = d['profileid'] || '';
             if (profileId && this.eventParticipantProfileIds.includes(profileId) && !ids.includes(profileId)) { ids.push(profileId); }
@@ -952,9 +1127,8 @@ export class LiveEventDataService implements OnDestroy {
         });
         this.atcToValidateProfileIds = ids;
         console.log('[v3][atc] atc_to_validate docs:', docs.length,
-          "| status!='validated' & in-range:", pendingDocs,
-          '| unvalidated profiles (event-participant):', ids.length,
-          '| models:', this.atcModels);
+          "| status=='atc given' (unvalidated) & online:", pendingDocs,
+          '| unvalidated profiles (event-participant):', ids.length);
         this.recomputeAtcBuckets();
         this.changed$.next();
       },
@@ -990,21 +1164,23 @@ export class LiveEventDataService implements OnDestroy {
 
   // FT subscribeToAtcAlpha (adjustments sums added from V1, applied to the same docs)
   private subscribeToAtcAlpha(): void {
+    const queueIds = this.selectedQueueIds();
+    if (queueIds.length === 0) { return; }
+    // CHANGED (operator): scope ATC by the SELECTED QUEUE ID(s) — atc_alpha.queueid —
+    // instead of product-in-atcModels + queue date range. queueid is stamped on
+    // submit (prescribe-atc) and is the read pattern eit-education-atc uses. isdelete
+    // and latest-doc-per-profile are applied client-side to keep the query index-light.
     const atcQuery = query(collection(this.firestoreATC, 'atc_alpha'),
-      where('product', 'in', this.atcModels),
-      where('isdelete', '==', false),
-      where('prescription_date', '>=', this.queueRangeStartDate),
-      where('prescription_date', '<=', this.queueRangeEndDate),
-      orderBy('prescription_date', 'desc'));
+      where('queueid', 'in', queueIds));
     this.atcSub = collectionData(atcQuery).subscribe({
       next: (docs: any[]) => {
-        this.atcDocs = docs;
+        this.atcDocs = docs.filter((d: any) => d['isdelete'] !== true);
         this.profileAtcMap = {};
-        docs.forEach((d: any) => {
+        this.atcDocs.forEach((d: any) => {
           const profileId: string = d['profileid'] || '';
           if (!profileId || !this.eventParticipantProfileIds.includes(profileId)) return;
           const prescriptionDate = d['prescription_date']?.toDate ? d['prescription_date'].toDate() : new Date(d['prescription_date']);
-          if (!this.profileAtcMap[profileId]) { this.profileAtcMap[profileId] = { ...d, _date: prescriptionDate }; }
+          if (!this.profileAtcMap[profileId] || prescriptionDate > this.profileAtcMap[profileId]._date) { this.profileAtcMap[profileId] = { ...d, _date: prescriptionDate }; }
         });
         this.beneficierProfileIds = [];
         Object.keys(this.profileAtcMap).forEach(profileId => {
@@ -1293,13 +1469,17 @@ export class LiveEventDataService implements OnDestroy {
     return { total: opp + done, done, pending: opp };
   }
 
-  /** Flattened LIVE-now who/what list from FT's live pipeline (mapProcedureData). */
+  /** Flattened LIVE-now who/what list from FT's live pipeline (mapProcedureData).
+   *  Both parties of each live changework are listed — the doer AND the beneficiary
+   *  — each tagged with its role + procedure. */
   get liveChangeworkList(): { profileId: string; name: string; proc: string }[] {
     const out: { profileId: string; name: string; proc: string }[] = [];
     for (const id of Object.keys(this.mapProcedureData)) {
       const d = this.mapProcedureData[id];
       (d.liveChangework.data || []).forEach((row: any) => {
-        out.push({ profileId: row.doerId, name: row.doerName, proc: row.displayText || this.mapProcedureNames[id] || '' });
+        const procName = row.procedureName || this.mapProcedureNames[id] || '';
+        if (row.doerId) { out.push({ profileId: row.doerId, name: row.doerName, proc: `Doer · ${procName}` }); }
+        if (row.beneficiaryId) { out.push({ profileId: row.beneficiaryId, name: row.beneficiaryName, proc: `Beneficiary · ${procName}` }); }
       });
     }
     return out;
@@ -1345,8 +1525,8 @@ export class LiveEventDataService implements OnDestroy {
   // V2 buildParticipantFromProfileId
   buildParticipantFromProfileId(profileId: string, isPresent: boolean): PanelParticipant {
     const metadata = this.participantMetadataMap[profileId] || {};
-    const registered = this.eventParticipants.find(p => p.profileid === profileId);
-    const isNotRegistered = !this.eventParticipantProfileIds.includes(profileId);
+    const registered = this.registeredByProfileId[profileId];
+    const isNotRegistered = !this.eventParticipantSet.has(profileId);
     return {
       docref: registered?.docref || profileId,
       profileid: profileId,
@@ -1414,6 +1594,8 @@ export class LiveEventDataService implements OnDestroy {
     this.profileAtcMap = {};
     this.atcToValidateProfileIds = [];
     this.atcBuckets = { full: 0, partial: 0, unvalidated: 0, none: 0, fullIds: [], partialIds: [], unvalidatedIds: [], noneIds: [] };
+    this.draftAtcProfileIds = [];
+    this.draftAtcCount = 0;
     this.liveChangeWorkData = [];
     this.liveChangeworkLiveData = [];
     this.liveChangeworkTotal = 0;
@@ -1429,6 +1611,7 @@ export class LiveEventDataService implements OnDestroy {
   private unsubscribeQueuePipeline(): void {
     if (this.atcSub) { this.atcSub.unsubscribe(); this.atcSub = null; }
     if (this.atcToValidateSub) { this.atcToValidateSub.unsubscribe(); this.atcToValidateSub = null; }
+    if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
     if (this.lcwSub) { this.lcwSub.unsubscribe(); this.lcwSub = null; }
     if (this.lcwLiveSub) { this.lcwLiveSub.unsubscribe(); this.lcwLiveSub = null; }
   }

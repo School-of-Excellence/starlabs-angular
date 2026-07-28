@@ -3,6 +3,8 @@ import { FirebaseApp } from '@angular/fire/app';
 import { Firestore, getFirestore } from '@angular/fire/firestore';
 import { Functions, getFunctions, httpsCallable } from '@angular/fire/functions';
 import {
+  AttachOfflineOk,
+  AttachOfflineReq,
   RebuildOk,
   RebuildReq,
   RegenerateOk,
@@ -58,5 +60,15 @@ export class AtcFirebaseService {
   readonly rebuildAtcPrompt = httpsCallable<RebuildReq, RebuildOk>(
     this.functions,
     'rebuildAtcPrompt',
+  );
+
+  /**
+   * attachOfflineStudioSession({ docid, stage, dropboxLink, profileName? }) —
+   * for a stage with NO studio-session log at all (the session happened
+   * offline). See atc-ops.types.ts for the full contract.
+   */
+  readonly attachOfflineStudioSession = httpsCallable<AttachOfflineReq, AttachOfflineOk>(
+    this.functions,
+    'attachOfflineStudioSession',
   );
 }

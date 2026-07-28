@@ -129,6 +129,18 @@ td.mat-mdc-cell { font-size: 13px; color: #2b3140; padding: 10px 12px; vertical-
 .name-text { font-weight: 500; }
 .profile-id { font-size: 10.5px; color: #9aa0ac; font-family: monospace; }
 
+/* per-row refresh — kept quiet until the row is hovered, so 700 refresh icons
+   do not compete with the badges that carry the actual state. */
+.row-refresh-btn {
+  width: 28px; height: 28px; line-height: 28px; margin-left: auto;
+  flex: 0 0 28px; color: #9aa0ac; opacity: 0; transition: opacity .15s;
+}
+.row-refresh-btn .mat-icon { font-size: 17px; width: 17px; height: 17px; }
+.data-row:hover .row-refresh-btn { opacity: 1; }
+.row-refresh-btn:focus-visible { opacity: 1; }
+.row-refresh-btn[disabled] { opacity: 1; }        /* spinner must stay visible */
+.row-refresh-btn:hover { color: #3f51b5; }
+
 .stage-badge, .queue-badge {
   display: inline-block; background: #eef1f7; color: #48505f;
   border-radius: 12px; padding: 3px 10px; font-size: 11.5px;
@@ -216,6 +228,13 @@ td.mat-mdc-cell { font-size: 13px; color: #2b3140; padding: 10px 12px; vertical-
   display: inline-flex; align-items: center; color: #3f51b5; text-decoration: none;
 }
 .link-open-btn mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+/* ── offline-session attach (no studio-session log; manual Dropbox override) ── */
+.offline-cell .link-input { border-color: #e0a800; }
+.offline-cell .link-save-btn { color: #856404; }
+.offline-hint {
+  font-size: 11px; color: #9aa0ac; font-style: italic;
+}
 
 /* ── empty ──────────────────────────────────────────────────────────────── */
 .no-data-cell { text-align: center; padding: 40px 0; color: #9aa0ac; }

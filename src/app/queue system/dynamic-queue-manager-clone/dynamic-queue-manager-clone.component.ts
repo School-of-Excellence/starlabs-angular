@@ -1954,10 +1954,8 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
 
     collectionData(query(collection(this.firestore, 'queue_token'), where("queueref", "==", doc(this.firestore, "queue generation", this.selectedQueue.docid)), orderBy("logdate", "asc"))).pipe(takeUntil(this.subscriptionHandle), takeUntil(this.liveQueueSubscription)).subscribe(token => {  
       this.allTokensData = token; 
-      this.availableStagesFromSlot = this.extractUniqueStagesFromSlot(token);  
       this.processTokensIntoStages(token);
       
-
       const newProfileIds: string[] = [];
 
       token.forEach((e) => {
@@ -2589,6 +2587,7 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       if (!queuePlanningSnap.empty) {
         const queuePlanningDoc = queuePlanningSnap.docs[0].data();
         this.cachedPlanningData = queuePlanningDoc;
+        this.availableStagesFromSlot = this.extractUniqueStagesFromPlanning();
         this.queuePlanningSegments = queuePlanningDoc['segmentlist'] || [];
 
         const planning = queuePlanningDoc['planning'] || [];
@@ -2661,45 +2660,22 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
     }
   }
 
-  extractUniqueStagesFromSlot(tokens: any[]): string[] { //dharshan
-    const stageSet = new Set<string>();  
-    tokens.forEach((token, index) => {
-      const slotData = token.selectedstageslot; 
-      
-      if (slotData) {
-        if (typeof slotData === 'object' && !Array.isArray(slotData)) {
-          Object.entries(slotData).forEach(([key, slot]: [string, any]) => {
-            if (index < 3) {
-              console.log(` Slot key: ${key}, value:`, slot);
-            }
-            
-            if (slot && typeof slot === 'object') {
-              const stageName = slot.stagename || slot.stageName || slot.stage;
-              if (stageName) {
-                if (index < 3) {
-                  console.log('Found stagename:', stageName);
-                }
-                stageSet.add(stageName);
-              } else {
-                if (index < 3) {
-                  console.log(' No stagename found in slot:', Object.keys(slot));
-                }
-              }
-            }
-          });
-        }
-      } else {
-        if (index < 3) { 
-          console.log(`Token ${index} has no selectedstageslot field`);
+  extractUniqueStagesFromPlanning(): string[] {
+    const stageSet = new Set<string>();
+    if (!this.cachedPlanningData?.planning) return [];
+
+    for (const variationPlanning of this.cachedPlanningData.planning) {
+      for (const segmentData of (variationPlanning.segments || [])) {
+        for (const slot of (segmentData.slots || [])) {
+          if (slot?.stagename) stageSet.add(slot.stagename);
         }
       }
-    });
-    
-    const stages = Array.from(stageSet).sort();
-    return stages;
+    }
+
+    return Array.from(stageSet).sort();
   }
 
-getBookedSlotTitle(token: any): string {
+  getBookedSlotTitle(token: any): string {
     const slot = this.getBookedSlot(token);
     if (!slot) return '';
     const key = `${slot.stagename}_${slot.start.getTime()}_${slot.end.getTime()}`;
