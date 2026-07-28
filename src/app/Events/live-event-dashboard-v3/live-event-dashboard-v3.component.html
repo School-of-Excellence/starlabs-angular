@@ -836,6 +836,7 @@
                   [(ngModel)]="panelFilter.products"
                   (selectionChange)="onPanelProductChange()"
                   (openedChange)="panelSelectOpen = $event"
+                  [panelWidth]="null"
                   panelClass="pf-select-panel">
         <mat-select-trigger>{{ panelProductTriggerLabel }}</mat-select-trigger>
         <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">
@@ -856,6 +857,7 @@
                   [(ngModel)]="panelFilter.cohorts"
                   (selectionChange)="onPanelCohortChange()"
                   (openedChange)="onCohortSelectOpened($event)"
+                  [panelWidth]="null"
                   panelClass="pf-select-panel pf-select-searchable">
         <mat-select-trigger>{{ panelCohortTriggerLabel }}</mat-select-trigger>
         <!-- pinned search — clicks must not bubble out to the option list -->

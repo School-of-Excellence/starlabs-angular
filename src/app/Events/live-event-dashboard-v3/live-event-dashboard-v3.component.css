@@ -375,11 +375,21 @@ mat-select.pf-select.on{
   --mat-full-pseudo-checkbox-selected-checkmark-color:#fff;
   --mat-full-pseudo-checkbox-unselected-icon-color:#aeaeb2;
 }
-::ng-deep .pf-select-panel .mat-mdc-option{min-height:36px;border-radius:8px}
-::ng-deep .pf-select-panel .mat-mdc-option .mdc-list-item__primary-text{width:100%;font-size:12.5px}
-::ng-deep .pf-select-panel .pf-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
-::ng-deep .pf-select-panel .pf-opt-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-::ng-deep .pf-select-panel .pf-opt-c{flex:none;font-size:10.5px;color:#8e8e93;font-variant-numeric:tabular-nums}
+/* The trigger is a fixed-height field so it must ellipsize, but the option list
+   shows names in full: [panelWidth]="null" lets the panel size to its content
+   instead of matching the trigger, and the option text wraps rather than
+   truncating. Bounded so a long product name cannot outgrow the 440px panel. */
+::ng-deep .pf-select-panel.mat-mdc-select-panel{min-width:216px;max-width:328px}
+::ng-deep .pf-select-panel .mat-mdc-option{
+  min-height:36px;height:auto;border-radius:8px;padding-top:7px;padding-bottom:7px;
+}
+::ng-deep .pf-select-panel .mat-mdc-option .mdc-list-item__primary-text{
+  width:100%;font-size:12.5px;line-height:1.35;
+  white-space:normal;overflow:visible;text-overflow:clip;
+}
+::ng-deep .pf-select-panel .pf-opt{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%}
+::ng-deep .pf-select-panel .pf-opt-n{white-space:normal;overflow-wrap:anywhere}
+::ng-deep .pf-select-panel .pf-opt-c{flex:none;font-size:10.5px;color:#8e8e93;font-variant-numeric:tabular-nums;margin-top:2px}
 
 /* in-dropdown search — sticks to the top of the scrolling option list. The negative
    margin + matching top offset let it cover the panel's own 6px padding as the list
