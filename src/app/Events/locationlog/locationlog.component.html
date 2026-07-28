@@ -152,10 +152,17 @@
             Location tracking
           </span>
           <h1 class="ll-title">Live Location Tracking</h1>
-          <p class="ll-subtitle">Shows the latest location reported by every participant.</p>
+          <p class="ll-subtitle">
+            @if (activeTab() === 0) {
+              Shows the latest location reported by every participant.
+            } @else {
+              Every location report in the collection, newest first.
+            }
+          </p>
         </div>
 
-        <div class="ll-header-actions">
+        <!-- Refresh belongs to the dashboard; the log tab has its own Reload. -->
+        <div class="ll-header-actions" [hidden]="activeTab() !== 0">
           <mat-slide-toggle
             class="ll-auto-toggle"
             [checked]="(autoRefresh | async) ?? false"
@@ -175,6 +182,21 @@
           </button>
         </div>
       </header>
+
+      <!--
+        Two tabs over the same collection: the dashboard reads the latest report
+        per participant, the log tab reads every document. Refresh and auto
+        refresh belong to the dashboard, so they are hidden on the log tab,
+        which has its own Reload.
+      -->
+      <mat-tab-group
+        class="ll-tabs"
+        animationDuration="200ms"
+        [selectedIndex]="activeTab()"
+        (selectedIndexChange)="activeTab.set($event)">
+
+        <mat-tab label="Live tracking">
+          <div class="ll-tab-body">
 
       <!--
         Status is derived, not stored. Saying so in the UI stops "Live" being
@@ -815,6 +837,16 @@
           </footer>
         }
       }
+          </div>
+        </mat-tab>
+
+        <mat-tab label="All logs">
+          <div class="ll-tab-body">
+            <app-location-logs [reference]="referenceCoords | async"></app-location-logs>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+
     </div>
 
     <!-- Mobile floating refresh -->

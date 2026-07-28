@@ -54,6 +54,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {
   BehaviorSubject,
@@ -92,6 +93,7 @@ import {
   TimeWindow,
 } from './location.model';
 import { GeocodingService } from './geocoding.service';
+import { LocationLogsComponent } from './location-logs.component';
 import { MapPickerComponent } from './map-picker.component';
 import { LatestLocationsResult, LocationlogService, SCAN_LIMIT } from './locationlog.service';
 import {
@@ -181,8 +183,10 @@ interface DashboardView {
     MatSidenavModule,
     MatSlideToggleModule,
     MatTableModule,
+    MatTabsModule,
     MatTooltipModule,
     MapPickerComponent,
+    LocationLogsComponent,
   ],
   templateUrl: './locationlog.component.html',
   styleUrl: './locationlog.component.css',
@@ -389,6 +393,9 @@ export class LocationlogComponent {
 
   /** Place search — the primary way to pick a location. */
   readonly placeSearchControl = new FormControl<string>('', { nonNullable: true });
+  /** 0 = Live tracking, 1 = All logs. */
+  readonly activeTab = signal(0);
+
   readonly searching = signal(false);
   readonly searched = signal(false);
   readonly manualEntryOpen = signal(false);
