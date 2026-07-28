@@ -96,6 +96,9 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   private panelRows: PanelParticipant[] = [];
   // manual attendance marking (only enabled for the per-day Unattended list)
   panelMarkable = false;
+  /** 'yyyy-mm-dd' the mark is credited to — '' = today. Set from the day card the
+   *  list was opened from, so marking off a PAST day backdates the log. */
+  panelMarkDate = '';
   markedIds = new Set<string>();
   markingId: string | null = null;
   // inline product picker: which row is expanded, that participant's active
@@ -576,6 +579,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   openAttAbsent(day: DayAttendance): void {
     this.openPanel(`Unattended · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', day.absentProfileIds);
     this.panelMarkable = true;   // allow manual attendance marking from this list
+    // Credit the mark to the day the operator is looking at. Today stays undated so
+    // the log keeps the real click time; a past day must be backdated or the mark
+    // lands on today and that day's Unattended count never moves.
+    this.panelMarkDate = day.isToday ? '' : day.date;
   }
   attMissingVACount(day: DayAttendance): number { return this.getMissingRecordingByDay(day).length; }
   openAttMissingVA(day: DayAttendance): void { this.openPanel(`Video Ask not submitted · ${this.attDayLabel(day)}`, this.data.selectedEvent?.['name'] || '', this.getMissingRecordingByDay(day)); }
@@ -1139,6 +1146,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelRowIds = this.panelRowProfileIds(rows);
     this.refreshPanelOptions();
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
+    this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
@@ -1362,13 +1370,20 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.markPickerId = null; this.markTicketId = null; this.markOptions = []; this.markSelected = new Set<string>();
   }
 
+  /** The day a mark will be credited to, spelled out for the confirm dialog — the
+   *  operator has to be able to see they are backdating. */
+  get markDateLabel(): string {
+    if (!this.panelMarkDate) { return 'today'; }
+    const [y, m, d] = this.panelMarkDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
   confirmMark(p: PanelParticipant): void {
     if (this.markingId || !this.markTicketId || !this.markSelected.size) { return; }
-    if (!window.confirm(`Are you sure you want to mark the attendance for ${p.name}?`)) { return; }
+    if (!window.confirm(`Mark ${p.name} present for ${this.markDateLabel}?`)) { return; }
     const ticketId = this.markTicketId;
     const productIds = [...this.markSelected];
     this.markingId = p.profileid;
-    this.data.markAttendanceForProducts(p.profileid, ticketId, productIds)
+    this.data.markAttendanceForProducts(p.profileid, ticketId, productIds, this.panelMarkDate || undefined)
       .then(() => {
         this.markedIds.add(p.profileid); this.markingId = null; this.closeMarkPicker(); this.cdr.detectChanges();
       })

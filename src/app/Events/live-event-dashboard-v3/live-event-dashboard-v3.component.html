@@ -927,7 +927,7 @@
         </div>
         <!-- inline product picker — one attendance log doc per selected product -->
         <div class="mark-picker" *ngIf="markPickerId === p.profileid">
-          <div class="mark-picker-head">Select the product(s) to mark attendance against</div>
+          <div class="mark-picker-head">Select the product(s) to mark attendance against &mdash; credited to <b>{{ markDateLabel }}</b></div>
           <label class="mark-opt" *ngFor="let opt of markOptions">
             <input type="checkbox" [checked]="markSelected.has(opt.id)" (change)="toggleMarkProduct(opt.id)">
             <span>{{ opt.name }}</span>

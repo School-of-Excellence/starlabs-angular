@@ -776,27 +776,45 @@ export class LiveEventDataService implements OnDestroy {
     return { id: d.id, data: { docid: d.id, ...d.data() } };
   }
 
+  /** Noon local on a 'yyyy-mm-dd' day. recomputeAttendanceDays buckets a log by the
+   *  LOCAL calendar date of `logdate`, so a backdated mark has to land safely inside
+   *  that day whatever the offset — midnight can slide into the neighbouring day
+   *  across a timezone or DST boundary, noon cannot. */
+  private noonOn(date: string): Date {
+    const [y, m, d] = date.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0, 0);
+  }
+
   /** One `arena e-ticket log` doc per selected product. Ids are pre-generated so
-   *  `docid` can carry the real id in the same single write. */
-  async markAttendanceForProducts(profileId: string, eticketDocId: string, productIds: string[]): Promise<void> {
+   *  `docid` can carry the real id in the same single write.
+   *
+   *  `onDate` ('yyyy-mm-dd') backdates the mark — the operator marking from a PAST
+   *  day's Unattended list means "this person was here that day", and stamping now
+   *  would credit today instead, leaving that day's count untouched. Omitted for
+   *  today's lists so the stamp stays the real click time (the Arena Followup
+   *  irregular-arrival cutoff reads the time of day, not just the date). */
+  async markAttendanceForProducts(profileId: string, eticketDocId: string, productIds: string[], onDate?: string): Promise<void> {
     if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
     if (!eticketDocId) { throw new Error('NO_ETICKET'); }
     if (!productIds.length) { throw new Error('NO_PRODUCT'); }
     const col = collection(this.firestoreDefault, 'arena e-ticket log');
     const eticketref = doc(this.firestoreDefault, 'arena e-ticket', eticketDocId);
+    // client now (avoids the pending serverTimestamp null the attendance read can't handle)
+    const logdate = onDate ? Timestamp.fromDate(this.noonOn(onDate)) : Timestamp.now();
     await Promise.all(productIds.map(productId => {
       const id = doc(col).id;                     // auto id, known before the write
       return setDoc(doc(col, id), {
         docid: id,
         product: doc(this.firestoreDefault, 'products', productId),
-        logdate: Timestamp.now(),                 // client now (avoids the pending serverTimestamp null the attendance read can't handle)
+        logdate,
         profileid: profileId,
         eventref: this.selectedEvent!.docref,
         eticketref,
         markedmanually: true,                     // audit flag — distinguishes manual marks from QR scans
       });
     }));
-    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', eticketDocId, '| products:', productIds);
+    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', eticketDocId,
+      '| products:', productIds, '| credited to:', onDate || 'today');
   }
 
   // ==========================================================================
