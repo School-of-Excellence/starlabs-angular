@@ -96,6 +96,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   panelMarkable = false;
   markedIds = new Set<string>();
   markingId: string | null = null;
+  // inline product picker: which row is expanded, that participant's active
+  // e-ticket, its eligible products and the operator's multi-selection.
+  markPickerId: string | null = null;
+  markTicketId: string | null = null;
+  markOptions: { id: string; name: string }[] = [];
+  markSelected = new Set<string>();
 
   private sub: Subscription | null = null;
 
@@ -1094,9 +1100,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelFilter = { type: 'all', unattended: false };
+    this.panelFilter = { type: 'all', attendance: 'all' };
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.markedIds = new Set<string>();
+    this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
     this.panelRows = preserveOrder ? rows.slice() : rows.slice().sort((a, b) => a.name.localeCompare(b.name));
     this.panelOpen = true;
@@ -1121,16 +1128,19 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     });
     return rows;
   }
-  // list filters: first-timer / repeat (mutually exclusive) + no-attendance-log.
-  panelFilter: { type: 'all' | 'ft' | 'rp'; unattended: boolean } = { type: 'all', unattended: false };
+  // list filters: first-timer / repeat (mutually exclusive) + attendance-log
+  // presence ('none' = no scan on any day · 'has' = at least one scan). The two
+  // attendance chips are mutually exclusive — together they would match nobody.
+  panelFilter: { type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has' } = { type: 'all', attendance: 'all' };
   togglePanelType(t: 'ft' | 'rp'): void { this.panelFilter.type = this.panelFilter.type === t ? 'all' : t; }
-  togglePanelUnattended(): void { this.panelFilter.unattended = !this.panelFilter.unattended; }
-  get panelFilterActive(): boolean { return this.panelFilter.type !== 'all' || this.panelFilter.unattended; }
+  togglePanelAttendance(a: 'none' | 'has'): void { this.panelFilter.attendance = this.panelFilter.attendance === a ? 'all' : a; }
+  get panelFilterActive(): boolean { return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all'; }
   private hasAttendanceLog(profileid: string): boolean { const r = this.data.mapAttendence[profileid]; return !!r && r.length > 0; }
   private matchesPanelFilter(profileid: string): boolean {
     if (this.panelFilter.type === 'ft' && !this.isFirstTimer(profileid)) { return false; }
     if (this.panelFilter.type === 'rp' && this.isFirstTimer(profileid)) { return false; }
-    if (this.panelFilter.unattended && this.hasAttendanceLog(profileid)) { return false; }
+    if (this.panelFilter.attendance === 'none' && this.hasAttendanceLog(profileid)) { return false; }
+    if (this.panelFilter.attendance === 'has' && !this.hasAttendanceLog(profileid)) { return false; }
     return true;
   }
   get panelParticipants(): PanelParticipant[] {
@@ -1151,14 +1161,61 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get panelCount(): number { return this.panelParticipants.length; }
   closePanel(): void { this.panelOpen = false; }
 
-  /** Manual attendance marking (Unattended list). Confirms, then writes an
-   *  `arena e-ticket log` doc via the service so the person becomes present today. */
-  markAttendance(p: PanelParticipant): void {
+  /** Manual attendance marking (Unattended list) — two steps.
+   *  Step 1 `openMarkPicker`: fetch the participant's ACTIVE arena e-ticket. No
+   *  ticket (or no eligible products on it) → alert and write nothing, so
+   *  `eticketref`/`product` can never be null. Otherwise the row expands inline
+   *  into a product multi-select.
+   *  Step 2 `confirmMark`: confirm, then write one log doc per selected product. */
+  openMarkPicker(p: PanelParticipant): void {
     if (!p?.profileid || this.markingId || this.markedIds.has(p.profileid)) { return; }
+    this.markingId = p.profileid;                 // single-flight lock during the fetch
+    this.data.fetchActiveETicket(p.profileid)
+      .then(ticket => {
+        this.markingId = null;
+        if (!ticket) {
+          window.alert(`${p.name} has no active e-ticket for this event, so attendance cannot be marked. Approve an e-ticket first.`);
+          this.cdr.detectChanges();
+          return;
+        }
+        const products: string[] = ticket.data['producteligible'] || [];
+        if (!products.length) {
+          window.alert(`${p.name}'s e-ticket has no eligible products, so there is nothing to mark attendance against.`);
+          this.cdr.detectChanges();
+          return;
+        }
+        this.markPickerId = p.profileid;
+        this.markTicketId = ticket.id;
+        this.markOptions = products.map(id => ({ id, name: this.data.productMap[id] || id }));
+        this.markSelected = new Set<string>();
+        this.cdr.detectChanges();
+      })
+      .catch((err: any) => {
+        this.markingId = null;
+        console.error('[v3][attendance] e-ticket lookup failed:', err);
+        window.alert('Could not load the e-ticket. Please try again.');
+        this.cdr.detectChanges();
+      });
+  }
+
+  toggleMarkProduct(productId: string): void {
+    if (this.markSelected.has(productId)) { this.markSelected.delete(productId); } else { this.markSelected.add(productId); }
+  }
+
+  closeMarkPicker(): void {
+    this.markPickerId = null; this.markTicketId = null; this.markOptions = []; this.markSelected = new Set<string>();
+  }
+
+  confirmMark(p: PanelParticipant): void {
+    if (this.markingId || !this.markTicketId || !this.markSelected.size) { return; }
     if (!window.confirm(`Are you sure you want to mark the attendance for ${p.name}?`)) { return; }
+    const ticketId = this.markTicketId;
+    const productIds = [...this.markSelected];
     this.markingId = p.profileid;
-    this.data.markAttendance(p.profileid)
-      .then(() => { this.markedIds.add(p.profileid); this.markingId = null; this.cdr.detectChanges(); })
+    this.data.markAttendanceForProducts(p.profileid, ticketId, productIds)
+      .then(() => {
+        this.markedIds.add(p.profileid); this.markingId = null; this.closeMarkPicker(); this.cdr.detectChanges();
+      })
       .catch((err: any) => {
         this.markingId = null;
         console.error('[v3][attendance] mark failed:', err);

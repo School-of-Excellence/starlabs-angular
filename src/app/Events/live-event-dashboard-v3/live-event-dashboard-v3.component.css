@@ -346,6 +346,19 @@ input,select{font:inherit}
 .mark-att:hover{filter:brightness(.96)}
 .mark-att:disabled{opacity:.5;cursor:default}
 .mark-done{font-size:10px;font-weight:600;color:var(--ok)}
+/* inline product multi-select for manual attendance marking */
+.p-row-picking{background:var(--z-50)}
+.mark-picker{margin:0 10px 8px 51px;padding:9px 11px;border:1px solid var(--z-200);border-radius:var(--r-sm);background:var(--z-50)}
+.mark-picker-head{font-size:10.5px;font-weight:600;color:var(--z-600);margin-bottom:6px}
+.mark-opt{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 0;cursor:pointer}
+.mark-opt input{cursor:pointer}
+.mark-picker-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:8px}
+.mark-cancel{
+  font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--z-600);background:#fff;
+  border:1px solid var(--z-200);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;white-space:nowrap;
+}
+.mark-cancel:hover{border-color:var(--z-400)}
+.mark-cancel:disabled{opacity:.5;cursor:default}
 /* doer vs beneficiary role pill — clear, colour-coded */
 .p-role{font-size:8.5px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:var(--r-pill);display:inline-block;white-space:nowrap}
 .p-role.doer{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
