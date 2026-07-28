@@ -25,6 +25,7 @@ import {
   Component,
   DestroyRef,
   PLATFORM_ID,
+  ViewChild,
   inject,
   signal,
 } from '@angular/core';
@@ -53,6 +54,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {
   BehaviorSubject,
@@ -75,22 +77,31 @@ import {
 
 import {
   Coordinates,
+  CustomDistance,
   DEFAULT_FILTERS,
   DashboardStats,
   DistanceBand,
+  DistanceDirection,
+  DistanceUnit,
   FreshnessFilter,
   DeviceLocationState,
   LocationFilters,
   ParticipantLocation,
+  PlaceResult,
   ReferencePoint,
   SortKey,
   TimeWindow,
 } from './location.model';
+import { GeocodingService } from './geocoding.service';
+import { LocationLogsComponent } from './location-logs.component';
+import { MapPickerComponent } from './map-picker.component';
 import { LatestLocationsResult, LocationlogService, SCAN_LIMIT } from './locationlog.service';
 import {
   SORT_TO_HEADER,
   calculateDistance,
   clampPageIndex,
+  customDistanceBounds,
+  describeCustomDistance,
   deriveStatus,
   distanceBounds,
   formatCoordinate,
@@ -116,6 +127,12 @@ const AUTO_REFRESH_MS = 30_000;
 
 /** Relative timestamps and status chips are recomputed on this cadence. */
 const CLOCK_TICK_MS = 30_000;
+
+/** Place search: wait this long after typing stops before querying. */
+const PLACE_SEARCH_DEBOUNCE_MS = 500;
+
+/** Shorter queries are too vague to spend a geocoder request on. */
+const MIN_PLACE_QUERY_LENGTH = 3;
 
 /** Where the chosen reference point is remembered between visits. */
 const REFERENCE_STORAGE_KEY = 'locationlog_reference_point';
@@ -166,7 +183,10 @@ interface DashboardView {
     MatSidenavModule,
     MatSlideToggleModule,
     MatTableModule,
+    MatTabsModule,
     MatTooltipModule,
+    MapPickerComponent,
+    LocationLogsComponent,
   ],
   templateUrl: './locationlog.component.html',
   styleUrl: './locationlog.component.css',
@@ -205,6 +225,7 @@ interface DashboardView {
 })
 export class LocationlogComponent {
   private readonly service = inject(LocationlogService);
+  private readonly geocoding = inject(GeocodingService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly breakpoints = inject(BreakpointObserver);
   private readonly destroyRef = inject(DestroyRef);
@@ -242,6 +263,7 @@ export class LocationlogComponent {
   readonly formatDistance = formatDistance;
   readonly formatCoordinate = formatCoordinate;
   readonly getStatusText = getStatusText;
+  readonly describeCustomDistance = describeCustomDistance;
   readonly getStatusHint = getStatusHint;
   readonly getAvatarInitials = getAvatarInitials;
   readonly getAvatarGradient = getAvatarGradient;
@@ -292,7 +314,22 @@ export class LocationlogComponent {
     { value: 'beyond25', label: 'Farther than 25 km' },
     { value: 'beyond50', label: 'Farther than 50 km' },
     { value: 'unknown', label: 'Distance unknown' },
+    { value: 'custom', label: 'Custom distance…' },
   ];
+
+  /**
+   * Hand-entered radius.
+   *
+   * Typed `number | null`, not string: the input is `type="number"`, so Angular
+   * binds it with NumberValueAccessor, which writes a parsed number (or null
+   * when the box is empty) into the control. Typing it as a string compiles
+   * fine and then throws at runtime on the first keystroke — and because the
+   * throw escapes a `valueChanges` subscription, it tears that subscription
+   * down for good, so the filter silently stops responding for the rest of the
+   * session.
+   */
+  readonly customDistanceControl = new FormControl<number | null>(null);
+  readonly unitOptions: readonly DistanceUnit[] = ['m', 'km'];
 
   readonly sortOptions: readonly FilterOption<SortKey>[] = [
     { value: 'newest', label: 'Newest first' },
@@ -353,6 +390,58 @@ export class LocationlogComponent {
   readonly latControl = new FormControl<string>('', { nonNullable: true });
   readonly lngControl = new FormControl<string>('', { nonNullable: true });
   readonly pickerError = signal<string | null>(null);
+
+  /** Place search — the primary way to pick a location. */
+  readonly placeSearchControl = new FormControl<string>('', { nonNullable: true });
+  /** 0 = Live tracking, 1 = All logs. */
+  readonly activeTab = signal(0);
+
+  readonly searching = signal(false);
+  readonly searched = signal(false);
+  readonly manualEntryOpen = signal(false);
+
+  /**
+   * The point the map is currently pointing at, before it is committed.
+   *
+   * Held separately from the reference point so clicking around the map does
+   * not repeatedly re-anchor every distance on the page mid-decision — the
+   * dashboard only moves when "Use this location" is pressed.
+   */
+  readonly pendingPoint = signal<Coordinates | null>(null);
+
+  /** Name for the pending point, when it came from a search rather than a click. */
+  readonly pendingLabel = signal<string | null>(null);
+
+  @ViewChild(MapPickerComponent) private mapPicker?: MapPickerComponent;
+
+  /**
+   * Place-search results.
+   *
+   * Debounced and length-gated to stay inside Nominatim's usage policy, and
+   * `switchMap` cancels a superseded request so a slow early query can never
+   * overwrite the results of a later one.
+   */
+  readonly placeResults$: Observable<readonly PlaceResult[]> =
+    this.placeSearchControl.valueChanges.pipe(
+      map((value) => value.trim()),
+      debounceTime(PLACE_SEARCH_DEBOUNCE_MS),
+      distinctUntilChanged(),
+      tap((query) => {
+        this.searching.set(query.length >= MIN_PLACE_QUERY_LENGTH);
+        if (query.length < MIN_PLACE_QUERY_LENGTH) this.searched.set(false);
+      }),
+      switchMap((query) =>
+        query.length < MIN_PLACE_QUERY_LENGTH
+          ? of([] as readonly PlaceResult[])
+          : this.geocoding.search(query),
+      ),
+      tap(() => {
+        this.searching.set(false);
+        this.searched.set(true);
+      }),
+      startWith([] as readonly PlaceResult[]),
+      shareReplay({ bufferSize: 1, refCount: true }),
+    );
 
   /** Handset + portrait tablet get the card layout instead of the table. */
   readonly isHandset$ = this.breakpoints
@@ -524,6 +613,12 @@ export class LocationlogComponent {
       )
       .subscribe((search) => this.patchFilters({ search }));
 
+    // Same treatment for the typed radius: debounced so the table is not
+    // re-filtered on every keystroke of "1500".
+    this.customDistanceControl.valueChanges
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => this.applyCustomDistanceValue(value));
+
     // Restore the previously chosen reference point. Nothing is requested from
     // the browser automatically — picking the point is the operator's call.
     const stored = this.readStoredReference();
@@ -558,6 +653,40 @@ export class LocationlogComponent {
 
   setDistance(distance: DistanceBand): void {
     this.patchFilters({ distance });
+    this.pageIndex$.next(0);
+  }
+
+  /** Switch the hand-entered radius between metres and kilometres. */
+  setCustomUnit(unit: DistanceUnit): void {
+    this.patchCustomDistance({ unit });
+  }
+
+  /** Flip between "within this radius" and "farther than this radius". */
+  setCustomDirection(direction: DistanceDirection): void {
+    this.patchCustomDistance({ direction });
+  }
+
+  /**
+   * Apply the typed radius.
+   *
+   * A blank or unparseable box parks `value` at null, which
+   * `customDistanceBounds` reads as "no radius yet" and the filter ignores —
+   * so a half-typed number never empties the table underneath the operator.
+   */
+  private applyCustomDistanceValue(raw: number | null): void {
+    const value = raw !== null && Number.isFinite(raw) && raw > 0 ? raw : null;
+    this.patchCustomDistance({ value });
+  }
+
+  private patchCustomDistance(patch: Partial<CustomDistance>): void {
+    const current = this.filters$.value;
+    this.patchFilters({
+      customDistance: { ...current.customDistance, ...patch },
+      // Typing a radius clearly means "use it", so select the band implicitly
+      // rather than making the operator also change the dropdown.
+      distance: 'custom',
+    });
+    this.pageIndex$.next(0);
   }
 
   /** Sort from the dropdown. Returns to page 1 — page 4 of the old order is
@@ -585,6 +714,7 @@ export class LocationlogComponent {
 
   clearFilters(): void {
     this.searchControl.setValue('');
+    this.customDistanceControl.setValue(null);
     this.filters$.next(DEFAULT_FILTERS);
     this.pageIndex$.next(0);
   }
@@ -655,7 +785,51 @@ export class LocationlogComponent {
       this.latControl.setValue(current ? String(current.coords.latitude) : '');
       this.lngControl.setValue(current ? String(current.coords.longitude) : '');
       this.pickerError.set(null);
+      this.placeSearchControl.setValue('');
+      this.searched.set(false);
+      this.manualEntryOpen.set(false);
+      this.pendingPoint.set(current ? current.coords : null);
+      this.pendingLabel.set(null);
     }
+  }
+
+  /** Reveal the coordinate boxes — the escape hatch, not the main path. */
+  toggleManualEntry(): void {
+    this.manualEntryOpen.update((open) => !open);
+    this.pickerError.set(null);
+  }
+
+  /**
+   * A place chosen from the search results.
+   *
+   * This recentres the map rather than committing straight away: the search is
+   * how you *get* to the right area, the map click is how you land on the exact
+   * spot. Committing on search would make the map pointless.
+   */
+  usePlaceAsReference(place: PlaceResult): void {
+    this.pendingPoint.set(place.coords);
+    this.pendingLabel.set(place.label);
+    this.mapPicker?.focusOn(place.coords);
+  }
+
+  /** The map reported a new pin position — click or drag. */
+  onMapPointPicked(coords: Coordinates): void {
+    this.pendingPoint.set(coords);
+    // A hand-placed pin is no longer "Vettuvankeni", it is a point on the map.
+    this.pendingLabel.set(null);
+  }
+
+  /** Commit whatever the map is currently pointing at. */
+  usePendingPoint(): void {
+    const point = this.pendingPoint();
+    if (!point) return;
+
+    const label = this.pendingLabel();
+    this.setReference({
+      coords: point,
+      source: label ? 'place' : 'map',
+      label: label ?? 'Picked on map',
+    });
   }
 
   /**
@@ -818,7 +992,10 @@ export class LocationlogComponent {
     filters: LocationFilters,
     now: number,
   ): ParticipantLocation[] {
-    const bounds = distanceBounds(filters.distance);
+    const bounds =
+      filters.distance === 'custom'
+        ? customDistanceBounds(filters.customDistance)
+        : distanceBounds(filters.distance);
     const window = timeWindowBounds(filters.timeWindow, now);
 
     return participants.filter((p) => {
