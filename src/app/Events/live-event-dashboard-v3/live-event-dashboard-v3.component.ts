@@ -558,6 +558,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get attTotalApproved(): number { return this.data.eventParticipantProfileIds.length; }
   get attAbsentToday(): number { const t = this.data.dayWiseAttendance.find(d => d.isToday); return t ? t.absentProfileIds.length : 0; }
   get attNeverAttended(): number { return this.data.allDayAbsentProfileIds.length; }
+  /** Distinct people who have turned up on ANY day so far = Total approved − Never
+   *  attended. Sound as a subtraction because allDayAbsentProfileIds is filtered out
+   *  of eventParticipantProfileIds, so the two partition the universe. */
+  get attUniqueParticipants(): number { return this.attTotalApproved - this.attNeverAttended; }
+  private get attUniqueProfileIds(): string[] {
+    const never = new Set(this.data.allDayAbsentProfileIds);
+    return this.data.eventParticipantProfileIds.filter(id => !never.has(id));
+  }
+  openAttUnique(): void { this.openPanel('Unique participants', 'Attended on at least one day', this.attUniqueProfileIds); }
 
   attWeekday(day: DayAttendance): string {
     const [y, m, d] = day.date.split('-').map(Number);

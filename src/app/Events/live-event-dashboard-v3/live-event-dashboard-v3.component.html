@@ -282,7 +282,11 @@
         <div class="day-card total" (click)="openAttTotal()">
           <div class="day-eyebrow"><span>Total approved</span></div>
           <div class="day-num num">{{ attTotalApproved | number }}</div>
-          <div class="day-sub" (click)="$event.stopPropagation(); openAttAbsentToday()"><span>Absent today</span><b class="num">{{ attAbsentToday }}</b></div>
+          <div class="day-subs">
+            <!-- turned up on any day so far = total approved − never attended -->
+            <div class="day-stat" (click)="$event.stopPropagation(); openAttUnique()"><span>Unique participants</span><b class="num">{{ attUniqueParticipants | number }}</b></div>
+            <div class="day-stat alert" (click)="$event.stopPropagation(); openAttAbsentToday()"><span>Absent today</span><b class="num">{{ attAbsentToday }}</b></div>
+          </div>
         </div>
         <!-- day cards -->
         <ng-container *ngFor="let d of attDays">
@@ -566,7 +570,11 @@
         <div class="day-card total" (click)="openAttTotal()">
           <div class="day-eyebrow"><span>Total approved</span></div>
           <div class="day-num num">{{ attTotalApproved | number }}</div>
-          <div class="day-sub" (click)="$event.stopPropagation(); openAttAbsentToday()"><span>Absent today</span><b class="num">{{ attAbsentToday }}</b></div>
+          <div class="day-subs">
+            <!-- turned up on any day so far = total approved − never attended -->
+            <div class="day-stat" (click)="$event.stopPropagation(); openAttUnique()"><span>Unique participants</span><b class="num">{{ attUniqueParticipants | number }}</b></div>
+            <div class="day-stat alert" (click)="$event.stopPropagation(); openAttAbsentToday()"><span>Absent today</span><b class="num">{{ attAbsentToday }}</b></div>
+          </div>
         </div>
         <ng-container *ngFor="let d of attDays">
           <div class="day-card upcoming" *ngIf="d.isFuture">

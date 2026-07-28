@@ -516,6 +516,11 @@ mat-select.pf-select.on{
 .day-card.total{background:var(--beige);border-color:var(--beige-line)}
 .day-card.total .day-sub{border-top-color:var(--beige-line);color:var(--alert);font-weight:500}
 .day-card.total .day-sub b{color:var(--alert)}
+.day-card.total .day-subs{border-top-color:var(--beige-line)}
+/* the total card stacks a neutral stat over a negative one, so the red is carried
+   by the row that earns it rather than by the card */
+.day-stat.alert,.day-stat.alert b{color:var(--alert)}
+.day-stat.alert:hover{opacity:.72}
 .day-card.today{background:var(--z-900);border-color:var(--z-900);color:#fff}
 .day-card.today .day-eyebrow{color:var(--z-400)}
 .day-subs{margin-top:auto;padding-top:6px;border-top:1px dashed var(--z-200);display:flex;flex-direction:column;gap:3px}
