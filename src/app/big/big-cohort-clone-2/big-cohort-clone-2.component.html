@@ -34,7 +34,7 @@
           <mat-icon>download</mat-icon> Export
         </button>
         <button class="btn btn-warn" (click)="showUnassignedParticipants()">
-          <mat-icon>person_off</mat-icon> Unassigned · {{getUnassignedCount()}}
+          <mat-icon>person_off</mat-icon> Unassigned · {{this.unassignedParticipants.length}}
         </button>
         <button class="btn btn-success" (click)="openProgressionReport()">
           <mat-icon>timeline</mat-icon> Progression
@@ -803,7 +803,7 @@
       <div class="ssection">
         <div class="ssection-head">Actions</div>
         <button class="btn btn-warn" style="width:100%;justify-content:center;margin-bottom:6px" (click)="mobileSheetOpen = false; showUnassignedParticipants()">
-          <mat-icon>person_off</mat-icon> Unassigned · {{getUnassignedCount()}}
+          <mat-icon>person_off</mat-icon> Unassigned · {{this.unassignedParticipants.length}}
         </button>
         <button class="btn btn-success" style="width:100%;justify-content:center" (click)="mobileSheetOpen = false; openProgressionReport()">
           <mat-icon>timeline</mat-icon> Progression
