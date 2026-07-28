@@ -309,7 +309,103 @@ input,select{font:inherit}
   font-size:13px;background:var(--z-50);outline:none;
 }
 .panel-search input:focus{border-color:var(--accent);background:var(--z-0)}
-.panel-filters{display:flex;gap:6px;flex-wrap:wrap;padding:12px 22px 0}
+/* ---- panel filters: 2 rows, not 4 ---------------------------------------------
+   The four chips were two either/or questions (type · attendance log) wearing the
+   wrong control, so at 440px they wrapped to a second row. Segmented controls say
+   pick-one, and both fit on one line. */
+.panel-filters{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:11px 22px 0}
+.pf-seg{
+  display:inline-flex;align-items:center;gap:2px;padding:2px;
+  background:var(--z-100);border:1px solid var(--z-200);border-radius:var(--r-pill);
+}
+.pf-seg button{
+  padding:5px 11px;border-radius:var(--r-pill);font-size:11.5px;font-weight:500;
+  color:var(--z-600);white-space:nowrap;transition:all .18s var(--ease);
+}
+.pf-seg button:hover:not(.on){color:var(--z-900)}
+.pf-seg button.on{
+  background:var(--z-0);color:var(--z-900);font-weight:600;
+  box-shadow:0 1px 2px rgba(28,28,30,.12);
+}
+.pf-seg.acc button.on{color:var(--accent)}
+
+/* Products / cohorts share one row and read as FIELDS — bordered and filled, same
+   height and radius as the search box above, so they do not look like bare text.
+   mat-select is used WITHOUT mat-form-field (it does not need one), which is what
+   lets the trigger be styled directly instead of through an MDC notched outline. */
+.pf-adv{display:flex;gap:7px;align-items:center;padding:8px 22px 0}
+/* flex:1 1 0 keeps the three equal and lets them expand when one is absent */
+.pf-field{position:relative;flex:1 1 0;min-width:0;display:flex}
+mat-select.pf-select{
+  flex:1;min-width:0;height:34px;padding:0 8px 0 12px;
+  display:inline-flex;align-items:center;cursor:pointer;
+  border:1px solid var(--z-200);border-radius:var(--r-sm);background:var(--z-50);
+  font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1;
+  letter-spacing:normal;color:var(--z-900);transition:all .15s var(--ease);
+}
+mat-select.pf-select:hover{border-color:var(--z-300);background:var(--z-0)}
+mat-select.pf-select.on{
+  background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
+  padding-right:26px;                 /* room for the clear button over the caret */
+}
+.pf-select ::ng-deep .mat-mdc-select-trigger{height:100%}
+.pf-select ::ng-deep .mat-mdc-select-value{color:inherit}
+.pf-select ::ng-deep .mat-mdc-select-placeholder{color:var(--z-500)}
+.pf-select ::ng-deep .mat-mdc-select-arrow-wrapper{height:auto}
+.pf-select ::ng-deep .mat-mdc-select-arrow{color:currentColor;opacity:.5}
+.pf-select.on ::ng-deep .mat-mdc-select-arrow-wrapper{display:none}
+.pf-x{
+  position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+  font-size:15px;line-height:1;color:var(--accent);opacity:.75;
+  transition:all .15s var(--ease);
+}
+.pf-x:hover{background:var(--z-0);opacity:1}
+
+/* ---- dropdown panel -------------------------------------------------------------
+   Renders in the CDK overlay container, OUTSIDE :host, so the design tokens above do
+   not resolve there — hence the literal values (kept in sync by hand with the :host
+   token block). Namespaced by panelClass so the ::ng-deep leak is inert. */
+::ng-deep .pf-select-panel.mat-mdc-select-panel{
+  padding:6px !important;border:1px solid #e3e3e8;background:#fff;
+  border-radius:12px !important;
+  box-shadow:0 1px 2px rgba(28,28,30,.04),0 10px 30px rgba(28,28,30,.06) !important;
+  --mat-option-selected-state-label-text-color:#5856d6;
+  --mat-option-selected-state-layer-color:#eeeefb;
+  --mat-full-pseudo-checkbox-selected-icon-color:#5856d6;
+  --mat-full-pseudo-checkbox-selected-checkmark-color:#fff;
+  --mat-full-pseudo-checkbox-unselected-icon-color:#aeaeb2;
+}
+/* The trigger is a fixed-height field so it must ellipsize, but the option list
+   shows names in full: [panelWidth]="null" lets the panel size to its content
+   instead of matching the trigger, and the option text wraps rather than
+   truncating. Bounded so a long product name cannot outgrow the 440px panel. */
+::ng-deep .pf-select-panel.mat-mdc-select-panel{min-width:216px;max-width:328px}
+::ng-deep .pf-select-panel .mat-mdc-option{
+  min-height:36px;height:auto;border-radius:8px;padding-top:7px;padding-bottom:7px;
+}
+::ng-deep .pf-select-panel .mat-mdc-option .mdc-list-item__primary-text{
+  width:100%;font-size:12.5px;line-height:1.35;
+  white-space:normal;overflow:visible;text-overflow:clip;
+}
+::ng-deep .pf-select-panel .pf-opt{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%}
+::ng-deep .pf-select-panel .pf-opt-n{white-space:normal;overflow-wrap:anywhere}
+::ng-deep .pf-select-panel .pf-opt-c{flex:none;font-size:10.5px;color:#8e8e93;font-variant-numeric:tabular-nums;margin-top:2px}
+
+/* in-dropdown search — sticks to the top of the scrolling option list. The negative
+   margin + matching top offset let it cover the panel's own 6px padding as the list
+   scrolls under it. */
+::ng-deep .pf-select-searchable .pf-search{
+  position:sticky;top:-6px;z-index:2;background:#fff;
+  margin:-6px -6px 4px;padding:8px 8px 7px;border-bottom:1px solid #f2f2f7;
+}
+::ng-deep .pf-select-searchable .pf-search input{
+  width:100%;height:28px;padding:0 10px;border:1px solid #e3e3e8;border-radius:999px;
+  background:#f6f6f8;font-size:12px;color:#1c1c1e;outline:none;
+}
+::ng-deep .pf-select-searchable .pf-search input:focus{border-color:#cfcef3;background:#fff}
+::ng-deep .pf-select-searchable .pf-search input::placeholder{color:#aeaeb2}
+::ng-deep .pf-select-searchable .pf-none{padding:10px 12px 8px;font-size:12px;color:#8e8e93}
 .panel-count{
   padding:12px 22px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;
   font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);
@@ -528,6 +624,17 @@ input,select{font:inherit}
 .pd-in:focus,.pd-sel:focus{border-color:var(--accent);background:var(--z-0)}
 .pd-sel{appearance:auto}
 .pd-num{width:54px;text-align:right}
+/* active ATC-completion band (set by clicking a tier) */
+.pd-band{
+  display:inline-flex;align-items:center;gap:4px;padding:5px 6px 5px 11px;
+  border-radius:var(--r-pill);background:var(--accent-soft);border:1px solid var(--accent-line);
+  font-size:12px;font-weight:500;color:var(--accent);
+}
+.pd-band-x{
+  width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
+  font-size:13px;line-height:1;color:var(--accent);opacity:.75;
+}
+.pd-band-x:hover{background:var(--z-0);opacity:1}
 .pd-tablewrap{overflow-x:auto;padding:8px 22px 4px}
 .pd-table{width:100%;border-collapse:collapse;min-width:860px}
 .pd-table th{
