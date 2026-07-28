@@ -311,13 +311,15 @@ input,select{font:inherit}
 .panel-search input:focus{border-color:var(--accent);background:var(--z-0)}
 .panel-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:12px 22px 0}
 
-/* ---- product filter row: [PRODUCTS] [multi-select ▾] [×] -----------------------
+/* ---- multi-select filter rows: [LABEL] [multi-select ▾] [×] --------------------
    mat-select re-skinned to the panel's flat pill language. It is used WITHOUT
    mat-form-field — it does not need one — so the trigger can be styled as a
-   .pf-chip instead of an MDC notched outline. */
-.pf-prod{display:flex;align-items:center;gap:8px;padding:10px 22px 0}
-.pf-prod-label{
-  flex:none;font-family:var(--mono);font-size:10.5px;font-weight:600;
+   .pf-chip instead of an MDC notched outline. The fixed-width label keeps the
+   selects of stacked rows aligned in a column. */
+.pf-adv{display:flex;flex-direction:column;gap:6px;padding:10px 22px 0}
+.pf-row{display:flex;align-items:center;gap:8px}
+.pf-row-label{
+  flex:none;width:64px;font-family:var(--mono);font-size:10.5px;font-weight:600;
   letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);
 }
 
@@ -340,6 +342,7 @@ mat-select.pf-select.on{background:var(--accent-soft);border-color:var(--accent-
   font-size:17px;line-height:1;color:var(--z-500);transition:all .15s var(--ease);
 }
 .pf-x:hover{background:var(--z-100);color:var(--z-900)}
+.pf-x-off{visibility:hidden;pointer-events:none}
 
 /* ---- dropdown panel -------------------------------------------------------------
    Renders in the CDK overlay container, OUTSIDE :host, so the design tokens above do
@@ -360,6 +363,21 @@ mat-select.pf-select.on{background:var(--accent-soft);border-color:var(--accent-
 ::ng-deep .pf-select-panel .pf-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
 ::ng-deep .pf-select-panel .pf-opt-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 ::ng-deep .pf-select-panel .pf-opt-c{flex:none;font-size:10.5px;color:#8e8e93;font-variant-numeric:tabular-nums}
+
+/* in-dropdown search — sticks to the top of the scrolling option list. The negative
+   margin + matching top offset let it cover the panel's own 6px padding as the list
+   scrolls under it. */
+::ng-deep .pf-select-searchable .pf-search{
+  position:sticky;top:-6px;z-index:2;background:#fff;
+  margin:-6px -6px 4px;padding:8px 8px 7px;border-bottom:1px solid #f2f2f7;
+}
+::ng-deep .pf-select-searchable .pf-search input{
+  width:100%;height:28px;padding:0 10px;border:1px solid #e3e3e8;border-radius:999px;
+  background:#f6f6f8;font-size:12px;color:#1c1c1e;outline:none;
+}
+::ng-deep .pf-select-searchable .pf-search input:focus{border-color:#cfcef3;background:#fff}
+::ng-deep .pf-select-searchable .pf-search input::placeholder{color:#aeaeb2}
+::ng-deep .pf-select-searchable .pf-none{padding:10px 12px 8px;font-size:12px;color:#8e8e93}
 .panel-count{
   padding:12px 22px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;
   font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);

@@ -812,28 +812,58 @@
     <button class="pf-chip" [class.on]="panelFilter.attendance === 'has'" (click)="togglePanelAttendance('has')">Only attendance log</button>
   </div>
 
-  <!-- Product filter — its own row rather than crowding the boolean chips above.
-       Multi-select; a participant is kept when they hold ANY of the picked
-       products. Hidden entirely when nobody in the open list has a product. -->
-  <div class="pf-prod" *ngIf="panelProductOptions.length">
-    <span class="pf-prod-label">Products</span>
+  <!-- Product / cohort filters — their own rows rather than crowding the boolean
+       chips above. Both are multi-select with OR semantics, and each row is hidden
+       when the open list has nothing to offer for it. -->
+  <div class="pf-adv" *ngIf="panelProductOptions.length || panelCohortOptions.length">
 
-    <mat-select class="pf-select" [class.on]="panelFilter.products.length" multiple
-                placeholder="Select products" aria-label="Filter this list by product"
-                [(ngModel)]="panelFilter.products"
-                (selectionChange)="onPanelProductChange()"
-                (openedChange)="panelProductSelectOpen = $event"
-                panelClass="pf-select-panel">
-      <mat-select-trigger>{{ panelProductTriggerLabel }}</mat-select-trigger>
-      <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">
-        <span class="pf-opt">
-          <span class="pf-opt-n">{{ opt.name }}</span>
-          <span class="pf-opt-c">{{ opt.count }}</span>
-        </span>
-      </mat-option>
-    </mat-select>
+    <div class="pf-row" *ngIf="panelProductOptions.length">
+      <span class="pf-row-label">Products</span>
+      <mat-select class="pf-select" [class.on]="panelFilter.products.length" multiple
+                  placeholder="Select products" aria-label="Filter this list by product"
+                  [(ngModel)]="panelFilter.products"
+                  (selectionChange)="onPanelProductChange()"
+                  (openedChange)="panelSelectOpen = $event"
+                  panelClass="pf-select-panel">
+        <mat-select-trigger>{{ panelProductTriggerLabel }}</mat-select-trigger>
+        <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">
+          <span class="pf-opt">
+            <span class="pf-opt-n">{{ opt.name }}</span>
+            <span class="pf-opt-c">{{ opt.count }}</span>
+          </span>
+        </mat-option>
+      </mat-select>
+      <!-- kept in the layout when idle so both rows' selects stay the same width -->
+      <button class="pf-x" [class.pf-x-off]="!panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">&times;</button>
+    </div>
 
-    <button class="pf-x" *ngIf="panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">&times;</button>
+    <!-- cohort = membership of a "big cohorts" participantidlist for this event -->
+    <div class="pf-row" *ngIf="panelCohortOptions.length">
+      <span class="pf-row-label">Cohorts</span>
+      <mat-select class="pf-select" [class.on]="panelFilter.cohorts.length" multiple
+                  placeholder="Select cohorts" aria-label="Filter this list by cohort"
+                  [(ngModel)]="panelFilter.cohorts"
+                  (selectionChange)="onPanelCohortChange()"
+                  (openedChange)="onCohortSelectOpened($event)"
+                  panelClass="pf-select-panel pf-select-searchable">
+        <mat-select-trigger>{{ panelCohortTriggerLabel }}</mat-select-trigger>
+        <!-- pinned search — clicks must not bubble out to the option list -->
+        <div class="pf-search" (click)="$event.stopPropagation()" (keydown)="onCohortSearchKeydown($event)">
+          <input #cohortSearchBox type="text" placeholder="Search cohorts…" autocomplete="off"
+                 [(ngModel)]="cohortSearch" [ngModelOptions]="{ standalone: true }"
+                 (ngModelChange)="onCohortSearch()">
+        </div>
+        <mat-option *ngFor="let opt of panelCohortView; trackBy: trackOptId" [value]="opt.id">
+          <span class="pf-opt">
+            <span class="pf-opt-n">{{ opt.name }}</span>
+            <span class="pf-opt-c">{{ opt.count }}</span>
+          </span>
+        </mat-option>
+        <div class="pf-none" *ngIf="!panelCohortView.length">No cohort matches that search</div>
+      </mat-select>
+      <button class="pf-x" [class.pf-x-off]="!panelFilter.cohorts.length" (click)="clearPanelCohorts()" title="Clear the cohort filter">&times;</button>
+    </div>
+
   </div>
   <div class="panel-count">
     <span>{{ panelCount | number }} participant{{ panelCount === 1 ? '' : 's' }}</span>

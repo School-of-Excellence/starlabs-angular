@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { Subscription } from 'rxjs';
@@ -133,6 +133,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       // refresh the cached call rows — only while the backend view is showing.
       this.reconcileCallOptimistic();
       if (this.activeView === 'backend') { this.rebuildCalls(); }
+      // "big cohorts" / e-tickets stream in, so a panel opened moments after the
+      // event was picked can compute its filter options before the data lands.
+      // Refresh them once per data version — but never while a dropdown is open,
+      // which would shuffle the options under the operator's cursor.
+      if (this.panelOpen && !this.panelSelectOpen && this.panelOptionsVersion !== this.viewVersion) {
+        this.refreshPanelOptions();
+      }
       this.cdr.detectChanges();
     });
     this.data.init();
@@ -247,9 +254,9 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   closeDropdowns(): void { this.eventDropdownOpen = false; this.queueDropdownOpen = false; }
   // The product multi-select renders in a CDK overlay ABOVE the drill-down panel;
   // its own ESC handler closes it, so swallow this one or the panel would go too.
-  // The product multi-select renders in a CDK overlay ABOVE the drill-down panel;
-  // its own ESC handler closes it, so swallow this one or the panel would go too.
-  onEscape(): void { if (this.panelProductSelectOpen) { return; } this.closePanel(); this.closeDropdowns(); }
+  // The panel's multi-selects render in a CDK overlay ABOVE the drill-down panel;
+  // their own ESC handler closes them, so swallow this one or the panel would go too.
+  onEscape(): void { if (this.panelSelectOpen) { return; } this.closePanel(); this.closeDropdowns(); }
 
   // Event (single-select)
   toggleEventDropdown(): void { this.queueDropdownOpen = false; this.eventDropdownOpen = !this.eventDropdownOpen; if (this.eventDropdownOpen) { this.eventSearch = ''; } }
@@ -1105,9 +1112,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelFilter = { type: 'all', attendance: 'all', products: [] };
+    this.panelFilter = { type: 'all', attendance: 'all', products: [], cohorts: [] };
     this.panelProductSet.clear();
-    this.panelProductOptions = this.computePanelProductOptions(rows);
+    this.panelCohortMemberSet.clear();
+    this.panelRowIds = this.panelRowProfileIds(rows);
+    this.refreshPanelOptions();
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.markedIds = new Set<string>();
     this.closeMarkPicker();                     // never carry a picker across lists
@@ -1137,32 +1146,80 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   // list filters: first-timer / repeat (mutually exclusive) + attendance-log
   // presence ('none' = no scan on any day · 'has' = at least one scan) + products
-  // (multi-select, OR semantics). The two attendance chips are mutually exclusive
-  // — together they would match nobody.
+  // + cohorts (both multi-select, OR semantics). The two attendance chips are
+  // mutually exclusive — together they would match nobody.
   panelFilter: {
-    type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has'; products: string[];
-  } = { type: 'all', attendance: 'all', products: [] };
+    type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has';
+    products: string[]; cohorts: string[];
+  } = { type: 'all', attendance: 'all', products: [], cohorts: [] };
   /** Products actually present in the OPEN list (not the whole catalogue), so the
    *  dropdown only ever offers options that can match something. `count` = how many
    *  distinct participants in this list hold that product. */
   panelProductOptions: { id: string; name: string; count: number }[] = [];
   private panelProductSet = new Set<string>();
-  /** True while the product dropdown overlay is open — ESC must close the dropdown
-   *  only, not the whole drill-down panel underneath it. */
-  panelProductSelectOpen = false;
+  /** "big cohorts" for this event that have at least one member in the OPEN list. */
+  panelCohortOptions: { id: string; name: string; count: number }[] = [];
+  /** What the cohort dropdown actually renders — panelCohortOptions narrowed by the
+   *  in-dropdown search. Held as a field, not a getter, so the *ngFor is not handed a
+   *  fresh array (and MatSelect a churning option list) on every change detection. */
+  panelCohortView: { id: string; name: string; count: number }[] = [];
+  cohortSearch = '';
+  @ViewChild('cohortSearchBox') private cohortSearchBox?: ElementRef<HTMLInputElement>;
+  /** Union of the picked cohorts' participantidlist — membership is then an O(1)
+   *  lookup per row instead of re-scanning every cohort's array. */
+  private panelCohortMemberSet = new Set<string>();
+  /** True while a dropdown overlay is open — ESC must close the dropdown only, not
+   *  the whole drill-down panel underneath it. */
+  panelSelectOpen = false;
   togglePanelType(t: 'ft' | 'rp'): void { this.panelFilter.type = this.panelFilter.type === t ? 'all' : t; }
   togglePanelAttendance(a: 'none' | 'has'): void { this.panelFilter.attendance = this.panelFilter.attendance === a ? 'all' : a; }
   onPanelProductChange(): void { this.panelProductSet = new Set(this.panelFilter.products); }
   clearPanelProducts(): void { this.panelFilter.products = []; this.panelProductSet.clear(); }
-  /** Trigger text — one product shows its name, several collapse to a count, because
-   *  Material's default comma-joined list overflows a 440px panel. */
-  get panelProductTriggerLabel(): string {
-    const picked = this.panelFilter.products;
-    if (picked.length === 1) { return this.panelProductOptions.find(o => o.id === picked[0])?.name || '1 product'; }
-    return `${picked.length} products`;
+  onPanelCohortChange(): void {
+    this.panelCohortMemberSet = new Set<string>();
+    this.panelFilter.cohorts.forEach(cid =>
+      (this.data.mapCohortParticipants[cid] || []).forEach(pid => this.panelCohortMemberSet.add(pid)));
   }
+  clearPanelCohorts(): void { this.panelFilter.cohorts = []; this.panelCohortMemberSet.clear(); }
+  trackOptId(_: number, o: { id: string }): string { return o.id; }
+
+  // ---- cohort dropdown search ---------------------------------------------------
+  /** Narrow the rendered cohorts. ALREADY-PICKED cohorts always stay rendered even
+   *  when they do not match: MatSelect rebuilds its selection from the options in the
+   *  DOM, so a selected option that is filtered away is dropped from the value the
+   *  next time anything is toggled. Keeping them also lets you undo a pick without
+   *  clearing the search first. */
+  onCohortSearch(): void {
+    const q = this.cohortSearch.toLowerCase().trim();
+    if (!q) { this.panelCohortView = this.panelCohortOptions; return; }
+    const picked = new Set(this.panelFilter.cohorts);
+    this.panelCohortView = this.panelCohortOptions.filter(o =>
+      picked.has(o.id) || o.name.toLowerCase().includes(q));
+  }
+  /** MatSelect's own typeahead would hijack the letters and space would toggle the
+   *  active option, so those keys stop here; navigation and close keys pass through
+   *  to the panel as usual. */
+  onCohortSearchKeydown(e: KeyboardEvent): void {
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', 'Escape', 'Tab'].includes(e.key)) { return; }
+    e.stopPropagation();
+  }
+  onCohortSelectOpened(open: boolean): void {
+    this.panelSelectOpen = open;
+    this.cohortSearch = '';                     // every open starts from the full list
+    this.panelCohortView = this.panelCohortOptions;
+    if (open) { setTimeout(() => this.cohortSearchBox?.nativeElement?.focus()); }
+  }
+  /** Trigger text — one pick shows its name, several collapse to a count, because
+   *  Material's default comma-joined list overflows a 440px panel. */
+  private triggerLabel(picked: string[], opts: { id: string; name: string }[], noun: string): string {
+    if (picked.length === 1) { return opts.find(o => o.id === picked[0])?.name || `1 ${noun}`; }
+    return `${picked.length} ${noun}s`;
+  }
+  get panelProductTriggerLabel(): string { return this.triggerLabel(this.panelFilter.products, this.panelProductOptions, 'product'); }
+  get panelCohortTriggerLabel(): string { return this.triggerLabel(this.panelFilter.cohorts, this.panelCohortOptions, 'cohort'); }
   get panelFilterActive(): boolean {
-    return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all' || this.panelProductSet.size > 0;
+    return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all'
+      || this.panelProductSet.size > 0 || this.panelFilter.cohorts.length > 0;
   }
   private hasAttendanceLog(profileid: string): boolean { const r = this.data.mapAttendence[profileid]; return !!r && r.length > 0; }
   private matchesPanelFilter(profileid: string): boolean {
@@ -1175,25 +1232,50 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       const ids = this.data.registeredProductIds[profileid] || [];
       if (!ids.some(id => this.panelProductSet.has(id))) { return false; }
     }
+    // cohort membership is the participantidlist on the "big cohorts" doc — NOT the
+    // per-participant `eligiliblecohorts` that cohortNameOf()/the Zones view read.
+    if (this.panelFilter.cohorts.length && !this.panelCohortMemberSet.has(profileid)) { return false; }
     return true;
   }
-  /** Distinct eligible products across the rows of the open list, name-sorted, each
-   *  with a distinct-participant count (a profile appearing on several pair rows is
-   *  counted once). */
-  private computePanelProductOptions(rows: PanelParticipant[]): { id: string; name: string; count: number }[] {
-    const counts: { [id: string]: number } = {};
-    const seen = new Set<string>();
-    const add = (pid: string) => {
-      if (!pid || seen.has(pid)) { return; }
-      seen.add(pid);
-      (this.data.registeredProductIds[pid] || []).forEach(id => { counts[id] = (counts[id] || 0) + 1; });
-    };
+  /** Distinct profile ids of the open list, and the data version its option lists
+   *  were built from (so late-arriving snapshots can refresh them — see ngOnInit). */
+  private panelRowIds = new Set<string>();
+  private panelOptionsVersion = -1;
+  private refreshPanelOptions(): void {
+    this.panelProductOptions = this.computePanelProductOptions(this.panelRowIds);
+    this.panelCohortOptions = this.computePanelCohortOptions(this.panelRowIds);
+    this.onCohortSearch();                      // re-apply any live search term
+    this.panelOptionsVersion = this.viewVersion;
+  }
+  /** Distinct profile ids across the rows of the open list (a profile on several pair
+   *  rows counts once) — the basis for both option lists' counts. */
+  private panelRowProfileIds(rows: PanelParticipant[]): Set<string> {
+    const ids = new Set<string>();
+    const add = (pid: string) => { if (pid) { ids.add(pid); } };
     rows.forEach((r: any) => {
       if (r['_pair']) { add(r['doer']?.profileid); add(r['beneficiary']?.profileid); }
       else { add(r.profileid); }
     });
+    return ids;
+  }
+  /** Eligible products held by anyone in the open list, name-sorted with counts. */
+  private computePanelProductOptions(ids: Set<string>): { id: string; name: string; count: number }[] {
+    const counts: { [id: string]: number } = {};
+    ids.forEach(pid => (this.data.registeredProductIds[pid] || [])
+      .forEach(id => { counts[id] = (counts[id] || 0) + 1; }));
     return Object.keys(counts)
       .map(id => ({ id, name: this.data.productMap[id] || id, count: counts[id] }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  /** "big cohorts" of this event, kept only where participantidlist overlaps the open
+   *  list; count = distinct members of that cohort present in the list. */
+  private computePanelCohortOptions(ids: Set<string>): { id: string; name: string; count: number }[] {
+    return Object.keys(this.data.mapCohortParticipants)
+      .map(cid => {
+        const members = new Set((this.data.mapCohortParticipants[cid] || []).filter(pid => ids.has(pid)));
+        return { id: cid, name: this.data.mapCohortsData[cid]?.['name'] || cid, count: members.size };
+      })
+      .filter(o => o.count > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
   }
   get panelParticipants(): PanelParticipant[] {
