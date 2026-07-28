@@ -110,7 +110,30 @@ export type DistanceBand =
   | 'beyond10'
   | 'beyond25'
   | 'beyond50'
-  | 'unknown';
+  | 'unknown'
+  /** A radius typed by hand — see `CustomDistance`. */
+  | 'custom';
+
+/** Unit for a hand-entered radius. Metres matter at campus/venue scale. */
+export type DistanceUnit = 'm' | 'km';
+
+/** Which side of the radius to keep. */
+export type DistanceDirection = 'within' | 'beyond';
+
+/**
+ * A radius typed by the operator rather than chosen from the presets.
+ *
+ * The value is kept exactly as entered, with its unit, rather than normalised
+ * to metres up front: "0.5 km" and "500 m" are the same radius but not the same
+ * thing to read back in the UI, and round-tripping through metres would rewrite
+ * what the operator typed.
+ */
+export interface CustomDistance {
+  /** Null while the box is empty or holds something unparseable. */
+  readonly value: number | null;
+  readonly unit: DistanceUnit;
+  readonly direction: DistanceDirection;
+}
 
 /** Inclusive-min / exclusive-max metre bounds for a distance band. */
 export interface DistanceBounds {
@@ -124,10 +147,23 @@ export interface LocationFilters {
   readonly freshness: FreshnessFilter;
   readonly timeWindow: TimeWindow;
   readonly distance: DistanceBand;
+  /** Only consulted when `distance` is 'custom'. */
+  readonly customDistance: CustomDistance;
 }
 
 /** Where the reference point came from. Shown so the number is never mystery. */
-export type ReferenceSource = 'manual' | 'device' | 'participant';
+export type ReferenceSource = 'manual' | 'device' | 'participant' | 'place' | 'map';
+
+/** One hit from the place search. */
+export interface PlaceResult {
+  /** Short name for the primary line, e.g. "Vettuvankeni". */
+  readonly label: string;
+  /** Full comma-separated address, shown underneath to disambiguate. */
+  readonly displayName: string;
+  /** Nominatim's category, e.g. "suburb" / "city" — shown as a small chip. */
+  readonly kind: string;
+  readonly coords: Coordinates;
+}
 
 /**
  * The point every distance on the dashboard is measured *from*.
@@ -156,4 +192,5 @@ export const DEFAULT_FILTERS: LocationFilters = {
   freshness: 'all',
   timeWindow: 'all',
   distance: 'all',
+  customDistance: { value: null, unit: 'km', direction: 'within' },
 };

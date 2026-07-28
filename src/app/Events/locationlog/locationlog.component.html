@@ -152,10 +152,17 @@
             Location tracking
           </span>
           <h1 class="ll-title">Live Location Tracking</h1>
-          <p class="ll-subtitle">Shows the latest location reported by every participant.</p>
+          <p class="ll-subtitle">
+            @if (activeTab() === 0) {
+              Shows the latest location reported by every participant.
+            } @else {
+              Every location report in the collection, newest first.
+            }
+          </p>
         </div>
 
-        <div class="ll-header-actions">
+        <!-- Refresh belongs to the dashboard; the log tab has its own Reload. -->
+        <div class="ll-header-actions" [hidden]="activeTab() !== 0">
           <mat-slide-toggle
             class="ll-auto-toggle"
             [checked]="(autoRefresh | async) ?? false"
@@ -175,6 +182,21 @@
           </button>
         </div>
       </header>
+
+      <!--
+        Two tabs over the same collection: the dashboard reads the latest report
+        per participant, the log tab reads every document. Refresh and auto
+        refresh belong to the dashboard, so they are hidden on the log tab,
+        which has its own Reload.
+      -->
+      <mat-tab-group
+        class="ll-tabs"
+        animationDuration="200ms"
+        [selectedIndex]="activeTab()"
+        (selectedIndexChange)="activeTab.set($event)">
+
+        <mat-tab label="Live tracking">
+          <div class="ll-tab-body">
 
       <!--
         Status is derived, not stored. Saying so in the UI stops "Live" being
@@ -228,46 +250,88 @@
 
         @if (pickerOpen | async) {
           <div class="ll-picker" @fadeIn>
-            <div class="ll-picker-row">
-              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ll-picker-field">
-                <mat-label>Latitude</mat-label>
-                <input
-                  matInput
-                  inputmode="decimal"
-                  placeholder="12.940029"
-                  [formControl]="latControl"
-                  (paste)="onCoordinatePaste($event)" />
-              </mat-form-field>
 
-              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ll-picker-field">
-                <mat-label>Longitude</mat-label>
-                <input
-                  matInput
-                  inputmode="decimal"
-                  placeholder="80.253343"
-                  [formControl]="lngControl"
-                  (paste)="onCoordinatePaste($event)" />
-              </mat-form-field>
+            <!-- Primary path: search for the place by name. -->
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ll-place-field">
+              <mat-icon matPrefix>search</mat-icon>
+              <mat-label>Search for a place</mat-label>
+              <input
+                matInput
+                type="search"
+                autocomplete="off"
+                placeholder="Vettuvankeni, Chennai"
+                [formControl]="placeSearchControl" />
+              @if (searching()) {
+                <span matSuffix class="ll-mini-spinner" aria-label="Searching"></span>
+              }
+            </mat-form-field>
 
-              <button mat-flat-button color="primary" (click)="applyManualReference()">
-                Use this location
-              </button>
-            </div>
+            @if (placeResults$ | async; as places) {
+              @if (places.length > 0) {
+                <ul class="ll-place-list" role="listbox" aria-label="Search results">
+                  @for (place of places; track place.displayName) {
+                    <li>
+                      <button type="button" class="ll-place" (click)="usePlaceAsReference(place)">
+                        <mat-icon>place</mat-icon>
+                        <span class="ll-place-text">
+                          <span class="ll-place-name">
+                            {{ place.label }}
+                            @if (place.kind) {
+                              <em class="ll-place-kind">{{ place.kind }}</em>
+                            }
+                          </span>
+                          <span class="ll-place-address">{{ place.displayName }}</span>
+                        </span>
+                        <span class="ll-place-coords ll-mono">
+                          {{ formatCoordinate(place.coords.latitude) }},
+                          {{ formatCoordinate(place.coords.longitude) }}
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              } @else if (searched() && !searching()) {
+                <p class="ll-picker-hint">
+                  No places found. Try a broader search, or enter coordinates below.
+                </p>
+              }
+            }
 
-            <p class="ll-picker-hint">
-              Paste a <code>latitude, longitude</code> pair into either box and it splits itself —
-              copy one straight from Google Maps or from the Coordinates column below.
-            </p>
-
-            @if (pickerError()) {
-              <p class="ll-picker-error" role="alert">
-                <mat-icon inline>error_outline</mat-icon>
-                {{ pickerError() }}
+            @if (!searched() && !searching()) {
+              <p class="ll-picker-hint">
+                Search to jump the map to an area — then click the exact spot below.
               </p>
             }
 
+            <!-- The map: click to drop the pin, drag to fine-tune. -->
+            <app-map-picker
+              class="ll-picker-map"
+              [initial]="pendingPoint()"
+              (pointPicked)="onMapPointPicked($event)"></app-map-picker>
+
+            <div class="ll-pending">
+              @if (pendingPoint(); as point) {
+                <div class="ll-pending-text">
+                  <span class="ll-pending-label">
+                    {{ pendingLabel() ?? 'Selected point' }}
+                  </span>
+                  <span class="ll-pending-coords ll-mono">
+                    {{ formatCoordinate(point.latitude) }}, {{ formatCoordinate(point.longitude) }}
+                  </span>
+                </div>
+                <button mat-flat-button color="primary" (click)="usePendingPoint()">
+                  <mat-icon>check</mat-icon>
+                  Use this location
+                </button>
+              } @else {
+                <span class="ll-pending-empty">Click the map to choose a point.</span>
+              }
+            </div>
+
+            <!-- Secondary paths. -->
             <div class="ll-picker-alt">
               <span class="ll-picker-alt-label">Or</span>
+
               <button
                 mat-stroked-button
                 [disabled]="(deviceState | async)?.loading"
@@ -275,8 +339,14 @@
                 <mat-icon>gps_fixed</mat-icon>
                 {{ (deviceState | async)?.loading ? 'Locating…' : 'Use this device' }}
               </button>
+
+              <button mat-stroked-button (click)="toggleManualEntry()">
+                <mat-icon>edit</mat-icon>
+                Enter coordinates
+              </button>
+
               <span class="ll-picker-alt-note">
-                You can also click <strong>Set as reference</strong> on any participant row.
+                …or <strong>Measure distances from here</strong> on any participant row.
               </span>
             </div>
 
@@ -285,6 +355,48 @@
                 <mat-icon inline>location_off</mat-icon>
                 {{ deviceError }}
               </p>
+            }
+
+            <!-- Escape hatch: exact coordinates, for when a name will not do. -->
+            @if (manualEntryOpen()) {
+              <div class="ll-manual" @fadeIn>
+                <div class="ll-picker-row">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ll-picker-field">
+                    <mat-label>Latitude</mat-label>
+                    <input
+                      matInput
+                      inputmode="decimal"
+                      placeholder="12.940029"
+                      [formControl]="latControl"
+                      (paste)="onCoordinatePaste($event)" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ll-picker-field">
+                    <mat-label>Longitude</mat-label>
+                    <input
+                      matInput
+                      inputmode="decimal"
+                      placeholder="80.253343"
+                      [formControl]="lngControl"
+                      (paste)="onCoordinatePaste($event)" />
+                  </mat-form-field>
+
+                  <button mat-flat-button color="primary" (click)="applyManualReference()">
+                    Use these coordinates
+                  </button>
+                </div>
+
+                <p class="ll-picker-hint">
+                  Paste a <code>latitude, longitude</code> pair into either box and it splits itself.
+                </p>
+
+                @if (pickerError()) {
+                  <p class="ll-picker-error" role="alert">
+                    <mat-icon inline>error_outline</mat-icon>
+                    {{ pickerError() }}
+                  </p>
+                }
+              </div>
             }
           </div>
         }
@@ -442,6 +554,75 @@
                   </button>
                 }
               </div>
+
+              <!--
+                Hand-entered radius. Only rendered for the 'custom' band, and it
+                filters as you type — the debounce lives in the component.
+              -->
+              @if (active.distance === 'custom') {
+                <div class="ll-custom-distance" @fadeIn>
+                  <div class="ll-seg" role="group" aria-label="Direction">
+                    <button
+                      type="button"
+                      class="ll-seg-btn"
+                      [class.ll-seg-on]="active.customDistance.direction === 'within'"
+                      [attr.aria-pressed]="active.customDistance.direction === 'within'"
+                      (click)="setCustomDirection('within')">
+                      Within
+                    </button>
+                    <button
+                      type="button"
+                      class="ll-seg-btn"
+                      [class.ll-seg-on]="active.customDistance.direction === 'beyond'"
+                      [attr.aria-pressed]="active.customDistance.direction === 'beyond'"
+                      (click)="setCustomDirection('beyond')">
+                      Farther than
+                    </button>
+                  </div>
+
+                  <mat-form-field
+                    appearance="outline"
+                    subscriptSizing="dynamic"
+                    class="ll-custom-value">
+                    <mat-label>Distance</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputmode="decimal"
+                      placeholder="750"
+                      [formControl]="customDistanceControl"
+                      aria-label="Custom distance value" />
+                  </mat-form-field>
+
+                  <div class="ll-seg" role="group" aria-label="Unit">
+                    @for (unit of unitOptions; track unit) {
+                      <button
+                        type="button"
+                        class="ll-seg-btn"
+                        [class.ll-seg-on]="active.customDistance.unit === unit"
+                        [attr.aria-pressed]="active.customDistance.unit === unit"
+                        (click)="setCustomUnit(unit)">
+                        {{ unit }}
+                      </button>
+                    }
+                  </div>
+
+                  @if (describeCustomDistance(active.customDistance); as summary) {
+                    <span class="ll-custom-summary">
+                      <mat-icon inline>filter_alt</mat-icon>
+                      {{ summary }} · {{ view.filteredCount }} match{{
+                        view.filteredCount === 1 ? '' : 'es'
+                      }}
+                    </span>
+                  } @else {
+                    <span class="ll-custom-summary ll-custom-summary-idle">
+                      Enter a distance to filter.
+                    </span>
+                  }
+                </div>
+              }
             }
           </section>
 
@@ -656,6 +837,16 @@
           </footer>
         }
       }
+          </div>
+        </mat-tab>
+
+        <mat-tab label="All logs">
+          <div class="ll-tab-body">
+            <app-location-logs [reference]="referenceCoords | async"></app-location-logs>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+
     </div>
 
     <!-- Mobile floating refresh -->

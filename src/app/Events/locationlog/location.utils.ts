@@ -7,6 +7,7 @@
 
 import {
   Coordinates,
+  CustomDistance,
   DistanceBand,
   DistanceBounds,
   LocationStatus,
@@ -346,6 +347,45 @@ export function distanceBounds(band: DistanceBand): DistanceBounds | null {
     default:
       return null;
   }
+}
+
+/** A hand-entered radius converted to metres. Null when nothing usable. */
+export function customDistanceMeters(custom: CustomDistance): number | null {
+  const { value, unit } = custom;
+  if (value === null || !Number.isFinite(value) || value <= 0) return null;
+  return unit === 'km' ? value * 1000 : value;
+}
+
+/**
+ * Metre bounds for a hand-entered radius.
+ *
+ * `within` is inclusive of the radius itself — someone typing "500 m" means
+ * "500 m or nearer", not "up to 499". `beyond` is therefore exclusive, so the
+ * two directions partition the participants with no row falling through both
+ * or neither.
+ */
+export function customDistanceBounds(custom: CustomDistance): DistanceBounds | null {
+  const meters = customDistanceMeters(custom);
+  if (meters === null) return null;
+
+  return custom.direction === 'within'
+    ? { min: 0, max: nextAfter(meters) }
+    : { min: nextAfter(meters), max: Infinity };
+}
+
+/** Human summary of a custom radius, e.g. "Within 750 m", for the filter chip. */
+export function describeCustomDistance(custom: CustomDistance): string | null {
+  if (customDistanceMeters(custom) === null) return null;
+  const verb = custom.direction === 'within' ? 'Within' : 'Farther than';
+  return `${verb} ${custom.value} ${custom.unit}`;
+}
+
+/**
+ * Smallest step above a value, so an inclusive upper bound can be expressed
+ * against the exclusive `max` that `distanceBounds` uses everywhere else.
+ */
+function nextAfter(value: number): number {
+  return value + Number.EPSILON * Math.max(1, Math.abs(value));
 }
 
 /**

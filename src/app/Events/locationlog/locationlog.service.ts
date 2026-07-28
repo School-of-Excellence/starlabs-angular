@@ -28,6 +28,8 @@ import { Injectable, Injector, inject, runInInjectionContext } from '@angular/co
 import {
   Firestore,
   GeoPoint,
+  QueryConstraint,
+  QueryDocumentSnapshot,
   Timestamp,
   collection,
   doc,
@@ -37,7 +39,9 @@ import {
   limit,
   orderBy,
   query,
+  startAfter,
   where,
+  writeBatch,
 } from '@angular/fire/firestore';
 import { Observable, defer, map, of } from 'rxjs';
 
@@ -48,6 +52,19 @@ export const SCAN_LIMIT = 1000;
 
 /** Firestore caps `in` filters at 30 values. */
 const IN_CHUNK_SIZE = 30;
+
+/** Firestore caps a write batch at 500 operations. */
+const WRITE_BATCH_LIMIT = 500;
+
+/** Opaque pagination cursor — the previous page's last document snapshot. */
+export type LogCursor = QueryDocumentSnapshot | null;
+
+/** One page of raw logs from the "All logs" tab. */
+export interface LogPage {
+  readonly logs: readonly LocationLog[];
+  readonly cursor: LogCursor;
+  readonly hasMore: boolean;
+}
 
 const LOCATION_LOGS = 'locationlogs';
 const PARTICIPANT_METADATA = 'participant metadata';
@@ -127,6 +144,72 @@ export class LocationlogService {
    * Requires the composite index (profileid ASC, created DESC) on
    * /locationlogs. Kept for drill-downs — the dashboard grid does not use it.
    */
+  /**
+   * One page of raw log documents, newest first, for the "All logs" tab.
+   *
+   * Cursor pagination rather than an offset: Firestore has no offset that skips
+   * reads, so `startAfter` on the previous page's last snapshot is both the
+   * cheapest and the only correct way to walk a large collection.
+   *
+   * Only `orderBy(created)` + `limit` is used, so this needs no composite index
+   * no matter how the UI filters afterwards. Participant and date narrowing are
+   * applied client-side over the loaded pages, and the tab says so rather than
+   * implying it searched the whole collection.
+   */
+  listLogs(pageSize: number, cursor: LogCursor = null): Observable<LogPage> {
+    return defer(() =>
+      this.run(() => {
+        const constraints: QueryConstraint[] = [orderBy('created', 'desc')];
+        if (cursor) constraints.push(startAfter(cursor));
+        // Fetch one extra to learn whether another page exists without a
+        // second round trip.
+        constraints.push(limit(pageSize + 1));
+
+        return getDocs(query(collection(this.firestore, LOCATION_LOGS), ...constraints));
+      }),
+    ).pipe(
+      map((snapshot) => {
+        const docs = snapshot.docs.slice(0, pageSize);
+        const logs = docs
+          .map((docSnap) => this.toLocationLog(docSnap.id, docSnap.data() as LocationLogDoc))
+          .filter((log): log is LocationLog => log !== null);
+
+        return {
+          logs,
+          cursor: docs.length ? docs[docs.length - 1] : null,
+          hasMore: snapshot.docs.length > pageSize,
+        };
+      }),
+    );
+  }
+
+  /**
+   * Permanently delete log documents.
+   *
+   * Batched because Firestore caps a write batch at 500 operations, and
+   * batching also makes each chunk atomic — a partial chunk cannot leave the
+   * collection in a half-deleted state that the UI then misreports.
+   *
+   * There is no undo. The caller is responsible for confirming with the
+   * operator first.
+   */
+  deleteLogs(ids: readonly string[]): Observable<number> {
+    if (ids.length === 0) return of(0);
+
+    return defer(() =>
+      this.run(async () => {
+        for (const batchIds of chunk(ids, WRITE_BATCH_LIMIT)) {
+          const batch = writeBatch(this.firestore);
+          for (const id of batchIds) {
+            batch.delete(doc(this.firestore, LOCATION_LOGS, id));
+          }
+          await batch.commit();
+        }
+        return ids.length;
+      }),
+    );
+  }
+
   latestForProfile(profileid: string): Observable<LocationLog | null> {
     return defer(() =>
       this.run(() =>
