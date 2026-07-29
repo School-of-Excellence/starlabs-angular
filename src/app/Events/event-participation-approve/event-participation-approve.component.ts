@@ -1,6 +1,6 @@
 import { SelectionModel } from '@angular/cdk/collections';
 import { Component, ElementRef, viewChild, ViewChild } from '@angular/core';
-import { collection,collectionData,Firestore,query,doc,where,writeBatch,QuerySnapshot,getDocs, orderBy} from '@angular/fire/firestore';
+import { collection,collectionData,Firestore,query,doc,where,writeBatch,QuerySnapshot,getDocs, orderBy, arrayUnion, Timestamp} from '@angular/fire/firestore';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -87,6 +87,7 @@ export class EventParticipationApproveComponent {
 
   // requestedQueue = []
   // attendenceQueue = []
+  loggedInProfileid = null
   requestselection = new SelectionModel(true,[]);
   attendanceselection = new SelectionModel(true,[]);
 
@@ -123,6 +124,9 @@ export class EventParticipationApproveComponent {
     private route : ActivatedRoute,
     private router : Router
   ){
+    this.authguard.getRoles().then(roles =>{
+      this.loggedInProfileid = roles?.["profile_ref"]?.id ?? null
+    })
     let n = 0
     const collRef = collection(this.firestore,"event collection")
     const q = query(collRef,orderBy("end_date","desc"))
@@ -333,7 +337,12 @@ export class EventParticipationApproveComponent {
         subList.forEach(element => {
           var ref = doc(this.firestore, "event participation request", element["docid"])
           batch.update(ref, {
-            status: "unattended"
+            status: "unattended",
+            statuslog: arrayUnion({
+              status: "unattended",
+              updatedby: this.loggedInProfileid,
+              updatedon: Timestamp.now()
+            })
           })
           const events_profilesCollRef = collection(this.firestore, "events_profiles")
           const q = query(
