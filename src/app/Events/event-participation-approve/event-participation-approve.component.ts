@@ -276,7 +276,12 @@ export class EventParticipationApproveComponent {
         subList.forEach(element =>{
           var ref = doc(this.firestore,"event participation request",element["docid"])
           batch.update(ref, {
-            status: "attended"
+            status: "attended",
+            statuslog: arrayUnion({
+              status: "attended",
+              updatedby: this.loggedInProfileid,
+              updatedon: Timestamp.now()
+            })
           })
           batch.set(doc(collection(this.firestore,"events_profiles")), {
             event_ref: element.eventref,
@@ -418,7 +423,12 @@ export class EventParticipationApproveComponent {
         subList.forEach(element =>{
           var ref = doc(this.firestore,"event participation request",element["docid"])
           batch.update(ref, {
-            status: status
+            status: status,
+            statuslog: arrayUnion({
+              status: status,
+              updatedby: this.loggedInProfileid,
+              updatedon: Timestamp.now()
+            })
           })
           batch.set(doc(collection(this.firestore,"events_profiles")), {
             event_ref: element.eventref,
